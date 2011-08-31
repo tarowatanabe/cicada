@@ -54,7 +54,7 @@ namespace cicada
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
     {
-      node_map.set_empty_key(symbol_type());
+      node_map.set_empty_key(symbol_id_type());
     }
 
     typedef uitn32_t id_type;
@@ -110,7 +110,7 @@ namespace cicada
       non_terminals.push_back(vocab_type::S);
       
       graph.connect_edge(egge.id, node_id);
-
+      
       actives(0, 1).push_back(active_type(0, node_id));
 
       if (edge.id != 0)
@@ -141,6 +141,8 @@ namespace cicada
 	    actives(pos + 1, pos + aiter->distance + 1).push_back(active_type(id, node_id));
 	  }
 	} else {
+	  node_map.clear();
+	  
 	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
 	    // enumerate grammar...
