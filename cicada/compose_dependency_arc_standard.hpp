@@ -17,6 +17,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
+#include <cicada/remove_epsilon.hpp>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -78,14 +79,6 @@ namespace cicada
     typedef std::pair<symbol_type, id_type> symbol_id_type;
     typedef google::dense_hash_map<symbol_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_id_type> > node_map_type;
     
-    struct filter_edge
-    {
-      bool operator()(const hypergraph_type::edge_type& edge) const
-      {
-	return edge.id == 0;
-      }
-    };
-
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
     {
@@ -131,6 +124,7 @@ namespace cicada
 	    hypergraph_type::edge_type& edge = graph.add_edge();
 	    edge.rule = rule_type::create(rule_type(tag, rule_type::symbol_set_type(1, terminal)));
 	    
+	    edge.features = aiter->features;
 	    edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(id);
 	    
 	    const hypergraph_type::id_type node_id = graph.add_node().id;
@@ -172,7 +166,7 @@ namespace cicada
 		hypergraph_type::edge_type& edge = graph.add_edge();
 		edge.rule = rule_type::create(rule_type(lhs, rule_type::symbol_set_type(1, aiter->label)));
 		
-		edge.features = riter->features;
+		edge.features = riter->features + aiter->features;
 		edge.attributes = riter->attributes;
 		
 		edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(id);
@@ -199,7 +193,7 @@ namespace cicada
 	    const item_set_type& items_right = actives(middle, last);
 	    
 	    if (items_left.empty() || items_right.empty()) continue;
-	    
+
 	    item_set_type::const_iterator liter_begin = items_left.begin();
 	    item_set_type::const_iterator liter_end   = items_left.end();
 	    item_set_type::const_iterator riter_begin = items_right.begin();
@@ -229,13 +223,13 @@ namespace cicada
 		    
 		    cell.push_back(item_type(riter->id, result.first->second));
 		  }
-		  
+
 		  graph.connect_edge(edge.id, result.first->second);
 		}
 		
 		{
 		  // right attachment
-		  const symbol_type& lhs = rhs.back();
+		  const symbol_type& lhs = rhs.front();
 
 		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		  edge.rule = rule_type::create(rule_type(lhs, rhs));
@@ -273,10 +267,7 @@ namespace cicada
 	graph.connect_edge(edge.id, goal_id);
       }
       
-      // topologically sort!
-      hypergraph_type sorted;
-      topologically_sort(graph, sorted, filter_edge(), true);
-      graph.swap(sorted);
+      cicada::remove_epsilon(graph);
     }
     
   private:
