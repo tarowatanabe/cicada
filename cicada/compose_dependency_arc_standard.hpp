@@ -21,6 +21,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/bithack.hpp>
 
 #include <google/dense_hash_map>
 
@@ -95,12 +96,12 @@ namespace cicada
       // we will insert pseudo edge, but this will be "removed"
       
       hypergraph_type::edge_type& edge = graph.add_edge();
-      edge.rule = rule_type::create(rule_type(vocab_type::S, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      edge.rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       
       edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(0);
       
       const hypergraph_type::id_type node_id = graph.add_node().id;
-      non_terminals.push_back(vocab_type::S);
+      non_terminals.push_back(vocab_type::GOAL);
       
       graph.connect_edge(edge.id, node_id);
       
@@ -253,24 +254,19 @@ namespace cicada
       // add goals!
       const item_set_type& goals = actives(0, lattice.size() + 1);
       
-      bool has_goal = false;
+      hypergraph_type::id_type goal_id = hypergraph_type::invalid;
+      size_t num_goal = 0;
       item_set_type::const_iterator giter_end = goals.end();
-      for (item_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter)
-	has_goal |= (giter->id == 0);
+      for (item_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
+	num_goal += (giter->id == 0);
+	goal_id = utils::bithack::branch(giter->id == 0, giter->node, goal_id);
+      }
       
-      if (! has_goal) return;
-      
-      const hypergraph_type::id_type goal_id = graph.add_node().id;
+      if (num_goal == 0) return;
+      if (num_goal > 1)
+	throw std::runtime_error("invalid dependency forest?");
       
       graph.goal = goal_id;
-      
-      for (item_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) 
-	if (giter->id == 0) {
-	  hypergraph_type::edge_type& edge = graph.add_edge(&(giter->node), &(giter->node) + 1);
-	  edge.rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminals[giter->node])));
-	  
-	  graph.connect_edge(edge.id, goal_id);
-	}
       
       cicada::remove_epsilon(graph);
     }
