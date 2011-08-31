@@ -197,13 +197,20 @@ namespace cicada
       if (goals.empty()) return;
 
       const hypergraph_type::id_type goal_id = graph.add_node().id;
+
+      graph.goal = goal_id;
       
       item_set_type::const_iterator giter_end = items.end();
       for (item_set_type::const_iterator giter = items.begin(); giter != giter_end; ++ giter) {
 	
 	hypegraph_type::edge_type& edge = graph.add_edge(&(giter->node), &(giter->node) + 1);
 	edge.rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminals[giter->node])));
+	
+	graph.connect_edge(edge.id, goal_id);
       }
+      
+      // topologically sort!
+      graph.topologically_sort();
     }
     
   private:
