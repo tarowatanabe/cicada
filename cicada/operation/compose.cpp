@@ -564,8 +564,7 @@ namespace cicada
 				       const grammar_type& __grammar,
 				       const std::string& __goal,
 				       const int __debug)
-      : base_type("compose-alignment"),
-	grammar(__grammar),
+      : grammar(__grammar),
 	goal(__goal),
 	lattice_mode(false),
 	forest_mode(false),
@@ -595,13 +594,14 @@ namespace cicada
 
       if (! lattice_mode && ! forest_mode)
 	lattice_mode = true;
+
+      name = std::string("compose-alignment") + (forest_mode ? "-forest" : "-lattice");
     }
 
     void ComposeAlignment::operator()(data_type& data) const
     {
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;
-      hypergraph_type composed;
       
       if (lattice_mode) {
 	if (lattice.empty()) {
@@ -619,6 +619,8 @@ namespace cicada
 	
       if (debug)
 	std::cerr << name << ": " << data.id << std::endl;
+      
+      hypergraph_type composed;
       
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 	
@@ -660,5 +662,92 @@ namespace cicada
       hypergraph.swap(composed);
     }
 
+    ComposeDependency::ComposeDependency(const std::string& parameter,
+					 const grammar_type& __grammar,
+					 const std::string& __goal,
+					 const int __debug)
+      : grammar(__grammar),
+	arc_standard(false),
+	arc_eager(false),
+	pos_mode(false),
+	debug(__debug)
+    {
+      typedef cicada::Parameter param_type;
+	
+      param_type param(parameter);
+      if (utils::ipiece(param.name()) != "compose-dependency")
+	throw std::runtime_error("this is not a dependency composer");
+      
+      for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "pos")
+	  pos_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "arc-standard" || utils::ipiece(piter->first) == "standard")
+	  arc_standard = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "arc-eager" || utils::ipiece(piter->first) == "eager")
+	  arc_eager = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for dependency composer: " << piter->first << "=" << piter->second << std::endl;
+      }
+
+      //if (int(arc_standard) + arc_eager == 0)
+      arc_standard = true;
+      
+      if (int(arc_standard) + arc_eager > 1)
+	throw std::runtime_error("you can specify either arc-standard or arc-eager");
+      
+      name = std::string("compose-dependency") + (arc_standard ? "-arc-standard" : "-arc-eager");
+    }
+
+    void ComposeDependency::operator()(data_type& data) const
+    {
+      const lattice_type& lattice = data.lattice;
+      hypergraph_type& hypergraph = data.hypergraph;
+      
+      if (lattice.empty()) {
+	hypergraph.clear();
+	return;
+      }
+      
+      if (debug)
+	std::cerr << name << ": " << data.id << std::endl;
+      
+      hypergraph_type composed;
+      
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+	
+      utils::resource start;
+      
+      grammar_compose.assign(lattice);
+      
+      cicada::compose_dependency_arc_standard(grammar_compose, lattice, composed, pos_mode);
+    
+      utils::resource end;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << std::endl;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " # of nodes: " << composed.nodes.size()
+		  << " # of edges: " << composed.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
+		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      
+      hypergraph.swap(composed);
+    }
+    
   };
 };

@@ -97,6 +97,13 @@ compose-phrase: composition from lattice (or sentence) with phrase-based grammar
 compose-alignment: composition from lattice (or forest) with target\n\
 \tlattice=[true|false] lattice composition\n\
 \tforest=[true|false] forest composition\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
+compose-dependency: composition by dependency\n\
+\tarc-standard=[true|false] arc-standard parsing\n\
+\tarc-eager=[true|false] arc-eager parsing\n\
+\tpos=[true|false] pos-annotated input\n\
+\tgrammar=[grammar spec] grammar\n\
 compose-tree: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \tgoal=[goal symbol]\n\
@@ -298,6 +305,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, debug)));
       else if (param_name == "compose-alignment")
 	operations.push_back(operation_ptr_type(new operation::ComposeAlignment(*piter, grammar, goal, debug)));
+      else if (param_name == "compose-dependency")
+	operations.push_back(operation_ptr_type(new operation::ComposeDependency(*piter, grammar, goal, debug)));
       else if (param_name == "parse-agenda")
 	operations.push_back(operation_ptr_type(new operation::ParseAgenda(*piter, grammar, goal, debug)));
       else if (param_name == "parse-cky" || param_name == "parse-cyk")
