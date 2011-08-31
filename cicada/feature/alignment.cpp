@@ -172,14 +172,27 @@ namespace cicada
       {
 	if (states.empty()) {
 	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
+	  attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_position);
+	  
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
+	  if (siter == edge.attributes.end())
+	    throw std::runtime_error("we do not support non alignment forest");
 
+	  const int pos_target = boost::apply_visitor(__attribute_integer(), titer->second);
+	  const int pos_source = boost::apply_visitor(__attribute_integer(), siter->second);
+	  
 	  int*         state_target = reinterpret_cast<int*>(state);
 	  symbol_type* state_source = reinterpret_cast<symbol_type*>(state_target + 1);
 	  
-	  *state_target =  boost::apply_visitor(__attribute_integer(), titer->second);
+	  *state_target = pos_target;
 	  *state_source = edge.rule->rhs.front();
+	  
+	  if (pos_source == 0 && pos_target >= 0) {
+	    // fire path from BOS!
+	    
+	    
+	  }
 	} else if (states.size() == 1) {
 	  int*         state_target = reinterpret_cast<int*>(state);
 	  symbol_type* state_source = reinterpret_cast<symbol_type*>(state_target + 1);
@@ -212,6 +225,12 @@ namespace cicada
 	  
 	  *reinterpret_cast<int*>(state)                                     = prev_target;
 	  *reinterpret_cast<symbol_type*>(reinterpret_cast<int*>(state) + 1) = prev_source;
+	}
+	
+	if (final && *reinterpret_cast<int*>(state) >= 0) {
+	  // fire feature for EOS...
+	  
+	  
 	}
       }
       
@@ -246,10 +265,22 @@ namespace cicada
 	
 	if (states.empty()) {
 	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
+	  attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_position);
+	  
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
+	  if (siter == edge.attributes.end())
+	    throw std::runtime_error("we do not support non alignment forest");
 	  
-	  *reinterpret_cast<int*>(state) = (boost::apply_visitor(__attribute_integer(), titer->second) < 0);
+	  const int pos_target = boost::apply_visitor(__attribute_integer(), titer->second);
+	  const int pos_source = boost::apply_visitor(__attribute_integer(), siter->second);
+	  
+	  *reinterpret_cast<int*>(state) = (pos_target < 0);
+	  
+	  // fire feature for BOS
+	  if (pos_source == 0)
+	    features[pos_target < 0 ? feature_word_none : feature_word_word] += 1.0;
+	      
 	} else if (states.size() == 1)
 	  *reinterpret_cast<int*>(state) = *reinterpret_cast<const int*>(states[0]);
 	else {
@@ -268,7 +299,11 @@ namespace cicada
 	    prev = next;
 	  }
 	  *reinterpret_cast<int*>(state) = prev;
-	} 
+	}
+	
+	// fire featuer for EOS
+	if (final)
+	  features[*reinterpret_cast<int*>(state) ? feature_none_word : feature_word_word] += 1.0;
       }
 
       TargetBigram::TargetBigram(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
