@@ -121,32 +121,70 @@ namespace cicada
     graphviz_label_generator<Iterator> string;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
+
+  template <typename Iterator>
+  struct graphviz_attribute_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::attribute_set_type()>
+  {
+    typedef cicada::Rule                 rule_type;
+    typedef rule_type::symbol_type       symbol_type;
+    typedef rule_type::symbol_set_type   symbol_set_type;
+
+    typedef cicada::HyperGraph::attribute_set_type  attribute_set_type;
+    typedef attribute_set_type::value_type value_type;
+    
+    graphviz_attribute_generator() : graphviz_attribute_generator::base_type(attributes)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      
+      // left adjusted newlines
+      attributes %= -(((string << ":\\ " << (int64_ | double10 | "\\\"" << string << "\\\"")) % "\\l") << "\\l");
+    }
+    
+    struct real_precision : boost::spirit::karma::real_policies<double>
+    {
+      static unsigned int precision(double) 
+      { 
+        return 10;
+      }
+    };
+    
+    boost::spirit::karma::real_generator<double, real_precision> double10;
+    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
+
+    graphviz_label_generator<Iterator> string;
+    boost::spirit::karma::rule<Iterator, attribute_set_type()> attributes;
+  };
   
   
   namespace graphviz_impl
   {
     typedef std::ostream_iterator<char> iterator_type;
     
-    typedef graphviz_label_generator<iterator_type>   grammar_label_type;
-    typedef graphviz_rule_generator<iterator_type>    grammar_rule_type;
-    typedef graphviz_tail_generator<iterator_type>    grammar_tail_type;
-    typedef graphviz_feature_generator<iterator_type> grammar_feature_type;
+    typedef graphviz_label_generator<iterator_type>     grammar_label_type;
+    typedef graphviz_rule_generator<iterator_type>      grammar_rule_type;
+    typedef graphviz_tail_generator<iterator_type>      grammar_tail_type;
+    typedef graphviz_feature_generator<iterator_type>   grammar_feature_type;
+    typedef graphviz_attribute_generator<iterator_type> grammar_attribute_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_label_type*   __grammar_label_tls = 0;
     static __thread grammar_rule_type*    __grammar_rule_tls = 0;
     static __thread grammar_tail_type*    __grammar_tail_tls = 0;
     static __thread grammar_feature_type* __grammar_feature_tls = 0;
+    static __thread grammar_attribute_type* __grammar_attribute_tls = 0;
     
     static boost::thread_specific_ptr<grammar_label_type >   __grammar_label;
     static boost::thread_specific_ptr<grammar_rule_type >    __grammar_rule;
     static boost::thread_specific_ptr<grammar_tail_type >    __grammar_tail;
     static boost::thread_specific_ptr<grammar_feature_type > __grammar_feature;
+    static boost::thread_specific_ptr<grammar_attribute_type > __grammar_attribute;
 #else
     static utils::thread_specific_ptr<grammar_label_type >   __grammar_label;
     static utils::thread_specific_ptr<grammar_rule_type >    __grammar_rule;
     static utils::thread_specific_ptr<grammar_tail_type >    __grammar_tail;
     static utils::thread_specific_ptr<grammar_feature_type > __grammar_feature;
+    static utils::thread_specific_ptr<grammar_attribute_type > __grammar_attribute;
 #endif
     
     static grammar_label_type& instance_label()
@@ -212,6 +250,23 @@ namespace cicada
       return *__grammar_feature;
 #endif
     }
+
+    static grammar_attribute_type& instance_attribute()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_attribute_tls) {
+	__grammar_attribute.reset(new grammar_attribute_type());
+	__grammar_attribute_tls = __grammar_attribute.get();
+      }
+      return * __grammar_attribute_tls;
+#else
+      if (! __grammar_attribute.get())
+	__grammar_attribute.reset(new grammar_attribute_type());
+      
+      return *__grammar_attribute;
+#endif
+    }
+
   };
 
   
@@ -224,9 +279,10 @@ namespace cicada
 
     typedef graphviz_impl::iterator_type iterator_type;
     
-    graphviz_impl::grammar_rule_type&    grammar_rule    = graphviz_impl::instance_rule();
-    graphviz_impl::grammar_tail_type&    grammar_tail    = graphviz_impl::instance_tail();
-    graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
+    graphviz_impl::grammar_rule_type&    grammar_rule        = graphviz_impl::instance_rule();
+    graphviz_impl::grammar_tail_type&    grammar_tail        = graphviz_impl::instance_tail();
+    graphviz_impl::grammar_feature_type& grammar_feature     = graphviz_impl::instance_feature();
+    graphviz_impl::grammar_attribute_type& grammar_attribute = graphviz_impl::instance_attribute();
     
     os << "digraph { rankdir=BT; ordering=in;";
     
@@ -254,6 +310,11 @@ namespace cicada
 	  if (! edge.features.empty()) {
 	    os << " | ";
 	    boost::spirit::karma::generate(iterator_type(os), grammar_feature, edge.features);
+	  }
+
+	  if (! edge.attributes.empty()) {
+	    os << " | ";
+	    boost::spirit::karma::generate(iterator_type(os), grammar_attribute, edge.attributes);
 	  }
 	  
 	  os << "\", shape=record];";
