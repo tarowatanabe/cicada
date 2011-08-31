@@ -469,6 +469,79 @@ namespace cicada
 	if (final)
 	  features[*reinterpret_cast<int*>(state) ? feature_none_word : feature_word_word] += 1.0;
       }
+      
+      class FertilityLocalImpl
+      {
+      public:
+	void clear() {}
+      };
+      
+      FertilityLocal::FertilityLocal(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
+	: pimpl(new impl_type()), normalizers(), sentence(0)
+      {
+	typedef cicada::Parameter parameter_type;
+	
+	const parameter_type param(parameter);
+	
+	if (utils::ipiece(param.name()) != "fertility-local")
+	  throw std::runtime_error("is this really local fertility feature function? " + parameter);
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "cluster") {
+	    if (! boost::filesystem::exists(piter->second))
+	      throw std::runtime_error("no cluster file: " + piter->second);
+	    
+	    normalizers.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
+	  } else if (utils::ipiece(piter->first) == "stemmer")
+	    normalizers.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
+	  else
+	    std::cerr << "WARNING: unsupported parameter for fertility-local: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	__state_size = sizeof(int) * 2 + sizeof(symbol_type);
+	__feature_name = "fertility-local";
+      }
+
+      FertilityLocal::FertilityLocal(const FertilityLocal& x)
+	: pimpl(new impl_type()),
+	  normalizers(x.normalizers),
+	  sentence(0) {}
+      
+      FertilityLocal::~FertilityLocal() { if (pimpl) delete pimpl; }
+      
+      FertilityLocal& FertilityLocal::operator=(const FertilityLocal& x)
+      {
+	static_cast<Base&>(*this) = static_cast<const Base&>(x);
+	pimpl->clear();
+	normalizers = x.normalziers;
+	return *this;
+      }
+      
+      void FertilityLocal::operator()(const feature_function_type& feature_function,
+				      state_ptr_type& state,
+				      const state_ptr_set_type& states,
+				      const edge_type& edge,
+				      feature_set_type& features,
+				      feature_set_type& estimates,
+				      const bool final) const
+      {
+	
+	
+      }
+      
+      void FertilityLocal::operator()(const feature_function_type& feature_function,
+				      const size_type& id,
+				      const hypergraph_type& hypergraph,
+				      const lattice_type& lattice,
+				      const span_set_type& spans,
+				      const sentence_set_type& targets,
+				      const ngram_count_set_type& ngram_counts)
+      {
+	sentence = 0;
+	if (! targets.empty())
+	  sentence = &targets.front();
+      }
+
 
       TargetBigram::TargetBigram(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
 	: normalizers(), sentence(0)

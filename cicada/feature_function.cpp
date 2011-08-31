@@ -142,6 +142,9 @@ path: path features\n\
 \tstemmer-source=[stemmer spec]\n\
 \tstemmer-target=[stemmer spec]\n\
 null-path: path involving epsilon\n\
+fertility-local: local fertility feature\n\
+\tcluster=[word class file]\n\
+\tstemmer=[stemmer spec]\n\
 target-bigram: target bigram feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -212,6 +215,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::NullPath(parameter));
     else if (param_name == "path")
       return feature_function_ptr_type(new feature::Path(parameter));
+    else if (param_name == "fertility-local")
+      return feature_function_ptr_type(new feature::FertilityLocal(parameter));
     else if (param_name == "target-bigram")
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
     else if (param_name == "word-pair")
