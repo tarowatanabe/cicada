@@ -287,6 +287,7 @@ compose_alignment.hpp \
 compose_cky.hpp \
 compose_dependency.hpp \
 compose_dependency_arc_standard.hpp \
+compose_dependency_hybrid.hpp \
 compose_earley.hpp \
 compose_grammar.hpp \
 compose_phrase.hpp \
