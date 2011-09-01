@@ -701,7 +701,7 @@ namespace cicada
       if (int(arc_standard) + arc_eager + hybrid > 1)
 	throw std::runtime_error("you can specify either arc-standard, arc-eager or hybrid");
       
-      name = std::string("compose-dependency") + (hybrid ? "hybrid" : (arc_standard ? "-arc-standard" : "-arc-eager"));
+      name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (arc_standard ? "arc-standard" : "arc-eager"));
     }
 
     void ComposeDependency::operator()(data_type& data) const

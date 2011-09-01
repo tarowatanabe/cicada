@@ -118,7 +118,6 @@ namespace cicada
       
       non_terminals.clear();
       
-      // how to handle the first and second....
       actives_first.clear();
       actives_second.clear();
       actives_first.resize(lattice.size() + 2);
