@@ -116,11 +116,12 @@ namespace cicada
     {
       graph.clear();
       
-      actives_first.clear();
-      actives_second.clear();
       non_terminals.clear();
       
+      actives_first.clear();
+      actives_second.clear();
       actives_first.resize(lattice.size() + 2);
+      actives_second.resize(lattice.size() + 2);
       
       // initialize actives by axioms... (terminals)
       
