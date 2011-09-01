@@ -102,6 +102,7 @@ compose-alignment: composition from lattice (or forest) with target\n\
 compose-dependency: composition by dependency\n\
 \tarc-standard=[true|false] arc-standard parsing\n\
 \tarc-eager=[true|false] arc-eager parsing\n\
+\thybrid=[true|false] hybrid parsing\n\
 \tpos=[true|false] pos-annotated input\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-tree: composition from tree with tree grammar\n\

@@ -8,6 +8,7 @@
 
 // dependency composer!
 #include <cicada/compose_dependency_arc_standard.hpp>
+#include <cicada/compose_dependency_hybrid.hpp>
 
 
 #endif

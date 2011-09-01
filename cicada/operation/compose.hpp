@@ -177,6 +177,8 @@ namespace cicada
       
       bool arc_standard;
       bool arc_eager;
+      bool hybrid;
+      bool top_down;
       bool pos_mode;
       
       int debug;

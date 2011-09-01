@@ -669,6 +669,8 @@ namespace cicada
       : grammar(__grammar),
 	arc_standard(false),
 	arc_eager(false),
+	hybrid(false),
+	top_down(false),
 	pos_mode(false),
 	debug(__debug)
     {
@@ -685,19 +687,21 @@ namespace cicada
 	  arc_standard = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "arc-eager" || utils::ipiece(piter->first) == "eager")
 	  arc_eager = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "hybrid")
+	  hybrid = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "grammar")
 	  grammar_local.push_back(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for dependency composer: " << piter->first << "=" << piter->second << std::endl;
       }
-
-      //if (int(arc_standard) + arc_eager == 0)
-      arc_standard = true;
       
-      if (int(arc_standard) + arc_eager > 1)
-	throw std::runtime_error("you can specify either arc-standard or arc-eager");
+      if (int(arc_standard) + arc_eager + hybrid == 0)
+	arc_standard = true;
       
-      name = std::string("compose-dependency") + (arc_standard ? "-arc-standard" : "-arc-eager");
+      if (int(arc_standard) + arc_eager + hybrid > 1)
+	throw std::runtime_error("you can specify either arc-standard, arc-eager or hybrid");
+      
+      name = std::string("compose-dependency") + (hybrid ? "hybrid" : (arc_standard ? "-arc-standard" : "-arc-eager"));
     }
 
     void ComposeDependency::operator()(data_type& data) const
@@ -721,7 +725,12 @@ namespace cicada
       
       grammar_compose.assign(lattice);
       
-      cicada::compose_dependency_arc_standard(grammar_compose, lattice, composed, pos_mode);
+      if (hybrid)
+	cicada::compose_dependency_hybrid(grammar_compose, lattice, composed, pos_mode);
+      else if (arc_standard)
+	cicada::compose_dependency_arc_standard(grammar_compose, lattice, composed, pos_mode);
+      else
+	throw std::runtime_error("not implemented?");
     
       utils::resource end;
     
