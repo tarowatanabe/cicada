@@ -663,15 +663,11 @@ namespace cicada
     }
 
     ComposeDependency::ComposeDependency(const std::string& parameter,
-					 const grammar_type& __grammar,
-					 const std::string& __goal,
 					 const int __debug)
-      : grammar(__grammar),
-	arc_standard(false),
+      : arc_standard(false),
 	arc_eager(false),
 	hybrid(false),
 	top_down(false),
-	pos_mode(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -681,16 +677,12 @@ namespace cicada
 	throw std::runtime_error("this is not a dependency composer");
       
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "pos")
-	  pos_mode = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "arc-standard" || utils::ipiece(piter->first) == "standard")
+	if (utils::ipiece(piter->first) == "arc-standard" || utils::ipiece(piter->first) == "standard")
 	  arc_standard = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "arc-eager" || utils::ipiece(piter->first) == "eager")
 	  arc_eager = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "hybrid")
 	  hybrid = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "grammar")
-	  grammar_local.push_back(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for dependency composer: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -703,7 +695,7 @@ namespace cicada
       
       name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (arc_standard ? "arc-standard" : "arc-eager"));
     }
-
+    
     void ComposeDependency::operator()(data_type& data) const
     {
       const lattice_type& lattice = data.lattice;
@@ -719,21 +711,15 @@ namespace cicada
       
       hypergraph_type composed;
       
-      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
-	
       utils::resource start;
       
-      grammar_compose.assign(lattice);
-      
-      if (hybrid)
-	cicada::compose_dependency_hybrid(grammar_compose, lattice, composed, pos_mode);
-      else if (arc_standard)
-	cicada::compose_dependency_arc_standard(grammar_compose, lattice, composed, pos_mode);
+      if (arc_standard)
+	cicada::compose_dependency_arc_standard(lattice, composed);
       else
 	throw std::runtime_error("not implemented?");
-    
+      
       utils::resource end;
-    
+      
       if (debug)
 	std::cerr << name << ": " << data.id
 		  << " cpu time: " << (end.cpu_time() - start.cpu_time())

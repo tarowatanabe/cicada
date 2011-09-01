@@ -166,20 +166,14 @@ namespace cicada
     {
     public:
       ComposeDependency(const std::string& parameter,
-			const grammar_type& __grammar,
-			const std::string& __goal,
 			const int __debug);
       
       void operator()(data_type& data) const;
-      
-      const grammar_type& grammar;
-      grammar_type grammar_local;
       
       bool arc_standard;
       bool arc_eager;
       bool hybrid;
       bool top_down;
-      bool pos_mode;
       
       int debug;
     };

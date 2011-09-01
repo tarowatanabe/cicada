@@ -13,8 +13,6 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/lattice.hpp>
-#include <cicada/grammar.hpp>
-#include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
 #include <cicada/remove_epsilon.hpp>
@@ -61,8 +59,6 @@ namespace cicada
     typedef Vocab  vocab_type;
 
     typedef Lattice    lattice_type;
-    typedef Grammar    grammar_type;
-    typedef Transducer transducer_type;
     typedef HyperGraph hypergraph_type;
     
     typedef hypergraph_type::feature_set_type   feature_set_type;
@@ -73,14 +69,15 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-    ComposeDependencyHybrid(const grammar_type& __grammar,
-			    const bool __pos_mode=false)
-      : grammar(__grammar), pos_mode(__pos_mode),
-	attr_dependency_pos("dependency-pos"),
+    ComposeDependencyHybrid()
+      : attr_dependency_pos("dependency-pos"),
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
     {
-      node_map.set_empty_key(symbol_id_type());
+      node_map.set_empty_key(id_type(-1));
+      
+      rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      rule_x1_x2   = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
     typedef uint32_t id_type;
@@ -99,10 +96,7 @@ namespace cicada
     typedef utils::chunk_vector<item_type, 4096 / sizeof(item_type), std::allocator<item_type> > item_set_type;
     typedef utils::chart<item_set_type, std::allocator<item_set_type> >  active_chart_type;
     
-    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-    
-    typedef std::pair<symbol_type, id_type> symbol_id_type;
-    typedef google::dense_hash_map<symbol_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_id_type> > node_map_type;
+    typedef google::dense_hash_map<id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > node_map_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<size_type, utils::hashmurmur<size_t>, std::equal_to<size_type>, std::allocator<size_type> > pos_set_type;
@@ -116,12 +110,8 @@ namespace cicada
     {
       graph.clear();
       
-      non_terminals.clear();
-      
-      actives_first.clear();
-      actives_second.clear();
-      actives_first.resize(lattice.size() + 2);
-      actives_second.resize(lattice.size() + 2);
+      actives.clear();
+      actives.resize(lattice.size() + 2);
       
       // initialize actives by axioms... (terminals)
       
@@ -129,12 +119,10 @@ namespace cicada
       // we will insert pseudo edge, but this will be "removed"
       
       hypergraph_type::edge_type& edge = graph.add_edge();
-      edge.rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-      
+      edge.rule = rule_epsilon;
       edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(0);
       
       const hypergraph_type::id_type node_id = graph.add_node().id;
-      non_terminals.push_back(vocab_type::GOAL);
       
       graph.connect_edge(edge.id, node_id);
       
@@ -157,78 +145,24 @@ namespace cicada
       id_type id = 1;
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	// here, we will construct a partial hypergraph...
-	
-	if (pos_mode) {
-	  lattice_type::arc_set_type::const_iterator aiter_end  = lattice[pos].end();
-	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
-	    const symbol_type terminal = aiter->label.terminal();
-	    
-	    symbol_type tag = aiter->label.pos();
-	    if (tag.empty())
-	      tag = vocab_type::X;
-	    
-	    hypergraph_type::edge_type& edge = graph.add_edge();
-	    edge.rule = rule_type::create(rule_type(tag, rule_type::symbol_set_type(1, terminal)));
-	    
-	    edge.features = aiter->features;
-	    edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(id);
-	    
-	    const hypergraph_type::id_type node_id = graph.add_node().id;
-	    non_terminals.push_back(tag);
-	    
-	    graph.connect_edge(edge.id, node_id);
-	    
-	    actives_first(pos + 1, pos + aiter->distance + 1).push_back(item_type(id, node_id));
-	    
-	    pos_set_type::const_iterator piter_end = pos_map[pos].end();
-	    for (pos_set_type::const_iterator piter = pos_map[pos].end(); piter != piter_end; ++ piter)
-	      actives_second(*piter + 1, pos + 1).push_back(item_type(id, node_id));
-	  }
-	} else {
-	  node_map.clear();
+	lattice_type::arc_set_type::const_iterator aiter_end  = lattice[pos].end();
+	for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
 	  
-	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
-	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
-	    // enumerate grammar...
-	    
-	    for (size_t table = 0; table != grammar.size(); ++ table) {
-	      const transducer_type& transducer = grammar[table];
-	      
-	      const transducer_type::id_type node = transducer.next(transducer.root(), aiter->label);
-	      if (node == transducer.root()) continue;
-	      
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
-	      
-	      if (rules.empty()) continue;
-	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		const symbol_type& lhs = riter->source->lhs;
-		
-		std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, id), 0));
-		if (result.second) {
-		  result.first->second = graph.add_node().id;
-		  non_terminals.push_back(lhs);
-		  
-		  actives_first(pos + 1, pos + aiter->distance + 1).push_back(item_type(id, result.first->second));
-
-		  pos_set_type::const_iterator piter_end = pos_map[pos].end();
-		  for (pos_set_type::const_iterator piter = pos_map[pos].end(); piter != piter_end; ++ piter)
-		    actives_second(*piter + 1, pos + 1).push_back(item_type(id, result.first->second));
-		}
-		
-		hypergraph_type::edge_type& edge = graph.add_edge();
-		edge.rule = rule_type::create(rule_type(lhs, rule_type::symbol_set_type(1, aiter->label)));
-		
-		edge.features = riter->features + aiter->features;
-		edge.attributes = riter->attributes;
-		
-		edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(id);
-		
-		graph.connect_edge(edge.id, result.first->second);
-	      }
-	    }
-	  }
+	  hypergraph_type::edge_type& edge = graph.add_edge();
+	  edge.rule = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, aiter->label)));
+	  
+	  edge.features = aiter->features;
+	  edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(id);
+	  
+	  const hypergraph_type::id_type node_id = graph.add_node().id;
+	  
+	  graph.connect_edge(edge.id, node_id);
+	  
+	  actives_first(pos + 1, pos + aiter->distance + 1).push_back(item_type(id, node_id));
+	  
+	  pos_set_type::const_iterator piter_end = pos_map[pos].end();
+	  for (pos_set_type::const_iterator piter = pos_map[pos].end(); piter != piter_end; ++ piter)
+	    actives_second(*piter + 1, pos + 1).push_back(item_type(id, node_id));
 	}
       }
 
@@ -262,9 +196,6 @@ namespace cicada
 		    tails.front() = liter->node;
 		    tails.back()  = riter->node;
 		    
-		    rhs.front() = non_terminals[liter->node];
-		    rhs.back()  = non_terminals[riter->node];
-		    
 		    const symbol_type& lhs = rhs.back();
 		    
 		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
@@ -275,7 +206,6 @@ namespace cicada
 		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, riter->id), 0));
 		    if (result.second) {
 		      result.first->second = graph.add_node().id;
-		      non_terminals.push_back(lhs);
 		      
 		      cell_second.push_back(item_type(riter->id, result.first->second));
 		    }
@@ -302,9 +232,6 @@ namespace cicada
 		    tails.front() = liter->node;
 		    tails.back()  = riter->node;
 		    
-		    rhs.front() = non_terminals[liter->node];
-		    rhs.back()  = non_terminals[riter->node];
-		    
 		    const symbol_type& lhs = rhs.front();
 		    
 		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
@@ -315,7 +242,6 @@ namespace cicada
 		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, liter->id), 0));
 		    if (result.second) {
 		      result.first->second = graph.add_node().id;
-		      non_terminals.push_back(lhs);
 		      
 		      cell_first.push_back(item_type(liter->id, result.first->second));
 		    }
@@ -349,24 +275,23 @@ namespace cicada
     }
     
   private:
-    const grammar_type& grammar;
-    const bool pos_mode;
-
     const attribute_type attr_dependency_pos;
     const attribute_type attr_dependency_head;
     const attribute_type attr_dependency_dependent;
     
     // we need to keep track of two actives in the first and the second
-    active_chart_type     actives_first;
-    active_chart_type     actives_second;
-    non_terminal_set_type non_terminals;
+    active_chart_type     actives;
     node_map_type         node_map;
+    
+    rule_ptr_type rule_epsilon;
+    rule_ptr_type rule_x1_x2;
   };
 
   inline
-  void compose_dependency_hybrid(const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool pos_mode=false)
+  void compose_dependency_hybrid(const Lattice& lattice, HyperGraph& graph)
   {
-    ComposeDependencyHybrid(grammar, pos_mode)(lattice, graph);
+    ComposeDependencyHybrid composer;
+    composer(lattice, graph);
   }
 };
 
