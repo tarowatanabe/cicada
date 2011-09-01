@@ -1,8 +1,9 @@
-2011-8-x
+2011-9-x
 New: pialign derivation to hiero grammar/hypergraph conversion filter
      We can generate source/target forest, hiero rules, GHKM rules in addition to source/target yield and alignment
 New: posterior operation to compute "posterior" given particular semiring (tropical/logprob/log) and weights
 New: remove-unary which remove unaries in forests
+New: preliminary support for dependency parsing: arc-standard and hybrid parsing
 Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
 Bugfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 Better composition/parse for string-to-tree by sharing internal nodes and terminals

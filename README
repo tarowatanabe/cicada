@@ -6,6 +6,7 @@ Based on the generic framework, we can
    - translate sentence, lattice and/or parsed tree
    - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph and sentence-like lattice)
    - parse lattices (or sentences)
+   - dependency parse sentences (or lattices)
    - analyze forest/tree/lattice
 
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
