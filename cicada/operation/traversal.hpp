@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <cicada/alignment.hpp>
+#include <cicada/dependency.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/rule.hpp>
 #include <cicada/vocab.hpp>
@@ -284,6 +285,140 @@ namespace cicada
 	// collect features...
 	for (/**/; first != last; ++ first) {
 	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*first).begin(), boost::get<0>(*first).end());
+	  boost::get<1>(yield) += boost::get<1>(*first);
+	}
+      }
+    };
+
+    struct dependency_traversal
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Rule       rule_type;
+      typedef cicada::Dependency dependency_type;
+      typedef cicada::Vocab      vocab_type;
+      
+      typedef hypergraph_type::feature_set_type   feature_set_type;
+      typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+      typedef attribute_set_type::attribute_type attribute_type;
+
+      typedef dependency_type value_type;
+
+      dependency_traversal() :
+	attr_dependency_head("dependency-head"),
+	attr_dependency_dependent("dependency-dependent") {}
+
+      attribute_type attr_dependency_head;
+      attribute_type attr_dependency_dependent;
+
+      struct __point : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	int operator()(const attribute_set_type::float_type& x) const { return -1; }
+	int operator()(const attribute_set_type::string_type& x) const { return -1; }
+      };
+
+      template <typename Edge, typename Iterator>
+      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+      {
+	yield.clear();
+	
+	attribute_set_type::const_iterator hiter = edge.attributes.find(attr_dependency_head);
+	attribute_set_type::const_iterator diter = edge.attributes.find(attr_dependency_dependent);
+
+	if (hiter != edge.attributes.end() && diter != edge.attributes.end()) {
+	  const int pos_head      = boost::apply_visitor(__point(), hiter->second);
+	  const int pos_dependent = boost::apply_visitor(__point(), diter->second);
+	  
+	  if (pos_head >= 0 && pos_dependent - 1 >= 0) {
+	    if (pos_dependent - 1 >= yield.size())
+	      yield.resize(pos_dependent, -1);
+	    
+	    yield[pos_dependent - 1] = pos_head;
+	  }
+	}
+	
+	// collect features...
+	for (/**/; first != last; ++ first) {
+	  
+	  yield.resize(utils::bithack::max(yield.size(), first->size()), -1);
+	  
+	  for (size_t i = 0; i != first->size(); ++ i)
+	    if (first->operator[](i) >= 0) {
+	      if (yield[i] >= 0)
+		throw std::runtime_error("we have already assing value?");
+	      
+	      yield[i] = first->operator[](i);
+	    }
+	}
+      }
+    };
+
+    struct dependency_feature_traversal
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Rule       rule_type;
+      typedef cicada::Dependency dependency_type;
+      typedef cicada::Vocab      vocab_type;
+      
+      typedef hypergraph_type::feature_set_type   feature_set_type;
+      typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+      typedef attribute_set_type::attribute_type attribute_type;
+  
+      typedef boost::tuple<dependency_type, feature_set_type> value_type;
+
+      dependency_feature_traversal() :
+	attr_dependency_head("dependency-head"),
+	attr_dependency_dependent("dependency-dependent") {}
+      
+      attribute_type attr_dependency_head;
+      attribute_type attr_dependency_dependent;
+      
+
+      struct __point : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	int operator()(const attribute_set_type::float_type& x) const { return -1; }
+	int operator()(const attribute_set_type::string_type& x) const { return -1; }
+      };
+
+      template <typename Edge, typename Iterator>
+      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+      {
+	boost::get<0>(yield).clear();
+	boost::get<1>(yield) = edge.features;
+	
+	attribute_set_type::const_iterator hiter = edge.attributes.find(attr_dependency_head);
+	attribute_set_type::const_iterator diter = edge.attributes.find(attr_dependency_dependent);
+
+	if (hiter != edge.attributes.end() && diter != edge.attributes.end()) {
+	  const int pos_head      = boost::apply_visitor(__point(), hiter->second);
+	  const int pos_dependent = boost::apply_visitor(__point(), diter->second);
+	  
+	  if (pos_head >= 0 && pos_dependent - 1 >= 0) {
+	    if (pos_dependent - 1 >= boost::get<0>(yield).size())
+	      boost::get<0>(yield).resize(pos_dependent, -1);
+	    
+	    boost::get<0>(yield).operator[](pos_dependent - 1) = pos_head;
+	  }
+	}
+	
+	// collect features...
+	for (/**/; first != last; ++ first) {
+	  const dependency_type& dep = boost::get<0>(*first);
+	  
+	  boost::get<0>(yield).resize(utils::bithack::max(boost::get<0>(yield).size(), dep.size()), -1);
+	  
+	  for (size_t i = 0; i != dep.size(); ++ i)
+	    if (dep[i] >= 0) {
+	      if (boost::get<0>(yield).operator[](i) >= 0)
+		throw std::runtime_error("we have already assing value?");
+	      
+	      boost::get<0>(yield).operator[](i) = dep[i];
+	    }
+	  
+	  
 	  boost::get<1>(yield) += boost::get<1>(*first);
 	}
       }
@@ -593,6 +728,15 @@ namespace cicada
     };
     
 
+    struct kbest_dependency_filter
+    {
+      template <typename Node, typename Yield>
+      bool operator()(const Node& node, const Yield& yield) const
+      {
+	return false;
+      }
+    };
+
     struct kbest_sentence_filter
     {
       template <typename Node, typename Yield>
@@ -646,6 +790,36 @@ namespace cicada
  
 
       kbest_alignment_filter_unique(const hypergraph_type& graph) : uniques(graph.nodes.size()) {}
+  
+      template <typename Node, typename Yield>
+      bool operator()(const Node& node, const Yield& yield) const
+      {
+	unique_set_type& aligns = const_cast<unique_set_type&>(uniques);
+	unique_type::iterator iter = aligns[node.id].find(boost::get<0>(yield));
+	if (iter == aligns[node.id].end()) {
+	  aligns[node.id].insert(boost::get<0>(yield));
+	  return false;
+	} else
+	  return true;
+      }
+
+      unique_set_type uniques;
+    };
+
+    struct kbest_dependency_filter_unique
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Dependency dependency_type;
+      
+#ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<dependency_type, boost::hash<dependency_type>, std::equal_to<dependency_type>, std::allocator<dependency_type> > unique_type;
+#else
+      typedef sgi::hash_set<dependency_type, boost::hash<dependency_type>, std::equal_to<dependency_type>, std::allocator<dependency_type> > unique_type;
+#endif
+      typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
+ 
+
+      kbest_dependency_filter_unique(const hypergraph_type& graph) : uniques(graph.nodes.size()) {}
   
       template <typename Node, typename Yield>
       bool operator()(const Node& node, const Yield& yield) const

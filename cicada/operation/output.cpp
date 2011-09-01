@@ -460,6 +460,12 @@ namespace cicada
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_dependency)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				dependency_feature_traversal(),
+				weight_function_one<weight_type>(),
+				kbest_dependency_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				span_feature_traversal(),
@@ -492,6 +498,12 @@ namespace cicada
 				alignment_feature_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter(),
+				no_id);
+	    else if (yield_dependency)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				dependency_feature_traversal(),
+				weight_function_one<weight_type>(),
+				kbest_dependency_filter(),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -528,6 +540,12 @@ namespace cicada
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_dependency)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				dependency_feature_traversal(),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_dependency_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				span_feature_traversal(),
@@ -560,6 +578,12 @@ namespace cicada
 				alignment_feature_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter(),
+				no_id);
+	    else if (yield_dependency)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				dependency_feature_traversal(),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_dependency_filter(),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
