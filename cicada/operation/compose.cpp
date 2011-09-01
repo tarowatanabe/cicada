@@ -713,7 +713,9 @@ namespace cicada
       
       utils::resource start;
       
-      if (arc_standard)
+      if (hybrid)
+	cicada::compose_dependency_hybrid(lattice, composed);
+      else if (arc_standard)
 	cicada::compose_dependency_arc_standard(lattice, composed);
       else
 	throw std::runtime_error("not implemented?");
