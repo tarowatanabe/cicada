@@ -54,22 +54,28 @@ namespace cicada
       // reassign features...
       const weight_type weight_total = inside.back();
 
-      hypergraph_type::edge_set_type::iterator eiter_end = graph.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	hypergraph_type::edge_type& edge = *eiter;
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+
+	const weight_type weight_outside = outside[niter->id];
 	
-	weight_type weight = outside[edge.head] * function(edge) / weight_total;
-	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	  weight *= inside[*titer];
-	
-	// assign features!
-	edge.features.clear();
-	
-	const double logweight = cicada::semiring::log(weight);
-	
-	if (logweight != 0.0)
-	  edge.features[feat_posterior] = logweight;
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = niter->edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = niter->edges.begin(); eiter != eiter_end; ++ eiter) {
+	  hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	  
+	  weight_type weight = weight_outside * function(edge) / weight_total;
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	    weight *= inside[*titer];
+	  
+	  // assign features!
+	  edge.features.clear();
+	  
+	  const double logweight = cicada::semiring::log(weight);
+	  
+	  if (logweight != 0.0)
+	    edge.features[feat_posterior] = logweight;
+	}
       }
     }
     

@@ -134,7 +134,10 @@ namespace cicada
 	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
 	    const symbol_type terminal = aiter->label.terminal();
-	    const symbol_type tag      = aiter->label.pos();
+	    
+	    symbol_type tag = aiter->label.pos();
+	    if (tag.empty())
+	      tag = vocab_type::X;
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge();
 	    edge.rule = rule_type::create(rule_type(tag, rule_type::symbol_set_type(1, terminal)));
