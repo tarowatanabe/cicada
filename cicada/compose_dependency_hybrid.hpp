@@ -71,8 +71,8 @@ namespace cicada
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
     {
-      rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-      rule_x1_x2   = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
+      rule_reduce1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
     typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> >  active_chart_type;
@@ -87,26 +87,6 @@ namespace cicada
       
       // initialize actives by axioms... (terminals)
       
-      // root...
-      // we will insert pseudo edge, but this will be "removed"
-      
-      hypergraph_type::edge_type& edge = graph.add_edge();
-      edge.rule = rule_epsilon;
-      edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(0);
-      
-      const hypergraph_type::id_type node_id = graph.add_node().id;
-      
-      graph.connect_edge(edge.id, node_id);
-      
-      actives(0, 1) = node_id;
-
-      if (edge.id != 0)
-	throw std::runtime_error("invalid edge id?");
-      if (node_id != 0)
-	throw std::runtime_error("invalid node id?");
-      
-      // we assume sentence-like data, not general lattice!
-      
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	
 	if (lattice[pos].size() != 1)
@@ -115,6 +95,10 @@ namespace cicada
 	// here, we will construct a partial hypergraph...
 	lattice_type::arc_set_type::const_iterator aiter_end  = lattice[pos].end();
 	for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
+	  
+	  if (aiter->distance != 1)
+	    throw std::runtime_error("this is not a sentential lattice");
+	  
 	  hypergraph_type::edge_type& edge = graph.add_edge();
 	  edge.rule = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, aiter->label)));
 	  
@@ -131,51 +115,64 @@ namespace cicada
       
       hypergraph_type::edge_type::node_set_type tails(2);
       
-      for (int last = 2; last <= static_cast<int>(lattice.size() + 1); ++ last) 
+      const int last_max = lattice.size() + 1;
+      for (int last = 2; last <= last_max; ++ last) 
 	for (int length = 2; last - length >= 0; ++ length) {
 	  const int first = last - length;
 	  
 	  hypergraph_type::id_type& cell = actives(first, last);
 	  
-	  for (int middle = first + 1; middle < last; ++ middle) 
-	    if (actives(first, middle) != hypergraph_type::invalid && actives(middle, last) != hypergraph_type::invalid) {
-	      
-	      if (cell == hypergraph_type::invalid)
-		cell = graph.add_node().id;
-	      
-	      tails.front() = actives(first, middle);
-	      tails.back()  = actives(middle, last);
-	      
-	      if (last < static_cast<int>(lattice.size() + 1)) {
-		// left attachment
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		edge.rule = rule_x1_x2;
+	  cell = graph.add_node().id;
+	  
+	  for (int middle = first + 1; middle < last; ++ middle) {
+	    tails.front() = actives(first, middle);
+	    tails.back()  = actives(middle, last);
+	    
+	    if (first == 0 && middle == 1) {
+	      if (last < last_max) {
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		edge.rule = rule_reduce1;
 		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
 		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
 		graph.connect_edge(edge.id, cell);
 	      }
-
+	      
+	      {
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		edge.rule = rule_reduce1;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		
+		graph.connect_edge(edge.id, cell);
+	      }
+	    } else {
+	      if (last < last_max) {
+		// left attachment
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		edge.rule = rule_reduce2;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		
+		graph.connect_edge(edge.id, cell);
+	      }
 	      
 	      {
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		edge.rule = rule_x1_x2;
+		edge.rule = rule_reduce2;
 		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
 		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
 		graph.connect_edge(edge.id, cell);
 	      }
 	    }
+	  }
 	}
       
-      hypergraph_type::id_type goal_id = actives(0, lattice.size() + 1);
-      
-      if (goal_id == hypergraph_type::invalid) return;
-      
-      graph.goal = goal_id;
-      
-      cicada::remove_epsilon(graph);
+      // final...
+      graph.goal = actives(0, last_max);
+      graph.topologically_sort();
     }
     
   private:
@@ -186,8 +183,8 @@ namespace cicada
     // we need to keep track of two actives in the first and the second
     active_chart_type     actives;
     
-    rule_ptr_type rule_epsilon;
-    rule_ptr_type rule_x1_x2;
+    rule_ptr_type rule_reduce1;
+    rule_ptr_type rule_reduce2;
   };
 
   inline
