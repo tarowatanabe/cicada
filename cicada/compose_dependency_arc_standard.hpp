@@ -97,7 +97,6 @@ namespace cicada
       actives.resize(lattice.size() + 1);
       
       // initialize actives by axioms... (terminals)
-      
       id_type id = 1;
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
