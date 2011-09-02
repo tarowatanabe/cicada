@@ -695,7 +695,7 @@ namespace cicada
       if (int(arc_standard) + arc_eager + hybrid + top_down > 1)
 	throw std::runtime_error("you can specify either arc-standard, arc-eager, hybrid or top-down");
       
-      name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (arc_standard ? "arc-standard" : "arc-eager"));
+      name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (top_down ? "top-down" : (arc_standard ? "arc-standard" : "arc-eager")));
     }
     
     void ComposeDependency::operator()(data_type& data) const
@@ -717,6 +717,8 @@ namespace cicada
       
       if (hybrid)
 	cicada::compose_dependency_hybrid(lattice, composed);
+      else if (top_down)
+	cicada::compose_dependency_top_down(lattice, composed);
       else if (arc_standard)
 	cicada::compose_dependency_arc_standard(lattice, composed);
       else if (arc_eager)
