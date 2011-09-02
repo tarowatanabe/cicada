@@ -110,7 +110,8 @@ namespace cicada
 	  graph.connect_edge(edge.id, node_id);
 	  
 	  actives(pos + 1, pos + aiter->distance + 1).first = node_id;
-	  
+	  actives(pos + 1, pos + aiter->distance + 1).second = node_id;
+#if 0
 	  {
 	    // right attachment
 	    hypergraph_type::edge_type& edge = graph.add_edge(&node_id, (&node_id) + 1);
@@ -125,6 +126,7 @@ namespace cicada
 	    
 	    actives(pos + 1, pos + aiter->distance + 1).second = node_id_next;
 	  }
+#endif
 	}
       }
       
@@ -134,9 +136,11 @@ namespace cicada
       for (int last = 2; last <= last_max; ++ last) 
 	for (int length = 2; last - length >= 0; ++ length) {
 	  const int first = last - length;
-	  	  
-	  const hypergraph_type::id_type node_first  = graph.add_node().id;
-	  const hypergraph_type::id_type node_second = graph.add_node().id;
+	  
+	  id_pair_type& cell = actives(first, last);
+	  
+	  cell.first  = graph.add_node().id;
+	  cell.second = graph.add_node().id;
 	  
 	  for (int middle = first + 1; middle < last; ++ middle) {
 	    if (first == 0 && middle == 1) {
@@ -151,7 +155,7 @@ namespace cicada
 		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
 		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
-		graph.connect_edge(edge.id, node_first);
+		graph.connect_edge(edge.id, cell.first);
 	      }
 	      
 	      {
@@ -159,9 +163,13 @@ namespace cicada
 		tails.back()  = actives(middle, last).second;
 		
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		if (middle + 1 == last) {
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		}
 		edge.rule = rule_reduce1;
 		
-		graph.connect_edge(edge.id, node_first);
+		graph.connect_edge(edge.id, cell.first);
 	      }
 	    } else {
 	      // we need to enumerate 4 cases
@@ -176,7 +184,7 @@ namespace cicada
 		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
 		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		  
-		  graph.connect_edge(edge.id, node_first);
+		  graph.connect_edge(edge.id, cell.first);
 		}
 
 		{
@@ -189,7 +197,7 @@ namespace cicada
 		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
 		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		  
-		  graph.connect_edge(edge.id, node_second);
+		  graph.connect_edge(edge.id, cell.second);
 		}
 	      }
 	      
@@ -200,8 +208,12 @@ namespace cicada
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		edge.rule = rule_reduce2;
+		if (middle + 1 == last) {
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		}
 		
-		graph.connect_edge(edge.id, node_first);
+		graph.connect_edge(edge.id, cell.first);
 	      }
 	      
 	      {
@@ -211,43 +223,14 @@ namespace cicada
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		edge.rule = rule_reduce2;
+		if (middle + 1 == last) {
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		}
 		
-		graph.connect_edge(edge.id, node_second);
+		graph.connect_edge(edge.id, cell.second);
 	      }
 	    }
-	  }
-	  
-	  // we need to enumerate 4 cases...
-	  id_pair_type& cell = actives(first, last);
-	  cell.first  = graph.add_node().id;
-	  cell.second = graph.add_node().id;
-	  
-	  {
-	    hypergraph_type::edge_type& edge1 = graph.add_edge(&node_first, (&node_first) + 1);
-	    edge1.rule = rule_reduce1;
-	    graph.connect_edge(edge1.id, cell.first);
-	    
-	    hypergraph_type::edge_type& edge2 = graph.add_edge(&node_second, (&node_second) + 1);
-	    edge2.rule = rule_reduce1;
-	    graph.connect_edge(edge2.id, cell.first);
-	  }
-	  
-	  {
-	    hypergraph_type::edge_type& edge1 = graph.add_edge(&node_first, (&node_first) + 1);
-	    edge1.rule = rule_reduce1;
-	    if (last != last_max) {
-	      edge1.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-	      edge1.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
-	    }
-	    graph.connect_edge(edge1.id, cell.second);
-	    
-	    hypergraph_type::edge_type& edge2 = graph.add_edge(&node_second, (&node_second) + 1);
-	    edge2.rule = rule_reduce1;
-	    if (last != last_max) {
-	      edge2.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-	      edge2.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
-	    }
-	    graph.connect_edge(edge2.id, cell.second);
 	  }
 	}
       
