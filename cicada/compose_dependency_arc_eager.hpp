@@ -111,6 +111,7 @@ namespace cicada
 	  
 	  actives(pos + 1, pos + aiter->distance + 1).first = node_id;
 	  actives(pos + 1, pos + aiter->distance + 1).second = node_id;
+	  
 #if 0
 	  {
 	    // right attachment
@@ -163,11 +164,9 @@ namespace cicada
 		tails.back()  = actives(middle, last).second;
 		
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
-		if (middle + 1 == last) {
-		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		}
 		edge.rule = rule_reduce1;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
 		graph.connect_edge(edge.id, cell.first);
 	      }
@@ -208,10 +207,8 @@ namespace cicada
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		edge.rule = rule_reduce2;
-		if (middle + 1 == last) {
-		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		}
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
 		graph.connect_edge(edge.id, cell.first);
 	      }
@@ -223,10 +220,8 @@ namespace cicada
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		edge.rule = rule_reduce2;
-		if (middle + 1 == last) {
-		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		}
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
 		graph.connect_edge(edge.id, cell.second);
 	      }
