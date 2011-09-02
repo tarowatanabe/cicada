@@ -186,6 +186,60 @@ namespace cicada
 	    }
 	  }
 	}
+	
+	if (head && first + 1 != last && head < first)
+	  for (int dependent = first; dependent != last; ++ dependent) {
+	    stack_type::id_type state_next = state_prev;
+	  
+	    if (dependent + 1 != last) {
+	      state_next = stack.push(state_next, span_type(head, dependent + 1, last));
+	      if (state_next >= nodes.size())
+		nodes.resize(state_next + 1, hypergraph_type::invalid);
+	      if (nodes[state_next] == hypergraph_type::invalid)
+		nodes[state_next] = graph.add_node().id;
+	    }
+	    
+	    if (first != dependent) {
+	      state_next = stack.push(state_next, span_type(head, first, dependent));
+	      if (state_next >= nodes.size())
+		nodes.resize(state_next + 1, hypergraph_type::invalid);
+	      if (nodes[state_next] == hypergraph_type::invalid)
+		nodes[state_next] = graph.add_node().id;
+	    }
+	    
+	    const hypergraph_type::id_type node_parent = nodes[state_next];
+	    
+	    if (node_prev == hypergraph_type::invalid) {
+	      tails.back() = terminals[dependent - 1];
+	      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+	      edge.rule = rule_reduce1;
+	      edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+	      edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
+	    
+	      graph.connect_edge(edge.id, node_parent);
+	    } else {
+	      tails.front() = node_prev;
+	      tails.back()  = terminals[dependent - 1];
+	      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+	      edge.rule = rule_reduce2;
+	      edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+	      edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
+	    
+	      graph.connect_edge(edge.id, node_parent);
+	    }
+
+	    if (state_next != stack.root()) {
+	    
+	      // push state_next into queue... if already queues, igore!
+	      if (state_next >= queued.size())
+		queued.resize(state_next + 1, false);
+	    
+	      if (! queued[state_next]) {
+		queue.push_back(state_next);
+		queued[state_next] = true;
+	      }
+	    }
+	  }
       }
 
       if (graph.is_valid())
