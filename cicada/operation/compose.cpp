@@ -683,15 +683,17 @@ namespace cicada
 	  arc_eager = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "hybrid")
 	  hybrid = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "top-down")
+	  top_down = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for dependency composer: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (int(arc_standard) + arc_eager + hybrid == 0)
+      if (int(arc_standard) + arc_eager + hybrid + top_down == 0)
 	arc_standard = true;
       
-      if (int(arc_standard) + arc_eager + hybrid > 1)
-	throw std::runtime_error("you can specify either arc-standard, arc-eager or hybrid");
+      if (int(arc_standard) + arc_eager + hybrid + top_down > 1)
+	throw std::runtime_error("you can specify either arc-standard, arc-eager, hybrid or top-down");
       
       name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (arc_standard ? "arc-standard" : "arc-eager"));
     }
@@ -717,6 +719,8 @@ namespace cicada
 	cicada::compose_dependency_hybrid(lattice, composed);
       else if (arc_standard)
 	cicada::compose_dependency_arc_standard(lattice, composed);
+      else if (arc_eager)
+	cicada::compose_dependency_arc_eager(lattice, composed);
       else
 	throw std::runtime_error("not implemented?");
       

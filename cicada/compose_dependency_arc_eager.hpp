@@ -134,54 +134,116 @@ namespace cicada
       for (int last = 2; last <= last_max; ++ last) 
 	for (int length = 2; last - length >= 0; ++ length) {
 	  const int first = last - length;
-	  
-	  hypergraph_type::id_type& cell = actives(first, last);
-	  
-	  cell = graph.add_node().id;
+	  	  
+	  const hypergraph_type::id_type node_first  = graph.add_node().id;
+	  const hypergraph_type::id_type node_second = graph.add_node().id;
 	  
 	  for (int middle = first + 1; middle < last; ++ middle) {
-	    tails.front() = actives(first, middle);
-	    tails.back()  = actives(middle, last);
-	    
 	    if (first == 0 && middle == 1) {
+	      // since we have [0^0, 1], we need to enumerate only two cases
+	      
 	      if (last < last_max) {
+		tails.front() = actives(first, middle).first;
+		tails.back()  = actives(middle, last).first;
+		
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
 		edge.rule = rule_reduce1;
 		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
 		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
-		graph.connect_edge(edge.id, cell);
+		graph.connect_edge(edge.id, node_first);
 	      }
 	      
 	      {
+		tails.front() = actives(first, middle).first;
+		tails.back()  = actives(middle, last).second;
+		
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
 		edge.rule = rule_reduce1;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
-		graph.connect_edge(edge.id, cell);
+		graph.connect_edge(edge.id, node_first);
 	      }
 	    } else {
+	      // we need to enumerate 4 cases
 	      if (last < last_max) {
-		// left attachment
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		edge.rule = rule_reduce2;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		
-		graph.connect_edge(edge.id, cell);
+		{
+		  tails.front() = actives(first, middle).first;
+		  tails.back()  = actives(middle, last).first;
+		  
+		  // left attachment
+		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		  edge.rule = rule_reduce2;
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		  
+		  graph.connect_edge(edge.id, node_first);
+		}
+
+		{
+		  tails.front() = actives(first, middle).second;
+		  tails.back()  = actives(middle, last).first;
+		  
+		  // left attachment
+		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		  edge.rule = rule_reduce2;
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+		  
+		  graph.connect_edge(edge.id, node_second);
+		}
 	      }
 	      
 	      {
+		tails.front() = actives(first, middle).first;
+		tails.back()  = actives(middle, last).second;
+
 		// right attachment
 		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 		edge.rule = rule_reduce2;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 		
-		graph.connect_edge(edge.id, cell);
+		graph.connect_edge(edge.id, node_first);
+	      }
+	      
+	      {
+		tails.front() = actives(first, middle).second;
+		tails.back()  = actives(middle, last).second;
+		
+		// right attachment
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		edge.rule = rule_reduce2;
+		
+		graph.connect_edge(edge.id, node_second);
 	      }
 	    }
+	  }
+	  
+	  // we need to enumerate 4 cases...
+	  id_pair_type& cell = actives(first, last);
+	  cell.first  = graph.add_node().id;
+	  cell.second = graph.add_node().id;
+	  
+	  {
+	    hypergraph_type::edge_type& edge1 = graph.add_edge(&node_first, (&node_first) + 1);
+	    edge1.rule = rule_reduce1;
+	    graph.connect_edge(edge1.id, cell.first);
+	    
+	    hypergraph_type::edge_type& edge2 = graph.add_edge(&node_second, (&node_second) + 1);
+	    edge2.rule = rule_reduce1;
+	    graph.connect_edge(edge2.id, cell.first);
+	  }
+	  
+	  {
+	    hypergraph_type::edge_type& edge1 = graph.add_edge(&node_first, (&node_first) + 1);
+	    edge1.rule = rule_reduce1;
+	    edge1.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+	    edge1.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    graph.connect_edge(edge1.id, cell.second);
+	    
+	    hypergraph_type::edge_type& edge2 = graph.add_edge(&node_second, (&node_second) + 1);
+	    edge2.rule = rule_reduce1;
+	    edge2.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+	    edge2.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    graph.connect_edge(edge2.id, cell.second);
 	  }
 	}
       
