@@ -18,7 +18,6 @@
 #include <cicada/remove_epsilon.hpp>
 
 #include <utils/chunk_vector.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
 
 namespace cicada
