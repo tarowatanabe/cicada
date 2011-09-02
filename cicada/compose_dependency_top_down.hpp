@@ -115,13 +115,13 @@ namespace cicada
       
       // breadth first search
       while (! queue.empty()) {
-	stack_type::id_type state = queue.front();
+	const stack_type::id_type state = queue.front();
 	queue.pop_front();
 	
 	const int head  = boost::fusion::get<0>(stack[state]);
 	const int first = boost::fusion::get<1>(stack[state]);
 	const int last  = boost::fusion::get<2>(stack[state]);
-	
+
 	const stack_type::id_type state_prev = stack.pop(state);
 	const hypergraph_type::id_type node_prev = nodes[state];
 	
@@ -173,18 +173,21 @@ namespace cicada
 	    
 	    graph.connect_edge(edge.id, node_parent);
 	  }
-	  
-	  // push state_next into queue... if already queues, igore!
-	  if (state_next >= queued.size())
-	    queued.resize(state_next + 1, false);
-	  
-	  if (! queued[state_next]) {
-	    queue.push_back(state_next);
-	    queued[state_next] = true;
+
+	  if (state_next != stack.root()) {
+	    
+	    // push state_next into queue... if already queues, igore!
+	    if (state_next >= queued.size())
+	      queued.resize(state_next + 1, false);
+	    
+	    if (! queued[state_next]) {
+	      queue.push_back(state_next);
+	      queued[state_next] = true;
+	    }
 	  }
 	}
       }
-      
+
       if (graph.is_valid())
 	graph.topologically_sort();
     }
