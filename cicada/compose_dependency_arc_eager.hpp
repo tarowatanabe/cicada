@@ -235,14 +235,18 @@ namespace cicada
 	  {
 	    hypergraph_type::edge_type& edge1 = graph.add_edge(&node_first, (&node_first) + 1);
 	    edge1.rule = rule_reduce1;
-	    edge1.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-	    edge1.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    if (last != last_max) {
+	      edge1.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+	      edge1.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    }
 	    graph.connect_edge(edge1.id, cell.second);
 	    
 	    hypergraph_type::edge_type& edge2 = graph.add_edge(&node_second, (&node_second) + 1);
 	    edge2.rule = rule_reduce1;
-	    edge2.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-	    edge2.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    if (last != last_max) {
+	      edge2.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+	      edge2.attributes[attr_dependency_dependent] = attribute_set_type::int_type(last);
+	    }
 	    graph.connect_edge(edge2.id, cell.second);
 	  }
 	}
