@@ -23,6 +23,8 @@
 #include <utils/sgi_hash_set.hpp>
 #include <utils/sgi_hash_map.hpp>
 
+#include <boost/fusion/tuple.hpp>
+
 namespace cicada
 {
   // top-down parser 
@@ -138,10 +140,8 @@ namespace cicada
 	const hypergraph_type::id_type node_prev = states[state];
 	
 	// we need to restrict our range...
-	const int first = 0;
 	const int last  = lattice.size();
-	
-	for (int i = first; i != last; ++ i) 
+	for (int i = 0; i != last; ++ i) 
 	  if (! coverage->test(i)) {
 	    coverage_type __coverage_new(*coverage);
 	    __coverage_new.set(i);
