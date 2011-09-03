@@ -136,7 +136,7 @@ namespace cicada
 	
 	const coverage_type* coverage = boost::fusion::get<0>(state);
 	const int head                = boost::fusion::get<1>(state);
-	//const int first               = boost::fusion::get<2>(state);
+	const int range               = boost::fusion::get<2>(state);
 	
 	const hypergraph_type::id_type node_prev = states[state];
 	
@@ -179,8 +179,8 @@ namespace cicada
 	    } else {
 	      // we need to consider two cases... one use the previous-head as our new nead or use dependent as our new head...
 	      
-	      if (head) {
-		const state_type state_next(coverage_new, head, 0);
+	      if (head && i >= range) {
+		const state_type state_next(coverage_new, head, i + 1);
 		
 		std::pair<state_set_type::iterator, bool> result = states.insert(std::make_pair(state_next, 0));
 		if (result.second)
