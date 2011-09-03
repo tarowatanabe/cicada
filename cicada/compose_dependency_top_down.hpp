@@ -58,13 +58,13 @@ namespace cicada
     }
     
     typedef utils::bit_vector<1024> coverage_type;
-    typedef std::pair<int, const coverage_type*> state_type;
+    typedef boost::fusion::tuple<const coverage_type*, int, int> state_type;
     
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, hypergraph_type::id_type, boost::hash<state_type>, std::equal_to<state_type>,
+    typedef std::tr1::unordered_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
 				    std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
 #else
-    typedef sgi::hash_map<state_type, hypergraph_type::id_type, boost::hash<state_type>, std::equal_to<state_type>,
+    typedef sgi::hash_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
 			  std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
 #endif
 
@@ -124,8 +124,8 @@ namespace cicada
       const coverage_type* coverage_start = coverage_vector(coverage_type()).first;
       const coverage_type* coverage_goal  = coverage_vector(__coverage_goal).first;
       
-      states[state_type(0, coverage_start)] = hypergraph_type::invalid;
-      queue.push_back(state_type(0, coverage_start));
+      states[state_type(coverage_start, 0, 0)] = hypergraph_type::invalid;
+      queue.push_back(state_type(coverage_start, 0, 0));
       
       hypergraph_type::edge_type::node_set_type tails(2);
       
@@ -134,14 +134,16 @@ namespace cicada
 	const state_type state = queue.front();
 	queue.pop_front();
 	
-	const int head                = state.first;
-	const coverage_type* coverage = state.second;
+	const coverage_type* coverage = boost::fusion::get<0>(state);
+	const int head                = boost::fusion::get<1>(state);
+	//const int first               = boost::fusion::get<2>(state);
 	
 	const hypergraph_type::id_type node_prev = states[state];
 	
 	// we need to restrict our range...
+	const int first = coverage->select(1, false);
 	const int last  = lattice.size();
-	for (int i = 0; i != last; ++ i) 
+	for (int i = first; i != last; ++ i) 
 	  if (! coverage->test(i)) {
 	    coverage_type __coverage_new(*coverage);
 	    __coverage_new.set(i);
@@ -178,7 +180,7 @@ namespace cicada
 	      // we need to consider two cases... one use the previous-head as our new nead or use dependent as our new head...
 	      
 	      if (head) {
-		const state_type state_next(head, coverage_new);
+		const state_type state_next(coverage_new, head, 0);
 		
 		std::pair<state_set_type::iterator, bool> result = states.insert(std::make_pair(state_next, 0));
 		if (result.second)
@@ -207,7 +209,7 @@ namespace cicada
 		  queue.push_back(state_next);
 	      }
 	      
-	      const state_type state_next(i + 1, coverage_new);
+	      const state_type state_next(coverage_new, i + 1, 0);
 	      
 	      std::pair<state_set_type::iterator, bool> result = states.insert(std::make_pair(state_next, 0));
 	      if (result.second)
