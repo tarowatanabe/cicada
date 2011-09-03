@@ -17,12 +17,11 @@
 #include <cicada/sort_topologically.hpp>
 #include <cicada/remove_epsilon.hpp>
 
-#include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
-#include <utils/indexed_trie.hpp>
-
-#include <boost/fusion/tuple.hpp>
+#include <utils/bit_vector.hpp>
+#include <utils/sgi_hash_set.hpp>
+#include <utils/sgi_hash_map.hpp>
 
 namespace cicada
 {
@@ -56,11 +55,27 @@ namespace cicada
       rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
-    typedef boost::fusion::tuple<int, int, int> span_type; // parent, span
-    typedef utils::indexed_trie<span_type, utils::hashmurmur<size_t>, std::equal_to<span_type>, std::allocator<span_type> > stack_type;
-    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_set_type;
-    typedef std::deque<stack_type::id_type, std::allocator<stack_type::id_type> > queue_type;
-    typedef std::vector<bool, std::allocator<bool> > queued_type;
+    typedef utils::bit_vector<1024> coverage_type;
+    typedef std::pair<int, const coverage_type*> state_type;
+    
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<state_type, hypergraph_type::id_type, boost::hash<state_type>, std::equal_to<state_type>,
+				    std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
+#else
+    typedef sgi::hash_map<state_type, hypergraph_type::id_type, boost::hash<state_type>, std::equal_to<state_type>,
+			  std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
+#endif
+
+#ifdef HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
+				    std::allocator<coverage_type > > coverage_set_type;
+#else
+    typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
+			  std::allocator<coverage_type > > coverage_set_type;
+#endif
+    
+    typedef std::deque<state_type, std::allocator<state_type> > queue_type;
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > terminal_map_type;
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -68,9 +83,6 @@ namespace cicada
       graph.clear();
       
       terminals.clear();
-      
-      // initialize actives by axioms... (terminals)
-
       terminals.resize(lattice.size());
       
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
@@ -99,145 +111,129 @@ namespace cicada
 	}
       }
       
-      stack.clear();
-      nodes.clear();
       queue.clear();
+      states.clear();
+      coverages.clear();
       
-      // initialize stack..
-      const stack_type::id_type id = stack.push(stack.root(), span_type(0, 1, lattice.size() + 1));
-      if (id != 0)
-	throw std::runtime_error("we assume id is zero!");
-      nodes.resize(1, hypergraph_type::invalid);
-      queued.resize(1, true);
-      queue.push_back(id);
+      coverage_type __coverage_goal;
+      for (size_t i = 0; i != lattice.size(); ++ i)
+	__coverage_goal.set(i);
+      
+      const coverage_type* coverage_start = coverage_vector(coverage_type()).first;
+      const coverage_type* coverage_goal  = coverage_vector(__coverage_goal).first;
+      
+      states[state_type(0, coverage_start)] = hypergraph_type::invalid;
+      queue.push_back(state_type(0, coverage_start));
       
       hypergraph_type::edge_type::node_set_type tails(2);
       
       // breadth first search
       while (! queue.empty()) {
-	const stack_type::id_type state = queue.front();
+	const state_type state = queue.front();
 	queue.pop_front();
 	
-	const int head  = boost::fusion::get<0>(stack[state]);
-	const int first = boost::fusion::get<1>(stack[state]);
-	const int last  = boost::fusion::get<2>(stack[state]);
-
-	const stack_type::id_type state_prev = stack.pop(state);
-	const hypergraph_type::id_type node_prev = nodes[state];
+	const int head                = state.first;
+	const coverage_type* coverage = state.second;
 	
-	for (int dependent = first; dependent != last; ++ dependent) {
-	  stack_type::id_type state_next = state_prev;
-	  
-	  if (dependent + 1 != last) {
-	    state_next = stack.push(state_next, span_type(dependent, dependent + 1, last));
-	    if (state_next >= nodes.size())
-	      nodes.resize(state_next + 1, hypergraph_type::invalid);
-	    if (nodes[state_next] == hypergraph_type::invalid)
-	      nodes[state_next] = graph.add_node().id;
-	  }
-	  
-	  if (first != dependent) {
-	    state_next = stack.push(state_next, span_type(dependent, first, dependent));
-	    if (state_next >= nodes.size())
-	      nodes.resize(state_next + 1, hypergraph_type::invalid);
-	    if (nodes[state_next] == hypergraph_type::invalid)
-	      nodes[state_next] = graph.add_node().id;
-	  }
-	  
-	  hypergraph_type::id_type node_parent;
-	  
-	  // we reached goal
-	  if (state_next == stack.root()) {
-	    if (graph.goal == hypergraph_type::invalid)
-	      graph.goal = graph.add_node().id;
-	    
-	    node_parent = graph.goal;
-	  } else
-	    node_parent = nodes[state_next];
-	  
-	  if (node_prev == hypergraph_type::invalid) {
-	    tails.back() = terminals[dependent - 1];
-	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
-	    edge.rule = rule_reduce1;
-	    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
-	    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
-	    
-	    graph.connect_edge(edge.id, node_parent);
-	  } else {
-	    tails.front() = node_prev;
-	    tails.back()  = terminals[dependent - 1];
-	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule = rule_reduce2;
-	    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
-	    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
-	    
-	    graph.connect_edge(edge.id, node_parent);
-	  }
-
-	  if (state_next != stack.root()) {
-	    
-	    // push state_next into queue... if already queues, igore!
-	    if (state_next >= queued.size())
-	      queued.resize(state_next + 1, false);
-	    
-	    if (! queued[state_next]) {
-	      queue.push_back(state_next);
-	      queued[state_next] = true;
-	    }
-	  }
-	}
+	const hypergraph_type::id_type node_prev = states[state];
 	
-	if (head && first + 1 != last && head < first)
-	  for (int dependent = first; dependent != last; ++ dependent) {
-	    stack_type::id_type state_next = state_prev;
-	  
-	    if (dependent + 1 != last) {
-	      state_next = stack.push(state_next, span_type(head, dependent + 1, last));
-	      if (state_next >= nodes.size())
-		nodes.resize(state_next + 1, hypergraph_type::invalid);
-	      if (nodes[state_next] == hypergraph_type::invalid)
-		nodes[state_next] = graph.add_node().id;
-	    }
+	// we need to restrict our range...
+	const int first = 0;
+	const int last  = lattice.size();
+	
+	for (int i = first; i != last; ++ i) 
+	  if (! coverage->test(i)) {
+	    coverage_type __coverage_new(*coverage);
+	    __coverage_new.set(i);
 	    
-	    if (first != dependent) {
-	      state_next = stack.push(state_next, span_type(head, first, dependent));
-	      if (state_next >= nodes.size())
-		nodes.resize(state_next + 1, hypergraph_type::invalid);
-	      if (nodes[state_next] == hypergraph_type::invalid)
-		nodes[state_next] = graph.add_node().id;
-	    }
+	    const coverage_type* coverage_new = coverage_vector(__coverage_new).first;
 	    
-	    const hypergraph_type::id_type node_parent = nodes[state_next];
-	    
-	    if (node_prev == hypergraph_type::invalid) {
-	      tails.back() = terminals[dependent - 1];
-	      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
-	      edge.rule = rule_reduce1;
-	      edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
-	      edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
-	    
-	      graph.connect_edge(edge.id, node_parent);
-	    } else {
-	      tails.front() = node_prev;
-	      tails.back()  = terminals[dependent - 1];
-	      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	      edge.rule = rule_reduce2;
-	      edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
-	      edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(dependent);
-	    
-	      graph.connect_edge(edge.id, node_parent);
-	    }
-
-	    if (state_next != stack.root()) {
-	    
-	      // push state_next into queue... if already queues, igore!
-	      if (state_next >= queued.size())
-		queued.resize(state_next + 1, false);
-	    
-	      if (! queued[state_next]) {
-		queue.push_back(state_next);
-		queued[state_next] = true;
+	    if (coverage_new == coverage_goal) {
+	      if (! graph.is_valid())
+		graph.goal = graph.add_node().id;
+	      
+	      if (node_prev == hypergraph_type::invalid) {
+		tails.back() = terminals[i];
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		edge.rule = rule_reduce1;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		
+		graph.connect_edge(edge.id, graph.goal);
+	      } else {
+		tails.front() = node_prev;
+		tails.back() = terminals[i];
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		edge.rule = rule_reduce2;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		
+		graph.connect_edge(edge.id, graph.goal);
 	      }
+	      
+	      // since it is almost the goal, we do not enumerate them!
+	      break;
+	      
+	    } else {
+	      // we need to consider two cases... one use the previous-head as our new nead or use dependent as our new head...
+	      
+	      if (head) {
+		const state_type state_next(head, coverage_new);
+		
+		std::pair<state_set_type::iterator, bool> result = states.insert(std::make_pair(state_next, 0));
+		if (result.second)
+		  result.first->second = graph.add_node().id;
+		
+		if (node_prev == hypergraph_type::invalid) {
+		  tails.back() = terminals[i];
+		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		  edge.rule = rule_reduce1;
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		  
+		  graph.connect_edge(edge.id, result.first->second);
+		} else {
+		  tails.front() = node_prev;
+		  tails.back() = terminals[i];
+		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		  edge.rule = rule_reduce2;
+		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		  
+		  graph.connect_edge(edge.id, result.first->second);
+		}
+		
+		if (result.second)
+		  queue.push_back(state_next);
+	      }
+	      
+	      const state_type state_next(i + 1, coverage_new);
+	      
+	      std::pair<state_set_type::iterator, bool> result = states.insert(std::make_pair(state_next, 0));
+	      if (result.second)
+		result.first->second = graph.add_node().id;
+		
+	      if (node_prev == hypergraph_type::invalid) {
+		tails.back() = terminals[i];
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		edge.rule = rule_reduce1;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		  
+		graph.connect_edge(edge.id, result.first->second);
+	      } else {
+		tails.front() = node_prev;
+		tails.back() = terminals[i];
+		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		edge.rule = rule_reduce2;
+		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(head);
+		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(i + 1);
+		  
+		graph.connect_edge(edge.id, result.first->second);
+	      }
+		
+	      if (result.second)
+		queue.push_back(state_next);
 	    }
 	  }
       }
@@ -245,17 +241,23 @@ namespace cicada
       if (graph.is_valid())
 	graph.topologically_sort();
     }
+
+    std::pair<const coverage_type*, bool> coverage_vector(const coverage_type& coverage)
+    {
+      std::pair<coverage_set_type::iterator, bool> result = coverages.insert(coverage);
+      
+      return std::make_pair(&(*result.first), result.second);
+    }
     
   private:
     const attribute_type attr_dependency_pos;
     const attribute_type attr_dependency_head;
     const attribute_type attr_dependency_dependent;
 
-    queue_type    queue;
-    queued_type   queued;
-    stack_type    stack;
-    node_set_type nodes;
-    node_set_type terminals;
+    queue_type        queue;
+    state_set_type    states;
+    coverage_set_type coverages;
+    terminal_map_type terminals;
     
     rule_ptr_type rule_reduce1;
     rule_ptr_type rule_reduce2;
