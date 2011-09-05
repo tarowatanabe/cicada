@@ -11,6 +11,11 @@ int main(int argc, char** argv)
   typedef cicada::Sentence sentence_type;
   typedef std::vector<transducer_type::id_type> id_set_type;
 
+  if (argc == 1) {
+    std::cout << argv[0] << " grammar-spec" << std::endl;
+    std::cout << transducer_type::lists();
+    return 1;
+  }
   transducer_ptr_type grammar(transducer_type::create(argv[1]));
   
   sentence_type sentence;
