@@ -20,6 +20,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
+#include <utils/chart.hpp>
 
 #include <google/dense_hash_map>
 

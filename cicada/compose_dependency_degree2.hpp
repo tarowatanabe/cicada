@@ -3,8 +3,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__COMPOSE_DEPENDENCY_HYBRID__HPP__
-#define __CICADA__COMPOSE_DEPENDENCY_HYBRID__HPP__ 1
+#ifndef __CICADA__COMPOSE_DEPENDENCY_DEGREE2__HPP__
+#define __CICADA__COMPOSE_DEPENDENCY_DEGREE2__HPP__ 1
 
 #include <vector>
 #include <deque>
@@ -19,34 +19,26 @@
 
 #include <utils/bithack.hpp>
 #include <utils/chart.hpp>
+#include <utils/vector3.hpp>
 
 namespace cicada
 {
-  // hybrid parser based on the deduction system presented in
+  // degree-2 non-projective parser based on the deduction system presented in
   //
-  // @InProceedings{kuhlmann-gomezrodriguez-satta:2011:ACL-HLT2011,
-  //   author    = {Kuhlmann, Marco  and  G\'{o}mez-Rodr\'{i}guez, Carlos  and  Satta, Giorgio},
-  //   title     = {Dynamic Programming Algorithms for Transition-Based Dependency Parsers},
-  //   booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
-  //   month     = {June},
+  // @InProceedings{cohen-gomezrodriguez-satta:2011:EMNLP,
+  //   author    = {Cohen, Shay B.  and  G\'{o}mez-Rodr\'{i}guez, Carlos  and  Satta, Giorgio},
+  //   title     = {Exact Inference for Generative Probabilistic Non-Projective Dependency Parsing},
+  //   booktitle = {Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing},
+  //   month     = {July},
   //   year      = {2011},
-  //   address   = {Portland, Oregon, USA},
+  //   address   = {Edinburgh, Scotland, UK.},
   //   publisher = {Association for Computational Linguistics},
-  //   pages     = {673--682},
-  //   url       = {http://www.aclweb.org/anthology/P11-1068}
+  //   pages     = {1234--1245},
+  //   url       = {http://www.aclweb.org/anthology/D11-1114}
   // }
   //
-  // which is originally presented in
-  //
-  // @INPROCEEDINGS{Yamada03statisticaldependency,
-  //   author = {Hiroyasu Yamada and Yuji Matsumoto},
-  //   title = {Statistical Dependency Analysis with Support Vector Machines},
-  //   booktitle = {In Proceedings of IWPT},
-  //   year = {2003},
-  //   pages = {195--206}
-  // }
 
-  struct ComposeDependencyHybrid
+  struct ComposeDependencyDegree2
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
@@ -65,7 +57,7 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-    ComposeDependencyHybrid()
+    ComposeDependencyDegree2()
       : attr_dependency_pos("dependency-pos"),
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
@@ -74,7 +66,17 @@ namespace cicada
       rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
-    typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> >  active_chart_type;
+    // for now, we use chart structure + array3, but I think we can easily optimize it away given
+    // the diagonal structure employed in the tabulation
+    //
+    // [h_1, i, h_2 h_3, j]
+    // where i <= h_2 < h_3 < j
+    // h_1 < i (??) (h_1 can be -1..????)
+    //
+    // since h_1 can be -1, we need to shift its index... (?)
+    
+    typedef utils::vector3<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > item_set_type;
+    typedef utils::chart<item_set_type, std::allocator<item_set_type> >  active_chart_type;
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -82,7 +84,7 @@ namespace cicada
       graph.clear();
       
       actives.clear();
-      actives.resize(lattice.size() + 2, hypergraph_type::invalid);
+      actives.resize(lattice.size() + 2, item_set_type(lattice.size() + 2, lattice.size() + 2, lattice.size() + 2, hypergraph_type::invalid));
       
       // initialize actives by axioms... (terminals)
       
@@ -187,9 +189,9 @@ namespace cicada
   };
 
   inline
-  void compose_dependency_hybrid(const Lattice& lattice, HyperGraph& graph)
+  void compose_dependency_degree2(const Lattice& lattice, HyperGraph& graph)
   {
-    ComposeDependencyHybrid composer;
+    ComposeDependencyDegree2 composer;
     composer(lattice, graph);
   }
 };
