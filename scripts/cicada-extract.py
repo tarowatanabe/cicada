@@ -640,7 +640,7 @@ class ExtractTree(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
-                 max_nodes=15, max_height=4, max_compose=0, max_scope=0,
+                 max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
                  collapse=None,
                  exhaustive=None,
                  constrained=None,
@@ -842,6 +842,7 @@ if options.first_step <= 5 and options.last_step >= 5:
     elif options.tree:
         extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
+                              max_sentence_length=options.max_sentence_length,
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               max_compose=options.max_compose,

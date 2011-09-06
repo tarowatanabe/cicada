@@ -30,6 +30,7 @@ path_type alignment_file;
 
 path_type output_file;
 
+int max_sentence_length = 0;
 int max_nodes = 15;
 int max_height = 3;
 int max_compose = 0;
@@ -156,10 +157,11 @@ void options(int argc, char** argv)
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     ("output",    po::value<path_type>(&output_file),    "output directory")
     
-    ("max-nodes",   po::value<int>(&max_nodes)->default_value(max_nodes),     "maximum # of nodes in a rule")
-    ("max-height",  po::value<int>(&max_height)->default_value(max_height),   "maximum height of a rule")
-    ("max-compose", po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
-    ("max-scope",   po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
+    ("max-sentence-length", po::value<int>(&max_sentence_length),                     "maximum sentence length")
+    ("max-nodes",           po::value<int>(&max_nodes)->default_value(max_nodes),     "maximum # of nodes in a rule")
+    ("max-height",          po::value<int>(&max_height)->default_value(max_height),   "maximum height of a rule")
+    ("max-compose",         po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
+    ("max-scope",           po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
     
     ("exhaustive",  po::bool_switch(&exhaustive),                           "exhausive extraction")
     ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")
