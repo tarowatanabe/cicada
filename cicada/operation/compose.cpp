@@ -668,6 +668,7 @@ namespace cicada
 	arc_eager(false),
 	hybrid(false),
 	top_down(false),
+	degree2(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -685,17 +686,19 @@ namespace cicada
 	  hybrid = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "top-down")
 	  top_down = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "degree2")
+	  degree2 = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for dependency composer: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (int(arc_standard) + arc_eager + hybrid + top_down == 0)
+      if (int(arc_standard) + arc_eager + hybrid + top_down + degree2 == 0)
 	arc_standard = true;
       
-      if (int(arc_standard) + arc_eager + hybrid + top_down > 1)
-	throw std::runtime_error("you can specify either arc-standard, arc-eager, hybrid or top-down");
+      if (int(arc_standard) + arc_eager + hybrid + top_down + degree2 > 1)
+	throw std::runtime_error("you can specify either arc-standard, arc-eager, hybrid, top-down or degree2");
       
-      name = std::string("compose-dependency-") + (hybrid ? "hybrid" : (top_down ? "top-down" : (arc_standard ? "arc-standard" : "arc-eager")));
+      name = std::string("compose-dependency-") + (degree2 ? "degree2" : (hybrid ? "hybrid" : (top_down ? "top-down" : (arc_standard ? "arc-standard" : "arc-eager"))));
     }
     
     void ComposeDependency::operator()(data_type& data) const
@@ -723,6 +726,8 @@ namespace cicada
 	cicada::compose_dependency_arc_standard(lattice, composed);
       else if (arc_eager)
 	cicada::compose_dependency_arc_eager(lattice, composed);
+      else if (degree2)
+	cicada::compose_dependency_degree2(lattice, composed);
       else
 	throw std::runtime_error("not implemented?");
       

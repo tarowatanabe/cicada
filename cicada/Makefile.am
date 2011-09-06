@@ -288,6 +288,7 @@ compose_cky.hpp \
 compose_dependency.hpp \
 compose_dependency_arc_standard.hpp \
 compose_dependency_arc_eager.hpp \
+compose_dependency_degree2.hpp \
 compose_dependency_hybrid.hpp \
 compose_dependency_top_down.hpp \
 compose_earley.hpp \

@@ -174,6 +174,7 @@ namespace cicada
       bool arc_eager;
       bool hybrid;
       bool top_down;
+      bool degree2;
       
       int debug;
     };
