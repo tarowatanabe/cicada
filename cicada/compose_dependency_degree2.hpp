@@ -150,10 +150,7 @@ namespace cicada
 	      for (int h5 = middle; h5 < last; ++ h5)
 		for (int h4 = h3; h4 < h5; ++ h4)
 		  for (int h1 = -1; h1 < h3; ++ h1)
-		    for (int h2 = h1; h2 < h3; ++ h2) {		      
-		      //std::cerr << "item1 [" << h1 << ", " << first << ", " << h2 << " " << h3 << ", " << middle << ']' << std::endl;
-		      //std::cerr << "item2 [" << h3 << ", " << middle << ", " << h4 << " " << h5 << ", " << last << ']' << std::endl;
-		      
+		    for (int h2 = h1; h2 < h3; ++ h2) {
 		      const hypergraph_type::id_type item_left  = items_left(h1 + 1, h2 + 1, h3 + 1);
 		      const hypergraph_type::id_type item_right = items_right(h3 + 1, h4 + 1, h5 + 1);
 		      
@@ -162,7 +159,10 @@ namespace cicada
 		      const bool item_right_valid = item_right != hypergraph_type::invalid;
 		      
 		      if (! item_left_valid || ! item_right_valid) continue;
-		      		      
+		      
+		      //std::cerr << "item1 [" << h1 << ", " << first << ", " << h2 << " " << h3 << ", " << middle << ']' << std::endl;
+		      //std::cerr << "item2 [" << h3 << ", " << middle << ", " << h4 << " " << h5 << ", " << last << ']' << std::endl;
+		      
 		      tails.front() = item_left;
 		      tails.back()  = item_right;
 		      
