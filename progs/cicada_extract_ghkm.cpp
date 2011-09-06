@@ -31,6 +31,7 @@ path_type alignment_file;
 path_type output_file;
 
 std::string non_terminal = "[x]";
+int max_sentence_length = 0;
 int max_nodes = 15;
 int max_height = 3;
 int max_compose = 0;
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
     
     queue_type queue(1024 * threads);
     task_set_type tasks(threads, task_type(queue, output_file, non_terminal,
-					   max_nodes, max_height, max_compose, max_scope,
+					   max_sentence_length, max_nodes, max_height, max_compose, max_scope,
 					   exhaustive, constrained, inverse, swap_source_target, collapse,
 					   max_malloc));
     boost::thread_group workers;
@@ -163,10 +164,11 @@ void options(int argc, char** argv)
     
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal for target side")
     
-    ("max-nodes",   po::value<int>(&max_nodes)->default_value(max_nodes),     "maximum # of nodes in a rule")
-    ("max-height",  po::value<int>(&max_height)->default_value(max_height),   "maximum height of a rule")
-    ("max-compose", po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
-    ("max-scope",   po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
+    ("max-sentence-length", po::value<int>(&max_sentence_length),                     "maximum sentence length")
+    ("max-nodes",           po::value<int>(&max_nodes)->default_value(max_nodes),     "maximum # of nodes in a rule")
+    ("max-height",          po::value<int>(&max_height)->default_value(max_height),   "maximum height of a rule")
+    ("max-compose",         po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
+    ("max-scope",           po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
     
     ("exhaustive",  po::bool_switch(&exhaustive),                           "exhausive extraction")
     ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")

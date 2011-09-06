@@ -474,6 +474,7 @@ struct ExtractGHKM
   
   
   ExtractGHKM(const symbol_type& __non_terminal,
+	      const int __max_sentence_length,
 	      const int __max_nodes,
 	      const int __max_height,
 	      const int __max_compose,
@@ -484,6 +485,7 @@ struct ExtractGHKM
 	      const bool __swap_source_target,
 	      const bool __collapse)
     : non_terminal(__non_terminal),
+      max_sentence_length(__max_sentence_length),
       max_nodes(__max_nodes),
       max_height(__max_height),
       max_compose(__max_compose),
@@ -497,6 +499,7 @@ struct ExtractGHKM
       attr_span_last("span-last") {}
 
   symbol_type non_terminal;
+  int max_sentence_length;
   int max_nodes;
   int max_height;
   int max_compose;
@@ -560,7 +563,8 @@ struct ExtractGHKM
 		  rule_pair_set_type& rules,
 		  const Dumper& dumper)
   {
-        
+    if (max_sentence_length > 0 && sentence.size() > max_sentence_length) return;
+    
 #if 0
     std::cerr << "hypergraph: " << graph << std::endl
 	      << "sentence: " << sentence << std::endl
@@ -588,6 +592,10 @@ struct ExtractGHKM
     
     //std::cerr << "admissible nodes" << std::endl;
     admissible_nodes(graph, sentence, alignment);
+    
+    if (max_sentence_length > 0
+	&& (alignment_source_target.size() > max_sentence_length
+	    || alignment_target_source.size() > max_sentence_length)) return;
     
     //std::cerr << "construct derivations" << std::endl;
     construct_derivations(graph, sentence);
@@ -1716,6 +1724,7 @@ struct Task
   Task(queue_type& __queue,
        const path_type& __output,
        const std::string& non_terminal,
+       const int max_sentence_length,
        const int max_nodes,
        const int max_height,
        const int max_compose,
@@ -1728,7 +1737,7 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, collapse),
+      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, collapse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

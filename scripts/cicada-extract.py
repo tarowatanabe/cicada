@@ -78,6 +78,9 @@ opt_parser = OptionParser(
     make_option("--tree",   default=None, action="store_true", help="extract tree-to-tree"),
 
     make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule (default: [x])"),
+
+    make_option("--max-sentence-length", default=0, action="store", type="int",
+                metavar="LENGTH", help="maximum sentence size (default: 0 == no limit)"),
     
     make_option("--max-span-source", default=15, action="store", type="int",
                 metavar="LENGTH", help="maximum source span size (default: 15)"),
@@ -553,7 +556,7 @@ class ExtractGHKM(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
-                 non_terminal="", max_nodes=15, max_height=4, max_compose=0, max_scope=0,
+                 non_terminal="", max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
                  collapse=None,
                  exhaustive=None,
                  constrained=None,
@@ -605,6 +608,9 @@ class ExtractGHKM(Extract):
                 raise ValueError, "invalid non-terminal: %s" %(non_terminal)
 
             command += " --non-terminal \"%s\"" %(non_terminal)
+
+        if max_sentence_length > 0:
+            command += " --max-sentence-length %d"   %(max_sentence_length)
         
         command += " --max-nodes %d"   %(max_nodes)
         command += " --max-height %d"  %(max_height)
@@ -823,6 +829,7 @@ if options.first_step <= 5 and options.last_step >= 5:
         extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
                               non_terminal=options.non_terminal,
+                              max_sentence_length=options.max_sentence_length,
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               max_compose=options.max_compose,
