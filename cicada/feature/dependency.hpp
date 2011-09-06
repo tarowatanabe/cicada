@@ -74,6 +74,8 @@ namespace cicada
 			  const span_set_type& spans,
 			  const sentence_set_type& targets,
 			  const ngram_count_set_type& ngram_counts);
+
+      virtual void initialize();
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Dependency(*this)); }
       

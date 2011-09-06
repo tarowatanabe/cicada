@@ -34,6 +34,11 @@ namespace cicada
       typedef feature_function_type::feature_set_type   feature_set_type;
       typedef feature_function_type::attribute_set_type attribute_set_type;
       
+      typedef feature_function_type::state_ptr_type     state_ptr_type;
+      typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
+      
+      typedef feature_function_type::edge_type edge_type;
+      
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
@@ -53,9 +58,24 @@ namespace cicada
       DependencyImpl(const int __order)
 	: order(__order),
 	  lattice(0),
+	  forced_feature(false),
 	  attr_dependency_pos("dependency-pos"),
 	  attr_dependency_head("dependency-head"),
 	  attr_dependency_dependent("dependency-dependent") {}
+
+      void dependency_score(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features)
+      {
+	
+	
+      }	
+
+      void clear()
+      {
+	
+      }
       
       void assign(const lattice_type& __lattice)
       {
@@ -84,6 +104,8 @@ namespace cicada
       const lattice_type*   lattice;
       lattice_edge_set_type edges;
       terminal_pos_set_type terminals;
+      
+      bool forced_feature;
       
       attribute_type attr_dependency_pos;
       attribute_type attr_dependency_head;
@@ -114,7 +136,7 @@ namespace cicada
       
       pimpl = new impl_type(order);
       
-      base_type::__state_size = sizeof(int) * order * 2;
+      base_type::__state_size = sizeof(int) * (1 << (order) - 1);
       base_type::__feature_name = "dependency";
       base_type::__sparse_feature = true;
     }
@@ -142,7 +164,11 @@ namespace cicada
 			   feature_set_type& estimates,
 			   const bool final) const
     {
-
+      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+      
+      pimpl->dependency_score(state, states, edge, features);
     }
     
     void Dependency::apply_coarse(state_ptr_type& state,
@@ -185,6 +211,11 @@ namespace cicada
     {
       apply(state, states, edge, features, estimates, final);
     }
+
+    void Dependency::initialize()
+    {
+      pimpl->clear();
+    }
     
     void Dependency::assign(const size_type& id,
 			    const hypergraph_type& hypergraph,
@@ -195,7 +226,6 @@ namespace cicada
     {
       pimpl->assign(lattice);
     }
-
     
   };
 };
