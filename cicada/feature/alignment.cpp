@@ -12,8 +12,8 @@
 #include "utils/sgi_hash_map.hpp"
 #include "utils/simple_vector.hpp"
 
-#include "boost/fusion/tuple.hpp"
-#include "boost/array.hpp"
+#include <boost/fusion/tuple.hpp>
+#include <boost/array.hpp>
 
 namespace cicada
 {
