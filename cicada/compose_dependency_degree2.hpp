@@ -167,7 +167,7 @@ namespace cicada
 		      tails.back()  = item_right;
 		      
 		      // [h1, i, h2 h5, j] (la1; h5 -> h4)
-		      if (h4) {
+		      if (h4 > 0) {
 			// left attachment
 			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
 			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
