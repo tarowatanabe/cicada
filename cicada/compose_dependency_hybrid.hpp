@@ -15,7 +15,6 @@
 #include <cicada/lattice.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
-#include <cicada/remove_epsilon.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/chart.hpp>

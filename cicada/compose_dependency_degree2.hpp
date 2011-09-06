@@ -15,7 +15,6 @@
 #include <cicada/lattice.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
-#include <cicada/remove_epsilon.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/chart.hpp>
@@ -62,8 +61,8 @@ namespace cicada
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
     {
-      rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-      rule_reduce = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
+      rule_reduce1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
     // for now, we use chart structure + array3, but I think we can easily optimize it away given
@@ -87,13 +86,6 @@ namespace cicada
       actives.resize(lattice.size() + 2, item_set_type(lattice.size() + 2, lattice.size() + 2, lattice.size() + 2, hypergraph_type::invalid));
       
       // initialize actives by axioms... (terminals)
-      
-      // epsilon
-      hypergraph_type::edge_type& edge = graph.add_edge();
-      edge.rule = rule_epsilon;
-      const hypergraph_type::id_type node_id = graph.add_node().id;
-      graph.connect_edge(edge.id, node_id);
-      actives(0, 0 + 1)(-1 + 1, -1 + 1, 0 + 1) = node_id;
       
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	
@@ -156,75 +148,73 @@ namespace cicada
 		      const hypergraph_type::id_type item_left  = items_left(h1 + 1, h2 + 1, h3 + 1);
 		      const hypergraph_type::id_type item_right = items_right(h3 + 1, h4 + 1, h5 + 1);
 		      
+		      const bool item_left_epsilon = (first == 0 && last == 1 && h1 == -1 && h2 == -1 && h3 == 0);
+		      const bool item_left_valid  = item_left_epsilon || item_left != hypergraph_type::invalid;
+		      const bool item_right_valid = item_right != hypergraph_type::invalid;
+		      
+		      if (! item_left_valid || ! item_right_valid) continue;
+		      
 		      tails.front() = item_left;
 		      tails.back()  = item_right;
 		      
 		      // [h1, i, h2 h5, j] (la1; h5 -> h4)
 		      if (h4) {
-			if (item_left != hypergraph_type::invalid && item_right != hypergraph_type::invalid) {
-			  // left attachment
-			  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-			  edge.rule = rule_reduce;
-			  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
-			  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h4);
-			  
-			  hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h5 + 1);
-			  if (cell == hypergraph_type::invalid)
-			    cell = graph.add_node().id;
-			  
-			  graph.connect_edge(edge.id, cell);
-			}
+			// left attachment
+			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
+			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
+			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h4);
+			
+			hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h5 + 1);
+			if (cell == hypergraph_type::invalid)
+			  cell = graph.add_node().id;
+			
+			graph.connect_edge(edge.id, cell);
 		      }
 		      
 		      // [h1, i, h2 h4, j] (ra1; h4 -> h5)
 		      if (h4 >= 0) {
-			if (item_left != hypergraph_type::invalid && item_right != hypergraph_type::invalid) {
-			  // right attachment
-			  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-			  edge.rule = rule_reduce;
-			  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h4);
-			  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
-			  
-			  hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h4 + 1);
-			  if (cell == hypergraph_type::invalid)
-			    cell = graph.add_node().id;
-			  
-			  graph.connect_edge(edge.id, cell);
-			}
+			// right attachment
+			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
+			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h4);
+			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
+			
+			hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h4 + 1);
+			if (cell == hypergraph_type::invalid)
+			  cell = graph.add_node().id;
+			
+			graph.connect_edge(edge.id, cell);
 		      } 
 		      
 		      // [h1, i, h4 h5, j] (la2; h5 -> h2)
 		      if (h2 > 0) {
-			if (item_left != hypergraph_type::invalid && item_right != hypergraph_type::invalid) {
-			  // left attachment
-			  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-			  edge.rule = rule_reduce;
-			  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
-			  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h2);
-			  
-			  hypergraph_type::id_type& cell =  items(h1 + 1, h4 + 1, h5 + 1);
-			  if (cell == hypergraph_type::invalid)
-			    cell = graph.add_node().id;
-			  
-			  graph.connect_edge(edge.id, cell);
-			}
+			// left attachment
+			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
+			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
+			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h2);
+			
+			hypergraph_type::id_type& cell =  items(h1 + 1, h4 + 1, h5 + 1);
+			if (cell == hypergraph_type::invalid)
+			  cell = graph.add_node().id;
+			
+			graph.connect_edge(edge.id, cell);
 		      }
 		      
 		      // [h1, i, h2 h4, j] (ra2; h2 -> h5)
 		      if (h2 >= 0) {
-			if (item_left != hypergraph_type::invalid && item_right != hypergraph_type::invalid) {
-			  // right attachment
-			  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-			  edge.rule = rule_reduce;
-			  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h2);
-			  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
-			  
-			  hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h4 + 1);
-			  if (cell == hypergraph_type::invalid)
-			    cell = graph.add_node().id;
-			  
-			  graph.connect_edge(edge.id, cell);
-			}
+			// right attachment
+			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
+			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h2);
+			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
+			
+			hypergraph_type::id_type& cell =  items(h1 + 1, h2 + 1, h4 + 1);
+			if (cell == hypergraph_type::invalid)
+			  cell = graph.add_node().id;
+			
+			graph.connect_edge(edge.id, cell);
 		      }
 		    }
 	  }
@@ -232,8 +222,8 @@ namespace cicada
       
       // final...
       graph.goal = actives(0, last_max)(-1 + 1, -1 + 1, 0 + 1);
-      graph.topologically_sort();
-      remove_epsilon(graph);
+      if (graph.is_valid())
+	graph.topologically_sort();
     }
     
   private:
@@ -244,8 +234,8 @@ namespace cicada
     // we need to keep track of two actives in the first and the second
     active_chart_type     actives;
     
-    rule_ptr_type rule_epsilon;
-    rule_ptr_type rule_reduce;
+    rule_ptr_type rule_reduce1;
+    rule_ptr_type rule_reduce2;
   };
 
   inline
