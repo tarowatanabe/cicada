@@ -22,14 +22,15 @@ namespace cicada
       typedef attribute_set_type::attribute_type attribute_type;
 
     private:
+      typedef FeatureFunction base_type;
       typedef DependencyImpl impl_type;
       
     public:
-      Dependency(const std:;string& parameter);
+      Dependency(const std::string& parameter);
       Dependency(const Dependency& x);
-      Dependency& operator=(const Dependency& x);
-
       ~Dependency();
+      
+      Dependency& operator=(const Dependency& x);
       
     private:
       Dependency() {}
