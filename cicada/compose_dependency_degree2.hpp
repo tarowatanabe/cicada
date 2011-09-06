@@ -112,8 +112,12 @@ namespace cicada
 	  // is this correct...?
 	  // we need to shift + 1 for correct indexing...
 	  // [h3, j, h3 j, j + 1] where j == pos + 1 and h3 should starts from -1
-	  for (int h3 = -1; h3 != static_cast<int>(pos + 1); ++ h3)
-	    actives(pos + 1, pos + aiter->distance + 1)(h3 + 1, h3 + 1, pos + 1) = node_id;
+	  
+	  const int j = pos + 1;
+	  for (int h3 = -1; h3 != j; ++ h3) {
+	    //std::cerr << "axiom [" << h3 << ", " << j << ", " << h3 << " " << j << ", " << j + aiter->distance << ']' << std::endl;
+	    actives(j, j + aiter->distance)(h3 + 1, h3 + 1, j + 1) = node_id;
+	  }
 	}
       }
       
@@ -139,21 +143,26 @@ namespace cicada
 	  for (int middle = first + 1; middle < last; ++ middle) {
 	    const item_set_type& items_left  = actives(first, middle);
 	    const item_set_type& items_right = actives(middle, last);
+
+	    //std::cerr << "span: " << first << ".." << middle << " " << middle << ".." << last << std::endl;
 	    
 	    for (int h3 = first; h3 < middle; ++ h3)
 	      for (int h5 = middle; h5 < last; ++ h5)
 		for (int h4 = h3; h4 < h5; ++ h4)
 		  for (int h1 = -1; h1 < h3; ++ h1)
-		    for (int h2 = h1; h2 < h3; ++ h2) {
+		    for (int h2 = h1; h2 < h3; ++ h2) {		      
+		      //std::cerr << "item1 [" << h1 << ", " << first << ", " << h2 << " " << h3 << ", " << middle << ']' << std::endl;
+		      //std::cerr << "item2 [" << h3 << ", " << middle << ", " << h4 << " " << h5 << ", " << last << ']' << std::endl;
+		      
 		      const hypergraph_type::id_type item_left  = items_left(h1 + 1, h2 + 1, h3 + 1);
 		      const hypergraph_type::id_type item_right = items_right(h3 + 1, h4 + 1, h5 + 1);
 		      
-		      const bool item_left_epsilon = (first == 0 && last == 1 && h1 == -1 && h2 == -1 && h3 == 0);
+		      const bool item_left_epsilon = (first == 0 && middle == 1 && h1 == -1 && h2 == -1 && h3 == 0);
 		      const bool item_left_valid  = item_left_epsilon || item_left != hypergraph_type::invalid;
 		      const bool item_right_valid = item_right != hypergraph_type::invalid;
 		      
 		      if (! item_left_valid || ! item_right_valid) continue;
-		      
+		      		      
 		      tails.front() = item_left;
 		      tails.back()  = item_right;
 		      
