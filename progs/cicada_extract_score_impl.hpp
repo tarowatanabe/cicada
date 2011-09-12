@@ -1969,14 +1969,12 @@ struct PhrasePairReverseReducer
 	
 	dump_counts(paths, counts);
 	counts.clear();
-	modified_unique_type(counts).swap(counts);
       }
     }
     
     if (! counts.empty()) {
       dump_counts(paths, counts);
       counts.clear();
-      modified_unique_type(counts).swap(counts);
     }
     
     merge_counts(paths);
