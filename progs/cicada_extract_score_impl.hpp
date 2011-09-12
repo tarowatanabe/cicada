@@ -1090,7 +1090,7 @@ struct PhrasePairModifyMapper
     modified_type     counts;
 
     size_t iter = 0;
-    size_t iter_mask = (1 << 4) - 1;
+    size_t iter_mask = (1 << 3) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
 
     int non_found_iter = 0;
@@ -1562,7 +1562,7 @@ struct PhrasePairReverseMapper
     buffer_stream_set_type buffer_streams(paths.size());
     
     size_t iter = 0;
-    size_t iter_mask = (1 << 4) - 1;
+    size_t iter_mask = (1 << 3) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     
     int non_found_iter = 0;
