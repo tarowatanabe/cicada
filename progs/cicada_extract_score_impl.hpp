@@ -1090,8 +1090,10 @@ struct PhrasePairModifyMapper
     modified_type     counts;
 
     size_t iter = 0;
-    size_t iter_mask = (1 << 5) - 1;
+    size_t iter_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+
+    int non_found_iter = 0;
     bool malloc_full = false;
     
     while (! pqueue.empty()) {
@@ -1129,7 +1131,7 @@ struct PhrasePairModifyMapper
       if ((iter & iter_mask) == iter_mask) {
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
@@ -1141,8 +1143,7 @@ struct PhrasePairModifyMapper
       
       ++ iter;
       
-      if (malloc_full)
-	boost::thread::yield();
+      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.counts.empty()) {
@@ -1159,7 +1160,6 @@ struct PhrasePairModifyMapper
 
     counts.clear();
     
-    int non_found_iter = 0;
     while (1) {
       bool found = false;
       
@@ -1562,8 +1562,10 @@ struct PhrasePairReverseMapper
     buffer_stream_set_type buffer_streams(paths.size());
     
     size_t iter = 0;
-    size_t iter_mask = (1 << 5) - 1;
+    size_t iter_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    
+    int non_found_iter = 0;
     bool malloc_full = false;
 
     size_t pos = 0;
@@ -1653,7 +1655,7 @@ struct PhrasePairReverseMapper
       if ((iter & iter_mask) == iter_mask) {
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
@@ -1665,8 +1667,7 @@ struct PhrasePairReverseMapper
       
       ++ iter;
       
-      if (malloc_full)
-	boost::thread::yield();
+      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.empty()) {
@@ -1698,7 +1699,6 @@ struct PhrasePairReverseMapper
     
     modified.clear();
     
-    int non_found_iter = 0;
     for (;;) {
       bool found = false;
       
