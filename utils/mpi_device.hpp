@@ -222,12 +222,14 @@ namespace utils
   private:
     struct impl
     {
+      typedef std::vector<char, std::allocator<char_type> > buffer_type;
+      
       MPI::Prequest request_size;
       MPI::Prequest request_buffer;
       volatile unsigned int send_size;
       volatile size_t buffer_offset;
-      std::vector<char_type, std::allocator<char_type> > buffer;
-      std::vector<char_type> buffer_overcommit;
+      buffer_type buffer;
+      buffer_type buffer_overcommit;
       bool terminate_on_close;
       bool overcommit;
       
@@ -408,6 +410,8 @@ namespace utils
     
     buffer.clear();
     buffer_overcommit.clear();
+    buffer_type(buffer_overcommit).swap(buffer_overcommit);
+    
     send_size = 0;
     buffer_offset = 0;
     terminate_on_close = true;
@@ -443,6 +447,7 @@ namespace utils
     buffer.resize(std::max(buffer_size, size_t(4)));
     
     buffer_overcommit.clear();
+    buffer_type(buffer_overcommit).swap(buffer_overcommit);
     
     send_size = send_size_type(-1);
     buffer_offset = 0;
