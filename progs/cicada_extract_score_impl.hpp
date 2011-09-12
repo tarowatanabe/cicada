@@ -1123,7 +1123,7 @@ struct PhrasePairModifyMapper
 		  break;
 	      }
 	      
-	      num_full += (counts_saved[shard].size() > 1024);
+	      num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
 	    }
 	    
 	    if (num_full > (queues.size() >> 1))
@@ -1411,12 +1411,14 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
       if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
 	dump_counts(paths, counts);
 	counts.clear();
+	modified_unique_type(counts).swap(counts);
       }
     }
     
     if (! counts.empty()) {
       dump_counts(paths, counts);
       counts.clear();
+      modified_unique_type(counts).swap(counts);
     }
     
     merge_counts(paths);
@@ -1621,9 +1623,9 @@ struct PhrasePairReverseMapper
 		break;
 	    }
 	    
-	    num_full += (counts_saved[shard].size() > 1024);
+	    num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
 	  }
-
+	  
 	  if (num_full > (queues.size() >> 1))
 	    for (size_t shard = 0; shard != queues.size(); ++ shard)
 	      while (! counts_saved[shard].empty()) {
