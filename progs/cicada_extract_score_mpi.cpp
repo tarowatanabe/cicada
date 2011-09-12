@@ -575,7 +575,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
-  const size_t queue_size = 1024 * 32;
+  const size_t queue_size = 1024 * 64;
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
@@ -750,7 +750,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t queue_size = mpi_size * 1024;
+  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
@@ -937,7 +937,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t queue_size = mpi_size * 1024;
+  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   
