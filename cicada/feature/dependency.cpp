@@ -9,6 +9,8 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/indexed_trie.hpp"
+#include "utils/chunk_vector.hpp"
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/array.hpp>
@@ -47,6 +49,15 @@ namespace cicada
       
       typedef std::pair<symbol_type, symbol_type> terminal_pos_type;
       typedef std::vector<terminal_pos_type, std::allocator<terminal_pos_type> > terminal_pos_set_type;
+      
+      typedef std::pair<int, int> dependency_type;
+      
+      
+      typedef utils::indexed_trie<dependency_type, utils::hashmurmur<size_t>, std::equal_to<dependency_type>, std::allocator<dependency_type> > dependency_index_type;
+
+      typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
+      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_map_type;
+      
       
       struct __attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
       {
