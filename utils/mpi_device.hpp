@@ -350,6 +350,9 @@ namespace utils
 	std::copy(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size, buffer.begin());
 	buffer_overcommit.erase(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size);
 	buffer_offset = buffer_overcommit.size();
+
+	if (buffer_offset == 0)
+	  buffer_type(buffer_overcommit).swap(buffer_overcommit);
 	
 	request_size.Start();
 	request_buffer.Start();
