@@ -1089,6 +1089,8 @@ struct PhrasePairModifyMapper
     modified_map_type counts_saved(queues.size());
     modified_type     counts;
 
+    size_t iter = 0;
+    size_t iter_mask = (1 << 5) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     
@@ -1110,31 +1112,6 @@ struct PhrasePairModifyMapper
 	  
 	  if (! queues[shard]->push_swap(counts, true))
 	    counts_saved[shard].push_back(counts);
-	  
-	  if (source_differ) {
-	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	    
-	    size_t num_full = 0;
-	    for (size_t shard = 0; shard != queues.size(); ++ shard) {
-	      while (! counts_saved[shard].empty()) {
-		if (queues[shard]->push_swap(counts_saved[shard].back(), true))
-		  counts_saved[shard].pop_back();
-		else
-		  break;
-	      }
-	      
-	      num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
-	    }
-	    
-	    if (num_full > (queues.size() >> 1))
-	      for (size_t shard = 0; shard != queues.size(); ++ shard)
-		while (! counts_saved[shard].empty()) {
-		  if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
-		    counts_saved[shard].pop_back();
-		  else
-		    break;
-		}
-	  }
 	}
 	
 	counts.swap(curr);
@@ -1148,6 +1125,33 @@ struct PhrasePairModifyMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
+      
+      if ((iter & iter_mask) == iter_mask) {
+	size_t num_full = 0;
+	for (size_t shard = 0; shard != queues.size(); ++ shard) {
+	  while (! counts_saved[shard].empty()) {
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
+	      counts_saved[shard].pop_back();
+	    else
+	      break;
+	  }
+	  
+	  num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
+	}
+	
+	if (num_full > (queues.size() >> 1))
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
+	    while (! counts_saved[shard].empty()) {
+	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		counts_saved[shard].pop_back();
+	      else
+		break;
+	    }
+	
+	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+      }
+      
+      ++ iter;
       
       if (malloc_full)
 	boost::thread::yield();
@@ -1562,6 +1566,8 @@ struct PhrasePairReverseMapper
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());
     
+    size_t iter = 0;
+    size_t iter_mask = (1 << 5) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
 
@@ -1614,30 +1620,7 @@ struct PhrasePairReverseMapper
 	      counts_saved[shard].push_back(*citer);
 	  }
 	  
-	  size_t num_full = 0;
-	  for (size_t shard = 0; shard != queues.size(); ++ shard) {
-	    while (! counts_saved[shard].empty()) {
-	      if (queues[shard]->push_swap(counts_saved[shard].back(), true))
-		counts_saved[shard].pop_back();
-	      else
-		break;
-	    }
-	    
-	    num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
-	  }
-	  
-	  if (num_full > (queues.size() >> 1))
-	    for (size_t shard = 0; shard != queues.size(); ++ shard)
-	      while (! counts_saved[shard].empty()) {
-		if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
-		  counts_saved[shard].pop_back();
-		else
-		  break;
-	      }
-	  
 	  counts.clear();
-	  
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	}
 	
 	counts.push_back(curr);
@@ -1671,6 +1654,33 @@ struct PhrasePairReverseMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
+
+      if ((iter & iter_mask) == iter_mask) {
+	size_t num_full = 0;
+	for (size_t shard = 0; shard != queues.size(); ++ shard) {
+	  while (! counts_saved[shard].empty()) {
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
+	      counts_saved[shard].pop_back();
+	    else
+	      break;
+	  }
+	  
+	  num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
+	}
+	
+	if (num_full > (queues.size() >> 1))
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
+	    while (! counts_saved[shard].empty()) {
+	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		counts_saved[shard].pop_back();
+	      else
+		break;
+	    }
+	
+	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+      }
+      
+      ++ iter;
 
       if (malloc_full)
 	boost::thread::yield();
