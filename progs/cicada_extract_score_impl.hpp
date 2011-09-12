@@ -1090,8 +1090,10 @@ struct PhrasePairModifyMapper
     modified_type     counts;
 
     size_t iter = 0;
-    size_t iter_mask = (1 << 5) - 1;
+    size_t iter_mask = (1 << 3) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+
+    int non_found_iter = 0;
     bool malloc_full = false;
     
     while (! pqueue.empty()) {
@@ -1129,20 +1131,17 @@ struct PhrasePairModifyMapper
       if ((iter & iter_mask) == iter_mask) {
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
 	  }
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
       }
       
       ++ iter;
-      
-      if (malloc_full)
-	boost::thread::yield();
     }
     
     if (! counts.counts.empty()) {
@@ -1159,7 +1158,6 @@ struct PhrasePairModifyMapper
 
     counts.clear();
     
-    int non_found_iter = 0;
     while (1) {
       bool found = false;
       
@@ -1380,6 +1378,7 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
 
     int num_termination = 0;
     
+    size_type min_counts_size = 0;
     const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
@@ -1400,7 +1399,13 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
       if (! result.second)
 	const_cast<modified_type&>(*result.first).increment(modified.counts.begin(), modified.counts.end());
       
-      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
+      if (((iteration & iteration_mask) == iteration_mask)
+	  && ! counts.empty()
+	  && (! min_counts_size || counts.size() > min_counts_size)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	if (! min_counts_size)
+	  min_counts_size = counts.size() >> 1;
+	    
 	dump_counts(paths, counts);
 	counts.clear();
 	modified_unique_type(counts).swap(counts);
@@ -1555,8 +1560,10 @@ struct PhrasePairReverseMapper
     buffer_stream_set_type buffer_streams(paths.size());
     
     size_t iter = 0;
-    size_t iter_mask = (1 << 5) - 1;
+    size_t iter_mask = (1 << 3) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    
+    int non_found_iter = 0;
     bool malloc_full = false;
 
     size_t pos = 0;
@@ -1646,20 +1653,17 @@ struct PhrasePairReverseMapper
       if ((iter & iter_mask) == iter_mask) {
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
 	  }
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
       }
       
       ++ iter;
-      
-      if (malloc_full)
-	boost::thread::yield();
     }
     
     if (! counts.empty()) {
@@ -1691,7 +1695,6 @@ struct PhrasePairReverseMapper
     
     modified.clear();
     
-    int non_found_iter = 0;
     for (;;) {
       bool found = false;
       
@@ -1934,6 +1937,7 @@ struct PhrasePairReverseReducer
     
     int num_termination = 0;
     
+    size_type min_counts_size = 0;
     const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
@@ -1952,7 +1956,13 @@ struct PhrasePairReverseReducer
       
       counts.push_back(modified);
       
-      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
+      if (((iteration & iteration_mask) == iteration_mask)
+	  && ! counts.empty()
+	  && (! min_counts_size || counts.size() > min_counts_size)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	if (! min_counts_size)
+	  min_counts_size = counts.size() >> 1;
+	
 	dump_counts(paths, counts);
 	counts.clear();
       }

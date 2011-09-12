@@ -668,7 +668,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024 * 4, false, true));
     
     stream[rank].reset(new ostream_type());
     stream[rank]->push(boost::iostreams::gzip_compressor());
@@ -744,7 +744,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024 * 4));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
@@ -772,7 +772,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
-	      boost::thread::yield();
+	      non_found_iter = loop_sleep(false, non_found_iter);
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
@@ -846,7 +846,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
 
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024 * 4, false, true));
     
     stream[rank].reset(new ostream_type());
     stream[rank]->push(boost::iostreams::gzip_compressor());
@@ -946,7 +946,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024 * 4));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
@@ -976,7 +976,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
-	      boost::thread::yield();
+	      non_found_iter = loop_sleep(false, non_found_iter);
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
