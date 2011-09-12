@@ -1138,12 +1138,10 @@ struct PhrasePairModifyMapper
 	  }
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
       }
       
       ++ iter;
-      
-      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.counts.empty()) {
@@ -1662,12 +1660,10 @@ struct PhrasePairReverseMapper
 	  }
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);a
       }
       
       ++ iter;
-      
-      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.empty()) {
