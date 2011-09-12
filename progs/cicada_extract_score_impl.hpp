@@ -1680,14 +1680,6 @@ struct PhrasePairReverseMapper
 	  counts_saved[shard].push_back(*citer);
       }
       
-      for (size_t shard = 0; shard != queues.size(); ++ shard)
-	while (! counts_saved[shard].empty()) {
-	  if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
-	    counts_saved[shard].pop_back();
-	  else
-	    break;
-	}
-      
       counts.clear();
     }
     
