@@ -1380,6 +1380,7 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
 
     int num_termination = 0;
     
+    size_type min_counts_size = 0;
     const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
@@ -1400,7 +1401,13 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
       if (! result.second)
 	const_cast<modified_type&>(*result.first).increment(modified.counts.begin(), modified.counts.end());
       
-      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
+      if (! counts.empty()
+	  && (! min_counts_size || counts.size() > min_counts_size)
+	  && ((iteration & iteration_mask) == iteration_mask)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	if (! min_counts_size)
+	  min_counts_size = counts.size() >> 1;
+	    
 	dump_counts(paths, counts);
 	counts.clear();
 	modified_unique_type(counts).swap(counts);
@@ -1934,6 +1941,7 @@ struct PhrasePairReverseReducer
     
     int num_termination = 0;
     
+    size_type min_counts_size = 0;
     const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
@@ -1952,15 +1960,23 @@ struct PhrasePairReverseReducer
       
       counts.push_back(modified);
       
-      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
+      if (! counts.empty()
+	  && (! min_counts_size || counts.size() > min_counts_size)
+	  && ((iteration & iteration_mask) == iteration_mask)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	if (! min_counts_size)
+	  min_counts_size = counts.size() >> 1;
+	
 	dump_counts(paths, counts);
 	counts.clear();
+	modified_unique_type(counts).swap(counts);
       }
     }
     
     if (! counts.empty()) {
       dump_counts(paths, counts);
       counts.clear();
+      modified_unique_type(counts).swap(counts);
     }
     
     merge_counts(paths);
