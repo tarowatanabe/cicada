@@ -1401,9 +1401,9 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
       if (! result.second)
 	const_cast<modified_type&>(*result.first).increment(modified.counts.begin(), modified.counts.end());
       
-      if (! counts.empty()
+      if (((iteration & iteration_mask) == iteration_mask)
+	  && ! counts.empty()
 	  && (! min_counts_size || counts.size() > min_counts_size)
-	  && ((iteration & iteration_mask) == iteration_mask)
 	  && (utils::malloc_stats::used() > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 1;
@@ -1960,9 +1960,9 @@ struct PhrasePairReverseReducer
       
       counts.push_back(modified);
       
-      if (! counts.empty()
+      if (((iteration & iteration_mask) == iteration_mask)
+	  && ! counts.empty()
 	  && (! min_counts_size || counts.size() > min_counts_size)
-	  && ((iteration & iteration_mask) == iteration_mask)
 	  && (utils::malloc_stats::used() > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 1;
