@@ -732,7 +732,8 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
   
-  typedef map_reduce_type::modified_type modified_type;
+  typedef map_reduce_type::modified_type     modified_type;
+  typedef map_reduce_type::modified_set_type modified_set_type;
   
   typedef PhrasePairModifiedParser modified_parser_type;
 
@@ -756,6 +757,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
   
   modified_type     modified;
+  modified_set_type modified_saved;
   
   modified_parser_type parser;
   std::string line;
@@ -765,11 +767,14 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ iter) {
+      if (stream[rank] && device[rank] && device[rank]->test()) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, modified))
-	    queue.push_swap(modified);
-	  else
+	  if (parser(line, modified)) {
+	    if (! queue.push_swap(modified, true)) {
+	      modified_saved.push_back(modified);
+	      boost::thread::yield();
+	    }
+	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
@@ -779,7 +784,18 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (! modified_saved.empty()) {
+      while (! modified_saved.empty()) {
+	if (queue.push_swap(modified_saved.back(), true))
+	  modified_saved.pop_back();
+	else
+	  break;
+      }
+      
+      found = modified_saved.empty();
+    }
+    
+    if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
@@ -944,7 +960,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(queue, output_file, modified_files, 1, max_malloc, debug)));
   
-  modified_type modified;
+  modified_type     modified;
+  modified_set_type modified_saved;
   
   modified_parser_type parser;
   std::string line;
@@ -954,11 +971,14 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ iter) {
+      if (stream[rank] && device[rank] && device[rank]->test()) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, modified))
-	    queue.push_swap(modified);
-	  else
+	  if (parser(line, modified)) {
+	    if (! queue.push_swap(modified, true)) {
+	      modified_saved.push_back(modified);
+	      boost::thread::yield();
+	    }
+	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
@@ -968,7 +988,18 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (! modified_saved.empty()) {
+      while (! modified_saved.empty()) {
+	if (queue.push_swap(modified_saved.back(), true))
+	  modified_saved.pop_back();
+	else
+	  break;
+      }
+      
+      found = modified_saved.empty();
+    }
+    
+    if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);

@@ -10,6 +10,7 @@ Better composition/parse for string-to-tree by sharing internal nodes and termin
 Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
 Better epsilon/bos-eos/sgml-tag removal w/o recursion
 Better left2right and right2left binarizatin by sharing nodes
+Better cicada_extract_score{,_mpi} by prohibitting spurious mapping
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Added max-compose constraint which set the maximum number of minimum rule compositions in GHKM
 Added sparse/dense option for feature-application to apply only sparse/dense features
