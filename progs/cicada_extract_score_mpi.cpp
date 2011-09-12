@@ -792,7 +792,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	  break;
       }
       
-      found = ! modified_saved.empty();
+      found = modified_saved.empty();
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
@@ -996,7 +996,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  break;
       }
       
-      found = ! modified_saved.empty();
+      found = modified_saved.empty();
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
