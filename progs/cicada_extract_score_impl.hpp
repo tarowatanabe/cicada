@@ -1127,26 +1127,14 @@ struct PhrasePairModifyMapper
 	pqueue.push(buffer_stream);
       
       if ((iter & iter_mask) == iter_mask) {
-	size_t num_full = 0;
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
 	  }
-	  
-	  num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
 	}
-	
-	if (num_full > (queues.size() >> 1))
-	  for (size_t shard = 0; shard != queues.size(); ++ shard)
-	    while (! counts_saved[shard].empty()) {
-	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
-		counts_saved[shard].pop_back();
-	      else
-		break;
-	    }
 	
 	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
       }
@@ -1656,32 +1644,20 @@ struct PhrasePairReverseMapper
 	pqueue.push(buffer_stream);
 
       if ((iter & iter_mask) == iter_mask) {
-	size_t num_full = 0;
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
-	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
+	    if (queues[shard]->push_swap(counts_saved[shard].back(), utils::malloc_stats::used() < malloc_threshold))
 	      counts_saved[shard].pop_back();
 	    else
 	      break;
 	  }
-	  
-	  num_full += (counts_saved[shard].size() >= 1024) + (counts_saved[shard].size() >= 1024 * 64);
 	}
-	
-	if (num_full > (queues.size() >> 1))
-	  for (size_t shard = 0; shard != queues.size(); ++ shard)
-	    while (! counts_saved[shard].empty()) {
-	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
-		counts_saved[shard].pop_back();
-	      else
-		break;
-	    }
 	
 	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
       }
       
       ++ iter;
-
+      
       if (malloc_full)
 	boost::thread::yield();
     }
