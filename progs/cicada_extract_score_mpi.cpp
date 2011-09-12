@@ -786,10 +786,15 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (! modified_saved.empty()) {
       while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true))
+	if (queue.size() < queue_size) {
+	  queue.push_swap(modified_saved.back());
 	  modified_saved.pop_back();
-	else
-	  break;
+	} else {
+	  if (queue.push_swap(modified_saved.back(), true))
+	    modified_saved.pop_back();
+	  else
+	    break;
+	}
       }
       
       found = modified_saved.empty();
@@ -990,10 +995,15 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (! modified_saved.empty()) {
       while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true))
+	if (queue.size() < queue_size) {
+	  queue.push_swap(modified_saved.back());
 	  modified_saved.pop_back();
-	else
-	  break;
+	} else {
+	  if (queue.push_swap(modified_saved.back(), true))
+	    modified_saved.pop_back();
+	  else
+	    break;
+	}
       }
       
       found = modified_saved.empty();
