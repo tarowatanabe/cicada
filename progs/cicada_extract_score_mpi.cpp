@@ -772,7 +772,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
-	      boost::thread::yield();
+	      non_found_iter = loop_sleep(false, non_found_iter);
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
@@ -976,7 +976,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
-	      boost::thread::yield();
+	      non_found_iter = loop_sleep(false, non_found_iter);
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
