@@ -1660,7 +1660,7 @@ struct PhrasePairReverseMapper
 	  }
 	}
 	
-	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);a
+	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
       }
       
       ++ iter;
