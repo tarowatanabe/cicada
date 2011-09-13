@@ -1090,11 +1090,11 @@ struct PhrasePairModifyMapper
     modified_type     counts;
 
     size_t iter = 0;
-    size_t iter_mask = (1 << 3) - 1;
+    size_t iter_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
 
     int non_found_iter = 0;
-    bool malloc_full = false;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1138,10 +1138,12 @@ struct PhrasePairModifyMapper
 	  }
 	}
 	
-	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
+	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
       }
       
       ++ iter;
+      
+      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.counts.empty()) {
@@ -1560,11 +1562,11 @@ struct PhrasePairReverseMapper
     buffer_stream_set_type buffer_streams(paths.size());
     
     size_t iter = 0;
-    size_t iter_mask = (1 << 3) - 1;
+    size_t iter_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
     
     int non_found_iter = 0;
-    bool malloc_full = false;
 
     size_t pos = 0;
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
@@ -1660,10 +1662,12 @@ struct PhrasePairReverseMapper
 	  }
 	}
 	
-	non_found_iter = loop_sleep(utils::malloc_stats::used() <= malloc_threshold, non_found_iter);
+	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
       }
       
       ++ iter;
+      
+      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.empty()) {
@@ -2132,6 +2136,7 @@ struct PhrasePairScoreMapper
     const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
+    int non_found_iter = 0;
 
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -2153,8 +2158,7 @@ struct PhrasePairScoreMapper
 	
 	++ iter;
 	
-	if (malloc_full)
-	  boost::thread::yield();
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
       } else
@@ -2179,7 +2183,6 @@ struct PhrasePairScoreMapper
     
     // termination...
     // we will terminate asynchronously...
-    int non_found_iter = 0;
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     while (1) {

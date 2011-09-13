@@ -215,6 +215,7 @@ namespace utils
     bool test() const { return pimpl->test(); }
     void wait() const { pimpl->wait(); }
     std::streamsize flush(const bool if_filled=false) { return pimpl->flush(if_filled); }
+    std::streamsize committed() const { return pimpl->committed(); }
     void terminate() { pimpl->terminate(); }
     void finalize() { pimpl->finalize(); }
     bool test_terminate() { return pimpl->test_terminate(); }
@@ -244,6 +245,7 @@ namespace utils
       bool test() const;
       void wait() const;
       std::streamsize flush(const bool if_filled=false);
+      std::streamsize committed() const;
       void terminate();
       void finalize();
       bool test_terminate();
@@ -370,6 +372,11 @@ namespace utils
       } else
 	return 0;
     }
+  }
+
+  std::streamsize mpi_device_sink::impl::committed() const
+  {
+    return buffer_overcommit.size();
   }
   
   bool mpi_device_sink::impl::test_terminate()

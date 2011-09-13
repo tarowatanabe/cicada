@@ -500,10 +500,10 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new ostream_type());
-    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, 1024 * 1024 * 16, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, 1024 * 1024, false, true));
     
-    stream[rank]->push(boost::iostreams::gzip_compressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
+    stream[rank]->push(*device[rank], 1024 * 1024);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -579,12 +579,12 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
-    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024 * 16));
+    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024));
 
     queues[rank].reset(new queue_type(queue_size));
     
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
+    stream[rank]->push(*device[rank], 1024 * 1024);
   }
   
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
@@ -660,6 +660,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  static const int buffer_size = 1024 * 1024;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
@@ -668,11 +670,11 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024 * 4, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -691,7 +693,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
+      if (stream[rank] && device[rank] && device[rank]->committed() < buffer_size) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
@@ -701,6 +703,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	}
       }
+    
+    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -744,11 +748,11 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024 * 4));
+    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
+    stream[rank]->push(*device[rank], 1024 * 1024);
   }
   
   const size_t queue_size = mpi_size * 1024 * 8;
@@ -767,12 +771,13 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
 	      non_found_iter = loop_sleep(false, non_found_iter);
+	      break;
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
@@ -833,6 +838,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  static const int buffer_size = 1024 * 1024;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
     
@@ -846,11 +853,11 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
 
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024 * 4, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -870,7 +877,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
+      if (stream[rank] && device[rank] && device[rank]->committed() < buffer_size) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
@@ -880,6 +887,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	}
       }
+
+    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -946,11 +955,11 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024 * 4));
+    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank]);
+    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
+    stream[rank]->push(*device[rank], 1024 * 1024);
   }
   
   const size_t queue_size = mpi_size * 1024 * 8;
@@ -971,12 +980,13 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
 	      non_found_iter = loop_sleep(false, non_found_iter);
+	      break;
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
