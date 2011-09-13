@@ -718,13 +718,13 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
-	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
-	  queues[rank]->pop_swap(modified);
-	  
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else 
-	    stream[rank].reset();
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else 
+	      stream[rank].reset();
+	  }
 	}
       }
     
@@ -916,13 +916,13 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
-	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
-	  queues[rank]->pop_swap(modified);
-	  
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else
-	    stream[rank].reset();
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else
+	      stream[rank].reset();
+	  }
 	}
       }
     
