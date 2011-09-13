@@ -584,11 +584,11 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
     device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024));
-
+    
     queues[rank].reset(new queue_type(queue_size));
     
-    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(*device[rank]);
   }
   
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
@@ -756,7 +756,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(*device[rank]);
   }
   
   const size_t queue_size = mpi_size * 1024 * 8;
@@ -963,7 +963,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(*device[rank]);
   }
   
   const size_t queue_size = mpi_size * 1024 * 8;
