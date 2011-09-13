@@ -1100,7 +1100,6 @@ struct PhrasePairModifyMapper
 	  counts.source.swap(counts.target);
 	  
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-	  
 	  queues[shard]->push_swap(counts);
 	}
 	
@@ -1120,9 +1119,28 @@ struct PhrasePairModifyMapper
     if (! counts.counts.empty()) {
       // swap source and target!
       counts.source.swap(counts.target);
-      const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
       
+      const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
       queues[shard]->push_swap(counts);
+    }
+    
+     // termination...
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    counts.clear();
+    
+    while (1) {
+      bool found = false;
+      
+      if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+	counts.clear();
+	
+	terminated[shard] = true;
+	found = true;
+      }
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
   }
 };
@@ -1541,7 +1559,6 @@ struct PhrasePairReverseMapper
 	    citer->counts = modified.counts;
 	    
 	    const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
-	    
 	    queues[shard]->push_swap(*citer);
 	  }
 	  
@@ -1590,11 +1607,28 @@ struct PhrasePairReverseMapper
 	citer->counts = modified.counts;
 	
 	const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
-	
 	queues[shard]->push_swap(*citer);
       }
       
       counts.clear();
+    }
+
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    modified.clear();
+    
+    for (;;) {
+      bool found = false;
+      
+      if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
+	modified.clear();
+	
+	terminated[shard] = true;
+	found = true;
+      }
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
   }
   

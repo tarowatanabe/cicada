@@ -811,14 +811,9 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (! modified_saved.empty()) {
-      while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true)) {
-	  modified_saved.pop_back();
-	  found = true;
-	} else
-	  break;
-      }
+    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
+      modified_saved.pop_back();
+      found = true;
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
@@ -1033,14 +1028,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (! modified_saved.empty()) {
-      while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true)) {
-	  modified_saved.pop_back();
-	  found = true;
-	} else
-	  break;
-      }
+    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
+      modified_saved.pop_back();
+      found = true;
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
