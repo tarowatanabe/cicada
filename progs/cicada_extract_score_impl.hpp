@@ -1131,12 +1131,13 @@ struct PhrasePairModifyMapper
     while (1) {
       bool found = false;
       
-      if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
-	counts.clear();
-	
-	terminated[shard] = true;
-	found = true;
-      }
+      for (size_t shard = 0; shard != queues.size(); ++ shard) 
+	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+	  counts.clear();
+	  
+	  terminated[shard] = true;
+	  found = true;
+	}
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
@@ -1619,12 +1620,13 @@ struct PhrasePairReverseMapper
     for (;;) {
       bool found = false;
       
-      if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
-	modified.clear();
-	
-	terminated[shard] = true;
-	found = true;
-      }
+      for (size_t shard = 0; shard != queues.size(); ++ shard) 
+	if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
+	  modified.clear();
+	  
+	  terminated[shard] = true;
+	  found = true;
+	}
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
       
