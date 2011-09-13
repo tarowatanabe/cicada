@@ -668,10 +668,10 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024 * 4, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024, false, true), 1024 * 1024);
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
     stream[rank]->push(*device[rank]);
     stream[rank]->precision(20);
     
@@ -846,10 +846,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
 
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024 * 4, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024, false, true), 1024 * 1024);
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
     stream[rank]->push(*device[rank]);
     stream[rank]->precision(20);
     
