@@ -691,7 +691,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
+      if (stream[rank] && device[rank] && device[rank]->test()) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
@@ -871,7 +871,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
+      if (stream[rank] && device[rank] && device[rank]->test()) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
