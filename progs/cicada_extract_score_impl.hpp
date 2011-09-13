@@ -2136,6 +2136,7 @@ struct PhrasePairScoreMapper
     const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
+    int non_found_iter = 0;
 
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -2157,8 +2158,7 @@ struct PhrasePairScoreMapper
 	
 	++ iter;
 	
-	if (malloc_full)
-	  boost::thread::yield();
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
       } else
@@ -2183,7 +2183,6 @@ struct PhrasePairScoreMapper
     
     // termination...
     // we will terminate asynchronously...
-    int non_found_iter = 0;
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     while (1) {
