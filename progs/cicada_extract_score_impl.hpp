@@ -1128,6 +1128,8 @@ struct PhrasePairModifyMapper
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     counts.clear();
     
+    int non_found_iter = 0;
+    
     while (1) {
       bool found = false;
       
@@ -1616,6 +1618,8 @@ struct PhrasePairReverseMapper
 
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     modified.clear();
+
+    int non_found_iter = 0;
     
     for (;;) {
       bool found = false;
