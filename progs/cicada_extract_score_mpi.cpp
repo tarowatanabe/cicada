@@ -767,12 +767,13 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
 	      non_found_iter = loop_sleep(false, non_found_iter);
+	      break;
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
@@ -971,12 +972,13 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
 	    if (! queue.push_swap(modified, true)) {
 	      modified_saved.push_back(modified);
 	      non_found_iter = loop_sleep(false, non_found_iter);
+	      break;
 	    }
 	  } else
 	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
