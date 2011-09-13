@@ -527,14 +527,14 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 7))
+	if (device[rank]->committed() < (buffer_size << 6))
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
 	    else
 	      stream[rank].reset();
 	    
-	    found |= true;
+	    found = true;
 	  }
       }
     
@@ -669,6 +669,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
   static const size_t buffer_size = 1024 * 1024;
+  static const size_t queue_size  = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -685,7 +686,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
-    queues[rank].reset(new queue_type(1024 * 8));
+    queues[rank].reset(new queue_type(queue_size));
   }
   
   if (debug >= 2)
@@ -695,6 +696,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   modified_type modified;
   modified_generator_type generator;
+
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
   int non_found_iter = 0;
   for (;;) {
@@ -706,7 +709,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 7))
+	if (device[rank]->committed() < (buffer_size << 6)) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -715,6 +718,16 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
+	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
+	  queues[rank]->pop_swap(modified);
+	  
+	  if (! modified.source.empty())
+	    generator(*stream[rank], modified) << '\n';
+	  else 
+	    stream[rank].reset();
+	  
+	  boost::thread::yield();
+	}
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
@@ -850,6 +863,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
   static const size_t buffer_size = 1024 * 1024;
+  static const size_t queue_size  = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -871,7 +885,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
-    queues[rank].reset(new queue_type(1024 * 8));
+    queues[rank].reset(new queue_type(queue_size));
   }
 
   if (debug >= 2)
@@ -883,6 +897,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   modified_type           modified;
   modified_generator_type generator;
 
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
@@ -893,7 +909,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 7)) 
+	if (device[rank]->committed() < (buffer_size << 6)) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -902,6 +918,16 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
+	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
+	  queues[rank]->pop_swap(modified);
+	  
+	  if (! modified.source.empty())
+	    generator(*stream[rank], modified) << '\n';
+	  else
+	    stream[rank].reset();
+	  
+	  boost::thread::yield();
+	}
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
