@@ -522,17 +522,21 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->committed() < (buffer_size << 1))
-	if (queues[rank]->pop_swap(phrase_pair, true)) {
-	  if (! phrase_pair.source.empty())
-	    generator(*stream[rank], phrase_pair) << '\n';
-	  else
-	    stream[rank].reset();
-	  
-	  found |= true;
-	}
-
-    utils::mpi_flush_devices(stream, device);
+      if (stream[rank] && device[rank]) {
+	
+	if (device[rank]->test() && device[rank]->flush(true))
+	  found = true;
+	
+	if (device[rank]->committed() < (buffer_size << 1))
+	  if (queues[rank]->pop_swap(phrase_pair, true)) {
+	    if (! phrase_pair.source.empty())
+	      generator(*stream[rank], phrase_pair) << '\n';
+	    else
+	      stream[rank].reset();
+	    
+	    found |= true;
+	  }
+      }
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -697,18 +701,21 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->committed() < (buffer_size << 1)) {
-	if (queues[rank]->pop_swap(modified, true)) {
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else 
-	    stream[rank].reset();
-	  
+      if (stream[rank] && device[rank]) {
+	
+	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
-	}
+	
+	if (device[rank]->committed() < (buffer_size << 1))
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else 
+	      stream[rank].reset();
+	    
+	    found = true;
+	  }
       }
-    
-    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -881,18 +888,21 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->committed() < (buffer_size << 1)) {
-	if (queues[rank]->pop_swap(modified, true)) {
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else
-	    stream[rank].reset();
-	  
-	  found = true;
-	}
-      }
+      if (stream[rank] && device[rank]) {
 
-    utils::mpi_flush_devices(stream, device);
+	if (device[rank]->test() && device[rank]->flush(true))
+	  found = true;
+	
+	if (device[rank]->committed() < (buffer_size << 1)) 
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else
+	      stream[rank].reset();
+	    
+	    found = true;
+	  }
+      }
     
     found |= utils::mpi_terminate_devices(stream, device);
     
