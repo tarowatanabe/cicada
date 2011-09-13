@@ -725,8 +725,6 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	    generator(*stream[rank], modified) << '\n';
 	  else 
 	    stream[rank].reset();
-	  
-	  boost::thread::yield();
 	}
       }
     
@@ -925,8 +923,6 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    generator(*stream[rank], modified) << '\n';
 	  else
 	    stream[rank].reset();
-	  
-	  boost::thread::yield();
 	}
       }
     
