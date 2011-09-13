@@ -485,6 +485,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
   
   typedef PhrasePairGenerator generator_type;
+
+  static const int buffer_size = 1024 * 1024;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -500,10 +502,10 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new ostream_type());
-    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, buffer_size, false, true));
     
-    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -520,7 +522,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0)
+      if (stream[rank] && device[rank] && device[rank]->committed() < buffer_size)
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
 	    generator(*stream[rank], phrase_pair) << '\n';
@@ -529,6 +531,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  
 	  found |= true;
 	}
+
+    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
