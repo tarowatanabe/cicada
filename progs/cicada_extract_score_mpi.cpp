@@ -755,7 +755,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank], 1024 * 1024);
   }
   
@@ -962,7 +962,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor(), 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank], 1024 * 1024);
   }
   
