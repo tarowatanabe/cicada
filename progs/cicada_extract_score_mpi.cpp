@@ -660,6 +660,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  static const int buffer_size = 1024 * 1024;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
@@ -668,11 +670,11 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -691,7 +693,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      if (stream[rank] && device[rank] && device[rank]->committed() < buffer_size) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
@@ -701,6 +703,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	}
       }
+    
+    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -834,6 +838,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  static const int buffer_size = 1024 * 1024;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
     
@@ -847,11 +853,11 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
 
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor(), 1024 * 1024);
-    stream[rank]->push(*device[rank], 1024 * 1024);
+    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024 * 8));
@@ -871,7 +877,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && device[rank]->test()) {
+      if (stream[rank] && device[rank] && device[rank]->committed() < buffer_size) {
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.source.empty())
 	    generator(*stream[rank], modified) << '\n';
@@ -881,6 +887,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	}
       }
+
+    utils::mpi_flush_devices(stream, device);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
