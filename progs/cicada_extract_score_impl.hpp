@@ -1129,6 +1129,7 @@ struct PhrasePairModifyMapper
 	pqueue.push(buffer_stream);
       
       if ((iter & iter_mask) == iter_mask) {
+	size_t num_failed = 0;
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
 	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
@@ -1136,9 +1137,11 @@ struct PhrasePairModifyMapper
 	    else
 	      break;
 	  }
+	  
+	  num_failed += ! counts_saved[shard].empty();
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	malloc_full = (num_failed > (queues.size() >> 1));
       }
       
       ++ iter;
@@ -1653,6 +1656,7 @@ struct PhrasePairReverseMapper
 	pqueue.push(buffer_stream);
 
       if ((iter & iter_mask) == iter_mask) {
+	size_t num_failed = 0;
 	for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	  while (! counts_saved[shard].empty()) {
 	    if (queues[shard]->push_swap(counts_saved[shard].back(), true))
@@ -1660,9 +1664,11 @@ struct PhrasePairReverseMapper
 	    else
 	      break;
 	  }
+	  
+	  num_failed += ! counts_saved[shard].empty();
 	}
 	
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	malloc_full = (num_failed > (queues.size() >> 1));
       }
       
       ++ iter;
