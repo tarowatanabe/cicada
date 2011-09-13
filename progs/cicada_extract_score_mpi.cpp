@@ -527,7 +527,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 3))
+	if (device[rank]->committed() < (buffer_size << 5))
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
@@ -706,7 +706,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 3))
+	if (device[rank]->committed() < (buffer_size << 5))
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -893,7 +893,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 3)) 
+	if (device[rank]->committed() < (buffer_size << 5)) 
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
