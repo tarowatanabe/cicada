@@ -486,7 +486,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairGenerator generator_type;
 
-  static const int buffer_size = 1024 * 1024;
+  static const size_t buffer_size = 1024 * 1024;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -668,7 +668,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const int buffer_size = 1024 * 1024;
+  static const size_t buffer_size = 1024 * 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -849,7 +849,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const int buffer_size = 1024 * 1024;
+  static const size_t buffer_size = 1024 * 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
