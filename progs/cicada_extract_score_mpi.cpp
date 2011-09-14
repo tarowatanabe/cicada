@@ -487,6 +487,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairGenerator generator_type;
 
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
@@ -503,6 +505,12 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
+  boost::mt19937 gen;
+  gen.seed(time(0) * getpid());
+  boost::random_number_generator<boost::mt19937> rgen(gen);
+  
+  rank_set_type ranks(mpi_size);
+  
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new ostream_type());
     device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, buffer_size, false, true));
@@ -512,6 +520,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(queue_size));
+    
+    ranks[rank] = rank;
   }
   
   phrase_pair_type phrase_pair;
@@ -524,13 +534,27 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   for (;;) {
     bool found = false;
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
       if (stream[rank] && device[rank]) {
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
-	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max)
+
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true)) {
+	    found = true;
+	    
+	    if (! phrase_pair.source.empty())
+	      generator(*stream[rank], phrase_pair) << '\n';
+	    else {
+	      stream[rank].reset();
+	      break;
+	    }
+	  }
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
@@ -539,7 +563,12 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
+	}
       }
+    }
+    
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -672,6 +701,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
@@ -683,6 +714,12 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
+  boost::mt19937 gen;
+  gen.seed(time(0) * getpid());
+  boost::random_number_generator<boost::mt19937> rgen(gen);
+  
+  rank_set_type ranks(mpi_size);
+  
   for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
     
@@ -692,6 +729,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(queue_size));
+    
+    ranks[rank] = rank;
   }
   
   if (debug >= 2)
@@ -701,20 +740,34 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   modified_type modified;
   modified_generator_type generator;
-
+  
   const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
       if (stream[rank] && device[rank]) {
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(modified, true)) {
+	    found = true;
+	    
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else {
+	      stream[rank].reset();
+	      break;
+	    }
+	  }
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -732,6 +785,10 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	}
       }
+    }
+
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -781,7 +838,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 
   boost::mt19937 gen;
   gen.seed(time(0) * getpid());
-  boost::random_number_generator<boost::mt19937> generator(gen);
+  boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
   
@@ -830,8 +887,9 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     }
-
-    std::random_shuffle(ranks.begin(), ranks.end(), generator);
+    
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
     while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
       modified_saved.pop_back();
@@ -876,6 +934,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
@@ -892,6 +952,12 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
+  boost::mt19937 gen;
+  gen.seed(time(0) * getpid());
+  boost::random_number_generator<boost::mt19937> rgen(gen);
+  
+  rank_set_type ranks(mpi_size);
+
   for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
@@ -901,6 +967,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(queue_size));
+    
+    ranks[rank] = rank;
   }
 
   if (debug >= 2)
@@ -918,13 +986,27 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   for (;;) {
     bool found = false;
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
       if (stream[rank] && device[rank]) {
-
+	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(modified, true)) {
+	    found = true;
+	    
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else {
+	      stream[rank].reset();
+	      break;
+	    }
+	  }
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -942,6 +1024,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	}
       }
+    }
+    
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -1014,7 +1100,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   boost::mt19937 gen;
   gen.seed(time(0) * getpid());
-  boost::random_number_generator<boost::mt19937> generator(gen);
+  boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
   
@@ -1066,7 +1152,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       }
     }
     
-    std::random_shuffle(ranks.begin(), ranks.end(), generator);
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
     while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
       modified_saved.pop_back();
