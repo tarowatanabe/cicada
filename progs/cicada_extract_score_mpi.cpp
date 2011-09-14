@@ -487,8 +487,9 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairGenerator generator_type;
 
-  static const size_t buffer_size = 1024 * 1024;
-  static const size_t queue_size  = 1024 * 8;
+  static const size_t buffer_size     = 1024 * 1024;
+  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t queue_size      = 1024 * 8;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -529,7 +530,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 6))
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max)
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
@@ -671,8 +672,9 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const size_t buffer_size = 1024 * 1024;
-  static const size_t queue_size  = 1024 * 8;
+  static const size_t buffer_size     = 1024 * 1024;
+  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -712,7 +714,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 6)) {
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';
@@ -874,8 +876,9 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const size_t buffer_size = 1024 * 1024;
-  static const size_t queue_size  = 1024 * 8;
+  static const size_t buffer_size     = 1024 * 1024;
+  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -921,7 +924,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
 	
-	if (device[rank]->committed() < (buffer_size << 6)) {
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(modified, true)) {
 	    if (! modified.source.empty())
 	      generator(*stream[rank], modified) << '\n';

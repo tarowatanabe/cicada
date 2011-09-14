@@ -1038,7 +1038,7 @@ struct PhrasePairModifyMapper
     } else
       non_found_iter = 0;
 
-    if (non_found_iter >= 16) {
+    if (non_found_iter >= 64) {
       struct timespec tm;
       tm.tv_sec = 0;
       tm.tv_nsec = 2000001;
@@ -1087,6 +1087,12 @@ struct PhrasePairModifyMapper
     }
     
     modified_type counts;
+
+    int iter = 0;
+    const int iteration_mask = (1 << 4) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
+    int non_found_iter = 0;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1102,6 +1108,13 @@ struct PhrasePairModifyMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
+	
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
       } else
@@ -1127,8 +1140,6 @@ struct PhrasePairModifyMapper
      // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     counts.clear();
-    
-    int non_found_iter = 0;
     
     while (1) {
       bool found = false;
@@ -1542,6 +1553,12 @@ struct PhrasePairReverseMapper
     
     root_count_set_type::iterator riter;
     
+    int iter = 0;
+    const int iteration_mask = (1 << 4) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
+    int non_found_iter = 0;
+
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1567,6 +1584,13 @@ struct PhrasePairReverseMapper
 	  
 	  counts.clear();
 	}
+
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.push_back(curr);
 	modified.swap(curr);
@@ -1619,8 +1643,6 @@ struct PhrasePairReverseMapper
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     modified.clear();
 
-    int non_found_iter = 0;
-    
     for (;;) {
       bool found = false;
       
@@ -1647,7 +1669,7 @@ struct PhrasePairReverseMapper
     } else
       non_found_iter = 0;
     
-    if (non_found_iter >= 16) {
+    if (non_found_iter >= 64) {
       struct timespec tm;
       tm.tv_sec = 0;
       tm.tv_nsec = 2000001;
@@ -2004,7 +2026,7 @@ struct PhrasePairScoreMapper
     } else
       non_found_iter = 0;
   
-    if (non_found_iter >= 16) {
+    if (non_found_iter >= 64) {
       struct timespec tm;
       tm.tv_sec = 0;
       tm.tv_nsec = 2000001;
