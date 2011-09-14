@@ -351,11 +351,11 @@ namespace utils
 	send_size = std::min(buffer.size(), buffer_overcommit.size());
 	std::copy(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size, buffer.begin());
 	buffer_overcommit.erase(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size);
-	// TODO
-	// shrinkg overcommit buffer... any efficient way to perform overcommitting???
-	// use of multiple fixed-sized buffer + storage
-	//
-	buffer_type(buffer_overcommit).swap(buffer_overcommit);
+	
+	// if the capacity is twice as large as the buffer size, shrink...
+	if (buffer_overcommit.capacity() > (buffer_overcommit.size() << 1))
+	  buffer_type(buffer_overcommit).swap(buffer_overcommit);
+	
 	buffer_offset = buffer_overcommit.size();
 	
 	request_size.Start();
