@@ -13,6 +13,7 @@
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
+#include <boost/random.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
@@ -487,6 +488,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef PhrasePairGenerator generator_type;
 
   static const size_t buffer_size = 1024 * 1024;
+  static const size_t queue_size  = 1024 * 8;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -508,7 +510,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
-    queues[rank].reset(new queue_type(1024 * 8));
+    queues[rank].reset(new queue_type(queue_size));
   }
   
   phrase_pair_type phrase_pair;
@@ -579,15 +581,16 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
+  const size_t queue_size  = 1024 * 64;
+  const size_t buffer_size = 1024 * 1024;
+  
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
-  const size_t queue_size = 1024 * 64;
-  
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
-    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, buffer_size));
     
     queues[rank].reset(new queue_type(queue_size));
     
@@ -763,21 +766,32 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   
   typedef PhrasePairModifiedParser modified_parser_type;
 
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  const size_t queue_size  = mpi_size * 1024 * 8;
+  const size_t buffer_size = 1024 * 1024;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
+
+  boost::mt19937 gen;
+  gen.seed(time(0) * getpid());
+  boost::random_number_generator<boost::mt19937> generator(gen);
+  
+  rank_set_type ranks(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank]);
+    
+    ranks[rank] = rank;
   }
-  
-  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
@@ -792,7 +806,10 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   for (;;) {
     bool found = false;
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
@@ -810,6 +827,9 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	
 	found = true;
       }
+    }
+
+    std::random_shuffle(ranks.begin(), ranks.end(), generator);
     
     while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
       modified_saved.pop_back();
@@ -868,7 +888,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   ostream_ptr_set_type stream(mpi_size);
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
-
+  
   for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
@@ -976,23 +996,34 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   typedef PhrasePairModifiedParser modified_parser_type;
 
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  const size_t queue_size  = mpi_size * 1024 * 8;
+  const size_t buffer_size = 1024 * 1024;
   
   path_set_type modified_files;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
   
+  boost::mt19937 gen;
+  gen.seed(time(0) * getpid());
+  boost::random_number_generator<boost::mt19937> generator(gen);
+  
+  rank_set_type ranks(mpi_size);
+  
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank]);
+    
+    ranks[rank] = rank;
   }
-  
-  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   
@@ -1009,7 +1040,10 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   for (;;) {
     bool found = false;
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
 	  if (parser(line, modified)) {
@@ -1027,6 +1061,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	
 	found = true;
       }
+    }
+    
+    std::random_shuffle(ranks.begin(), ranks.end(), generator);
     
     while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
       modified_saved.pop_back();
