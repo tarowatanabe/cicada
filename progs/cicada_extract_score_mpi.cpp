@@ -718,15 +718,13 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
-	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
-	  queues[rank]->pop_swap(modified);
-	  
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else 
-	    stream[rank].reset();
-
-	  boost::thread::yield();
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else 
+	      stream[rank].reset();
+	  }
 	}
       }
     
@@ -813,15 +811,9 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (! modified_saved.empty()) {
-      while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true))
-	  modified_saved.pop_back();
-	else
-	  break;
-      }
-      
-      found = modified_saved.empty();
+    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
+      modified_saved.pop_back();
+      found = true;
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
@@ -918,15 +910,13 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    found = true;
 	  }
-	} else if (queues[rank]->size() >= queue_size && utils::malloc_stats::used() < malloc_threshold) {
-	  queues[rank]->pop_swap(modified);
-	  
-	  if (! modified.source.empty())
-	    generator(*stream[rank], modified) << '\n';
-	  else
-	    stream[rank].reset();
-
-	  boost::thread::yield();
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(modified, true)) {
+	    if (! modified.source.empty())
+	      generator(*stream[rank], modified) << '\n';
+	    else
+	      stream[rank].reset();
+	  }
 	}
       }
     
@@ -1038,15 +1028,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	found = true;
       }
     
-    if (! modified_saved.empty()) {
-      while (! modified_saved.empty()) {
-	if (queue.push_swap(modified_saved.back(), true))
-	  modified_saved.pop_back();
-	else
-	  break;
-      }
-      
-      found = modified_saved.empty();
+    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
+      modified_saved.pop_back();
+      found = true;
     }
     
     if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
