@@ -488,6 +488,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef PhrasePairGenerator generator_type;
 
   static const size_t buffer_size = 1024 * 1024;
+  static const size_t queue_size  = 1024 * 8;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -509,7 +510,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
-    queues[rank].reset(new queue_type(1024 * 8));
+    queues[rank].reset(new queue_type(queue_size));
   }
   
   phrase_pair_type phrase_pair;
@@ -580,15 +581,16 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
+  const size_t queue_size  = 1024 * 64;
+  const size_t buffer_size = 1024 * 1024;
+  
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
-  const size_t queue_size = 1024 * 64;
-  
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
-    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, buffer_size));
     
     queues[rank].reset(new queue_type(queue_size));
     
