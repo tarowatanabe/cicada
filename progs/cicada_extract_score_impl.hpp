@@ -2125,19 +2125,17 @@ struct PhrasePairScoreMapper
     // termination...
     // we will terminate asynchronously...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    counts.clear();
     
     while (1) {
       bool found = false;
       
       for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (! terminated[shard]) {
+	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
 	  counts.clear();
 	  
-	  if (queues[shard]->push_swap(counts, true)) {
-	    counts.clear();
-	    terminated[shard] = true;
-	    found = true;
-	  }
+	  terminated[shard] = true;
+	  found = true;
 	}
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
