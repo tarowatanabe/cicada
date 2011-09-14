@@ -435,7 +435,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::gzip_decompressor());
-      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
+      is.push(utils::mpi_device_source(rank, root_count_tag, 4096));
       
       while (std::getline(is, line)) {
 	if (! parser(line, root_count)) {
@@ -454,7 +454,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
   } else {
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::gzip_compressor());
-    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
+    os.push(utils::mpi_device_sink(0, root_count_tag, 4096));
     
     RootCountGenerator generator;
     root_count_set_type::const_iterator riter_end = root_counts.end();
