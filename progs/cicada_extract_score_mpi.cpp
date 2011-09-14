@@ -487,8 +487,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairGenerator generator_type;
 
-  static const size_t buffer_size     = 1024 * 1024;
-  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t buffer_size     = 1024 * 1024 * 4;
+  static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -507,7 +507,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank].reset(new ostream_type());
     device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, buffer_size, false, true));
     
-    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -583,7 +583,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   const size_t queue_size  = 1024 * 64;
-  const size_t buffer_size = 1024 * 1024;
+  const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
@@ -672,8 +672,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const size_t buffer_size     = 1024 * 1024;
-  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t buffer_size     = 1024 * 1024 * 4;
+  static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -687,7 +687,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -774,7 +774,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   const size_t queue_size  = mpi_size * 1024 * 8;
-  const size_t buffer_size = 1024 * 1024;
+  const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
@@ -876,8 +876,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModifiedGenerator modified_generator_type;
   
-  static const size_t buffer_size     = 1024 * 1024;
-  static const size_t buffer_size_max = buffer_size << 6;
+  static const size_t buffer_size     = 1024 * 1024 * 4;
+  static const size_t buffer_size_max = buffer_size << 4;
   static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -896,7 +896,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor(), buffer_size);
+    stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -1005,7 +1005,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   const size_t queue_size  = mpi_size * 1024 * 8;
-  const size_t buffer_size = 1024 * 1024;
+  const size_t buffer_size = 1024 * 1024 * 4;
   
   path_set_type modified_files;
   
