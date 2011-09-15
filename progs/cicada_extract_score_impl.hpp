@@ -1108,7 +1108,14 @@ struct PhrasePairModifyMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
-		
+	
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+
 	counts.swap(curr);
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
@@ -1120,13 +1127,6 @@ struct PhrasePairModifyMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
-
-      if ((iter & iteration_mask) == iteration_mask)
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-      
-      ++ iter;
-      
-      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.counts.empty()) {
@@ -1584,6 +1584,13 @@ struct PhrasePairReverseMapper
 	  
 	  counts.clear();
 	}
+
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.push_back(curr);
 	modified.swap(curr);
@@ -1616,13 +1623,6 @@ struct PhrasePairReverseMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
-      
-      if ((iter & iteration_mask) == iteration_mask)
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-      
-      ++ iter;
-      
-      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.empty()) {
@@ -2093,7 +2093,15 @@ struct PhrasePairScoreMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
-		
+	
+	
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	
 	counts.swap(curr);
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
@@ -2105,13 +2113,6 @@ struct PhrasePairScoreMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
-      
-      if ((iter & iteration_mask) == iteration_mask)
-	malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-      
-      ++ iter;
-      
-      non_found_iter = loop_sleep(! malloc_full, non_found_iter);
     }
     
     if (! counts.counts.empty()) {
