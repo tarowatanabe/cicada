@@ -151,7 +151,7 @@ int main(int argc, char** argv)
 		offsets.push_back(dependency.size());
 		dependency.push_back(-1);
 	      } else 
-		dependency.push_back(head_pos);
+		dependency.push_back(head_pos + 1);
 	    }
 	  }
 	  
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
 		if (niter->pos < 0)
 		  dependency[index] = 0;
 		else
-		  dependency[index] = offsets[niter->pos];
+		  dependency[index] = offsets[niter->pos] + 1;
 	      }
 	      
 	      ++ index;
