@@ -1062,8 +1062,6 @@ struct PhrasePairModifyMapper
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
-    typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
-
     pqueue_type pqueue;
 
     istream_ptr_set_type   istreams(paths.size());
@@ -1525,8 +1523,6 @@ struct PhrasePairReverseMapper
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
-    typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
-    
     pqueue_type            pqueue;
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());

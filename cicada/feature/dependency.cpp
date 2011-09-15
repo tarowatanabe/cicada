@@ -82,22 +82,25 @@ namespace cicada
 	
 	
       }	
-
+      
       void clear()
       {
+	
 	
       }
       
       void assign(const lattice_type& __lattice)
       {
 	lattice = &__lattice;
-
+	
 	edges.clear();
 	terminals.clear();
 	
+	// ROOT
 	edges.push_back(std::make_pair(-1, 0));
 	terminals.push_back(std::make_pair(vocab_type::EPSILON, vocab_type::X));
 	
+	// terminals/POSs
 	for (size_type pos = 0; pos != lattice->size(); ++ pos) {
 	  lattice_type::arc_set_type::const_iterator aiter_end = lattice->operator[](pos).end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = lattice->operator[](pos).begin(); aiter != aiter_end; ++ aiter) {

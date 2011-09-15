@@ -59,6 +59,8 @@ struct equal_pos
   int pos;
 };
 
+typedef std::vector<int, std::allocator<int> > dependency_type;
+typedef std::vector<int, std::allocator<int> > offset_set_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -69,6 +71,7 @@ std::string non_terminal = "[x]";
 bool head_mode = false;
 bool pos_mode = false;
 bool leaf_mode = false;
+bool dependency_mode = false;
 
 void options(int argc, char** argv);
 
@@ -80,7 +83,9 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file);
 
-    node_set_type nodes;
+    node_set_type   nodes;
+    dependency_type dependency;
+    offset_set_type offsets;
  
     hypergraph_type graph;
     
@@ -121,9 +126,57 @@ int main(int argc, char** argv)
 	      if (!initial)
 		os << ' ';
 	      
-	      os << titer->first;
+	      if (pos_mode)
+		os << titer->first << "|[" << titer->second << "]";
+	      else
+		os << titer->first;
+	      
 	      initial = false;
 	    }
+	  }
+	  os << '\n';
+	} else if (dependency_mode) {
+	  // we will convert bunsetsu dependency into word-dependency...
+	  dependency.clear();
+	  offsets.clear();
+	  
+	  node_set_type::const_iterator niter_end = nodes.end();
+	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	    const size_t head_pos = dependency.size() + niter->head;
+	    
+	    int pos = 0;
+	    terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	    for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
+	      if (pos == niter->head) {
+		offsets.push_back(dependency.size());
+		dependency.push_back(-1);
+	      } else 
+		dependency.push_back(head_pos);
+	    }
+	  }
+	  
+	  //
+	  // second iteration to perform bunsets-wise dependency, but shifted by the bunsets length
+	  //
+	  int index = 0;
+	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	    int pos = 0;
+	    terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	    for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
+	      if (pos == niter->head) {
+		if (niter->pos < 0)
+		  dependency[index] = 0;
+		else
+		  dependency[index] = offsets[niter->pos];
+	      }
+	      
+	      ++ index;
+	    }
+	  }
+
+	  if (! dependency.empty()) {
+	    std::copy(dependency.begin(), dependency.end() - 1, std::ostream_iterator<int>(os, " "));
+	    os << dependency.back();
 	  }
 	  os << '\n';
 	} else {
@@ -293,9 +346,10 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
-    ("head",    po::bool_switch(&head_mode), "use non-terminal for head word")
-    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-terminal")
-    ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
+    ("head",       po::bool_switch(&head_mode),       "use non-terminal for head word")
+    ("pos",        po::bool_switch(&pos_mode),        "use pos as non-terminal")
+    ("leaf",       po::bool_switch(&leaf_mode),       "collect leaf nodes only")
+    ("dependency", po::bool_switch(&dependency_mode), "collect dependency only")
     
     ("help", "help message");
   
