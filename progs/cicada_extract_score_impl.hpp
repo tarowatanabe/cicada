@@ -1603,6 +1603,8 @@ struct PhrasePairReverseMapper
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	
+	// copy into curr (assuming std::string sharing...)
+	curr.source = modified.source;
 	counts.push_back(curr);
 	modified.target.swap(curr.target);
 	modified.increment(curr.counts.begin(), curr.counts.end());
