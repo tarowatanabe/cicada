@@ -33,6 +33,7 @@ namespace cicada
     typedef operation_type::lattice_type         lattice_type;
     typedef operation_type::span_set_type        span_set_type;
     typedef operation_type::alignment_type       alignment_type;
+    typedef operation_type::dependency_type      dependency_type;
     typedef operation_type::sentence_type        sentence_type;
     typedef operation_type::sentence_set_type    sentence_set_type;
     typedef operation_type::ngram_count_set_type ngram_count_set_type;
@@ -61,12 +62,13 @@ namespace cicada
 		 const bool __input_forest,
 		 const bool __input_span,
 		 const bool __input_alignment,
+		 const bool __input_dependency,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
 		 const int debug)
     {
       initialize(parameter_set_type(first, last), model, grammar, tree_grammar, goal, 
-		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
+		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_dependency, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -81,12 +83,13 @@ namespace cicada
 		 const bool __input_forest,
 		 const bool __input_span,
 		 const bool __input_alignment,
+		 const bool __input_dependency,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
 		 const int debug)
     {
       initialize(parameters, model, grammar, tree_grammar, goal, 
-		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
+		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_dependency, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -125,6 +128,7 @@ namespace cicada
 		    const bool __input_forest,
 		    const bool __input_span,
 		    const bool __input_alignment,
+		    const bool __input_dependency,
 		    const bool __input_bitext,
 		    const bool __input_mpi,
 		    const int debug);
@@ -136,6 +140,7 @@ namespace cicada
     bool input_forest;
     bool input_span;
     bool input_alignment;
+    bool input_dependency;
     bool input_bitext;
     bool input_mpi;
     

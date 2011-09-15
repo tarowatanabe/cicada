@@ -250,6 +250,7 @@ viterbi: compute viterbi tree\n\
 				const bool __input_forest,
 				const bool __input_span,
 				const bool __input_alignment,
+				const bool __input_dependency,
 				const bool __input_bitext,
 				const bool __input_mpi,
 				const int debug)
@@ -260,14 +261,15 @@ viterbi: compute viterbi tree\n\
 
     // initialize...
     
-    input_id        = __input_id;
-    input_sentence  = __input_sentence;
-    input_lattice   = __input_lattice;
-    input_forest    = __input_forest;
-    input_span      = __input_span;
-    input_alignment = __input_alignment;
-    input_bitext    = __input_bitext;
-    input_mpi       = __input_mpi;
+    input_id         = __input_id;
+    input_sentence   = __input_sentence;
+    input_lattice    = __input_lattice;
+    input_forest     = __input_forest;
+    input_span       = __input_span;
+    input_alignment  = __input_alignment;
+    input_dependency = __input_dependency;
+    input_bitext     = __input_bitext;
+    input_mpi        = __input_mpi;
     
     // default to sentence input...
     if (! input_lattice && ! input_forest && ! input_sentence)
@@ -408,6 +410,7 @@ viterbi: compute viterbi tree\n\
     data.lattice.clear();
     data.spans.clear();
     data.alignment.clear();
+    data.dependency.clear();
     data.targets.clear();
     data.ngram_counts.clear();
     data.statistics.clear();
@@ -512,6 +515,14 @@ viterbi: compute viterbi tree\n\
       
       if (! data.alignment.assign(iter, end))
 	throw std::runtime_error("invalid alignment format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
+    }
+
+    if (input_dependency) {
+      if (! qi::phrase_parse(iter, end, "|||", standard::space))
+	throw std::runtime_error("invalid dependency format (separator): " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
+      
+      if (! data.dependency.assign(iter, end))
+	throw std::runtime_error("invalid dependency format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
     }
     
     if (input_bitext) {

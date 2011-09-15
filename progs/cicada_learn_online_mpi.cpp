@@ -77,6 +77,7 @@ bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_span_mode = false;
 bool input_alignment_mode = false;
+bool input_dependency_mode = false;
 bool input_directory_mode = false;
 
 path_type weights_file;
@@ -250,6 +251,7 @@ int main(int argc, char ** argv)
 				  input_forest_mode,
 				  input_span_mode,
 				  input_alignment_mode,
+				  input_dependency_mode,
 				  input_bitext_mode,
 				  false,
 				  debug);
@@ -1618,6 +1620,7 @@ void options(int argc, char** argv)
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-span",       po::bool_switch(&input_span_mode),       "span input")
     ("input-alignment",  po::bool_switch(&input_alignment_mode),  "alignment input")
+    ("input-dependency", po::bool_switch(&input_dependency_mode), "dependency input")
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
 
     ("weights", po::value<path_type>(&weights_file), "initial weights")
