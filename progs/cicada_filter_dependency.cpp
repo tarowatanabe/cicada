@@ -127,9 +127,9 @@ int main(int argc, char** argv)
       iiter_type siter_end;
       iiter_type titer_end;
       
-      sentence_type source;
-      sentence_type target;
-      alignment_type alignment;
+      sentence_type   source;
+      sentence_type   target;
+      alignment_type  alignment;
       dependency_type dependency;
       dependency_type projected;
       
