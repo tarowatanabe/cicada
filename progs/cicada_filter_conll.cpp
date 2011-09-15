@@ -147,6 +147,7 @@ bool head_mode = false;
 bool pos_mode = false;
 bool relation_mode = false;
 bool leaf_mode = false;
+bool dependency_mode = false;
 bool projective_mode = false;
 bool split_mode = false;
 
@@ -161,6 +162,9 @@ int main(int argc, char** argv)
     
     if (pos_mode && relation_mode)
       throw std::runtime_error("either pos or relation or none");
+
+    if (leaf_mode && dependency_mode)
+      throw std::runtime_error("either leaf or dependency");
     
     typedef boost::spirit::istream_iterator iter_type;
     
@@ -210,10 +214,46 @@ int main(int argc, char** argv)
       
       if (leaf_mode) {
 	if (! conlls.empty()) {
-	  conll_set_type::const_iterator citer_end = conlls.end();
-	  for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
-	    os << citer->form << ' ';
-	  os << conlls.back().form;
+	  if (pos_mode) {
+	    conll_set_type::const_iterator citer_end = conlls.end();
+	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
+	      os << citer->form << "|[" << citer->cpostag << "] ";
+	    os << conlls.back().form << "|[" << conlls.back().cpostag << "]";
+	  } else {
+	    conll_set_type::const_iterator citer_end = conlls.end();
+	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
+	      os << citer->form << ' ';
+	    os << conlls.back().form;
+	  }
+	}
+	os << '\n';
+	
+	continue;
+      }
+      
+      if (dependency_mode) {
+	if (! conlls.empty()) {
+	  if (projective_mode) {
+	    conll_set_type::const_iterator citer_end = conlls.end();
+	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer) {
+	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	      if (head == conll_type::size_type(-1))
+		throw std::runtime_error("invalid projective head");
+	      
+	      os << head << ' ';
+	    }
+	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), conlls.back().phead);
+	    if (head == conll_type::size_type(-1))
+	      throw std::runtime_error("invalid projective head");
+	    
+	    os << head;
+	    
+	  } else {
+	    conll_set_type::const_iterator citer_end = conlls.end();
+	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
+	      os << citer->head << ' ';
+	    os << conlls.back().head;
+	  }
 	}
 	os << '\n';
 	
@@ -395,6 +435,7 @@ void options(int argc, char** argv)
     ("pos",        po::bool_switch(&pos_mode),        "use pos as non-terminal")
     ("relation",   po::bool_switch(&relation_mode),   "use relation as non-terminal")
     ("leaf",       po::bool_switch(&leaf_mode),       "collect leaf nodes only")
+    ("dependency", po::bool_switch(&dependency_mode), "collect dependency only")
     ("projective", po::bool_switch(&projective_mode), "use projective filed for dependency")
     ("split",      po::bool_switch(&split_mode),      "split multi word expression")
     
