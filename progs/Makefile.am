@@ -56,6 +56,7 @@ bin_PROGRAMS = \
 	cicada_filter_kbest \
 	cicada_filter_charniak \
 	cicada_filter_conll \
+	cicada_filter_dependency \
 	cicada_filter_penntreebank \
 	cicada_filter_pialign \
 	cicada_filter_terminal \
@@ -188,6 +189,9 @@ cicada_filter_charniak_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perft
 
 cicada_filter_conll_SOURCES = cicada_filter_conll.cpp
 cicada_filter_conll_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_dependency_SOURCES = cicada_filter_dependency.cpp
+cicada_filter_dependency_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
 cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
