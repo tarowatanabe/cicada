@@ -1276,7 +1276,7 @@ void options(int argc, char** argv)
     ("target-source", po::value<path_type>(&target_source_file), "P(source | target) viterbi output")
     ("span-source",   po::value<path_type>(&span_source_file),   "source span data")
     ("span-target",   po::value<path_type>(&span_target_file),   "target span data")
-    ("input",         po::value<path_type>(&input_file),                      "input alignement")
+    ("input",         po::value<path_type>(&input_file),                      "input alignment")
     ("output",        po::value<path_type>(&output_file)->default_value("-"), "output alignment")
     
     ("f2e", po::bool_switch(&source_target_mode), "source target")

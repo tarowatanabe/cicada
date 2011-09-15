@@ -30,8 +30,6 @@
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/subprocess.hpp"
-#include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
 
 typedef cicada::Vocab     vocab_type;
@@ -144,9 +142,9 @@ int main(int argc, char** argv)
       throw std::runtime_error("# of files do not match");
     if (alignment_mode) {
       if (source_files.size() != alignment_files.size())
-	throw std::runtime_error("# of alignemnt files do not match");
+	throw std::runtime_error("# of alignment files do not match");
       if (target_files.size() != alignment_files.size())
-	throw std::runtime_error("# of alignemnt files do not match");
+	throw std::runtime_error("# of alignment files do not match");
     }
     
     const std::string bos = static_cast<const std::string&>(vocab_type::BOS);
