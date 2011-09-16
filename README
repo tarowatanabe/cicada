@@ -36,7 +36,8 @@ Dependency parsing can be carried out by:
    - A lattice is dependency parsed by compose-dependency-{arc-standard, arc-eager, hybrid, degree2}, generating derivation hypergraph
    - Forests are rescored by dependency features (TODO)
    
-     We support dependency projection [32] with Model1/HMM posterior probabilies so that we can train arbitrary dependency parses.
+     We support dependency projection [32] with Model1/HMM posterior probabilies so that we can train arbitrary dependency parses
+     after projections.
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].

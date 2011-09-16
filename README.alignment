@@ -7,9 +7,13 @@ cicada_lexicon_dice
 
 cicada_lexicon_model1
 	IBM Model1[1] + symmetric learning[2] + posterior constrained learning [3]
+	+ ITG constrained posterior alignment
+	+ MaxMatch posterior alignment (using Hungarian algorithm)
 
 cicada_lexicon_hmm
 	HMM Model[2] + symmetric learning[2] + posterior constrained learning [3]
+	+ ITG constrained posteriors
+	+ MaxMatch posteriors (using Hungarian algorithm)
 
 cicada_lexicon_global{,_mpi}
 	Trigger based global lexicon[4]

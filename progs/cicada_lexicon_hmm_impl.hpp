@@ -1719,7 +1719,7 @@ struct DependencyHMM : public ViterbiBase
 	    const size_type src_dep  = src + 1;
 	    
 	    const double score = scores(src_dep, trg_dep);
-	    
+
 	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	  }
     }
@@ -1763,7 +1763,16 @@ struct DependencyHMM : public ViterbiBase
 
   void shrink()
   {
-    
+    scores_source.clear();
+    scores_target.clear();
+    scores.clear();
+
+    matrix_type(scores_source).swap(scores_source);
+    matrix_type(scores_target).swap(scores_target);
+    matrix_type(scores).swap(scores);
+
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
   }
   
   matrix_type scores_source;
@@ -1816,6 +1825,12 @@ struct DependencyHybridHMM : public DependencyHMM
       analyzer(scores_source, projected_source);
     }
   }
+
+  void shink()
+  {
+    analyzer.shrink();
+    DependencyHMM::shrink();
+  }
   
   analyzer_type analyzer;
 };
@@ -1861,6 +1876,12 @@ struct DependencyDegree2HMM : public DependencyHMM
       
       analyzer(scores_source, projected_source);
     }
+  }
+
+  void shink()
+  {
+    analyzer.shrink();
+    DependencyHMM::shrink();
   }
   
   analyzer_type analyzer;

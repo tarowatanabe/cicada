@@ -64,29 +64,26 @@ struct DependencyDegree2
   typedef utils::vector3<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
   
   typedef utils::chart<hypothesis_set_type, std::allocator<hypothesis_set_type> >  hypothesis_chart_type;
-  
-  hypothesis_chart_type actives;
-  
+    
   template <typename Scores, typename Dependency>
   void operator()(const Scores& scores,
 		  Dependency& dependency)
   {
     const size_t sentence_size = dependency.size();
+    const int    last_max = sentence_size + 1;
     
     actives.clear();
     actives.resize(sentence_size + 2, hypothesis_set_type(sentence_size + 2, sentence_size + 2, sentence_size + 2, hypothesis_type()));
     
     // initialize by axioms...
-    for (size_t pos = 0; pos != sentence_size; ++ pos) {
+    for (int pos = 0; pos != last_max; ++ pos) {
       // we need to shift + 1 for correct indexing...
       // [h3, j, h3 j, j + 1] where j == pos + 1 and h3 should starts from -1
       
-      const int j = pos + 1;
-      for (int h3 = -1; h3 != j; ++ h3)
-	actives(j, j + 1)(h3 + 1, h3 + 1, j + 1).score = 0.0;
+      for (int h3 = -1; h3 != pos; ++ h3)
+	actives(pos, pos + 1)(h3 + 1, h3 + 1, pos + 1).score = 0.0;
     }
     
-    const int last_max = sentence_size + 1;
     for (int last = 2; last <= last_max; ++ last)
       for (int length = 2; last - length >= 0; ++ length)  {
 	const int first = last - length;
@@ -158,6 +155,14 @@ struct DependencyDegree2
     cell += left;
     cell += right;
   }
+
+  void shrink()
+  {
+    actives.clear();
+    hypothesis_chart_type(actives).swap(actives);
+  }
+  
+  hypothesis_chart_type actives;
   
 };
 

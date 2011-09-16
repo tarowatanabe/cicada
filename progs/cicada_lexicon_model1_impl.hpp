@@ -1865,7 +1865,24 @@ struct DependencyModel1 : public ViterbiBase
 
   void shrink()
   {
+    scores_source.clear();
+    scores_target.clear();
+    scores.clear();
+
+    prob_source_target.clear();
+    prob_target_source.clear();
+    posterior_source_target.clear();
+    posterior_target_source.clear();
     
+    matrix_type(scores_source).swap(scores_source);
+    matrix_type(scores_target).swap(scores_target);
+    matrix_type(scores).swap(scores);
+    
+    prob_set_type(prob_source_target).swap(prob_source_target);
+    prob_set_type(prob_target_source).swap(prob_target_source);
+
+    posterior_set_type(posterior_source_target).swap(posterior_source_target);
+    posterior_set_type(posterior_target_source).swap(posterior_target_source);
   }
   
   matrix_type scores_source;
@@ -1914,6 +1931,12 @@ struct DependencyHybridModel1 : public DependencyModel1
       analyzer(scores_source, projected_source);
     }
   }
+
+  void shink()
+  {
+    analyzer.shrink();
+    DependencyModel1::shrink();
+  }
   
   analyzer_type analyzer;
 };
@@ -1953,6 +1976,12 @@ struct DependencyDegree2Model1 : public DependencyModel1
       
       analyzer(scores_source, projected_source);
     }
+  }
+
+  void shink()
+  {
+    analyzer.shrink();
+    DependencyModel1::shrink();
   }
   
   analyzer_type analyzer;
