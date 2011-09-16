@@ -65,9 +65,9 @@ namespace cicada
 	attr_dependency_dependent("dependency-dependent")
     {
       node_map.set_empty_key(id_type(-1));
-
-      rule_goal   = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
-      rule_reduce = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
+      
+      rule_reduce1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
 
     typedef uint32_t id_type;
@@ -94,9 +94,13 @@ namespace cicada
       graph.clear();
       
       actives.clear();
-      actives.resize(lattice.size() + 1);
+      actives.resize(lattice.size() + 2);
       
       // initialize actives by axioms... (terminals)
+      
+      // root...
+      actives(0, 1).push_back(item_type(0, hypergraph_type::invalid));
+      
       id_type id = 1;
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
@@ -110,14 +114,15 @@ namespace cicada
 	  
 	  graph.connect_edge(edge.id, node_id);
 	  
-	  actives(pos, pos + aiter->distance).push_back(item_type(id, node_id));
+	  actives(pos + 1, pos + aiter->distance + 1).push_back(item_type(id, node_id));
 	}
       }
       
       hypergraph_type::edge_type::node_set_type tails(2);
       
-      for (size_t length = 2; length <= lattice.size(); ++ length)
-	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
+      const size_t last_max = lattice.size() + 1;
+      for (size_t length = 2; length <= last_max; ++ length)
+	for (size_t first = 0; first + length <= last_max; ++ first) {
 	  const size_t last = first + length;
 	  
 	  node_map.clear();
@@ -139,36 +144,70 @@ namespace cicada
 		tails.front() = liter->node;
 		tails.back()  = riter->node;
 		
-		{
-		  // left attachment
-		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		  edge.rule = rule_reduce;
-		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(riter->id);
-		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(liter->id);
-		  
-		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(riter->id, 0));
-		  if (result.second) {
-		    result.first->second = graph.add_node().id;
-		    cell.push_back(item_type(riter->id, result.first->second));
+		if (first == 0 && middle == 1) {
+		  {
+		    // left attachment
+		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		    edge.rule = rule_reduce1;
+		    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(riter->id);
+		    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(liter->id);
+		    
+		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(riter->id, 0));
+		    if (result.second) {
+		      result.first->second = graph.add_node().id;
+		      cell.push_back(item_type(riter->id, result.first->second));
+		    }
+		    
+		    graph.connect_edge(edge.id, result.first->second);
 		  }
 		  
-		  graph.connect_edge(edge.id, result.first->second);
-		}
-		
-		{
-		  // right attachment
-		  hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		  edge.rule = rule_reduce;
-		  edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(liter->id);
-		  edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(riter->id);
-		  
-		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(liter->id, 0));
-		  if (result.second) {
-		    result.first->second = graph.add_node().id;
-		    cell.push_back(item_type(liter->id, result.first->second));
+		  {
+		    // right attachment
+		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
+		    edge.rule = rule_reduce1;
+		    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(liter->id);
+		    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(riter->id);
+		    
+		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(liter->id, 0));
+		    if (result.second) {
+		      result.first->second = graph.add_node().id;
+		      cell.push_back(item_type(liter->id, result.first->second));
+		    }
+		    
+		    graph.connect_edge(edge.id, result.first->second);
+		  }
+		} else {
+		  {
+		    // left attachment
+		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		    edge.rule = rule_reduce2;
+		    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(riter->id);
+		    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(liter->id);
+		    
+		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(riter->id, 0));
+		    if (result.second) {
+		      result.first->second = graph.add_node().id;
+		      cell.push_back(item_type(riter->id, result.first->second));
+		    }
+		    
+		    graph.connect_edge(edge.id, result.first->second);
 		  }
 		  
-		  graph.connect_edge(edge.id, result.first->second);
+		  {
+		    // right attachment
+		    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+		    edge.rule = rule_reduce2;
+		    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(liter->id);
+		    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(riter->id);
+		    
+		    std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(liter->id, 0));
+		    if (result.second) {
+		      result.first->second = graph.add_node().id;
+		      cell.push_back(item_type(liter->id, result.first->second));
+		    }
+		    
+		    graph.connect_edge(edge.id, result.first->second);
+		  }
 		}
 	      }
 	  }
@@ -179,14 +218,12 @@ namespace cicada
       const hypergraph_type::id_type goal_id = graph.add_node().id;
       graph.goal = goal_id;
       
-      const item_set_type& goals = actives(0, lattice.size());
+      const item_set_type& goals = actives(0, last_max);
       
       item_set_type::const_iterator giter_end = goals.end();
       for (item_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
 	hypergraph_type::edge_type& edge = graph.add_edge(&(giter->node), &(giter->node) + 1);
-	edge.rule = rule_goal;
-	edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(0);
-	edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(giter->id);
+	edge.rule = rule_reduce1;
 	
 	graph.connect_edge(edge.id, goal_id);
       }
@@ -202,8 +239,8 @@ namespace cicada
     active_chart_type     actives;
     node_map_type         node_map;
     
-    rule_ptr_type rule_goal;
-    rule_ptr_type rule_reduce;
+    rule_ptr_type rule_reduce1;
+    rule_ptr_type rule_reduce2;
   };
 
   inline
