@@ -116,40 +116,24 @@ struct DependencyDegree2
 		    const hypothesis_type& right = rights(h3 + 1, h4 + 1, h5 + 1);
 		    
 		    // [h1, i, h2 h5, j] (la1; h5 -> h4)
-		    if (h4 > 0) {
-		      // left attachment
-		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h5 + 1);
-		      const double& score_edge = scores(h5, h4);
-		      
-		      enumerate(cell,  left,  right, h5, h4, score_edge);
-		    }
+		    // left attachment
+		    if (h4 > 0)
+		      enumerate(cells(h1 + 1, h2 + 1, h5 + 1),  left,  right, h5, h4, scores(h5, h4));
 		    
 		    // [h1, i, h2 h4, j] (ra1; h4 -> h5)
-		    if (h4 >= 0) {
-		      // right attachment
-		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
-		      const double& score_edge = scores(h4, h5);
-		      
-		      enumerate(cell, left, right, h4, h5, score_edge);
-		    }
+		    // right attachment
+		    if (h4 >= 0)
+		      enumerate(cells(h1 + 1, h2 + 1, h4 + 1), left, right, h4, h5, scores(h4, h5));
 		    
 		    // [h1, i, h4 h5, j] (la2; h5 -> h2)
-		    if (h2 > 0) {
-		      // left attachment
-		      hypothesis_type& cell = cells(h1 + 1, h4 + 1, h5 + 1);
-		      const double score_edge = scores(h5, h2);
-		      
-		      enumerate(cell, left, right, h5, h2, score_edge);
-		    }
+		    // left attachment
+		    if (h2 > 0)
+		      enumerate(cells(h1 + 1, h4 + 1, h5 + 1), left, right, h5, h2, scores(h5, h2));
 		    
 		    // [h1, i, h2 h4, j] (ra2; h2 -> h5)
-		    if (h2 >= 0) {
-		      // right attachment
-		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
-		      const double score_edge = scores(h2, h5);
-		      
-		      enumerate(cell, left, right, h2, h5, score_edge);
-		    }
+		    // right attachment
+		    if (h2 >= 0)
+		      enumerate(cells(h1 + 1, h2 + 1, h4 + 1), left, right, h2, h5, scores(h2, h5));
 		  }
 	}
       }
