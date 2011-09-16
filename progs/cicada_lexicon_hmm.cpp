@@ -1138,6 +1138,9 @@ void viterbi(const ttable_type& ttable_source_target,
   for (;;) {
     is_src >> bitext.source;
     is_trg >> bitext.target;
+
+    bitext.span_source.clear();
+    bitext.span_target.clear();
     
     if (is_span_src.get())
       *is_span_src >> bitext.span_source;
@@ -1429,6 +1432,9 @@ void project_dependency(const ttable_type& ttable_source_target,
     is_src >> bitext.source;
     is_trg >> bitext.target;
     
+    bitext.dependency_source.clear();
+    bitext.dependency_target.clear();
+
     if (is_dep_src.get())
       *is_dep_src >> bitext.dependency_source;
     if (is_dep_trg.get())
