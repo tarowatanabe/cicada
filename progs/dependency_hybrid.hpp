@@ -72,9 +72,7 @@ struct DependencyHybrid
   typedef Hypothesis hypothesis_type;
   
   typedef utils::chart<hypothesis_type, std::allocator<hypothesis_type> >  hypothesis_chart_type;
-  
-  hypothesis_chart_type actives;
-  
+    
   template <typename Scores, typename Dependency>
   void operator()(const Scores& scores,
 		  Dependency& dependency)
@@ -129,6 +127,13 @@ struct DependencyHybrid
     cell += right;
   }
 
+  void shrink()
+  {
+    actives.clear();
+    hypothesis_chart_type(actives).swap(actives);
+  }
+
+  hypothesis_chart_type actives;
 };
 
 #endif

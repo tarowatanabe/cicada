@@ -64,9 +64,7 @@ struct DependencyDegree2
   typedef utils::vector3<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
   
   typedef utils::chart<hypothesis_set_type, std::allocator<hypothesis_set_type> >  hypothesis_chart_type;
-  
-  hypothesis_chart_type actives;
-  
+    
   template <typename Scores, typename Dependency>
   void operator()(const Scores& scores,
 		  Dependency& dependency)
@@ -157,6 +155,14 @@ struct DependencyDegree2
     cell += left;
     cell += right;
   }
+
+  void shrink()
+  {
+    actives.clear();
+    hypothesis_chart_type(actives).swap(actives);
+  }
+  
+  hypothesis_chart_type actives;
   
 };
 
