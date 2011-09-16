@@ -99,37 +99,12 @@ struct DependencyHybrid
 	  const hypothesis_type& left = actives(first, middle);
 	  const hypothesis_type& right = actives(middle, last);
 	  
-	  if (last < last_max) {
-	    // left attachment
-	    
-	    // head is last and middle is dependent
-	    // we will compute three cases, first and second, second and first and second and second
-
-	    const double score_edge = scores(last, middle);
-	    
-	    if (left.valid() && right.valid() && score_edge + left.score + right.score > cell.score) {
-	      cell.clear();
-	      
-	      cell.score = score_edge;
-	      
-	      cell += dep_type(last, middle);
-	      cell += left;
-	      cell += right;
-	    }
-	  }
+	  // left attachment
+	  if (last < last_max)
+	    enumerate(cell, left, right, last, middle, scores(last, middle));
 	  
 	  // right attachment
-	  const double score_edge = scores(first, middle);
-	  
-	  if (left.valid() && right.valid() && score_edge + left.score + right.score > cell.score) {
-	    cell.clear();
-	    
-	    cell.score = score_edge;
-	    
-	    cell += dep_type(first, middle);
-	    cell += left;
-	    cell += right;
-	  }
+	  enumerate(cell, left, right, first, middle, scores(first, middle));
 	}
       }
     
@@ -139,6 +114,21 @@ struct DependencyHybrid
     for (dep_set_type::const_iterator diter = deps.begin(); diter != diter_end; ++ diter)
       dependency[diter->second - 1] = diter->first;
   }
+
+  void enumerate(hypothesis_type& cell, const hypothesis_type& left, const hypothesis_type& right, const int& head, const int& dep, const double& score_edge)
+  {
+    if (! left.valid() || ! right.valid()) return;
+    
+    if (score_edge + left.score + right.score <= cell.score) return;
+    
+    cell.clear();
+    cell.score = score_edge;
+    
+    cell += dep_type(head, dep);
+    cell += left;
+    cell += right;
+  }
+
 };
 
 #endif
