@@ -287,10 +287,23 @@ cicada_lexicon_global_mpi_SOURCES = cicada_lexicon_global_mpi.cpp $(LBFGS_SOURCE
 cicada_lexicon_global_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_lexicon_hmm_SOURCES = cicada_lexicon_hmm.cpp cicada_lexicon_hmm_impl.hpp cicada_lexicon_model1_impl.hpp cicada_lexicon_maximize_impl.hpp kuhn_munkres.hpp
+cicada_lexicon_hmm_SOURCES = \
+	cicada_lexicon_hmm.cpp \
+	cicada_lexicon_hmm_impl.hpp \
+	cicada_lexicon_model1_impl.hpp \
+	cicada_lexicon_maximize_impl.hpp \
+	itg_alignment.hpp \
+	itg_alignment.hpp \
+	kuhn_munkres.hpp
 cicada_lexicon_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_lexicon_model1_SOURCES = cicada_lexicon_model1.cpp cicada_lexicon_model1_impl.hpp cicada_lexicon_maximize_impl.hpp kuhn_munkres.hpp
+cicada_lexicon_model1_SOURCES = \
+	cicada_lexicon_model1.cpp \
+	cicada_lexicon_model1_impl.hpp \
+	cicada_lexicon_maximize_impl.hpp \
+	dependency_hybrid.hpp \
+	itg_alignment.hpp \
+	kuhn_munkres.hpp 
 cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp cicada_text_impl.hpp
