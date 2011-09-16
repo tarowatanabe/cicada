@@ -1760,6 +1760,11 @@ struct DependencyHMM : public ViterbiBase
 	  }
     }
   }
+
+  void shrink()
+  {
+    
+  }
   
   matrix_type scores_source;
   matrix_type scores_target;

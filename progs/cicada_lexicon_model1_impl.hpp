@@ -1690,7 +1690,7 @@ struct MaxMatchModel1 : public ViterbiBase
     posterior_set_type(posterior_source_target).swap(posterior_source_target);
     posterior_set_type(posterior_target_source).swap(posterior_target_source);
   }
-
+  
   matrix_type costs;
 
   prob_set_type      prob_source_target;
@@ -1861,6 +1861,11 @@ struct DependencyModel1 : public ViterbiBase
 	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
 	  }
     }
+  }
+
+  void shrink()
+  {
+    
   }
   
   matrix_type scores_source;

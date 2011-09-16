@@ -40,6 +40,9 @@ bool moses_mode = false;
 bool itg_mode = false;
 bool max_match_mode = false;
 
+bool hybrid_mode = false;
+bool degree2_mode = false;
+
 // parameter...
 double p0    = 0.01;
 double prior_lexicon = 0.01;
@@ -64,6 +67,10 @@ template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
 	     const ttable_type& ttable_target_source);
 
+template <typename Analyzer>
+void project_dependency(const ttable_type& ttable_source_target,
+			const ttable_type& ttable_target_source);
+
 void options(int argc, char** argv);
 
 int main(int argc, char ** argv)
@@ -74,7 +81,7 @@ int main(int argc, char ** argv)
     if (itg_mode && max_match_mode)
       throw std::runtime_error("you cannot specify both of ITG and max-match for Viterbi alignment");
 
-    if (! projected_target_file.empty())    
+    if (! projected_target_file.empty())
       if (dependency_source_file != "-" && ! boost::filesystem::exists(dependency_source_file))
 	throw std::runtime_error("no source side dependency");
     
@@ -82,6 +89,12 @@ int main(int argc, char ** argv)
       if (dependency_target_file != "-" && ! boost::filesystem::exists(dependency_target_file))
 	throw std::runtime_error("no target side dependency");
     
+    if (hybrid_mode && degree2_mode)
+      throw std::runtime_error("you cannot specify both of Hybrid and Degree2 dependency parsing");
+    
+    if (int(hybrid_mode) + degree2_mode == 0)
+      hybrid_mode = true;
+
     threads = utils::bithack::max(threads, 1);
     
     ttable_type ttable_source_target(prior_lexicon, smooth_lexicon);
@@ -158,14 +171,21 @@ int main(int argc, char ** argv)
       }
     }
     
+    // dependency parsing projection
     if (! projected_source_file.empty() || ! projected_target_file.empty()) {
-      
-      
-      
-      
+      if (hybrid_mode) {
+	if (debug)
+	  std::cerr << "hybrid projective dependency" << std::endl;
+
+	project_dependency<DependencyHybridModel1>(ttable_source_target, ttable_target_source);
+      } else if (degree2_mode) {
+	if (debug)
+	  std::cerr << "degree2 non-projective dependency" << std::endl;
+	
+	project_dependency<DependencyDegree2Model1>(ttable_source_target, ttable_target_source);
+      } else
+	throw std::runtime_error("no dependency algorithm?");
     }
-
-
       
     // final writing
     boost::thread_group workers_write;
@@ -642,7 +662,7 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
 
     const int iter_mask = (1 << 12) - 1;
     
-    for (int iter = 0;; ++ iter) {
+    for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
       
@@ -872,7 +892,286 @@ void viterbi(const ttable_type& ttable_source_target,
 	      << "user time: " << viterbi_end.user_time() - viterbi_start.user_time() << std::endl;
 }
 
+struct ProjectionMapReduce
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct bitext_type
+  {
+    size_type       id;
+    sentence_type   source;
+    sentence_type   target;
+    dependency_type dependency_source;
+    dependency_type dependency_target;
 
+    bitext_type() : id(size_type(-1)), source(), target(), dependency_source(), dependency_target() {}
+    
+    void clear()
+    {
+      id = size_type(-1);
+      source.clear();
+      target.clear();
+      dependency_source.clear();
+      dependency_target.clear();
+    }
+    
+    void swap(bitext_type& x)
+    {
+      std::swap(id, x.id);
+      source.swap(x.source);
+      target.swap(x.target);
+      dependency_source.swap(x.dependency_source);
+      dependency_target.swap(x.dependency_target);
+    }
+  };
+  
+  struct projected_type
+  {
+    size_type id;
+    dependency_type dependency;
+    
+    projected_type() : id(size_type(-1)), dependency() {}
+    
+    void clear()
+    {
+      id = size_type(-1);
+      dependency.clear();
+    }
+    
+    void swap(projected_type& x)
+    {
+      std::swap(id, x.id);
+      dependency.swap(x.dependency);
+    }
+  };
+  
+
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> >       queue_mapper_type;
+  typedef utils::lockfree_list_queue<projected_type, std::allocator<projected_type> > queue_reducer_type;
+};
+
+namespace std
+{
+  inline
+  void swap(ProjectionMapReduce::bitext_type& x, ProjectionMapReduce::bitext_type& y)
+  {
+    x.swap(y);
+  }
+  
+  inline
+  void swap(ProjectionMapReduce::projected_type& x, ProjectionMapReduce::projected_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+template <typename Analyzer>
+struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
+{
+  queue_mapper_type& mapper;
+  queue_reducer_type& reducer_source;
+  queue_reducer_type& reducer_target;
+  
+  ProjectionMapper(const Analyzer& __analyzer,
+		   queue_mapper_type& __mapper,
+		   queue_reducer_type& __reducer_source,
+		   queue_reducer_type& __reducer_target)
+    : Analyzer(__analyzer),
+      mapper(__mapper),
+      reducer_source(__reducer_source),
+      reducer_target(__reducer_target) {}
+  
+  void operator()()
+  {
+    bitext_type bitext;
+    projected_type projected_source;
+    projected_type projected_target;
+    
+    const int iter_mask = (1 << 12) - 1;
+    
+    for (int iter = 0; /**/; ++ iter) {
+      mapper.pop_swap(bitext);
+      if (bitext.id == size_type(-1)) break;
+
+      projected_source.clear();
+      projected_target.clear();
+      
+      if (! bitext.source.empty() && ! bitext.target.empty())
+	Analyzer::operator()(bitext.source,
+			     bitext.target,
+			     bitext.dependency_source,
+			     bitext.dependency_target,
+			     projected_source.dependency,
+			     projected_target.dependency);
+      
+      projected_source.id = bitext.id;
+      projected_target.id = bitext.id;
+      
+      reducer_source.push_swap(projected_source);
+      reducer_target.push_swap(projected_target);
+      
+      if ((iter & iter_mask) == iter_mask)
+	Analyzer::shrink();
+    }
+  }
+  
+};
+
+struct ProjectionReducer : public ProjectionMapReduce
+{
+  struct less_projected
+  {
+    bool operator()(const projected_type& x, const projected_type& y) const
+    {
+      return x.id < y.id;
+    }
+  };
+  typedef std::set<projected_type, less_projected, std::allocator<projected_type> > projected_set_type;
+  
+  path_type           path;
+  queue_reducer_type& queue;
+  
+  ProjectionReducer(const path_type& __path, queue_reducer_type& __queue) : path(__path), queue(__queue) {}
+  
+  void operator()()
+  {
+   if (path.empty()) {
+     projected_type projected;
+     for (;;) {
+       queue.pop_swap(projected);
+       if (projected.id == size_type(-1)) break;
+     }
+   } else { 
+     const bool flush_output = (path == "-"
+				|| (boost::filesystem::exists(path)
+				    && ! boost::filesystem::is_regular_file(path)));
+     
+     utils::compress_ostream os(path, 1024 * 1024 * (! flush_output));
+     
+     size_type id = 0;
+     projected_type     projected;
+     projected_set_type buffer;
+     for (;;) {
+       queue.pop_swap(projected);
+       if (projected.id == size_type(-1)) break;
+       
+       if (projected.id == id) {
+	 os << projected.dependency << '\n';
+	 ++ id;
+       } else
+	 buffer.insert(projected);
+       
+       while (! buffer.empty() && buffer.begin()->id == id) {
+	 os << buffer.begin()->dependency << '\n';
+	 buffer.erase(buffer.begin());
+	 ++ id;
+       }
+     }
+     
+     while (! buffer.empty() && buffer.begin()->id == id) {
+       os << buffer.begin()->dependency << '\n';
+       buffer.erase(buffer.begin());
+       ++ id;
+     }
+     
+     if (! buffer.empty())
+       throw std::runtime_error("error while writing dependency output?");
+   }
+  }
+};
+
+template <typename Analyzer>
+void project_dependency(const ttable_type& ttable_source_target,
+			const ttable_type& ttable_target_source)
+{
+  typedef ProjectionMapper<Analyzer> mapper_type;
+  typedef ProjectionReducer          reducer_type;
+  
+  typedef reducer_type::bitext_type    bitext_type;
+  typedef reducer_type::projected_type projected_type;
+  
+  typedef reducer_type::queue_mapper_type  queue_mapper_type;
+  typedef reducer_type::queue_reducer_type queue_reducer_type;
+
+  typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
+  
+  
+  queue_mapper_type  queue(threads * 4096);
+  queue_reducer_type queue_source(threads * 4096);
+  queue_reducer_type queue_target(threads * 4096);
+  
+  boost::thread_group mapper;
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(mapper_type(Analyzer(ttable_source_target, ttable_target_source),
+						    queue,
+						    queue_source,
+						    queue_target)));
+  
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(projected_source_file, queue_source)));
+  reducer.add_thread(new boost::thread(reducer_type(projected_target_file, queue_target)));
+  
+  bitext_type bitext;
+  bitext.id = 0;
+
+  utils::resource projection_start;
+  
+  utils::compress_istream is_src(source_file, 1024 * 1024);
+  utils::compress_istream is_trg(target_file, 1024 * 1024);
+  
+  std::auto_ptr<std::istream> is_dep_src(! dependency_source_file.empty()
+					 ? new utils::compress_istream(dependency_source_file, 1024 * 1024) : 0);
+  std::auto_ptr<std::istream> is_dep_trg(! dependency_target_file.empty()
+					 ? new utils::compress_istream(dependency_target_file, 1024 * 1024) : 0);
+  
+  for (;;) {
+    is_src >> bitext.source;
+    is_trg >> bitext.target;
+    
+    if (is_dep_src.get())
+      *is_dep_src >> bitext.dependency_source;
+    if (is_dep_trg.get())
+      *is_dep_trg >> bitext.dependency_target;
+    
+    if (! is_src || ! is_trg || (is_dep_src.get() && ! *is_dep_src) || (is_dep_trg.get() && ! *is_dep_trg)) break;
+    
+    queue.push(bitext);
+    
+    ++ bitext.id;
+    
+    if (debug) {
+      if (bitext.id % 10000 == 0)
+	std::cerr << '.';
+      if (bitext.id % 1000000 == 0)
+	std::cerr << '\n';
+    }
+  }
+  
+  if (debug && bitext.id >= 10000)
+    std::cerr << std::endl;
+  if (debug)
+    std::cerr << "# of bitexts: " << bitext.id << std::endl;
+
+  if (is_src || is_trg || (is_dep_src.get() && *is_dep_src) || (is_dep_trg.get() && *is_dep_trg))
+    throw std::runtime_error("# of samples do not match");
+  
+  for (int i = 0; i != threads; ++ i) {
+    bitext.clear();
+    queue.push_swap(bitext);
+  }
+  mapper.join_all();
+  
+  queue_source.push(projected_type());
+  queue_target.push(projected_type());
+  reducer.join_all();
+
+  utils::resource projection_end;
+  
+  if (debug)
+    std::cerr << "cpu time:  " << projection_end.cpu_time() - projection_start.cpu_time() << std::endl
+	      << "user time: " << projection_end.user_time() - projection_start.user_time() << std::endl;
+}
 
 void options(int argc, char** argv)
 {
@@ -913,6 +1212,9 @@ void options(int argc, char** argv)
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     ("moses",     po::bool_switch(&moses_mode),     "Moses alignment foramt")
+
+    ("hybrid",  po::bool_switch(&hybrid_mode),  "hybrid projective dependency parsing")
+    ("degree2", po::bool_switch(&degree2_mode), "degree2 non-projective dependency parsing")
     
     ("p0",             po::value<double>(&p0)->default_value(p0),                         "parameter for NULL alignment")
     ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),   "Dirichlet prior for variational Bayes")
