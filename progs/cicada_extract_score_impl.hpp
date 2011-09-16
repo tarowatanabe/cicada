@@ -58,6 +58,7 @@
 #include <utils/base64.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/simple_vector.hpp>
 
 #include <google/dense_hash_map>
 
@@ -65,7 +66,7 @@ class RootCount
 {
 public:
   typedef std::string label_type;
-  typedef std::vector<double, std::allocator<double> > counts_type;
+  typedef utils::simple_vector<double, std::allocator<double> > counts_type;
 
   label_type  label;
   counts_type counts;
@@ -99,7 +100,7 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    counts.reserve(size_max);
+    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -153,7 +154,7 @@ class PhrasePair
 {
 public:
   typedef std::string phrase_type;
-  typedef std::vector<double, std::allocator<double> > counts_type;
+  typedef utils::simple_vector<double, std::allocator<double> > counts_type;
   typedef cicada::Alignment alignment_type;
   typedef alignment_type::point_type point_type;
 
@@ -185,7 +186,7 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    counts.reserve(size_max);
+    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -279,7 +280,7 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    counts.reserve(size_max);
+    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -1589,6 +1590,7 @@ struct PhrasePairReverseMapper
 	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.push_back(curr);
+	counts.back().counts.clear();
 	modified.swap(curr);
 	observed = 1;
 	
@@ -1606,6 +1608,7 @@ struct PhrasePairReverseMapper
 	// copy into curr (assuming std::string sharing...)
 	curr.source = modified.source;
 	counts.push_back(curr);
+	counts.back().counts.clear();
 	modified.target.swap(curr.target);
 	modified.increment(curr.counts.begin(), curr.counts.end());
 	observed += 1;
