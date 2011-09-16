@@ -32,6 +32,12 @@ Alignment can be carried out by:
      by symmetized learning [22] or posterior constrained learning [23] with smoothing
      via variational Bayes.
 
+Dependency parsing can be carried out by:
+   - A lattice is dependency parsed by compose-dependency-{arc-standard, arc-eager, hybrid, degree2}, generating derivation hypergraph
+   - Forests are rescored by dependency features (TODO)
+   
+     We support dependency projection [32] with Model1/HMM posterior probabilies so that we can train arbitrary dependency parses.
+
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
       * cicada implementes cube-pruning [4], cube-growing [4], incremental [18]
@@ -475,3 +481,16 @@ References:
   year = {2010},
   pages = {267--274},
   location = {Paris, France}
+
+[32]
+@InProceedings{jiang-liu:2010:ACL,
+  author    = {Jiang, Wenbin  and  Liu, Qun},
+  title     = {Dependency Parsing and Projection Based on Word-Pair Classification},
+  booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
+  month     = {July},
+  year      = {2010},
+  address   = {Uppsala, Sweden},
+  publisher = {Association for Computational Linguistics},
+  pages     = {12--20},
+  url       = {http://www.aclweb.org/anthology/P10-1002}
+}
