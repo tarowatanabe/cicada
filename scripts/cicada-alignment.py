@@ -87,6 +87,10 @@ opt_parser = OptionParser(
     make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-20)"),
     make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
 
+    ## option for lexicon
+    make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
+    make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
+    
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="cicada directory"),
@@ -150,6 +154,8 @@ class CICADA:
                         ## step2
                         'cicada_alignment', 
                         ## step 3
+                        'cicada_lexicon',
+                        ## step 4
                         ):
 	    
 	    for bindir in self.bindirs:
@@ -481,6 +487,58 @@ class AlignmentPosterior:
     def run(self):
         run_command(self.command)
 
+class Lexicon:
+    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
+                 inverse=None,
+                 threads=4,
+                 debug=None):
+        self.threads = threads
+        
+        self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
+        self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
+        self.makedirs = lexical_dir
+        self.data = []
+
+        self.data.append(corpus.source)
+        self.data.append(corpus.target)
+
+        command = "%s" %(cicada.cicada_lexicon)
+        
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+        
+        command += " --output-source-target \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.f2n'))
+        command += " --output-target-source \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.n2f'))
+        
+        command += " --variational-bayes"
+        command += " --prior %g" %(prior)
+        
+        if inverse:
+            command += " --inverse"
+
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        for file in self.data:
+            if not os.path.exists(file):
+                raise ValueError, "no file: " + file
+
+        if not os.path.exists(self.makedirs):
+            os.makedirs(self.makedirs)
+        
+        run_command(self.command)
+
+        self.source_target = compressed_file(self.source_target)
+        self.target_source = compressed_file(self.target_source)
+
 (options, args) = opt_parser.parse_args()
 
 if options.root_dir:
@@ -574,5 +632,17 @@ if options.first_step <= 3 and options.last_step >= 3:
     print "(3) generate word alignment started  @", time.ctime()
     alignment.run()
     print "(3) generate word alignment finished @", time.ctime()
+
+lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
+                  lexical_dir=options.lexical_dir,
+                  prior=options.lexicon_prior,
+                  inverse=options.lexicon_inverse,
+                  threads=options.threads, 
+                  debug=options.debug)
+
+if options.first_step <= 4 and options.last_step >= 4:
+    print "(4) generate lexical translation table started  @", time.ctime()
+    lexicon.run()
+    print "(4) generate lexical translation table finished @", time.ctime()
 
 

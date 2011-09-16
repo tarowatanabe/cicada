@@ -14,6 +14,8 @@
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
+#include "dependency_hybrid.hpp"
+#include "dependency_degree2.hpp"
 
 struct LearnModel1 : public LearnBase
 {
@@ -1688,13 +1690,272 @@ struct MaxMatchModel1 : public ViterbiBase
     posterior_set_type(posterior_source_target).swap(posterior_source_target);
     posterior_set_type(posterior_target_source).swap(posterior_target_source);
   }
-
+  
   matrix_type costs;
 
   prob_set_type      prob_source_target;
   prob_set_type      prob_target_source;
   posterior_set_type posterior_source_target;
   posterior_set_type posterior_target_source;
+};
+
+struct DependencyModel1 : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  
+  DependencyModel1(const ttable_type& __ttable_source_target,
+		   const ttable_type& __ttable_target_source)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const double prob_null  = p0;
+    const double prob_align = 1.0 - p0;
+    
+    // we do not have to clearn!
+    posterior_source_target.reserve(target_size + 1, source_size + 1);
+    posterior_target_source.reserve(source_size + 1, target_size + 1);
+    
+    posterior_source_target.resize(target_size + 1, source_size + 1);
+    posterior_target_source.resize(source_size + 1, target_size + 1);
+    
+    prob_source_target.reserve(source_size + 1);
+    prob_target_source.reserve(target_size + 1);
+    
+    prob_source_target.resize(source_size + 1);
+    prob_target_source.resize(target_size + 1);
+    
+    for (size_type trg = 0; trg != target_size; ++ trg) {
+      const double prob_align_norm = 1.0 / source_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_source_target.begin();
+      prob_set_type::iterator piter_end = prob_source_target.end();
+      *piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
+	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_source_target.begin();
+      posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ siter)
+	(*siter) = (*piter) * factor;
+    }
+    
+    for (size_type src = 0; src != source_size; ++ src) {
+      const double prob_align_norm = 1.0 / target_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_target_source.begin();
+      prob_set_type::iterator piter_end = prob_target_source.end();
+      *piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
+	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_target_source.begin();
+      posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ titer)
+	(*titer) = (*piter) * factor;
+    }
+    
+    static const double lowest = - std::numeric_limits<double>::infinity();
+    
+    scores.clear();
+    scores.reserve(source_size + 1, target_size + 1);
+    scores.resize(source_size + 1, target_size + 1, lowest);
+    
+    for (size_type src = 1; src <= source_size; ++ src)
+      for (size_type trg = 1; trg <= target_size; ++ trg)
+	scores(src, trg) = 0.5 * (utils::mathop::log(posterior_source_target(trg, src))
+				  + utils::mathop::log(posterior_target_source(src, trg)));
+    
+    if (! dependency_source.empty()) {
+      if (dependency_source.size() != source_size)
+	throw std::runtime_error("dependency size do not match");
+      
+      scores_target.clear();
+      scores_target.reserve(target_size + 1, target_size + 1);
+      scores_target.resize(target_size + 1, target_size + 1, lowest);
+      
+      // we will compute the score matrix...
+      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
+	for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
+	  if (trg_head != trg_dep)
+	    for (size_type src = 0; src != dependency_source.size(); ++ src) 
+	      if (dependency_source[src]) {
+		const size_type src_head = dependency_source[src];
+		const size_type src_dep  = src + 1;
+		
+		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
+		
+		scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+	      }
+      
+      // this is for the root...
+      for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
+	for (size_type src = 0; src != dependency_source.size(); ++ src) 
+	  if (! dependency_source[src]) {
+	    const size_type trg_head = 0;
+	    const size_type src_head = dependency_source[src];
+	    const size_type src_dep  = src + 1;
+	    
+	    const double score = scores(src_dep, trg_dep);
+	    
+	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+	  }
+    }
+    
+    if (! dependency_target.empty()) {
+      if (dependency_target.size() != target_size)
+	throw std::runtime_error("dependency size do not match");
+
+      scores_source.clear();
+      scores_source.reserve(source_size + 1, source_size + 1);
+      scores_source.resize(source_size + 1, source_size + 1, lowest);
+      
+      // we will compute the score matrix...
+      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
+	for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
+	  if (src_head != src_dep)
+	    for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
+	      if (dependency_target[trg]) {
+		const size_type trg_head = dependency_target[trg];
+		const size_type trg_dep  = trg + 1;
+		
+		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
+		
+		scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+	      }
+      
+      // this is for the root.
+      for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
+	for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
+	  if (! dependency_target[trg]) {
+	    const size_type src_head = 0;
+	    const size_type trg_head = dependency_target[trg];
+	    const size_type trg_dep  = trg + 1;
+	    
+	    const double score = scores(src_dep, trg_dep);
+	    
+	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+	  }
+    }
+  }
+
+  void shrink()
+  {
+    
+  }
+  
+  matrix_type scores_source;
+  matrix_type scores_target;
+  matrix_type scores;
+  
+  prob_set_type      prob_source_target;
+  prob_set_type      prob_target_source;
+  posterior_set_type posterior_source_target;
+  posterior_set_type posterior_target_source;
+};
+
+struct DependencyHybridModel1 : public DependencyModel1
+{
+  
+  typedef DependencyHybrid analyzer_type;
+
+  DependencyHybridModel1(const ttable_type& __ttable_source_target,
+			 const ttable_type& __ttable_target_source)
+    : DependencyModel1(__ttable_source_target, __ttable_target_source) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    DependencyModel1::operator()(source, target, dependency_source, dependency_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! dependency_source.empty()) {
+      projected_target.resize(target_size, - 1);
+      
+      analyzer(scores_target, projected_target);
+    }
+    
+    if (! dependency_target.empty()) {
+      projected_source.resize(source_size, - 1);
+      
+      analyzer(scores_source, projected_source);
+    }
+  }
+  
+  analyzer_type analyzer;
+};
+
+struct DependencyDegree2Model1 : public DependencyModel1
+{
+  
+  typedef DependencyDegree2 analyzer_type;
+
+  DependencyDegree2Model1(const ttable_type& __ttable_source_target,
+			 const ttable_type& __ttable_target_source)
+    : DependencyModel1(__ttable_source_target, __ttable_target_source) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    DependencyModel1::operator()(source, target, dependency_source, dependency_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! dependency_source.empty()) {
+      projected_target.resize(target_size, - 1);
+      
+      analyzer(scores_target, projected_target);
+    }
+    
+    if (! dependency_target.empty()) {
+      projected_source.resize(source_size, - 1);
+      
+      analyzer(scores_source, projected_source);
+    }
+  }
+  
+  analyzer_type analyzer;
 };
 
 #endif
