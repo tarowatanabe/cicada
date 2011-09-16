@@ -1719,7 +1719,7 @@ struct DependencyHMM : public ViterbiBase
 	    const size_type src_dep  = src + 1;
 	    
 	    const double score = scores(src_dep, trg_dep);
-	    
+
 	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	  }
     }

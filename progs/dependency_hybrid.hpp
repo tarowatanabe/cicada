@@ -80,15 +80,15 @@ struct DependencyHybrid
 		  Dependency& dependency)
   {
     const size_t sentence_size = dependency.size();
+    const int    last_max = sentence_size + 1;
     
     actives.clear();
     actives.resize(dependency.size() + 2, hypothesis_type());
     
     // initialize by axioms...
-    for (size_t pos = 0; pos != sentence_size; ++ pos)
-      actives(pos + 1, pos + 2).score = 0.0;
+    for (int pos = 0; pos != last_max; ++ pos)
+      actives(pos, pos + 1).score = 0.0;
     
-    const int last_max = sentence_size + 1;
     for (int last = 2; last <= last_max; ++ last)
       for (int length = 2; last - length >= 0; ++ length)  {
 	const int first = last - length;
