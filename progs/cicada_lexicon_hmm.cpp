@@ -17,6 +17,8 @@
 path_type source_file = "-";
 path_type target_file = "-";
 path_type alignment_file;
+path_type dependency_source_file;
+path_type dependency_target_file;
 path_type span_source_file;
 path_type span_target_file;
 path_type classes_source_file;
@@ -31,6 +33,8 @@ path_type output_alignment_source_target_file;
 path_type output_alignment_target_source_file;
 path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
+path_type projected_source_file;
+path_type projected_target_file;
 
 int iteration_model1 = 5;
 int iteration_hmm = 5;
@@ -88,6 +92,15 @@ int main(int argc, char ** argv)
     
     if (itg_mode && max_match_mode)
       throw std::runtime_error("you cannot specify both of ITG and max-match for Viterbi alignment");
+    
+
+    if (! projected_target_file.empty())    
+      if (dependency_source_file != "-" && ! boost::filesystem::exists(dependency_source_file))
+	throw std::runtime_error("no source side dependency");
+    
+    if (! projected_source_file.empty())
+      if (dependency_target_file != "-" && ! boost::filesystem::exists(dependency_target_file))
+	throw std::runtime_error("no target side dependency");
     
     threads = utils::bithack::max(threads, 1);
     
@@ -1143,6 +1156,9 @@ void options(int argc, char** argv)
     ("target",    po::value<path_type>(&target_file),    "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     
+    ("dependency-source", po::value<path_type>(&dependency_source_file), "source dependency file")
+    ("dependency-target", po::value<path_type>(&dependency_target_file), "target dependency file")
+    
     ("span-source", po::value<path_type>(&span_source_file), "source span file")
     ("span-target", po::value<path_type>(&span_target_file), "target span file")
 
@@ -1161,6 +1177,9 @@ void options(int argc, char** argv)
     
     ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
     ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
+
+    ("projected-source", po::value<path_type>(&projected_source_file), "source projected dependency file")
+    ("projected-target", po::value<path_type>(&projected_target_file), "target projected dependency file")
     
     ("iteration-model1", po::value<int>(&iteration_model1)->default_value(iteration_model1), "max Model1 iteration")
     ("iteration-hmm", po::value<int>(&iteration_hmm)->default_value(iteration_hmm), "max HMM iteration")

@@ -11,6 +11,30 @@
 
 #include <utils/chart.hpp>
 
+// hybrid parser based on the deduction system presented in
+//
+// @InProceedings{kuhlmann-gomezrodriguez-satta:2011:ACL-HLT2011,
+//   author    = {Kuhlmann, Marco  and  G\'{o}mez-Rodr\'{i}guez, Carlos  and  Satta, Giorgio},
+//   title     = {Dynamic Programming Algorithms for Transition-Based Dependency Parsers},
+//   booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+//   month     = {June},
+//   year      = {2011},
+//   address   = {Portland, Oregon, USA},
+//   publisher = {Association for Computational Linguistics},
+//   pages     = {673--682},
+//   url       = {http://www.aclweb.org/anthology/P11-1068}
+// }
+//
+// which is originally presented in
+//
+// @INPROCEEDINGS{Yamada03statisticaldependency,
+//   author = {Hiroyasu Yamada and Yuji Matsumoto},
+//   title = {Statistical Dependency Analysis with Support Vector Machines},
+//   booktitle = {In Proceedings of IWPT},
+//   year = {2003},
+//   pages = {195--206}
+// }
+
 struct DependencyHybrid
 {
   typedef std::pair<int, int> dep_type;
@@ -126,7 +150,7 @@ struct DependencyHybrid
 	      
 	      cell.first.score = score_edge;
 	      
-	      cell.first += dep_type(first, last);
+	      cell.first += dep_type(first, middle);
 	      cell.first += left.second;
 	      cell.first += right.second;
 	    }
@@ -158,7 +182,7 @@ struct DependencyHybrid
 	      
 	      cell.second.score = score_edge;
 	      
-	      cell.second += dep_type(first, last);
+	      cell.second += dep_type(first, middle);
 	      cell.second += left.second;
 	      cell.second += right.second;
 	    }

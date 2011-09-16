@@ -17,6 +17,8 @@
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
+#include "dependency_hybrid.hpp"
+#include "dependency_degree2.hpp"
 
 struct LearnHMM : public LearnBase
 {
@@ -1638,6 +1640,225 @@ struct MaxMatchHMM : public ViterbiBase
 
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
+};
+
+struct DependencyHMM : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  
+  DependencyHMM(const ttable_type& __ttable_source_target,
+		const ttable_type& __ttable_target_source,
+		const atable_type& __atable_source_target,
+		const atable_type& __atable_target_source,
+		const classes_type& __classes_source,
+		const classes_type& __classes_target)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		  __atable_source_target, __atable_target_source,
+		  __classes_source, __classes_target) {}
+  
+  typedef LearnHMM::hmm_data_type hmm_data_type;
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm_source_target.prepare(source, target, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, ttable_target_source, atable_target_source, classes_target, classes_source);
+    
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
+    
+    hmm_source_target.estimate_posterior(source, target);
+    hmm_target_source.estimate_posterior(target, source);
+    
+    static const double lowest = - std::numeric_limits<double>::infinity();
+    
+    scores.clear();
+    scores.reserve(source_size + 1, target_size + 1);
+    scores.resize(source_size + 1, target_size + 1, lowest);
+    
+    for (size_type src = 1; src <= source_size; ++ src)
+      for (size_type trg = 1; trg <= target_size; ++ trg)
+	scores(src, trg) = 0.5 * (utils::mathop::log(hmm_source_target.posterior(trg, src)) 
+				  + utils::mathop::log(hmm_target_source.posterior(src, trg)));
+    
+    if (! dependency_source.empty()) {
+      if (dependency_source.size() != source_size)
+	throw std::runtime_error("dependency size do not match");
+      
+      scores_target.clear();
+      scores_target.reserve(target_size + 1, target_size + 1);
+      scores_target.resize(target_size + 1, target_size + 1, lowest);
+      
+      // we will compute the score matrix...
+      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
+	for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
+	  if (trg_head != trg_dep)
+	    for (size_type src = 0; src != dependency_source.size(); ++ src) 
+	      if (dependency_source[src]) {
+		const size_type src_head = dependency_source[src];
+		const size_type src_dep  = src + 1;
+		
+		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
+		
+		scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+	      }
+      
+      // this is for the root...
+      for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
+	for (size_type src = 0; src != dependency_source.size(); ++ src) 
+	  if (! dependency_source[src]) {
+	    const size_type trg_head = 0;
+	    const size_type src_head = dependency_source[src];
+	    const size_type src_dep  = src + 1;
+	    
+	    const double score = scores(src_dep, trg_dep);
+	    
+	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+	  }
+    }
+    
+    if (! dependency_target.empty()) {
+      if (dependency_target.size() != target_size)
+	throw std::runtime_error("dependency size do not match");
+
+      scores_source.clear();
+      scores_source.reserve(source_size + 1, source_size + 1);
+      scores_source.resize(source_size + 1, source_size + 1, lowest);
+      
+      // we will compute the score matrix...
+      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
+	for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
+	  if (src_head != src_dep)
+	    for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
+	      if (dependency_target[trg]) {
+		const size_type trg_head = dependency_target[trg];
+		const size_type trg_dep  = trg + 1;
+		
+		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
+		
+		scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+	      }
+      
+      // this is for the root.
+      for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
+	for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
+	  if (! dependency_target[trg]) {
+	    const size_type src_head = 0;
+	    const size_type trg_head = dependency_target[trg];
+	    const size_type trg_dep  = trg + 1;
+	    
+	    const double score = scores(src_dep, trg_dep);
+	    
+	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+	  }
+    }
+  }
+  
+  matrix_type scores_source;
+  matrix_type scores_target;
+  matrix_type scores;
+  
+  hmm_data_type hmm_source_target;
+  hmm_data_type hmm_target_source;
+};
+
+struct DependencyHybridHMM : public DependencyHMM
+{
+  
+  typedef DependencyHybrid analyzer_type;
+  
+  DependencyHybridHMM(const ttable_type& __ttable_source_target,
+		      const ttable_type& __ttable_target_source,
+		      const atable_type& __atable_source_target,
+		      const atable_type& __atable_target_source,
+		      const classes_type& __classes_source,
+		      const classes_type& __classes_target)
+    : DependencyHMM(__ttable_source_target, __ttable_target_source,
+		    __atable_source_target, __atable_target_source,
+		    __classes_source, __classes_target) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    DependencyHMM::operator()(source, target, dependency_source, dependency_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! dependency_source.empty()) {
+      projected_target.resize(target_size, - 1);
+      
+      analyzer(scores_target, projected_target);
+    }
+    
+    if (! dependency_target.empty()) {
+      projected_source.resize(source_size, - 1);
+      
+      analyzer(scores_source, projected_source);
+    }
+  }
+  
+  analyzer_type analyzer;
+};
+
+struct DependencyDegree2HMM : public DependencyHMM
+{
+  
+  typedef DependencyDegree2 analyzer_type;
+
+  DependencyDegree2HMM(const ttable_type& __ttable_source_target,
+		       const ttable_type& __ttable_target_source,
+		       const atable_type& __atable_source_target,
+		       const atable_type& __atable_target_source,
+		       const classes_type& __classes_source,
+		       const classes_type& __classes_target)
+    : DependencyHMM(__ttable_source_target, __ttable_target_source,
+		    __atable_source_target, __atable_target_source,
+		    __classes_source, __classes_target) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    DependencyHMM::operator()(source, target, dependency_source, dependency_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! dependency_source.empty()) {
+      projected_target.resize(target_size, - 1);
+      
+      analyzer(scores_target, projected_target);
+    }
+    
+    if (! dependency_target.empty()) {
+      projected_source.resize(source_size, - 1);
+      
+      analyzer(scores_source, projected_source);
+    }
+  }
+  
+  analyzer_type analyzer;
 };
 
 #endif
