@@ -71,10 +71,7 @@ struct DependencyHybrid
   
   typedef Hypothesis hypothesis_type;
   
-  // hypothesis pair: first for root-assigned hypothesis, second for root-non-assigned hypothesis
-  typedef std::pair<hypothesis_type, hypothesis_type> hypothesis_pair_type;
-  
-  typedef utils::chart<hypothesis_pair_type, std::allocator<hypothesis_pair_type> >  hypothesis_chart_type;
+  typedef utils::chart<hypothesis_type, std::allocator<hypothesis_type> >  hypothesis_chart_type;
   
   hypothesis_chart_type actives;
   
@@ -83,24 +80,24 @@ struct DependencyHybrid
 		  Dependency& dependency)
   {
     const size_t sentence_size = dependency.size();
-
+    
     actives.clear();
-    actives.resize(dependency.size() + 2, hypothesis_pair_type());
+    actives.resize(dependency.size() + 2, hypothesis_type());
     
     // initialize by axioms...
     for (size_t pos = 0; pos != sentence_size; ++ pos)
-      actives(pos + 1, pos + 2).second.score = 0.0;
+      actives(pos + 1, pos + 2).score = 0.0;
     
     const int last_max = sentence_size + 1;
     for (int last = 2; last <= last_max; ++ last)
       for (int length = 2; last - length >= 0; ++ length)  {
 	const int first = last - length;
 	
-	hypothesis_pair_type& cell = actives(first, last);
+	hypothesis_type& cell = actives(first, last);
 	
 	for (int middle = first + 1; middle < last; ++ middle) {
-	  const hypothesis_pair_type& left = actives(first, middle);
-	  const hypothesis_pair_type& right = actives(middle, last);
+	  const hypothesis_type& left = actives(first, middle);
+	  const hypothesis_type& right = actives(middle, last);
 	  
 	  if (last < last_max) {
 	    // left attachment
@@ -110,87 +107,33 @@ struct DependencyHybrid
 
 	    const double score_edge = scores(last, middle);
 	    
-	    if (left.first.valid() && right.second.valid() && score_edge + left.first.score + right.second.score > cell.first.score) {
-	      cell.first.clear();
-
-	      cell.first.score = score_edge;
+	    if (left.valid() && right.valid() && score_edge + left.score + right.score > cell.score) {
+	      cell.clear();
 	      
-	      cell.first += dep_type(last, middle);
-	      cell.first += left.first;
-	      cell.first += right.second;
-	    }
-	    
-	    if (left.second.valid() && right.first.valid() && score_edge + left.second.score + right.first.score > cell.first.score) {
-	      cell.first.clear();
+	      cell.score = score_edge;
 	      
-	      cell.first.score = score_edge;
-	      
-	      cell.first += dep_type(last, middle);
-	      cell.first += left.second;
-	      cell.first += right.first;
-	    }
-	    
-	    if (left.second.valid() && right.second.valid() && score_edge + left.second.score + right.second.score > cell.second.score) {
-	      cell.second.clear();
-	      
-	      cell.second.score = score_edge;
-	      
-	      cell.second += dep_type(last, middle);
-	      cell.second += left.second;
-	      cell.second += right.second;
+	      cell += dep_type(last, middle);
+	      cell += left;
+	      cell += right;
 	    }
 	  }
 	  
 	  // right attachment
-	  if (first == 0) {
-	    const double score_edge = scores(first, middle);
+	  const double score_edge = scores(first, middle);
+	  
+	  if (left.valid() && right.valid() && score_edge + left.score + right.score > cell.score) {
+	    cell.clear();
 	    
-	    if (left.second.valid() && right.second.valid() && score_edge + left.second.score + right.second.score > cell.first.score) {
-	      cell.first.clear();
-	      
-	      cell.first.score = score_edge;
-	      
-	      cell.first += dep_type(first, middle);
-	      cell.first += left.second;
-	      cell.first += right.second;
-	    }
-	  } else {
-	    const double score_edge = scores(first, middle);
+	    cell.score = score_edge;
 	    
-	    if (left.first.valid() && right.second.valid() && score_edge + left.first.score + right.second.score > cell.first.score) {
-	      cell.first.clear();
-	      
-	      cell.first.score = score_edge;
-	      
-	      cell.first += dep_type(first, middle);
-	      cell.first += left.first;
-	      cell.first += right.second;
-	    }
-	    
-	    if (left.second.valid() && right.first.valid() && score_edge + left.second.score + right.first.score > cell.first.score) {
-	      cell.first.clear();
-	      
-	      cell.first.score = score_edge;
-	      
-	      cell.first += dep_type(first, middle);
-	      cell.first += left.second;
-	      cell.first += right.first;
-	    }
-	    
-	    if (left.second.valid() && right.second.valid() && score_edge + left.second.score + right.second.score > cell.second.score) {
-	      cell.second.clear();
-	      
-	      cell.second.score = score_edge;
-	      
-	      cell.second += dep_type(first, middle);
-	      cell.second += left.second;
-	      cell.second += right.second;
-	    }
+	    cell += dep_type(first, middle);
+	    cell += left;
+	    cell += right;
 	  }
 	}
       }
     
-    const dep_set_type& deps = actives(0, last_max).first.deps;
+    const dep_set_type& deps = actives(0, last_max).deps;
     
     dep_set_type::const_iterator diter_end = deps.end();
     for (dep_set_type::const_iterator diter = deps.begin(); diter != diter_end; ++ diter)

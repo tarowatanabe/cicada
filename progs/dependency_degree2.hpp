@@ -61,10 +61,7 @@ struct DependencyDegree2
   
   typedef Hypothesis hypothesis_type;
   
-  // hypothesis pair: first for root-assigned hypothesis, second for root-non-assigned hypothesis
-  typedef std::pair<hypothesis_type, hypothesis_type> hypothesis_pair_type;
-
-  typedef utils::vector3<hypothesis_pair_type, std::allocator<hypothesis_pair_type> > hypothesis_set_type;
+  typedef utils::vector3<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
   
   typedef utils::chart<hypothesis_set_type, std::allocator<hypothesis_set_type> >  hypothesis_chart_type;
   
@@ -77,7 +74,7 @@ struct DependencyDegree2
     const size_t sentence_size = dependency.size();
     
     actives.clear();
-    actives.resize(sentence_size + 2, hypothesis_set_type(sentence_size + 2, sentence_size + 2, sentence_size + 2, hypothesis_pair_type()));
+    actives.resize(sentence_size + 2, hypothesis_set_type(sentence_size + 2, sentence_size + 2, sentence_size + 2, hypothesis_type()));
     
     // initialize by axioms...
     for (size_t pos = 0; pos != sentence_size; ++ pos) {
@@ -86,7 +83,7 @@ struct DependencyDegree2
       
       const int j = pos + 1;
       for (int h3 = -1; h3 != j; ++ h3)
-	actives(j, j + 1)(h3 + 1, h3 + 1, j + 1).second.score = 0.0;
+	actives(j, j + 1)(h3 + 1, h3 + 1, j + 1).score = 0.0;
     }
     
     const int last_max = sentence_size + 1;
@@ -115,65 +112,49 @@ struct DependencyDegree2
 	      for (int h4 = h3; h4 < h5; ++ h4)
 		for (int h1 = -1; h1 < first; ++ h1)
 		  for (int h2 = h1; h2 < h3; ++ h2) {
-		    const hypothesis_pair_type& left  = lefts(h1 + 1, h2 + 1, h3 + 1);
-		    const hypothesis_pair_type& right = rights(h3 + 1, h4 + 1, h5 + 1);
+		    const hypothesis_type& left  = lefts(h1 + 1, h2 + 1, h3 + 1);
+		    const hypothesis_type& right = rights(h3 + 1, h4 + 1, h5 + 1);
 		    
 		    // [h1, i, h2 h5, j] (la1; h5 -> h4)
 		    if (h4 > 0) {
 		      // left attachment
-		      hypothesis_pair_type& cell = cells(h1 + 1, h2 + 1, h5 + 1);
+		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h5 + 1);
 		      const double& score_edge = scores(h5, h4);
 		      
-		      enumerate(cell.first,  left.first,  right.second, h5, h4, score_edge);
-		      enumerate(cell.first,  left.second, right.first,  h5, h4, score_edge);
-		      enumerate(cell.second, left.second, right.second, h5, h4, score_edge);
+		      enumerate(cell,  left,  right, h5, h4, score_edge);
 		    }
 		    
 		    // [h1, i, h2 h4, j] (ra1; h4 -> h5)
 		    if (h4 >= 0) {
 		      // right attachment
-		      hypothesis_pair_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
+		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
 		      const double& score_edge = scores(h4, h5);
 		      
-		      if (h4 == 0)
-			enumerate(cell.first, left.second, right.second, h4, h5, score_edge);
-		      else {
-			enumerate(cell.first,  left.first,  right.second, h4, h5, score_edge);
-			enumerate(cell.first,  left.second, right.first,  h4, h5, score_edge);
-			enumerate(cell.second, left.second, right.second, h4, h5, score_edge);
-		      }
+		      enumerate(cell, left, right, h4, h5, score_edge);
 		    }
 		    
 		    // [h1, i, h4 h5, j] (la2; h5 -> h2)
 		    if (h2 > 0) {
 		      // left attachment
-		      hypothesis_pair_type& cell = cells(h1 + 1, h4 + 1, h5 + 1);
+		      hypothesis_type& cell = cells(h1 + 1, h4 + 1, h5 + 1);
 		      const double score_edge = scores(h5, h2);
 		      
-		      enumerate(cell.first,  left.first,  right.second, h5, h2, score_edge);
-		      enumerate(cell.first,  left.second, right.first,  h5, h2, score_edge);
-		      enumerate(cell.second, left.second, right.second, h5, h2, score_edge);
+		      enumerate(cell, left, right, h5, h2, score_edge);
 		    }
 		    
 		    // [h1, i, h2 h4, j] (ra2; h2 -> h5)
 		    if (h2 >= 0) {
 		      // right attachment
-		      hypothesis_pair_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
+		      hypothesis_type& cell = cells(h1 + 1, h2 + 1, h4 + 1);
 		      const double score_edge = scores(h2, h5);
 		      
-		      if (h2 == 0)
-			enumerate(cell.first, left.second, right.second, h2, h5, score_edge);
-		      else {
-			enumerate(cell.first,  left.first,  right.second, h2, h5, score_edge);
-			enumerate(cell.first,  left.second, right.first,  h2, h5, score_edge);
-			enumerate(cell.second, left.second, right.second, h2, h5, score_edge);
-		      }
+		      enumerate(cell, left, right, h2, h5, score_edge);
 		    }
 		  }
 	}
       }
     
-    const dep_set_type& deps = actives(0, last_max)(-1 + 1, -1 + 1, 0 + 1).first.deps;
+    const dep_set_type& deps = actives(0, last_max)(-1 + 1, -1 + 1, 0 + 1).deps;
     
     dep_set_type::const_iterator diter_end = deps.end();
     for (dep_set_type::const_iterator diter = deps.begin(); diter != diter_end; ++ diter)
