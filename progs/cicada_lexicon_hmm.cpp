@@ -49,6 +49,7 @@ bool max_match_mode = false;
 
 bool hybrid_mode = false;
 bool degree2_mode = false;
+bool single_root_mode = false;
 
 // parameter...
 double p0    = 0.01;
@@ -411,22 +412,40 @@ int main(int argc, char ** argv)
 	if (debug)
 	  std::cerr << "hybrid projective dependency" << std::endl;
 	
-	project_dependency<DependencyHybridHMM>(ttable_source_target,
-						ttable_target_source,
-						atable_source_target,
-						atable_target_source,
-						classes_source,
-						classes_target);
+	if (single_root_mode)
+	  project_dependency<DependencyHybridSingleHMM>(ttable_source_target,
+							ttable_target_source,
+							atable_source_target,
+							atable_target_source,
+							classes_source,
+							classes_target);
+	else
+	  project_dependency<DependencyHybridHMM>(ttable_source_target,
+						  ttable_target_source,
+						  atable_source_target,
+						  atable_target_source,
+						  classes_source,
+						  classes_target);
+
       } else if (degree2_mode) {
 	if (debug)
 	  std::cerr << "degree2 non-projective dependency" << std::endl;
 	
-	project_dependency<DependencyDegree2HMM>(ttable_source_target,
-						 ttable_target_source,
-						 atable_source_target,
-						 atable_target_source,
-						 classes_source,
-						 classes_target);
+	if (single_root_mode)
+	  project_dependency<DependencyDegree2SingleHMM>(ttable_source_target,
+							 ttable_target_source,
+							 atable_source_target,
+							 atable_target_source,
+							 classes_source,
+							 classes_target);
+	else
+	  project_dependency<DependencyDegree2HMM>(ttable_source_target,
+						   ttable_target_source,
+						   atable_source_target,
+						   atable_target_source,
+						   classes_source,
+						   classes_target);
+	  
       } else
 	throw std::runtime_error("no dependency algorithm?");
     }
@@ -1528,8 +1547,9 @@ void options(int argc, char** argv)
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     ("moses",     po::bool_switch(&moses_mode),     "Moses alignment foramt")
 
-    ("hybrid",  po::bool_switch(&hybrid_mode),  "hybrid projective dependency parsing")
-    ("degree2", po::bool_switch(&degree2_mode), "degree2 non-projective dependency parsing")
+    ("hybrid",      po::bool_switch(&hybrid_mode),      "hybrid projective dependency parsing")
+    ("degree2",     po::bool_switch(&degree2_mode),     "degree2 non-projective dependency parsing")
+    ("single-root", po::bool_switch(&single_root_mode), "single root dependency")
 
     ("p0",             po::value<double>(&p0)->default_value(p0),                               "parameter for NULL alignment")
     ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),         "Dirichlet prior for variational Bayes")

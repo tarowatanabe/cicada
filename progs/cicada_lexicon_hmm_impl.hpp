@@ -1783,12 +1783,13 @@ struct DependencyHMM : public ViterbiBase
   hmm_data_type hmm_target_source;
 };
 
-struct DependencyHybridHMM : public DependencyHMM
+template <typename Analyzer>
+struct __DependencyHMMBase : public DependencyHMM
 {
   
-  typedef DependencyHybrid analyzer_type;
+  typedef Analyzer analyzer_type;
   
-  DependencyHybridHMM(const ttable_type& __ttable_source_target,
+  __DependencyHMMBase(const ttable_type& __ttable_source_target,
 		      const ttable_type& __ttable_target_source,
 		      const atable_type& __atable_source_target,
 		      const atable_type& __atable_target_source,
@@ -1835,56 +1836,9 @@ struct DependencyHybridHMM : public DependencyHMM
   analyzer_type analyzer;
 };
 
-struct DependencyDegree2HMM : public DependencyHMM
-{
-  
-  typedef DependencyDegree2 analyzer_type;
-
-  DependencyDegree2HMM(const ttable_type& __ttable_source_target,
-		       const ttable_type& __ttable_target_source,
-		       const atable_type& __atable_source_target,
-		       const atable_type& __atable_target_source,
-		       const classes_type& __classes_source,
-		       const classes_type& __classes_target)
-    : DependencyHMM(__ttable_source_target, __ttable_target_source,
-		    __atable_source_target, __atable_target_source,
-		    __classes_source, __classes_target) {}
-  
-  void operator()(const sentence_type& source,
-		  const sentence_type& target,
-		  const dependency_type& dependency_source,
-		  const dependency_type& dependency_target,
-		  dependency_type& projected_source,
-		  dependency_type& projected_target)
-  {
-    DependencyHMM::operator()(source, target, dependency_source, dependency_target);
-    
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-
-    projected_source.clear();
-    projected_target.clear();
-    
-    if (! dependency_source.empty()) {
-      projected_target.resize(target_size, - 1);
-      
-      analyzer(scores_target, projected_target);
-    }
-    
-    if (! dependency_target.empty()) {
-      projected_source.resize(source_size, - 1);
-      
-      analyzer(scores_source, projected_source);
-    }
-  }
-
-  void shink()
-  {
-    analyzer.shrink();
-    DependencyHMM::shrink();
-  }
-  
-  analyzer_type analyzer;
-};
+typedef __DependencyHMMBase<DependencyHybrid>        DependencyHybridHMM;
+typedef __DependencyHMMBase<DependencyHybridSingle>  DependencyHybridSingleHMM;
+typedef __DependencyHMMBase<DependencyDegree2>       DependencyDegree2HMM;
+typedef __DependencyHMMBase<DependencyDegree2Single> DependencyDegree2SingleHMM;
 
 #endif
