@@ -1895,12 +1895,12 @@ struct DependencyModel1 : public ViterbiBase
   posterior_set_type posterior_target_source;
 };
 
-struct DependencyHybridModel1 : public DependencyModel1
+template <typename Analyzer>
+struct __DependencyModel1Base : public DependencyModel1
 {
+  typedef Analyzer analyzer_type;
   
-  typedef DependencyHybrid analyzer_type;
-
-  DependencyHybridModel1(const ttable_type& __ttable_source_target,
+  __DependencyModel1Base(const ttable_type& __ttable_source_target,
 			 const ttable_type& __ttable_target_source)
     : DependencyModel1(__ttable_source_target, __ttable_target_source) {}
   
@@ -1941,50 +1941,9 @@ struct DependencyHybridModel1 : public DependencyModel1
   analyzer_type analyzer;
 };
 
-struct DependencyDegree2Model1 : public DependencyModel1
-{
-  
-  typedef DependencyDegree2 analyzer_type;
-
-  DependencyDegree2Model1(const ttable_type& __ttable_source_target,
-			 const ttable_type& __ttable_target_source)
-    : DependencyModel1(__ttable_source_target, __ttable_target_source) {}
-  
-  void operator()(const sentence_type& source,
-		  const sentence_type& target,
-		  const dependency_type& dependency_source,
-		  const dependency_type& dependency_target,
-		  dependency_type& projected_source,
-		  dependency_type& projected_target)
-  {
-    DependencyModel1::operator()(source, target, dependency_source, dependency_target);
-    
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-
-    projected_source.clear();
-    projected_target.clear();
-    
-    if (! dependency_source.empty()) {
-      projected_target.resize(target_size, - 1);
-      
-      analyzer(scores_target, projected_target);
-    }
-    
-    if (! dependency_target.empty()) {
-      projected_source.resize(source_size, - 1);
-      
-      analyzer(scores_source, projected_source);
-    }
-  }
-
-  void shink()
-  {
-    analyzer.shrink();
-    DependencyModel1::shrink();
-  }
-  
-  analyzer_type analyzer;
-};
+typedef __DependencyModel1Base<DependencyHybrid>        DependencyHybridModel1;
+typedef __DependencyModel1Base<DependencyHybridSingle>  DependencyHybridSingleModel1;
+typedef __DependencyModel1Base<DependencyDegree2>       DependencyDegree2Model1;
+typedef __DependencyModel1Base<DependencyDegree2Single> DependencyDegree2SingleModel1;
 
 #endif
