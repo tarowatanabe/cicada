@@ -1941,9 +1941,9 @@ struct __DependencyModel1Base : public DependencyModel1
   analyzer_type analyzer;
 };
 
-typedef __DependencyModel1Base<DependencyHybrid>        DependencyHybridModel1;
-typedef __DependencyModel1Base<DependencyHybridSingle>  DependencyHybridSingleModel1;
-typedef __DependencyModel1Base<DependencyDegree2>       DependencyDegree2Model1;
-typedef __DependencyModel1Base<DependencyDegree2Single> DependencyDegree2SingleModel1;
+typedef __DependencyModel1Base<DependencyHybrid>            DependencyHybridModel1;
+typedef __DependencyModel1Base<DependencyHybridSingleRoot>  DependencyHybridSingleRootModel1;
+typedef __DependencyModel1Base<DependencyDegree2>           DependencyDegree2Model1;
+typedef __DependencyModel1Base<DependencyDegree2SingleRoot> DependencyDegree2SingleRootModel1;
 
 #endif

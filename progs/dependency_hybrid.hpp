@@ -135,7 +135,7 @@ struct DependencyHybrid
 };
 
 // single root version
-struct DependencyHybridSingle
+struct DependencyHybridSingleRoot
 {
   typedef std::pair<int, int> dep_type;
   typedef std::vector<dep_type, std::allocator<dep_type> > dep_set_type;

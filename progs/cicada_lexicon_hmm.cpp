@@ -413,12 +413,12 @@ int main(int argc, char ** argv)
 	  std::cerr << "hybrid projective dependency" << std::endl;
 	
 	if (single_root_mode)
-	  project_dependency<DependencyHybridSingleHMM>(ttable_source_target,
-							ttable_target_source,
-							atable_source_target,
-							atable_target_source,
-							classes_source,
-							classes_target);
+	  project_dependency<DependencyHybridSingleRootHMM>(ttable_source_target,
+							    ttable_target_source,
+							    atable_source_target,
+							    atable_target_source,
+							    classes_source,
+							    classes_target);
 	else
 	  project_dependency<DependencyHybridHMM>(ttable_source_target,
 						  ttable_target_source,
@@ -432,12 +432,12 @@ int main(int argc, char ** argv)
 	  std::cerr << "degree2 non-projective dependency" << std::endl;
 	
 	if (single_root_mode)
-	  project_dependency<DependencyDegree2SingleHMM>(ttable_source_target,
-							 ttable_target_source,
-							 atable_source_target,
-							 atable_target_source,
-							 classes_source,
-							 classes_target);
+	  project_dependency<DependencyDegree2SingleRootHMM>(ttable_source_target,
+							     ttable_target_source,
+							     atable_source_target,
+							     atable_target_source,
+							     classes_source,
+							     classes_target);
 	else
 	  project_dependency<DependencyDegree2HMM>(ttable_source_target,
 						   ttable_target_source,

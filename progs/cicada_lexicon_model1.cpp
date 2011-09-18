@@ -179,7 +179,7 @@ int main(int argc, char ** argv)
 	  std::cerr << "hybrid projective dependency" << std::endl;
 
 	if (single_root_mode)
-	  project_dependency<DependencyHybridSingleModel1>(ttable_source_target, ttable_target_source);
+	  project_dependency<DependencyHybridSingleRootModel1>(ttable_source_target, ttable_target_source);
 	else
 	  project_dependency<DependencyHybridModel1>(ttable_source_target, ttable_target_source);
       } else if (degree2_mode) {
@@ -187,7 +187,7 @@ int main(int argc, char ** argv)
 	  std::cerr << "degree2 non-projective dependency" << std::endl;
 	
 	if (single_root_mode)
-	  project_dependency<DependencyDegree2SingleModel1>(ttable_source_target, ttable_target_source);
+	  project_dependency<DependencyDegree2SingleRootModel1>(ttable_source_target, ttable_target_source);
 	else
 	  project_dependency<DependencyDegree2Model1>(ttable_source_target, ttable_target_source);
       } else
