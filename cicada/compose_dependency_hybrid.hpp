@@ -126,45 +126,24 @@ namespace cicada
 	    tails.front() = actives(first, middle);
 	    tails.back()  = actives(middle, last);
 	    
-	    if (first == 0 && middle == 1) {
-	      if (last < last_max) {
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
-		edge.rule = rule_reduce1;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		
-		graph.connect_edge(edge.id, cell);
-	      }
+	    const int shift = (first == 0 && middle == 1);
+	    const rule_ptr_type rule = (shift ? rule_reduce1 : rule_reduce2);
+	    
+	    if (last < last_max) {
+	      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + shift, tails.end());
+	      edge.rule = rule;
+	      edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
+	      edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
 	      
-	      {
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + 1, tails.end());
-		edge.rule = rule_reduce1;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		
-		graph.connect_edge(edge.id, cell);
-	      }
-	    } else {
-	      if (last < last_max) {
-		// left attachment
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		edge.rule = rule_reduce2;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(last);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		
-		graph.connect_edge(edge.id, cell);
-	      }
-	      
-	      {
-		// right attachment
-		hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-		edge.rule = rule_reduce2;
-		edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
-		edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
-		
-		graph.connect_edge(edge.id, cell);
-	      }
+	      graph.connect_edge(edge.id, cell);
 	    }
+	    
+	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + shift, tails.end());
+	    edge.rule = rule;
+	    edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(first);
+	    edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(middle);
+	    
+	    graph.connect_edge(edge.id, cell);
 	  }
 	}
       
