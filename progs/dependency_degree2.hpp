@@ -166,7 +166,7 @@ struct DependencyDegree2
   
 };
 
-struct DependencyDegree2Single
+struct DependencyDegree2SingleRoot
 {
   typedef std::pair<int, int> dep_type;
   typedef std::vector<dep_type, std::allocator<dep_type> > dep_set_type;

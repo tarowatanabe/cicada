@@ -1836,9 +1836,9 @@ struct __DependencyHMMBase : public DependencyHMM
   analyzer_type analyzer;
 };
 
-typedef __DependencyHMMBase<DependencyHybrid>        DependencyHybridHMM;
-typedef __DependencyHMMBase<DependencyHybridSingle>  DependencyHybridSingleHMM;
-typedef __DependencyHMMBase<DependencyDegree2>       DependencyDegree2HMM;
-typedef __DependencyHMMBase<DependencyDegree2Single> DependencyDegree2SingleHMM;
+typedef __DependencyHMMBase<DependencyHybrid>            DependencyHybridHMM;
+typedef __DependencyHMMBase<DependencyHybridSingleRoot>  DependencyHybridSingleRootHMM;
+typedef __DependencyHMMBase<DependencyDegree2>           DependencyDegree2HMM;
+typedef __DependencyHMMBase<DependencyDegree2SingleRoot> DependencyDegree2SingleRootHMM;
 
 #endif
