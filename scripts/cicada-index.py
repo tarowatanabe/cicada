@@ -56,6 +56,7 @@ opt_parser = OptionParser(
     make_option("--tree",   default=None, action="store_true", help="index tree-to-tree grammar"),
     
     make_option("--cky",    default=None, action="store_true", help="CKY mode indexing for tree-grammar"),
+    make_option("--reordering", default=None, action="store_true", help="reordering for phrase grammar"),
     
     ## additional feature functions
     make_option("--lexicon-model1",             default=None, action="store_true", help="compute Model1 features"),
@@ -307,10 +308,14 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 class IndexPhrase:
-    def __init__(self, cicada=None, model_dir="", cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
+        
+        if reordering:
+            self.filter += " --reordering --bidirectional"
+
         self.cky = None
         self.grammar = "grammar"
         self.name = "phrase"
@@ -320,7 +325,7 @@ class IndexPhrase:
         self.index  = os.path.join(model_dir, "phrase-index")
         
 class IndexSCFG:
-    def __init__(self, cicada=None, model_dir="", cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
         self.filter += " --feature-root"
@@ -333,7 +338,7 @@ class IndexSCFG:
         self.index  = os.path.join(model_dir, "scfg-index")
 
 class IndexGHKM:
-    def __init__(self, cicada=None, model_dir="", cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
         self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
@@ -346,7 +351,7 @@ class IndexGHKM:
 
 
 class IndexTree:
-    def __init__(self, cicada=None, model_dir="", cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
         self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
@@ -416,7 +421,7 @@ class Index(UserString.UserString):
                 options_lexicon += " --insertion-deletion"
                 options_lexicon += " --threshold-insertion %.20g" %(lexicon.threshold_insertion)
                 options_lexicon += " --threshold-deletion %.20g" %(lexicon.threshold_deletion)
-        
+            
         command = ""
 
         if kbest > 0:
@@ -537,13 +542,13 @@ cicada = CICADA(options.cicada_dir)
 
 indexer = None
 if options.phrase:
-    indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky)
+    indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
 elif options.scfg:
-    indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky)
+    indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
 elif options.ghkm:
-    indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky)
+    indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
 elif options.tree:
-    indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky)
+    indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
 else:
     raise ValueError, "no indexer?"
 
