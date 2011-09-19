@@ -1577,6 +1577,7 @@ struct PhrasePairReverseMapper
 	    
 	    const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	    queues[shard]->push_swap(*citer);
+	    citer->clear();
 	  }
 	  
 	  counts.clear();
@@ -1638,6 +1639,7 @@ struct PhrasePairReverseMapper
 	
 	const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	queues[shard]->push_swap(*citer);
+	citer->clear();
       }
       
       counts.clear();

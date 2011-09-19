@@ -165,12 +165,14 @@ namespace cicada
 		      
 		      tails.front() = item_left;
 		      tails.back()  = item_right;
+
+		      const rule_ptr_type rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
 		      
 		      // [h1, i, h2 h5, j] (la1; h5 -> h4)
 		      if (h4 > 0) {
 			// left attachment
 			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
-			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.rule = rule;
 			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
 			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h4);
 			
@@ -185,7 +187,7 @@ namespace cicada
 		      if (h4 >= 0) {
 			// right attachment
 			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
-			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.rule = rule;
 			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h4);
 			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
 			
@@ -200,7 +202,7 @@ namespace cicada
 		      if (h2 > 0) {
 			// left attachment
 			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
-			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.rule = rule;
 			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h5);
 			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h2);
 			
@@ -215,7 +217,7 @@ namespace cicada
 		      if (h2 >= 0) {
 			// right attachment
 			hypergraph_type::edge_type& edge = graph.add_edge(tails.begin() + item_left_epsilon, tails.end());
-			edge.rule = (item_left_epsilon ? rule_reduce1 : rule_reduce2);
+			edge.rule = rule;
 			edge.attributes[attr_dependency_head]      = attribute_set_type::int_type(h2);
 			edge.attributes[attr_dependency_dependent] = attribute_set_type::int_type(h5);
 			
