@@ -32,7 +32,7 @@ number: number format\n\
 \tlocale-target=[locale] generator locale\n\
 \tlocale-parser=[locale] parser locale\n\
 \tlocale-generator=[locale] generator locale\n\
-    ";
+";
     
     return desc;
   }
