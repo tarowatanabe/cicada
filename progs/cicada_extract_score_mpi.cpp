@@ -233,7 +233,7 @@ int main(int argc, char** argv)
 	std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
 	
 	boost::iostreams::filtering_ostream os;
-	os.push(boost::iostreams::gzip_compressor());
+	os.push(boost::iostreams::zlib_compressor());
 	os.push(utils::mpi_device_bcast_sink(0, 4096));
 	
 	path_set_type::const_iterator citer_end = counts_files.end();
@@ -241,7 +241,7 @@ int main(int argc, char** argv)
 	  os << citer->string() << '\n';
       } else {
 	boost::iostreams::filtering_istream is;
-	is.push(boost::iostreams::gzip_decompressor());
+	is.push(boost::iostreams::zlib_decompressor());
 	is.push(utils::mpi_device_bcast_source(0, 4096));
 	
 	std::string line;
@@ -434,7 +434,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
     std::string line;
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_source(rank, root_count_tag, 4096));
       
       while (std::getline(is, line)) {
@@ -453,7 +453,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
     }
   } else {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_sink(0, root_count_tag, 4096));
     
     RootCountGenerator generator;
@@ -515,7 +515,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank].reset(new ostream_type());
     device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, buffer_size, false, true));
     
-    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(boost::iostreams::zlib_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -624,7 +624,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     
     queues[rank].reset(new queue_type(queue_size));
     
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(boost::iostreams::zlib_decompressor());
     stream[rank]->push(*device[rank]);
   }
   
@@ -724,7 +724,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(boost::iostreams::zlib_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -846,7 +846,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(boost::iostreams::zlib_decompressor());
     stream[rank]->push(*device[rank]);
     
     ranks[rank] = rank;
@@ -962,7 +962,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
-    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(boost::iostreams::zlib_compressor());
     stream[rank]->push(*device[rank], buffer_size);
     stream[rank]->precision(20);
     
@@ -1108,7 +1108,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(boost::iostreams::zlib_decompressor());
     stream[rank]->push(*device[rank]);
     
     ranks[rank] = rank;

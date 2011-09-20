@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 	stream[rank].reset(new ostream_type());
 	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	stream[rank]->push(boost::iostreams::gzip_compressor());
+	stream[rank]->push(boost::iostreams::zlib_compressor());
 	stream[rank]->push(*device[rank]);
       }
 
@@ -239,7 +239,7 @@ int main(int argc, char** argv)
       
     } else {
       boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::gzip_decompressor());
+      stream.push(boost::iostreams::zlib_decompressor());
       stream.push(utils::mpi_device_source(0, bitext_tag, 4096));
       
       bitext_type bitext;

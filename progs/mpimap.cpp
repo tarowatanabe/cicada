@@ -103,7 +103,7 @@ int main(int argc, char** argv)
       FILE* fp = ::popen(command.c_str(), "w");
       
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_source(comm_parent.comm, 0, line_tag, 1024 * 1024));
       
       std::string line;
@@ -166,7 +166,7 @@ int main(int argc, char** argv)
 	  device[rank].reset(new odevice_type(comm_child.comm, rank, line_tag, 1024 * 1024, false, true));
 	  
 	  stream[rank].reset(new ostream_type());
-	  stream[rank]->push(boost::iostreams::gzip_compressor());
+	  stream[rank]->push(boost::iostreams::zlib_compressor());
 	  stream[rank]->push(*device[rank]);
 	}
 

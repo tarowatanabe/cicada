@@ -582,7 +582,7 @@ void bcast_kbest(hypothesis_map_type& kbests)
   for (int rank = 0; rank < mpi_size; ++ rank) {
     if (rank == mpi_rank) {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_device_bcast_sink(rank, 4096));
       
       for (size_t id = 0; id != kbests.size(); ++ id)
@@ -603,7 +603,7 @@ void bcast_kbest(hypothesis_map_type& kbests)
       
     } else {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_bcast_source(rank, 4096));
       is.unsetf(std::ios::skipws);
       
