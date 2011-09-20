@@ -46,6 +46,7 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/sgi_hash_set.hpp"
+#include "utils/lexical_cast.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -214,6 +215,27 @@ struct Task
   }
 };
 
+void moses_to_cicada(tokens_type& features)
+{
+  std::string feature_name = "";
+  int id = 0;
+  tokens_type features_new;
+  
+  tokens_type::const_iterator fiter_end = features.end();
+  for (tokens_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+    const size_t feature_size = fiter->size();
+    
+    if (fiter->operator[](feature_size - 1) == ':') {
+      feature_name = *fiter;
+      id = 0;
+    } else {
+      features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
+      ++ id;
+    }
+  }
+  features.swap(features_new);
+}
+
 path_type input_file = "-";
 path_type output_file = "-";
 
@@ -221,6 +243,7 @@ std::string filter;
 
 bool id_mode = false;
 bool features_mode = false;
+bool moses_mode = false;
 
 // alternative mode...
 bool merge_mode = false;
@@ -270,7 +293,7 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
-
+	
 	const size_t& id = boost::fusion::get<0>(kbest);
 	
 	if (id >= hypotheses.size())
@@ -284,7 +307,7 @@ int main(int argc, char** argv)
       for (size_t id = 0; id != hypotheses.size(); ++ id) {
 	namespace karma = boost::spirit::karma;
 	namespace standard = boost::spirit::standard;
-
+	
 	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
 	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
 	  os << id << " ||| ";
@@ -497,6 +520,7 @@ void options(int argc, char** argv)
 
     ("id",       po::bool_switch(&id_mode),       "output id")
     ("features", po::bool_switch(&features_mode), "output features")
+    ("moses",    po::bool_switch(&moses_mode),    "features in moses format")
     ("merge",    po::bool_switch(&merge_mode),    "merge features")
     ("lattice",  po::bool_switch(&lattice_mode),  "output merged lattice")
     
