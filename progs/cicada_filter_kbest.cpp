@@ -59,6 +59,11 @@ typedef std::vector<feature_type, std::allocator<feature_type> > features_type;
 
 typedef boost::fusion::tuple<size_type, tokens_type, features_type> kbest_feature_type;
 
+typedef std::vector<double, std::allocator<double> > moses_feats_type;
+typedef std::pair<std::string, moses_feats_type> moses_features_type;
+typedef std::vector<moses_features_type, std::allocator<moses_features_type> > moses_features_set_type;
+typedef boost::fusion::tuple<size_type, tokens_type, moses_features_set_type> kbest_moses_type;
+
 struct hypothesis_type
 {
   typedef cicada::Symbol  word_type;
@@ -73,6 +78,23 @@ struct hypothesis_type
     : sentence(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end()),
       features(boost::fusion::get<2>(x).begin(), boost::fusion::get<2>(x).end())
   {
+    std::sort(features.begin(), features.end());
+  }
+
+  hypothesis_type(const kbest_moses_type& x)
+    : sentence(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end()),
+      features()
+  {
+    const moses_features_set_type& feats = boost::fusion::get<2>(x);
+    
+    moses_features_set_type::const_iterator fiter_end = feats.end();
+    for (moses_features_set_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter) {
+      const std::string& name = fiter->first;
+      
+      for (size_t i = 0; i != fiter->second.size(); ++ i)
+	features.push_back(std::make_pair(name + utils::lexical_cast<std::string>(i), fiter->second[i]));
+    }
+    
     std::sort(features.begin(), features.end());
   }
   
@@ -147,6 +169,39 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   boost::spirit::qi::rule<Iterator, kbest_feature_type(), blank_type>  kbest;
 };
 
+template <typename Iterator>
+struct kbest_moses_parser : boost::spirit::qi::grammar<Iterator, kbest_moses_type(), boost::spirit::standard::blank_type>
+{
+  kbest_moses_parser() : kbest_moses_parser::base_type(kbest)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    remains %= *qi::lexeme[+(standard::char_ - standard::space)];
+    
+    feats %= +qi::double_;
+    name %= qi::lexeme[(+(standard::char_) >> ':') - "|||"];
+    
+    features %= +(name >> feats);
+    
+    kbest %= size >> "|||" >> tokens >> "|||" >> features >> -("|||" >> remains) >> (qi::eol | qi::eoi);
+  }
+  
+  typedef boost::spirit::standard::blank_type blank_type;
+  
+  boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
+  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
+  
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type> name;
+  boost::spirit::qi::rule<Iterator, moses_feats_type(), blank_type> feats;
+  boost::spirit::qi::rule<Iterator, moses_features_set_type(), blank_type> features;
+  
+  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
+  
+  boost::spirit::qi::rule<Iterator, kbest_moses_type(), blank_type> kbest;
+};
+
 struct real_precision20 : boost::spirit::karma::real_policies<double>
 {
   static unsigned int precision(double) 
@@ -215,26 +270,6 @@ struct Task
   }
 };
 
-void moses_to_cicada(tokens_type& features)
-{
-  std::string feature_name = "";
-  int id = 0;
-  tokens_type features_new;
-  
-  tokens_type::const_iterator fiter_end = features.end();
-  for (tokens_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
-    const size_t feature_size = fiter->size();
-    
-    if (fiter->operator[](feature_size - 1) == ':') {
-      feature_name = *fiter;
-      id = 0;
-    } else {
-      features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
-      ++ id;
-    }
-  }
-  features.swap(features_new);
-}
 
 path_type input_file = "-";
 path_type output_file = "-";
