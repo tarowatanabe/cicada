@@ -5,6 +5,7 @@ New: posterior operation to compute "posterior" given particular semiring (tropi
 New: remove-unary which remove unaries in forests
 New: preliminary support for dependency parsing: arc-standard, arc-eager, hybrid and degree2 parsing
 New: preliminary support for dependency projection using alignment posterior probabilities + source dependency
+Serious bugfix: use of zlib_{compressor,decompresso} as a workaround for empty data sending/receiving in MPI
 Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
 Bugfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 Better composition/parse for string-to-tree by sharing internal nodes and terminals
