@@ -1454,7 +1454,7 @@ void grammar_merge(treebank_set_type& treebanks,
       typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
       
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_deivice_source(rank, scale_tag, 1024 * 1024));
 
       std::string line;
@@ -1474,21 +1474,21 @@ void grammar_merge(treebank_set_type& treebanks,
     }
     
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_deivice_bcast_source(0, 1024 * 1024));
     
     os << scale;
   } else {
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_deivice_sink(0, scale_tag, 1024 * 1024));
       
       os << task_scale.scale;
     }
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
     
     is >> scale;
@@ -1514,7 +1514,7 @@ void grammar_merge(treebank_set_type& treebanks,
       typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
       
       boost::iostreams::filtering_ostream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_deivice_source(rank, loss_tag, 1024 * 1024));
 
       std::string line;
@@ -1539,7 +1539,7 @@ void grammar_merge(treebank_set_type& treebanks,
     }
   } else {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_deivice_sink(0, loss_tag, 1024 * 1024));
     
     os << task_scale.loss;
@@ -1595,13 +1595,13 @@ void grammar_merge(treebank_set_type& treebanks,
   // bcast merged...
   if (mpi_rank == 0) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_deivice_bcast_source(0, 1024 * 1024));
     
     std::copy(merged.begin(), merged.end(), std::ostream_iterator<symbol_type>(os, " "));
   } else {
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
     
     std::string token;
@@ -1968,7 +1968,7 @@ double grammar_learn(const treebank_set_type& treebanks,
       typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
       
       boost::iostreams::filtering_ostream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_deivice_source(rank, scale_tag, 1024 * 1024));
 
       std::string line;
@@ -1988,21 +1988,21 @@ double grammar_learn(const treebank_set_type& treebanks,
     }
     
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_deivice_bcast_source(0, 1024 * 1024));
     
     os << labels;
   } else {
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_deivice_sink(0, label_tag, 1024 * 1024));
       
       os << task.labels;
     }
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
     
     is >> labels;
@@ -2741,7 +2741,7 @@ void grammar_maximize(const count_set_type& counts,
       for (int rank = 0; rank != mpi_size; ++ rank) 
 	if (rank != mpi_rank) {
 	  streams[rank].reset(new stream_type());
-	  streams[rank]->push(boost::iostreams::gzip_compressor());
+	  streams[rank]->push(boost::iostreams::zlib_compressor());
 	  streams[rank]->push(utils::mpi_deivice_sink(rank, grammar_tag, 1024 * 1024));
 	}
       
@@ -2756,7 +2756,7 @@ void grammar_maximize(const count_set_type& counts,
       }
     } else {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_source(rank, grammar_tag, 1024 * 1024));
       
       is >> counts_mapped;
@@ -2783,28 +2783,28 @@ void grammar_maximize(const count_set_type& counts,
 
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_deivice_source(rank, grammar_tag, 1024 * 1024));
       
       is >> grammar;
     }
     
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_deivice_bcast_sink(rank, 1024 * 1024));
     
     os << grammar;
   } else {
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_deivice_sink(0, grammar_tag, 1024 * 1024));
       
       os << task.grammar;
     }
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
     
     is >> grammar;
@@ -3063,7 +3063,7 @@ void read_treebank(const path_set_type& files,
     stream_ptr_set_type streams(mpi_size);
     for (int rank = 1; rank != mpi_size; ++ rank) {
       streams[rank].reset(new stream_type());
-      streams[rank]->push(boost::iostreams::gzip_compressor());
+      streams[rank]->push(boost::iostreams::zlib_compressor());
       streams[rank]->push(utils::mpi_deivice_sink(rank, treebank_tag, 1024 * 1024));
     }
     
@@ -3097,7 +3097,7 @@ void read_treebank(const path_set_type& files,
       std::cerr << "# of treebank: " << id << std::endl;
   } else {
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_source(0, treebank_tag, 1024 * 1024));
     
     hypergraph_type treebank;

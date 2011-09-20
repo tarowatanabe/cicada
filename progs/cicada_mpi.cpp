@@ -219,7 +219,7 @@ void merge_statistics(const operation_set_type& operations,
 
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_source(rank, stat_tag, 4096));
       
       std::string line;
@@ -261,7 +261,7 @@ void merge_statistics(const operation_set_type& operations,
     
   } else {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_sink(0, stat_tag, 4096));
     
     statistics_type::const_iterator siter_end = operations.get_statistics().end();

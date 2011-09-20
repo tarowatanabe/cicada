@@ -1336,7 +1336,7 @@ void send_weights(const int rank, const weight_set_type& weights)
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   boost::iostreams::filtering_ostream os;
-  os.push(boost::iostreams::gzip_compressor());
+  os.push(boost::iostreams::zlib_compressor());
   os.push(utils::mpi_device_sink(rank, weights_tag, 4096));
   
   for (feature_type::id_type id = 0; id < weights.size(); ++ id)
@@ -1355,7 +1355,7 @@ void reduce_weights(const int rank, weight_set_type& weights)
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   boost::iostreams::filtering_istream is;
-  is.push(boost::iostreams::gzip_decompressor());
+  is.push(boost::iostreams::zlib_decompressor());
   is.push(utils::mpi_device_source(rank, weights_tag, 4096));
   
   std::string line;
@@ -1399,7 +1399,7 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
     device.push_back(device_ptr_type(new device_type(*first, weights_tag, 4096)));
     stream.push_back(stream_ptr_type(new stream_type()));
     
-    stream.back()->push(boost::iostreams::gzip_decompressor());
+    stream.back()->push(boost::iostreams::zlib_decompressor());
     stream.back()->push(*device.back());
   }
   
@@ -1479,7 +1479,7 @@ void reduce_weights_optimized(const int rank, weight_set_type& weights, Optimize
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   boost::iostreams::filtering_istream is;
-  is.push(boost::iostreams::gzip_decompressor());
+  is.push(boost::iostreams::zlib_decompressor());
   is.push(utils::mpi_device_source(rank, weights_tag, 4096));
   
   std::string line;
@@ -1562,7 +1562,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
   
   if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_bcast_sink(rank, 4096));
     
     static const weight_set_type::feature_type __empty;
@@ -1584,7 +1584,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
     weights.allocate();
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(rank, 4096));
     
     std::string feature;

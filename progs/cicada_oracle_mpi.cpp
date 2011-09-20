@@ -631,7 +631,7 @@ void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)
   for (int rank = 0; rank < mpi_size; ++ rank) {
     if (rank == mpi_rank) {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_device_bcast_sink(rank, 4096));
       
       for (size_t id = 0; id != sentences.size(); ++ id)
@@ -640,7 +640,7 @@ void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)
       
     } else {
       boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
+      is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_bcast_source(rank, 4096));
       
       std::string line;
@@ -685,7 +685,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
   
   if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_bcast_sink(rank, 4096));
     
     static const weight_set_type::feature_type __empty;
@@ -707,7 +707,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
     weights.allocate();
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(rank, 4096));
     
     std::string feature;

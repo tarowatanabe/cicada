@@ -718,7 +718,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       dev[rank].reset(new idevice_type(rank, envelope_tag, 4096));
       is[rank].reset(new istream_type());
       
-      is[rank]->push(boost::iostreams::gzip_decompressor());
+      is[rank]->push(boost::iostreams::zlib_decompressor());
       is[rank]->push(*dev[rank]);
       
       dev[rank]->test();
@@ -806,7 +806,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     envelope_set_type envelopes;
     
     ostream_type os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(odevice_type(0, envelope_tag, 4096));
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
@@ -878,7 +878,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       dev[rank].reset(new idevice_type(rank, viterbi_tag, 4096));
       is[rank].reset(new istream_type());
       
-      is[rank]->push(boost::iostreams::gzip_decompressor());
+      is[rank]->push(boost::iostreams::zlib_decompressor());
       is[rank]->push(*dev[rank]);
 
       dev[rank]->test();
@@ -949,7 +949,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     sentence_type yield;
     
     ostream_type os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(odevice_type(0, viterbi_tag, 4096));
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
@@ -1099,7 +1099,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
   
   if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
+    os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_bcast_sink(rank, 4096));
     
     static const weight_set_type::feature_type __empty;
@@ -1121,7 +1121,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
     weights.allocate();
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(utils::mpi_device_bcast_source(rank, 4096));
     
     std::string feature;
