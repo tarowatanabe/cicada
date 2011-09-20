@@ -54,6 +54,7 @@ bin_PROGRAMS = \
 	cicada_filter_extract_phrase \
 	cicada_filter_extract_scfg \
 	cicada_filter_kbest \
+	cicada_filter_kbest_moses \
 	cicada_filter_charniak \
 	cicada_filter_conll \
 	cicada_filter_dependency \
@@ -228,6 +229,9 @@ cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_filter_kbest_SOURCES = cicada_filter_kbest.cpp
 cicada_filter_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_kbest_moses_SOURCES = cicada_filter_kbest_moses.cpp
+cicada_filter_kbest_moses_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_weights_SOURCES = cicada_filter_weights.cpp
 cicada_filter_weights_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

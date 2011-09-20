@@ -57,6 +57,7 @@ cicada_filter_extract_ghkm
 cicada_filter_extract_phrase
 cicada_filter_extract_scfg
 cicada_filter_kbest
+cicada_filter_kbest_moses
 cicada_filter_charniak
 cicada_filter_conll
 cicada_filter_dependency
