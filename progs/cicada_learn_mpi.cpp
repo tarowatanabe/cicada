@@ -1118,6 +1118,7 @@ void send_weights(const weight_set_type& weights)
       utils::encode_base64(weights[id], std::ostream_iterator<char>(os));
       os << '\n';
     }
+  os << '\n';
 }
 
 void bcast_weights(const int rank, weight_set_type& weights)
@@ -1146,6 +1147,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
 	  os << '\n';
 	}
       }
+    os << '\n';
   } else {
     weights.clear();
     weights.allocate();
