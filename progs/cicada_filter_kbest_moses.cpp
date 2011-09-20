@@ -94,6 +94,8 @@ int main(int argc, char** argv)
     iter_type iter_end;
     
     kbest_type kbest;
+    tokens_type features_new;
+    std::string feature_name;
     
     while (iter != iter_end) {
       boost::fusion::get<1>(kbest).clear();
@@ -115,10 +117,8 @@ int main(int argc, char** argv)
       
       
       if (! features.empty()) {
-	static tokens_type features_new;
-	
 	features_new.clear();
-	std::string name = "";
+	feature_name = "";
 	int id = 0;
 
 	tokens_type::const_iterator fiter_end = features.end();
@@ -126,10 +126,10 @@ int main(int argc, char** argv)
 	  const size_t feature_size = fiter->size();
 	  
 	  if (fiter->operator[](feature_size - 1) == ':') {
-	    name = *fiter;
+	    feature_name = *fiter;
 	    id = 0;
 	  } else {
-	    features_new.push_back(name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
+	    features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
 	    ++ id;
 	  }
 	}
