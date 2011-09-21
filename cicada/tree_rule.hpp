@@ -90,6 +90,30 @@ namespace cicada
       for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
 	aiter->frontier(iter);
     }
+    
+    size_type size_internal() const
+    {
+      size_type __size = 0;
+      const_iterator aiter_end = antecedents.end();
+      for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
+	if (! aiter->antecedents.empty())
+	  __size += aiter->size_internal() + 1;
+      
+      return __size;
+    }
+    
+    size_type size_frontier() const
+    {
+      if (antecedents.empty())
+	return label.is_non_terminal();
+      
+      size_type __size = 0;
+      const_iterator aiter_end = antecedents.end();
+      for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
+	__size += aiter->size_frontier();
+      
+      return __size;
+    }
 
   private:
     size_type __depth(const TreeRule& tree, const size_type depth) const
