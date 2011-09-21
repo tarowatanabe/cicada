@@ -199,18 +199,35 @@ struct OptimizeLinear
   {
     
   }
-  
-  OptimizeLinear(const hypothesis_map_type& kbests,
-		 const hypothesis_map_type& oracles)
-    : weights(), objective(0.0)
-  {
-    // compute unique before processing
-    // 
-    
-    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
-    for (size_t id = 0; id != id_max; ++ id)
-      if (! kbests[id].empty() && ! oracles[id].empty()) {
 
+  struct Encoder
+  {
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+
+    Encoder(queue_type& __queue,
+	    const hypothesis_map_type& __kbests,
+	    const hypothesis_map_type& __oracles)
+      : queue(__queue),
+	kbests(__kbests),
+	oracles(__oracles) {}
+    
+    queue_type& queue;
+    const hypothesis_map_type& kbests;
+    const hypothesis_map_type& oracles;
+    
+    offset_set_type       offsets;
+    feature_node_set_type feature_nodes;
+    
+    void operator()()
+    {
+      sentence_unique_type  sentences;
+      
+      int id = 0;
+      
+      for (;;) {
+	queue.pop(id);
+	if (id < 0) break;
+	
 	sentences.clear();
 	for (size_t o = 0; o != oracles[id].size(); ++ o)
 	  sentences.insert(oracles[id][o].sentence);
@@ -223,7 +240,6 @@ struct OptimizeLinear
 	    // ignore oracle translations
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
-	    labels.push_back(1);
 	    offsets.push_back(feature_nodes.size());
 	    
 	    feature_node_type feat;
@@ -273,20 +289,55 @@ struct OptimizeLinear
 	    feature_nodes.push_back(feat);
 	  }
       }
+      
+      feature_node_set_type(feature_nodes).swap(feature_nodes);
+    }
+  };
+  typedef Encoder encoder_type;
+  typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
+  
+  OptimizeLinear(const hypothesis_map_type& kbests,
+		 const hypothesis_map_type& oracles)
+    : weights(), objective(0.0)
+  {
+    // compute unique before processing
+    // 
 
+    encoder_type::queue_type queue;
+    encoder_set_type encoders(threads, encoder_type(queue, kbests, oracles));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(encoders[i])));
+    
+    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+    for (size_t id = 0; id != id_max; ++ id)
+      if (! kbests[id].empty() && ! oracles[id].empty())
+	queue.push(id);
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    workers.join_all();
+    
+    size_t data_size = 0;
+    for (int i = 0; i < threads; ++ i)
+      data_size += encoders[i].offsets.size();
+    
     if (debug)
-      std::cerr << "liblinear data size: " << labels.size() << std::endl;
-
-    // construct problem...
-    label_set_type(labels).swap(labels);
-    feature_node_set_type(feature_nodes).swap(feature_nodes);
+      std::cerr << "liblinear data size: " << data_size << std::endl;
     
-    features.reserve(offsets.size());
-    for (size_type pos = 0; pos != offsets.size(); ++ pos)
-      features.push_back(const_cast<feature_node_type*>(&(*feature_nodes.begin())) + offsets[pos]);
+    labels.reserve(data_size);
+    features.reserve(data_size);
     
-    offsets.clear();
-    offset_set_type(offsets).swap(offsets);
+    labels.resize(data_size, 1);
+    for (int i = 0; i < threads; ++ i) {
+      for (size_type pos = 0; pos != encoders[i].offsets.size(); ++ pos)
+	features.push_back(const_cast<feature_node_type*>(&(*encoders[i].feature_nodes.begin())) + encoders[i].offsets[pos]);
+      
+      encoders[i].offsets.clear();
+      offset_set_type(encoders[i].offsets).swap(encoders[i].offsets);
+    }
     
     problem_type problem;
     
@@ -341,11 +392,8 @@ struct OptimizeLinear
   
 private:
   label_set_type        labels;
-  offset_set_type       offsets;
   feature_node_map_type features;
-  feature_node_set_type feature_nodes;
-  sentence_unique_type  sentences;
-
+  
 public:
   weight_set_type weights;
   double objective;
