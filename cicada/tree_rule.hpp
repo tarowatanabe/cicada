@@ -104,13 +104,13 @@ namespace cicada
     
     size_type size_frontier() const
     {
-      if (antecedents.empty())
-	return label.is_non_terminal();
-      
       size_type __size = 0;
       const_iterator aiter_end = antecedents.end();
       for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
-	__size += aiter->size_frontier();
+	if (aiter->antecedents.empty())
+	  __size += aiter->label.is_non_terminal();
+	else
+	  __size += aiter->size_frontier();
       
       return __size;
     }
