@@ -397,7 +397,7 @@ namespace cicada
 	  const int pos_dependent = boost::apply_visitor(__point(), diter->second);
 	  
 	  if (pos_head >= 0 && pos_dependent - 1 >= 0) {
-	    if (pos_dependent - 1 >= boost::get<0>(yield).size())
+	    if (pos_dependent - 1 >= static_cast<int>(boost::get<0>(yield).size()))
 	      boost::get<0>(yield).resize(pos_dependent, -1);
 	    
 	    boost::get<0>(yield).operator[](pos_dependent - 1) = pos_head;
