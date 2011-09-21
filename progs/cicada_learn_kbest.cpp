@@ -191,8 +191,7 @@ struct OptimizeLinear
 
   static void print_string_stderr(const char *s)
   {
-    fputs(s,stderr);
-    fflush(stderr);
+    std::cerr << s << std::flush;
   }
 
   static void print_string_none(const char *s)
@@ -216,11 +215,15 @@ struct OptimizeLinear
     const hypothesis_map_type& oracles;
     
     offset_set_type       offsets;
-    feature_node_set_type feature_nodes;
+    feature_node_set_type features;
     
     void operator()()
     {
+      offsets.clear();
+      features.clear();
+      
       sentence_unique_type  sentences;
+      feature_node_type     feature;
       
       int id = 0;
       
@@ -240,10 +243,8 @@ struct OptimizeLinear
 	    // ignore oracle translations
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
-	    offsets.push_back(feature_nodes.size());
-	    
-	    feature_node_type feat;
-	    
+	    offsets.push_back(features.size());
+	    	    
 	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
 	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
 	    
@@ -252,45 +253,45 @@ struct OptimizeLinear
 	    
 	    while (oiter != oiter_end && kiter != kiter_end) {
 	      if (oiter->first < kiter->first) {
-		feat.index = oiter->first.id() + 1;
-		feat.value = oiter->second;
-		feature_nodes.push_back(feat);
+		feature.index = oiter->first.id() + 1;
+		feature.value = oiter->second;
+		features.push_back(feature);
 		++ oiter;
 	      } else if (kiter->first < oiter->first) {
-		feat.index = kiter->first.id() + 1;
-		feat.value = - kiter->second;
-		feature_nodes.push_back(feat);
+		feature.index = kiter->first.id() + 1;
+		feature.value = - kiter->second;
+		features.push_back(feature);
 		++ kiter;
 	      } else {
-		feat.index = oiter->first.id() + 1;
-		feat.value = oiter->second - kiter->second;
-		if (feat.value != 0.0)
-		  feature_nodes.push_back(feat);
+		feature.index = oiter->first.id() + 1;
+		feature.value = oiter->second - kiter->second;
+		if (feature.value != 0.0)
+		  features.push_back(feature);
 		++ oiter;
 		++ kiter;
 	      }
 	    }
 	    
 	    for (/**/; oiter != oiter_end; ++ oiter) {
-	      feat.index = oiter->first.id() + 1;
-	      feat.value = oiter->second;
-	      feature_nodes.push_back(feat);
+	      feature.index = oiter->first.id() + 1;
+	      feature.value = oiter->second;
+	      features.push_back(feature);
 	    }
 	    
 	    for (/**/; kiter != kiter_end; ++ kiter) {
-	      feat.index = kiter->first.id() + 1;
-	      feat.value = - kiter->second;
-	      feature_nodes.push_back(feat);
+	      feature.index = kiter->first.id() + 1;
+	      feature.value = - kiter->second;
+	      features.push_back(feature);
 	    }
 	    
 	    // termination...
-	    feat.index = -1;
-	    feat.value = 0.0;
-	    feature_nodes.push_back(feat);
+	    feature.index = -1;
+	    feature.value = 0.0;
+	    features.push_back(feature);
 	  }
       }
       
-      feature_node_set_type(feature_nodes).swap(feature_nodes);
+      feature_node_set_type(features).swap(features);
     }
   };
   typedef Encoder encoder_type;
@@ -327,13 +328,16 @@ struct OptimizeLinear
     if (debug)
       std::cerr << "liblinear data size: " << data_size << std::endl;
     
+    labels.clear();
+    features.clear();
+    
     labels.reserve(data_size);
     features.reserve(data_size);
     
     labels.resize(data_size, 1);
     for (int i = 0; i < threads; ++ i) {
       for (size_type pos = 0; pos != encoders[i].offsets.size(); ++ pos)
-	features.push_back(const_cast<feature_node_type*>(&(*encoders[i].feature_nodes.begin())) + encoders[i].offsets[pos]);
+	features.push_back(const_cast<feature_node_type*>(&(*encoders[i].features.begin())) + encoders[i].offsets[pos]);
       
       encoders[i].offsets.clear();
       offset_set_type(encoders[i].offsets).swap(encoders[i].offsets);
