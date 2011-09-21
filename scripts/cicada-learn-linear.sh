@@ -23,7 +23,7 @@ refset=""
 
 ## # of processes, # of cores
 np=1
-nc=2
+nc=4
 hosts=""
 hosts_file=""
 
@@ -309,7 +309,7 @@ qsubwrapper() {
         echo "#PBS -l select=${np}:ncpus=${nc}:mpiprocs=${nc}:mem=${mem}"
         echo "#PBS -l place=scatter"
       else
-        echo "#PBS -l select=1:ncpus=1:mem=${mem}"
+        echo "#PBS -l select=1:ncpus=${nc}:mem=${mem}"
       fi
 
       if test "$TMPDIR_SPEC" != ""; then
@@ -457,6 +457,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --learn-linear \
                         --solver $solver \
                         --C $C \
+                        --threads $nc \
                         \
                         --debug=2 || exit 1
 

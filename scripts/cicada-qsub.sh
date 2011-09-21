@@ -135,10 +135,10 @@ if test "$qsub" != ""; then
     echo "#PBS -o /dev/null"
     echo "#PBS -q $queue"
     if test "$stripped" != "$1" -a $np -gt 1; then
-      echo "#PBS -l select=$np:ncpus=$nc:mpiprocs=$nc:mem=${mem}"
+      echo "#PBS -l select=${np}:ncpus=${nc}:mpiprocs=${nc}:mem=${mem}"
       echo "#PBS -l place=scatter"
     else
-      echo "#PBS -l select=1:ncpus=1:mem=${mem}"
+      echo "#PBS -l select=1:ncpus=${nc}:mem=${mem}"
     fi
       
     if test "$TMPDIR_SPEC" != ""; then
