@@ -23,7 +23,7 @@ refset=""
 
 ## # of processes, # of cores
 np=1
-nc=4
+nc=2
 hosts=""
 hosts_file=""
 
