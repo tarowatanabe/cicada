@@ -44,6 +44,8 @@ bool learn_sgd = false;
 bool learn_mira = false;
 bool learn_cw = false;
 bool learn_arow = false;
+bool learn_linear = false;
+int  linear_solver = L2R_L2LOSS_SVC_DUAL;
 
 path_type prog_name;
 
@@ -67,10 +69,10 @@ int main(int argc, char** argv)
     if (getoptions(argc, argv) != 0) 
       return 1;
     
-    switch (int(learn_maxent) + learn_sgd + learn_mira + learn_cw + learn_arow) {
+    switch (int(learn_maxent) + learn_sgd + learn_mira + learn_cw + learn_arow + learn_linear) {
     case 0: learn_maxent = true; break;
     case 1: break;
-    default: throw std::runtime_error("you can specily one of learn_{maxent,sgd,mira,cw,arow}");
+    default: throw std::runtime_error("you can specily one of learn_{maxent,sgd,mira,cw,arow,linear}");
     }
     
     // setup regularizer... default is L2
@@ -169,25 +171,29 @@ void learn(const path_type& path,
   
   thread_ptr_type mapper;
   if (learn_maxent)
-    mapper.reset(new thread_type(Mapper<OptimizeLBFGS>(bitexts,
-						       queue,
-						       path_lexicon)));
+    mapper.reset(new thread_type(Mapper<OptimizeLBFGS>(bitexts, queue, path_lexicon)));
   if (learn_sgd)
-    mapper.reset(new thread_type(Mapper<OptimizeSGD>(bitexts,
-						     queue,
-						     path_lexicon)));
+    mapper.reset(new thread_type(Mapper<OptimizeSGD>(bitexts, queue, path_lexicon)));
   else if (learn_mira)
-    mapper.reset(new thread_type(Mapper<OptimizeMIRA>(bitexts,
-						      queue,
-						      path_lexicon)));
+    mapper.reset(new thread_type(Mapper<OptimizeMIRA>(bitexts, queue, path_lexicon)));
   else if (learn_cw)
-    mapper.reset(new thread_type(Mapper<OptimizeCW>(bitexts,
-						    queue,
-						    path_lexicon)));
+    mapper.reset(new thread_type(Mapper<OptimizeCW>(bitexts, queue, path_lexicon)));
   else if (learn_arow)
-    mapper.reset(new thread_type(Mapper<OptimizeAROW>(bitexts,
-						      queue,
-						      path_lexicon)));
+    mapper.reset(new thread_type(Mapper<OptimizeAROW>(bitexts, queue, path_lexicon)));
+  else if (learn_linear) {
+    switch (linear_solver) {
+    case 0: mapper.reset(new thread_type(Mapper<OptimizerLinear<0> >(bitexts, queue, path_lexicon))); break;
+    case 1: mapper.reset(new thread_type(Mapper<OptimizerLinear<1> >(bitexts, queue, path_lexicon))); break;
+    case 2: mapper.reset(new thread_type(Mapper<OptimizerLinear<2> >(bitexts, queue, path_lexicon))); break;
+    case 3: mapper.reset(new thread_type(Mapper<OptimizerLinear<3> >(bitexts, queue, path_lexicon))); break;
+    case 4: mapper.reset(new thread_type(Mapper<OptimizerLinear<4> >(bitexts, queue, path_lexicon))); break;
+    case 5: mapper.reset(new thread_type(Mapper<OptimizerLinear<5> >(bitexts, queue, path_lexicon))); break;
+    case 6: mapper.reset(new thread_type(Mapper<OptimizerLinear<6> >(bitexts, queue, path_lexicon))); break;
+    case 7: mapper.reset(new thread_type(Mapper<OptimizerLinear<7> >(bitexts, queue, path_lexicon))); break;
+    default:
+      throw std::runtime_error("unsupported liblinear-solver");
+    }
+  }
 
   if (mpi_rank == 0) {
     typedef utils::mpi_ostream ostream_type;
@@ -297,6 +303,15 @@ int getoptions(int argc, char** argv)
     ("learn-mira",   po::bool_switch(&learn_mira),    "MIRA")
     ("learn-cw",     po::bool_switch(&learn_cw),      "Confidence-Weighted")
     ("learn-arow",   po::bool_switch(&learn_arow),    "Adaptive-Regularization")
+    ("learn-linear", po::bool_switch(&learn_linear),  "liblinear algorithm")
+    ("solver",       po::value<int>(&linear_solver),  "liblinear solver type (default: 1)\n"
+     " 0: \tL2-regularized logistic regression (primal)\n"
+     " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
+     " 2: \tL2-regularized L2-loss support vector classification (primal)\n"
+     " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
+     " 5: \tL1-regularized L2-loss support vector classification\n"
+     " 6: \tL1-regularized logistic regression\n"
+     " 7: \tL2-regularized logistic regression (dual)")
     
     ("max-iteration", po::value<int>(&max_iteration),  "maximum iteration")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-norm (only for logistic-loss, maxent/SGD)")

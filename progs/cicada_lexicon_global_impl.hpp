@@ -225,6 +225,8 @@ struct OptimizerLinearBase
 template <int Solver>  
 struct OptimizerLinear : public OptimizerLinearBase
 {
+  typedef OptimizerLinearBase base_type;
+
   OptimizerLinear(const bitext_set_type& bitexts,
 		  const word_type& word)
     : OptimizerLinearBase(bitexts, word) {}

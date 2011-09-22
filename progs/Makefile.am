@@ -285,11 +285,11 @@ cicada_lexicon_dice_SOURCES = cicada_lexicon_dice.cpp
 cicada_lexicon_dice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_lexicon_global_SOURCES = cicada_lexicon_global.cpp $(LBFGS_SOURCE) cicada_lexicon_global_impl.hpp
-cicada_lexicon_global_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_lexicon_global_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 cicada_lexicon_global_mpi_SOURCES = cicada_lexicon_global_mpi.cpp $(LBFGS_SOURCE) cicada_lexicon_global_impl.hpp
 cicada_lexicon_global_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 cicada_lexicon_hmm_SOURCES = \
 	cicada_lexicon_hmm.cpp \
