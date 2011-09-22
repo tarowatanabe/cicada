@@ -21,6 +21,7 @@ qsub=`which qsub 2> /dev/null`
 
 name=""
 logfile=""
+threads=""
 
 ## # of processes, # of cores
 np=1
@@ -43,6 +44,7 @@ $me name [options] cicada-program args
   --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
   --log, -l                 logfile
+  --threads,-t              threading option
   --name                    process name
 
   -h, --help                help message
@@ -82,6 +84,9 @@ while test $# -gt 0; do
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
     shift; shift ;;
+  --threads | -t )
+    threads="yes"
+    shift ;;
   --name )
     test $# = 1 && eval "$exit_missing_arg"
     name=$2
@@ -102,6 +107,10 @@ done
 stripped=`expr "$1" : '\(.*\)_mpi$'`
 if test "$stripped" = ""; then
   stripped=$1
+fi
+
+if test "$threads" = "yes"; then
+  threads=" --threads ${nc}"
 fi
 
 if test "$openmpi" != ""; then
@@ -163,9 +172,9 @@ if test "$qsub" != ""; then
       ## shift here!
       shift;
       if test "$logfile" != ""; then
-        echo "$stripped $@ >& $logfile"
+        echo "$stripped $@ $threads >& $logfile"
       else
-        echo "$stripped $@"
+        echo "$stripped $@ $threads"
       fi
     fi
   ) |
@@ -180,9 +189,9 @@ else
   else
     shift
     if test "$logfile" != ""; then
-      exec $stripped "$@" >& $logfile
+      exec $stripped "$@ $threads" >& $logfile
     else
-      exec $stripped "$@"
+      exec $stripped "$@ $threads"
     fi
   fi
 fi
