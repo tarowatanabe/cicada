@@ -244,7 +244,7 @@ struct OptimizeLinear
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
 	    offsets.push_back(features.size());
-	    	    
+	    
 	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
 	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
 	    

@@ -244,8 +244,12 @@ qsubwrapper() {
   shift
   
   logfile=""
+  threads=""
   while test $# -gt 0 ; do
   case $1 in
+  -t )
+    threads=" --threads ${nc}"
+    shift ;;
   -l )
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
@@ -301,9 +305,9 @@ qsubwrapper() {
 	## shift here!
 	shift;
 	if test "$logfile" != ""; then
-          echo "$stripped $@ >& $logfile"
+          echo "$stripped $@ $threads >& $logfile"
         else
-          echo "$stripped $@"
+          echo "$stripped $@ $threads"
         fi
       fi
     ) |
@@ -318,14 +322,13 @@ qsubwrapper() {
     else
       shift
       if test "$logfile" != ""; then
-        $stripped "$@" >& $logfile || exit 1
+        $stripped "$@ $threads" >& $logfile || exit 1
       else
-        $stripped "$@" || exit 1
+        $stripped "$@ $threads" || exit 1
       fi
     fi
   fi
 }
-
 
 ### setup config file
 ### we will simply remove operation field..
@@ -347,7 +350,7 @@ qsubwrapper decode -l ${root}forest.maxent.log $cicada/cicada_mpi \
 	--debug || exit 1
   
 echo "oracle translations ${root}forest-maxent.oracle" >&2
-qsubwrapper oracle -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
+qsubwrapper oracle -t -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
         --refset $refset \
         --tstset ${root}forest-maxent \
         --output ${root}forest-maxent.oracle \
@@ -359,7 +362,7 @@ qsubwrapper oracle -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
         --debug || exit 1
 
 echo "learning ${root}weights.maxent" >&2
-qsubwrapper learn -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
+qsubwrapper learn -t -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
          --forest ${root}forest-maxent \
          --oracle ${root}forest-maxent.oracle \
          --output ${root}weights.maxent \

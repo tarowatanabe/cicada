@@ -289,8 +289,12 @@ qsubwrapper() {
   shift
   
   logfile=""
+  threads=""
   while test $# -gt 0 ; do
   case $1 in
+  -t )
+    threads=" --threads ${nc}"
+    shift ;;
   -l )
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
@@ -346,9 +350,9 @@ qsubwrapper() {
 	## shift here!
 	shift;
 	if test "$logfile" != ""; then
-          echo "$stripped $@ >& $logfile"
+          echo "$stripped $@ $threads >& $logfile"
         else
-          echo "$stripped $@"
+          echo "$stripped $@ $threads"
         fi
       fi
     ) |
@@ -363,9 +367,9 @@ qsubwrapper() {
     else
       shift
       if test "$logfile" != ""; then
-        $stripped "$@" >& $logfile || exit 1
+        $stripped "$@ $threads" >& $logfile || exit 1
       else
-        $stripped "$@" || exit 1
+        $stripped "$@ $threads" || exit 1
       fi
     fi
   fi
@@ -450,7 +454,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   ### compute oracles
   if test $kbest -eq 0; then
     echo "oracle translations ${root}${output}-${iter}.oracle" >&2
-    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_mpi \
+    qsubwrapper oracle -t -l ${root}oracle.$iter.log $cicada/cicada_oracle_mpi \
         --refset $refset \
         --tstset $tstset_oracle \
         --output ${root}${output}-${iter}.oracle \
@@ -462,7 +466,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --debug || exit 1
   else
     echo "oracle translations ${root}${output}-${iter}.oracle" >&2
-    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+    qsubwrapper oracle -t -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
         --refset $refset \
         --tstset $tstset_oracle \
         --output ${root}${output}-${iter}.oracle \
@@ -500,7 +504,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
+    qsubwrapper learn -t -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
                         --forest $tstset \
                         --oracle $learn_oracle \
                         $unite \
@@ -513,7 +517,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --debug=2 || exit 1
   else
     echo "learning ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest_mpi \
+    qsubwrapper learn -t -l ${root}learn.$iter.log $cicada/cicada_learn_kbest_mpi \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
 	                $unite \

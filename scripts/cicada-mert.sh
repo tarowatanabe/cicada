@@ -283,8 +283,12 @@ qsubwrapper() {
   shift
   
   logfile=""
+  threads=""
   while test $# -gt 0 ; do
   case $1 in
+  -t )
+    threads=" --threads ${nc}"
+    shift ;;
   -l )
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
@@ -317,7 +321,7 @@ qsubwrapper() {
       else
         echo "#PBS -l select=1:ncpus=${nc}:mem=${mem}"
       fi
-      
+
       if test "$TMPDIR_SPEC" != ""; then
         echo "export TMPDIR_SPEC=$TMPDIR_SPEC"
       fi
@@ -340,9 +344,9 @@ qsubwrapper() {
 	## shift here!
 	shift;
 	if test "$logfile" != ""; then
-          echo "$stripped $@ >& $logfile"
+          echo "$stripped $@ $threads >& $logfile"
         else
-          echo "$stripped $@"
+          echo "$stripped $@ $threads"
         fi
       fi
     ) |
@@ -357,9 +361,9 @@ qsubwrapper() {
     else
       shift
       if test "$logfile" != ""; then
-        $stripped "$@" >& $logfile || exit 1
+        $stripped "$@ $threads" >& $logfile || exit 1
       else
-        $stripped "$@" || exit 1
+        $stripped "$@ $threads" || exit 1
       fi
     fi
   fi
@@ -464,7 +468,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   ## MERT
   if test $kbest -eq 0; then
     echo "MERT ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
+    qsubwrapper learn -t -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
 			--refset $refset \
 			--tstset $tstset \
 			--output ${root}weights.$iter \
@@ -485,7 +489,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--debug=2 || exit 1
   else
     echo "MERT ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_kbest_mpi \
+    qsubwrapper learn -t -l ${root}mert.$iter.log $cicada/cicada_mert_kbest_mpi \
 			--refset $refset \
 			--tstset $tstset \
 			--output ${root}weights.$iter \
