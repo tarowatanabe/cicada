@@ -40,6 +40,9 @@ void process(const utils::piece& rule_str)
   std::ostream_iterator<std::string> iter(std::cout, " ");
   rule.frontier(iter);
   std::cout << std::endl;
+
+  std::cout << "internal size: " << rule.size_internal() << std::endl;
+  std::cout << "frontier size: " << rule.size_frontier() << std::endl;
 }
 
 int main(int argc, char** argv)
