@@ -99,7 +99,7 @@ bleu:\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 ribes: RIBES\n\
-\tweight=[weight for precision]\n\
+\tweight=[weight for precision] (default 0.25)\n\
 \tspearman=[true|false] use Spearman's correlation\n\
 \tkendall=[true|false] use Kendall's correlation (default)\n\
 per: position indenendent error rate\n\
