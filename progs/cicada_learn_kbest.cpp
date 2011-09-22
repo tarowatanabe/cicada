@@ -328,8 +328,8 @@ struct OptimizeLinear
     if (debug)
       std::cerr << "liblinear data size: " << data_size << std::endl;
     
-    labels.clear();
-    features.clear();
+    label_set_type        labels;
+    feature_node_map_type features;
     
     labels.reserve(data_size);
     features.reserve(data_size);
@@ -393,10 +393,6 @@ struct OptimizeLinear
     
     free_and_destroy_model(const_cast<model_type**>(&model));
   }
-  
-private:
-  label_set_type        labels;
-  feature_node_map_type features;
   
 public:
   weight_set_type weights;
