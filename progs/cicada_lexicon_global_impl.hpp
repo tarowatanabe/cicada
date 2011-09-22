@@ -209,8 +209,7 @@ struct OptimizerLinearBase
   
   static void print_string_stderr(const char *s)
   {
-    fputs(s,stderr);
-    fflush(stderr);
+    std::cerr << s << std::flush;
   }
   
   static void print_string_none(const char *s)
@@ -281,7 +280,7 @@ struct OptimizerLinear : public OptimizerLinearBase
     const double scale = model->label[0];
     for (int j = 0; j != model->nr_feature; ++ j)
       if (model->w[j] != 0.0)
-	x[j - 1] = model->w[j] * scale;
+	x[j] = model->w[j] * scale;
     
     free_and_destroy_model(const_cast<model_type**>(&model));
   }
