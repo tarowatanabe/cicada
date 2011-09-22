@@ -189,9 +189,9 @@ else
   else
     shift
     if test "$logfile" != ""; then
-      exec $stripped "$@ $threads" >& $logfile
+      exec $stripped "$@" $threads >& $logfile
     else
-      exec $stripped "$@ $threads"
+      exec $stripped "$@" $threads
     fi
   fi
 fi
