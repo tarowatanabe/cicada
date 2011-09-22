@@ -79,13 +79,22 @@ namespace cicada
 			    const edge_type& edge,
 			    feature_set_type& features)
       {
+	int pos_head = -1;
+	int pos_dep  = -1;
+	
+	attribute_set_type::const_iterator hiter = edge.attributes.find(attr_dependency_head);
+	attribute_set_type::const_iterator diter = edge.attributes.find(attr_dependency_dependent);
+	
+	if (hiter != edge.attributes.end() && diter != edge.attributes.end()) {
+	  pos_head = boost::apply_visitor(__attribute_integer(), hiter->second);
+	  pos_dep  = boost::apply_visitor(__attribute_integer(), diter->second);
+	}
 	
 	
       }	
       
       void clear()
       {
-	
 	
       }
       
