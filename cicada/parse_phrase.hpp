@@ -203,9 +203,11 @@ namespace cicada
       
       // initialization...
       
-      for (size_t i = 0; i != lattice.size(); ++ i) {
+      for (size_type i = 0; i <= lattice.size(); ++ i) {
 	// states...
 	// we will synchronize by the candidate_type
+
+	const size_type cardinality = i;
 	
 	candidate_heap_type& heap = heaps[i];
 	coverages.clear();
@@ -258,9 +260,9 @@ namespace cicada
 	// enumerate coverages and add new candidates to the heaps...
 	coverage_ptr_set_type::const_iterator citer_end = coverages.end();
 	for (coverage_ptr_set_type::const_iterator citer = coverages.begin(); citer != citer_end; ++ citer) {
-	  coverage_type __coverage_new = *(*citer);
+	  const coverage_type& coverage = *(*citer);
 	  
-	  const int first = __coverage_new.select(1, false);
+	  const int first = coverage.select(1, false);
 	  const int last  = utils::bithack::min(static_cast<int>(lattices.size()), first + max_distortion + 1);
 	  
 	  node_set_type nodes;
@@ -275,22 +277,80 @@ namespace cicada
 	    
 	    node_set_type::const_iterator niter_end = nodes.end();
 	    for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	      if (! coverage_new->test(*niter)) {
-		// start enumerating...
-		
-		
-		
-		
-		
-		// fill-in nodes-next
-		lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
-		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
-		  const int next = *niter + aiter->distance;
+	      if (! coverage.test(*niter))
+		for (size_type table = 0; table != grammar.size(); ++ table) {
+		  // start enumerating grammar...
 		  
-		  if (! visited[next]) {
-		    nodes_next.push_back(next);
-		    visited.set(next);
+		  const transducer_type& transducer = grammar[table];
+		  
+		  coverage_type coverage_new    = coverage;
+		  size_type     cardinality_new = cardinality;
+		  
+		  nodes_intersected.clear();
+		  nodes_intersected.resize(lattice.size() + 1);
+		  nodes_intersected[*niter].push_back(std::make_pair(transducer.root(), feature_set_type()));
+		  
+		  const size_type first = *niter;
+		  for (size_type last = first; last <= lattice.size() && (first == last || ! coverage.test(last - 1)); ++ last) {
+		    if (first != last) {
+		      coverage_new.set(last - 1);
+		      ++ cardinality_new;
+		    }
+		    
+		    node_intersected_set_type::const_iterator niter_end = nodes_intersected[last].end();
+		    for (node_intersected_set_type::const_iterator niter = nodes_intersected[last].begin(); niter != niter_end; ++ niter) {
+		      const phrase_candidate_set_type& phrases = candidate_phrases(table, niter->first);
+		      
+		      if (phrases.empty()) continue;
+		      
+		      candidate_type& cand = candidates.push_back(candidate_type());
+		      
+		      cand.score = function(niter->second) * phrases.begin()->score;
+		      
+		      cand.phrase_first = phrases.begin();
+		      cand.phrase_last  = phrasees.end();
+		      
+		      cand.features = niter->second;
+		      
+		      cand.tail = ; // this is the node-id associated with the previous coverage...
+		      cand.tail_phrase = hypergraph_type::invalid;
+		      
+		      cand.first = first;
+		      cand.last  = last;
+		      
+		      heaps[cardinality_new].push(&cand);
+		      
+		      // extention...
+		      if (last != lattice.size()) {
+			const lattice_type::arc_set_type& arcs = lattice[last];
+			
+			lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+			for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
+			  const symbol_type& terminal = aiter->label;
+			  const int length = aiter->distance;
+			  
+			  if (terminal == vocab_type::EPSILON)
+			    nodes_intersected[last + length].push_back(std::make_pair(niter->first, niter->second + aiter->features));
+			  else {
+			    const transducer_type::id_type node = transducer.next(niter->first, terminal);
+			    if (node == transducer.root()) continue;
+			    
+			    nodes_intersected[last + length].push_back(std::make_pair(node, niter->second + aiter->features));
+			  }
+			}
+		      }
+		    }
 		  }
+		}
+	      
+	      // fill-in nodes-next to determine the jump position over the lattice...
+	      lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
+	      for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
+		const int next = *niter + aiter->distance;
+		
+		if (! visited[next]) {
+		  nodes_next.push_back(next);
+		  visited.set(next);
 		}
 	      }
 	    }
