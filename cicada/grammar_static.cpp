@@ -921,6 +921,7 @@ namespace cicada
       boost::fusion::get<1>(rule).clear();
       boost::fusion::get<2>(rule).clear();
       boost::fusion::get<3>(rule).clear();
+      boost::fusion::get<4>(rule).clear();
       
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
