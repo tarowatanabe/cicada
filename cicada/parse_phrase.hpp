@@ -247,14 +247,6 @@ namespace cicada
 	    
 	  }
 	  
-	  // extend using the coverages...
-	  coverage_ptr_set_type::const_iterator citer_end = coverages.end();
-	  for (coverage_ptr_set_type::const_iterator citer = coverages.begin(); citer != citer_end; ++ citer) {
-	    
-	    
-	    
-	  }
-	  
 	  // proceed to the next...
 	  ++ item->phrase_first;
 	  if (item->phrase_first != item->phrase_last)
@@ -264,9 +256,27 @@ namespace cicada
 	}
 	
 	// enumerate coverages and add new candidates to the heaps...
-	
-	
-	
+	coverage_ptr_set_type::const_iterator citer_end = coverages.end();
+	for (coverage_ptr_set_type::const_iterator citer = coverages.begin(); citer != citer_end; ++ citer) {
+	  coverage_type __coverage_new = *(*citer);
+	  
+	  const int first = __coverage_new.select(1, false);
+	  const int last  = utils::bithack::min(static_cast<int>(lattices.size()), first + max_distortion + 1);
+	  
+	  node_set_type nodes;
+	  node_set_type nodes_next;
+	  coverage_type visited;
+	  
+	  nodes.push_back(first);
+	  visited.set(first);
+	  
+	  // first, determine the initial starting point...
+	  
+	  
+	  // then, enumerate lattice/grammar to proceed nexts...
+	  
+	  
+	}
       }
       
       // goal...
