@@ -280,6 +280,8 @@ namespace cicada
 		
 		
 		
+		
+		
 		// fill-in nodes-next
 		lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
 		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
