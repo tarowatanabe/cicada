@@ -357,7 +357,7 @@ namespace cicada
   };
   
   inline
-  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const Lattice& lattice, const int max_distortion, HyperGraph& graph, const bool yield_source=false)
+  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
   {
     ComposePhrase __composer(non_terminal, grammar, max_distortion, yield_source);
     __composer(lattice, graph);

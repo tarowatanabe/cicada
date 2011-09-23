@@ -531,7 +531,7 @@ namespace cicada
 
       grammar_compose.assign(lattice);
     
-      cicada::compose_phrase(goal, grammar_compose, lattice, distortion, composed);
+      cicada::compose_phrase(goal, grammar_compose, distortion, lattice, composed);
     
       utils::resource end;
     

@@ -121,7 +121,9 @@ namespace cicada
       
       feature_set_type features;
       
-      hypergraph_type::id_type tail;
+      hypergraph_type::id_type tail;        // this is fixed
+      hypergraph_type::id_type tail_phrase; // this will be udpated
+      
       int first;
       int last;
     };
@@ -172,10 +174,12 @@ namespace cicada
     ParsePhrase(const symbol_type& non_terminal,
 		const grammar_type& __grammar,
 		const function_type& __function,
+		const int __beam_size,
 		const int& __max_distortion,
 		const bool __yield_source)
       : grammar(__grammar),
 	function(__function),
+	beam_size(__beam_size),
 	max_distortion(__max_distortion),
 	yield_source(__yield_source),
 	attr_phrase_span_first("phrase-span-first"),
@@ -193,12 +197,86 @@ namespace cicada
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)
     {
-       graph.clear();
-
+      graph.clear();
+      
       if (lattice.empty()) return;
-
+      
+      // initialization...
+      
+      for (size_t i = 0; i != lattice.size(); ++ i) {
+	// states...
+	// we will synchronize by the candidate_type
+	
+	candidate_heap_type& heap = heaps[i];
+	coverages.clear();
+	
+	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
+	  candidate_type* item = heap.top();
+	  heap.pop();
+	  
+	  // when constructig hypergraph, we will construct by
+	  //
+	  // head -> tail tail-for-phrase
+	  //
+	  // thus, for each candidate, we need to keep head associated with coverage vector + tail-for-phrase associated
+	  // with each candidate_type...
+	  
+	  std::pair<node_map_type::iterator, bool> result_head = nodes.insert(std::make_pair(item->coverage, 0));
+	  if (result_head.second) {
+	    result_head.first->second = graph.add_node().id;
+	    
+	    // keep local coverages!
+	    coverages.push_back(item->coverage);
+	  }
+	  
+	  if (item->tail == hypergraph_type::invalid) {
+	    // this is the initial phrases...
+	    // we will construct a phral edge with head associated with "coverage" node-id
+	    
+	    // add hyperedge connecting phrase with result_head.first->second
+	    
+	  } else {
+	    if (item->tail_phrase == hypergraph_type::invalid) {
+	      item->tail_phrase = graph.add_node().id;
+	      
+	      // add hyperedge connecting result_head.first->second as head, and item->tail and item->tail_phrase as tails.
+	      
+	    }
+	    
+	    // add hyperedge connecting phrase with item->tail_phrase;
+	    
+	  }
+	  
+	  // extend using the coverages...
+	  coverage_ptr_set_type::const_iterator citer_end = coverages.end();
+	  for (coverage_ptr_set_type::const_iterator citer = coverages.begin(); citer != citer_end; ++ citer) {
+	    
+	    
+	    
+	  }
+	  
+	  // proceed to the next...
+	  ++ item->phrase_first;
+	  if (item->phrase_first != item->phrase_last)
+	    heap.push(item);
+	  
+	  ++ num_pop;
+	}
+	
+	// enumerate coverages and add new candidates to the heaps...
+	
+	
+	
+      }
+      
+      // goal...
+      
       nodes.clear();
       coverages.clear();
+      
+      
+      
+
       
       queue_type queue;
       
@@ -441,6 +519,7 @@ namespace cicada
     
     const grammar_type& grammar;
     const function_type& function;
+    const int beam_size;
     
     const int max_distortion;
     const bool yield_source;
@@ -457,9 +536,9 @@ namespace cicada
   
   template <typename Function>
   inline
-  void parse_phrase(const Symbol& non_terminal, const Grammar& grammar, const Function& function, const Lattice& lattice, const int max_distortion, HyperGraph& graph, const bool yield_source=false)
+  void parse_phrase(const Symbol& non_terminal, const Grammar& grammar, const Function& function, const int beam_size, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
   {
-    ParsePhrase<typename FUnction::value_type, Function> __parser(non_terminal, grammar, function, max_distortion, yield_source);
+    ParsePhrase<typename FUnction::value_type, Function> __parser(non_terminal, grammar, function, beam_size, max_distortion, yield_source);
     __parser(lattice, graph);
   }
 
