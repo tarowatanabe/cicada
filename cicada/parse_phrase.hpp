@@ -111,9 +111,16 @@ namespace cicada
 			  std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > > phrase_candidate_map_type;
 #endif
     typedef std::vector<phrase_candidate_map_type, std::allocator<phrase_candidate_map_type> > phrase_candidate_table_type;
-
+    
+    // coverage vector...
+    typedef utils::bit_vector<1024> coverage_type;
+    typedef utils::indexed_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>, std::allocator<coverage_type> > coverage_set_type;
+    typedef coverage_set_type::index_type coverage_id_type;
+    
     struct Candidate
     {
+      typedef boost::array<hypegraph_type::id_type, 2> tails_type;
+
       score_type score;
       
       typename phrase_candidate_set_type::const_iterator phrase_first;
@@ -121,55 +128,29 @@ namespace cicada
       
       feature_set_type features;
       
-      hypergraph_type::id_type tail;        // this is fixed
-      hypergraph_type::id_type tail_phrase; // this will be udpated
+      coverage_id_type coverage;
+      
+      tails_type tails;
       
       int first;
       int last;
     };
     
-    typedef utils::bit_vector<1024> coverage_type;
+    typedef Candidate candidate_type;
+    typedef utils::chunk_vector<candidate_type, 1024 * 8 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
-    struct State
+    struct compare_heap_type
     {
-      const coverage_type* coverage;
-      
-      int grammar_id;
-      transducer_type::id_type node;
-      
-      int first;
-      int last;
-
-      feature_set_type features;
-      
-      State(const coverage_type* __coverage,
-	    const int& __grammar_id, const transducer_type::id_type& __node,
-	    const int& __first, const int& __last,
-	    const feature_set_type& __features)
-	: coverage(__coverage),
-	  grammar_id(__grammar_id), node(__node),
-	  first(__first), last(__last),
-	  features(__features) {}
+      // we use less, so that when popped from heap, we will grab "greater" in back...
+      bool operator()(const candidate_type* x, const candidate_type* y) const
+      {
+	return x->score * x->first->score < y->score * y->first->score;
+      }
     };
-
-    typedef State state_type;
     
-    typedef std::deque<state_type, std::allocator<state_type> > queue_type;
-
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
-				    std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > > node_map_type;
-#else
-    typedef sgi::hash_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
-			  std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > > node_map_type;
-#endif
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-				    std::allocator<coverage_type > > coverage_set_type;
-#else
-    typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-			  std::allocator<coverage_type > > coverage_set_type;
-#endif
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+    typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+    typedef std::vector<candidate_heap_type, std::allocator<candidate_heap_type> > candidate_heap_map_type;
     
     ParsePhrase(const symbol_type& non_terminal,
 		const grammar_type& __grammar,
@@ -203,6 +184,10 @@ namespace cicada
       
       // initialization...
       
+      coverages.clear();
+      nodes.clear();
+      
+      
       for (size_type i = 0; i <= lattice.size(); ++ i) {
 	// states...
 	// we will synchronize by the candidate_type
@@ -210,11 +195,16 @@ namespace cicada
 	const size_type cardinality = i;
 	
 	candidate_heap_type& heap = heaps[i];
-	coverages.clear();
+	
+	coverages_cardinality.clear();
+	if (cardinality == 0)
+	  coverages_cardinality.push_back(coverage_start);
 	
 	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
 	  candidate_type* item = heap.top();
 	  heap.pop();
+
+	  const phrase_candidate_type& phrase_cand = *(item->phrase_first);
 	  
 	  // when constructig hypergraph, we will construct by
 	  //
@@ -223,30 +213,50 @@ namespace cicada
 	  // thus, for each candidate, we need to keep head associated with coverage vector + tail-for-phrase associated
 	  // with each candidate_type...
 	  
-	  std::pair<node_map_type::iterator, bool> result_head = nodes.insert(std::make_pair(item->coverage, 0));
-	  if (result_head.second) {
-	    result_head.first->second = graph.add_node().id;
-	    
-	    // keep local coverages!
-	    coverages.push_back(item->coverage);
+	  if (nodes[item->coverage] == hypergraph_type::invalid) {
+	    nodes[item->coverage] = graph.add_node().id;
+	    coverages_cardinality.push_back(item->coverage);
 	  }
+
+	  const hypergraph_type::id_type node_head = nodes[item->coverage];
 	  
-	  if (item->tail == hypergraph_type::invalid) {
+	  if (item->tails[0] == hypergraph_type::invalid) {
 	    // this is the initial phrases...
 	    // we will construct a phral edge with head associated with "coverage" node-id
 	    
-	    // add hyperedge connecting phrase with result_head.first->second
+	    // add hyperedge connecting phrase with node_head
 	    
+	    hypergraph_type::edge_type& edge = graph.add_edge();
+	    edge.rule = phrase_cand.rule;
+	    edge.features = phrase_cand.features + item->features;
+	    edge.attributes = phrase_cand.attributes;
+	    
+	    edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(item->first);
+	    edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(item->last);
+	    
+	    graph.connect_edge(edge.id, node_head);
 	  } else {
-	    if (item->tail_phrase == hypergraph_type::invalid) {
-	      item->tail_phrase = graph.add_node().id;
+	    if (item->tails[1] == hypergraph_type::invalid) {
+	      item->tails[1] = graph.add_node().id;
 	      
-	      // add hyperedge connecting result_head.first->second as head, and item->tail and item->tail_phrase as tails.
+	      // add hyperedge connecting node_head as head, and item->tail and item->tail_phrase as tails.
 	      
+	      hypergraph_type::edge_type& edge = graph.add_edge();
+	      edge.rule = phrase_cand.rule;
+	      edge.features = phrase_cand.features + item->features;
+	      
+	      edge.attributes = phrase_cand.attributes;
+	      edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(item->first);
+	      edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(item->last);
+	      
+	      graph.connect_edge(edge.id, item->tail_phrase);
 	    }
 	    
 	    // add hyperedge connecting phrase with item->tail_phrase;
+	    hypergraph_type::edge_type& edge = grah.add_edge(item->tails.begin(), item->tails.end());
+	    edge.rule = rule_x1_x2;
 	    
+	    graph.connect_edge(edge.id, node_head);
 	  }
 	  
 	  // proceed to the next...
@@ -257,10 +267,14 @@ namespace cicada
 	  ++ num_pop;
 	}
 	
+	// clear unused heap...
+	heap.clear();
+	candidate_heap_type(heap).swap(heap);
+	
 	// enumerate coverages and add new candidates to the heaps...
-	coverage_ptr_set_type::const_iterator citer_end = coverages.end();
-	for (coverage_ptr_set_type::const_iterator citer = coverages.begin(); citer != citer_end; ++ citer) {
-	  const coverage_type& coverage = *(*citer);
+	coverage_ptr_set_type::const_iterator citer_end = coverages_cardinality.end();
+	for (coverage_ptr_set_type::const_iterator citer = coverages_cardinality.begin(); citer != citer_end; ++ citer) {
+	  const coverage_type& coverage = coverages[*citer];
 	  
 	  const int first = coverage.select(1, false);
 	  const int last  = utils::bithack::min(static_cast<int>(lattices.size()), first + max_distortion + 1);
@@ -305,7 +319,7 @@ namespace cicada
 		      
 		      candidate_type& cand = candidates.push_back(candidate_type());
 		      
-		      cand.score = function(niter->second) * phrases.begin()->score;
+		      cand.score = function(niter->second);
 		      
 		      cand.phrase_first = phrases.begin();
 		      cand.phrase_last  = phrasees.end();
