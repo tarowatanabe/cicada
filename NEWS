@@ -1,3 +1,6 @@
+2011-9-X
+Bugfix for grammar indexing with attributes
+
 2011-9-20
 New: pialign derivation to hiero grammar/hypergraph conversion filter
      We can generate source/target forest, hiero rules, GHKM rules in addition to source/target yield and alignment
