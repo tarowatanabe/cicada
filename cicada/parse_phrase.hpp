@@ -70,8 +70,64 @@ namespace cicada
     
     typedef Function function_type;
     
-    typedef utils::bit_vector<1024> coverage_type;
+    struct PhraseCandidate
+    {
+      score_type    score;
+      
+      rule_ptr_type rule;
+      
+      feature_set_type   features;
+      attribute_set_type attributes; 
 
+      PhraseCandidate() : score(), rule(), features(), attributes() {}
+      PhraseCandidate() : score(), rule(), features(), attributes() {}
+      PhraseCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+      
+      void swap(PhraseCandidate& x)
+      {
+	std::swap(score, x.score);
+	rule.swap(x.rule);
+	features.swap(x.features);
+	attributes.swap(x.attributes);
+      }
+      
+      friend
+      void swap(PhraseCandidate& x, PhraseCandidate& y)
+      {
+	x.swap(y);
+      }
+    };
+
+    typedef PhraseCandidate phrase_candidate_type;
+    typedef utils::simple_vector<phrase_phrase_candidate_type, std::allocator<phrase_candidate_type> > phrase_candidate_set_type;
+
+    
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > > phrase_candidate_map_type;
+#else
+    typedef sgi::hash_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > > phrase_candidate_map_type;
+#endif
+    typedef std::vector<phrase_candidate_map_type, std::allocator<phrase_candidate_map_type> > phrase_candidate_table_type;
+
+    struct Candidate
+    {
+      score_type score;
+      
+      typename phrase_candidate_set_type::const_iterator phrase_first;
+      typename phrase_candidate_set_type::const_iterator phrase_last;
+      
+      feature_set_type features;
+      
+      hypergraph_type::id_type tail;
+      int first;
+      int last;
+    };
+    
+    typedef utils::bit_vector<1024> coverage_type;
+    
     struct State
     {
       const coverage_type* coverage;
@@ -347,6 +403,38 @@ namespace cicada
       std::pair<coverage_set_type::iterator, bool> result = coverages.insert(coverage);
       
       return std::make_pair(&(*result.first), result.second);
+    }
+    
+    
+    template <typename Tp>
+    struct greater_score
+    {
+      bool operator()(const Tp& x, const Tp& y) const
+      {
+	return x.score > y.score;
+      }
+    };
+    
+    const phrase_candidate_set_type& candidate_phrases(const size_type& table, const transducer_type::id_type& node)
+    {
+      typename phrase_candidate_map_type::iterator riter = phrase_tables[table].find(node);
+      if (riter == phrase_tables[table].end()) {
+	const transducer_type::rule_pair_set_type& phrases = grammar[table].rules(node);
+	
+	riter = phrase_tables[table].insert(std::make_pair(node, phrase_candidate_set_type(phrases.size()))).first;
+	
+	typename phrase_candidate_set_type::iterator citer = riter->second.begin();
+	transducer_type::rule_pair_set_type::const_iterator iter_end = phrases.end();
+	for (transducer_type::rule_pair_set_type::const_iterator iter = phrases.begin(); iter != iter_end; ++ iter, ++ citer)
+	  *citer = phrase_candidate_type(function(iter->features),
+					 yield_source ? iter->source : iter->target,
+					 iter->features,
+					 iter->attributes);
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_score<phrase_candidate_type>());
+      }
+      
+      return riter->second;
     }
 
   private:
