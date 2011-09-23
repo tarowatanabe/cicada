@@ -116,9 +116,6 @@ namespace cicada
 	attr_phrase_span_first("phrase-span-first"),
 	attr_phrase_span_last("phrase-span-last")
     {
-      // initializer...
-      rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
-      
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
       sequence.front() = non_terminal.non_terminal(1);
       sequence.back()  = non_terminal.non_terminal(2);
@@ -314,21 +311,10 @@ namespace cicada
 	queue.pop_front();
       }
       
+      // remove the last one!
       node_map_type::iterator niter = nodes.find(coverage_goal);
       if (niter != nodes.end() && niter->second != hypergraph_type::invalid) {
-	
-	hypergraph_type::edge_type& edge = graph.add_edge(&(niter->second), &(niter->second) + 1);
-	edge.rule = rule_goal;
-	
-	edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);
-	edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice.size());
-	
-	hypergraph_type::node_type& node = graph.add_node();
-	
-	graph.connect_edge(edge.id, node.id);
-
-	graph.goal = node.id;
-
+	graph.goal = niter->second;
 	graph.topologically_sort();
       }
     }
@@ -352,7 +338,6 @@ namespace cicada
     node_map_type     nodes;
     coverage_set_type coverages;
     
-    rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
   };
   
