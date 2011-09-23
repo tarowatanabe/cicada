@@ -270,12 +270,31 @@ namespace cicada
 	  nodes.push_back(first);
 	  visited.set(first);
 	  
-	  // first, determine the initial starting point...
-	  
-	  
-	  // then, enumerate lattice/grammar to proceed nexts...
-	  
-	  
+	  for (int i = first; i != last && ! nodes.empty(); ++ i) {
+	    nodes_next.clear();
+	    
+	    node_set_type::const_iterator niter_end = nodes.end();
+	    for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	      if (! coverage_new->test(*niter)) {
+		// start enumerating...
+		
+		
+		
+		// fill-in nodes-next
+		lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
+		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
+		  const int next = *niter + aiter->distance;
+		  
+		  if (! visited[next]) {
+		    nodes_next.push_back(next);
+		    visited.set(next);
+		  }
+		}
+	      }
+	    }
+	    
+	    nodes.swap(nodes_next);
+	  }
 	}
       }
       
@@ -370,21 +389,21 @@ namespace cicada
 	      nodes_next.clear();
 	      
 	      node_set_type::const_iterator niter_end = nodes.end();
-	      for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-		if (! coverage_new->test(*niter))
+	      for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter)
+		if (! coverage_new->test(*niter)) {
 		  for (size_t table = 0; table != grammar.size(); ++ table)
 		    queue.push_back(state_type(coverage_new, table, grammar[table].root(), *niter, *niter, feature_set_type()));
-		
-		lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
-		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
-		  const int next = *niter + aiter->distance;
 		  
-		  if (! visited[next]) {
-		    nodes_next.push_back(next);
-		    visited.set(next);
+		  lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
+		  for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
+		    const int next = *niter + aiter->distance;
+		    
+		    if (! visited[next]) {
+		      nodes_next.push_back(next);
+		      visited.set(next);
+		    }
 		  }
 		}
-	      }
 	      
 	      nodes.swap(nodes_next);
 	    }
