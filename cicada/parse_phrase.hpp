@@ -100,7 +100,7 @@ namespace cicada
     };
 
     typedef PhraseCandidate phrase_candidate_type;
-    typedef utils::simple_vector<phrase_phrase_candidate_type, std::allocator<phrase_candidate_type> > phrase_candidate_set_type;
+    typedef utils::simple_vector<phrase_candidate_type, std::allocator<phrase_candidate_type> > phrase_candidate_set_type;
 
     
 #ifdef HAVE_TR1_UNORDERED_MAP
@@ -118,11 +118,11 @@ namespace cicada
     typedef coverage_set_type::index_type coverage_id_type;
     typedef std::vector<coverage_id_type, std::allocator<coverage_id_type> > coverage_id_set_type;
     
-    struct Edge
+    struct LatticeEdge
     {
-      Edge(const coverage_id_type& __tail, const coverage_id_type& __head)
+      LatticeEdge(const coverage_id_type& __tail, const coverage_id_type& __head)
 	: tail(__tail), head(__head) {}
-      Edge() {}
+      LatticeEdge() {}
       
       coverage_id_type tail;
       coverage_id_type head;
@@ -136,40 +136,41 @@ namespace cicada
       int first;
       int last;
     };
-    typedef Edge edge_type;
-    typedef utils::chunk_vector<edge_type, 4096 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
+    typedef LatticeEdge lattice_edge_type;
+    typedef utils::chunk_vector<lattice_edge_type, 4096 / sizeof(lattice_edge_type), std::allocator<lattice_edge_type> > lattice_edge_set_type;
     
-    struct Node
+    struct LatticeNode
     {
-      Node() {}
-      Node(const coverage_id_type& __coverage) : coverage(__coverage) {}
+      LatticeNode() {}
+      LatticeNode(const coverage_id_type& __coverage) : coverage(__coverage) {}
 
-      coverage_id_type coverage;
-      edge_set_type edges;
+      coverage_id_type      coverage;
+      lattice_edge_set_type edges;
     };
-    typedef Node node_type;
-    typedef utils::chunk_vector<node_type, 4096 / sizeof(node_type), std::allocator<node_type> > node_set_type;
+    typedef LatticeNode lattice_node_type;
+    typedef utils::chunk_vector<lattice_node_type, 4096 / sizeof(lattice_node_type), std::allocator<lattice_node_type> > lattice_node_set_type;
+    typedef std::vector<lattice_node_set_type, std::allocator<lattice_node_set_type> > lattice_node_map_type;
     
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
     typedef std::vector<score_type,  std::allocator<score_type> >                            score_map_type;
     
     struct Candidate
     {
-      typedef boost::array<hypegraph_type::id_type, 2> tails_type;
-
+      const lattice_edge_type* edge;
+      
+      typename phrase_candidate_set_type::const_iterator first;
+      typename phrase_candidate_set_type::const_iterator last;
+      
       score_type score;
-
-      feature_set_type features;
-      coverage_id_type coverage;
-      tails_type tails;
+      hypergraph_type::id_type tail;
       
-      typename phrase_candidate_set_type::const_iterator phrase_first;
-      typename phrase_candidate_set_type::const_iterator phrase_last;
-      
-      int first;
-      int last;
-      
-      Candidate() : score(), features(), coverage(), tails() {}
+      Candidate() : edge(0) {}
+      Candidate(const lattice_edge_type& __edge)
+	: edge(&__edge),
+	  first(__edge.phrase_first),
+	  last(__edge.phrase_last),
+	  score(__edge.score),
+	  tail(hypergraph_type::invalid) {}
     };
     
     typedef Candidate candidate_type;
@@ -218,43 +219,49 @@ namespace cicada
       if (lattice.empty()) return;
       
       // initialization...
+      lattice_nodes.clear();
       coverages.clear();
-      heaps.clear();
-      nodes.clear();
+      
       node_map_forward.clear();
       node_map_backward.clear();
       forward.clear();
       backward.clear();
       
+      candidates.clear();
+      heaps.clear();
+
+      phrase_tables.clear();
+      phrase_tables.resize(grammar.size());
+      
       const coverage_id_type coverage_start_id = coverage_map(coverage_type());
       
       // forward computation: we will construct a "lazy" lattice
       
-      nodes.resize(lattice.size() + 1);
+      lattice_nodes.resize(lattice.size() + 1);
       forward[coverage_start_id] = semiring::traits<score_type>::one();
-      node_map_forward[coverage_start_id] = nodes[0].size();
-      nodes[0].push_back(node_type(coverage_start_id));
+      node_map_forward[coverage_start_id] = lattice_nodes[0].size();
+      lattice_nodes[0].push_back(lattice_node_type(coverage_start_id));
       
-      for (size_type cardinality = 0; i <= lattice.size(); ++ cardinality) {
+      for (size_type cardinality = 0; cardinality <= lattice.size(); ++ cardinality) {
 	
 	// enumerate coverages and add new candidates to the heaps...
-	coverage_id_set_type::const_iterator citer_end = nodes[cardinality].end();
-	for (coverage_id_set_type::const_iterator citer = nodes[cardinality].begin(); citer != citer_end; ++ citer) {
+	typename lattice_node_set_type::const_iterator citer_end = lattice_nodes[cardinality].end();
+	for (typename lattice_node_set_type::const_iterator citer = lattice_nodes[cardinality].begin(); citer != citer_end; ++ citer) {
 	  typedef std::vector<int, std::allocator<int> > node_set_type;
-	  typedef std::pair<transducder_type::id_type, feature_set_type> intersected_type;
+	  typedef std::pair<transducer_type::id_type, feature_set_type> intersected_type;
 	  typedef std::deque<intersected_type, std::allocator<intersected_type> > intersected_set_type;
 	  typedef std::vector<intersected_set_type, std::allocator<intersected_set_type> > intersected_map_type;
 	  
-	  const coverage_id_type& coverage_id = citer->first;
+	  const coverage_id_type& coverage_id = citer->coverage;
 	  const coverage_type& coverage = coverages[coverage_id];
 	  
 	  const int first = coverage.select(1, false);
-	  const int last  = utils::bithack::min(static_cast<int>(lattices.size()), first + max_distortion + 1);
+	  const int last  = utils::bithack::min(static_cast<int>(lattice.size()), first + max_distortion + 1);
 	  
 	  node_set_type        nodes;
 	  node_set_type        nodes_next;
 	  coverage_type        visited;
-	  intersected_map_type intersected(lattices.size() + 1);
+	  intersected_map_type intersected(lattice.size() + 1);
 	  
 	  nodes.push_back(first);
 	  visited.set(first);
@@ -287,32 +294,30 @@ namespace cicada
 		    const coverage_id_type coverage_new_id = coverage_map(coverage_new);
 		    
 		    if (node_map_forward[coverage_new_id] == hypergraph_type::invalid) {
-		      node_map_forward[coverage_new_id] = nodes[cardinality_new].size();
-		      nodes[cardinality_new].push_back(node_type(coverage_new_id));
+		      node_map_forward[coverage_new_id] = lattice_nodes[cardinality_new].size();
+		      lattice_nodes[cardinality_new].push_back(lattice_node_type(coverage_new_id));
 		    }
 		    
-		    const int edge_pos = node_map_forward[coverage_new_id];
-		    
-		    edge_set_type& edges = nodes[cardinality_new][edge_pos].edges;
+		    lattice_edge_set_type& lattice_edges = lattice_nodes[cardinality_new][node_map_forward[coverage_new_id]].edges;
 		    
 		    intersected_set_type::const_iterator niter_end = intersected[last].end();
 		    for (intersected_set_type::const_iterator niter = intersected[last].begin(); niter != niter_end; ++ niter) {
 		      const phrase_candidate_set_type& phrases = candidate_phrases(table, niter->first);
 		      
 		      if (! phrases.empty()) {
-			edges.push_back(edge_type(coverage_id, coverage_new_id));
-			edge_tyep& edge_lattice = edges.back();
+			lattice_edges.push_back(lattice_edge_type(coverage_id, coverage_new_id));
+			lattice_edge_type& lattice_edge = lattice_edges.back();
 			
-			edge_lattice.score = function(niter->second);
-			edge_lattice.features = niter->second;
+			lattice_edge.score    = function(niter->second);
+			lattice_edge.features = niter->second;
 			
-			edge_lattice.phrase_first = phrases.begin();
-			edge_lattice.phrase_last  = phrasees.end();
+			lattice_edge.phrase_first = phrases.begin();
+			lattice_edge.phrase_last  = phrases.end();
 			
-			edge_lattice.first = first;
-			edge_lattice.last  = last;
+			lattice_edge.first = first;
+			lattice_edge.last  = last;
 			
-			const score_type score = forward[coverage_id] * edge_lattice.score * edge_lattice.phrase_first->score;
+			const score_type score = forward[coverage_id] * lattice_edge.score * lattice_edge.phrase_first->score;
 			
 			forward[coverage_new_id] = std::max(forward[coverage_new_id], score);
 		      }
@@ -358,13 +363,13 @@ namespace cicada
       }
       
       // check whether we have reached a goal...
-      if (nodes.back().empty()) return;
-      if (nodes.back().size() != 1)
+      if (lattice_nodes.back().empty()) return;
+      if (lattice_nodes.back().size() != 1)
 	throw std::runtime_error("invalid goal node...?");
       
       // we will start backward path, which enumerate edges with "beam"
       
-      const coverage_id_type coverage_goal_id = nodes.back().front().coverage;
+      const coverage_id_type coverage_goal_id = lattice_nodes.back().front().coverage;
       
       heaps.resize(lattice.size() + 1);
       node_map_backward.resize(coverages.size(), hypergraph_type::invalid);
@@ -373,7 +378,7 @@ namespace cicada
       backward[coverage_goal_id] = semiring::traits<score_type>::one();
       node_map_backward[coverage_goal_id] = graph.add_node().id;
       
-      coverages_backward.clear();
+      coverage_id_set_type coverages_backward;
       coverages_backward.push_back(coverage_goal_id);
       
       for (int cardinality = lattice.size(); cardinality > 0; -- cardinality) {
@@ -385,39 +390,42 @@ namespace cicada
 	  candidate_type* item = heap.top();
 	  heap.pop();
 	  
-	  const edge_type& edge_lattice = *(item->edge);
+	  const lattice_edge_type& lattice_edge = *(item->edge);
 	  
 	  // update backward score...
-	  backward[edge_lattice.tail] = std::max(backward[edge_lattice.tail], item->score * edge->iter->score);
+	  backward[lattice_edge.tail] = std::max(backward[lattice_edge.tail], item->score * lattice_edge->iter->score);
 	  
-	  hypergraph_type::id_type head = node_map_backward[edge_lattice.head];
+	  hypergraph_type::id_type head = node_map_backward[lattice_edge.head];
+
+	  if (head == hypergraph_type::invalid)
+	    throw std::runtime_error("invalid head node id");
 	  
-	  if (edge_lattice.tail != coverage_start_id) {
-	    if (node_map_backward[edge_lattice.tail] == hypergraph_type::invalid) {
-	      node_map_backward[edge_lattice.tail] = graph.add_node().id;
-	      coverages_backward.push_back(edge_lattice.tail);
+	  if (lattice_edge.tail != coverage_start_id) {
+	    if (node_map_backward[lattice_edge.tail] == hypergraph_type::invalid) {
+	      node_map_backward[lattice_edge.tail] = graph.add_node().id;
+	      coverages_backward.push_back(lattice_edge.tail);
 	    }
 	    
 	    if (item->tail == hypergraph_type::invalid) {
 	      item->tail = graph.add_node().id;
 	      
-	      const hypergraph_type::id_type tails[2] = {node_map_backward[edge_lattice.tail], item->tail};
+	      const hypergraph_type::id_type tails[2] = {node_map_backward[lattice_edge.tail], item->tail};
 	      
 	      hypergraph_type::edge_type& edge = graph.add_edge(tails, tails + 2);
 	      edge.rule = rule_x1_x2;
 	      
-	      graph.connect_edge(edge.id, node_map_backward[edge_lattice.head]);
+	      graph.connect_edge(edge.id, node_map_backward[lattice_edge.head]);
 	    }
 	    
 	    head = item->tail;
 	  }
 	  
 	  hypergraph_type::edge_type& edge = graph.add_edge();
-	  edge.features = edge_lattice.features + item->first->features;
+	  edge.features = lattice_edge.features + item->first->features;
 	  edge.attributes = item->first->attributes;
 	  
-	  edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(edge_lattice.first);
-	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(edge_lattice.last);
+	  edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(lattice_edge.first);
+	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice_edge.last);
 	  
 	  graph.connect_edge(edge.id, head);
 	  
@@ -433,18 +441,18 @@ namespace cicada
 	for (coverage_id_set_type::const_iterator citer = coverages_backward.begin(); citer != citer_end; ++ citer) {
 	  const coverage_id_type& coverage_id = *citer;
 	  const coverage_type& coverage = coverages[coverage_id];
-	  const int cardinality = coverage_prev.count();
+	  const int cardinality = coverage.count();
 	  
-	  const edge_set_type& edges = nodes[cardinality][node_map_forward[coverage_id]].edges;
+	  const lattice_edge_set_type& lattice_edges = lattice_nodes[cardinality][node_map_forward[coverage_id]].edges;
 	  
-	  edge_set_type::const_iterator eiter_end = edges.end();
-	  for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
-	    const edge_type& edge = *eiter;
-	    const int cardinality_prev = cardinality - (edge.last - edge.first);
+	  typename lattice_edge_set_type::const_iterator eiter_end = lattice_edges.end();
+	  for (typename lattice_edge_set_type::const_iterator eiter = lattice_edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const lattice_edge_type& lattice_edge = *eiter;
+	    const int cardinality_prev = cardinality - (lattice_edge.last - lattice_edge.first);
 	    
-	    candidates.push_back(candidate_type(edge));
+	    candidates.push_back(candidate_type(lattice_edge));
 	    candidate_type& cand = candidates.back();
-	    cand.score = edge.score * backward[coverage_id];
+	    cand.score = lattice_edge.score * backward[coverage_id];
 	    
 	    heaps[cardinality_prev].push(&cand);
 	  }
@@ -519,8 +527,19 @@ namespace cicada
     const attribute_type attr_phrase_span_first;
     const attribute_type attr_phrase_span_last;
 
-    node_map_type     nodes;
-    coverage_set_type coverages;
+    coverage_set_type     coverages;
+    lattice_node_map_type lattice_nodes;
+    
+    node_map_type node_map_forward;
+    node_map_type node_map_backward;
+    
+    score_map_type forward;
+    score_map_type backward;
+    
+    candidate_set_type      candidates;
+    candidate_heap_map_type heaps;
+
+    phrase_candidate_table_type phrase_tables;
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
@@ -530,7 +549,7 @@ namespace cicada
   inline
   void parse_phrase(const Symbol& non_terminal, const Grammar& grammar, const Function& function, const int beam_size, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
   {
-    ParsePhrase<typename FUnction::value_type, Function> __parser(non_terminal, grammar, function, beam_size, max_distortion, yield_source);
+    ParsePhrase<typename Function::value_type, Function> __parser(non_terminal, grammar, function, beam_size, max_distortion, yield_source);
     __parser(lattice, graph);
   }
 
