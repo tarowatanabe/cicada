@@ -118,6 +118,9 @@ namespace cicada
     typedef coverage_set_type::index_type coverage_id_type;
     typedef std::vector<coverage_id_type, std::allocator<coverage_id_type> > coverage_id_set_type;
     
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+    typedef std::vector<score_type,  std::allocator<score_type> >                            score_map_type;
+    
     struct Candidate
     {
       typedef boost::array<hypegraph_type::id_type, 2> tails_type;
@@ -183,94 +186,35 @@ namespace cicada
       if (lattice.empty()) return;
       
       // initialization...
-      
-      heaps.clear();
       coverages.clear();
+      heaps.clear();
       nodes.clear();
+      node_map_forward.clear();
+      node_map_backward.clear();
+      forward.clear();
+      backward.clear();
       
-      heaps.resize(lattice.size() + 1);
+      const coverage_id_type coverage_start_id = coverage_map(coverage_type());
       
-      coverage_type __coverage_goal;
-      for (size_t i = 0; i != lattice.size(); ++ i)
-	__coverage_goal.set(i);
+      // forward computation: we will construct a "lazy" lattice
       
-      const coverage_id_type coverage_start = coverage_map(coverage_type());
-      const coverage_id_type coverage_goal  = coverage_map(__coverage_goal);
+      nodes.resize(lattice.size() + 1);
+      forward[coverage_start_id] = semiring::traits<score_type>::one();
+      node_map_forward[coverage_start_id] = nodes[0].size();
+      nodes[0].push_back(node_type(coverage_start_id));
       
       for (size_type cardinality = 0; i <= lattice.size(); ++ cardinality) {
-	// states...
-	// we will synchronize by the candidate_type
-	
-	candidate_heap_type& heap = heaps[cardinality];
-	
-	coverages_cardinality.clear();
-	if (cardinality == 0)
-	  coverages_cardinality.push_back(coverage_start);
-	
-	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
-	  candidate_type* item = heap.top();
-	  heap.pop();
-
-	  const phrase_candidate_type& phrase_cand = *(item->phrase_first);
-	  
-	  // when constructig hypergraph, we will construct by
-	  //
-	  // head -> tail tail-for-phrase
-	  //
-	  // thus, for each candidate, we need to keep head associated with coverage vector + tail-for-phrase associated
-	  // with each candidate_type...
-	  
-	  if (nodes[item->coverage] == hypergraph_type::invalid) {
-	    nodes[item->coverage] = graph.add_node().id;
-	    coverages_cardinality.push_back(item->coverage);
-	  }
-
-	  hypergraph_type::id_type node_head = nodes[item->coverage];
-	  
-	  if (item->tails.front() != hypegraph_type::invalid) {
-	    if (item->tails.back() == hypergraph_type::invalid) {
-	      item->tails.back() = graph.add_node().id;
-	      
-	      hypergraph_type::edge_type& edge = grah.add_edge(item->tails.begin(), item->tails.end());
-	      edge.rule = rule_x1_x2;
-	      
-	      graph.connect_edge(edge.id, nodes[item->coverage]);
-	    }
-	    
-	    node_head = item->tails.back();
-	  }
-	  
-	  hypergraph_type::edge_type& edge = graph.add_edge();
-	  edge.rule = phrase_cand.rule;
-	  edge.features = phrase_cand.features + item->features;
-	  edge.attributes = phrase_cand.attributes;
-	  
-	  edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(item->first);
-	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(item->last);
-	  
-	  graph.connect_edge(edge.id, node_head);
-	  
-	  // proceed to the next...
-	  ++ item->phrase_first;
-	  if (item->phrase_first != item->phrase_last)
-	    heap.push(item);
-	  
-	  ++ num_pop;
-	}
-	
-	// clear unused heap...
-	heap.clear();
-	candidate_heap_type(heap).swap(heap);
 	
 	// enumerate coverages and add new candidates to the heaps...
-	coverage_id_set_type::const_iterator citer_end = coverages_cardinality.end();
-	for (coverage_id_set_type::const_iterator citer = coverages_cardinality.begin(); citer != citer_end; ++ citer) {
+	coverage_id_set_type::const_iterator citer_end = nodes[cardinality].end();
+	for (coverage_id_set_type::const_iterator citer = nodes[cardinality].begin(); citer != citer_end; ++ citer) {
 	  typedef std::vector<int, std::allocator<int> > node_set_type;
 	  typedef std::pair<transducder_type::id_type, feature_set_type> intersected_type;
 	  typedef std::deque<intersected_type, std::allocator<intersected_type> > intersected_set_type;
 	  typedef std::vector<intersected_set_type, std::allocator<intersected_set_type> > intersected_map_type;
-
-	  const coverage_type& coverage = coverages[*citer];
+	  
+	  const coverage_id_type& coverage_id = citer->first;
+	  const coverage_type& coverage = coverages[coverage_id];
 	  
 	  const int first = coverage.select(1, false);
 	  const int last  = utils::bithack::min(static_cast<int>(lattices.size()), first + max_distortion + 1);
@@ -310,28 +254,33 @@ namespace cicada
 		    
 		    const coverage_id_type coverage_new_id = coverage_map(coverage_new);
 		    
+		    if (node_map_forward[coverage_new_id] == hypergraph_type::invalid) {
+		      node_map_forward[coverage_new_id] = nodes[cardinality_new].size();
+		      nodes[cardinality_new].push_back(node_type(coverage_new_id));
+		    }
+		    
+		    const int edge_pos = node_map_forward[coverage_new_id];
+		    
+		    edge_set_type& edges = nodes[cardinality_new][edge_pos].edges;
+		    
 		    intersected_set_type::const_iterator niter_end = intersected[last].end();
 		    for (intersected_set_type::const_iterator niter = intersected[last].begin(); niter != niter_end; ++ niter) {
 		      const phrase_candidate_set_type& phrases = candidate_phrases(table, niter->first);
 		      
 		      if (! phrases.empty()) {
-		      
-			candidate_type& cand = candidates.push_back(candidate_type());
+			edges.push_back(edge_type(coverage_id, coverage_new_id));
+			edge_tyep& edge = edges.back();
 			
-			cand.score = function(niter->second);
+			edge.score = function(niter->second);
+			edge.features = niter->second;
 			
-			cand.features = niter->second;
-			cand.coverage = coverage_new;
-			cand.tails.front() = nodes[coverage_new];
-			cand.tails.back()  = hypergraph_type::invalid;
+			edge.phrase_first = phrases.begin();
+			edge.phrase_last  = phrasees.end();
 			
-			cand.phrase_first = phrases.begin();
-			cand.phrase_last  = phrasees.end();
+			edge.first = first;
+			edge.last  = last;
 			
-			cand.first = first;
-			cand.last  = last;
-			
-			heaps[cardinality_new].push(&cand);
+			forward[coverage_new_id] = std::max(forward[coverage_new_id], forward[coverage_id] * edge.score * edge.phrase_first->score);
 		      }
 		      
 		      // extention...
@@ -374,27 +323,118 @@ namespace cicada
 	}
       }
       
-      // goal...
-      if (nodes[coverage_goal] != hypergraph_type::invalid) {
-	hypergraph_type::edge_type& edge = graph.add_edge(&(nodes[coverage_goal]), &(nodes[coverage_goal]) + 1);
-	edge.rule = rule_goal;
-	
-	edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);
-	edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice.size());
-	
-	hypergraph_type::node_type& node = graph.add_node();
-	
-	graph.connect_edge(edge.id, node.id);
-	
-	graph.goal = node.id;
-	graph.topologically_sort();
-      }
-    }
+      // check whether we have reached a goal...
+      if (nodes.back().empty()) return;
+      if (nodes.back().size() != 1)
+	throw std::runtime_error("invalid goal node...?");
+      
+      // we will start backward path, which enumerate edges with "beam"
+      
+      const coverage_id_type coverage_goal_id = nodes.back().front().coverage;
+      
+      heaps.resize(lattice.size() + 1);
+      node_map_backward.resize(coverages.size(), hypergraph_type::invalid);
+      backward.resize(coverages.size());
+      
+      backward[coverage_goal_id] = semiring::traits<score_type>::one();
+      
+      coverages_backward.clear();
+      coverages_backward.push_back(coverage_goal_id);
 
+      for (int cardinality = lattice.size(); cardinality > 0; -- cardinality) {
+	// enumerate heaps...
+	
+	candidate_heap_type& heap = heaps[cardinality];
+	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
+	  candidate_type* item = heap.top();
+	  heap.pop();
+	  
+	  const edge_type& edge_lattice = *(item->edge);
+	  
+	  // update backward score...
+	  backward[edge_lattice.tail] = std::max(backward[edge_lattice.tail], item->score * edge->iter->score);
+	  
+	  // construct hypergraph...
+	  if (node_map_backward[edge_lattice.head] == hypergraph_type::invalid) {
+	    node_map_backward[edge_lattice.head] = graph.add_node().id;
+	    coverages_backward.push_back(edge_lattice.head);
+	  }
+	  
+	  hypergraph_type::id_type head = node_map_backward[edge_lattice.head];
+	  
+	  if (edge_lattice.tail != coverage_start_id) {
+	    if (node_map_backward[edge_lattice.tail] == hypergraph_type::invalid) {
+	      node_map_backward[edge_lattice.tail] = graph.add_node().id;
+	      coverages_backward.push_back(edge_lattice.tail);
+	    }
+	    
+	    if (item->tail == hypergraph_type::invalid) {
+	      item->tail = graph.add_node().id;
+	      
+	      const hypergraph_type::id_type tails[2] = {node_map_backward[edge_lattice.tail], item->tail};
+	      
+	      hypergraph_type::edge_type& edge = graph.add_edge(tails, tails + 2);
+	      edge.rule = rule_x1_x2;
+	      
+	      graph.connect_edge(edge.id, node_map_backward[edge_lattice.head]);
+	    }
+	    
+	    head = item->tail;
+	  }
+	  
+	  hypergraph_type::edge_type& edge = graph.add_edge();
+	  edge.features = edge_lattice.features + item->first->features;
+	  edge.attributes = item->first->attributes;
+	  
+	  edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(edge_lattice.first);
+	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(edge_lattice.last);
+	  
+	  graph.connect_edge(edge.id, head);
+
+	  ++ item->first;
+	  if (item->first != item->last)
+	    heap.push(item);
+	}
+	heap.clear();
+	
+	// enumerate next coverages
+	coverage_id_set_type::const_iterator citer_end = coverages_backward.end();
+	for (coverage_id_set_type::const_iterator citer = coverages_backward.begin(); citer != citer_end; ++ citer) {
+	  const coverage_id_type& coverage_id = *citer;
+	  const coverage_type& coverage = coverages[coverage_id];
+	  const int cardinality = coverage_prev.count();
+	  
+	  const edge_set_type& edges = nodes[cardinality][node_map_forward[coverage_id]].edges;
+	  
+	  edge_set_type::const_iterator eiter_end = edges.end();
+	  for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const edge_type& edge = *eiter;
+	    const int cardinality_prev = cardinality - (edge.last - edge.first);
+	    
+	    candidates.push_back(candidate_type(edge));
+	    candidate_type& cand = candidates.back();
+	    cand.score = edge.score * backward[coverage_id];
+	    
+	    heaps[cardinality_prev].push(&cand);
+	  }
+	}
+	
+	// finished.. chear here...
+	coverages_backward.clear();
+      }
+      
+      // add extra rule_goal hyperedge
+      
+      
+      // sort...
+      graph.topologically_sort();
+    }
+    
     coverage_id_type coverage_map(const coverage_type& coverage)
     {
       coverage_set_type::iterator citer = coverages.insert(coverage).first;
-      nodes.resize(coverages.size(), hypergraph_type::invalid);
+      node_map_forward.resize(coverages.size(), hypergraph_type::invalid);
+      forward.resize(coverages.size(), score_type());
       return coverages.begin() - citer;
     }
     
