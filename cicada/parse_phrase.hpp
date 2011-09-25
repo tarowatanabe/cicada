@@ -337,13 +337,15 @@ namespace cicada
       backward.resize(coverages.size());
       
       backward[coverage_goal_id] = semiring::traits<score_type>::one();
+      node_map_backward[coverage_goal_id] = graph.add_node().id;
       
       coverages_backward.clear();
       coverages_backward.push_back(coverage_goal_id);
-
+      
       for (int cardinality = lattice.size(); cardinality > 0; -- cardinality) {
 	// enumerate heaps...
 	
+	// when cardinality == lattice.size(), we will simply skip this, since nothing is pushed into headp
 	candidate_heap_type& heap = heaps[cardinality];
 	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
 	  candidate_type* item = heap.top();
@@ -353,12 +355,6 @@ namespace cicada
 	  
 	  // update backward score...
 	  backward[edge_lattice.tail] = std::max(backward[edge_lattice.tail], item->score * edge->iter->score);
-	  
-	  // construct hypergraph...
-	  if (node_map_backward[edge_lattice.head] == hypergraph_type::invalid) {
-	    node_map_backward[edge_lattice.head] = graph.add_node().id;
-	    coverages_backward.push_back(edge_lattice.head);
-	  }
 	  
 	  hypergraph_type::id_type head = node_map_backward[edge_lattice.head];
 	  
@@ -390,14 +386,15 @@ namespace cicada
 	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(edge_lattice.last);
 	  
 	  graph.connect_edge(edge.id, head);
-
+	  
 	  ++ item->first;
 	  if (item->first != item->last)
 	    heap.push(item);
 	}
 	heap.clear();
 	
-	// enumerate next coverages
+	// enumerate next coverages.
+	// coverages_backward is updated during initialization or the items in the heaps.
 	coverage_id_set_type::const_iterator citer_end = coverages_backward.end();
 	for (coverage_id_set_type::const_iterator citer = coverages_backward.begin(); citer != citer_end; ++ citer) {
 	  const coverage_id_type& coverage_id = *citer;
@@ -424,9 +421,15 @@ namespace cicada
       }
       
       // add extra rule_goal hyperedge
+      hypergraph_type::edge_type& ege = graph.add_edge(&node_map_backward[coverage_goal_id], (&node_map_backward[coverage_goal_id]) + 1);
+      edge.rule = rule_goal;
       
+      edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);
+      edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice.size());
       
-      // sort...
+      graph.goal = graph.add_node().id;
+      graph.connect_edge(edge.id, graph.goal);
+      
       graph.topologically_sort();
     }
     
