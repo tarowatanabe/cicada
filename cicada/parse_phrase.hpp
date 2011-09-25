@@ -118,6 +118,38 @@ namespace cicada
     typedef coverage_set_type::index_type coverage_id_type;
     typedef std::vector<coverage_id_type, std::allocator<coverage_id_type> > coverage_id_set_type;
     
+    struct Edge
+    {
+      Edge(const coverage_id_type& __tail, const coverage_id_type& __head)
+	: tail(__tail), head(__head) {}
+      Edge() {}
+      
+      coverage_id_type tail;
+      coverage_id_type head;
+
+      score_type       score;
+      feature_set_type features;
+      
+      typename phrase_candidate_set_type::const_iterator phrase_first;
+      typename phrase_candidate_set_type::const_iterator phrase_last;
+      
+      int first;
+      int last;
+    };
+    typedef Edge edge_type;
+    typedef utils::chunk_vector<edge_type, 4096 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
+    
+    struct Node
+    {
+      Node() {}
+      Node(const coverage_id_type& __coverage) : coverage(__coverage) {}
+
+      coverage_id_type coverage;
+      edge_set_type edges;
+    };
+    typedef Node node_type;
+    typedef utils::chunk_vector<node_type, 4096 / sizeof(node_type), std::allocator<node_type> > node_set_type;
+    
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
     typedef std::vector<score_type,  std::allocator<score_type> >                            score_map_type;
     
@@ -269,18 +301,20 @@ namespace cicada
 		      
 		      if (! phrases.empty()) {
 			edges.push_back(edge_type(coverage_id, coverage_new_id));
-			edge_tyep& edge = edges.back();
+			edge_tyep& edge_lattice = edges.back();
 			
-			edge.score = function(niter->second);
-			edge.features = niter->second;
+			edge_lattice.score = function(niter->second);
+			edge_lattice.features = niter->second;
 			
-			edge.phrase_first = phrases.begin();
-			edge.phrase_last  = phrasees.end();
+			edge_lattice.phrase_first = phrases.begin();
+			edge_lattice.phrase_last  = phrasees.end();
 			
-			edge.first = first;
-			edge.last  = last;
+			edge_lattice.first = first;
+			edge_lattice.last  = last;
 			
-			forward[coverage_new_id] = std::max(forward[coverage_new_id], forward[coverage_id] * edge.score * edge.phrase_first->score);
+			const score_type score = forward[coverage_id] * edge_lattice.score * edge_lattice.phrase_first->score;
+			
+			forward[coverage_new_id] = std::max(forward[coverage_new_id], score);
 		      }
 		      
 		      // extention...
@@ -421,7 +455,7 @@ namespace cicada
       }
       
       // add extra rule_goal hyperedge
-      hypergraph_type::edge_type& ege = graph.add_edge(&node_map_backward[coverage_goal_id], (&node_map_backward[coverage_goal_id]) + 1);
+      hypergraph_type::edge_type& edge = graph.add_edge(&node_map_backward[coverage_goal_id], (&node_map_backward[coverage_goal_id]) + 1);
       edge.rule = rule_goal;
       
       edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);

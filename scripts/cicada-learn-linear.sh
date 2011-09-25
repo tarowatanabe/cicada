@@ -384,7 +384,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
       --kbest   $kbest \
-      --directory ${root}kbest-$iter \
+      --file directory=${root}kbest-$iter \
       --input $config \
       --output ${root}cicada.config.$iter || exit 1
   

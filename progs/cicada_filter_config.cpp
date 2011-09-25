@@ -31,9 +31,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 std::string weights;
-std::string weight_file;
 std::string kbest;
-std::string directory;
 std::string file;
 
 bool remove_operation = false;
@@ -60,12 +58,8 @@ int main(int argc, char** argv)
     // replace!
     if (! weights.empty())
       boost::algorithm::replace_all(config, "${weights}", weights);
-    if (! weight_file.empty())
-      boost::algorithm::replace_all(config, "${weight_file}", weight_file);
     if (! kbest.empty())
       boost::algorithm::replace_all(config, "${kbest}", kbest);
-    if (! directory.empty())
-      boost::algorithm::replace_all(config, "${directory}", directory);
     if (! file.empty())
       boost::algorithm::replace_all(config, "${file}", file);
 
@@ -110,9 +104,7 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     
     ("weights",     po::value<std::string>(&weights),     "substitute ${weights}")
-    ("weight-file", po::value<std::string>(&weight_file), "substitute ${weight_file}")
     ("kbest",       po::value<std::string>(&kbest),       "substitute ${kbest}")
-    ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
     ("file",        po::value<std::string>(&file),        "substitute ${file}")
     
     ("remove-operation",        po::bool_switch(&remove_operation),        "remove operation(s)")

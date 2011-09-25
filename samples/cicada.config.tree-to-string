@@ -41,5 +41,5 @@ operation = apply:prune=true,size=200,${weights}
 operation = remove-bos-eos:forest=true
 
 ### output
-operation = output:directory=${directory},kbest=${kbest},${weights}
+operation = output:${file},kbest=${kbest},${weights}
 

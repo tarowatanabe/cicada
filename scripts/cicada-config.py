@@ -51,10 +51,6 @@ opt_parser = OptionParser(
     make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
     
-    ### outputs
-    make_option("--file",      default=None, action="store_true", help="output in a file"),
-    make_option("--directory", default=None, action="store_true", help="output in a directory"),
-    
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
     ])
@@ -220,10 +216,5 @@ print "operation = push-bos-eos"
 print "operation = apply:prune=true,size=200,${weights}"
 print "operation = remove-bos-eos:forest=true"
 
-if options.file:
-    print "operation = output:file=${file},kbest=${kbest},unique=true,${weights}"
-elif options.directory:
-    print "operation = output:directory=${directory},kbest=${kbest},unique=true,${weights}"
-else:
-    raise ValueError, "no output? --{file,directory}"
+print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
 print
