@@ -170,6 +170,35 @@ namespace cicada
       int debug;
     };
 
+    class ParsePhrase : public Operation
+    {
+    public:
+      ParsePhrase(const std::string& parameter,
+		  const grammar_type& __grammar,
+		  const std::string& __goal,
+		  const int __debug);
+  
+      void operator()(data_type& data) const;
+      
+      void assign(const weight_set_type& __weights);
+      
+      const grammar_type& grammar;
+      grammar_type grammar_local;
+      std::string goal;
+  
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
+      int size;
+      bool weights_one;
+      bool weights_fixed;
+
+      int distortion;
+      bool yield_source;
+      
+      int debug;
+    };
+    
+
   };
 };
 

@@ -179,6 +179,14 @@ parse-coarse: parsing via coarse-to-fine\n\
 \tcoarse1=[coarse grammar spec] the second coarse grammar\n\
 \tthreshold1=[double] threshold for the second coarse grammar\n\
 \t...\n\
+parse-phrase: parsing for phrase based grammar\n\
+\tdistortion=[distortion limit] default: 0 (== monotone)\n\
+\tyield=[source|target] use source or target yield for rule\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
+\tsize=<beam size>\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
 parse-tree: parsing for tree-matching\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \tgoal=[goal symbol]\n\
@@ -316,6 +324,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::ParseCKY(*piter, grammar, goal, debug)));
       else if (param_name == "parse-coarse")
 	operations.push_back(operation_ptr_type(new operation::ParseCoarse(*piter, grammar, goal, debug)));
+      else if (param_name == "parse-phrase")
+	operations.push_back(operation_ptr_type(new operation::ParsePhrase(*piter, grammar, goal, debug)));
       else if (param_name == "parse-tree")
 	operations.push_back(operation_ptr_type(new operation::ParseTree(*piter, tree_grammar, grammar, goal, debug)));
       else if (param_name == "parse-tree-cky" || param_name == "parse-tree-cyk")

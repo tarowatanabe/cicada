@@ -80,7 +80,6 @@ namespace cicada
       attribute_set_type attributes; 
 
       PhraseCandidate() : score(), rule(), features(), attributes() {}
-      PhraseCandidate() : score(), rule(), features(), attributes() {}
       PhraseCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
       
@@ -387,13 +386,13 @@ namespace cicada
 	// when cardinality == lattice.size(), we will simply skip this, since nothing is pushed into headp
 	candidate_heap_type& heap = heaps[cardinality];
 	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
-	  candidate_type* item = heap.top();
+	  const candidate_type* item = heap.top();
 	  heap.pop();
 	  
 	  const lattice_edge_type& lattice_edge = *(item->edge);
 	  
 	  // update backward score...
-	  backward[lattice_edge.tail] = std::max(backward[lattice_edge.tail], item->score * lattice_edge->iter->score);
+	  backward[lattice_edge.tail] = std::max(backward[lattice_edge.tail], item->score * item->first->score);
 	  
 	  hypergraph_type::id_type head = node_map_backward[lattice_edge.head];
 
@@ -407,7 +406,7 @@ namespace cicada
 	    }
 	    
 	    if (item->tail == hypergraph_type::invalid) {
-	      item->tail = graph.add_node().id;
+	      const_cast<candidate_type*>(item)->tail = graph.add_node().id;
 	      
 	      const hypergraph_type::id_type tails[2] = {node_map_backward[lattice_edge.tail], item->tail};
 	      
@@ -429,7 +428,7 @@ namespace cicada
 	  
 	  graph.connect_edge(edge.id, head);
 	  
-	  ++ item->first;
+	  ++ const_cast<candidate_type*>(item)->first;
 	  if (item->first != item->last)
 	    heap.push(item);
 	}

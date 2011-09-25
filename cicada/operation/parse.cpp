@@ -731,6 +731,129 @@ namespace cicada
     
       hypergraph.swap(parsed);
     }
+
+    ParsePhrase::ParsePhrase(const std::string& parameter,
+			     const grammar_type& __grammar,
+			     const std::string& __goal,
+			     const int __debug)
+      : base_type("parse-phrase"),
+	grammar(__grammar),
+	goal(__goal), 
+	weights(0),
+	weights_assigned(0),
+	size(200),
+	weights_one(false),
+	weights_fixed(false),
+	distortion(0),
+	yield_source(false),
+	debug(__debug)
+    { 
+      typedef cicada::Parameter param_type;
+      
+      param_type param(parameter);
+      if (utils::ipiece(param.name()) != "parse-phrase")
+	throw std::runtime_error("this is not a phrase parser");
+      
+      bool source = false;
+      bool target = false;
+	
+      for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "size")
+	  size = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "weights")
+	  weights = &base_type::weights(piter->second);
+	else if (utils::ipiece(piter->first) == "weights-one")
+	  weights_one = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
+	    source = true;
+	  else if (utils::ipiece(piter->second) == "target")
+	    target = true;
+	  else
+	    throw std::runtime_error("unknown yield: " + piter->second);
+	} else if (utils::ipiece(piter->first) == "distortion")
+	  distortion = utils::lexical_cast<int>(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for phrase parser: " << piter->first << "=" << piter->second << std::endl;
+      }
+      
+      if (source && target)
+	throw std::runtime_error("phrase parser can work either source or target yield");
+	
+      yield_source = source;
+
+      if (weights && weights_one)
+	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+      
+      if (! weights)
+	weights = &base_type::weights();
+    }
+
+    void ParsePhrase::assign(const weight_set_type& __weights)
+    {
+      if (! weights_fixed)
+	weights_assigned = &__weights;
+    }
+    
+    void ParsePhrase::operator()(data_type& data) const
+    {
+      typedef cicada::semiring::Logprob<double> weight_type;
+
+      const lattice_type& lattice = data.lattice;
+      hypergraph_type& hypergraph = data.hypergraph;
+      hypergraph_type parsed;
+      
+      hypergraph.clear();
+      if (lattice.empty()) return;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id << std::endl;
+
+      const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
+      
+      const grammar_type& grammar_parse = (grammar_local.empty() ? grammar : grammar_local);
+
+      utils::resource start;
+      
+      grammar_parse.assign(lattice);
+	
+      if (weights_one)
+	cicada::parse_phrase(goal, grammar_parse, weight_function_one<weight_type>(), size, distortion, lattice, parsed, yield_source);
+      else
+	cicada::parse_phrase(goal, grammar_parse, weight_function<weight_type>(*weights_parse), size, distortion, lattice, parsed, yield_source);
+      
+      utils::resource end;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << std::endl;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " # of nodes: " << parsed.nodes.size()
+		  << " # of edges: " << parsed.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(parsed.is_valid())
+		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += parsed.nodes.size();
+      stat.edge += parsed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+    
+      hypergraph.swap(parsed);
+    }
     
   };
 };
