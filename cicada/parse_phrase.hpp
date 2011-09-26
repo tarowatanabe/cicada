@@ -260,13 +260,13 @@ namespace cicada
 	  node_set_type        nodes_next;
 	  coverage_type        visited;
 	  intersected_map_type intersected(lattice.size() + 1);
-	  
+
 	  nodes.push_back(first);
 	  visited.set(first);
 	  
 	  for (int i = first; i != last && ! nodes.empty(); ++ i) {
 	    nodes_next.clear();
-	    
+
 	    node_set_type::const_iterator niter_end = nodes.end();
 	    for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
 	      if (! coverages[coverage_id].test(*niter))
@@ -295,7 +295,7 @@ namespace cicada
 		      node_map_forward[coverage_new_id] = lattice_nodes[cardinality_new].size();
 		      lattice_nodes[cardinality_new].push_back(lattice_node_type(coverage_new_id));
 		    }
-		    
+
 		    lattice_edge_set_type& lattice_edges = lattice_nodes[cardinality_new][node_map_forward[coverage_new_id]].edges;
 		    
 		    intersected_set_type::const_iterator niter_end = intersected[last].end();
@@ -334,7 +334,7 @@ namespace cicada
 			  else {
 			    const transducer_type::id_type node = transducer.next(niter->first, terminal);
 			    if (node == transducer.root()) continue;
-			    
+
 			    intersected[last + length].push_back(std::make_pair(node, niter->second + aiter->features));
 			  }
 			}
@@ -379,9 +379,9 @@ namespace cicada
       coverage_id_set_type coverages_backward;
       coverages_backward.push_back(coverage_goal_id);
       
-      for (int cardinality = lattice.size(); cardinality > 0; -- cardinality) {
+      for (int cardinality = lattice.size(); cardinality >= 0; -- cardinality) {
 	// enumerate heaps...
-	
+
 	// when cardinality == lattice.size(), we will simply skip this, since nothing is pushed into headp
 	candidate_heap_type& heap = heaps[cardinality];
 	for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
@@ -419,6 +419,7 @@ namespace cicada
 	  }
 	  
 	  hypergraph_type::edge_type& edge = graph.add_edge();
+	  edge.rule = item->first->rule;
 	  edge.features = lattice_edge.features + item->first->features;
 	  edge.attributes = item->first->attributes;
 	  
@@ -426,7 +427,7 @@ namespace cicada
 	  edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice_edge.last);
 	  
 	  graph.connect_edge(edge.id, head);
-	  
+
 	  ++ const_cast<candidate_type*>(item)->first;
 	  if (item->first != item->last)
 	    heap.push(item);
@@ -447,7 +448,7 @@ namespace cicada
 	  for (typename lattice_edge_set_type::const_iterator eiter = lattice_edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const lattice_edge_type& lattice_edge = *eiter;
 	    const int cardinality_prev = cardinality - (lattice_edge.last - lattice_edge.first);
-	    
+
 	    candidates.push_back(candidate_type(lattice_edge));
 	    candidate_type& cand = candidates.back();
 	    
@@ -480,7 +481,7 @@ namespace cicada
       coverage_set_type::iterator citer = coverages.insert(coverage).first;
       node_map_forward.resize(coverages.size(), hypergraph_type::invalid);
       forward.resize(coverages.size(), score_type());
-      return coverages.begin() - citer;
+      return citer - coverages.begin();
     }
     
     
