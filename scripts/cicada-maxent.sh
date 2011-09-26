@@ -322,9 +322,9 @@ qsubwrapper() {
     else
       shift
       if test "$logfile" != ""; then
-        $stripped "$@ $threads" >& $logfile || exit 1
+        $stripped "$@" $threads >& $logfile || exit 1
       else
-        $stripped "$@ $threads" || exit 1
+        $stripped "$@" $threads || exit 1
       fi
     fi
   fi
