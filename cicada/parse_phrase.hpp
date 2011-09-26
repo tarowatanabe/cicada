@@ -252,9 +252,8 @@ namespace cicada
 	  typedef std::vector<intersected_set_type, std::allocator<intersected_set_type> > intersected_map_type;
 	  
 	  const coverage_id_type& coverage_id = citer->coverage;
-	  const coverage_type& coverage = coverages[coverage_id];
 	  
-	  const int first = coverage.select(1, false);
+	  const int first = coverages[coverage_id].select(1, false);
 	  const int last  = utils::bithack::min(static_cast<int>(lattice.size()), first + max_distortion + 1);
 	  
 	  node_set_type        nodes;
@@ -270,13 +269,13 @@ namespace cicada
 	    
 	    node_set_type::const_iterator niter_end = nodes.end();
 	    for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	      if (! coverage.test(*niter))
+	      if (! coverages[coverage_id].test(*niter))
 		for (size_type table = 0; table != grammar.size(); ++ table) {
 		  // start enumerating grammar...
 		  
 		  const transducer_type& transducer = grammar[table];
 		  
-		  coverage_type coverage_new    = coverage;
+		  coverage_type coverage_new    = coverages[coverage_id];
 		  size_type     cardinality_new = cardinality;
 		  
 		  intersected.clear();
@@ -284,7 +283,7 @@ namespace cicada
 		  intersected[*niter].push_back(std::make_pair(transducer.root(), feature_set_type()));
 		  
 		  const size_type first = *niter;
-		  for (size_type last = first; last <= lattice.size() && (first == last || ! coverage.test(last - 1)); ++ last) {
+		  for (size_type last = first; last <= lattice.size() && (first == last || ! coverages[coverage_id].test(last - 1)); ++ last) {
 		    if (first != last) {
 		      coverage_new.set(last - 1);
 		      ++ cardinality_new;
