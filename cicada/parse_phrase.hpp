@@ -392,7 +392,7 @@ namespace cicada
 	  const lattice_edge_type& lattice_edge = *(item->edge);
 	  
 	  // update backward score...
-	  backward[lattice_edge.tail] = std::max(backward[lattice_edge.tail], item->score * item->first->score);
+	  backward[lattice_edge.tail] = std::max(backward[lattice_edge.tail], item->score * item->first->score / forward[lattice_edge.tail]);
 	  
 	  hypergraph_type::id_type head = node_map_backward[lattice_edge.head];
 
@@ -451,7 +451,9 @@ namespace cicada
 	    
 	    candidates.push_back(candidate_type(lattice_edge));
 	    candidate_type& cand = candidates.back();
-	    cand.score = lattice_edge.score * backward[coverage_id];
+	    
+	    // for comparision, we need to integrate forward estimates
+	    cand.score = forward[lattice_edge.tail] * lattice_edge.score * backward[lattice_edge.head];
 	    
 	    heaps[cardinality_prev].push(&cand);
 	  }
