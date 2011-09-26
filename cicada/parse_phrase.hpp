@@ -467,9 +467,6 @@ namespace cicada
       hypergraph_type::edge_type& edge = graph.add_edge(&node_map_backward[coverage_goal_id], (&node_map_backward[coverage_goal_id]) + 1);
       edge.rule = rule_goal;
       
-      edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);
-      edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice.size());
-      
       graph.goal = graph.add_node().id;
       graph.connect_edge(edge.id, graph.goal);
       
