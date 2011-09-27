@@ -452,7 +452,10 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   if test "$weights_process" = ""; then
     cp $config $moses_ini
   else
-    echo "process $config and generate $moses_ini"
+    qsubwrapper config $cicada/cicada_filter_config_moses \
+	--weights $weights_process \
+	--input $config \
+	--output $moses_ini || exit 1
   fi
 
   ### actual decoding
