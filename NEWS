@@ -1,4 +1,6 @@
 2011-9-X
+New: Support moses training using the cicada tools: learn by LBFGS or liblinear with kbests
+New: parse variant of phrasal composition: we do forward lazy graph constructin + backward filtering
 Bugfix for grammar indexing with attributes
 
 2011-9-20
