@@ -531,11 +531,12 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   fi
     
   ## liblinear learning
-  learn_opt=" --learn-lbfgs"
+  learn_option=" --learn-lbfgs"
   if test "$liblinear" = "yes"; then
-    learn_opt=" --learn-linear --solver $solver"
+    learn_option=" --learn-linear --solver $solver"
   fi
-
+ 
+  ### option for previous weights
   weights_option=""
   if test "$weights_last" != ""; then
     weights_option=" --weights $weights_last"
@@ -549,7 +550,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
                         $weights_option \
-                        $learn_opt \
+                        $learn_option \
                         --C $C \
                         \
                         --debug=2 || exit 1
