@@ -283,6 +283,7 @@ qsubwrapper() {
   shift
   
   logfile=""
+  outfile=""
   threads=""
   while test $# -gt 0 ; do
   case $1 in
@@ -292,6 +293,10 @@ qsubwrapper() {
   -l )
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
+    shift; shift ;;
+  -o )
+    test $# = 1 && eval "$exit_missing_arg"
+    outfile=$2
     shift; shift ;;
   -* )
     exec >&2
@@ -336,17 +341,33 @@ qsubwrapper() {
 
       if test "$stripped" != "$1" -a $np -gt 1; then
         if test "$logfile" != ""; then
-          echo "${openmpi}mpirun $mpinp $@ >& $logfile"
+          if test "$outfile" != ""; then
+            echo "${openmpi}mpirun $mpinp $@ > $outfile 2> $logfile"
+          else
+            echo "${openmpi}mpirun $mpinp $@ 2> $logfile"
+          fi
         else
-          echo "${openmpi}mpirun $mpinp $@"
+          if test "$outfile" != ""; then
+            echo "${openmpi}mpirun $mpinp $@ > $outfile"
+	  else
+            echo "${openmpi}mpirun $mpinp $@"
+	  fi
         fi
       else
 	## shift here!
 	shift;
 	if test "$logfile" != ""; then
-          echo "$stripped $@ $threads >& $logfile"
+          if test "$outfile" != ""; then
+            echo "$stripped $@ $threads > $outfile 2> $logfile"
+	  else
+            echo "$stripped $@ $threads 2> $logfile"
+	  fi
         else
-          echo "$stripped $@ $threads"
+          if test "$outfile" != ""; then
+            echo "$stripped $@ $threads > $outfile"
+	  else
+            echo "$stripped $@ $threads"
+	  fi
         fi
       fi
     ) |
@@ -354,16 +375,32 @@ qsubwrapper() {
   else
     if test "$stripped" != "$1" -a $np -gt 1; then
       if test "$logfile" != ""; then
-        ${openmpi}mpirun $mpinp "$@" >& $logfile || exit 1
+	if test "$outfile" != ""; then
+          ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
+	else
+          ${openmpi}mpirun $mpinp "$@" 2> $logfile || exit 1
+	fi
       else
-        ${openmpi}mpirun $mpinp "$@" || exit 1
+	if test "$outfile" != ""; then
+          ${openmpi}mpirun $mpinp "$@" > $outfile || exit 1
+	else
+          ${openmpi}mpirun $mpinp "$@" || exit 1
+	fi
       fi
     else
       shift
       if test "$logfile" != ""; then
-        $stripped "$@" $threads >& $logfile || exit 1
+	if test "$outfile" != ""; then
+          $stripped "$@" $threads > $outfile 2> $logfile || exit 1
+	else
+          $stripped "$@" $threads 2> $logfile || exit 1
+	fi
       else
-        $stripped "$@" $threads || exit 1
+	if test "$outfile" != ""; then
+          $stripped "$@" $threads > $outfile || exit 1
+	else
+          $stripped "$@" $threads || exit 1
+	fi
       fi
     fi
   fi

@@ -21,6 +21,7 @@ qsub=`which qsub 2> /dev/null`
 
 name=""
 logfile=""
+outfile=""
 threads=""
 
 ## # of processes, # of cores
@@ -43,7 +44,8 @@ $me name [options] cicada-program args
   -n, --np                  # of processes to run    (default: $np)
   --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
-  --log, -l                 logfile
+  --log, --logfile, -l      logfile
+  --out, --outfile, -o      stdout file
   --threads,-t              threading option
   --name                    process name
 
@@ -80,9 +82,13 @@ while test $# -gt 0; do
     test $# = 1 && eval "$exit_missing_arg"
     mem=$2
     shift; shift ;;
-  --log | -l )
+  --log | --logfile | -l )
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
+    shift; shift ;;
+  --out | --outfile | -o )
+    test $# = 1 && eval "$exit_missing_arg"
+    outfile=$2
     shift; shift ;;
   --threads | -t )
     threads="yes"
@@ -164,17 +170,33 @@ if test "$qsub" != ""; then
 
     if test "$stripped" != "$1" -a $np -gt 1; then
       if test "$logfile" != ""; then
-        echo "${openmpi}mpirun $mpinp $@ >& $logfile"
+	if test "$outfile" != ""; then
+          echo "${openmpi}mpirun $mpinp $@ > $outfile 2> $logfile"
+	else
+	  echo "${openmpi}mpirun $mpinp $@ 2> $logfile"
+	fi
       else
-        echo "${openmpi}mpirun $mpinp $@"
+	if test "$outfile" != ""; then
+          echo "${openmpi}mpirun $mpinp $@ > $outfile"
+	else
+	  echo "${openmpi}mpirun $mpinp $@"
+	fi
       fi
     else
       ## shift here!
       shift;
       if test "$logfile" != ""; then
-        echo "$stripped $@ $threads >& $logfile"
+	if test "$outfile" != ""; then
+          echo "$stripped $@ $threads > $outfile 2> $logfile"
+	else
+	  echo "$stripped $@ $threads 2> $logfile"
+	fi
       else
-        echo "$stripped $@ $threads"
+	 if test "$outfile" != ""; then
+          echo "$stripped $@ $threads > $outfile"
+	else
+	  echo "$stripped $@ $threads"
+	fi
       fi
     fi
   ) |
@@ -182,16 +204,32 @@ if test "$qsub" != ""; then
 else
   if test "$stripped" != "$1" -a $np -gt 1; then
     if test "$logfile" != ""; then
-      exec ${openmpi}mpirun $mpinp "$@" >& $logfile
+      if test "$outfile" != ""; then
+        exec ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile
+      else
+        exec ${openmpi}mpirun $mpinp "$@" 2> $logfile
+      fi
     else
-      exec ${openmpi}mpirun $mpinp "$@"
+      if test "$outfile" != ""; then
+        exec ${openmpi}mpirun $mpinp "$@" > $outfile
+      else
+	exec ${openmpi}mpirun $mpinp "$@"
+      fi
     fi
   else
     shift
     if test "$logfile" != ""; then
-      exec $stripped "$@" $threads >& $logfile
+      if test "$outfile" != ""; then
+	exec $stripped "$@" $threads > $outfile 2> $logfile
+      else
+	exec $stripped "$@" $threads 2> $logfile
+      fi
     else
-      exec $stripped "$@" $threads
+      if test "$outfile" != ""; then
+        exec $stripped "$@" $threads > $outfile
+      else
+	exec $stripped "$@" $threads
+      fi
     fi
   fi
 fi
