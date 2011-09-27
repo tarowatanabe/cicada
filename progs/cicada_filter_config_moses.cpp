@@ -133,6 +133,8 @@ int main(int argc, char** argv)
 	const int&         pos     = boost::fusion::get<1>(feature_weight);
 	const double&      value   = boost::fusion::get<2>(feature_weight);
 
+	if (feature.empty()) continue;
+
 	std::string feat = feature;
 	feature_map_type::const_iterator miter = feature_map.find(feature);
 	if (miter != feature_map.end())
