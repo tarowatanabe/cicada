@@ -536,6 +536,11 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     learn_opt=" --learn-linear --solver $solver"
   fi
 
+  weights_option=""
+  if test "$weights_last" != ""; then
+    weights_option=" --weights $weights_last"
+  fi
+
   echo "learning ${root}weights.$iter" >&2
   qsubwrapper learn -t -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
@@ -543,6 +548,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	                $unite \
                         --output $weights_learn \
                         \
+                        $weights_option \
                         $learn_opt \
                         --C $C \
                         \
