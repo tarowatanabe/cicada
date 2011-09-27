@@ -463,6 +463,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   qsubwrapper decode -l ${root}decode.$iter.log -o ${root}1best-$iter $moses \
 	-input-file $devset \
 	-config $moses_ini \
+        -inputtype 0 \
         -n-best-list ${root}kbest-moses-$iter $kbest distinct \
         $moses_options || exit 1
 
@@ -470,7 +471,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   echo "cicada kbests ${root}kbest-$iter"
   qsubwrapper kbest $cicada/cicada_filter_kbest_moses \
       --input  ${root}kbest-moses-$iter \
-      --output ${root}kbest-$iter || exit 1
+      --output ${root}kbest-$iter \
+      --directory || exit 1
 
   ### END of moses specific changes...
 
@@ -534,7 +536,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     learn_opt=" --learn-linear --solver $solver"
   fi
 
-  echo "liblinear learning ${root}weights.$iter" >&2
+  echo "learning ${root}weights.$iter" >&2
   qsubwrapper learn -t -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
