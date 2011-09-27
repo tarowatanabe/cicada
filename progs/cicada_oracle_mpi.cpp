@@ -72,6 +72,7 @@
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 
+#include "cicada_impl.hpp"
 #include "cicada_text_impl.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -484,6 +485,8 @@ void read_tstset(const path_set_type& files,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
+  std::string line;
+
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
@@ -492,30 +495,36 @@ void read_tstset(const path_set_type& files,
       
     if (boost::filesystem::is_directory(*titer)) {
 
-      for (int i = mpi_rank; /**/; i += mpi_size) {
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	
-	int id;
-	std::string sep;
+	size_t id;
 	hypergraph_type hypergraph;
-            
-	if (is >> id >> sep >> hypergraph) {
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?: " + path.string());
 	
-	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
+	if (std::getline(is, line)) {
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id, iter, end))
+	    throw std::runtime_error("invalid id input: " + path.string());
+	  
+	  if (id != i)
+	    throw std::runtime_error("id mismatch: "  + path.string());
+	  
+	  if (! hypergraph.assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path.string());
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format" + path.string());
 	  
 	  if (id % mpi_size != mpi_rank)
 	    throw std::runtime_error("difference it?");
 	  
 	  graphs[id].unite(hypergraph);
-	} else
-	  throw std::runtime_error("format error?: " + path.string());
+	}
       }
     } else {
       utils::compress_istream is(*titer, 1024 * 1024);
