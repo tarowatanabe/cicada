@@ -524,25 +524,33 @@ void read_tstset(const path_set_type& files,
 	    throw std::runtime_error("difference it?");
 	  
 	  graphs[id].unite(hypergraph);
-	}
+	} else
+	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
       }
     } else {
-      utils::compress_istream is(*titer, 1024 * 1024);
+      const path_type& path = *titer;
+
+      utils::compress_istream is(path, 1024 * 1024);
       
-      int id;
-      std::string sep;
+      size_t id;
       hypergraph_type hypergraph;
-            
-      while (is >> id >> sep >> hypergraph) {
+
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?: " + titer->string());
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
 	
 	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->string());
 	
-	if (id % mpi_size == mpi_rank)
+	if (id % mpi_size == mpi_rank) {
+	  if (! hypergraph.assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path.string());
+	  
 	  graphs[id].unite(hypergraph);
+	}
       }
     }
   }
