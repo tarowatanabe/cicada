@@ -186,36 +186,33 @@ if test ! -x $moses; then
 fi
 
 ## check cicada...
+cicadapath() {
+  file=$1
+  shift
+  
+  path=$cicada/$file
+  if test ! -e $path; then
+    path=$cicada/bin/$file
+    if test ! -e $path; then
+      path=$cicada/progs/$file
+      if test ! -e $path; then
+        path=$cicada/scripts/$file
+	if test ! -e $path; then
+	  echo $file
+	  return 1
+	fi
+      fi
+    fi
+  fi
+  echo $path
+  return 0
+}
+
 cicadas="cicada_filter_kbest_moses mpimap mpipe"
 
-found=yes
 for prog in $cicadas; do
-  if test ! -e "$cicada/$prog"; then
-    found=no
-    break
-  fi
+  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
 done
-
-if test "$found" = "no"; then
-  for bin in progs bin; do
-    found=yes
-    for prog in $cicadas; do
-      if test ! -e "$cicada/$bin/$prog"; then
-        found=no
-        break
-      fi
-    done
-    if test "$found" = "yes"; then
-      cicada=$cicada/$bin
-      break
-    fi
-  done
-  
-  if test "$found" = "no"; then
-    echo "no --cicada | --cicada-dir?" >&2
-    exit 1
-  fi
-fi
 
 if test "$openmpi" != ""; then
   openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
@@ -387,9 +384,9 @@ if test $kbest -le 1; then
   
   ### workaround for qsub stuff...
   if test "$qsub" != ""; then
-    qsubwrapper 1best -m $cicada/mpipe --command "\"$command\"" --input $input --output $output --debug || exit 1
+    qsubwrapper 1best -m `cicadapath mpipe` --command "\"$command\"" --input $input --output $output --debug || exit 1
   else
-    qsubwrapper 1best -m $cicada/mpipe --command "$command" --input $input --output $output --debug || exit 1
+    qsubwrapper 1best -m `cicadapath mpipe` --command "$command" --input $input --output $output --debug || exit 1
   fi
   
 else
@@ -422,14 +419,17 @@ else
     fi
     echo "$moses -config $moses_config $moses_options $kbest_option" \
 	>> $kbest_generation
-    echo "$cicada/cicada_filter_kbest_moses --input $kbest_file --output $output --directory --keep --offset $i --stride $np" \
+
+    filter=`cicadapath cicada_filter_kbest_moses`
+    echo "$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np" \
 	>> $kbest_transform
   done
   
   ### actually run
-  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_generation || exit 1
+  mpimap=`cicadapath mpimap`
+  qsubwrapper kbest -m $mpimap --prog $mpimap --even --input $input $kbest_generation || exit 1
   
-  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_transform || exit 1
+  qsubwrapper kbest -m $mpimap --prog $mpimap --even --input $input $kbest_transform || exit 1
   
   rm -rf ${output}/kbests || exit 1
 fi

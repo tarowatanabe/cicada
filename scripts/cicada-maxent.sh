@@ -185,36 +185,33 @@ if test "$cicada" = ""; then
 fi
 
 ## check cicada...
+cicadapath() {
+  file=$1
+  shift
+  
+  path=$cicada/$file
+  if test ! -e $path; then
+    path=$cicada/bin/$file
+    if test ! -e $path; then
+      path=$cicada/progs/$file
+      if test ! -e $path; then
+        path=$cicada/scripts/$file
+	if test ! -e $path; then
+	  echo $file
+	  return 1
+	fi
+      fi
+    fi
+  fi
+  echo $path
+  return 0
+}
+
 cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_learn cicada_learn_mpi"
 
-found=yes
 for prog in $cicadas; do
-  if test ! -e "$cicada/$prog"; then
-    found=no
-    break
-  fi
+  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
 done
-
-if test "$found" = "no"; then
-  for bin in progs bin; do
-    found=yes
-    for prog in $cicadas; do
-      if test ! -e "$cicada/$bin/$prog"; then
-        found=no
-        break
-      fi
-    done
-    if test "$found" = "yes"; then
-      cicada=$cicada/$bin
-      break
-    fi
-  done
-  
-  if test "$found" = "no"; then
-    echo "no --cicada | --cicada-dir?" >&2
-    exit 1
-  fi
-fi
 
 if test "$openmpi" != ""; then
   openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
@@ -378,7 +375,7 @@ qsubwrapper() {
 ### setup config file
 ### we will simply remove operation field..
 echo "generate config file ${root}cicada.config.maxent" >&2
-qsubwrapper config ${cicada}/cicada_filter_config \
+qsubwrapper config `cicadapath cicada_filter_config` \
       --remove-operation \
       --remove-feature-function \
       --input $config \
@@ -386,7 +383,7 @@ qsubwrapper config ${cicada}/cicada_filter_config \
 
 ### actual composition
 echo "composition ${root}forest-maxent" >&2
-qsubwrapper decode -l ${root}forest.maxent.log $cicada/cicada_mpi \
+qsubwrapper decode -l ${root}forest.maxent.log `cicadapath cicada_mpi` \
 	--input $devset \
 	--config ${root}cicada.config.maxent \
         --operation $compose \
@@ -395,7 +392,7 @@ qsubwrapper decode -l ${root}forest.maxent.log $cicada/cicada_mpi \
 	--debug || exit 1
   
 echo "oracle translations ${root}forest-maxent.oracle" >&2
-qsubwrapper oracle -t -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
+qsubwrapper oracle -t -l ${root}oracle.maxent.log `cicadapath cicada_oracle_mpi` \
         --refset $refset \
         --tstset ${root}forest-maxent \
         --output ${root}forest-maxent.oracle \
@@ -407,7 +404,7 @@ qsubwrapper oracle -t -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
         --debug || exit 1
 
 echo "learning ${root}weights.maxent" >&2
-qsubwrapper learn -t -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
+qsubwrapper learn -t -l ${root}learn.maxent.log `cicadapath cicada_learn_mpi` \
          --forest ${root}forest-maxent \
          --oracle ${root}forest-maxent.oracle \
          --output ${root}weights.maxent \

@@ -26,7 +26,7 @@ refset=""
 
 ## # of processes, # of cores
 np=1
-nc=2
+nc=1
 hosts=""
 hosts_file=""
 
@@ -243,38 +243,34 @@ if test ! -x $moses; then
   exit 1
 fi
 
-## check cicada...
-cicadas="cicada_filter_config_moses cicada_filter_kbest_moses cicada_filter_weights cicada_eval cicada_oracle_kbest cicada_learn_kbest"
-
-found=yes
-for prog in $cicadas; do
-  if test ! -e "$cicada/$prog"; then
-    found=no
-    break
-  fi
-done
-
-if test "$found" = "no"; then
-  for bin in progs bin; do
-    found=yes
-    for prog in $cicadas; do
-      if test ! -e "$cicada/$bin/$prog"; then
-        found=no
-        break
-      fi
-    done
-    if test "$found" = "yes"; then
-      cicada=$cicada/$bin
-      break
-    fi
-  done
+cicadapath() {
+  file=$1
+  shift
   
-  if test "$found" = "no"; then
-    echo "no --cicada | --cicada-dir?" >&2
-    exit 1
+  path=$cicada/$file
+  if test ! -e $path; then
+    path=$cicada/bin/$file
+    if test ! -e $path; then
+      path=$cicada/progs/$file
+      if test ! -e $path; then
+        path=$cicada/scripts/$file
+	if test ! -e $path; then
+	  echo $file
+	  return 1
+	fi
+      fi
+    fi
   fi
-fi
+  echo $path
+  return 0
+}
 
+## check cicada...
+cicadas="cicada_filter_config_moses cicada_filter_kbest_moses cicada_filter_weights cicada_eval cicada_oracle_kbest cicada_learn_kbest cicada-moses.sh"
+
+for prog in $cicadas; do
+  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
+done
 
 if test "$weights_init" != ""; then
   if test ! -e $weights_init; then
@@ -466,33 +462,19 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   if test "$weights_process" = ""; then
     cp $config $moses_ini
   else
-    qsubwrapper config $cicada/cicada_filter_config_moses \
+    qsubwrapper config `cicadapath cicada_filter_config_moses` \
 	--weights $weights_process \
 	--input $config \
 	--output $moses_ini || exit 1
   fi
-
-  ### actual decoding
-  echo "decoding ${root}kbest-moses-$iter" >&2
-  qsubwrapper decode -l ${root}decode.$iter.log -o ${root}1best-$iter $moses \
-	-input-file $devset \
-	-config $moses_ini \
-        -inputtype 0 \
-        -n-best-list ${root}kbest-moses-$iter $kbest distinct \
-        $moses_options || exit 1
-
-  ### transform moses kbests
-  echo "cicada kbests ${root}kbest-$iter"
-  qsubwrapper kbest $cicada/cicada_filter_kbest_moses \
-      --input  ${root}kbest-moses-$iter \
-      --output ${root}kbest-$iter \
-      --directory || exit 1
+  
+  
 
   ### END of moses specific changes...
 
   ### BLEU
   echo "BLEU ${root}eval-$iter.1best" >&2
-  qsubwrapper eval $cicada/cicada_eval \
+  qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
       --tstset ${root}kbest-$iter \
       --output ${root}eval-$iter.1best \
@@ -523,7 +505,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   ### compute oracles
   echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-  qsubwrapper oracle -t -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest \
+  qsubwrapper oracle -t -l ${root}oracle.$iter.log `cicadapath cicada_oracle_kbest_mpi` \
         --refset $refset \
         --tstset $tstset_oracle \
         --output ${root}kbest-${iter}.oracle \
@@ -557,7 +539,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   echo "learning ${root}weights.$iter" >&2
-  qsubwrapper learn -t -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
+  qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath cicada_learn_kbest` \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
 	                $unite \
@@ -575,7 +557,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
       cp $weights_learn ${root}weights.$iter
     else
       echo "merging weights" >&2
-      qsubwrapper interpolate $cicada/cicada_filter_weights \
+      qsubwrapper interpolate `cicadapath cicada_filter_weights` \
 	  --output ${root}weights.$iter \
 	  ${weights_last}:scale=`echo "1.0 - $interpolate_ratio" | bc`  \
           ${weights_learn}:scale=$interpolate_ratio || exit 1
