@@ -559,8 +559,10 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     
   ## liblinear learning
   learn_option=" --learn-lbfgs"
+  learner="cicada_learn_kbest_mpi"
   if test "$liblinear" = "yes"; then
     learn_option=" --learn-linear --solver $solver"
+    learner="cicada_learn_kbest"
   fi
  
   ### option for previous weights
@@ -570,7 +572,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   echo "learning ${root}weights.$iter" >&2
-  qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath cicada_learn_kbest` \
+  qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
 	                $unite \
