@@ -267,6 +267,14 @@ if test "$root" != ""; then
   fi
 fi
 
+### check np and nc
+if test $np -le 1; then
+  np=1
+fi
+if test $nc -le 1; then
+  nc=1
+fi
+
 mpinp=""
 if test "$qsub" = ""; then
   mpinp="--np $np"

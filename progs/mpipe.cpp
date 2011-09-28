@@ -543,7 +543,7 @@ int main(int argc, char** argv)
     }
   }
   catch (const std::exception& err) {
-    std::cerr << "error: " << err.what() << std::endl;
+    std::cerr << "error: " << argv[0] << " "<< err.what() << std::endl;
     return 1;
   }
   return 0;

@@ -30,6 +30,7 @@ enum {
   command_tag = 1000,
   line_tag,
   notify_tag,
+  sync_tag,
 };
 
 
@@ -99,7 +100,7 @@ int main(int argc, char** argv)
 	utils::mpi_istream_simple is(comm_parent.comm, 0, command_tag, 4096);
 	is.read(command);
       }
-
+      
       FILE* fp = ::popen(command.c_str(), "w");
       
       boost::iostreams::filtering_istream is;
@@ -114,6 +115,8 @@ int main(int argc, char** argv)
       ::pclose(fp);
       
       comm_parent.comm.Send(0, 0, MPI::INT, 0, notify_tag);
+
+      MPI::COMM_WORLD.Barrier();
       
     } else {
       command_set_type commands;
@@ -149,7 +152,7 @@ int main(int argc, char** argv)
 	  utils::mpi_ostream_simple stream(comm_child.comm, rank, command_tag, 4096);
 	  stream.write(commands[rank]);
 	}
-	
+
 	typedef boost::iostreams::filtering_ostream ostream_type;
 	typedef utils::mpi_device_sink              odevice_type;
 	
