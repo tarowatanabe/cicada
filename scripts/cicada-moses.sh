@@ -410,7 +410,6 @@ else
   
   mkdir -p $output/kbests || exit 1
   
-  
   ### generate scripts for kbest generation + kbest conversion
   kbest_generation=${output}/kbests/kbest-generation
   kbest_transform=${output}/kbests/kbest-transform

@@ -105,7 +105,7 @@ int main(int argc, char** argv)
       
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::zlib_decompressor());
-      is.push(utils::mpi_device_source(comm_parent.comm, 0, line_tag, 1024 * 1024));
+      is.push(utils::mpi_device_source(comm_parent.comm, 0, line_tag, 4096));
       
       std::string line;
       while (std::getline(is, line)) {
@@ -166,7 +166,7 @@ int main(int argc, char** argv)
 	odevice_ptr_set_type device(mpi_child_size);
 	
 	for (int rank = 0; rank != mpi_child_size; ++ rank) {
-	  device[rank].reset(new odevice_type(comm_child.comm, rank, line_tag, 1024 * 1024, false, true));
+	  device[rank].reset(new odevice_type(comm_child.comm, rank, line_tag, 4096, false, true));
 	  
 	  stream[rank].reset(new ostream_type());
 	  stream[rank]->push(boost::iostreams::zlib_compressor());
