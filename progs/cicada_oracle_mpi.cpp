@@ -495,37 +495,35 @@ void read_tstset(const path_set_type& files,
       
     if (boost::filesystem::is_directory(*titer)) {
 
+      size_t id;
+      hypergraph_type hypergraph;
+      
       for (size_t i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
-
+	
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	
-	size_t id;
-	hypergraph_type hypergraph;
-	
-	if (std::getline(is, line)) {
-	  std::string::const_iterator iter = line.begin();
-	  std::string::const_iterator end = line.end();
-	  
-	  if (! parse_id(id, iter, end))
-	    throw std::runtime_error("invalid id input: " + path.string());
-	  
-	  if (id != i)
-	    throw std::runtime_error("id mismatch: "  + path.string());
-	  
-	  if (! hypergraph.assign(iter, end))
-	    throw std::runtime_error("invalid graph format" + path.string());
-	  if (iter != end)
-	    throw std::runtime_error("invalid id ||| graph format" + path.string());
-	  
-	  if (id % mpi_size != mpi_rank)
-	    throw std::runtime_error("difference it?");
-	  
-	  graphs[id].unite(hypergraph);
-	} else
+	if (! std::getline(is, line))
 	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
+	if (id != i)
+	  throw std::runtime_error("id mismatch: "  + path.string());
+	if (static_cast<int>(id % mpi_size) != mpi_rank)
+	  throw std::runtime_error("difference it?");
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
+	
+	graphs[id].unite(hypergraph);
       }
     } else {
       const path_type& path = *titer;
@@ -537,20 +535,21 @@ void read_tstset(const path_set_type& files,
 
       while (std::getline(is, line)) {
 	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end = line.end();
+	std::string::const_iterator end  = line.end();
 	
 	if (! parse_id(id, iter, end))
 	  throw std::runtime_error("invalid id input: " + path.string());
-	
-	if (id >= static_cast<int>(graphs.size()))
+	if (id >= graphs.size())
 	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->string());
 	
-	if (id % mpi_size == mpi_rank) {
-	  if (! hypergraph.assign(iter, end))
-	    throw std::runtime_error("invalid graph format" + path.string());
-	  
-	  graphs[id].unite(hypergraph);
-	}
+	if (static_cast<int>(id % mpi_size) != mpi_rank) continue;
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
+	
+	graphs[id].unite(hypergraph);
       }
     }
   }

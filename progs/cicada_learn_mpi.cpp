@@ -922,7 +922,7 @@ void read_forest(const path_set_type& forest_path,
 	std::getline(is, line);
       
 	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end = line.end();
+	std::string::const_iterator end  = line.end();
       
 	if (! parse_id(id_forest, iter, end))
 	  throw std::runtime_error("invalid id input: " + path_forest.string());

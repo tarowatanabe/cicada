@@ -48,6 +48,7 @@
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 
+#include "cicada_impl.hpp"
 #include "cicada_text_impl.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -722,6 +723,8 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
 
 void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const size_t scorers_size)
 {
+  std::string line;
+  
   size_t iter = 0;
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer, ++ iter) {
@@ -732,53 +735,61 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
     const size_t id_offset = size_t(iterative) * scorers_size * iter;
       
     if (boost::filesystem::is_directory(*titer)) {
-
-      for (int i = 0; /**/; ++ i) {
+      size_t id;
+      hypergraph_type hypergraph;
+      
+      for (size_t i = 0; /**/; ++ i) {
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
-
+	
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
-      
-	weight_set_type origin;
-	weight_set_type direction;
-      
-	while (is >> id >> sep >> hypergraph) {
+	if (! std::getline(is, line))
+	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
 	
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
-
-	  id += id_offset;
-
-	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
 	
-	  graphs[id].unite(hypergraph);
-	}
-      }
-    } else {
-      utils::compress_istream is(*titer, 1024 * 1024);
-      
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
-      
-      weight_set_type origin;
-      weight_set_type direction;
-      
-      while (is >> id >> sep >> hypergraph) {
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?");
-
 	id += id_offset;
 	
-	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
+	if (id >= graphs.size())
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
+	
+	graphs[id].unite(hypergraph);
+      }
+    } else {
+      const path_type& path = *titer;
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      size_t id;
+      hypergraph_type hypergraph;
+      
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
+	
+	id += id_offset;
+	
+	if (id >= graphs.size())
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
 	graphs[id].unite(hypergraph);
       }

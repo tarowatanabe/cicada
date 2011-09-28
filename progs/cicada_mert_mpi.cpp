@@ -58,6 +58,7 @@
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 
+#include "cicada_impl.hpp"
 #include "cicada_text_impl.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -971,6 +972,8 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
+  std::string line;
+
   graphs.clear();
 
   size_t iter = 0;
@@ -983,55 +986,65 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
     const size_t id_offset = size_t(iterative) * scorers_size * iter;
       
     if (boost::filesystem::is_directory(*titer)) {
-
-      for (int i = 0; /**/; ++ i) {
-
-	if ((i + id_offset) % mpi_size != mpi_rank) continue;
-							       
+      size_t id;
+      hypergraph_type hypergraph;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	
+	if (static_cast<int>((i + id_offset) % mpi_size) != mpi_rank) continue;
+	
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
-											  
+	
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
+	if (! std::getline(is, line))
+	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
 	
-	weight_set_type origin;
-	weight_set_type direction;
-      
-	while (is >> id >> sep >> hypergraph) {
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
-	  
-	  id += id_offset;
-	  
-	  const int mpi_id = id / mpi_size;
-	  
-	  if (mpi_id >= static_cast<int>(graphs.size()))
-	    graphs.resize(mpi_id + 1);
-	  
-	  graphs[mpi_id].unite(hypergraph);
-	}
-      }
-    } else {
-      utils::compress_istream is(*titer, 1024 * 1024);
-      
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
-      
-      weight_set_type origin;
-      weight_set_type direction;
-      
-      while (is >> id >> sep >> hypergraph) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
+	
 	id += id_offset;
 	
-	if (id % mpi_size != mpi_rank) continue;
+	const int mpi_id = id / mpi_size;
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?");
+	if (mpi_id >= static_cast<int>(graphs.size()))
+	  graphs.resize(mpi_id + 1);
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
+	
+	graphs[mpi_id].unite(hypergraph);
+      }
+    } else {
+      const path_type& path = *titer;
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      size_t id;
+      hypergraph_type hypergraph;
+      
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path.string());
+	
+	id += id_offset;
+	
+	if (static_cast<int>(id % mpi_size) != mpi_rank) continue;
+	
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
 	const int mpi_id = id / mpi_size;
 	
