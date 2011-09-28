@@ -497,7 +497,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
       $mpimap --prog $mpimap --even --input $devset $kbest_generation || exit 1
   
   qsubwrapper kbest -m \
-      $mpimap --prog $mpimap --even --input $devset $kbest_transform || exit 1
+      `cicadapath mpish` $kbest_transform || exit 1
   
   rm -rf ${output}/kbests || exit 1
 

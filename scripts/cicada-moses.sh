@@ -208,7 +208,7 @@ cicadapath() {
   return 0
 }
 
-cicadas="cicada_filter_kbest_moses mpimap mpipe"
+cicadas="cicada_filter_kbest_moses mpimap mpipe mpish"
 
 for prog in $cicadas; do
   tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
@@ -414,7 +414,7 @@ else
   mpimap=`cicadapath mpimap`
   qsubwrapper kbest -m $mpimap --prog $mpimap --even --input $input $kbest_generation || exit 1
   
-  qsubwrapper kbest -m $mpimap --prog $mpimap --even --input $input $kbest_transform || exit 1
+  qsubwrapper kbest -m `cicadapath mpish` $kbest_transform || exit 1
   
   rm -rf ${output}/kbests || exit 1
 fi
