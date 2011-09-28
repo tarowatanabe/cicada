@@ -26,7 +26,7 @@ threads=""
 
 ## # of processes, # of cores
 np=1
-nc=2
+nc=1
 openmpi=""
 hosts=""
 hosts_file=""

@@ -23,7 +23,7 @@ refset=""
 
 ## # of processes, # of cores
 np=1
-nc=2
+nc=1
 hosts=""
 hosts_file=""
 
@@ -251,10 +251,14 @@ qsubwrapper() {
   logfile=""
   outfile=""
   threads=""
+  mpimode=no
   while test $# -gt 0 ; do
   case $1 in
   -t )
     threads=" --threads ${nc}"
+    shift ;;
+  -m )
+    mpimode=yes
     shift ;;
   -l )
     test $# = 1 && eval "$exit_missing_arg"
@@ -278,6 +282,12 @@ qsubwrapper() {
     stripped=$1
   fi
 
+  if test "$mpimode" = "no"; then
+    if test "$stripped" != "$1" -a $np -gt 1; then
+      mpimode=yes
+    fi
+  fi
+
   if test "$qsub" != ""; then
     (
       echo "#!/bin/sh"
@@ -286,7 +296,7 @@ qsubwrapper() {
       echo "#PBS -e /dev/null"
       echo "#PBS -o /dev/null"
       echo "#PBS -q $queue"
-      if test "$stripped" != "$1" -a $np -gt 1; then
+      if test "$mpimode" = "yes"; then
         echo "#PBS -l select=${np}:ncpus=${nc}:mpiprocs=${nc}:mem=${mem}"
         echo "#PBS -l place=scatter"
       else
@@ -305,41 +315,26 @@ qsubwrapper() {
 
       echo "cd $workingdir"
 
-      if test "$stripped" != "$1" -a $np -gt 1; then
-        if test "$logfile" != ""; then
-          if test "$outfile" != ""; then
-            echo "${openmpi}mpirun $mpinp $@ > $outfile 2> $logfile"
-          else
-            echo "${openmpi}mpirun $mpinp $@ 2> $logfile"
-          fi
-        else
-          if test "$outfile" != ""; then
-            echo "${openmpi}mpirun $mpinp $@ > $outfile"
-	  else
-            echo "${openmpi}mpirun $mpinp $@"
-	  fi
-        fi
+      out_option=""
+      if test "$outfile" != ""; then
+	out_option="> $outfile"
+      fi
+      log_option=""
+      if test "$logfile" != ""; then
+	log_option="2> $logfile"
+      fi
+
+      if test "$mpimode" = "yes"; then
+	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
       else
 	## shift here!
 	shift;
-	if test "$logfile" != ""; then
-          if test "$outfile" != ""; then
-            echo "$stripped $@ $threads > $outfile 2> $logfile"
-	  else
-            echo "$stripped $@ $threads 2> $logfile"
-	  fi
-        else
-          if test "$outfile" != ""; then
-            echo "$stripped $@ $threads > $outfile"
-	  else
-            echo "$stripped $@ $threads"
-	  fi
-        fi
+	echo "$stripped $@ $threads $out_option $log_option"
       fi
     ) |
     qsub -S /bin/sh || exit 1
   else
-    if test "$stripped" != "$1" -a $np -gt 1; then
+    if test "$mpimode" = "yes"; then
       if test "$logfile" != ""; then
 	if test "$outfile" != ""; then
           ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1

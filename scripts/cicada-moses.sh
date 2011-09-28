@@ -308,36 +308,21 @@ qsubwrapper() {
 
       echo "cd $workingdir"
 
+      out_option=""
+      if test "$outfile" != ""; then
+	out_option="> $outfile"
+      fi
+      log_option=""
+      if test "$logfile" != ""; then
+	log_option="2> $logfile"
+      fi
+
       if test "$mpimode" = "yes"; then
-        if test "$logfile" != ""; then
-          if test "$outfile" != ""; then
-            echo "${openmpi}mpirun $mpinp $@ > $outfile 2> $logfile"
-          else
-            echo "${openmpi}mpirun $mpinp $@ 2> $logfile"
-          fi
-        else
-          if test "$outfile" != ""; then
-            echo "${openmpi}mpirun $mpinp $@ > $outfile"
-	  else
-            echo "${openmpi}mpirun $mpinp $@"
-	  fi
-        fi
+	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
       else
 	## shift here!
 	shift;
-	if test "$logfile" != ""; then
-          if test "$outfile" != ""; then
-            echo "$stripped $@ $threads > $outfile 2> $logfile"
-	  else
-            echo "$stripped $@ $threads 2> $logfile"
-	  fi
-        else
-          if test "$outfile" != ""; then
-            echo "$stripped $@ $threads > $outfile"
-	  else
-            echo "$stripped $@ $threads"
-	  fi
-        fi
+	echo "$stripped $@ $threads $out_option $log_option"
       fi
     ) |
     qsub -S /bin/sh || exit 1
