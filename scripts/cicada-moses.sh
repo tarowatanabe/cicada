@@ -427,9 +427,9 @@ else
   done
   
   ### actually run
-  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_generation || exit -1
+  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_generation || exit 1
   
-  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_transform || exit -1
+  qsubwrapper kbest -m $cicada/mpimap --prog $cicada/mpimap --even --input $input $kbest_transform || exit 1
   
-  #rm -rf ${output}/kbests
+  rm -rf ${output}/kbests || exit 1
 fi
