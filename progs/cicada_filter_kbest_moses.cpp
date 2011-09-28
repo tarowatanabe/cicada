@@ -71,6 +71,10 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 bool directory_mode = false;
+bool keep_mode = false;
+
+int offset = 0;
+int stride = 1;
 
 int debug = 0;
 
@@ -90,9 +94,11 @@ int main(int argc, char** argv)
 	
 	boost::filesystem::create_directories(output_file);
 	
-	boost::filesystem::directory_iterator iter_end;
-	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	  boost::filesystem::remove_all(*iter);
+	if (! keep_mode) {
+	  boost::filesystem::directory_iterator iter_end;
+	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+	    boost::filesystem::remove_all(*iter);
+	}
       }
       
       utils::compress_istream is(input_file, 1024 * 1024);
@@ -117,6 +123,9 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
+	
+	// adjust id...
+	boost::fusion::get<0>(kbest) = boost::fusion::get<0>(kbest) * stride + offset;
 	
 	if (boost::fusion::get<0>(kbest) != id) {
 	  id = boost::fusion::get<0>(kbest);
@@ -192,7 +201,10 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
-      
+	
+	// adjust id...
+	boost::fusion::get<0>(kbest) = boost::fusion::get<0>(kbest) * stride + offset;
+	
 	os << boost::fusion::get<0>(kbest) << " ||| ";
       
 	const tokens_type& tokens = boost::fusion::get<1>(kbest);
@@ -254,7 +266,10 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output")
     
-    ("directory", po::bool_switch(&directory_mode), "output in directory")
+    ("directory", po::bool_switch(&directory_mode),            "output in directory")
+    ("keep",      po::bool_switch(&keep_mode),                 "keep contents in the directory (when exists)")
+    ("offset", po::value<int>(&offset)->default_value(offset), "offset for the id (id = id * stride + offset)")
+    ("stride", po::value<int>(&stride)->default_value(stride), "stride for the id (id = id * stride + offset)")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
