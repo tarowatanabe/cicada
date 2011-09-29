@@ -390,7 +390,8 @@ qsubwrapper() {
       if test "$logfile" != ""; then
 	log_option="2> $logfile"
       fi
-
+      
+      ### we need to handle argument spiltting...
       if test "$mpimode" = "yes"; then
 	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
       else
@@ -401,35 +402,19 @@ qsubwrapper() {
     ) |
     qsub -S /bin/sh || exit 1
   else
+    
+    if test "$logfile" = ""; then
+      logfile=/dev/stderr
+    fi
+    if test "$outfile" = ""; then
+      outfile=/dev/stdout
+    fi
+
     if test "$mpimode" = "yes"; then
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
-	else
-          ${openmpi}mpirun $mpinp "$@" 2> $logfile || exit 1
-	fi
-      else
-	if test "$outfile" != ""; then
-          ${openmpi}mpirun $mpinp "$@" > $outfile || exit 1
-	else
-          ${openmpi}mpirun $mpinp "$@" || exit 1
-	fi
-      fi
+      ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
     else
       shift
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          $stripped "$@" $threads > $outfile 2> $logfile || exit 1
-	else
-          $stripped "$@" $threads 2> $logfile || exit 1
-	fi
-      else
-	if test "$outfile" != ""; then
-          $stripped "$@" $threads > $outfile || exit 1
-	else
-          $stripped "$@" $threads || exit 1
-	fi
-      fi
+      $stripped "$@" $threads > $outfile 2> $logfile || exit 1
     fi
   fi
 }
@@ -476,28 +461,27 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   
   mkdir -p $output/kbests || exit 1
 
-  ### generate scripts for kbest generation + kbest conversion
+  ### generate scripts for kbest generation
   kbest_generation=${output}/kbests/kbest-generation
-  kbest_transform=${output}/kbests/kbest-transform
   for ((i=0;i<$np;++i)); do
     kbest_file=${output}/kbests/kbest.$i
-  
-    kbest_option="-n-best-list $kbest_file $kbest distinct"
-    echo "$moses -config $moses_ini $moses_options $kbest_option" \
-	>> $kbest_generation
 
     filter=`cicadapath cicada_filter_kbest_moses`
-    echo "$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np" \
-	>> $kbest_transform
+  
+    kbest_option="-n-best-list $kbest_file $kbest distinct"
+    moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
+    filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np"
+    
+    echo  "$moses_cmd && $filrer_cmd" >> $kbest_generation
   done  
   
   ### actually run
-  mpimap=`cicadapath mpimap`
   qsubwrapper kbest -m -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
-      $mpimap --prog $mpimap --even --input $devset $kbest_generation || exit 1
-  
-  qsubwrapper kbest -m \
-      `cicadapath mpish` $kbest_transform || exit 1
+      `cicadapath mpimap` \
+      --prog `cicadapath mpimap` \
+      --even \
+      --input $devset \
+      $kbest_generation || exit 1
   
   rm -rf ${output}/kbests || exit 1
 

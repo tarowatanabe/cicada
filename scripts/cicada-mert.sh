@@ -362,7 +362,8 @@ qsubwrapper() {
       if test "$logfile" != ""; then
 	log_option="2> $logfile"
       fi
-
+      
+      ### we need to handle argument spiltting...
       if test "$mpimode" = "yes"; then
 	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
       else
@@ -373,35 +374,19 @@ qsubwrapper() {
     ) |
     qsub -S /bin/sh || exit 1
   else
+    
+    if test "$logfile" = ""; then
+      logfile=/dev/stderr
+    fi
+    if test "$outfile" = ""; then
+      outfile=/dev/stdout
+    fi
+
     if test "$mpimode" = "yes"; then
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
-	else
-          ${openmpi}mpirun $mpinp "$@" 2> $logfile || exit 1
-	fi
-      else
-	if test "$outfile" != ""; then
-          ${openmpi}mpirun $mpinp "$@" > $outfile || exit 1
-	else
-          ${openmpi}mpirun $mpinp "$@" || exit 1
-	fi
-      fi
+      ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
     else
       shift
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          $stripped "$@" $threads > $outfile 2> $logfile || exit 1
-	else
-          $stripped "$@" $threads 2> $logfile || exit 1
-	fi
-      else
-	if test "$outfile" != ""; then
-          $stripped "$@" $threads > $outfile || exit 1
-	else
-          $stripped "$@" $threads || exit 1
-	fi
-      fi
+      $stripped "$@" $threads > $outfile 2> $logfile || exit 1
     fi
   fi
 }
