@@ -22,6 +22,7 @@ qsub=`which qsub 2> /dev/null`
 name=""
 logfile=""
 outfile=""
+mpimode="no"
 threads=""
 
 ## # of processes, # of cores
@@ -44,6 +45,7 @@ $me name [options] cicada-program args
   -n, --np                  # of processes to run    (default: $np)
   --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
+  -m                        forced MPI execution
   --log, --logfile, -l      logfile
   --out, --outfile, -o      stdout file
   --threads,-t              threading option
@@ -90,6 +92,9 @@ while test $# -gt 0; do
     test $# = 1 && eval "$exit_missing_arg"
     outfile=$2
     shift; shift ;;
+  -m )
+    mpimode="yes"
+    shift ;;
   --threads | -t )
     threads="yes"
     shift ;;
@@ -113,6 +118,12 @@ done
 stripped=`expr "$1" : '\(.*\)_mpi$'`
 if test "$stripped" = ""; then
   stripped=$1
+fi
+
+if test "$mpimode" = "no"; then
+  if test "$stripped" != "$1" -a $np -gt 1; then
+    mpimode=yes
+  fi
 fi
 
 if test "$threads" = "yes"; then
@@ -142,6 +153,21 @@ if test "$qsub" = ""; then
   fi
 fi
 
+argument() {
+  if test $# -gt 1; then
+    echo "\"$@\""
+  else
+    echo "$@"
+  fi
+}
+
+arguments() {
+  args=""
+  for arg in "$@"; do 
+    args="$args `argument $arg`"
+  done
+  echo $args
+}
 
 if test "$qsub" != ""; then
     
@@ -157,7 +183,7 @@ if test "$qsub" != ""; then
     echo "#PBS -e /dev/null"
     echo "#PBS -o /dev/null"
     echo "#PBS -q $queue"
-    if test "$stripped" != "$1" -a $np -gt 1; then
+    if test "$mpimode" = "yes"; then
       echo "#PBS -l select=${np}:ncpus=${nc}:mpiprocs=${nc}:mem=${mem}"
       echo "#PBS -l place=scatter"
     else
@@ -176,68 +202,39 @@ if test "$qsub" != ""; then
 
     echo "cd $workingdir"
 
-    if test "$stripped" != "$1" -a $np -gt 1; then
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          echo "${openmpi}mpirun $mpinp $@ > $outfile 2> $logfile"
-	else
-	  echo "${openmpi}mpirun $mpinp $@ 2> $logfile"
-	fi
-      else
-	if test "$outfile" != ""; then
-          echo "${openmpi}mpirun $mpinp $@ > $outfile"
-	else
-	  echo "${openmpi}mpirun $mpinp $@"
-	fi
-      fi
+    out_option=""
+    if test "$outfile" != ""; then
+      out_option="> $outfile"
+    fi
+    log_option=""
+    if test "$logfile" != ""; then
+      log_option="2> $logfile"
+    fi
+
+    ### we need to handle argument spiltting...
+    if test "$mpimode" = "yes"; then
+      parameters=`arguments "$@"`
+      echo "${openmpi}mpirun $mpinp $parameters $out_option $log_option"
     else
       ## shift here!
       shift;
-      if test "$logfile" != ""; then
-	if test "$outfile" != ""; then
-          echo "$stripped $@ $threads > $outfile 2> $logfile"
-	else
-	  echo "$stripped $@ $threads 2> $logfile"
-	fi
-      else
-	 if test "$outfile" != ""; then
-          echo "$stripped $@ $threads > $outfile"
-	else
-	  echo "$stripped $@ $threads"
-	fi
-      fi
+      parameters=`arguments "$@"`
+      echo "$stripped $parameters $threads $out_option $log_option"
     fi
   ) |
   exec qsub -S /bin/sh
 else
-  if test "$stripped" != "$1" -a $np -gt 1; then
-    if test "$logfile" != ""; then
-      if test "$outfile" != ""; then
-        exec ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile
-      else
-        exec ${openmpi}mpirun $mpinp "$@" 2> $logfile
-      fi
-    else
-      if test "$outfile" != ""; then
-        exec ${openmpi}mpirun $mpinp "$@" > $outfile
-      else
-	exec ${openmpi}mpirun $mpinp "$@"
-      fi
-    fi
+  if test "$logfile" = ""; then
+    logfile=/dev/stderr
+  fi
+  if test "$outfile" = ""; then
+    outfile=/dev/stdout
+  fi
+
+  if test "$mpimode" = "yes"; then
+    ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
   else
     shift
-    if test "$logfile" != ""; then
-      if test "$outfile" != ""; then
-	exec $stripped "$@" $threads > $outfile 2> $logfile
-      else
-	exec $stripped "$@" $threads 2> $logfile
-      fi
-    else
-      if test "$outfile" != ""; then
-        exec $stripped "$@" $threads > $outfile
-      else
-	exec $stripped "$@" $threads
-      fi
-    fi
+    $stripped "$@" $threads > $outfile 2> $logfile || exit 1
   fi
 fi
