@@ -472,7 +472,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
     filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np"
     
-    echo  "$moses_cmd && $filrer_cmd" >> $kbest_generation
+    echo  "$moses_cmd && $filter_cmd" >> $kbest_generation
   done  
   
   ### actually run

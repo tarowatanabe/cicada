@@ -406,7 +406,7 @@ else
     moses_cmd="$moses -config $moses_config $moses_options $kbest_option"
     filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np"
     
-    echo "$moses_cmd && $filer_cmd" >> $kbest_generation
+    echo "$moses_cmd && $filter_cmd" >> $kbest_generation
   done
   
   ### actually run
