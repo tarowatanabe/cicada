@@ -256,9 +256,9 @@ fi
 if test "$openmpi" != ""; then
   openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
   
-  if test ! -e $openmpi/mpirun; then
-    openmpi=$openmpi/bin
-    if test ! -e $openmpi/mpirun; then
+  if test ! -e ${openmpi}mpirun; then
+    openmpi=${openmpi}bin/
+    if test ! -e ${openmpi}mpirun; then
       echo "no mpirun?" >&2
     exit 1
     fi
