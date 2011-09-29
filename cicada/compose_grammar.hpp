@@ -53,7 +53,7 @@ namespace cicada
     
     
     ComposeGrammar(const grammar_type& __grammar, const bool __yield_source=false)
-      : grammar(__grammar), yield_source(__yield_source),
+      : grammar(__grammar), yield_source(__yield_source)
     { }
 
     struct filter_edge
