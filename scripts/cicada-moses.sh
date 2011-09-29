@@ -237,6 +237,22 @@ if test "$qsub" = ""; then
   fi
 fi
 
+argument() {
+  if test $# -gt 1; then
+    echo "\"$@\""
+  else
+    echo "$@"
+  fi
+}
+
+arguments() {
+  args=""
+  for arg in "$@"; do 
+    args="$args `argument $arg`"
+  done
+  echo $args
+}
+
 qsubwrapper() {
   name=$1
   shift
@@ -319,11 +335,11 @@ qsubwrapper() {
       
       ### we need to handle argument spiltting...
       if test "$mpimode" = "yes"; then
-	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
+	echo "${openmpi}mpirun $mpinp `arguments $@` $out_option $log_option"
       else
 	## shift here!
 	shift;
-	echo "$stripped $@ $threads $out_option $log_option"
+	echo "$stripped `arguments $@` $threads $out_option $log_option"
       fi
     ) |
     qsub -S /bin/sh || exit 1
