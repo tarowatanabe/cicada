@@ -323,7 +323,7 @@ fi
 qsubwrapper() {
   name=$1
   shift
-  
+
   logfile=""
   outfile=""
   threads=""
