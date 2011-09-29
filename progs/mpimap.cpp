@@ -114,9 +114,10 @@ int main(int argc, char** argv)
       }
       ::pclose(fp);
       
-      MPI::Request request = comm_parent.comm.Isend(0, 0, MPI::INT, 0, notify_tag);
+      MPI::Request request_send = comm_parent.comm.Isend(0, 0, MPI::INT, 0, notify_tag);
+      MPI::Request request_recv = comm_parent.comm.Irecv(0, 0, MPI::INT, 0, notify_tag);
       int non_found_iter = 0;
-      while (! request.Test()) {
+      while (! request_send.Test() || ! request_recv.Test()) {
 	non_found_iter = loop_sleep(false, non_found_iter);
       }
       
@@ -239,23 +240,33 @@ int main(int argc, char** argv)
 	}
 	
 	// termination...
+	std::vector<MPI::Request, std::allocator<MPI::Request> > request_send(mpi_child_size);
+	std::vector<MPI::Request, std::allocator<MPI::Request> > request_recv(mpi_child_size);
+	std::vector<bool, std::allocator<bool> > terminated_send(mpi_child_size, false);
+	std::vector<bool, std::allocator<bool> > terminated_recv(mpi_child_size, false);
 	
-	std::vector<MPI::Request, std::allocator<MPI::Request> > request(mpi_child_size);
-	std::vector<bool, std::allocator<bool> > terminated(mpi_child_size, false);
-	
-	for (int rank = 0; rank != mpi_child_size; ++ rank)
-	  request[rank] = comm_child.comm.Irecv(0, 0, MPI::INT, rank, notify_tag);
+	for (int rank = 0; rank != mpi_child_size; ++ rank) {
+	  request_recv[rank] = comm_child.comm.Irecv(0, 0, MPI::INT, rank, notify_tag);
+	  request_send[rank] = comm_child.comm.Isend(0, 0, MPI::INT, rank, notify_tag);
+	}
 	
 	for (;;) {
 	  bool found = false;
 	  
-	  for (int rank = 0; rank != mpi_child_size; ++ rank)
-	    if (! terminated[rank] && request[rank].Test()) {
-	      terminated[rank] = true;
+	  for (int rank = 0; rank != mpi_child_size; ++ rank) {
+	    if (! terminated_recv[rank] && request_recv[rank].Test()) {
+	      terminated_recv[rank] = true;
 	      found = true;
 	    }
+	    
+	    if (! terminated_send[rank] && request_send[rank].Test()) {
+	      terminated_send[rank] = true;
+	      found = true;
+	    }
+	  }
 	  
-	  if (std::count(terminated.begin(), terminated.end(), true) == mpi_child_size) break;
+	  if (std::count(terminated_recv.begin(), terminated_recv.end(), true) == mpi_child_size
+	      && std::count(terminated_send.begin(), terminated_send.end(), true) == mpi_child_size) break;
 	  
 	  non_found_iter = loop_sleep(found, non_found_iter);
 	}
