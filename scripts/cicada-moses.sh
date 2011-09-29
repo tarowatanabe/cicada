@@ -334,12 +334,15 @@ qsubwrapper() {
       fi
       
       ### we need to handle argument spiltting...
+      
       if test "$mpimode" = "yes"; then
-	echo "${openmpi}mpirun $mpinp `arguments $@` $out_option $log_option"
+	parameters=`arguments "$@"`
+	echo "${openmpi}mpirun $mpinp $parameters $out_option $log_option"
       else
 	## shift here!
 	shift;
-	echo "$stripped `arguments $@` $threads $out_option $log_option"
+	parameters=`arguments "$@"`
+	echo "$stripped $parameters $threads $out_option $log_option"
       fi
     ) |
     qsub -S /bin/sh || exit 1
