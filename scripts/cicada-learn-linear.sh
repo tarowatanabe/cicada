@@ -284,10 +284,26 @@ if test "$qsub" = ""; then
   fi
 fi
 
+argument() {
+  if test $# -gt 1; then
+    echo "\"$@\""
+  else
+    echo "$@"
+  fi
+}
+
+arguments() {
+  args=""
+  for arg in "$@"; do 
+    args="$args `argument $arg`"
+  done
+  echo $args
+}
+
 qsubwrapper() {
   name=$1
   shift
-  
+
   logfile=""
   outfile=""
   threads=""
@@ -328,6 +344,15 @@ qsubwrapper() {
     fi
   fi
 
+  out_option=""
+  if test "$outfile" != ""; then
+    out_option="> $outfile"
+  fi
+  log_option=""
+  if test "$logfile" != ""; then
+    log_option="2> $logfile"
+  fi
+
   if test "$qsub" != ""; then
     (
       echo "#!/bin/sh"
@@ -354,40 +379,27 @@ qsubwrapper() {
       fi
 
       echo "cd $workingdir"
-
-      out_option=""
-      if test "$outfile" != ""; then
-	out_option="> $outfile"
-      fi
-      log_option=""
-      if test "$logfile" != ""; then
-	log_option="2> $logfile"
-      fi
       
       ### we need to handle argument spiltting...
       if test "$mpimode" = "yes"; then
-	echo "${openmpi}mpirun $mpinp $@ $out_option $log_option"
+        parameters=`arguments "$@"`
+	echo "${openmpi}mpirun $mpinp $parameters $out_option $log_option"
       else
 	## shift here!
 	shift;
-	echo "$stripped $@ $threads $out_option $log_option"
+	parameters=`arguments "$@"`
+	echo "$stripped $parameters $threads $out_option $log_option"
       fi
     ) |
     qsub -S /bin/sh || exit 1
   else
-    
-    if test "$logfile" = ""; then
-      logfile=/dev/stderr
-    fi
-    if test "$outfile" = ""; then
-      outfile=/dev/stdout
-    fi
-
     if test "$mpimode" = "yes"; then
-      ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
+      parameters=`arguments "$@"`
+      eval "${openmpi}mpirun $mpinp $parameters $out_option $log_option" || exit 1
     else
       shift
-      $stripped "$@" $threads > $outfile 2> $logfile || exit 1
+      parameters=`arguments "$@"`
+      eval "$stripped $parameters $threads $out_option $log_option" || exit 1
     fi
   fi
 }

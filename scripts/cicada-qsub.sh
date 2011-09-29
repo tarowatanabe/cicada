@@ -177,6 +177,15 @@ arguments() {
   echo $args
 }
 
+out_option=""
+if test "$outfile" != ""; then
+  out_option="> $outfile"
+fi
+log_option=""
+if test "$logfile" != ""; then
+  log_option="2> $logfile"
+fi
+
 if test "$qsub" != ""; then
     
   if test "$name" = ""; then
@@ -210,15 +219,6 @@ if test "$qsub" != ""; then
 
     echo "cd $workingdir"
 
-    out_option=""
-    if test "$outfile" != ""; then
-      out_option="> $outfile"
-    fi
-    log_option=""
-    if test "$logfile" != ""; then
-      log_option="2> $logfile"
-    fi
-
     ### we need to handle argument spiltting...
     if test "$mpimode" = "yes"; then
       parameters=`arguments "$@"`
@@ -232,17 +232,12 @@ if test "$qsub" != ""; then
   ) |
   exec qsub -S /bin/sh
 else
-  if test "$logfile" = ""; then
-    logfile=/dev/stderr
-  fi
-  if test "$outfile" = ""; then
-    outfile=/dev/stdout
-  fi
-
   if test "$mpimode" = "yes"; then
-    ${openmpi}mpirun $mpinp "$@" > $outfile 2> $logfile || exit 1
+    parameters=`arguments "$@"`
+    eval "${openmpi}mpirun $mpinp $parameters $out_option $log_option" || exit 1
   else
     shift
-    $stripped "$@" $threads > $outfile 2> $logfile || exit 1
+    parameters=`arguments "$@"`
+    eval "$stripped $parameters $threads $out_option $log_option" || exit 1
   fi
 fi
