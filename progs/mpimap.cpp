@@ -114,8 +114,12 @@ int main(int argc, char** argv)
       }
       ::pclose(fp);
       
-      comm_parent.comm.Send(0, 0, MPI::INT, 0, notify_tag);
-
+      MPI::Request request = comm_parent.comm.Isend(0, 0, MPI::INT, 0, notify_tag);
+      int non_found_iter = 0;
+      while (! request.Test()) {
+	non_found_iter = loop_sleep(false, non_found_iter);
+      }
+      
       MPI::COMM_WORLD.Barrier();
       
     } else {
