@@ -54,8 +54,6 @@ namespace cicada
     
     ComposeGrammar(const grammar_type& __grammar, const bool __yield_source=false)
       : grammar(__grammar), yield_source(__yield_source),
-	attr_span_first("span-first"),
-	attr_span_last("span-last")
     { }
 
     struct filter_edge
@@ -137,8 +135,6 @@ namespace cicada
   private:
     const grammar_type& grammar;
     const bool yield_source;
-    const attribute_type attr_span_first;
-    const attribute_type attr_span_last;
   };
 
   inline
