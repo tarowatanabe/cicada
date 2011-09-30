@@ -15,6 +15,8 @@ google-sparsehash (http://code.google.com/p/google-sparsehash/)
 
 Optional:
 	srilm:   language model training (http://www-speech.sri.com/projects/srilm/)
+	         For indexing, you still need "expgram"
+
 	GIZA++:  alignment model training (http://code.google.com/p/giza-pp/)
 	         or, you can uses moses (http://www.statmt.org/moses/) for alignment training with GIZA++
 	         or, try berkeley aligner (http://code.google.com/p/berkeleyaligner/)

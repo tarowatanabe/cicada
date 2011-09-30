@@ -1,7 +1,10 @@
 2011-9-X
-New: Support moses training using the cicada tools: learn by LBFGS or liblinear with kbests
+New: Support moses training using the cicada tools (cicada-learn-moses.sh): learn by LBFGS or liblinear with kbests
 New: parse variant of phrasal composition: we do forward lazy graph constructin + backward filtering
-Bugfix for grammar indexing with attributes
+Updated scripts for tuning: You should revise cicada.config file so that decoder's output should be ${file} not directory=${directory}
+Serious bugfix: grammar indexing with attributes
+Added kbest filter for moses
+Added reference format converter to/from moses/cdec/joshua (We do not support xml/sgml style refsets found in LDC)
 
 2011-9-20
 New: pialign derivation to hiero grammar/hypergraph conversion filter

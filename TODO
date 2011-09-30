@@ -24,10 +24,6 @@ Re-engineer kbest/viterbi framework...
   I don't like current interface, separating weight and derivation
   Is there a workaround, like use iterator-based enumeration?
 
-Better training via MERT like procedure:
-  We already have LBFGS(L1,L2) and SGD(L1, L2).
-  Add MIRA etc. originally implemented for learn_online...
-
 Support word alignment training!
   We know feature-rich unsupervised training!
   Use of syntax-tree combined with alignment
@@ -65,10 +61,6 @@ POS annotated sentence input:
   model. Otherwise use POS as a "hint"?
 
 Add more tests
-
-Add mert,decode,mbr,parse script?
-    Personally, I don't like a single script to handle many things, since 
-    that is usually not instructive....
 
 A unified framework to collect statistics: Do we need stats from features?
     We have a support to collect stats from operations, but not from individual features..
@@ -134,3 +126,6 @@ Do we keep pair of source-target lhs???
 
 Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
   I'm not sure which is better..
+
+Support joshua training?
+Support cicada forest converter?

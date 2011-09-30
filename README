@@ -81,8 +81,10 @@ Various learning components are implemented:
    - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear [30] (New, but still open problems!)
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
    - Small feature set on small devset learned by hypergraph-MERT [8]
-   - Small/Large feature set on small devset learned by hypergraph-MaxEnt (optimized by LBFGS or SGD)
+   - Small/large feature set on small devset learned by hypergraph-MaxEnt (optimized by LBFGS or SGD)
      + softmax-margin [9] (New! But still open problems!)
+   - Small/large feature set learned by iteratively construncting training samples with rank-learning.
+     + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
 
 Word clustering tool is also included to support word alignment learning + translation [20]
 
@@ -482,6 +484,7 @@ References:
   year = {2010},
   pages = {267--274},
   location = {Paris, France}
+}
 
 [32]
 @InProceedings{jiang-liu:2010:ACL,
@@ -494,4 +497,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {12--20},
   url       = {http://www.aclweb.org/anthology/P10-1002}
+}
+
+[33]
+@InProceedings{hopkins-may:2011:EMNLP,
+  author    = {Hopkins, Mark  and  May, Jonathan},
+  title     = {Tuning as Ranking},
+  booktitle = {Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing},
+  month     = {July},
+  year      = {2011},
+  address   = {Edinburgh, Scotland, UK.},
+  publisher = {Association for Computational Linguistics},
+  pages     = {1352--1362},
+  url       = {http://www.aclweb.org/anthology/D11-1125}
 }
