@@ -37,7 +37,7 @@ mem=1gb
 queue=ltg
 
 usage="\
-$me name [options] cicada-program args
+$me [options] cicada-program args
   --mpi                     MPI implementation
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
@@ -170,11 +170,11 @@ argument() {
 }
 
 arguments() {
-  args=""
+  args__=""
   for arg in "$@"; do 
-    args="$args `argument $arg`"
+    args__="$args__ `argument $arg`"
   done
-  echo $args
+  echo $args__
 }
 
 out_option=""
@@ -219,25 +219,20 @@ if test "$qsub" != ""; then
 
     echo "cd $workingdir"
 
-    ### we need to handle argument spiltting...
     if test "$mpimode" = "yes"; then
-      parameters=`arguments "$@"`
-      echo "${openmpi}mpirun $mpinp $parameters $out_option $log_option"
+      echo "${openmpi}mpirun $mpinp `arguments "$@"` $out_option $log_option"
     else
       ## shift here!
       shift;
-      parameters=`arguments "$@"`
-      echo "$stripped $parameters $threads $out_option $log_option"
+      echo "$stripped `arguments "$@"` $threads $out_option $log_option"
     fi
   ) |
   exec qsub -S /bin/sh
 else
   if test "$mpimode" = "yes"; then
-    parameters=`arguments "$@"`
-    eval "${openmpi}mpirun $mpinp $parameters $out_option $log_option" || exit 1
+    eval "${openmpi}mpirun $mpinp `arguments "$@"` $out_option $log_option" || exit 1
   else
     shift
-    parameters=`arguments "$@"`
-    eval "$stripped $parameters $threads $out_option $log_option" || exit 1
+    eval "$stripped `arguments "$@"` $threads $out_option $log_option" || exit 1
   fi
 fi
