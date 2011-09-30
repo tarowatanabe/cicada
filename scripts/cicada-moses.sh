@@ -167,7 +167,7 @@ while test $# -gt 0 ; do
   esac
 done
 
-if test "$moses_config" = ""; then
+if test "$moses_config" = "" -o ! -e "$moses_config"; then
   echo "specify config file" >&2
   exit 1
 fi
@@ -175,12 +175,7 @@ if test "$cicada" = ""; then
   echo "no cicada dir?" >&2
   exit 1
 fi
-
-if test ! -e $moses_config; then
-  echo "no config file?" >& 2
-  exit 1
-fi
-if test ! -x $moses; then
+if test "$moses" = "" -o ! -x "$moses"; then
   echo "no moses" >&2
   exit 1
 fi

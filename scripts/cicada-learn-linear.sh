@@ -183,23 +183,15 @@ while test $# -gt 0 ; do
   esac
 done
 
-if test "$devset" = ""; then
+if test "$devset" = "" -o ! -e "$devset"; then
   echo "specify development data" >&2
   exit 1
 fi
-if test ! -e $devset; then
-  echo "specify development data" >&2
-  exit 1
-fi
-if test "$refset" = ""; then
+if test "$refset" = "" -o ! -e "$refset"; then
   echo "specify reference data" >&2
   exit 1
 fi
-if test ! -e $refset; then
-  echo "specify reference data" >&2
-  exit 1
-fi
-if test "$config" = ""; then
+if test "$config" = "" -o ! -e "$config"; then
   echo "specify config file" >&2
   exit 1
 fi
