@@ -51,13 +51,16 @@ namespace cicada
       typedef std::vector<terminal_pos_type, std::allocator<terminal_pos_type> > terminal_pos_set_type;
       
       typedef std::pair<int, int> dependency_type;
+      typedef std::vector<dependency_type, std::allocator<dependency_type> >         dependency_set_type;
+      typedef std::vector<dependency_set_type, std::allocator<dependency_set_type> > dependency_map_type;
       
       
       typedef utils::indexed_trie<dependency_type, utils::hashmurmur<size_t>, std::equal_to<dependency_type>, std::allocator<dependency_type> > dependency_index_type;
 
       typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
-      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_map_type;
-      
+      typedef std::vector<feature_list_type, std::allocator<feature_list_type> > feature_map_type;
+      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_ordered_map_type;
+
       
       struct __attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
       {
@@ -65,20 +68,25 @@ namespace cicada
 	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
 	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
       };
-
+      
       DependencyImpl(const int __order)
 	: order(__order),
 	  lattice(0),
 	  forced_feature(false),
+	  feat_none("dependency"),
+	  feat_root_multiple("dependency:root-multiple"),
+	  feat_root_count("dependency:root-count"),
 	  attr_dependency_pos("dependency-pos"),
 	  attr_dependency_head("dependency-head"),
 	  attr_dependency_dependent("dependency-dependent") {}
-
+      
       void dependency_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
 			    feature_set_type& features)
       {
+	typedef dependency_index_type::id_type id_type;
+	
 	int pos_head = -1;
 	int pos_dep  = -1;
 	
@@ -90,12 +98,184 @@ namespace cicada
 	  pos_dep  = boost::apply_visitor(__attribute_integer(), diter->second);
 	}
 	
+	const id_type state_dep = (pos_head >= 0 && pos_dep >= 0 
+				   ? dependency_index.push(dependency_index.root(), dependency_type(pos_head, pos_dep))
+				   : dependency_index.root());
 	
+	if (pos_head >= 0 && pos_dep >= 0)
+	  apply_features(state_dep, pos_head, pos_dep, features);
+		
+	// root-count...
+	int root_count = (pos_head == 0 && pos_dep >= 0);
+	bool fired_root_multiple = false;
+	
+	if (root_count)
+	  features[feat_root_count] = 1.0;
+	
+	dependency_antecedents.clear();
+	dependency_antecedents.resize(order - 1);
+	
+	for (size_t i = 0; i != states.size(); ++ i) {
+	  // root count...
+	  const int& root_count_antecedent = *reinterpret_cast<const int*>(states[i]);
+	  
+	  root_count += root_count_antecedent;
+	  fired_root_multiple |= root_count_antecedent > 1;
+	  
+	  // convert state representation into ordered dependencies...
+	  const id_type* id_antecedent = reinterpret_cast<const id_type*>(reinterpret_cast<const int*>(states[i]) + 1);
+	  
+	  
+	  // TODO: how to represent state space...?
+	  for (int k = 0; k != order - 1 && *id_antecedent != dependency_index.root(); ++ k, ++ id_antecedent) {
+	    id_type id = *id_antecedent;
+	    while (id != dependency_index.root()) {
+	      dependency_antecedents[k].push_back(dependency_index[id]);
+	      id = dependency_index.parent(id);
+	    }
+	  }
+	}
+	
+	// we will fire for higher order features...
+	// in this implementation, we will simply ignore the boundary of antecedents...
+	if (pos_head >= 0 && pos_dep >= 0)
+	  apply_features(state_dep, pos_head, pos_dep, dependency_antecedents, features);
+	  
+	// fire root multiple
+	if (! fired_root_multiple && root_count > 1) 
+	  features[feat_root_multiple] = 1.0;
+	
+	// update states...
+	
+	// root-count
+	*reinterpret_cast<int*>(state) = root_count;
+	
+	id_type* state_id = reinterpret_cast<id_type*>(reinterpret_cast<int*>(state) + 1);
+	
+	// antecedents..
+	int order_adjusted = order - 1;
+	if (pos_head >= 0 && pos_dep >= 0) {
+	  *state_id = state_dep;
+	  ++ state_id;
+	  order_adjusted = order - 2;
+	}
+	
+	for (int k = 0; k < order_adjusted && ! dependency_antecedents[k].empty(); ++ k, ++ state_id) {
+	  std::sort(dependency_antecedents[k].begin(), dependency_antecedents[k].end());
+	  
+	  id_type id = dependency_index.root();
+	  dependency_set_type::const_iterator diter_end = dependency_antecedents[k].end();
+	  for (dependency_set_type::const_iterator diter = dependency_antecedents[k].begin(); diter != diter_end; ++ diter)
+	    id = dependency_index.push(id, *diter);
+	  
+	  *state_id = id;
+	}
+	*state_id = dependency_index.root();
       }	
+
+      template <typename Iterator>
+      void apply_features(Iterator first, Iterator last, feature_set_type& features)
+      {
+	for (/**/; first != last; ++ first)
+	  if (*first != feat_none)
+	    features[*first] += 1.0;
+      }
+      
+      void apply_features(const dependency_index_type::id_type& state,
+			  const int& pos_head,
+			  const int& pos_tail,
+			  feature_set_type& features)
+      {
+	// we will do caching for base features....
+	
+	
+	// head...
+	if (features_heads[pos_head].empty()) {
+	  const std::string& word = terminals[pos_head].first;
+	  const std::string& pos = terminals[pos_head].second;
+	  
+	  const std::string feat_word_pos = "dependency:head-word-pos:" + word + '|' + pos;
+	  const std::string feat_word     = "dependency:head-word:" + word;
+	  const std::string feat_pos      = "dependency:head-pos:" + pos;
+	  
+	  if (forced_feature) {
+	    features_heads[pos_head].push_back(feat_word_pos);
+	    features_heads[pos_head].push_back(feat_word);
+	    features_heads[pos_head].push_back(feat_pos);
+	  } else {
+	    if (feature_type::exists(feat_word_pos))
+	      features_heads[pos_head].push_back(feat_word_pos);
+	    if (feature_type::exists(feat_word))
+	      features_heads[pos_head].push_back(feat_word);
+	    if (feature_type::exists(feat_pos))
+	      features_heads[pos_head].push_back(feat_pos);
+	    
+	    // fallback to NONE
+	    if (features_heads[pos_head].empty())
+	      features_heads[pos_head].push_back(feat_none);
+	  }
+	}
+	
+	// apply features...
+	apply_features(features_heads[pos_head].begin(), features_heads[pos_head].end(), features);
+	
+	
+	// dependent...
+	if (features_tails[pos_tail].empty()) {
+	  const std::string& word = terminals[pos_tail].first;
+	  const std::string& pos = terminals[pos_tail].second;
+	  
+	  const std::string feat_word_pos = "dependency:dep-word-pos:" + word + '|' + pos;
+	  const std::string feat_word     = "dependency:dep-word:" + word;
+	  const std::string feat_pos      = "dependency:dep-pos:" + pos;
+	  
+	  if (forced_feature) {
+	    features_tails[pos_tail].push_back(feat_word_pos);
+	    features_tails[pos_tail].push_back(feat_word);
+	    features_tails[pos_tail].push_back(feat_pos);
+	  } else {
+	    if (feature_type::exists(feat_word_pos))
+	      features_tails[pos_tail].push_back(feat_word_pos);
+	    if (feature_type::exists(feat_word))
+	      features_tails[pos_tail].push_back(feat_word);
+	    if (feature_type::exists(feat_pos))
+	      features_tails[pos_tail].push_back(feat_pos);
+	    
+	    // fallback to NONE
+	    if (features_tails[pos_tail].empty())
+	      features_tails[pos_tail].push_back(feat_none);
+	  }
+	}
+	
+	// apply features...
+	apply_features(features_tails[pos_tail].begin(), features_tails[pos_tail].end(), features);
+	
+	
+	// pairs...
+	if (state >= features_pairs.size())
+	  features_pairs.resize(state + 1);
+	
+	if (features_pairs[state].empty()) {
+	  
+	}
+	
+      }
+      
+      void apply_features(const dependency_index_type::id_type& state,
+			  const int& pos_head,
+			  const int& pos_tail,
+			  const dependency_map_type& antecedents,
+			  feature_set_type& features)
+      {
+	// we will do caching...
+	
+	
+      }
       
       void clear()
       {
-	
+	dependency_index.clear();
+	dependency_antecedents.clear();
       }
       
       void assign(const lattice_type& __lattice)
@@ -105,9 +285,12 @@ namespace cicada
 	edges.clear();
 	terminals.clear();
 	
+	dependency_index.clear();
+	dependency_antecedents.clear();
+	
 	// ROOT
 	edges.push_back(std::make_pair(-1, 0));
-	terminals.push_back(std::make_pair(vocab_type::EPSILON, vocab_type::X));
+	terminals.push_back(std::make_pair(vocab_type::EPSILON, vocab_type::GOAL));
 	
 	// terminals/POSs
 	for (size_type pos = 0; pos != lattice->size(); ++ pos) {
@@ -120,6 +303,14 @@ namespace cicada
 	      terminals.back().second = vocab_type::X;
 	  }
 	}
+	
+	// caching...
+	features_heads.clear();
+	features_tails.clear();
+	features_pairs.clear();
+	
+	features_heads.resize(edges.size());
+	features_tails.resize(edges.size());
       }
 
       int order;
@@ -129,10 +320,22 @@ namespace cicada
       terminal_pos_set_type terminals;
       
       bool forced_feature;
+
+      feature_type feat_none;
+      feature_type feat_root_multiple;
+      feature_type feat_root_count;
       
       attribute_type attr_dependency_pos;
       attribute_type attr_dependency_head;
       attribute_type attr_dependency_dependent;
+      
+      // internal use only...
+      dependency_index_type dependency_index;
+      dependency_map_type   dependency_antecedents;
+      
+      feature_map_type         features_heads;
+      feature_map_type         features_tails;
+      feature_ordered_map_type features_pairs;
     };
 
     Dependency::Dependency(const std::string& parameter)
@@ -159,7 +362,7 @@ namespace cicada
       
       pimpl = new impl_type(order);
       
-      base_type::__state_size = sizeof(int) * (1 << (order) - 1);
+      base_type::__state_size = sizeof(impl_type::dependency_index_type::id_type) * (1 << (order + 1)) + sizeof(int);
       base_type::__feature_name = "dependency";
       base_type::__sparse_feature = true;
     }
