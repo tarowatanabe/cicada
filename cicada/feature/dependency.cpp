@@ -114,17 +114,14 @@ namespace cicada
 	  pos_dep  = boost::apply_visitor(__attribute_integer(), diter->second);
 	}
 
-	std::cerr << "hypergraph head: " << edge.head << std::endl;
+	//std::cerr << "hypergraph head: " << edge.head << std::endl;
 	
 	const id_type state_dep = (pos_head >= 0 && pos_dep >= 0 
 				   ? dependency_index.push(dependency_index.root(), dependency_type(pos_head, pos_dep))
 				   : dependency_index.root());
 	
-	if (pos_head >= 0 && pos_dep >= 0) {
-	  std::cerr << "dep: " << pos_head << "->" << pos_dep << std::endl;
-
+	if (pos_head >= 0 && pos_dep >= 0)
 	  apply_features(state_dep, pos_head, pos_dep, features);
-	}
 		
 	// root-count...
 	int root_count = (pos_head == 0 && pos_dep >= 0);
@@ -132,9 +129,7 @@ namespace cicada
 		
 	dependency_antecedents.clear();
 	dependency_antecedents.resize(order - 1);
-	
-	std::cerr << "states sizes: " << states.size() << std::endl;
-	
+		
 	for (size_t i = 0; i != states.size(); ++ i) {
 	  // root count...
 	  const int& root_count_antecedent = *reinterpret_cast<const int*>(states[i]);
@@ -152,12 +147,10 @@ namespace cicada
 	    while (id != dependency_index.root()) {
 	      dependency_antecedents[k].push_back(dependency_index[id]);
 	      
-	      std::cerr << "order: " << k << " dep: " << dependency_index[id].first << "->" << dependency_index[id].second << std::endl;
-
 	      id = dependency_index.parent(id);
 	    }
 	  }
-
+	  
 	  if (id_antecedent > id_antecedent_last)
 	    throw std::runtime_error("invalid access for antecedent state");
 	}
@@ -201,8 +194,6 @@ namespace cicada
 	
 	if (state_id > state_id_last)
 	  throw std::runtime_error("exceed max?");
-	
-	std::cerr << "finished" << std::endl;
       }	
 
       template <typename Iterator>
