@@ -46,6 +46,9 @@ namespace cicada
       
       typedef std::pair<int, int> lattice_edge_type;
       typedef std::vector<lattice_edge_type, std::allocator<lattice_edge_type> > lattice_edge_set_type;
+
+      typedef std::vector<int, std::allocator<int> > lattice_node_set_type;
+      typedef std::vector<lattice_node_set_type, std::allocator<lattice_node_set_type> > lattice_node_map_type;
       
       typedef std::pair<symbol_type, symbol_type> terminal_pos_type;
       typedef std::vector<terminal_pos_type, std::allocator<terminal_pos_type> > terminal_pos_set_type;
@@ -219,7 +222,6 @@ namespace cicada
 	// apply features...
 	apply_features(features_heads[pos_head].begin(), features_heads[pos_head].end(), features);
 	
-	
 	// dependent...
 	if (features_tails[pos_tail].empty()) {
 	  const std::string& word = terminals[pos_tail].first;
@@ -256,9 +258,120 @@ namespace cicada
 	  features_pairs.resize(state + 1);
 	
 	if (features_pairs[state].empty()) {
+	  typedef std::vector<std::string, std::allocator<std::string> > feats_type;
 	  
+	  // bigram features...
+	  {
+	    const std::string& head_word = terminals[pos_head].first;
+	    const std::string& head_pos  = terminals[pos_head].second;
+	    const std::string& tail_word = terminals[pos_tail].first;
+	    const std::string& tail_pos  = terminals[pos_tail].second;
+	    const std::string  empty;
+	    
+	    feats_type feats(7);
+	    
+	    feats[0] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
+	    feats[1] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
+	    feats[2] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + tail_pos;
+	    feats[3] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + empty     + '|' + tail_pos;
+	    feats[4] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + empty;
+	    feats[5] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + empty;
+	    feats[6] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + empty     + '|' + tail_pos;
+	    
+	    if (forced_feature)
+	      features_pairs[state].insert(features_pairs[state].end(), feats.begin(), feats.end());
+	    else {
+	      feats_type::const_iterator fiter_end = feats.end();
+	      for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		if (feature_type::exists(*fiter))
+		  features_pairs[state].push_back(*fiter);
+	    }
+	  }
+	  
+	  // surrounding POS context features
+	  {
+	    static const lattice_node_set_type nodes_empty;
+	    
+	    feats_type feats;
+	    
+	    const lattice_node_set_type& nodes_head_prev = (pos_head == 0 ? nodes_empty : nodes_backward[edges[pos_head].first]);
+	    const lattice_node_set_type& nodes_head_next = nodes_forward[edges[pos_head].second];
+	    
+	    const lattice_node_set_type& nodes_tail_prev = nodes_backward[edges[pos_tail].first];
+	    const lattice_node_set_type& nodes_tail_next = nodes_forward[edges[pos_tail].second];
+	      
+	    const std::string& head_pos = terminals[pos_head].second;
+	    const std::string& tail_pos = terminals[pos_tail].second;
+	      
+	    if (! nodes_head_next.empty() && ! nodes_tail_prev.empty()) {
+	      lattice_node_set_type::const_iterator head_niter_end = nodes_head_next.end();
+	      for (lattice_node_set_type::const_iterator head_niter = nodes_head_next.begin(); head_niter != head_niter_end; ++ head_niter) {
+		lattice_node_set_type::const_iterator tail_piter_end = nodes_tail_prev.end();
+		for (lattice_node_set_type::const_iterator tail_piter = nodes_tail_prev.begin(); tail_piter != tail_piter_end; ++ tail_piter) {
+		  const std::string& head_pos_next = terminals[*head_niter].second;
+		  const std::string& tail_pos_prev = terminals[*tail_piter].second;
+		    
+		  feats.push_back("dependency:+1-1:" + head_pos + '|' + head_pos_next + '+' + tail_pos_prev + '|' + tail_pos);
+		}
+	      }
+	    }
+	      
+	    if (! nodes_head_prev.empty() && ! nodes_tail_prev.empty()) {
+	      lattice_node_set_type::const_iterator head_piter_end = nodes_head_prev.end();
+	      for (lattice_node_set_type::const_iterator head_piter = nodes_head_prev.begin(); head_piter != head_piter_end; ++ head_piter) {
+		lattice_node_set_type::const_iterator tail_piter_end = nodes_tail_prev.end();
+		for (lattice_node_set_type::const_iterator tail_piter = nodes_tail_prev.begin(); tail_piter != tail_piter_end; ++ tail_piter) {
+		  const std::string& head_pos_prev = terminals[*head_piter].second;
+		  const std::string& tail_pos_prev = terminals[*tail_piter].second;
+		    
+		  feats.push_back("dependency:-1-1:" + head_pos_prev + '|' + head_pos + '+' + tail_pos_prev + '|' + tail_pos);
+		}
+	      }
+	    }
+	      
+	    if (! nodes_head_next.empty() && ! nodes_tail_next.empty()) {
+	      lattice_node_set_type::const_iterator head_niter_end = nodes_head_next.end();
+	      for (lattice_node_set_type::const_iterator head_niter = nodes_head_next.begin(); head_niter != head_niter_end; ++ head_niter) {
+		lattice_node_set_type::const_iterator tail_niter_end = nodes_tail_next.end();
+		for (lattice_node_set_type::const_iterator tail_niter = nodes_tail_next.begin(); tail_niter != tail_niter_end; ++ tail_niter) {
+		  const std::string& head_pos_next = terminals[*head_niter].second;
+		  const std::string& tail_pos_next = terminals[*tail_niter].second;
+		    
+		  feats.push_back("dependency:+1+1:" + head_pos + '|' + head_pos_next + '+' + tail_pos + '|' + tail_pos_next);
+		}
+	      }
+	    }
+	      
+	    if (! nodes_head_prev.empty() && ! nodes_tail_next.empty()) {
+	      lattice_node_set_type::const_iterator head_piter_end = nodes_head_prev.end();
+	      for (lattice_node_set_type::const_iterator head_piter = nodes_head_prev.begin(); head_piter != head_piter_end; ++ head_piter) {
+		lattice_node_set_type::const_iterator tail_niter_end = nodes_tail_next.end();
+		for (lattice_node_set_type::const_iterator tail_niter = nodes_tail_next.begin(); tail_niter != tail_niter_end; ++ tail_niter) {
+		  const std::string& head_pos_prev = terminals[*head_piter].second;
+		  const std::string& tail_pos_next = terminals[*tail_niter].second;
+		  
+		  feats.push_back("dependency:-1+1:" + head_pos_prev + '|' + head_pos + '+' + tail_pos + '|' + tail_pos_next);
+		}
+	      }
+	    }
+	    
+	    if (forced_feature)
+	      features_pairs[state].insert(features_pairs[state].end(), feats.begin(), feats.end());
+	    else {
+	      feats_type::const_iterator fiter_end = feats.end();
+	      for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		if (feature_type::exists(*fiter))
+		  features_pairs[state].push_back(*fiter);
+	    }
+	  }
+	  
+	  // fallback to NONE
+	  if (features_pairs[state].empty())
+	    features_pairs[state].push_back(feat_none);
 	}
 	
+	// apply features...
+	apply_features(features_pairs[state].begin(), features_pairs[state].end(), features);
       }
       
       void apply_features(const dependency_index_type::id_type& state,
@@ -285,17 +398,28 @@ namespace cicada
 	edges.clear();
 	terminals.clear();
 	
-	dependency_index.clear();
-	dependency_antecedents.clear();
+	nodes_forward.clear();
+	nodes_backward.clear();
+	nodes_forward.resize(lattice->size() + 1);
+	nodes_backward.resize(lattice->size() + 1);
+	
+	//
+	// we need to compute adjacent nodes and edges...
+	//
 	
 	// ROOT
+	nodes_backward.front().push_back(0);
 	edges.push_back(std::make_pair(-1, 0));
-	terminals.push_back(std::make_pair(vocab_type::EPSILON, vocab_type::GOAL));
+	terminals.push_back(std::make_pair(vocab_type::BOS, vocab_type::BOS));
 	
 	// terminals/POSs
 	for (size_type pos = 0; pos != lattice->size(); ++ pos) {
 	  lattice_type::arc_set_type::const_iterator aiter_end = lattice->operator[](pos).end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = lattice->operator[](pos).begin(); aiter != aiter_end; ++ aiter) {
+	    // keep forward and backward edges...
+	    nodes_forward[pos].push_back(edges.size());
+	    nodes_backward[pos + aiter->distance].push_back(edges.size());
+	    
 	    edges.push_back(std::make_pair(pos, pos + aiter->distance));
 	    terminals.push_back(std::make_pair(aiter->label.terminal(), aiter->label.pos()));
 	    
@@ -303,6 +427,15 @@ namespace cicada
 	      terminals.back().second = vocab_type::X;
 	  }
 	}
+	
+	// END
+	nodes_forward[lattice->size()].push_back(edges.size());
+	edges.push_back(std::make_pair(lattice->size(), lattice->size() + 1));
+	terminals.push_back(std::make_pair(vocab_type::EOS, vocab_type::EOS));
+	
+	// clear dependency index
+	dependency_index.clear();
+	dependency_antecedents.clear();
 	
 	// caching...
 	features_heads.clear();
@@ -312,12 +445,15 @@ namespace cicada
 	features_heads.resize(edges.size());
 	features_tails.resize(edges.size());
       }
-
+      
       int order;
-
+      
       const lattice_type*   lattice;
       lattice_edge_set_type edges;
       terminal_pos_set_type terminals;
+      
+      lattice_node_map_type nodes_forward;
+      lattice_node_map_type nodes_backward;
       
       bool forced_feature;
 
