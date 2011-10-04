@@ -64,10 +64,10 @@ namespace cicada
   
     StateAllocator& operator=(const StateAllocator& x)
     { 
-      static_cast<allocator_type&>(*this) = static_cast<const allocator_type&>(x);
-    
       clear();
-    
+      
+      static_cast<allocator_type&>(*this) = static_cast<const allocator_type&>(x);
+      
       state_size = x.state_size;
       state_alloc_size = x.state_alloc_size;
       state_chunk_size = x.state_chunk_size;
