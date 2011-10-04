@@ -62,6 +62,7 @@ namespace cicada
       typedef utils::indexed_trie<dependency_type, utils::hashmurmur<size_t>, std::equal_to<dependency_type>, std::allocator<dependency_type> > dependency_index_type;
 
       typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
+      //typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
       typedef std::vector<feature_list_type, std::allocator<feature_list_type> > feature_map_type;
       typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_pair_map_type;
 
@@ -91,7 +92,6 @@ namespace cicada
 	  forced_feature(false),
 	  feat_none("dependency"),
 	  feat_root_multiple("dependency:root-multiple"),
-	  feat_root_count("dependency:root-count"),
 	  attr_dependency_pos("dependency-pos"),
 	  attr_dependency_head("dependency-head"),
 	  attr_dependency_dependent("dependency-dependent") {}
@@ -113,23 +113,27 @@ namespace cicada
 	  pos_head = boost::apply_visitor(__attribute_integer(), hiter->second);
 	  pos_dep  = boost::apply_visitor(__attribute_integer(), diter->second);
 	}
+
+	std::cerr << "hypergraph head: " << edge.head << std::endl;
 	
 	const id_type state_dep = (pos_head >= 0 && pos_dep >= 0 
 				   ? dependency_index.push(dependency_index.root(), dependency_type(pos_head, pos_dep))
 				   : dependency_index.root());
 	
-	if (pos_head >= 0 && pos_dep >= 0)
+	if (pos_head >= 0 && pos_dep >= 0) {
+	  std::cerr << "dep: " << pos_head << "->" << pos_dep << std::endl;
+
 	  apply_features(state_dep, pos_head, pos_dep, features);
+	}
 		
 	// root-count...
 	int root_count = (pos_head == 0 && pos_dep >= 0);
 	bool fired_root_multiple = false;
-	
-	if (root_count)
-	  features[feat_root_count] = 1.0;
-	
+		
 	dependency_antecedents.clear();
 	dependency_antecedents.resize(order - 1);
+	
+	std::cerr << "states sizes: " << states.size() << std::endl;
 	
 	for (size_t i = 0; i != states.size(); ++ i) {
 	  // root count...
@@ -140,16 +144,22 @@ namespace cicada
 	  
 	  // convert state representation into ordered dependencies...
 	  const id_type* id_antecedent = reinterpret_cast<const id_type*>(reinterpret_cast<const int*>(states[i]) + 1);
-	  
+	  const id_type* id_antecedent_last = id_antecedent + order;
 	  
 	  // TODO: how to represent state space...?
 	  for (int k = 0; k != order - 1 && *id_antecedent != dependency_index.root(); ++ k, ++ id_antecedent) {
 	    id_type id = *id_antecedent;
 	    while (id != dependency_index.root()) {
 	      dependency_antecedents[k].push_back(dependency_index[id]);
+	      
+	      std::cerr << "order: " << k << " dep: " << dependency_index[id].first << "->" << dependency_index[id].second << std::endl;
+
 	      id = dependency_index.parent(id);
 	    }
 	  }
+
+	  if (id_antecedent > id_antecedent_last)
+	    throw std::runtime_error("invalid access for antecedent state");
 	}
 	
 	// we will fire for higher order features...
@@ -167,6 +177,8 @@ namespace cicada
 	*reinterpret_cast<int*>(state) = root_count;
 	
 	id_type* state_id = reinterpret_cast<id_type*>(reinterpret_cast<int*>(state) + 1);
+	id_type* state_id_last = state_id + order;
+	std::fill(state_id, state_id + order, dependency_index.root());
 	
 	// antecedents..
 	int order_adjusted = order - 1;
@@ -186,7 +198,11 @@ namespace cicada
 	  
 	  *state_id = id;
 	}
-	*state_id = dependency_index.root();
+	
+	if (state_id > state_id_last)
+	  throw std::runtime_error("exceed max?");
+	
+	std::cerr << "finished" << std::endl;
       }	
 
       template <typename Iterator>
@@ -425,6 +441,7 @@ namespace cicada
 				  + std::string(pos3 > pos2 ? "&R" : "&L")
 				  + std::string(pos3 > pos1 ? "&R" : "&L"));
 		} else if (antecedent.second == pos_head) {
+		  // actually, this will not hapen...?
 		  const int pos1 = antecedent.first;
 		  const int pos2 = antecedent.second;
 		  const int pos3 = pos_tail;
@@ -504,8 +521,6 @@ namespace cicada
       
       void clear()
       {
-	dependency_index.clear();
-	dependency_antecedents.clear();
       }
       
       void assign(const lattice_type& __lattice)
@@ -577,7 +592,6 @@ namespace cicada
 
       feature_type feat_none;
       feature_type feat_root_multiple;
-      feature_type feat_root_count;
       
       attribute_type attr_dependency_pos;
       attribute_type attr_dependency_head;
@@ -619,7 +633,7 @@ namespace cicada
       
       pimpl = new impl_type(order);
       
-      base_type::__state_size = sizeof(impl_type::dependency_index_type::id_type) * order + sizeof(int);
+      base_type::__state_size = sizeof(int) + sizeof(impl_type::dependency_index_type::id_type) * order;
       base_type::__feature_name = "dependency";
       base_type::__sparse_feature = true;
     }
