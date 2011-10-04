@@ -193,6 +193,7 @@ namespace cicada
 	tree_grammar(__tree_grammar), 
 	grammar(__grammar),
 	yield_source(__yield_source),
+	attr_internal_node("internal-node"),
 	attr_source_root("source-root")
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
@@ -504,6 +505,7 @@ namespace cicada
 			 *fiter,
 			 riter->features + *siter,
 			 riter->attributes + *aiter,
+			 riter->source->size_internal(),
 			 graph_in,
 			 graph_out);
 	  }
@@ -519,6 +521,7 @@ namespace cicada
 		    const frontier_type& frontiers,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
+		    const attribute_set_type::int_type& size_internal,
 		    const hypergraph_type& graph_in,
 		    hypergraph_type& graph_out)
     {
@@ -549,6 +552,9 @@ namespace cicada
       
       // root-label is assigned to source-root attribute
       graph_out.edges[edge_id].attributes[attr_source_root] = static_cast<const std::string&>(root_label);
+      
+      if (size_internal)
+	graph_out.edges[edge_id].attributes[attr_internal_node] = size_internal;
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
@@ -669,6 +675,7 @@ namespace cicada
     const grammar_type& grammar;
     const bool yield_source;
     
+    attribute_type attr_internal_node;
     attribute_type attr_source_root;
   };
   

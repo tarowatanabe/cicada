@@ -356,6 +356,7 @@ namespace cicada
 	function(__function),
 	beam_size(__beam_size),
 	yield_source(__yield_source),
+	attr_internal_node("internal-node"),
 	attr_source_root("source-root")
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
@@ -914,11 +915,16 @@ namespace cicada
 	typename tree_candidate_set_type::iterator citer = riter->second.begin();
 	tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
 	tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter, ++ citer)
+	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter, ++ citer) {
 	  *citer = tree_candidate_type(function(iter->features),
 				       yield_source ? iter->source : iter->target,
 				       iter->features,
 				       iter->attributes);
+
+	  const attribute_set_type::int_type size_internal = iter->source->size_internal();
+	  if (size_internal)
+	    citer->attributes[attr_internal_node] = size_internal;
+	}
 	
 	std::sort(riter->second.begin(), riter->second.end(), greater_score<tree_candidate_type>());
       }
@@ -959,6 +965,7 @@ namespace cicada
     const int beam_size;
     const bool yield_source;
     
+    attribute_type attr_internal_node;
     attribute_type attr_source_root;
   };
   

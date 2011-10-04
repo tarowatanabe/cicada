@@ -63,5 +63,30 @@ namespace cicada
       else
 	features.erase(feature_name());
     }
+    
+    namespace in {
+      struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return 0; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return 0; }
+      };
+    };
+      
+    void InternalNodePenalty::apply_estimate(const edge_type& edge, feature_set_type& features) const
+    {
+      int internal_node = 0;
+      attribute_set_type::const_iterator iter = edge.attributes.find(attr_internal_node);
+      if (iter != edge.attributes.end())
+	internal_node = boost::apply_visitor(in::__attribute_integer(), iter->second);
+      
+      if (internal_node)
+	features[feature_name()] = - internal_node;
+      else
+	features.erase(feature_name());
+    }
+    
   };
 };

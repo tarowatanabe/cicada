@@ -74,6 +74,7 @@ namespace cicada
 	grammar(__grammar),
 	yield_source(__yield_source),
 	unique_goal(__unique_goal),
+	attr_internal_node("internal-node"),
 	attr_span_first("span-first"),
 	attr_span_last("span-last"),
 	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
@@ -927,6 +928,7 @@ namespace cicada
     const bool yield_source;
     const bool unique_goal;
     
+    attribute_type attr_internal_node;
     attribute_type attr_span_first;
     attribute_type attr_span_last;
     attribute_type attr_glue_tree;

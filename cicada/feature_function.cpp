@@ -131,6 +131,7 @@ rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
 glue-tree-penalty: glue tree penalty feature\n\
 non-latin-penalty: non-latin word penalty feature\n\
+internal-node-penalty: internal node penalty feature\n\
 rule-shape: rule shape feature\n\
 vocabulary: vocabulary feature\n\
 \tfile=[vocabulary file]\n\
@@ -214,6 +215,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::GlueTreePenalty());
     else if (param_name == "non-latin-penalty")
       return feature_function_ptr_type(new feature::NonLatinPenalty());
+    else if (param_name == "internal-node-penalty")
+      return feature_function_ptr_type(new feature::InternalNodePenalty());
     else if (param_name == "relative-position")
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
     else if (param_name == "null-path")

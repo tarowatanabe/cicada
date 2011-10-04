@@ -335,6 +335,67 @@ namespace cicada
       non_latin_type non_latin;
     };
     
+    class InternalNodePenalty : public FeatureFunction
+    {
+    public:
+      InternalNodePenalty() : FeatureFunction(0, "internal-node-penalty"),
+			      attr_internal_node("internal-node") { }
+      
+      void apply(state_ptr_type& state,
+		 const state_ptr_set_type& states,
+		 const edge_type& edge,
+		 feature_set_type& features,
+		 feature_set_type& estimates,
+		 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      void apply_coarse(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_predict(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_scan(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      const int dot,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const {}
+      
+      void apply_complete(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  feature_set_type& estimates,
+			  const bool final) const {}
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new InternalNodePenalty(*this)); }
+      
+    private:
+      void apply_estimate(const edge_type& edge, feature_set_type& features) const;
+      
+    private:
+      typedef attribute_set_type::attribute_type attribute_type;
+      
+      attribute_type attr_internal_node;
+    };
+
   };
 };
 

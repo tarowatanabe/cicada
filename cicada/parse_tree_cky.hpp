@@ -97,6 +97,7 @@ namespace cicada
 	beam_size(__beam_size),
 	yield_source(__yield_source),
 	unique_goal(__unique_goal),
+	attr_internal_node("internal-node"),
 	attr_span_first("span-first"),
 	attr_span_last("span-last"),
 	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
@@ -1181,12 +1182,17 @@ namespace cicada
 	
 	typename tree_candidate_set_type::iterator citer = riter->second.begin();
 	tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer)
+	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer) {
 	  *citer = tree_candidate_type(function(iter->features),
 				       iter->source->label,
 				       yield_source ? iter->source : iter->target,
 				       iter->features,
 				       iter->attributes);
+	  
+	  const attribute_set_type::int_type size_internal = iter->source->size_internal();
+	  if (size_internal)
+	    citer->attributes[attr_internal_node] = size_internal;
+	}
 	
 	std::sort(riter->second.begin(), riter->second.end(), greater_score<tree_candidate_type>());
       }
@@ -1204,6 +1210,8 @@ namespace cicada
 
     const bool yield_source;
     const bool unique_goal;
+    
+    const attribute_type attr_internal_node;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     const attribute_type attr_glue_tree;
