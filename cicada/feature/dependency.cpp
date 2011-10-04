@@ -75,6 +75,9 @@ namespace cicada
 			    std::allocator<std::pair<const dependency_pair_type, feature_list_type> > > feature_order_map_type;
 #endif
       
+      // temporary...
+      typedef std::vector<std::string, std::allocator<std::string> > feats_type;
+
       struct __attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
       {
 	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
@@ -267,9 +270,7 @@ namespace cicada
 	  features_pairs.resize(state + 1);
 	
 	if (features_pairs[state].empty()) {
-	  typedef std::vector<std::string, std::allocator<std::string> > feats_type;
-	  
-	  feats_type feats(8);
+	  feats.clear();
 	  
 	  // bigram features...
 	  {
@@ -277,17 +278,18 @@ namespace cicada
 	    const std::string& head_pos  = terminals[pos_head].second;
 	    const std::string& tail_word = terminals[pos_tail].first;
 	    const std::string& tail_pos  = terminals[pos_tail].second;
-	    const std::string  empty;
+	    static const std::string empty;
 	    
-	    feats[0] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
-	    feats[1] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
-	    feats[2] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + tail_pos;
-	    feats[3] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + empty     + '|' + tail_pos;
-	    feats[4] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + empty;
-	    feats[5] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + empty;
-	    feats[6] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + empty     + '|' + tail_pos;
+	    feats.push_back("dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + tail_pos);
+	    feats.push_back("dependency:head-dep:" + empty     + '|' + head_pos + '+' + tail_word + '|' + tail_pos);
+	    feats.push_back("dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + tail_pos);
+	    feats.push_back("dependency:head-dep:" + head_word + '|' + head_pos + '+' + empty     + '|' + tail_pos);
+	    feats.push_back("dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + empty);
+	    feats.push_back("dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + empty);
+	    feats.push_back("dependency:head-dep:" + empty     + '|' + head_pos + '+' + empty     + '|' + tail_pos);
 	    
-	    feats[7] = "dependency:head-dep-dir:" + head_pos + '+' + tail_pos + (pos_tail > pos_head ? "+R" : "+L");
+	    // direction
+	    feats.push_back("dependency:head-dep-dir:" + head_pos + '+' + tail_pos + (pos_tail > pos_head ? ":R" : ":L"));
 	  }
 	  
 	  // surrounding POS context features
@@ -380,6 +382,7 @@ namespace cicada
 			  const dependency_map_type& antecedents,
 			  feature_set_type& features)
       {
+	static const std::string empty;
 	const dependency_type parent(pos_head, pos_tail);
 	
 	// we will do caching...
@@ -393,16 +396,104 @@ namespace cicada
 													      feature_list_type()));
 	      
 	      if (result.second) {
+		feats.clear();
+		
 		if (pos_tail == antecedent.first) {
+		  const int pos1 = pos_head;
+		  const int pos2 = pos_tail;
+		  const int pos3 = antecedent.second;
+
+		  const std::string& head_word = terminals[pos_head].first;
+		  const std::string& head_pos  = terminals[pos_head].second;
+		  const std::string& mid_word  = terminals[pos_tail].first;
+		  const std::string& mid_pos   = terminals[pos_tail].second;
+		  const std::string& tail_word = terminals[antecedent.second].first;
+		  const std::string& tail_pos  = terminals[antecedent.second].second;
+		  
+		  feats.push_back("dependency:parent:" + head_word + '|' + head_pos
+				  + '&' + empty     + '|' + mid_pos
+				  + '&' + empty     + '|' + tail_pos);
+		  feats.push_back("dependency:parent:" + empty     + '|' + head_pos
+				  + '&' + mid_word  + '|' + mid_pos
+				  + '&' + empty     + '|' + tail_pos);
+		  feats.push_back("dependency:parent:" + empty     + '|' + head_pos
+				  + '&' + empty     + '|' + mid_pos
+				  + '&' + tail_word + '|' + tail_pos);
+		  
+		  feats.push_back("dependency:parent:" + head_pos + '&' + mid_pos + '&' + tail_pos
+				  + std::string(pos2 > pos1 ? ":R" : ":L")
+				  + std::string(pos3 > pos2 ? "&R" : "&L")
+				  + std::string(pos3 > pos1 ? "&R" : "&L"));
+		} else if (antecedent.second == pos_head) {
+		  const int pos1 = antecedent.first;
+		  const int pos2 = antecedent.second;
+		  const int pos3 = pos_tail;
+		  
+		  const std::string& head_word = terminals[antecedent.first].first;
+		  const std::string& head_pos  = terminals[antecedent.first].second;
+		  const std::string& mid_word  = terminals[antecedent.second].first;
+		  const std::string& mid_pos   = terminals[antecedent.second].second;
+		  const std::string& tail_word = terminals[pos_tail].first;
+		  const std::string& tail_pos  = terminals[pos_tail].second;
+		  
+		  feats.push_back("dependency:child:" + head_word + '|' + head_pos
+				  + '&' + empty     + '|' + mid_pos
+				  + '&' + empty     + '|' + tail_pos);
+		  feats.push_back("dependency:child:" + empty     + '|' + head_pos
+				  + '&' + mid_word  + '|' + mid_pos
+				  + '&' + empty     + '|' + tail_pos);
+		  feats.push_back("dependency:child:" + empty     + '|' + head_pos
+				  + '&' + empty     + '|' + mid_pos
+				  + '&' + tail_word + '|' + tail_pos);
+		  
+		  feats.push_back("dependency:child:" + head_pos + '&' + mid_pos + '&' + tail_pos
+				  + std::string(pos2 > pos1 ? ":R" : ":L")
+				  + std::string(pos3 > pos2 ? "&R" : "&L")
+				  + std::string(pos3 > pos1 ? "&R" : "&L"));
+		} else if (pos_head == antecedent.first) {
+		  const std::string& head_word = terminals[pos_head].first;
+		  const std::string& head_pos  = terminals[pos_head].second;
+		  const std::string& tail1_word = terminals[pos_tail].first;
+		  const std::string& tail1_pos  = terminals[pos_tail].second;
+		  const std::string& tail2_word = terminals[antecedent.second].first;
+		  const std::string& tail2_pos  = terminals[antecedent.second].second;
+		  
+		  feats.push_back("dependency:sibling:" + head_word + '|' + head_pos
+				  + '+' + empty      + '|' + tail1_pos
+				  + '&' + empty      + '|' + tail2_pos);
+		  feats.push_back("dependency:sibling:" + empty     + '|' + head_pos
+				  + '+' + tail1_word + '|' + tail1_pos
+				  + '&' + empty      + '|' + tail2_pos);
+		  feats.push_back("dependency:sibling:" + empty     + '|' + head_pos
+				  + '+' + empty      + '|' + tail1_pos
+				  + '&' + tail2_word + '|' + tail2_pos);
+		  feats.push_back("dependency:sibling:" + head_pos + '+' + tail1_pos + '&' + tail2_pos
+				  + std::string(pos_tail > pos_head ? ":R" : ":L")
+				  + std::string(antecedent.second > pos_head ? "+R" : "+L")
+				  + std::string(pos_tail > antecedent.second ? "&R" : "&L"));
+		} else {
+		  // floating... do we construct a feature set...?
+#if 0
+		  const std::string& head1_word = terminals[pos_head].first;
+		  const std::string& head1_pos  = terminals[pos_head].second;
+		  const std::string& tail1_word = terminals[pos_tail].first;
+		  const std::string& tail1_pos  = terminals[pos_tail].second;
+		  const std::string& tail1_word = terminals[antecedent.first].first;
+		  const std::string& tail1_pos  = terminals[antecedent.first].second;
+		  const std::string& tail2_word = terminals[antecedent.second].first;
+		  const std::string& tail2_pos  = terminals[antecedent.second].second;
+#endif
+		  
 		  
 		}
 		
-		if (antecedent.second == pos_head) {
-		  
-		}
-		
-		if (pos_head == antecedent.first) {
-		  
+		if (forced_feature)
+		  result.first->second.insert(result.first->second.end(), feats.begin(), feats.end());
+		else {
+		  feats_type::const_iterator fiter_end = feats.end();
+		  for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		    if (feature_type::exists(*fiter))
+		      result.first->second.push_back(*fiter);
 		}
 	      }
 	      
@@ -500,6 +591,8 @@ namespace cicada
       feature_map_type       features_tails;
       feature_pair_map_type  features_pairs;
       feature_order_map_type features_order;
+
+      feats_type feats;
     };
 
     Dependency::Dependency(const std::string& parameter)
@@ -526,7 +619,7 @@ namespace cicada
       
       pimpl = new impl_type(order);
       
-      base_type::__state_size = sizeof(impl_type::dependency_index_type::id_type) * (1 << (order + 1)) + sizeof(int);
+      base_type::__state_size = sizeof(impl_type::dependency_index_type::id_type) * order + sizeof(int);
       base_type::__feature_name = "dependency";
       base_type::__sparse_feature = true;
     }
