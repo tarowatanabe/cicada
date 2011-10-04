@@ -208,6 +208,7 @@ permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
 \texclude=[a non-terminal] to prohibit permutation.\n\
 posterior: compute posterior features\n\
+\tname=feature name (default: posterior)\n\
 \tscale=scaling for score\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\

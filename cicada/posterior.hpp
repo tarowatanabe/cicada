@@ -31,6 +31,7 @@ namespace cicada
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     
     Posterior(Function __function) : function(__function), feat_posterior("posterior") {}
+    Posterior(Function __function, const feature_type& __feat_posterior) : function(__function), feat_posterior(__feat_posterior) {}
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -84,7 +85,7 @@ namespace cicada
     weight_set_type inside;
     weight_set_type outside;
     
-    const feature_type feat_posterior;
+    feature_type feat_posterior;
   };
   
   
@@ -95,12 +96,30 @@ namespace cicada
     Posterior<typename Function::value_type, Function> __posterior(func);
     __posterior(source, target);
   }
+
+  template <typename Function>
+  inline
+  void posterior(const HyperGraph& source, HyperGraph& target, const Function& func, const std::string& feature)
+  {
+    Posterior<typename Function::value_type, Function> __posterior(func, feature);
+    __posterior(source, target);
+  }
   
   template <typename Function>
   inline
   void posterior(HyperGraph& graph, const Function& func)
   {
     Posterior<typename Function::value_type, Function> __posterior(func);
+    HyperGraph computed;
+    __posterior(graph, computed);
+    graph.swap(computed);
+  }
+
+  template <typename Function>
+  inline
+  void posterior(HyperGraph& graph, const Function& func, const std::string& feature)
+  {
+    Posterior<typename Function::value_type, Function> __posterior(func, feature);
     HyperGraph computed;
     __posterior(graph, computed);
     graph.swap(computed);

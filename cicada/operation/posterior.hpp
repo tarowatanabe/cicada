@@ -23,6 +23,8 @@ namespace cicada
       void operator()(data_type& data) const;
 
       void assign(const weight_set_type& __weights);
+      
+      std::string name;
 
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
