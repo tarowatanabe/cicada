@@ -11,6 +11,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/indexed_trie.hpp"
 #include "utils/chunk_vector.hpp"
+#include "utils/sgi_hash_map.hpp"
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/array.hpp>
@@ -62,8 +63,17 @@ namespace cicada
 
       typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
       typedef std::vector<feature_list_type, std::allocator<feature_list_type> > feature_map_type;
-      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_ordered_map_type;
+      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > feature_pair_map_type;
 
+      
+      typedef std::pair<dependency_type, dependency_type> dependency_pair_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
+				      std::allocator<std::pair<const dependency_pair_type, feature_list_type> > > feature_order_map_type;
+#else
+      typedef sgi::hash_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
+			    std::allocator<std::pair<const dependency_pair_type, feature_list_type> > > feature_order_map_type;
+#endif
       
       struct __attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
       {
@@ -252,13 +262,14 @@ namespace cicada
 	// apply features...
 	apply_features(features_tails[pos_tail].begin(), features_tails[pos_tail].end(), features);
 	
-	
 	// pairs...
 	if (state >= features_pairs.size())
 	  features_pairs.resize(state + 1);
 	
 	if (features_pairs[state].empty()) {
 	  typedef std::vector<std::string, std::allocator<std::string> > feats_type;
+	  
+	  feats_type feats(8);
 	  
 	  // bigram features...
 	  {
@@ -268,8 +279,6 @@ namespace cicada
 	    const std::string& tail_pos  = terminals[pos_tail].second;
 	    const std::string  empty;
 	    
-	    feats_type feats(7);
-	    
 	    feats[0] = "dependency:head-dep:" + head_word + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
 	    feats[1] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + tail_word + '|' + tail_pos;
 	    feats[2] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + tail_pos;
@@ -278,21 +287,12 @@ namespace cicada
 	    feats[5] = "dependency:head-dep:" + head_word + '|' + empty    + '+' + tail_word + '|' + empty;
 	    feats[6] = "dependency:head-dep:" + empty     + '|' + head_pos + '+' + empty     + '|' + tail_pos;
 	    
-	    if (forced_feature)
-	      features_pairs[state].insert(features_pairs[state].end(), feats.begin(), feats.end());
-	    else {
-	      feats_type::const_iterator fiter_end = feats.end();
-	      for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		if (feature_type::exists(*fiter))
-		  features_pairs[state].push_back(*fiter);
-	    }
+	    feats[7] = "dependency:head-dep-dir:" + head_pos + '+' + tail_pos + (pos_tail > pos_head ? "+R" : "+L");
 	  }
 	  
 	  // surrounding POS context features
 	  {
 	    static const lattice_node_set_type nodes_empty;
-	    
-	    feats_type feats;
 	    
 	    const lattice_node_set_type& nodes_head_prev = (pos_head == 0 ? nodes_empty : nodes_backward[edges[pos_head].first]);
 	    const lattice_node_set_type& nodes_head_next = nodes_forward[edges[pos_head].second];
@@ -354,20 +354,20 @@ namespace cicada
 		}
 	      }
 	    }
-	    
-	    if (forced_feature)
-	      features_pairs[state].insert(features_pairs[state].end(), feats.begin(), feats.end());
-	    else {
-	      feats_type::const_iterator fiter_end = feats.end();
-	      for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		if (feature_type::exists(*fiter))
-		  features_pairs[state].push_back(*fiter);
-	    }
 	  }
 	  
-	  // fallback to NONE
-	  if (features_pairs[state].empty())
-	    features_pairs[state].push_back(feat_none);
+	  if (forced_feature)
+	    features_pairs[state].insert(features_pairs[state].end(), feats.begin(), feats.end());
+	  else {
+	    feats_type::const_iterator fiter_end = feats.end();
+	    for (feats_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+	      if (feature_type::exists(*fiter))
+		features_pairs[state].push_back(*fiter);
+	    
+	    // fallback to NONE
+	    if (features_pairs[state].empty())
+	      features_pairs[state].push_back(feat_none);
+	  }
 	}
 	
 	// apply features...
@@ -380,9 +380,35 @@ namespace cicada
 			  const dependency_map_type& antecedents,
 			  feature_set_type& features)
       {
+	const dependency_type parent(pos_head, pos_tail);
+	
 	// we will do caching...
-	
-	
+	for (size_t k = 0; k != antecedents.size(); ++ k)
+	  if (! antecedents[k].empty()) {
+	    dependency_set_type::const_iterator aiter_end = antecedents[k].end();
+	    for (dependency_set_type::const_iterator aiter = antecedents[k].begin(); aiter != aiter_end; ++ aiter) {
+	      const dependency_type& antecedent = *aiter;
+	      
+	      std::pair<feature_order_map_type::iterator, bool> result = features_order.insert(std::make_pair(dependency_pair_type(parent, antecedent),
+													      feature_list_type()));
+	      
+	      if (result.second) {
+		if (pos_tail == antecedent.first) {
+		  
+		}
+		
+		if (antecedent.second == pos_head) {
+		  
+		}
+		
+		if (pos_head == antecedent.first) {
+		  
+		}
+	      }
+	      
+	      apply_features(result.first->second.begin(), result.first->second.end(), features);
+	    }
+	  }
       }
       
       void clear()
@@ -441,6 +467,7 @@ namespace cicada
 	features_heads.clear();
 	features_tails.clear();
 	features_pairs.clear();
+	features_order.clear();
 	
 	features_heads.resize(edges.size());
 	features_tails.resize(edges.size());
@@ -469,9 +496,10 @@ namespace cicada
       dependency_index_type dependency_index;
       dependency_map_type   dependency_antecedents;
       
-      feature_map_type         features_heads;
-      feature_map_type         features_tails;
-      feature_ordered_map_type features_pairs;
+      feature_map_type       features_heads;
+      feature_map_type       features_tails;
+      feature_pair_map_type  features_pairs;
+      feature_order_map_type features_order;
     };
 
     Dependency::Dependency(const std::string& parameter)

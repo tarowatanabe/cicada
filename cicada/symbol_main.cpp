@@ -26,7 +26,9 @@ void process(const cicada::Symbol& x, int index)
 	    << "annotate 2 false?" << x.annotate(2, false) << std::endl
 	    << "coarse 1? " << x.coarse(1) << std::endl
 	    << "coarse 2? " << x.coarse(2) << std::endl
-	    << "coarse? " << x.coarse() << std::endl;
+	    << "coarse? " << x.coarse() << std::endl
+	    << "pos " << x.pos() << std::endl
+	    << "terminal " << x.terminal() << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -55,6 +57,8 @@ int main(int argc, char** argv)
   std::cerr << "pos: " << symbol_type("Good/[ADJ]").pos() << " terminal: " << symbol_type("Good/[ADJ]").terminal() << std::endl;
   std::cerr << "pos: " << symbol_type("Good|[ADJ]").pos() << " terminal: " << symbol_type("Good|[ADJ]").terminal() << std::endl;
   std::cerr << "pos: " << symbol_type("Good\\[ADJ]").pos() << " terminal: " << symbol_type("Good\\[ADJ]").terminal() << std::endl;
+  std::cerr << "pos: " << symbol_type("Good|/[ADJ]").pos() << " terminal: " << symbol_type("Good|/[ADJ]").terminal() << std::endl;
+  std::cerr << "pos: " << symbol_type("Good[g]|[ADJ]").pos() << " terminal: " << symbol_type("Good[g]|[ADJ]").terminal() << std::endl;
 
   srandom(time(0) * getpid());
 
