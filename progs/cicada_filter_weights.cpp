@@ -47,6 +47,8 @@ bool sort_mode = false;
 bool sort_abs_mode = false;
 bool normalize_l1 = false;
 bool normalize_l2 = false;
+bool distance_l1 = false;
+bool distance_l2 = false;
 
 int debug = 0;
 
@@ -95,10 +97,10 @@ int main(int argc, char** argv)
       if (input_files.size() != 2)
 	throw std::runtime_error("we need at least two weights for comparison");
 
-      if (int(normalize_l1) + normalize_l2 > 1)
+      if (int(distance_l1) + distance_l2 > 1)
 	throw std::runtime_error("you cannot compute both l1 and l2 distance");
-      if (int(normalize_l1) + normalize_l2 == 0)
-	normalize_l2 = true;
+      if (int(distance_l1) + distance_l2 == 0)
+	distance_l2 = true;
       
       weight_set_type weights1;
       weight_set_type weights2;
@@ -112,7 +114,7 @@ int main(int argc, char** argv)
       weights1.allocate();
       weights2.allocate();
 
-      if (normalize_l1) {
+      if (distance_l1) {
 	double diff = 0.0;
 	for (size_t i = 0; i != weights1.size(); ++ i)
 	  diff += std::fabs(weights1[i] - weights2[i]);
@@ -237,10 +239,10 @@ void options(int argc, char** argv)
     
     ("sort",         po::bool_switch(&sort_mode),     "sort weights")
     ("sort-abs",     po::bool_switch(&sort_abs_mode), "sort weights wrt absolute value")
-    ("normalize-l1", po::bool_switch(),  "weight normalization by L1")
-    ("normalize-l2", po::bool_switch(),  "weight normalization by L2")
-    ("l1",           po::bool_switch(),  "weight distance by L1")
-    ("l2",           po::bool_switch(),  "weight distance by L2")
+    ("normalize-l1", po::bool_switch(&normalize_l1),  "weight normalization by L1")
+    ("normalize-l2", po::bool_switch(&normalize_l2),  "weight normalization by L2")
+    ("distance-l1",  po::bool_switch(&distance_l1),  "weight distance by L1")
+    ("distance-l2",  po::bool_switch(&distance_l2),  "weight distance by L2")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     
@@ -263,9 +265,4 @@ void options(int argc, char** argv)
     exit(0);
   }
 
-  if (vm.count("normalize-l1") || vm.count("l1"))
-    normalize_l1 = true;
-  if (vm.count("normalize-l2") || vm.count("l2"))
-    normalize_l2 = true;
-  
 }
