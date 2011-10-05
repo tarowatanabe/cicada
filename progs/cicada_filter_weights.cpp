@@ -40,7 +40,7 @@ typedef cicada::WeightVector<double> weight_set_type;
 path_set_type input_files;
 path_type     output_file = "-";
 
-bool diff_mode = false;
+bool distance_mode = false;
 bool average_mode = false;
 bool sum_mode = false;
 bool sort_mode = false;
@@ -75,14 +75,14 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (int(sum_mode) + average_mode + diff_mode > 1)
-      throw std::runtime_error("You cannnot perform both sum, average and diff");
+    if (int(sum_mode) + average_mode + distance_mode > 1)
+      throw std::runtime_error("You cannnot perform both sum, average and dist");
     if (normalize_l1 && normalize_l2)
       throw std::runtime_error("You cannnot perform both normalize-l1 and normalize-l2");
     if (sort_mode && sort_abs_mode)
       throw std::runtime_error("You cannnot perform both sort and sort-abs");
 
-    if (int(sum_mode) + average_mode + diff_mode == 0)
+    if (int(sum_mode) + average_mode + distance_mode == 0)
       sum_mode = true;
     
     weight_set_type weights;
@@ -91,12 +91,12 @@ int main(int argc, char** argv)
     if (input_files.empty())
       input_files.push_back("-");
     
-    if (diff_mode) {
+    if (distance_mode) {
       if (input_files.size() != 2)
 	throw std::runtime_error("we need at least two weights for comparison");
 
       if (int(normalize_l1) + normalize_l2 > 1)
-	throw std::runtime_error("you cannot compute both l1 and l2 difference");
+	throw std::runtime_error("you cannot compute both l1 and l2 distance");
       if (int(normalize_l1) + normalize_l2 == 0)
 	normalize_l2 = true;
       
@@ -232,8 +232,10 @@ void options(int argc, char** argv)
     ("input",     po::value<path_set_type>(&input_files)->multitoken(),           "input files")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
 
+    ("distance",     po::bool_switch(&distance_mode), "compute distance")
     ("average",      po::bool_switch(&average_mode),  "average weights")
     ("sum",          po::bool_switch(&sum_mode),      "sum weights")
+    
     ("sort",         po::bool_switch(&sort_mode),     "sort weights")
     ("sort-abs",     po::bool_switch(&sort_abs_mode), "sort weights wrt absolute value")
     ("normalize-l1", po::bool_switch(&normalize_l1),  "weight normalization by L1")
