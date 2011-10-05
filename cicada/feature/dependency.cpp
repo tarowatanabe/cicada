@@ -480,19 +480,37 @@ namespace cicada
 				  + std::string(antecedent.second > pos_head ? "+R" : "+L")
 				  + std::string(pos_tail > antecedent.second ? "&R" : "&L"));
 		} else {
-		  // floating... do we construct a feature set...?
-#if 0
+		  const int pos1_head = pos_head;
+		  const int pos1_tail = pos_tail;
+		  const int pos2_head = antecedent.first;
+		  const int pos2_tail = antecedent.second;
+
 		  const std::string& head1_word = terminals[pos_head].first;
 		  const std::string& head1_pos  = terminals[pos_head].second;
 		  const std::string& tail1_word = terminals[pos_tail].first;
 		  const std::string& tail1_pos  = terminals[pos_tail].second;
-		  const std::string& tail1_word = terminals[antecedent.first].first;
-		  const std::string& tail1_pos  = terminals[antecedent.first].second;
+		  const std::string& head2_word = terminals[antecedent.first].first;
+		  const std::string& head2_pos  = terminals[antecedent.first].second;
 		  const std::string& tail2_word = terminals[antecedent.second].first;
 		  const std::string& tail2_pos  = terminals[antecedent.second].second;
-#endif
 		  
-		  
+		  feats.push_back("dependency:float:"
+				  +       head1_word + '|' + head1_pos + '+' + empty      + '|' + tail1_pos
+				  + '&' + empty      + '|' + head2_pos + '+' + empty      + '|' + tail2_pos);
+		  feats.push_back("dependency:float:"
+				  +       empty      + '|' + head1_pos + '+' + tail1_word + '|' + tail1_pos
+				  + '&' + empty      + '|' + head2_pos + '+' + empty      + '|' + tail2_pos);
+		  feats.push_back("dependency:float:"
+				  +       empty      + '|' + head1_pos + '+' + empty      + '|' + tail1_pos
+				  + '&' + head2_word + '|' + head2_pos + '+' + empty      + '|' + tail2_pos);
+		  feats.push_back("dependency:float:"
+				  +       empty      + '|' + head1_pos + '+' + empty      + '|' + tail1_pos
+				  + '&' + empty      + '|' + head2_pos + '+' + tail2_word + '|' + tail2_pos);
+		  feats.push_back("dependency:float:" + head1_pos + '+' + tail1_pos + '&' + head2_pos + '+' + tail2_pos
+				  + std::string(pos1_tail > pos1_head ? ":R" : ":L")
+				  + std::string(pos2_tail > pos2_head ? "&R" : "&L")
+				  + std::string(pos1_head > pos2_head ? "-R" : "-L")
+				  + std::string(pos1_tail > pos2_tail ? "&R" : "&L"));
 		}
 		
 		if (forced_feature)
