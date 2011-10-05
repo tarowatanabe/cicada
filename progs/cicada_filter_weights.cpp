@@ -168,7 +168,6 @@ int main(int argc, char** argv)
       weights *= (1.0 / num);
     
     if (normalize_l1) {
-      
       double sum = 0.0;
       weight_set_type::iterator witer_end = weights.end();
       for (weight_set_type::iterator witer = weights.begin(); witer != witer_end; ++ witer)
@@ -238,10 +237,10 @@ void options(int argc, char** argv)
     
     ("sort",         po::bool_switch(&sort_mode),     "sort weights")
     ("sort-abs",     po::bool_switch(&sort_abs_mode), "sort weights wrt absolute value")
-    ("normalize-l1", po::bool_switch(&normalize_l1),  "weight normalization by L1")
-    ("normalize-l2", po::bool_switch(&normalize_l2),  "weight normalization by L2")
-    ("l1",           po::bool_switch(&normalize_l1),  "weight distance by L1")
-    ("l2",           po::bool_switch(&normalize_l2),  "weight distance by L2")
+    ("normalize-l1", po::bool_switch(),  "weight normalization by L1")
+    ("normalize-l2", po::bool_switch(),  "weight normalization by L2")
+    ("l1",           po::bool_switch(),  "weight distance by L1")
+    ("l2",           po::bool_switch(),  "weight distance by L2")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     
@@ -263,4 +262,10 @@ void options(int argc, char** argv)
     std::cout << argv[0] << " [options]" << '\n' << desc << '\n';
     exit(0);
   }
+
+  if (vm.count("normalize-l1") || vm.count("l1"))
+    normalize_l1 = true;
+  if (vm.count("normalize-l2") || vm.count("l2"))
+    normalize_l2 = true;
+  
 }
