@@ -89,6 +89,7 @@ namespace cicada
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Bleu(*this)); }
       
       // bleu specific...
+      virtual bool error_metric() const { return false; }
       virtual void assign(const score_ptr_type& score);
       
     private:

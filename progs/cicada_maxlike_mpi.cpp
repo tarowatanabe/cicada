@@ -30,8 +30,7 @@
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
 
-#include "cicada/feature/bleu.hpp"
-#include "cicada/feature/bleu_linear.hpp"
+#include "cicada/feature/scorer.hpp"
 #include "cicada/parameter.hpp"
 
 #include "cicada/eval.hpp"
@@ -337,8 +336,8 @@ struct OptimizeLBFGS
     
     typedef std::vector<weight_type, std::allocator<weight_type> > inside_set_type;
 
-    typedef cicada::semiring::Tropical<double> bleu_weight_type;
-    typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_weight_set_type;
+    typedef cicada::semiring::Tropical<double> scorer_weight_type;
+    typedef std::vector<scorer_weight_type, std::allocator<scorer_weight_type> > scorer_weight_set_type;
     
     struct gradient_set_type
     {
@@ -392,18 +391,18 @@ struct OptimizeLBFGS
     {
       typedef weight_type value_type;
 
-      weight_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
-	: weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+      weight_max_function(const weight_set_type& __weights, const scorer_weight_set_type& __scorers, const scorer_weight_type& __max_scorer)
+	: weights(__weights), scorers(__scorers), max_scorer(__max_scorer) {}
 
       const weight_set_type&      weights;
-      const bleu_weight_set_type& bleus;
-      const bleu_weight_type      max_bleu;
+      const scorer_weight_set_type& scorers;
+      const scorer_weight_type      max_scorer;
 
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+	if (log(max_scorer) - log(scorers[edge.id]) >= 1e-4)
 	  return value_type();
 	else
 	  return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
@@ -439,14 +438,14 @@ struct OptimizeLBFGS
     {
       typedef gradient_type value_type;
 
-      feature_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
-	: weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+      feature_max_function(const weight_set_type& __weights, const scorer_weight_set_type& __scorers, const scorer_weight_type& __max_scorer)
+	: weights(__weights), scorers(__scorers), max_scorer(__max_scorer) {}
 
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
 	// p_e r_e
-	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+	if (log(max_scorer) - log(scorers[edge.id]) >= 1e-4)
 	  return gradient_type();
 
 	gradient_type grad;
@@ -462,8 +461,8 @@ struct OptimizeLBFGS
       }
       
       const weight_set_type&      weights;
-      const bleu_weight_set_type& bleus;
-      const bleu_weight_type      max_bleu;
+      const scorer_weight_set_type& scorers;
+      const scorer_weight_type      max_scorer;
     };
     
     void operator()()
@@ -473,24 +472,24 @@ struct OptimizeLBFGS
 
       weight_set_type weights_reward(weights);
       weight_set_type weights_penalty(weights);
-      weight_set_type weights_bleu;
+      weight_set_type weights_scorer;
 
-      weight_set_type::feature_type feature_bleu;
+      weight_set_type::feature_type feature_scorer;
       for (size_t i = 0; i != features.size(); ++ i)
 	if (features[i]) {
-	  feature_bleu = features[i]->feature_name();
+	  feature_scorer = features[i]->feature_name();
 	  break;
 	}
       
-      weights_reward[feature_bleu]  =  loss_scale;
-      weights_penalty[feature_bleu] = -loss_scale;
-      weights_bleu[feature_bleu]    =  loss_scale;
+      weights_reward[feature_scorer]  =  loss_scale;
+      weights_penalty[feature_scorer] = -loss_scale;
+      weights_scorer[feature_scorer]    =  loss_scale;
       
       hypergraph_type graph_reward;
       hypergraph_type graph_penalty;
       
-      bleu_weight_set_type bleus_inside;
-      bleu_weight_set_type bleus_inside_outside;
+      scorer_weight_set_type scorers_inside;
+      scorer_weight_set_type scorers_inside_outside;
       
       inside_set_type   inside;
       gradient_set_type gradients;
@@ -516,20 +515,20 @@ struct OptimizeLBFGS
 	  
 	  const hypergraph_type& graph = (apply_exact ? graphs[id] : graph_reward);
 	
-	  // compute inside/outside by bleu using tropical semiring...
-	  bleus_inside.clear();
-	  bleus_inside_outside.clear();
+	  // compute inside/outside by scorer using tropical semiring...
+	  scorers_inside.clear();
+	  scorers_inside_outside.clear();
 	
-	  bleus_inside.resize(graph.nodes.size());
-	  bleus_inside_outside.resize(graph.edges.size());
+	  scorers_inside.resize(graph.nodes.size());
+	  scorers_inside_outside.resize(graph.edges.size());
 
 	  cicada::inside_outside(graph,
-				 bleus_inside,
-				 bleus_inside_outside,
-				 cicada::operation::weight_function<bleu_weight_type >(weights_bleu),
-				 cicada::operation::weight_function<bleu_weight_type >(weights_bleu));
+				 scorers_inside,
+				 scorers_inside_outside,
+				 cicada::operation::weight_function<scorer_weight_type >(weights_scorer),
+				 cicada::operation::weight_function<scorer_weight_type >(weights_scorer));
 	
-	  const bleu_weight_type bleu_max = *std::max_element(bleus_inside_outside.begin(), bleus_inside_outside.end());
+	  const scorer_weight_type scorer_max = *std::max_element(scorers_inside_outside.begin(), scorers_inside_outside.end());
 	
 	  // then, inside/outside to collect potentials...
 
@@ -546,14 +545,14 @@ struct OptimizeLBFGS
 	    cicada::inside_outside(graph, inside, gradients, weight_function(weights_penalty), feature_function(weights_penalty));
 	  
 	    cicada::inside_outside(graph, inside_correct, gradients_correct,
-				   weight_max_function(weights_penalty, bleus_inside_outside, bleu_max),
-				   feature_max_function(weights_penalty, bleus_inside_outside, bleu_max));
+				   weight_max_function(weights_penalty, scorers_inside_outside, scorer_max),
+				   feature_max_function(weights_penalty, scorers_inside_outside, scorer_max));
 	  } else {
 	    cicada::inside_outside(graph, inside, gradients, weight_function(weights), feature_function(weights));
 	  
 	    cicada::inside_outside(graph, inside_correct, gradients_correct,
-				   weight_max_function(weights, bleus_inside_outside, bleu_max),
-				   feature_max_function(weights, bleus_inside_outside, bleu_max));
+				   weight_max_function(weights, scorers_inside_outside, scorer_max),
+				   feature_max_function(weights, scorers_inside_outside, scorer_max));
 	  }
 	  
 	
@@ -575,7 +574,7 @@ struct OptimizeLBFGS
 	  
 	  if (debug >= 3)
 	    std::cerr << "id: " << id
-		      << " bleu: " << log(bleu_max)
+		      << " scorer: " << log(scorer_max)
 		      << " correct: " << log(Z_correct)
 		      << " partition: " << log(Z)
 		      << " margin: " << margin
@@ -587,7 +586,7 @@ struct OptimizeLBFGS
       
       std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
       
-      g[feature_bleu] = 0.0;
+      g[feature_scorer] = 0.0;
     }
     
     const hypergraph_set_type&           graphs;
@@ -611,13 +610,13 @@ struct OptimizeLBFGS
     
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
 
-    weight_set_type::feature_type feature_bleu;
+    weight_set_type::feature_type feature_scorer;
     for (size_t i = 0; i != optimizer.features.size(); ++ i)
       if (optimizer.features[i]) {
-	feature_bleu = optimizer.features[i]->feature_name();
+	feature_scorer = optimizer.features[i]->feature_name();
 	break;
       }
-    optimizer.weights[feature_bleu] = 0.0;
+    optimizer.weights[feature_scorer] = 0.0;
     
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -872,10 +871,10 @@ struct TaskOracle
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
     
-    weight_set_type::feature_type feature_bleu;
+    weight_set_type::feature_type feature_scorer;
     for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
-	feature_bleu = features[i]->feature_name();
+	feature_scorer = features[i]->feature_name();
 	break;
       }
     
@@ -895,24 +894,21 @@ struct TaskOracle
       if (scores[id])
 	*score_curr -= *scores[id];
       
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+      cicada::feature::Scorer* __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
       
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
+      if (__scorer)
+	__scorer->assign(score_curr);
 
       typedef cicada::semiring::Logprob<double> weight_type;
       
       model_type model;
       model.push_back(features[id]);
       
-      cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor), cube_size);
+      cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), cube_size);
       
       weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)
@@ -997,13 +993,10 @@ void compute_oracles(const hypergraph_set_type& graphs,
       score_ptr_type score_curr = score_optimum->clone();
       *score_curr -= *scores[id];
       
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+      cicada::feature::Scorer* __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
       
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
+      if (__scorer)
+	__scorer->assign(score_curr);
 
       if (apply_exact && ! oracle_loss) {
 	model_type model;
@@ -1097,7 +1090,7 @@ void read_tstset(const path_set_type& files,
   }
 
   if (debug && mpi_rank == 0)
-    std::cerr << "assign BLEU scorer" << std::endl;
+    std::cerr << "assign SCORER scorer" << std::endl;
     
   for (size_t id = 0; id != graphs.size(); ++ id) 
     if (static_cast<int>(id % mpi_size) == mpi_rank) {
@@ -1106,20 +1099,16 @@ void read_tstset(const path_set_type& files,
       else {
 	features[id] = feature_function_type::create(scorer_name);
 	
-	cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-	cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+	cicada::feature::Scorer*       __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
 	
-	if (! __bleu && ! __bleu_linear)
-	  throw std::runtime_error("invalid bleu feature function...");
+	if (! __scorer)
+	  throw std::runtime_error("invalid scorer feature function...");
 
 	static const cicada::Lattice       __lattice;
 	static const cicada::SpanVector    __spans;
 	static const cicada::NGramCountSet __ngram_counts;
 	
-	if (__bleu)
-	  __bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
-	else
-	  __bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	__scorer->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
 	
 	if (apply_exact) {
 	  model_type model;

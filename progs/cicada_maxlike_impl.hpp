@@ -93,14 +93,14 @@ struct OptimizerBase
       weight_scale(1.0),
       weight_norm(0.0)
   {
-    // initialize weights and weights bleu...
+    // initialize weights and weights scorer...
     for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
-	feature_bleu = features[i]->feature_name();
+	feature_scorer = features[i]->feature_name();
 	break;
       }
     
-    weights_bleu[feature_bleu] = loss_scale;
+    weights_scorer[feature_scorer] = loss_scale;
   }
   
   typedef cicada::semiring::Log<double> weight_type;
@@ -109,8 +109,8 @@ struct OptimizerBase
   
   typedef std::vector<weight_type, std::allocator<weight_type> > inside_set_type;
   
-  typedef cicada::semiring::Tropical<double> bleu_weight_type;
-  typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_weight_set_type;
+  typedef cicada::semiring::Tropical<double> scorer_weight_type;
+  typedef std::vector<scorer_weight_type, std::allocator<scorer_weight_type> > scorer_weight_set_type;
   
   struct gradient_set_type
   {
@@ -149,18 +149,18 @@ struct OptimizerBase
   {
     typedef weight_type value_type;
 
-    weight_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
-      : weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+    weight_max_function(const weight_set_type& __weights, const scorer_weight_set_type& __scorers, const scorer_weight_type& __max_scorer)
+      : weights(__weights), scorers(__scorers), max_scorer(__max_scorer) {}
 
     const weight_set_type&      weights;
-    const bleu_weight_set_type& bleus;
-    const bleu_weight_type      max_bleu;
+    const scorer_weight_set_type& scorers;
+    const scorer_weight_type      max_scorer;
 
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
       // p_e
-      if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+      if (log(max_scorer) - log(scorers[edge.id]) >= 1e-4)
 	return value_type();
       else
 	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
@@ -197,14 +197,14 @@ struct OptimizerBase
   {
     typedef gradient_type value_type;
 
-    feature_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
-      : weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+    feature_max_function(const weight_set_type& __weights, const scorer_weight_set_type& __scorers, const scorer_weight_type& __max_scorer)
+      : weights(__weights), scorers(__scorers), max_scorer(__max_scorer) {}
 
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
       // p_e r_e
-      if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+      if (log(max_scorer) - log(scorers[edge.id]) >= 1e-4)
 	return gradient_type();
 
       gradient_type grad;
@@ -221,8 +221,8 @@ struct OptimizerBase
     
     
     const weight_set_type&      weights;
-    const bleu_weight_set_type& bleus;
-    const bleu_weight_type      max_bleu;
+    const scorer_weight_set_type& scorers;
+    const scorer_weight_type      max_scorer;
   };
   
   bool operator()(const int id)
@@ -233,13 +233,13 @@ struct OptimizerBase
     model.push_back(features[id]);
     
     if (! apply_exact) {
-      weights[feature_bleu] = loss_scale / weight_scale;
+      weights[feature_scorer] = loss_scale / weight_scale;
       cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
-      weights[feature_bleu] = - loss_scale / weight_scale;
+      weights[feature_scorer] = - loss_scale / weight_scale;
       cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
-      weights[feature_bleu] = 0.0;
+      weights[feature_scorer] = 0.0;
       
       graph_reward.unite(graph_penalty);
       graph_penalty.clear();
@@ -247,20 +247,20 @@ struct OptimizerBase
     
     const hypergraph_type& graph = (apply_exact ? graphs[id] : graph_reward);
     
-    // compute inside/outside by bleu using tropical semiring...
-    bleus_inside.clear();
-    bleus_inside_outside.clear();
+    // compute inside/outside by scorer using tropical semiring...
+    scorers_inside.clear();
+    scorers_inside_outside.clear();
     
-    bleus_inside.resize(graph.nodes.size());
-    bleus_inside_outside.resize(graph.edges.size());
+    scorers_inside.resize(graph.nodes.size());
+    scorers_inside_outside.resize(graph.edges.size());
     
     cicada::inside_outside(graph,
-			   bleus_inside,
-			   bleus_inside_outside,
-			   cicada::operation::weight_function<bleu_weight_type >(weights_bleu),
-			   cicada::operation::weight_function<bleu_weight_type >(weights_bleu));
+			   scorers_inside,
+			   scorers_inside_outside,
+			   cicada::operation::weight_function<scorer_weight_type >(weights_scorer),
+			   cicada::operation::weight_function<scorer_weight_type >(weights_scorer));
     
-    const bleu_weight_type bleu_max = *std::max_element(bleus_inside_outside.begin(), bleus_inside_outside.end());
+    const scorer_weight_type scorer_max = *std::max_element(scorers_inside_outside.begin(), scorers_inside_outside.end());
     
     // then, inside/outside to collect potentials...
     
@@ -274,21 +274,21 @@ struct OptimizerBase
     inside_correct.resize(graph.nodes.size());
     
     if (softmax_margin) {
-      weights[feature_bleu] = - loss_scale / weight_scale;
+      weights[feature_scorer] = - loss_scale / weight_scale;
       
       cicada::inside_outside(graph, inside, gradients, weight_function(weights), feature_function(weights));
       
       cicada::inside_outside(graph, inside_correct, gradients_correct,
-			     weight_max_function(weights, bleus_inside_outside, bleu_max),
-			     feature_max_function(weights, bleus_inside_outside, bleu_max));
+			     weight_max_function(weights, scorers_inside_outside, scorer_max),
+			     feature_max_function(weights, scorers_inside_outside, scorer_max));
       
-      weights[feature_bleu] = 0.0;
+      weights[feature_scorer] = 0.0;
     } else {
       cicada::inside_outside(graph, inside, gradients, weight_function(weights), feature_function(weights));
       
       cicada::inside_outside(graph, inside_correct, gradients_correct,
-			     weight_max_function(weights, bleus_inside_outside, bleu_max),
-			     feature_max_function(weights, bleus_inside_outside, bleu_max));
+			     weight_max_function(weights, scorers_inside_outside, scorer_max),
+			     feature_max_function(weights, scorers_inside_outside, scorer_max));
     }
     
     Z = inside.back();
@@ -301,7 +301,7 @@ struct OptimizerBase
 
     if (debug >= 3)
       std::cerr << "id: " << id
-		<< " bleu: " << log(bleu_max)
+		<< " scorer: " << log(scorer_max)
 		<< " correct: " << log(Z_correct)
 		<< " partition: " << log(Z)
 		<< " margin: " << margin
@@ -314,8 +314,8 @@ struct OptimizerBase
   const feature_function_ptr_set_type& features;
   
   weight_set_type weights;
-  weight_set_type weights_bleu;
-  weight_set_type::feature_type feature_bleu;
+  weight_set_type weights_scorer;
+  weight_set_type::feature_type feature_scorer;
 
   double objective;
   
@@ -325,8 +325,8 @@ struct OptimizerBase
   hypergraph_type graph_reward;
   hypergraph_type graph_penalty;
 
-  bleu_weight_set_type bleus_inside;
-  bleu_weight_set_type bleus_inside_outside;
+  scorer_weight_set_type scorers_inside;
+  scorer_weight_set_type scorers_inside_outside;
 
   inside_set_type   inside;
   gradient_set_type gradients;
@@ -351,7 +351,7 @@ struct OptimizerSGDL2 : public OptimizerBase
   {
     samples = 0;
     
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
@@ -361,7 +361,7 @@ struct OptimizerSGDL2 : public OptimizerBase
   
   void finalize()
   {
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     
     weights *= weight_scale;
     
@@ -385,7 +385,7 @@ struct OptimizerSGDL2 : public OptimizerBase
       // update wrt correct gradients
       gradient_type::const_iterator citer_end = gradients_correct.gradient.end();
       for (gradient_type::const_iterator citer = gradients_correct.gradient.begin(); citer != citer_end; ++ citer) 
-	if (citer->first != feature_bleu) {
+	if (citer->first != feature_scorer) {
 	  const double feature = citer->second;
 	  update(weights[citer->first], feature * eta);
 	}
@@ -393,7 +393,7 @@ struct OptimizerSGDL2 : public OptimizerBase
       // update wrt marginal gradients...
       gradient_type::const_iterator miter_end = gradients.gradient.end();
       for (gradient_type::const_iterator miter = gradients.gradient.begin(); miter != miter_end; ++ miter) 
-	if (miter->first != feature_bleu) {
+	if (miter->first != feature_scorer) {
 	  const double feature = miter->second;
 	  update(weights[miter->first], - feature * eta);
 	}
@@ -405,7 +405,7 @@ struct OptimizerSGDL2 : public OptimizerBase
       objective += double(log(Z_correct) - log(Z)) * weight_scale;
       
       if (weight_scale < 0.01 || 100 < weight_scale) {
-	weights[feature_bleu] = 0.0;
+	weights[feature_scorer] = 0.0;
 	weights *= weight_scale;
 	weight_scale = 1.0;
 	weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
@@ -455,7 +455,7 @@ struct OptimizerSGDL1 : public OptimizerBase
   {
     samples = 0;
 
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     
     weight_scale = 1.0;
     
@@ -486,7 +486,7 @@ struct OptimizerSGDL1 : public OptimizerBase
       
       gradient_type::const_iterator citer_end = gradients_correct.gradient.end();
       for (gradient_type::const_iterator citer = gradients_correct.gradient.begin(); citer != citer_end; ++ citer) 
-	if (citer->first != feature_bleu) {
+	if (citer->first != feature_scorer) {
 	  const double feature = citer->second;
 	  
 	  weights[citer->first] += eta * feature;
@@ -495,7 +495,7 @@ struct OptimizerSGDL1 : public OptimizerBase
       
       gradient_type::const_iterator miter_end = gradients.gradient.end();
       for (gradient_type::const_iterator miter = gradients.gradient.begin(); miter != miter_end; ++ miter) 
-	if (miter->first != feature_bleu) {
+	if (miter->first != feature_scorer) {
 	  const double feature = miter->second;
 	  
 	  weights[miter->first] -= eta * feature;
@@ -589,14 +589,14 @@ struct OptimizerMarginBase
       beam(__beam),
       kbest(__kbest)
   {
-    // initialize weights and weights bleu...
+    // initialize weights and weights scorer...
     for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
-	feature_bleu = features[i]->feature_name();
+	feature_scorer = features[i]->feature_name();
 	break;
       }
     
-    weights_bleu[feature_bleu] = loss_scale;
+    weights_scorer[feature_scorer] = loss_scale;
   }
 
   bool operator()(const int id)
@@ -604,36 +604,36 @@ struct OptimizerMarginBase
     if (! graphs[id].is_valid()) return false;
 
     if (apply_exact) {
-      weights[feature_bleu] = loss_scale;
+      weights[feature_scorer] = loss_scale;
       
       if (kbest > 0) 
-	cicada::prune_kbest(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
+	cicada::prune_kbest(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_scorer), kbest);
       else
-	cicada::prune_beam(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
+	cicada::prune_beam(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_scorer), beam);
       
-      weights[feature_bleu] = - loss_scale;
+      weights[feature_scorer] = - loss_scale;
       
       if (kbest > 0)
 	cicada::prune_kbest(graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), kbest);
       else
 	cicada::prune_beam(graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
       
-      weights[feature_bleu] = 0.0;
+      weights[feature_scorer] = 0.0;
     } else {
       model_type model;
       model.push_back(features[id]);
       
       // we compute rewarded derivertive..
-      weights[feature_bleu] = loss_scale;
+      weights[feature_scorer] = loss_scale;
       cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
       if (kbest > 0) 
-	cicada::prune_kbest(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
+	cicada::prune_kbest(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_scorer), kbest);
       else
-	cicada::prune_beam(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
+	cicada::prune_beam(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_scorer), beam);
       
       // we compute violated derivertive..
-      weights[feature_bleu] = - loss_scale;
+      weights[feature_scorer] = - loss_scale;
       cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
       if (kbest > 0)
@@ -641,7 +641,7 @@ struct OptimizerMarginBase
       else
 	cicada::prune_beam(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
       
-      weights[feature_bleu] = 0.0;
+      weights[feature_scorer] = 0.0;
     }
     
     count_set_type counts_reward(graph_reward.nodes.size());
@@ -669,8 +669,8 @@ struct OptimizerMarginBase
   const int kbest;
   
   weight_set_type weights;
-  weight_set_type weights_bleu;
-  weight_set_type::feature_type feature_bleu;
+  weight_set_type weights_scorer;
+  weight_set_type::feature_type feature_scorer;
   
   double objective;
   
@@ -696,7 +696,7 @@ struct OptimizerMIRA : public OptimizerMarginBase
   {
     samples = 0;
 
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     objective = 0.0;
   }
   
@@ -707,8 +707,8 @@ struct OptimizerMIRA : public OptimizerMarginBase
       // do we use the difference of score...? or simply use zero-one?
       
       feature_set_type features(features_reward - features_penalty);
-      const double loss = loss_scale * features[feature_bleu];
-      features.erase(feature_bleu);
+      const double loss = loss_scale * features[feature_scorer];
+      features.erase(feature_scorer);
       
       const double margin = cicada::dot_product(weights, features);
       const double variance = cicada::dot_product(features, features);
@@ -751,7 +751,7 @@ struct OptimizerAROW : public OptimizerMarginBase
   {
     samples = 0;
 
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     objective = 0.0;
   }
   
@@ -765,8 +765,8 @@ struct OptimizerAROW : public OptimizerMarginBase
       covariances.allocate(1.0);
       
       feature_set_type features(features_reward - features_penalty);
-      const double loss = loss_scale * features[feature_bleu];
-      features.erase(feature_bleu);
+      const double loss = loss_scale * features[feature_scorer];
+      features.erase(feature_scorer);
       
       const double margin = cicada::dot_product(weights, features);
       const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
@@ -815,7 +815,7 @@ struct OptimizerCW : public OptimizerMarginBase
   {
     samples = 0;
     
-    weights[feature_bleu] = 0.0;
+    weights[feature_scorer] = 0.0;
     objective = 0.0;
   }
   
@@ -829,8 +829,8 @@ struct OptimizerCW : public OptimizerMarginBase
       covariances.allocate(1.0);
       
       feature_set_type features(features_reward - features_penalty);
-      const double loss = loss_scale * features[feature_bleu];
-      features.erase(feature_bleu);
+      const double loss = loss_scale * features[feature_scorer];
+      features.erase(feature_scorer);
       
       const double margin = cicada::dot_product(weights, features);
       const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...

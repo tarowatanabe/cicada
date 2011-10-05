@@ -94,6 +94,7 @@ namespace cicada
       void clear();
       
       // depeval specific...
+      virtual bool error_metric() const { return false; }
       void assign(const score_ptr_type& score);
       
     private:

@@ -24,6 +24,8 @@ namespace cicada
       typedef score_type::score_ptr_type score_ptr_type;
       
       // this is scorer specific assign
+      virtual bool error_metric() const = 0;
+
       virtual void assign(const size_type& id,
 			  const hypergraph_type& hypergraph,
 			  const lattice_type& lattice,
