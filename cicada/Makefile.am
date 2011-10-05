@@ -46,6 +46,7 @@ dist_eval_HEADERS = \
 eval/combined.hpp \
 eval/f.hpp \
 eval/bleu.hpp \
+eval/depeval.hpp \
 eval/parseval.hpp \
 eval/per.hpp \
 eval/ribes.hpp \
@@ -60,6 +61,7 @@ libcicada_eval_la_SOURCES = \
 eval/bleu.cpp \
 eval/combined.cpp \
 eval/decode.hpp \
+eval/depeval.cpp \
 eval/encode.hpp \
 eval/f.cpp \
 eval/parseval.cpp \

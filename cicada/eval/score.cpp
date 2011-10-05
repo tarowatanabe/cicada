@@ -14,6 +14,7 @@
 #include "eval/wlcs.hpp"
 #include "eval/combined.hpp"
 #include "eval/parseval.hpp"
+#include "eval/depeval.hpp"
 #include "eval/ribes.hpp"
 
 #include "stemmer.hpp"
@@ -74,6 +75,8 @@ namespace cicada
 	return Combined::decode(iter, end);
       else if (scorer.second == "parseval")
 	return Parseval::decode(iter, end);
+      else if (scorer.second == "depeval")
+	return Depeval::decode(iter, end);
       else
 	return score_ptr_type();
     }
@@ -137,6 +140,9 @@ sb: skip bigram\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 parseval: parse evaluation\n\
 \tignore=[category] ignored category\n\
+\ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+depeval: dependency parse evaluation\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 ";
@@ -422,6 +428,22 @@ parseval: parse evaluation\n\
 	}
 	
 	scorer = scorer_ptr_type(new ParsevalScorer(ignored.begin(), ignored.end()));
+	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
+      } else if (utils::ipiece(param.name()) == "depeval") {
+	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "tokenizer")
+	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for depeval: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new DepevalScorer());
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
       } else
