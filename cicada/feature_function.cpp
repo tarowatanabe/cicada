@@ -13,6 +13,7 @@
 #include "feature/bleu_linear.hpp"
 #include "feature/bleu_multi.hpp"
 #include "feature/dependency.hpp"
+#include "feature/depeval.hpp"
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/lexicalized_reordering.hpp"
@@ -70,6 +71,9 @@ bleu-multi: multiple BLEU\n\
 \tsize=# of BLEU features\n\
 dependency: dependency feature\n\
 \torder=[order] (default: 2)\n\
+depeval: dependency evaluation feature\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\ttokenizer=[tokenizer spec]\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
@@ -192,6 +196,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Distortion(parameter));
     else if (param_name == "dependency")
       return feature_function_ptr_type(new feature::Dependency(parameter));
+    else if (param_name == "depeval")
+      return feature_function_ptr_type(new feature::Depeval(parameter));
     else if (param_name == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
     else if (param_name == "lexicalized-reordering"

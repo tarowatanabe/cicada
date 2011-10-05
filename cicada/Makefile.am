@@ -114,6 +114,7 @@ feature/bleu_expected.hpp \
 feature/bleu_linear.hpp \
 feature/bleu_multi.hpp \
 feature/dependency.hpp \
+feature/depeval.hpp \
 feature/distortion.hpp \
 feature/global_lexicon.hpp \
 feature/lexicalized_reordering.hpp \
@@ -140,6 +141,7 @@ feature/bleu_linear.cpp \
 feature/bleu_multi.cpp \
 feature/distortion.cpp \
 feature/dependency.cpp \
+feature/depeval.cpp \
 feature/global_lexicon.cpp \
 feature/lexicalized_reordering.cpp \
 feature/neighbours.cpp \
