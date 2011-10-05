@@ -13,7 +13,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
-#include <cicada/eval.hpp>
+#include <cicada/feature/scorer.hpp>
 
 namespace cicada
 {
@@ -22,7 +22,7 @@ namespace cicada
     
     class RibesImpl;
     
-    class Ribes : public FeatureFunction
+    class Ribes : public Scorer
     {
     public:
       typedef size_t    size_type;
@@ -36,8 +36,8 @@ namespace cicada
       typedef score_type::score_ptr_type score_ptr_type;
       
     private:
-      typedef FeatureFunction base_type;
-      typedef RibesImpl        impl_type;
+      typedef Scorer    base_type;
+      typedef RibesImpl impl_type;
       
     public:
       Ribes(const std::string& parameter);
@@ -92,10 +92,9 @@ namespace cicada
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Ribes(*this)); }
       
-      void clear();
-      
       // ribes specific...
-      void assign(const score_ptr_type& score);
+      virtual bool error_metric() const { return false; }
+      virtual void assign(const score_ptr_type& score);
       
     private:
       impl_type* pimpl;

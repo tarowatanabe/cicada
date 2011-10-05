@@ -805,11 +805,6 @@ namespace cicada
       pimpl->initialize();
     }
     
-    void Ribes::clear()
-    {
-      pimpl->clear();
-    }
-
     void Ribes::assign(const size_type& id,
 		      const hypergraph_type& hypergraph,
 		      const lattice_type& lattice,

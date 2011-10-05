@@ -13,7 +13,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
-#include <cicada/eval.hpp>
+#include <cicada/feature/scorer.hpp>
 
 namespace cicada
 {
@@ -22,7 +22,7 @@ namespace cicada
     
     class BleuExpectedImpl;
     
-    class BleuExpected : public FeatureFunction
+    class BleuExpected : public Scorer
     {
     public:
       typedef size_t    size_type;
@@ -36,8 +36,8 @@ namespace cicada
       typedef score_type::score_ptr_type score_ptr_type;
       
     private:
-      typedef FeatureFunction base_type;
-      typedef BleuExpectedImpl        impl_type;
+      typedef Scorer           base_type;
+      typedef BleuExpectedImpl impl_type;
       
     public:
       BleuExpected(const std::string& parameter);
@@ -93,10 +93,9 @@ namespace cicada
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new BleuExpected(*this)); }
       
-      void clear();
-      
       // bleu specific...
-      void assign(const score_ptr_type& score);
+      virtual bool error_metric() const { return false; }
+      virtual void assign(const score_ptr_type& score);
       
     private:
       impl_type* pimpl;

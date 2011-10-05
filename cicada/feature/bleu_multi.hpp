@@ -91,8 +91,6 @@ namespace cicada
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new BleuMulti(*this)); }
       
-      void clear();
-      
     private:
       feature_function_ptr_set_type bleus;
     };
