@@ -369,6 +369,7 @@ namespace cicada
 			       rule,
 			       riter->features,
 			       riter->attributes,
+			       rule_internal_size(*(riter->source)),
 			       tails, 
 			       passive_arcs,
 			       graph,
@@ -414,6 +415,7 @@ namespace cicada
 			       rule,
 			       riter->features,
 			       riter->attributes,
+			       rule_internal_size(*(riter->source)),
 			       tails,
 			       passive_arcs,
 			       graph,
@@ -580,12 +582,13 @@ namespace cicada
 	  std::cerr << std::endl;
 #endif
 	  
-	  typename transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+	  typename transducer_type::rule_pair_set_type::const_iterator riter_end  = rules.end();
 	  for (typename transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 	    apply_rule(extract_lhs(*riter),
 		       yield_source ? riter->source : riter->target,
 		       riter->features + citer->features,
 		       riter->attributes + citer->attributes,
+		       rule_internal_size(*(riter->source)),
 		       citer->tails, 
 		       passive_arcs,
 		       graph,
@@ -696,6 +699,7 @@ namespace cicada
 		    const rule_ptr_type& rule,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
+		    const attribute_set_type::int_type& internal_size,
 		    const hypergraph_type::edge_type::node_set_type& frontier,
 		    passive_set_type& passives,
 		    hypergraph_type& graph,
@@ -768,6 +772,7 @@ namespace cicada
 		    const tree_rule_ptr_type& rule,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
+		    const attribute_set_type::int_type& internal_size,
 		    const hypergraph_type::edge_type::node_set_type& frontier,
 		    passive_set_type& passives,
 		    hypergraph_type& graph,
@@ -817,6 +822,19 @@ namespace cicada
       // assign metadata only for the root edge...?????
       graph.edges[edge_id].attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       graph.edges[edge_id].attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
+      
+      if (internal_size)
+	graph.edges[edge_id].attributes[attr_internal_node] = internal_size;
+    }
+
+    attribute_set_type::int_type rule_internal_size(const tree_rule_type& rule) const
+    {
+      return rule.size_internal();
+    }
+    
+    attribute_set_type::int_type rule_internal_size(const rule_type& rule) const
+    {
+      return 0;
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
