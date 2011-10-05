@@ -40,6 +40,7 @@ typedef cicada::WeightVector<double> weight_set_type;
 path_set_type input_files;
 path_type     output_file = "-";
 
+bool diff_mode = false;
 bool average_mode = false;
 bool sum_mode = false;
 bool sort_mode = false;
@@ -74,18 +75,63 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (sum_mode && average_mode)
-      throw std::runtime_error("You cannnot perform both sum and average");
+    if (int(sum_mode) + average_mode + diff_mode > 1)
+      throw std::runtime_error("You cannnot perform both sum, average and diff");
     if (normalize_l1 && normalize_l2)
       throw std::runtime_error("You cannnot perform both normalize-l1 and normalize-l2");
     if (sort_mode && sort_abs_mode)
       throw std::runtime_error("You cannnot perform both sort and sort-abs");
+
+    if (int(sum_mode) + average_mode + diff_mode == 0)
+      sum_mode = true;
     
     weight_set_type weights;
     size_t          num = 0;
     
     if (input_files.empty())
       input_files.push_back("-");
+    
+    if (diff_mode) {
+      if (input_files.size() != 2)
+	throw std::runtime_error("we need at least two weights for comparison");
+
+      if (int(normalize_l1) + normalize_l2 > 1)
+	throw std::runtime_error("you cannot compute both l1 and l2 difference");
+      if (int(normalize_l1) + normalize_l2 == 0)
+	normalize_l2 = true;
+      
+      weight_set_type weights1;
+      weight_set_type weights2;
+      
+      utils::compress_istream is1(input_files.front(), 1024 * 1024);
+      utils::compress_istream is2(input_files.back(),  1024 * 1024);
+      
+      is1 >> weights1;
+      is2 >> weights2;
+
+      weights1.allocate();
+      weights2.allocate();
+
+      if (normalize_l1) {
+	double diff = 0.0;
+	for (size_t i = 0; i != weights1.size(); ++ i)
+	  diff += std::fabs(weights1[i] - weights2[i]);
+	
+	utils::compress_ostream os(output_file);
+	os << diff << '\n';
+      } else {
+	double diff = 0.0;
+	for (size_t i = 0; i != weights1.size(); ++ i)
+	  diff += (weights1[i] - weights2[i]) * (weights1[i] - weights2[i]);
+	if (diff != 0.0)
+	  diff = std::sqrt(diff);
+	
+	utils::compress_ostream os(output_file);
+	os << diff << '\n';
+      }
+      
+      return 0;
+    }
     
     weight_set_type weights_input;
     for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
@@ -192,6 +238,8 @@ void options(int argc, char** argv)
     ("sort-abs",     po::bool_switch(&sort_abs_mode), "sort weights wrt absolute value")
     ("normalize-l1", po::bool_switch(&normalize_l1),  "weight normalization by L1")
     ("normalize-l2", po::bool_switch(&normalize_l2),  "weight normalization by L2")
+    ("l1",           po::bool_switch(&normalize_l1),  "weight distance by L1")
+    ("l2",           po::bool_switch(&normalize_l2),  "weight distance by L2")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     
