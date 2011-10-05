@@ -58,31 +58,107 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
 
+      typedef std::pair<int, int> count_type;
+      typedef utils::simple_vector<count_type, std::allocator<count_type> > count_set_type;
+      
+      struct count_set_hash : public utils::hashmurmur<size_t>
+      {
+	typedef utils::hashmurmur<size_t> hasher_type;
+	
+	size_t operator()(const count_set_type& x) const
+	{
+	  return hasher_type::operator()(x.begin(), x.end(), 0);
+	}
+      };
+      
+      typedef utils::indexed_set<count_set_type, count_set_hash, std::equal_to<count_set_type>, std::allocator<count_set_type> > counts_index_type;
+      
+
       DepevalImpl()
 	: attr_dependency_pos("dependency-pos"),
 	  attr_dependency_head("dependency-head"),
 	  attr_dependency_dependent("dependency-dependent") {}
-
+      
+      struct __attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
+      {
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
+      };
+      
       double depeval_score(state_ptr_type& state,
 			   const state_ptr_set_type& states,
 			   const edge_type& edge)
       {
+	if (deprefs.empty()) return 0.0;
 	
+	int pos_head = -1;
+	int pos_dep  = -1;
 	
+	attribute_set_type::const_iterator hiter = edge.attributes.find(attr_dependency_head);
+	attribute_set_type::const_iterator diter = edge.attributes.find(attr_dependency_dependent);
 	
+	if (hiter != edge.attributes.end() && diter != edge.attributes.end()) {
+	  pos_head = boost::apply_visitor(__attribute_integer(), hiter->second);
+	  pos_dep  = boost::apply_visitor(__attribute_integer(), diter->second);
+	}
+	
+	count_set_type counts(deprefs.size(), count_type(0, 0));
+	
+	double score_antecedent = 0.0;
+	
+	if (pos_head >= 0 && pos_dep > 0)
+	  for (size_t i = 0; i != deprefs.size(); ++ i)
+	    if (pos_dep - 1 < static_cast<int>(deprefs[i].size())) {
+	      counts[i].first += (pos_head == deprefs[i][pos_dep - 1]);
+	      ++ counts[i].second;
+	    }
+	
+	for (size_t j = 0; j != states.size(); ++ j) {
+	  const count_set_type& counts_antecedent = counts_index[*reinterpret_cast<const counts_index_type::index_type*>(states[j])];
+	  
+	  // compute current score...
+	  double score_max = 0.0;
+	  for (size_t i = 0; i != deprefs.size(); ++ i)
+	    if (counts_antecedent[i].first)
+	      score_max = std::max(score_max, double(counts_antecedent[i].first) / double(counts_antecedent[i].second));
+	  
+	  score_antecedent += score_max;
+	  
+	  for (size_t i = 0; i != deprefs.size(); ++ i) {
+	    counts[i].first  += counts_antecedent[i].first;
+	    counts[i].second += counts_antecedent[i].second;
+	  }
+	}
+	
+	counts_index_type::iterator citer = counts_index.insert(counts).first;
+	*reinterpret_cast<counts_index_type::index_type*>(state) = citer - counts_index.begin();
+	
+	// compute current score...
+	double score_max = 0.0;
+	for (size_t i = 0; i != deprefs.size(); ++ i)
+	  if (counts[i].first)
+	    score_max = std::max(score_max, double(counts[i].first) / double(counts[i].second));
+	
+	return score_max - score_antecedent;
       }
       
-      void initialize() {}
-      void clear() { deprefs.clear(); }
+      void initialize() { counts_index.clear(); }
+      void clear() { counts_index.clear(); deprefs.clear(); score.reset(); }
       
       void insert(const dependency_type& dep)
       {
-
+	deprefs.push_back(dep);
       }
       
       void insert(const sentence_type& sent)
       {
+	dependency_type dep;
+	sentence_type::const_iterator siter_end = sent.end();
+	for (sentence_type::const_iterator siter = sent.begin(); siter != siter_end; ++ siter)
+	  dep.push_back(utils::lexical_cast<dependency_type::index_type>(static_cast<const std::string&>(*siter)));
 	
+	deprefs.push_back(dep);
       }
       
       void insert(const score_ptr_type& __score)
@@ -92,6 +168,9 @@ namespace cicada
 	if (score && ! dynamic_cast<const cicada::eval::Depeval*>(score.get()))
 	  throw std::runtime_error("this is not a depeval-score!");
       }
+
+      
+      counts_index_type counts_index;
       
       dependency_set_type      deprefs;
       dependency_document_type refset;
@@ -140,7 +219,7 @@ namespace cicada
       std::auto_ptr<impl_type> depeval_impl(new impl_type());
       
       // matched count + total count
-      base_type::__state_size = sizeof(int) * 2;
+      base_type::__state_size = sizeof(impl_type::counts_index_type::index_type);
       base_type::__feature_name = (name.empty() ? std::string("depeval") : name);
       
       pimpl = depeval_impl.release();
