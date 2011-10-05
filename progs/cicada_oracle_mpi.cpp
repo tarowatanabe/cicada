@@ -39,8 +39,7 @@
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
 
-#include "cicada/feature/bleu.hpp"
-#include "cicada/feature/bleu_linear.hpp"
+#include "cicada/feature/scorer.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/prune.hpp"
 #include "cicada/eval.hpp"
@@ -308,10 +307,10 @@ struct TaskOracle
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
     
-    weight_set_type::feature_type feature_bleu;
+    weight_set_type::feature_type feature_scorer;
     for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
-	feature_bleu = features[i]->feature_name();
+	feature_scorer = features[i]->feature_name();
 	break;
       }
     
@@ -342,13 +341,9 @@ struct TaskOracle
       if (scores[id])
 	*score_curr -= *scores[id];
       
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+      cicada::feature::Scorer* __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
       
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
+      __scorer->assign(score_curr);
 
       typedef cicada::semiring::Logprob<double> weight_type;
       
@@ -358,16 +353,16 @@ struct TaskOracle
       if (apply_exact)
 	cicada::apply_exact(model, graphs[id], graph_oracle);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor), cube_size);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), cube_size);
       
       // compute viterbi...
       weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor));
       
       // compute pruned forest
       hypergraph_type forest;
-      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), beam_size);
+      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_scorer, score_factor), beam_size);
       
       // compute scores...
       score_ptr_type score_sample = scorers[id]->score(sentence);
@@ -389,7 +384,7 @@ struct TaskOracle
 	// remove features...
 	hypergraph_type::edge_set_type::iterator eiter_end = forests[id].edges.end();
 	for (hypergraph_type::edge_set_type::iterator eiter = forests[id].edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features.erase(feature_bleu);
+	  eiter->features.erase(feature_scorer);
       }
     }
   }
@@ -555,7 +550,7 @@ void read_tstset(const path_set_type& files,
   }
 
   if (debug && mpi_rank == 0)
-    std::cerr << "assign BLEU scorer" << std::endl;
+    std::cerr << "assign scorer feature" << std::endl;
     
   for (size_t id = 0; id != graphs.size(); ++ id) 
     if (static_cast<int>(id % mpi_size) == mpi_rank) {
@@ -564,20 +559,16 @@ void read_tstset(const path_set_type& files,
       else {
 	features[id] = feature_function_type::create(scorer_name);
 	
-	cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-	cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+	cicada::feature::Scorer* __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
 	
-	if (! __bleu && ! __bleu_linear)
-	  throw std::runtime_error("invalid bleu feature function...");
-
+	if (! __scorer)
+	  throw std::runtime_error("invalid scorer feature function...");
+	
 	static const cicada::Lattice       __lattice;
 	static const cicada::SpanVector    __spans;
 	static const cicada::NGramCountSet __ngram_counts;
 	
-	if (__bleu)
-	  __bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
-	else
-	  __bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	__scorer->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
       }
     }
   

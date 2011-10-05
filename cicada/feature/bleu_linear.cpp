@@ -555,12 +555,7 @@ namespace cicada
     {
       pimpl->initialize();
     }
-    
-    void BleuLinear::clear()
-    {
-      pimpl->clear();
-    }
-    
+        
     void BleuLinear::assign(const size_type& id,
 			    const hypergraph_type& hypergraph,
 			    const lattice_type& lattice,

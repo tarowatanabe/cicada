@@ -792,11 +792,6 @@ namespace cicada
       pimpl->initialize();
     }
     
-    void Bleu::clear()
-    {
-      pimpl->clear();
-    }
-
     void Bleu::assign(const size_type& id,
 		      const hypergraph_type& hypergraph,
 		      const lattice_type& lattice,

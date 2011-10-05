@@ -125,6 +125,7 @@ feature/parent.hpp \
 feature/penalty.hpp \
 feature/permute.hpp \
 feature/rule_shape.hpp \
+feature/scorer.hpp \
 feature/sgml_tag.hpp \
 feature/span.hpp \
 feature/sparse_lexicon.hpp \
