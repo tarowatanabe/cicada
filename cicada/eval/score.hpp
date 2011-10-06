@@ -235,12 +235,14 @@ namespace cicada
       
       inline const_iterator end() const { return scorers.end(); }
       inline       iterator end()       { return scorers.end(); }
+
+      void push_back(const scorer_ptr_type& x) { scorers.push_back(x); }
       
       bool error_metric() const
       {
 	return scorer_type::create(parameter)->error_metric();
       }
-      
+
       void resize(size_type x) { scorers.resize(x); }
       void clear() { scorers.clear(); }
 

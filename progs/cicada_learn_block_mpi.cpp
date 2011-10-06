@@ -123,6 +123,10 @@ struct LearnLinear;
 
 void options(int argc, char** argv);
 
+void read_refset(const path_type& refset_path,
+		 scorer_document_type& scorers,
+		 const size_t shard_rank = 0,
+		 const size_t shard_size = 0);
 void read_samples(const path_type& input_path,
 		  sample_set_type& samples,
 		  const bool directory_mode,
@@ -130,7 +134,10 @@ void read_samples(const path_type& input_path,
 		  const size_t shard_rank = 0,
 		  const size_t shard_size = 0);
 template <typename Learner>
-void cicada_learn(operation_set_type& operations, weight_set_type& weights);
+void cicada_learn(operation_set_type& operations,
+		  const sample_set_type& samples,
+		  const scorer_document_type& scorers,
+		  weight_set_type& weights);
 void synchronize();
 
 int main(int argc, char ** argv)
@@ -220,15 +227,18 @@ int main(int argc, char ** argv)
     
     ::sync();
     
+    // read input data
     sample_set_type samples;
     read_samples(input_file, samples, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
-
+    
+    // read reference data
     scorer_document_type scorers(scorer_name);
-    read_refset(refset_file, scorers);
+    read_refset(refset_file, scorers, mpi_rank, mpi_size);
     
     if (scorers.size() != samples.size())
       throw std::runtime_error("training sample size and reference translation size does not match");
     
+    // weights
     weight_set_type weights;
     if (! weights_file.empty()) {
       if (weights_file != "-" && ! boost::filesystem::exists(weights_file))
@@ -242,9 +252,9 @@ int main(int argc, char ** argv)
     
     // perform learning...
     if (learn_lbfgs)
-      cicada_learn<LearnLBFGS>(operations, samples, weights);
+      cicada_learn<LearnLBFGS>(operations, samples, scorers, weights);
     else
-      cicada_learn<LearnLinear>(operations, samples, weights);
+      cicada_learn<LearnLinear>(operations, samples, scorers, weights);
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file, 1024 * 1024);
@@ -354,10 +364,42 @@ void synchronize()
 }
 
 void read_refset(const path_type& refset_path,
-		 scorer_document_type& scorers)
+		 scorer_document_type& scorers,
+		 const size_t shard_rank = 0,
+		 const size_t shard_size = 0)
 {
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
   
+  parser_type parser;
+  id_sentence_type id_sentence;
+
+  utils::compress_istream is(refset_path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
   
+  iter_type iter(is);
+  iter_type iter_end;
+  
+  while (iter != iter_end) {
+    id_sentence.second.clear();
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+      if (iter != iter_end)
+	throw std::runtime_error("refset parsing failed");
+    
+    const size_t id = id_sentence.first;
+    
+    if (shard_size && (id % shard_size != shard_rank)) continue;
+    
+    const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+    
+    if (id_rank >= scorers.size())
+      scorers.resize(id_rank + 1);
+    
+    if (! scorers[id_rank])
+      scorers[id_rank] = scorers.create();
+    
+    scorers[id_rank]->insert(id_sentence.second);
+  }
 }
 
 void read_samples(const path_type& input_path,
@@ -394,11 +436,16 @@ void read_samples(const path_type& input_path,
 	
 	if (! qi::phrase_parse(iter, iter_end, id_parser >> "|||", standard::blank, id))
 	  throw std::runtime_error("id prefixed input format error");
-
+	
 	if (id != i)
 	  throw std::runtime_error("id doest not match!");
 	
-	samples.push_back(line);
+	const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+	
+	if (id_rank >= samples.size())
+	  samples.resize(id_rank + 1);
+	
+	samples[id_rank] = line;
       }
   } else if (id_mode) {
     utils::compress_istream is(input_path, 1024 * 1024);
@@ -415,17 +462,26 @@ void read_samples(const path_type& input_path,
 	if (! qi::phrase_parse(iter, iter_end, id_parser >> "|||", standard::blank, id))
 	  throw std::runtime_error("id prefixed input format error");
 	
-	if (shard_size == 0 || id % shard_size == shard_rank)
-	  samples.push_back(line);
+	if (shard_size == 0 || id % shard_size == shard_rank) {
+	  const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+	  
+	  if (id_rank >= samples.size())
+	    samples.resize(id_rank + 1);
+	  
+	  samples[id_rank] = line;
+	}
       }
   } else {
     utils::compress_istream is(input_path, 1024 * 1024);
     
     std::string line;
     for (size_t id = 0; std::getine(is, line); ++ id) 
-      if (shard_size == 0 || id % shard_size == shard_rank)
+      if (shard_size == 0 || id % shard_size == shard_rank) {
 	if (! line.empty())
 	  samples.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);
+	else
+	  samples.push_back(std::string());
+      }
   }
 }
 
@@ -794,13 +850,106 @@ struct LearnLinear
 };
 
 template <typename Learner>
-void cicada_learn(operation_set_type& operations, weight_set_type& weights)
+void cicada_learn(operation_set_type& operations,
+		  const sample_set_type& samples,
+		  const scorer_document_type& scorers,
+		  weight_set_type& weights)
 {
+  typedef std::vector<size_t, std::allocator<size_t> > segment_set_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  Learner         learner;
+  KBestGenerator  kbest_generator;
+  OracleGenerator oracle_generator;
   
+  segment_set_type segments(samples.size());
+  for (size_t seg = 0; seg != segments.size(); ++ seg)
+    segments[seg] = seg;
   
+  // random number generator...
+  boost::mt19937 generator;
+  generator.seed(time(0) * getpid());
+  boost::random_number_generator<generator_type> gen(generator);
   
+  weight_set_type weights_total;
+  int             learned_total = 0;
+
+  hypothesis_set_type kbests;
+  
+  segment_set_type     segments_block;
+  hypothesis_map_type  kbests_block;
+  hypothesis_map_type  oracles_block;
+  scorer_document_type scorers_block(scorers);
+  
+  for (int iter = 0; iter != iteration; ++ iter) {
+    // perform learning
+    
+    segment_set_type::const_iterator siter     = segments.begin();
+    segment_set_type::const_iterator siter_end = segments.end();
+    
+    while (siter != siter_end) {
+      segments_block.clear();
+      kbests_block.clear();
+      oracles_block.clear();
+      scorers_block.clear();
+      
+      segment_set_type::const_iterator siter_last = std::min(siter + block_size, siter_end);
+      for (/**/; siter != siter_last; ++ siter) {
+	const size_t id = *siter;
+	
+	if (samples[id].empty() || ! scorers[id]) continue;
+	
+	kbest_generator(operations, samples[id], kbests);
+	
+	// no translations?
+	if (kbests.empty()) continue;
+	
+	segments_block.push_back(id);
+	kbests_block.push_back(kbests);
+	scorers_block.push_back(scorers[id]);
+      }
+      
+      // no kbests?
+      if (segments_block.empty()) continue;
+      
+      // oracle computation
+      oracle_generator(kbests_block, scorers_block, oracles_block);
+      
+      // encode into learner...
+      for (size_t i = 0; i != kbests_block.size(); ++ i)
+	learner.encode(segments_block[i], kbests_block[i], oracles_block[i], merge_samples_mode);
+      
+      // perform learning...
+      learner.learn(weights);
+      
+      // keep totals...
+      weights_total += weights;
+      ++ learned_total;
+    }
+    
+    // randomize..
+    std::random_shuffle(segments.begin(), segments.end(), gen);
+    
+    if (mix_weights_mode) {
+      
+    }
+    
+    if (dump_weights_mode && mpi_rank == 0) {
+      if (average_weights_mode) {
+	
+      } else {
+	
+      }
+    }
+  }
+  
+  if (average_weights_mode) {
+    
+  } else {
+    
+  }
 }
 
 struct deprecated
