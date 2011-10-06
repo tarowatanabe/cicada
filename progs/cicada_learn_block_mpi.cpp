@@ -29,6 +29,9 @@
 
 #include "cicada/semiring.hpp"
 #include "cicada/eval.hpp"
+#include "cicada/kbest.hpp"
+#include "cicada/operation/traversal.hpp"
+#include "cicada/operation/functional.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -111,15 +114,20 @@ double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
 
 // additional misc parameters...
-bool mix_weights_mode     = false; // mix weights after each iteration
-bool average_weights_mode = false; // dump averaged weights at the final iteration
 bool merge_samples_mode   = false; // merge all the samples, instead of "replacing"
 bool dump_weights_mode    = false; // dump current weights... for debugging purpose etc.
 
 int debug = 0;
 
+// forward declarations...
 struct LearnLBFGS;
 struct LearnLinear;
+
+struct KBestSentence;
+struct KBestAlignment;
+struct KBestDependency;
+
+struct Oracle;
 
 void options(int argc, char** argv);
 
@@ -139,6 +147,11 @@ void cicada_learn(operation_set_type& operations,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights);
 void synchronize();
+
+void bcast_weights(const int rank, weight_set_type& weights);
+void send_weights(const int rank, const weight_set_type& weights);
+void reduce_weights(const int rank, weight_set_type& weights);
+void reduce_weights(weight_set_type& weights);
 
 int main(int argc, char ** argv)
 {
@@ -849,13 +862,278 @@ struct LearnLinear
   encoder_set_type encoders;
 };
 
-template <typename Learner>
+inline
+path_type add_suffix(const path_type& path, const std::string& suffix)
+{
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path_added = path;
+  
+  if (path.extension() == ".gz") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_gz = true;
+  } else if (path.extension() == ".bz2") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path_added = path_added.string() + suffix;
+  
+  if (has_suffix_gz)
+    path_added = path_added.string() + ".gz";
+  else if (has_suffix_bz2)
+    path_added = path_added.string() + ".bz2";
+  
+  return path_added;
+}
+
+struct KBestSentence
+{
+  typedef cicada::semiring::Logprob<double>               weight_type;
+  typedef cicada::operation::edge_feature_traversal       traversal_type;
+  typedef cicada::operation::weight_function<weight_type> function_type;
+  typedef cicada::operation::kbest_sentence_filter_unique filter_type;
+  
+  typedef cicada::KBest<traversal_type, function_type, filter_type> derivation_set_type;
+
+  typedef traversal_type::value_type derivation_type;
+  
+  void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
+  {    
+    kbests.clear();
+    
+    if (input.empty()) return;
+    
+    // assign weights
+    operations.assign(weights);
+    
+    // perform translation
+    operations(input);
+    
+    // generate kbests...
+    const hypergraph_type& graph = operations.get_data().hypergraph;
+    
+    derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(), filter_type(graph));
+    
+    derivation_type derivation;
+    weight_type     weight;
+    
+    for (size_t k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k)
+      kbests.push_back(hypothesis_type(boost::get<0>(derivation).begin(), boost::get<0>(derivation).end(),
+				       boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
+  }
+};
+
+struct KBestAlignment
+{
+  typedef cicada::semiring::Logprob<double>               weight_type;
+  typedef cicada::operation::edge_feature_traversal       traversal_type;
+  typedef cicada::operation::weight_function<weight_type> function_type;
+  typedef cicada::operation::kbest_sentence_filter_unique filter_type;
+  
+  typedef cicada::KBest<traversal_type, function_type, filter_type> derivation_set_type;
+
+  typedef traversal_type::value_type derivation_type;
+  
+  void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
+  {    
+    kbests.clear();
+    
+    if (input.empty()) return;
+    
+    // assign weights
+    operations.assign(weights);
+    
+    // perform translation
+    operations(input);
+    
+    // generate kbests...
+    const hypergraph_type& graph = operations.get_data().hypergraph;
+    
+    derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(), filter_type(graph));
+    
+    derivation_type derivation;
+    weight_type     weight;
+    
+    for (size_t k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k)
+      kbests.push_back(hypothesis_type(boost::get<0>(derivation).begin(), boost::get<0>(derivation).end(),
+				       boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
+  }
+};
+
+struct KBestDependency
+{
+  typedef cicada::semiring::Logprob<double>               weight_type;
+  typedef cicada::operation::edge_feature_traversal       traversal_type;
+  typedef cicada::operation::weight_function<weight_type> function_type;
+  typedef cicada::operation::kbest_sentence_filter_unique filter_type;
+  
+  typedef cicada::KBest<traversal_type, function_type, filter_type> derivation_set_type;
+
+  typedef traversal_type::value_type derivation_type;
+  
+  void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
+  {    
+    kbests.clear();
+    
+    if (input.empty()) return;
+    
+    // assign weights
+    operations.assign(weights);
+    
+    // perform translation
+    operations(input);
+    
+    // generate kbests...
+    const hypergraph_type& graph = operations.get_data().hypergraph;
+    
+    derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(), filter_type(graph));
+    
+    derivation_type derivation;
+    weight_type     weight;
+    
+    for (size_t k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k)
+      kbests.push_back(hypothesis_type(boost::get<0>(derivation).begin(), boost::get<0>(derivation).end(),
+				       boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
+  }
+};
+
+
+struct Oracle
+{
+  typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
+  typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
+
+  void operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& __oracles)
+  {
+    const bool error_metric = scorers.error_metric();
+    const double score_factor = (error_metric ? - 1.0 : 1.0);
+        
+    score_ptr_type score_prev;
+    score_ptr_type score_best;
+    score_ptr_type score_curr;
+    
+    oracle_map_type oracles_prev(kbests.size());
+    oracle_map_type oracles_best(kbests.size());
+    oracle_map_type oracles_curr(kbests.size());
+    
+    // initialization...
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	  hypothesis_type& hyp = const_cast<hypothesis_type&>(*hiter);
+	  
+	  if (! hyp.score)
+	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	}
+	
+	if (! score_prev)
+	  score_prev = kbests[id].front().score->clone();
+	else
+	  *score_prev += *(kbests[id].front().score);
+	
+	oracles_prev[id].push_back(&kbests[id].front());
+      }
+    
+    if (score_prev)
+      score_best = score_prev->clone();
+    else
+      throw std::runtime_error("no scores?");
+    
+    oracles_best = oracles_prev;
+    
+    double objective_prev = score_prev->score() * score_factor;
+    double objective_best = objective_prev;
+    double objective_curr = objective_prev;
+    
+    // 
+    // 10 iteration will be fine
+    //
+    for (int i = 0; i < 10; ++ i) {
+      score_curr     = score_prev->clone();
+      objective_curr = objective_prev;
+      oracles_curr   = oracles_prev;
+      
+      for (size_t id = 0; id != kbests.size(); ++ id) 
+	if (! kbests[id].empty()) {
+	  score_ptr_type score = score_curr->clone();
+	  *score -= *(oracles_curr[id].front()->score);
+	  
+	  hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
+	  for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	    score_ptr_type score_sample = score->clone();
+	    *score_sample += *(hiter->score);
+	    
+	    const double objective_sample = score_sample->score() * score_factor;
+	    
+	    if (objective_sample > objective_curr) {
+	      oracles_curr[id].clear();
+	      oracles_curr[id].push_back(&(*hiter));
+	      
+	      objective_curr = objective_sample;
+	      score_curr     = score_sample;
+	    } else if (objective_sample == objective_curr)
+	      oracles_curr[id].push_back(&(*hiter));
+	  }
+	}
+      
+      if (objective_curr > objective_best) {
+	score_best     = score_curr->clone();
+	objective_best = objective_curr;
+	oracles_best   = oracles_curr;
+      }
+      
+      if (objective_curr <= objective_prev) break;
+      
+      score_prev     = score_curr->clone();
+      objective_prev = objective_curr;
+      oracles_prev   = oracles_curr;
+    }
+    
+    oracles.clear();
+    oracles.resize(kbests.size());
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      for (size_t i = 0; i != oracles_best[id].size(); ++ i)
+	oracles[id].push_back(*oracles_best[id][i]);
+  }
+};
+
+struct Dumper
+{
+  typedef std::pair<path_type, weight_set_type > value_type;
+  typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
+  
+  Dumper(queue_type& __queue)
+    : queue(__queue) {}
+  
+  void operator()()
+  {
+    value_type value;
+    
+    while (1) {
+      queue.pop_swap(value);
+      if (value.first.empty()) break;
+      
+      utils::compress_ostream os(value.first, 1024 * 1024);
+      os.precision(20);
+      os << value.second;
+    }
+  }
+
+  queue_type& queue;
+};
+
+template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const sample_set_type& samples,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights)
 {
   typedef std::vector<size_t, std::allocator<size_t> > segment_set_type;
+  
+  typedef Dumper dumper_type;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -873,18 +1151,20 @@ void cicada_learn(operation_set_type& operations,
   generator.seed(time(0) * getpid());
   boost::random_number_generator<generator_type> gen(generator);
   
-  weight_set_type weights_total;
-  int             learned_total = 0;
-
   hypothesis_set_type kbests;
   
   segment_set_type     segments_block;
   hypothesis_map_type  kbests_block;
   hypothesis_map_type  oracles_block;
   scorer_document_type scorers_block(scorers);
+
+  dumper_type::queue_type queue_dumper;
+  std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
   
   for (int iter = 0; iter != iteration; ++ iter) {
     // perform learning
+
+    int updated = 0;
     
     segment_set_type::const_iterator siter     = segments.begin();
     segment_set_type::const_iterator siter_end = segments.end();
@@ -901,7 +1181,7 @@ void cicada_learn(operation_set_type& operations,
 	
 	if (samples[id].empty() || ! scorers[id]) continue;
 	
-	kbest_generator(operations, samples[id], kbests);
+	kbest_generator(operations, samples[id], weights, kbests);
 	
 	// no translations?
 	if (kbests.empty()) continue;
@@ -925,30 +1205,212 @@ void cicada_learn(operation_set_type& operations,
       learner.learn(weights);
       
       // keep totals...
-      weights_total += weights;
-      ++ learned_total;
+      ++ updated;
     }
     
     // randomize..
     std::random_shuffle(segments.begin(), segments.end(), gen);
     
-    if (mix_weights_mode) {
+    // mix weights
+    {
+      weights *= updated;
       
+      redue_weights(weights);
+      
+      bcast_weights(0, weights);
+      
+      int updated_total = 0;
+      MPI::COMM_WORLD.Allreduce(&updated, &pudated_total, 1, MPI::INT, MPI::SUM);
+      
+      weights *= 1.0 / updated_total;
     }
     
-    if (dump_weights_mode && mpi_rank == 0) {
-      if (average_weights_mode) {
-	
-      } else {
-	
-      }
-    }
+    // dump...
+    if (dump_weights_mode && mpi_rank == 0)
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
   }
   
-  if (average_weights_mode) {
+  queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
+  hread_dumper->join();
+}
+
+void send_weights(const int rank, const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::zlib_compressor());
+  os.push(utils::mpi_device_sink(rank, weights_tag, 4096));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0) {
+      os << feature_type(id) << ' ';
+      utils::encode_base64(weights[id], std::ostream_iterator<char>(os));
+      os << '\n';
+    }
+}
+
+void reduce_weights(const int rank, weight_set_type& weights)
+{
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(boost::iostreams::zlib_decompressor());
+  is.push(utils::mpi_device_source(rank, weights_tag, 4096));
+  
+  std::string line;
+  
+  while (std::getline(is, line)) {
+    const utils::piece line_piece(line);
+    tokenizer_type tokenizer(line_piece);
     
+    tokenizer_type::iterator iter = tokenizer.begin();
+    if (iter == tokenizer.end()) continue;
+    const utils::piece feature = *iter;
+    ++ iter;
+    if (iter == tokenizer.end()) continue;
+    const utils::piece value = *iter;
+    
+    weights[feature] += utils::decode_base64<double>(value);
+  }
+}
+
+template <typename Iterator>
+void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
+{
+  typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+  
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+  
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  device_ptr_set_type device;
+  stream_ptr_set_type stream;
+  
+  for (/**/; first != last; ++ first) {
+    device.push_back(device_ptr_type(new device_type(*first, weights_tag, 4096)));
+    stream.push_back(stream_ptr_type(new stream_type()));
+    
+    stream.back()->push(boost::iostreams::zlib_decompressor());
+    stream.back()->push(*device.back());
+  }
+  
+  std::string line;
+  
+  int non_found_iter = 0;
+  while (1) {
+    bool found = false;
+    
+    for (size_t i = 0; i != device.size(); ++ i)
+      while (stream[i] && device[i] && device[i]->test()) {
+	if (std::getline(*stream[i], line)) {
+	  const utils::piece line_piece(line);
+	  tokenizer_type tokenizer(line_piece);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  const utils::piece feature = *iter;
+	  ++ iter;
+	  if (iter == tokenizer.end()) continue;
+	  const utils::piece value = *iter;
+	  
+	  weights[feature] += utils::decode_base64<double>(value);
+	} else {
+	  stream[i].reset();
+	  device[i].reset();
+	}
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == static_cast<int>(device.size())) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+}
+
+
+void reduce_weights(weight_set_type& weights)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+  
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_weights(ranks.front(), weights);
+      else
+	reduce_weights(ranks.begin(), ranks.end(), weights);
+      
+    } else
+      send_weights(mpi_rank % reduce_size, weights);
+    
+    merge_size = reduce_size;
+  }
+}
+
+void bcast_weights(const int rank, weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == rank) {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_bcast_sink(rank, 4096));
+    
+    static const weight_set_type::feature_type __empty;
+    
+    weight_set_type::const_iterator witer_begin = weights.begin();
+    weight_set_type::const_iterator witer_end = weights.end();
+    
+    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
+      if (*witer != 0.0) {
+	const weight_set_type::feature_type feature(witer - witer_begin);
+	if (feature != __empty) {
+	  os << feature << ' ';
+	  utils::encode_base64(*witer, std::ostream_iterator<char>(os));
+	  os << '\n';
+	}
+      }
   } else {
+    weights.clear();
+    weights.allocate();
     
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::zlib_decompressor());
+    is.push(utils::mpi_device_bcast_source(rank, 4096));
+    
+    std::string feature;
+    std::string value;
+    
+    while ((is >> feature) && (is >> value))
+      weights[feature] = utils::decode_base64<double>(value);
   }
 }
 

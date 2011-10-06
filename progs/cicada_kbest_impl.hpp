@@ -56,6 +56,15 @@ struct hypothesis_type
   {
     std::sort(features.begin(), features.end());
   }
+  template <typename IteratorSentence, typename IteratorFeature>
+  hypothesis_type(IteratorSentence sfirst, IteratorSentence slast,
+		  IteratorFeature  ffirst, IteratorFeature  flast)
+    : sentence(sfirst, slast),
+      features(ffirst, flast),
+      score()
+  {
+    std::sort(features.begin(), features.end());
+  }
   
   sentence_type    sentence;
   feature_set_type features;
