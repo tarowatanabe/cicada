@@ -388,6 +388,7 @@ struct OptimizeLinear
     objective = model->objective * C;
     
     // it is an optimization...
+    weights.clear();
     for (int j = 0; j != model->nr_feature; ++ j)
       weights[weight_set_type::feature_type(j)] = model->w[j];
     
