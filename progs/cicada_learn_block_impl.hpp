@@ -833,4 +833,155 @@ struct Oracle
 };
 
 
+inline
+void read_refset(const path_type& refset_path,
+		 scorer_document_type& scorers,
+		 const size_t shard_rank,
+		 const size_t shard_size)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+  
+  parser_type parser;
+  id_sentence_type id_sentence;
+
+  utils::compress_istream is(refset_path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iter_type iter(is);
+  iter_type iter_end;
+  
+  while (iter != iter_end) {
+    id_sentence.second.clear();
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+      if (iter != iter_end)
+	throw std::runtime_error("refset parsing failed");
+    
+    const size_t id = id_sentence.first;
+    
+    if (shard_size && (id % shard_size != shard_rank)) continue;
+    
+    const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+    
+    if (id_rank >= scorers.size())
+      scorers.resize(id_rank + 1);
+    
+    if (! scorers[id_rank])
+      scorers[id_rank] = scorers.create();
+    
+    scorers[id_rank]->insert(id_sentence.second);
+  }
+}
+
+inline
+void read_samples(const path_type& input_path,
+		  sample_set_type& samples,
+		  const bool directory_mode,
+		  const bool id_mode,
+		  const size_t shard_rank,
+		  const size_t shard_size)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+
+  if (directory_mode) {
+    if (! boost::filesystem::is_directory(input_path))
+      throw std::runtime_error("input is not directory! " + input_path.string());
+
+    boost::spirit::qi::uint_parser<size_t, 10, 1, -1> id_parser;
+    
+    size_t id;
+    std::string line;
+    for (size_t i = 0; /**/; ++ i)
+      if (shard_size <= 0 || i % shard_size == shard_rank) {
+	const path_type path = input_path / (utils::lexical_cast<std::string>(i) + ".gz");
+	
+	if (! boost::filesystem::exists(path)) break;
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	std::getline(is, line);
+	
+	if (line.empty()) continue;
+	
+	std::string::const_iterator iter     = line.begin();
+	std::string::const_iterator iter_end = line.end();
+	
+	if (! qi::phrase_parse(iter, iter_end, id_parser >> "|||", standard::blank, id))
+	  throw std::runtime_error("id prefixed input format error");
+	
+	if (id != i)
+	  throw std::runtime_error("id doest not match!");
+	
+	const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+	
+	if (id_rank >= samples.size())
+	  samples.resize(id_rank + 1);
+	
+	samples[id_rank] = line;
+      }
+  } else if (id_mode) {
+    utils::compress_istream is(input_path, 1024 * 1024);
+    
+    boost::spirit::qi::uint_parser<size_t, 10, 1, -1> id_parser;
+    
+    size_t id;
+    std::string line;
+    while (std::getline(is, line)) 
+      if (! line.empty()) {
+	std::string::const_iterator iter     = line.begin();
+	std::string::const_iterator iter_end = line.end();
+	
+	if (! qi::phrase_parse(iter, iter_end, id_parser >> "|||", standard::blank, id))
+	  throw std::runtime_error("id prefixed input format error");
+	
+	if (shard_size == 0 || id % shard_size == shard_rank) {
+	  const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
+	  
+	  if (id_rank >= samples.size())
+	    samples.resize(id_rank + 1);
+	  
+	  samples[id_rank] = line;
+	}
+      }
+  } else {
+    utils::compress_istream is(input_path, 1024 * 1024);
+    
+    std::string line;
+    for (size_t id = 0; std::getline(is, line); ++ id) 
+      if (shard_size == 0 || id % shard_size == shard_rank) {
+	if (! line.empty())
+	  samples.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);
+	else
+	  samples.push_back(std::string());
+      }
+  }
+}
+
+
+inline
+path_type add_suffix(const path_type& path, const std::string& suffix)
+{
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path_added = path;
+  
+  if (path.extension() == ".gz") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_gz = true;
+  } else if (path.extension() == ".bz2") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path_added = path_added.string() + suffix;
+  
+  if (has_suffix_gz)
+    path_added = path_added.string() + ".gz";
+  else if (has_suffix_bz2)
+    path_added = path_added.string() + ".bz2";
+  
+  return path_added;
+}
+
 #endif

@@ -85,6 +85,7 @@ Various learning components are implemented:
      + softmax-margin [9] (New! But still open problems!)
    - Small/large feature set learned by iteratively construncting training samples with rank-learning.
      + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
+     + we have a script-based implementation + single-binary implementation for efficiency
 
 Word clustering tool is also included to support word alignment learning + translation [20]
 
