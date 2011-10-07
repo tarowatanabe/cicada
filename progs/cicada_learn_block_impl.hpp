@@ -99,8 +99,31 @@ struct LearnLBFGS
 	for (sample_pair_set_type::const_iterator siter = samples[id].begin(); siter != siter_end; ++ siter) {
 	  const sample_pair_type& sample = *siter;
 	  
+	  if (sample.oracles.empty() || sample.kbests.empty()) continue;
 	  
+	  sample_type::const_iterator oiter_end = sample.oracles.end();
+	  for (sample_type::const_iterator oiter = sample.oracles.begin(); oiter != oiter_end; ++ oiter) {
+	    os << "oracle:";
+	    
+	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->end();
+	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->begin(); fiter != fiter_end; ++ fiter) {
+	      os << ' ' << fiter->first << ' ';
+	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
+	    }
+	    os << '\n';
+	  }
 	  
+	  sample_type::const_iterator kiter_end = sample.kbests.end();
+	  for (sample_type::const_iterator kiter = sample.kbests.begin(); kiter != kiter_end; ++ kiter) {
+	    os << "kbest:";
+	    
+	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->end();
+	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->begin(); fiter != fiter_end; ++ fiter) {
+	      os << ' ' << fiter->first << ' ';
+	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
+	    }
+	    os << '\n';
+	  }
 	}
       }
     
@@ -109,6 +132,60 @@ struct LearnLBFGS
 
   std::istream& decode(std::istream& is)
   {
+    typedef cicada::Feature feature_type;
+    typedef std::pair<feature_type, double> feature_value_type;
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+    
+    std::string mode = "kbest:";
+
+    sample_type* psample;
+    
+    std::string line;
+    feature_set_type features;
+    while (std::getline(is, line)) {
+      features.clear();
+      
+      const utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+      
+      tokenizer_type::iterator iter     = tokenizer.begin();
+      tokenizer_type::iterator iter_end = tokenizer.end();
+      
+      if (iter == iter_end) continue;
+      
+      const utils::piece mode_curr = *iter;
+      ++ iter;
+      
+      if (iter == iter_end) continue;
+      
+      if (mode_curr != mode) {
+	if (mode_curr == "oracle:") {
+	  samples_other.push_back(sample_pair_type());
+	  psample = &(samples_other.back().oracles);
+	} else
+	  psample = &(samples_other.back().kbests);
+	
+	mode = mode_curr;
+      }
+      
+      while (iter != iter_end) {
+	const utils::piece feature = *iter;
+	++ iter;
+	
+	if (iter == iter_end) break;
+	
+	const utils::piece value = *iter;
+	++ iter;
+	
+	features.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
+      }
+      
+      if (features.empty()) continue;
+      
+      psample->push_back(hypothesis_type::feature_set_type(features.begin(), features.end()));
+    }
+    
     return is;
   }
   
@@ -440,6 +517,8 @@ struct LearnLinear
 	
 	features.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
       }
+
+      if (features.empty()) continue;
       
       std::sort(features.begin(), features.end());
       encoder_other.encode(features.begin(), features.end());

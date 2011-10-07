@@ -107,8 +107,9 @@ double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
 
 // additional misc parameters...
-bool merge_samples_mode   = false; // merge all the samples, instead of "replacing"
-bool dump_weights_mode    = false; // dump current weights... for debugging purpose etc.
+bool merge_samples_mode  = false; // merge all the samples, instead of "replacing"
+bool merge_vectors_mode  = false; // merge all the vectors from others
+bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
 int debug = 0;
 
@@ -639,6 +640,31 @@ void cicada_learn(operation_set_type& operations,
     // randomize..
     std::random_shuffle(segments.begin(), segments.end(), gen);
     
+    if (merge_vectors_mode) {
+      if (debug && mpi_rank == 0)
+	std::cerr << "merge vectors" << std::endl;
+      
+      learner.clear();
+      for (int rank = 0; rank != mpi_size; ++ rank)
+	if (rank == mpi_rank) {
+	  boost::iostreams::filtering_ostream os;
+	  os.push(boost::iostreams::zlib_compressor());
+	  os.push(utils::mpi_device_bcast_sink(rank, 1024 * 16));
+	  
+	  learner.encode(os);
+	} else {
+	  boost::iostreams::filtering_istream is;
+	  is.push(boost::iostreams::zlib_decompressor());
+	  is.push(utils::mpi_device_bcast_source(rank, 1024 * 16));
+	  
+	  learner.decode(is);
+	}
+      
+      // perform learning...
+      learner.learn(weights);
+    }
+
+    
     // mix weights
     if (debug && mpi_rank == 0)
       std::cerr << "mix weights" << std::endl;
@@ -936,6 +962,7 @@ void options(int argc, char** argv)
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
     
     ("merge-sample", po::bool_switch(&merge_samples_mode), "merge samples across iterations")
+    ("merge-vector", po::bool_switch(&merge_vectors_mode), "merge vectors from others")
     ("dump-weights", po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
