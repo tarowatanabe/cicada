@@ -205,7 +205,7 @@ int main(int argc, char ** argv)
 				  input_dependency_mode,
 				  input_bitext_mode,
 				  true,
-				  debug);
+				  debug ? debug - 1 : debug);
     
     // make sure to synchronize here... otherwise, badthink may happen...
     if (mpi_rank == 0 && ! operations.get_output_data().directory.empty()) {
@@ -589,6 +589,9 @@ void cicada_learn(operation_set_type& operations,
   for (int iter = 0; iter != iteration; ++ iter) {
     // perform learning
 
+    if (debug && mpi_rank == 0)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+    
     int updated = 0;
     
     segment_set_type::const_iterator siter     = segments.begin();
@@ -637,6 +640,9 @@ void cicada_learn(operation_set_type& operations,
     std::random_shuffle(segments.begin(), segments.end(), gen);
     
     // mix weights
+    if (debug && mpi_rank == 0)
+      std::cerr << "mix weights" << std::endl;
+
     {
       weights *= updated;
       
