@@ -79,6 +79,7 @@ cicada_learn
 cicada_learn_mpi
 cicada_learn_kbest
 cicada_learn_kbest_mpi
+cicada_learn_block_mpi
 cicada_learn_online
 cicada_learn_online_mpi
 cicada_lexicon
