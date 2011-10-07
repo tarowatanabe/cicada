@@ -149,9 +149,7 @@ void cicada_learn(operation_set_type& operations,
 		  weight_set_type& weights);
 void synchronize();
 
-void bcast_weights(const int rank, weight_set_type& weights);
-void send_weights(const int rank, const weight_set_type& weights);
-void reduce_weights(const int rank, weight_set_type& weights);
+void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 
 int main(int argc, char ** argv)
@@ -1183,10 +1181,14 @@ void cicada_learn(operation_set_type& operations,
   hypothesis_map_type  kbests_block;
   hypothesis_map_type  oracles_block;
   scorer_document_type scorers_block(scorers);
-
-  dumper_type::queue_type queue_dumper;
-  std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
   
+  dumper_type::queue_type queue_dumper;
+  std::auto_ptr<boost::thread> thread_dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
+  
+  // first, bcast weights...
+  bcast_weights(weights);
+  
+  // start training
   for (int iter = 0; iter != iteration; ++ iter) {
     // perform learning
 
@@ -1241,12 +1243,12 @@ void cicada_learn(operation_set_type& operations,
     {
       weights *= updated;
       
-      redue_weights(weights);
+      reduce_weights(weights);
       
-      bcast_weights(0, weights);
+      bcast_weights(weights);
       
       int updated_total = 0;
-      MPI::COMM_WORLD.Allreduce(&updated, &pudated_total, 1, MPI::INT, MPI::SUM);
+      MPI::COMM_WORLD.Allreduce(&updated, &udated_total, 1, MPI::INT, MPI::SUM);
       
       weights *= 1.0 / updated_total;
     }
@@ -1256,8 +1258,10 @@ void cicada_learn(operation_set_type& operations,
       queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
   }
   
-  queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
-  hread_dumper->join();
+  if (mpi_rank == 0) {
+    queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
+    thread_dumper->join();
+  }
 }
 
 void send_weights(const int rank, const weight_set_type& weights)
@@ -1438,6 +1442,11 @@ void bcast_weights(const int rank, weight_set_type& weights)
     while ((is >> feature) && (is >> value))
       weights[feature] = utils::decode_base64<double>(value);
   }
+}
+
+void bcast_weights(weight_set_type& weights)
+{
+  bcast_weights(0, weights);
 }
 
 struct deprecated

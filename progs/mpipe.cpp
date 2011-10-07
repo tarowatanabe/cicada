@@ -319,9 +319,13 @@ int main(int argc, char** argv)
       queue_type    queue_send(1);
       queue_id_type queue_id;
       queue_type    queue_recv;
-
+      
+      const bool flush_output = (output_file == "-"
+				 || (boost::filesystem::exists(output_file)
+				     && ! boost::filesystem::is_regular_file(output_file)));
+      
       utils::compress_istream is(input_file, 1024 * 1024);
-      utils::compress_ostream os(output_file, output_file == "-" ? 4096 : 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
 
       boost::thread consumer(consumer_type(queue_is, is));
       boost::thread dumper(dumper_type(queue_recv, os, mpi_size));
