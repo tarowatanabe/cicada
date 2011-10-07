@@ -138,6 +138,7 @@ void synchronize();
 
 void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
+void reduce_score(score_ptr_type& score);
 
 int main(int argc, char ** argv)
 {
@@ -282,6 +283,7 @@ int main(int argc, char ** argv)
 
 enum {
   weights_tag = 1000,
+  score_tag,
   notify_tag,
 };
 
@@ -594,6 +596,8 @@ void cicada_learn(operation_set_type& operations,
       std::cerr << "iteration: " << (iter + 1) << std::endl;
     
     int updated = 0;
+    score_ptr_type score_1best;
+    score_ptr_type score_oracle;
     
     segment_set_type::const_iterator siter     = segments.begin();
     segment_set_type::const_iterator siter_end = segments.end();
@@ -624,7 +628,22 @@ void cicada_learn(operation_set_type& operations,
       if (segments_block.empty()) continue;
       
       // oracle computation
-      oracle_generator(kbests_block, scorers_block, oracles_block);
+      std::pair<score_ptr_type, score_ptr_type> scores = oracle_generator(kbests_block, scorers_block, oracles_block);
+
+
+      if (! score_1best)
+	score_1best = scores.first;
+      else
+	*score_1best += *(scores.first);
+      
+      if (! score_oracle)
+	score_oracle = scores.second;
+      else
+	*score_oracle += *(scores.second);
+      
+      if (debug >= 2)
+	std::cerr << "devset block       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
+		  << "devset accumulated 1best: " << score_1best->score()  << " oracle: " << score_oracle->score() << std::endl;
       
       // encode into learner...
       for (size_t i = 0; i != kbests_block.size(); ++ i)
@@ -635,6 +654,14 @@ void cicada_learn(operation_set_type& operations,
       
       // keep totals...
       ++ updated;
+    }
+
+    if (debug) {
+      reduce_score(score_1best);
+      reduce_score(score_oracle);
+      
+      if (mpi_rank == 0)
+	std::cerr << "devset total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
     }
     
     // randomize..
@@ -690,6 +717,31 @@ void cicada_learn(operation_set_type& operations,
   if (mpi_rank == 0) {
     queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
     thread_dumper->join();
+  }
+}
+
+void reduce_score(score_ptr_type& score)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(utils::mpi_device_source(rank, score_tag, 256));
+      
+      std::string score_str;
+      is >> score_str;
+      
+      if (! score)
+	score = scorer_type::score_type::decode(score_str);
+      else
+	*score += *scorer_type::score_type::decode(score_str);
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_sink(0, score_tag, 256));
+    os << score->encode();
   }
 }
 

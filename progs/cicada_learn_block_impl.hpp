@@ -730,10 +730,13 @@ struct Oracle
   typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
   typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
 
-  void operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& oracles)
+  std::pair<score_ptr_type, score_ptr_type>
+  operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& oracles)
   {
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
+
+    score_ptr_type score_1best;
         
     score_ptr_type score_prev;
     score_ptr_type score_best;
@@ -766,6 +769,8 @@ struct Oracle
       score_best = score_prev->clone();
     else
       throw std::runtime_error("no scores?");
+    
+    score_1best = score_best->clone();
     
     oracles_best = oracles_prev;
     
@@ -822,6 +827,8 @@ struct Oracle
     for (size_t id = 0; id != kbests.size(); ++ id)
       for (size_t i = 0; i != oracles_best[id].size(); ++ i)
 	oracles[id].push_back(*oracles_best[id][i]);
+
+    return std::make_pair(score_1best, score_best);
   }
 };
 
