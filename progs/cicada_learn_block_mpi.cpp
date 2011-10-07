@@ -99,6 +99,7 @@ int kbest_size = 1000;
 
 // solver parameters
 bool learn_lbfgs  = false;
+bool learn_mira   = false;
 bool learn_linear = false;
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 bool regularize_l1 = false;
@@ -165,6 +166,35 @@ int main(int argc, char ** argv)
     }
 
 
+    // check parameters for learning...
+    // 
+    //
+    if (refset_file.empty() || ! boost::filesystem::exists(refset_file))
+      throw std::runtime_error("no refset file? " + refset_file.string());
+    
+    if (output_file.empty())
+      throw std::runtime_error("no output?");
+    
+    if (int(yield_sentence) + yield_alignment + yield_dependency > 1)
+      throw std::runtime_error("you can specify either --yield-{sentence,alignment,dependency}");
+    if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
+      yield_sentence = true;
+    
+    if (int(learn_lbfgs) + learn_mira + learn_linear > 1)
+      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,linear}");
+    if (int(learn_lbfgs) + learn_mira + learn_linear == 0)
+      learn_lbfgs = true;
+
+    if (regularize_l1 && regularize_l2)
+      throw std::runtime_error("either L1 or L2 regularization");
+    if (int(regularize_l1) + regularize_l2 == 0)
+      regularize_l2 = true;
+
+    if (block_size <= 0)
+      throw std::runtime_error("block size must be possitive: " + utils::lexical_cast<std::string>(block_size));
+    if (kbest_size <= 0)
+      throw std::runtime_error("kbest size must be possitive: " + utils::lexical_cast<std::string>(kbest_size));
+    
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
     if (debug && mpi_rank == 0)
@@ -244,16 +274,22 @@ int main(int argc, char ** argv)
     if (yield_sentence) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, samples, scorers, weights);
       else
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
     } else if (yield_alignment) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
       else
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
     } else if (yield_dependency) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, samples, scorers, weights);
       else
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
     } else
@@ -540,16 +576,25 @@ void cicada_learn(operation_set_type& operations,
     if (debug && mpi_rank == 0)
       std::cerr << "mix weights" << std::endl;
 
-    weights *= updated;
-    
-    reduce_weights(weights);
-    
-    bcast_weights(weights);
-    
-    int updated_total = 0;
-    MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, MPI::INT, MPI::SUM);
-    
-    weights *= 1.0 / updated_total;
+    if (merge_vectors_mode) {
+      // simply averaging, since we have distributed vectors
+      reduce_weights(weights);
+      
+      bcast_weights(weights);
+      
+      weights *= 1.0 / mpi_size;
+    } else {
+      weights *= updated;
+      
+      reduce_weights(weights);
+      
+      bcast_weights(weights);
+      
+      int updated_total = 0;
+      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, MPI::INT, MPI::SUM);
+      
+      weights *= 1.0 / updated_total;
+    }
     
     // dump...
     if (dump_weights_mode && mpi_rank == 0)
@@ -841,6 +886,7 @@ void options(int argc, char** argv)
     ("kbset",     po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
+    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
     ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"

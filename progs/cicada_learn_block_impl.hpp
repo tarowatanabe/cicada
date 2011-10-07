@@ -5,6 +5,11 @@
 #ifndef __CICADA_LEARN_BLOCK_IMPL__HPP__
 #define __CICADA_LEARN_BLOCK_IMPL__HPP__ 1
 
+#define BOOST_SPIRIT_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
 #include <sstream>
 #include <vector>
 
@@ -29,6 +34,38 @@
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
+
+// MIRA learner
+struct LearnMIRA
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  void clear()
+  {
+
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  {
+    
+  }
+  
+  double learn(weight_set_type& __weights)
+  {
+    return 0.0;
+  }
+};
 
 // LBFGS learner
 struct LearnLBFGS
