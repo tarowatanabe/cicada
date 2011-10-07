@@ -265,10 +265,23 @@ int main(int argc, char ** argv)
     }
     
     // perform learning...
-    if (learn_lbfgs)
-      cicada_learn<LearnLBFGS>(operations, samples, scorers, weights);
-    else
-      cicada_learn<LearnLinear>(operations, samples, scorers, weights);
+    if (yield_sentence) {
+      if (learn_lbfgs)
+	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
+    } else if (yield_alignment) {
+      if (learn_lbfgs)
+	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+    } else if (yield_dependency) {
+      if (learn_lbfgs)
+	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
+    } else
+      throw std::runtime_error("invalid yield");
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file, 1024 * 1024);

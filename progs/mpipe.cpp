@@ -230,6 +230,7 @@ struct Dumper
 
 enum {
   line_tag = 1000,
+  notify_tag,
 };
 
 inline
@@ -540,6 +541,68 @@ int main(int argc, char** argv)
       
       mapper.join();
       reducer.join();
+    }
+    
+    // synchronize...
+    if (mpi_rank == 0) {
+      std::vector<MPI::Request, std::allocator<MPI::Request> > request_recv(mpi_size);
+      std::vector<MPI::Request, std::allocator<MPI::Request> > request_send(mpi_size);
+      std::vector<bool, std::allocator<bool> > terminated_recv(mpi_size, false);
+      std::vector<bool, std::allocator<bool> > terminated_send(mpi_size, false);
+    
+      terminated_recv[0] = true;
+      terminated_send[0] = true;
+      for (int rank = 1; rank != mpi_size; ++ rank) {
+	request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
+	request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, rank, notify_tag);
+      }
+    
+      int non_found_iter = 0;
+      for (;;) {
+	bool found = false;
+      
+	for (int rank = 1; rank != mpi_size; ++ rank)
+	  if (! terminated_recv[rank] && request_recv[rank].Test()) {
+	    terminated_recv[rank] = true;
+	    found = true;
+	  }
+      
+	for (int rank = 1; rank != mpi_size; ++ rank)
+	  if (! terminated_send[rank] && request_send[rank].Test()) {
+	    terminated_send[rank] = true;
+	    found = true;
+	  }
+      
+	if (std::count(terminated_send.begin(), terminated_send.end(), true) == mpi_size
+	    && std::count(terminated_recv.begin(), terminated_recv.end(), true) == mpi_size) break;
+      
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
+    } else {
+      MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, 0, notify_tag);
+      MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, 0, notify_tag);
+    
+      bool terminated_send = false;
+      bool terminated_recv = false;
+    
+      int non_found_iter = 0;
+      for (;;) {
+	bool found = false;
+      
+	if (! terminated_send && request_send.Test()) {
+	  terminated_send = true;
+	  found = true;
+	}
+      
+	if (! terminated_recv && request_recv.Test()) {
+	  terminated_recv = true;
+	  found = true;
+	}
+      
+	if (terminated_send && terminated_recv) break;
+      
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
     }
   }
   catch (const std::exception& err) {
