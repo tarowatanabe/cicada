@@ -18,6 +18,11 @@
 #include "cicada/operation/functional.hpp"
 
 #include "utils/sgi_hash_set.hpp"
+#include "utils/base64.hpp"
+#include "utils/space_separator.hpp"
+#include "utils/piece.hpp"
+
+#include <boost/tokenizer.hpp>
 
 #include "lbfgs.h"
 #include "liblinear/linear.h"
@@ -226,6 +231,28 @@ struct LearnLinear
 
     offset_set_type       offsets;
     feature_node_set_type features;
+    
+    template <typename Iterator>
+    void encode(Iterator first, Iterator last)
+    {
+      feature_node_type feature;
+      
+      if (first == last) return;
+      
+      offsets.push_back(features.size());
+      
+      for (/**/; first != last; ++ first) {
+	feature.index = first->first.id() + 1;
+	feature.value = first->second;
+	
+	features.push_back(feature);
+      }
+      
+      // termination...
+      feature.index = -1;
+      feature.value = 0.0;
+      features.push_back(feature);
+    }
 
     void encode(const hypothesis_set_type& kbests,
 		const hypothesis_set_type& oracles)
@@ -318,16 +345,73 @@ struct LearnLinear
     
     encoders[id].encode(kbests, oracles);
   }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    for (size_type id = 0; id != encoders.size(); ++ id)
+      for (size_type pos = 0; pos != encoders[id].offsets.size(); ++ pos) {
+	encoder_type::feature_node_set_type::const_iterator fiter     = encoders[id].features.begin() + encoders[id].offsets[pos];
+	encoder_type::feature_node_set_type::const_iterator fiter_end = (pos + 1 < encoders[id].offsets.size()
+							   ? encoders[id].features.begin() + encoders[id].offsets[pos + 1] - 1
+							   : encoders[id].features.end() - 1);
+	for (/**/; fiter != fiter_end; ++ fiter) {
+	  os << weight_set_type::feature_type(fiter->index - 1) << ' ';
+	  utils::encode_base64(fiter->value, std::ostream_iterator<char>(os));
+	  os << ' ';
+	}
+	os << '\n';
+      }
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    typedef cicada::Feature feature_type;
+    typedef std::pair<feature_type, double> feature_value_type;
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 
+    std::string line;
+    feature_set_type features;
+    while (std::getline(is, line)) {
+      features.clear();
+      
+      const utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+      
+      tokenizer_type::iterator iter     = tokenizer.begin();
+      tokenizer_type::iterator iter_end = tokenizer.end();
+      
+      while (iter != iter_end) {
+	const utils::piece feature = *iter;
+	++ iter;
+	
+	if (iter == iter_end) break;
+	
+	const utils::piece value = *iter;
+	++ iter;
+	
+	features.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
+      }
+      
+      std::sort(features.begin(), features.end());
+      encoder_other.encode(features.begin(), features.end());
+    }
+    return is;
+  }
+  
   double learn(weight_set_type& weights)
   {
-    size_type data_size = 0;
+    size_type data_size = encoder_other.offsets.size();
     for (size_type id = 0; id != encoders.size(); ++ id)
       data_size += encoders[id].offsets.size();
     
     label_set_type        labels(data_size, 1);
     feature_node_map_type features;
     features.reserve(data_size);
+
+    for (size_type pos = 0; pos != encoder_other.offsets.size(); ++ pos)
+      features.push_back(const_cast<feature_node_type*>(&(*encoder_other.features.begin())) + encoder_other.offsets[pos]);
     
     for (size_type id = 0; id != encoders.size(); ++ id)
       for (size_type pos = 0; pos != encoders[id].offsets.size(); ++ pos)
@@ -387,6 +471,7 @@ struct LearnLinear
   }
   
   encoder_set_type encoders;
+  encoder_type     encoder_other;
 };
 
 
