@@ -61,8 +61,78 @@ struct LearnMIRA
     
   }
   
-  double learn(weight_set_type& __weights)
+  double learn(weight_set_type& weights)
   {
+    
+    
+    return 0.0;
+  }
+};
+
+// SGDL1 learner
+struct LearnSGDL1
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  void clear()
+  {
+
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    
+    
+    return 0.0;
+  }
+};
+
+// SGDL2 learner
+struct LearnSGDL2
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  void clear()
+  {
+
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    
+    
     return 0.0;
   }
 };

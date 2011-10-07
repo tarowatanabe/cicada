@@ -100,6 +100,7 @@ int kbest_size = 1000;
 // solver parameters
 bool learn_lbfgs  = false;
 bool learn_mira   = false;
+bool learn_sgd    = false;
 bool learn_linear = false;
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 bool regularize_l1 = false;
@@ -180,12 +181,12 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_linear > 1)
-      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,linear}");
-    if (int(learn_lbfgs) + learn_mira + learn_linear == 0)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear > 1)
+      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear}");
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear == 0)
       learn_lbfgs = true;
-
-    if (regularize_l1 && regularize_l2)
+    
+    if (int(regularize_l1) + regularize_l2 > 1)
       throw std::runtime_error("either L1 or L2 regularization");
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
@@ -276,6 +277,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l2)
+	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, samples, scorers, weights);      
       else
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
     } else if (yield_alignment) {
@@ -283,6 +288,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l2)
+	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, samples, scorers, weights);      
       else
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
     } else if (yield_dependency) {
@@ -290,6 +299,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_sgd && regularize_l2)
+	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, samples, scorers, weights);      
       else
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
     } else
@@ -887,6 +900,7 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
+    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
     ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"
