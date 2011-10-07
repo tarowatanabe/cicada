@@ -39,16 +39,78 @@ struct LearnLBFGS
   typedef hypothesis_type::feature_set_type feature_set_type;
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > sample_type;
 
+  typedef cicada::semiring::Log<double> weight_type;
+  typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
+  
   struct sample_pair_type
   {
     sample_pair_type() : kbests(), oracles() {}
     
     sample_type kbests;
     sample_type oracles;
+
+    
+    double encode(const weight_set_type& weights, expectation_type& expectations) const
+    {
+      weight_type Z_oracle;
+      weight_type Z_kbest; 
+      
+      sample_type::const_iterator oiter_end = oracles.end();
+      for (sample_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
+	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0));
+      
+      sample_type::const_iterator kiter_end = kbests.end();
+      for (sample_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
+	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0));
+      
+      for (sample_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0)) / Z_oracle;
+	
+	hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->end();
+	for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->begin(); fiter != fiter_end; ++ fiter)
+	  expectations[fiter->first] -= weight_type(fiter->second) * weight;
+      }
+      
+      for (sample_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0)) / Z_kbest;
+	
+	hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->end();
+	for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->begin(); fiter != fiter_end; ++ fiter)
+	  expectations[fiter->first] += weight_type(fiter->second) * weight;
+      }
+      
+      return log(Z_oracle) - log(Z_kbest);
+    }
   };
   
   typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
   typedef utils::chunk_vector<sample_pair_set_type, 4096 / sizeof(sample_pair_set_type), std::allocator<sample_pair_set_type> > sample_pair_map_type;
+
+  void clear()
+  {
+    samples_other.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    for (size_t id = 0; id != samples.size(); ++ id) 
+      if (! samples[id].empty()) {
+	sample_pair_set_type::const_iterator siter_end = samples[id].end();
+	for (sample_pair_set_type::const_iterator siter = samples[id].begin(); siter != siter_end; ++ siter) {
+	  const sample_pair_type& sample = *siter;
+	  
+	  
+	  
+	}
+      }
+    
+    return os;
+  }
+
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
   {
@@ -94,9 +156,6 @@ struct LearnLBFGS
     
     return objective;
   }
-
-  typedef cicada::semiring::Log<double> weight_type;
-  typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
   
   static lbfgsfloatval_t evaluate(void *instance,
 				  const lbfgsfloatval_t *x,
@@ -106,15 +165,24 @@ struct LearnLBFGS
   {
     LearnLBFGS& optimizer = *((LearnLBFGS*) instance);
     
-    expectation_type& expectations = optimizer.expectations;
-    weight_set_type& weights       = optimizer.weights;
-    sample_pair_map_type& samples  = optimizer.samples;
+    expectation_type& expectations            = optimizer.expectations;
+    weight_set_type& weights                  = optimizer.weights;
+    const sample_pair_map_type& samples       = optimizer.samples;
+    const sample_pair_set_type& samples_other = optimizer.samples_other;
     
     expectations.clear();
     expectations.allocate();
 
     double objective = 0.0;
     size_t instances = 0;
+
+    for (size_t i = 0; i != samples_other.size(); ++ i) {
+      const sample_pair_type& sample = samples_other[i];
+      
+      const double margin = sample.encode(weights, expectations);
+      objective -= margin;
+      ++ instances;
+    }
     
     for (size_t id = 0; id != samples.size(); ++ id) 
       if (! samples[id].empty()) {
@@ -122,34 +190,7 @@ struct LearnLBFGS
 	for (sample_pair_set_type::const_iterator siter = samples[id].begin(); siter != siter_end; ++ siter) {
 	  const sample_pair_type& sample = *siter;
 	  
-	  weight_type Z_oracle;
-	  weight_type Z_kbest;
-	  
-	  sample_type::const_iterator oiter_end = sample.oracles.end();
-	  for (sample_type::const_iterator oiter = sample.oracles.begin(); oiter != oiter_end; ++ oiter)
-	    Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0));
-	  
-	  sample_type::const_iterator kiter_end = sample.kbests.end();
-	  for (sample_type::const_iterator kiter = sample.kbests.begin(); kiter != kiter_end; ++ kiter)
-	    Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0));
-	  
-	  for (sample_type::const_iterator oiter = sample.oracles.begin(); oiter != oiter_end; ++ oiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0)) / Z_oracle;
-	    
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->begin(); fiter != fiter_end; ++ fiter)
-	      expectations[fiter->first] -= weight_type(fiter->second) * weight;
-	  }
-	  
-	  for (sample_type::const_iterator kiter = sample.kbests.begin(); kiter != kiter_end; ++ kiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0)) / Z_kbest;
-	    
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->begin(); fiter != fiter_end; ++ fiter)
-	      expectations[fiter->first] += weight_type(fiter->second) * weight;
-	  }
-	  
-	  const double margin = log(Z_oracle) - log(Z_kbest);
+	  const double margin = sample.encode(weights, expectations);
 	  objective -= margin;
 	  ++ instances;
 	}
@@ -176,6 +217,7 @@ struct LearnLBFGS
   expectation_type     expectations;
   weight_set_type      weights;
   sample_pair_map_type samples;
+  sample_pair_set_type samples_other;
 };
 
 // linear learner
@@ -344,6 +386,11 @@ struct LearnLinear
       encoders[id].clear();
     
     encoders[id].encode(kbests, oracles);
+  }
+  
+  void clear()
+  {
+    encoder_other.clear();
   }
   
   std::ostream& encode(std::ostream& os)
