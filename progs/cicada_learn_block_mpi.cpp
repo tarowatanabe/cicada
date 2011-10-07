@@ -138,7 +138,7 @@ void synchronize();
 
 void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
-void reduce_score(score_ptr_type& score);
+void reduce_score(score_ptr_type& score, const int tag);
 
 int main(int argc, char ** argv)
 {
@@ -283,7 +283,8 @@ int main(int argc, char ** argv)
 
 enum {
   weights_tag = 1000,
-  score_tag,
+  score_1best_tag,
+  score_oracle_tag,
   notify_tag,
 };
 
@@ -657,8 +658,8 @@ void cicada_learn(operation_set_type& operations,
     }
 
     if (debug) {
-      reduce_score(score_1best);
-      reduce_score(score_oracle);
+      reduce_score(score_1best, score_1best_tag);
+      reduce_score(score_oracle, score_oracle_tag);
       
       if (mpi_rank == 0)
 	std::cerr << "devset total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
@@ -719,7 +720,7 @@ void cicada_learn(operation_set_type& operations,
   }
 }
 
-void reduce_score(score_ptr_type& score)
+void reduce_score(score_ptr_type& score, const int tag)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -727,7 +728,7 @@ void reduce_score(score_ptr_type& score)
   if (mpi_rank == 0) {
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
-      is.push(utils::mpi_device_source(rank, score_tag, 256));
+      is.push(utils::mpi_device_source(rank, tag, 256));
       
       std::string score_str;
       is >> score_str;
@@ -739,7 +740,7 @@ void reduce_score(score_ptr_type& score)
     }
   } else {
     boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_sink(0, score_tag, 256));
+    os.push(utils::mpi_device_sink(0, tag, 256));
     os << score->encode();
   }
 }
