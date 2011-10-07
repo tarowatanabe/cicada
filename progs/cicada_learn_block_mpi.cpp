@@ -667,6 +667,7 @@ void cicada_learn(operation_set_type& operations,
     // randomize..
     std::random_shuffle(segments.begin(), segments.end(), gen);
     
+    // merge vectors...
     if (merge_vectors_mode) {
       if (debug && mpi_rank == 0)
 	std::cerr << "merge vectors" << std::endl;
@@ -696,18 +697,16 @@ void cicada_learn(operation_set_type& operations,
     if (debug && mpi_rank == 0)
       std::cerr << "mix weights" << std::endl;
 
-    {
-      weights *= updated;
-      
-      reduce_weights(weights);
-      
-      bcast_weights(weights);
-      
-      int updated_total = 0;
-      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, MPI::INT, MPI::SUM);
-      
-      weights *= 1.0 / updated_total;
-    }
+    weights *= updated;
+    
+    reduce_weights(weights);
+    
+    bcast_weights(weights);
+    
+    int updated_total = 0;
+    MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, MPI::INT, MPI::SUM);
+    
+    weights *= 1.0 / updated_total;
     
     // dump...
     if (dump_weights_mode && mpi_rank == 0)
