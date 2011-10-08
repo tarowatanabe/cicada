@@ -88,7 +88,8 @@ struct LearnMIRA
   
   void clear()
   {
-    
+    features.clear();
+    labels.clear();
   }
   
   std::ostream& encode(std::ostream& os)
