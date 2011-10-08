@@ -36,10 +36,10 @@ namespace cicada
       
       
       double operator()() const { return score(); }
+
       virtual double score() const = 0;
 
       virtual bool equal(const score_type& score) const = 0;
-      
       virtual void assign(const score_type& score) = 0;
       
       virtual void plus_equal(const score_type& score) = 0;

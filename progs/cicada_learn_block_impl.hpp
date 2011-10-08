@@ -101,7 +101,7 @@ struct LearnMIRA
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
@@ -111,6 +111,8 @@ struct LearnMIRA
     sentences.clear();
     for (size_t o = 0; o != oracles.size(); ++ o)
       sentences.insert(oracles[o].sentence);
+
+    const double score_factor = (error_metric ? - 1.0 : 1.0);
 
     features_type feats;
     
@@ -153,8 +155,7 @@ struct LearnMIRA
 	
 	if (feats.empty()) continue;
 	
-	const bool error_metric = oracle.score()->error_metric();
-	const double loss = (oracle.score()->score() - kbest.score->score()) * (error_metric ? -1 : 1);
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	// or, do we use simple loss == 1?
 	
 	labels.push_back(loss);
@@ -193,7 +194,7 @@ struct LearnMIRA
     
     double objective_max = - std::numeric_limits<double>::infinity();
     double objective_min =   std::numeric_limits<double>::infinity();
-
+    double objective = 0.0;
     
     size_type num_instance = 0;
     for (size_t i = 0; i != labels.size(); ++ i) {
@@ -205,11 +206,12 @@ struct LearnMIRA
       num_instance += ! skipping;
       
       if (! skipping) {
+	objective += gradient[i];
 	objective_max = std::max(objective_max, gradient[i]);
 	objective_min = std::min(objective_min, gradient[i]);
       }
     }
-    
+
     if (! num_instance) {
       features.clear();
       labels.clear();
@@ -217,9 +219,11 @@ struct LearnMIRA
       return 0.0;
     }
 
+    objective /= num_instance;
+
     const int model_size = labels.size();
     
-    const dobule C = 1.0 / (lambda * num_instance);
+    const double C = 1.0 / (lambda * num_instance);
     
     double alpha_neq = C;
     
@@ -323,7 +327,7 @@ struct LearnMIRA
 	    
 	    alpha[u] += update;
 	    alpha_neq -= update;
-	    for (size_t i = 0; i != model_size; ++ i)
+	    for (int i = 0; i != model_size; ++ i)
 	      if (! skipped[i])
 		gradient[i] -= update * H(i, u);
 	  }
@@ -391,24 +395,26 @@ struct LearnMIRA
       features.clear();
       labels.clear();
     
-      return 0.0;
+      return objective;
     }
     
-    for (int k = 0; k = model_size; ++ k)
-      if (! skipped[i] && alpha[k] > 0.0) {
+    for (int k = 0; k != model_size; ++ k)
+      if (! skipped[k] && alpha[k] > 0.0) {
 	// update: weights[fiter->first] += alpha[k] * fiter->second;
 	
+	feature_set_type::const_iterator fiter_end = features[k].end();
+	for (feature_set_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter)
+	  weights[fiter->first] += alpha[k] * fiter->second;
       }
-
     
     features.clear();
     labels.clear();
     
-    return 0.0;
+    return objective;
   }
   
-  doble tolerance;
-  double labmda;
+  double tolerance;
+  double lambda;
 
   feature_map_type features;
   label_map_type   labels;
@@ -418,7 +424,6 @@ struct LearnMIRA
   alpha_type    alpha;
   gradient_type gradient;
   skipped_type  skipped;
-  pos_map_type  pos_map;
 };
 
 // logistic regression base...
@@ -503,7 +508,7 @@ struct LearnSGDL1 : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -554,6 +559,7 @@ struct LearnSGDL1 : public LearnLR
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
       objective += siter->encode(weights, expectations);
+    objective /= samples.size();
     
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
@@ -613,7 +619,7 @@ struct LearnSGDL2 : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -665,6 +671,7 @@ struct LearnSGDL2 : public LearnLR
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
       objective += siter->encode(weights, expectations);
+    objective /= samples.size();
     
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
@@ -821,7 +828,7 @@ struct LearnLBFGS : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -1106,7 +1113,7 @@ struct LearnLinear
   typedef Encoder encoder_type;
   typedef utils::chunk_vector<encoder_type, 4096 / sizeof(encoder_type), std::allocator<encoder_type> > encoder_set_type; 
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     if (id >= encoders.size())
       encoders.resize(id + 1);
