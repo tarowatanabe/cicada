@@ -112,7 +112,7 @@ struct LearnMIRA
     for (size_t o = 0; o != oracles.size(); ++ o)
       sentences.insert(oracles[o].sentence);
 
-    const double score_factor = (error_metric ? - 1.0 : 1.0);
+    const double error_factor = (error_metric ? - 1.0 : 1.0);
 
     features_type feats;
     
