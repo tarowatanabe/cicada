@@ -176,6 +176,8 @@ struct LearnMIRA
   double learn(weight_set_type& weights)
   {
     HMatrix<feature_map_type> H(features);
+
+    if (features.empty()) return 0.0;
     
     alpha.clear();
     gradient.clear();
@@ -208,7 +210,12 @@ struct LearnMIRA
       }
     }
     
-    if (! num_instance) return 0.0;
+    if (! num_instance) {
+      features.clear();
+      labels.clear();
+    
+      return 0.0;
+    }
 
     const int model_size = labels.size();
     
@@ -225,8 +232,12 @@ struct LearnMIRA
 	obj_dual   += gradient[k] * alpha[k];
       }
     
+    if (debug >= 2)
+      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl;
+
     bool perform_update = false;
     for (int iter = 0; iter != 100; ++ iter) {
+      bool perform_update_local = false;
       
       int u = -1;
       double max_obj = - std::numeric_limits<double>::infinity();
@@ -293,7 +304,7 @@ struct LearnMIRA
 	    update = - alpha[u];
 	  
 	  if (update != 0.0) {
-	    perform_update = true;
+	    perform_update_local = true;
 	    
 	    alpha[u] += update;
 	    alpha[v] -= update;
@@ -308,7 +319,7 @@ struct LearnMIRA
 	    update = - alpha[u];
 	  
 	  if (update != 0.0) {
-	    perform_update = true;
+	    perform_update_local = true;
 	    
 	    alpha[u] += update;
 	    alpha_neq -= update;
@@ -344,7 +355,7 @@ struct LearnMIRA
 	    update = - alpha_neq;
 	  
 	  if (update != 0.0) {
-	    perform_update = true;
+	    perform_update_local = true;
 	    
 	    alpha_neq += update;
 	    alpha[v] -= update;
@@ -354,11 +365,41 @@ struct LearnMIRA
 	  }
 	}
       }
+
+      perform_update |= perform_update_local;
       
+      if (! perform_update_local) break;
+
+      // compute primal, dual
+      obj_primal = 0.0;
+      obj_dual   = 0.0;
+      for (int k = 0; k != model_size; ++ k) 
+	if (! skipped[k]) {
+	  obj_primal += gradient[k] * C;
+	  obj_dual   += gradient[k] * alpha[k];
+	}
       
-      
+      // global tolerance
+      if (obj_primal - obj_dual <= tolerance * num_instance)
+	break;
+    }
+
+    if (debug >= 2)
+      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
+
+    if (! perform_update) {
+      features.clear();
+      labels.clear();
+    
+      return 0.0;
     }
     
+    for (int k = 0; k = model_size; ++ k)
+      if (! skipped[i] && alpha[k] > 0.0) {
+	// update: weights[fiter->first] += alpha[k] * fiter->second;
+	
+      }
+
     
     features.clear();
     labels.clear();
