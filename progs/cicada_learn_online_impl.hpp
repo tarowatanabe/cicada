@@ -1212,7 +1212,8 @@ struct OptimizeMIRA
         
     if (! num_instance) return;
 
-    const size_t model_size = num_instance;
+    // this is wrong!
+    const size_t model_size = labels.size();
 
     double obj_primal = 0.0;
     double obj_dual   = 0.0;

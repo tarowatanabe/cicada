@@ -42,9 +42,53 @@ struct LearnMIRA
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
+  typedef hypothesis_type::feature_set_type feature_set_type;
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
+  typedef std::vector<double, std::allocator<double> > label_map_type;
+  
+  //
+  // typedef for unique sentences
+  //
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+
+
+  template <typename FeatureSet>
+  struct HMatrix
+  {
+    HMatrix(const FeatureSet& __features) : features(__features) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
+    }
+    
+    const FeatureSet& features;
+  };
+
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    gradient_type;
+  typedef std::vector<bool, std::allocator<bool> >        skipped_type;
+
+  LearnMIRA() : tolerance(1e-4), lambda(C) {}
+  
   void clear()
   {
-
+    
   }
   
   std::ostream& encode(std::ostream& os)
@@ -59,14 +103,71 @@ struct LearnMIRA
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
   {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
-  }
+    if (kbests.empty() || oracles.empty()) return;
+    
+    sentences.clear();
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      sentences.insert(oracles[o].sentence);
 
+    features_type feats;
+    
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      for (size_t k = 0; k != kbests.size(); ++ k) {
+	const hypothesis_type& oracle = oracles[o];
+	const hypothesis_type& kbest  = kbests[k];
+	
+	if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	
+	hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	
+	hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	
+	feats.clear();
+	
+	while (oiter != oiter_end && kiter != kiter_end) {
+	  if (oiter->first < kiter->first) {
+	    feats.push_back(*oiter);
+	    ++ oiter;
+	  } else if (kiter->first < oiter->first) {
+	    feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    ++ kiter;
+	  } else {
+	    const double value = oiter->second - kiter->second;
+	    if (value != 0.0)
+	      feats.push_back(feature_value_type(kiter->first, value));
+	    ++ oiter;
+	    ++ kiter;
+	  }
+	}
+	
+	for (/**/; oiter != oiter_end; ++ oiter)
+	  feats.push_back(*oiter);
+	
+	for (/**/; kiter != kiter_end; ++ kiter)
+	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	
+	if (feats.empty()) continue;
+	
+	const bool error_metric = oracle.score()->error_metric();
+	const double loss = (oracle.score()->score() - kbest.score->score()) * (error_metric ? -1 : 1);
+	// or, do we use simple loss == 1?
+	
+	labels.push_back(loss);
+	features.push_back(feature_set_type(feats.begin(), feats.end()));
+      }
+  }
+  
   void initialize(weight_set_type& weights)
   {
-
+    
+    
   }
-
+  
   void finalize(weight_set_type& weights)
   {
     
@@ -74,10 +175,209 @@ struct LearnMIRA
   
   double learn(weight_set_type& weights)
   {
+    HMatrix<feature_map_type> H(features);
     
+    alpha.clear();
+    gradient.clear();
+    skipped.clear();
+    
+    alpha.reserve(labels.size());
+    gradient.reserve(labels.size());
+    skipped.reserve(labels.size());
+    
+    alpha.resize(labels.size(), 0.0);
+    gradient.resize(labels.size(), 0.0);
+    skipped.resize(labels.size(), false);
+    
+    double objective_max = - std::numeric_limits<double>::infinity();
+    double objective_min =   std::numeric_limits<double>::infinity();
+
+    
+    size_type num_instance = 0;
+    for (size_t i = 0; i != labels.size(); ++ i) {
+      gradient[i] = labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0);
+      
+      const bool skipping = (gradient[i] <= 0 || labels[i] <= 0);
+      
+      skipped[i] = skipping;
+      num_instance += ! skipping;
+      
+      if (! skipping) {
+	objective_max = std::max(objective_max, gradient[i]);
+	objective_min = std::min(objective_min, gradient[i]);
+      }
+    }
+    
+    if (! num_instance) return 0.0;
+
+    const int model_size = labels.size();
+    
+    const dobule C = 1.0 / (lambda * num_instance);
+    
+    double alpha_neq = C;
+    
+    // compute initial primal, dual
+    double obj_primal = 0.0;
+    double obj_dual   = 0.0;
+    for (int k = 0; k != model_size; ++ k) 
+      if (! skipped[k]) {
+	obj_primal += gradient[k] * C;
+	obj_dual   += gradient[k] * alpha[k];
+      }
+    
+    bool perform_update = false;
+    for (int iter = 0; iter != 100; ++ iter) {
+      
+      int u = -1;
+      double max_obj = - std::numeric_limits<double>::infinity();
+      double delta = 0.0;
+      
+      for (int k = 0; k != model_size; ++ k) 
+	if (! skipped[k]) {
+	  delta -= alpha[k] * gradient[k];
+	  
+	  if (gradient[k] > max_obj) {
+	    max_obj = gradient[k];
+	    u = k;
+	  }
+	}
+      
+      if (gradient[u] < 0.0)
+	u = -1;
+      else
+	delta += C * gradient[u];
+      
+      // quit if delta is below tolerance...
+      if (delta <= tolerance) break;
+      
+      if (u >= 0) {
+	int v = -1;
+	double max_improvement = - std::numeric_limits<double>::infinity();
+	double tau = 1.0;
+	
+	for (int k = 0; k != model_size; ++ k) 
+	  if (! skipped[k] && k != u && alpha[k] > 0.0) {
+	    const double numer = alpha[k] * (gradient[u] - gradient[k]);
+	    const double denom = alpha[k] * alpha[k] * (H(u, u) - 2.0 * H(u, k) + H(k, k));
+	    
+	    if (denom > 0.0) {
+	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	      
+	      if (improvement > max_improvement) {
+		max_improvement = improvement;
+		tau = std::max(0.0, std::min(1.0, numer / denom));
+		v = k;
+	      }
+	    }
+	  }
+	
+	if (alpha_neq > 0.0) {
+	  const double numer = alpha_neq * gradient[u];
+	  const double denom = alpha_neq * alpha_neq * H(u, u);
+	  
+	  if (denom > 0.0) {
+	    const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	    
+	    if (improvement > max_improvement) {
+	      max_improvement = improvement;
+	      tau = std::max(0.0, std::min(1.0, numer / denom));
+	      v = -1;
+	    }
+	  }
+	}
+	
+	if (v >= 0) {
+	  // maximize objective, u and v
+	  double update = alpha[v] * tau;
+	  if (alpha[u] + update < 0.0)
+	    update = - alpha[u];
+	  
+	  if (update != 0.0) {
+	    perform_update = true;
+	    
+	    alpha[u] += update;
+	    alpha[v] -= update;
+	    for (int i = 0; i != model_size; ++ i)
+	      if (! skipped[i])
+		gradient[i] += update * (H(i, v) - H(i, u));
+	  }
+	} else {
+	  // update via alpha_neq
+	  double update = alpha_neq * tau;
+	  if (alpha[u] + update < 0.0)
+	    update = - alpha[u];
+	  
+	  if (update != 0.0) {
+	    perform_update = true;
+	    
+	    alpha[u] += update;
+	    alpha_neq -= update;
+	    for (size_t i = 0; i != model_size; ++ i)
+	      if (! skipped[i])
+		gradient[i] -= update * H(i, u);
+	  }
+	}
+      } else {
+	int v = -1;
+	double max_improvement = - std::numeric_limits<double>::infinity();
+	double tau = 1.0;
+	
+	for (int k = 0; k != model_size; ++ k) 
+	  if (! skipped[k] && alpha[k] > 0.0) {
+	    const double numer = alpha[k] * gradient[k];
+	    const double denom = alpha[k] * alpha[k] * H(k, k);
+	    
+	    if (denom > 0.0) {
+	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	      
+	      if (improvement > max_improvement) {
+		max_improvement = improvement;
+		tau = std::max(0.0, std::min(1.0, numer / denom));
+		v = k;
+	      }
+	    }
+	  }
+	
+	if (v >= 0) {
+	  double update = alpha[v] * tau;
+	  if (alpha_neq + update < 0.0)
+	    update = - alpha_neq;
+	  
+	  if (update != 0.0) {
+	    perform_update = true;
+	    
+	    alpha_neq += update;
+	    alpha[v] -= update;
+	    for (int i = 0; i != model_size; ++ i)
+	      if (! skipped[i])
+		gradient[i] += update * H(i, v);
+	  }
+	}
+      }
+      
+      
+      
+    }
+    
+    
+    features.clear();
+    labels.clear();
     
     return 0.0;
   }
+  
+  doble tolerance;
+  double labmda;
+
+  feature_map_type features;
+  label_map_type   labels;
+  
+  sentence_unique_type sentences;
+  
+  alpha_type    alpha;
+  gradient_type gradient;
+  skipped_type  skipped;
+  pos_map_type  pos_map;
 };
 
 // logistic regression base...
