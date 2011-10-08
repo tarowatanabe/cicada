@@ -490,6 +490,8 @@ void cicada_learn(operation_set_type& operations,
     int updated = 0;
     score_ptr_type score_1best;
     score_ptr_type score_oracle;
+
+    learner.initialize(weights);
     
     segment_set_type::const_iterator siter     = segments.begin();
     segment_set_type::const_iterator siter_end = segments.end();
@@ -584,6 +586,7 @@ void cicada_learn(operation_set_type& operations,
       learner.learn(weights);
     }
 
+    learner.finalize(weights);
     
     // mix weights
     if (debug && mpi_rank == 0)

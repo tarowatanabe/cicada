@@ -285,9 +285,14 @@ struct OptimizeLinear
 	    }
 	    
 	    // termination...
-	    feature.index = -1;
-	    feature.value = 0.0;
-	    features.push_back(feature);
+	    // if we have no instances, simply erase the last offsets
+	    if (offsets.back() == features.size())
+	      offsets.pop_back();
+	    else {
+	      feature.index = -1;
+	      feature.value = 0.0;
+	      features.push_back(feature);
+	    }
 	  }
       }
       

@@ -36,6 +36,7 @@ typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
 // MIRA learner
+// We will run a qp solver and determine the alpha, then, translate this into w
 struct LearnMIRA
 {
   typedef size_t    size_type;
@@ -60,37 +61,13 @@ struct LearnMIRA
   {
     
   }
-  
-  double learn(weight_set_type& weights)
-  {
-    
-    
-    return 0.0;
-  }
-};
 
-// SGDL1 learner
-struct LearnSGDL1
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  void clear()
+  void initialize(weight_set_type& weights)
   {
 
   }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+
+  void finalize(weight_set_type& weights)
   {
     
   }
@@ -103,51 +80,17 @@ struct LearnSGDL1
   }
 };
 
-// SGDL2 learner
-struct LearnSGDL2
+// logistic regression base...
+struct LearnLR
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
-  
-  void clear()
-  {
 
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
-  {
-    
-  }
-  
-  double learn(weight_set_type& weights)
-  {
-    
-    
-    return 0.0;
-  }
-};
-
-// LBFGS learner
-struct LearnLBFGS
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
   typedef hypothesis_type::feature_set_type feature_set_type;
+  typedef hypothesis_type::feature_value_type feature_value_type;
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > sample_type;
-
+  
   typedef cicada::semiring::Log<double> weight_type;
-  typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
   
   struct sample_pair_type
   {
@@ -155,9 +98,9 @@ struct LearnLBFGS
     
     sample_type kbests;
     sample_type oracles;
-
     
-    double encode(const weight_set_type& weights, expectation_type& expectations) const
+    template <typename Expectations>
+    double encode(const weight_set_type& weights, Expectations& expectations) const
     {
       weight_type Z_oracle;
       weight_type Z_kbest; 
@@ -189,10 +132,251 @@ struct LearnLBFGS
       return log(Z_oracle) - log(Z_kbest);
     }
   };
+};
+
+// SGDL1 learner
+struct LearnSGDL1 : public LearnLR
+{
+  typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
   
+  typedef cicada::WeightVector<double> penalty_set_type;
+  
+  // maximize...
+  // L_w =  \sum \log p(y | x) - C |w|
+  // 
+  
+  LearnSGDL1() : epoch(0), lambda(C), penalties(), penalty(0.0) {}
+  
+  void clear()
+  {
+    samples.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  {
+    if (kbests.empty() || oracles.empty()) return;
+    
+    samples.push_back(sample_pair_type());
+    
+    samples.back().kbests.reserve(kbests.size());
+    samples.back().oracles.reserve(oracles.size());
+    
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
+      samples.back().kbests.push_back(kiter->features);
+    
+    hypothesis_set_type::const_iterator oiter_end = oracles.end();
+    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
+      samples.back().oracles.push_back(oiter->features);
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+
+  }
+
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
+
+    if (samples.empty()) return 0.0;
+    
+    //
+    // C = lambda * N
+    //
+    
+    const size_type k = samples.size();
+    const double k_norm = 1.0 / k;
+    const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
+    ++ epoch;
+    
+    penalty += eta * lambda * k_norm;
+    
+    expectation_type expectations;
+    
+    double objective = 0.0;
+    sample_pair_set_type::const_iterator siter_end = samples.end();
+    for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
+      objective += siter->encode(weights, expectations);
+    
+    // update by expectations...
+    expectation_type::const_iterator eiter_end = expectations.end();
+    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
+      double& x = weights[eiter->first];
+      
+      // update weight ... we will update "minus" value
+      x += - static_cast<double>(eiter->second) * eta * k_norm;
+      
+      // apply penalty
+      apply(x, penalties[eiter->first], penalty);
+    }
+    
+    samples.clear();
+    
+    return objective;
+  }
+
+  void apply(double& x, double& penalty, const double& cummulative)
+  {
+    const double x_half = x;
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - cummulative);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + cummulative);
+    penalty += x - x_half;
+  }
+  
+  sample_pair_set_type samples;
+  
+  size_type epoch;
+  double    lambda;
+  
+  penalty_set_type penalties;
+  double penalty;
+};
+
+// SGDL2 learner
+struct LearnSGDL2 : public LearnLR
+{
+  typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
+    
+  LearnSGDL2() : epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  
+  void clear()
+  {
+    samples.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
+  {
+    if (kbests.empty() || oracles.empty()) return;
+    
+    samples.push_back(sample_pair_type());
+    
+    samples.back().kbests.reserve(kbests.size());
+    samples.back().oracles.reserve(oracles.size());
+    
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
+      samples.back().kbests.push_back(kiter->features);
+    
+    hypothesis_set_type::const_iterator oiter_end = oracles.end();
+    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
+      samples.back().oracles.push_back(oiter->features);
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
+    
+    if (samples.empty()) return 0.0;
+    
+    const size_type k = samples.size();
+    const double k_norm = 1.0 / k;
+    const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    ++ epoch;
+    
+    rescale(weights, 1.0 - eta * lambda);
+    
+    expectation_type expectations;
+    
+    // update... by eta / k
+    double objective = 0.0;
+    sample_pair_set_type::const_iterator siter_end = samples.end();
+    for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
+      objective += siter->encode(weights, expectations);
+    
+    // update by expectations...
+    expectation_type::const_iterator eiter_end = expectations.end();
+    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
+      // we will update "minus" value...
+      
+      double& x = weights[eiter->first];
+      const double alpha = - static_cast<double>(eiter->second) * eta * k_norm;
+      
+      weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+      x += alpha / weight_scale;
+    }
+    
+    if (weight_norm > 1.0 / lambda)
+      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.01 || 100 < weight_scale)
+      finalize(weights);
+    
+    // clear current training events..
+    samples.clear();
+    
+    return objective;
+  }
+
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+  
+  sample_pair_set_type samples;
+  
+  size_type epoch;
+  double    lambda;
+  
+  double weight_scale;
+  double weight_norm;
+};
+
+// LBFGS learner
+struct LearnLBFGS : public LearnLR
+{
   typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
   typedef utils::chunk_vector<sample_pair_set_type, 4096 / sizeof(sample_pair_set_type), std::allocator<sample_pair_set_type> > sample_pair_map_type;
-
+  
+  typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
+  
   void clear()
   {
     samples_other.clear();
@@ -298,6 +482,8 @@ struct LearnLBFGS
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool merge=false)
   {
+    if (kbests.empty() || oracles.empty()) return;
+    
     if (id >= samples.size())
       samples.resize(id + 1);
     
@@ -318,6 +504,16 @@ struct LearnLBFGS
       samples[id].back().oracles.push_back(oiter->features);
   }
   
+  void initialize(weight_set_type& weights)
+  {
+
+  }
+
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
   double learn(weight_set_type& __weights)
   {
     lbfgs_parameter_t param;
@@ -473,11 +669,15 @@ struct LearnLinear
 	
 	features.push_back(feature);
       }
-      
-      // termination...
-      feature.index = -1;
-      feature.value = 0.0;
-      features.push_back(feature);
+
+      if (offsets.back() == features.size())
+	offsets.pop_back();
+      else {
+	// termination...
+	feature.index = -1;
+	feature.value = 0.0;
+	features.push_back(feature);
+      }
     }
 
     void encode(const hypothesis_set_type& kbests,
@@ -537,10 +737,14 @@ struct LearnLinear
 	    features.push_back(feature);
 	  }
 	  
-	  // termination...
-	  feature.index = -1;
-	  feature.value = 0.0;
-	  features.push_back(feature);
+	  if (offsets.back() == features.size())
+	    offsets.pop_back();
+	  else {
+	    // termination...
+	    feature.index = -1;
+	    feature.value = 0.0;
+	    features.push_back(feature);
+	  }
 	}
 
       shrink();
@@ -633,6 +837,16 @@ struct LearnLinear
     return is;
   }
   
+  void initialize(weight_set_type& weights)
+  {
+
+  }
+
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
   double learn(weight_set_type& weights)
   {
     size_type data_size = encoder_other.offsets.size();
