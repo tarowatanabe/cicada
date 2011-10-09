@@ -482,23 +482,29 @@ struct LearnMIRA : public LearnBase
 };
 
 // logistic regression base...
-struct LearnLR
+struct LearnLR : public LearnBase
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef hypothesis_type::feature_set_type feature_set_type;
-  typedef hypothesis_type::feature_value_type feature_value_type;
-  typedef std::vector<feature_set_type, std::allocator<feature_set_type> > sample_type;
-  
   typedef cicada::semiring::Log<double> weight_type;
   
   struct sample_pair_type
   {
     sample_pair_type() : kbests(), oracles() {}
     
-    sample_type kbests;
-    sample_type oracles;
+    sample_set_type kbests;
+    sample_set_type oracles;
+
+    void encode(const hypothesis_set_type& __kbests, const hypothesis_set_type& __oracles)
+    {
+      if (__kbests.empty() || __oracles.empty()) return;
+      
+      hypothesis_set_type::const_iterator kiter_end = __kbests.end();
+      for (hypothesis_set_type::const_iterator kiter = __kbests.begin(); kiter != kiter_end; ++ kiter)
+	kbests.insert(kiter->features.begin(), kiter->features.end());
+      
+      hypothesis_set_type::const_iterator oiter_end = __oracles.end();
+      for (hypothesis_set_type::const_iterator oiter = __oracles.begin(); oiter != oiter_end; ++ oiter)
+	oracles.insert(oiter->features.begin(), oiter->features.end());
+    }
     
     template <typename Expectations>
     double encode(const weight_set_type& weights, Expectations& expectations) const
@@ -506,27 +512,25 @@ struct LearnLR
       weight_type Z_oracle;
       weight_type Z_kbest; 
       
-      sample_type::const_iterator oiter_end = oracles.end();
-      for (sample_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0));
+      for (size_type o = 0; o != oracles.size(); ++ o)
+	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0));
       
-      sample_type::const_iterator kiter_end = kbests.end();
-      for (sample_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0));
+      for (size_type k = 0; k != kbests.size(); ++ k)
+	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0));
       
-      for (sample_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->begin(), oiter->end(), 0.0)) / Z_oracle;
+      for (size_type o = 0; o != oracles.size(); ++ o) {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0)) / Z_oracle;
 	
-	hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->end();
-	for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->begin(); fiter != fiter_end; ++ fiter)
+	sample_set_type::value_type::const_iterator fiter_end = oracles[o].end();
+	for (sample_set_type::value_type::const_iterator fiter = oracles[o].begin(); fiter != fiter_end; ++ fiter)
 	  expectations[fiter->first] -= weight_type(fiter->second) * weight;
       }
       
-      for (sample_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->begin(), kiter->end(), 0.0)) / Z_kbest;
+      for (size_type k = 0; k != kbests.size(); ++ k) {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0)) / Z_kbest;	
 	
-	hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->end();
-	for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->begin(); fiter != fiter_end; ++ fiter)
+	sample_set_type::value_type::const_iterator fiter_end = kbests[k].end();
+	for (sample_set_type::value_type::const_iterator fiter = kbests[k].begin(); fiter != fiter_end; ++ fiter)
 	  expectations[fiter->first] += weight_type(fiter->second) * weight;
       }
       
@@ -568,17 +572,7 @@ struct LearnSGDL1 : public LearnLR
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    
-    samples.back().kbests.reserve(kbests.size());
-    samples.back().oracles.reserve(oracles.size());
-    
-    hypothesis_set_type::const_iterator kiter_end = kbests.end();
-    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-      samples.back().kbests.push_back(kiter->features);
-    
-    hypothesis_set_type::const_iterator oiter_end = oracles.end();
-    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-      samples.back().oracles.push_back(oiter->features);
+    samples.back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -679,17 +673,7 @@ struct LearnSGDL2 : public LearnLR
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    
-    samples.back().kbests.reserve(kbests.size());
-    samples.back().oracles.reserve(oracles.size());
-    
-    hypothesis_set_type::const_iterator kiter_end = kbests.end();
-    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-      samples.back().kbests.push_back(kiter->features);
-    
-    hypothesis_set_type::const_iterator oiter_end = oracles.end();
-    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-      samples.back().oracles.push_back(oiter->features);
+    samples.back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -775,7 +759,7 @@ struct LearnSGDL2 : public LearnLR
 // LBFGS learner
 struct LearnLBFGS : public LearnLR
 {
-  typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
+  typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
   typedef utils::chunk_vector<sample_pair_set_type, 4096 / sizeof(sample_pair_set_type), std::allocator<sample_pair_set_type> > sample_pair_map_type;
   
   typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
@@ -795,24 +779,22 @@ struct LearnLBFGS : public LearnLR
 	  
 	  if (sample.oracles.empty() || sample.kbests.empty()) continue;
 	  
-	  sample_type::const_iterator oiter_end = sample.oracles.end();
-	  for (sample_type::const_iterator oiter = sample.oracles.begin(); oiter != oiter_end; ++ oiter) {
+	  for (size_type o = 0; o != sample.oracles.size(); ++ o) {
 	    os << "oracle:";
 	    
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->begin(); fiter != fiter_end; ++ fiter) {
+	    sample_set_type::value_type::const_iterator fiter_end = sample.oracles[o].end();
+	    for (sample_set_type::value_type::const_iterator fiter = sample.oracles[o].begin(); fiter != fiter_end; ++ fiter) {
 	      os << ' ' << fiter->first << ' ';
 	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
 	    }
 	    os << '\n';
 	  }
 	  
-	  sample_type::const_iterator kiter_end = sample.kbests.end();
-	  for (sample_type::const_iterator kiter = sample.kbests.begin(); kiter != kiter_end; ++ kiter) {
+	  for (size_type k = 0; k != sample.kbests.size(); ++ k) {
 	    os << "kbest:";
 	    
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->begin(); fiter != fiter_end; ++ fiter) {
+	    sample_set_type::value_type::const_iterator fiter_end = sample.kbests[k].end();
+	    for (sample_set_type::value_type::const_iterator fiter = sample.kbests[k].begin(); fiter != fiter_end; ++ fiter) {
 	      os << ' ' << fiter->first << ' ';
 	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
 	    }
@@ -826,14 +808,12 @@ struct LearnLBFGS : public LearnLR
 
   std::istream& decode(std::istream& is)
   {
-    typedef cicada::Feature feature_type;
-    typedef std::pair<feature_type, double> feature_value_type;
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
     typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
     std::string mode = "kbest:";
 
-    sample_type* psample;
+    sample_set_type* psample;
     
     std::string line;
     feature_set_type features;
@@ -877,7 +857,7 @@ struct LearnLBFGS : public LearnLR
       
       if (features.empty()) continue;
       
-      psample->push_back(hypothesis_type::feature_set_type(features.begin(), features.end()));
+      psample->insert(features.begin(), features.end());
     }
     
     return is;
@@ -895,16 +875,7 @@ struct LearnLBFGS : public LearnLR
     
     samples[id].push_back(sample_pair_type());
     
-    samples[id].back().kbests.reserve(kbests.size());
-    samples[id].back().oracles.reserve(oracles.size());
-    
-    hypothesis_set_type::const_iterator kiter_end = kbests.end();
-    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-      samples[id].back().kbests.push_back(kiter->features);
-    
-    hypothesis_set_type::const_iterator oiter_end = oracles.end();
-    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-      samples[id].back().oracles.push_back(oiter->features);
+    samples[id].back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -1204,8 +1175,7 @@ struct LearnLinear
   
   std::istream& decode(std::istream& is)
   {
-    typedef cicada::Feature feature_type;
-    typedef std::pair<feature_type, double> feature_value_type;
+    typedef hypothesis_type::feature_value_type feature_value_type;
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
     typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 
