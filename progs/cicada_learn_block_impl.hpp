@@ -236,15 +236,15 @@ struct LearnMIRA : public LearnBase
     if (features.empty()) return 0.0;
     
     alpha.clear();
-    gradient.clear();
+    g.clear();
     skipped.clear();
     
     alpha.reserve(labels.size());
-    gradient.reserve(labels.size());
+    g.reserve(labels.size());
     skipped.reserve(labels.size());
     
     alpha.resize(labels.size(), 0.0);
-    gradient.resize(labels.size(), 0.0);
+    g.resize(labels.size(), 0.0);
     skipped.resize(labels.size(), false);
     
     double objective_max = - std::numeric_limits<double>::infinity();
@@ -253,17 +253,17 @@ struct LearnMIRA : public LearnBase
     
     size_type num_instance = 0;
     for (size_t i = 0; i != labels.size(); ++ i) {
-      gradient[i] = labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0);
+      g[i] = labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0);
       
-      const bool skipping = (gradient[i] <= 0 || labels[i] <= 0);
+      const bool skipping = (g[i] <= 0 || labels[i] <= 0);
       
       skipped[i] = skipping;
       num_instance += ! skipping;
       
       if (! skipping) {
-	objective += gradient[i];
-	objective_max = std::max(objective_max, gradient[i]);
-	objective_min = std::min(objective_min, gradient[i]);
+	objective += g[i];
+	objective_max = std::max(objective_max, g[i]);
+	objective_min = std::min(objective_min, g[i]);
       }
     }
 
@@ -287,8 +287,8 @@ struct LearnMIRA : public LearnBase
     double obj_dual   = 0.0;
     for (int k = 0; k != model_size; ++ k) 
       if (! skipped[k]) {
-	obj_primal += gradient[k] * C;
-	obj_dual   += gradient[k] * alpha[k];
+	obj_primal += g[k] * C;
+	obj_dual   += g[k] * alpha[k];
       }
     
     if (debug >= 2)
@@ -304,18 +304,18 @@ struct LearnMIRA : public LearnBase
       
       for (int k = 0; k != model_size; ++ k) 
 	if (! skipped[k]) {
-	  delta -= alpha[k] * gradient[k];
+	  delta -= alpha[k] * g[k];
 	  
-	  if (gradient[k] > max_obj) {
-	    max_obj = gradient[k];
+	  if (g[k] > max_obj) {
+	    max_obj = g[k];
 	    u = k;
 	  }
 	}
       
-      if (gradient[u] < 0.0)
+      if (g[u] < 0.0)
 	u = -1;
       else
-	delta += C * gradient[u];
+	delta += C * g[u];
       
       // quit if delta is below tolerance...
       if (delta <= tolerance) break;
@@ -327,7 +327,7 @@ struct LearnMIRA : public LearnBase
 	
 	for (int k = 0; k != model_size; ++ k) 
 	  if (! skipped[k] && k != u && alpha[k] > 0.0) {
-	    const double numer = alpha[k] * (gradient[u] - gradient[k]);
+	    const double numer = alpha[k] * (g[u] - g[k]);
 	    const double denom = alpha[k] * alpha[k] * (H(u, u) - 2.0 * H(u, k) + H(k, k));
 	    
 	    if (denom > 0.0) {
@@ -342,7 +342,7 @@ struct LearnMIRA : public LearnBase
 	  }
 	
 	if (alpha_neq > 0.0) {
-	  const double numer = alpha_neq * gradient[u];
+	  const double numer = alpha_neq * g[u];
 	  const double denom = alpha_neq * alpha_neq * H(u, u);
 	  
 	  if (denom > 0.0) {
@@ -369,7 +369,7 @@ struct LearnMIRA : public LearnBase
 	    alpha[v] -= update;
 	    for (int i = 0; i != model_size; ++ i)
 	      if (! skipped[i])
-		gradient[i] += update * (H(i, v) - H(i, u));
+		g[i] += update * (H(i, v) - H(i, u));
 	  }
 	} else {
 	  // update via alpha_neq
@@ -384,7 +384,7 @@ struct LearnMIRA : public LearnBase
 	    alpha_neq -= update;
 	    for (int i = 0; i != model_size; ++ i)
 	      if (! skipped[i])
-		gradient[i] -= update * H(i, u);
+		g[i] -= update * H(i, u);
 	  }
 	}
       } else {
@@ -394,7 +394,7 @@ struct LearnMIRA : public LearnBase
 	
 	for (int k = 0; k != model_size; ++ k) 
 	  if (! skipped[k] && alpha[k] > 0.0) {
-	    const double numer = alpha[k] * gradient[k];
+	    const double numer = alpha[k] * g[k];
 	    const double denom = alpha[k] * alpha[k] * H(k, k);
 	    
 	    if (denom > 0.0) {
@@ -420,7 +420,7 @@ struct LearnMIRA : public LearnBase
 	    alpha[v] -= update;
 	    for (int i = 0; i != model_size; ++ i)
 	      if (! skipped[i])
-		gradient[i] += update * H(i, v);
+		g[i] += update * H(i, v);
 	  }
 	}
       }
@@ -434,8 +434,8 @@ struct LearnMIRA : public LearnBase
       obj_dual   = 0.0;
       for (int k = 0; k != model_size; ++ k) 
 	if (! skipped[k]) {
-	  obj_primal += gradient[k] * C;
-	  obj_dual   += gradient[k] * alpha[k];
+	  obj_primal += g[k] * C;
+	  obj_dual   += g[k] * alpha[k];
 	}
       
       // global tolerance
@@ -477,7 +477,7 @@ struct LearnMIRA : public LearnBase
   sentence_unique_type sentences;
   
   alpha_type    alpha;
-  gradient_type gradient;
+  gradient_type g;
   skipped_type  skipped;
 };
 
