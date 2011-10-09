@@ -35,18 +35,72 @@
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
-// MIRA learner
-// We will run a qp solver and determine the alpha, then, translate this into w
-struct LearnMIRA
+struct LearnBase
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
-  
-  typedef hypothesis_type::feature_set_type feature_set_type;
+
   typedef hypothesis_type::feature_value_type feature_value_type;
   
-  typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
-  typedef std::vector<double, std::allocator<double> > label_map_type;
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef features_type::const_iterator const_iterator;
+
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+};
+
+// MIRA learner
+// We will run a qp solver and determine the alpha, then, translate this into w
+struct LearnMIRA : public LearnBase
+{
+  typedef std::vector<double, std::allocator<double> > label_set_type;
   
   //
   // typedef for unique sentences
@@ -160,7 +214,7 @@ struct LearnMIRA
 	// or, do we use simple loss == 1?
 	
 	labels.push_back(loss);
-	features.push_back(feature_set_type(feats.begin(), feats.end()));
+	features.insert(feats.begin(), feats.end());
       }
   }
   
@@ -177,7 +231,7 @@ struct LearnMIRA
   
   double learn(weight_set_type& weights)
   {
-    HMatrix<feature_map_type> H(features);
+    HMatrix<sample_set_type> H(features);
 
     if (features.empty()) return 0.0;
     
@@ -403,8 +457,8 @@ struct LearnMIRA
       if (! skipped[k] && alpha[k] > 0.0) {
 	// update: weights[fiter->first] += alpha[k] * fiter->second;
 	
-	feature_set_type::const_iterator fiter_end = features[k].end();
-	for (feature_set_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter)
+	sample_set_type::value_type::const_iterator fiter_end = features[k].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter)
 	  weights[fiter->first] += alpha[k] * fiter->second;
       }
     
@@ -417,8 +471,8 @@ struct LearnMIRA
   double tolerance;
   double lambda;
 
-  feature_map_type features;
-  label_map_type   labels;
+  sample_set_type features;
+  label_set_type  labels;
   
   sentence_unique_type sentences;
   
@@ -1400,9 +1454,12 @@ struct Oracle
   typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
   typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
 
+  template <typename Generator>
   std::pair<score_ptr_type, score_ptr_type>
-  operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& oracles)
+  operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& oracles, Generator& generator)
   {
+    typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
+
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
 
@@ -1415,10 +1472,15 @@ struct Oracle
     oracle_map_type oracles_prev(kbests.size());
     oracle_map_type oracles_best(kbests.size());
     oracle_map_type oracles_curr(kbests.size());
+
+    id_set_type ids;
+    boost::random_number_generator<boost::mt19937> gen(generator);
     
     // initialization...
     for (size_t id = 0; id != kbests.size(); ++ id) 
       if (! kbests[id].empty()) {
+	ids.push_back(id);
+	
 	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
 	  hypothesis_type& hyp = const_cast<hypothesis_type&>(*hiter);
@@ -1455,29 +1517,30 @@ struct Oracle
       score_curr     = score_prev->clone();
       objective_curr = objective_prev;
       oracles_curr   = oracles_prev;
-      
-      for (size_t id = 0; id != kbests.size(); ++ id) 
-	if (! kbests[id].empty()) {
-	  score_ptr_type score = score_curr->clone();
-	  *score -= *(oracles_curr[id].front()->score);
+
+      for (id_set_type::const_iterator iiter = ids.begin(); iiter != ids.end(); ++ iiter) {
+	const size_t id = *iiter;
+	
+	score_ptr_type score = score_curr->clone();
+	*score -= *(oracles_curr[id].front()->score);
 	  
-	  hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
-	    score_ptr_type score_sample = score->clone();
-	    *score_sample += *(hiter->score);
+	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	  score_ptr_type score_sample = score->clone();
+	  *score_sample += *(hiter->score);
 	    
-	    const double objective_sample = score_sample->score() * score_factor;
+	  const double objective_sample = score_sample->score() * score_factor;
 	    
-	    if (objective_sample > objective_curr) {
-	      oracles_curr[id].clear();
-	      oracles_curr[id].push_back(&(*hiter));
+	  if (objective_sample > objective_curr) {
+	    oracles_curr[id].clear();
+	    oracles_curr[id].push_back(&(*hiter));
 	      
-	      objective_curr = objective_sample;
-	      score_curr     = score_sample;
-	    } else if (objective_sample == objective_curr)
-	      oracles_curr[id].push_back(&(*hiter));
-	  }
+	    objective_curr = objective_sample;
+	    score_curr     = score_sample;
+	  } else if (objective_sample == objective_curr)
+	    oracles_curr[id].push_back(&(*hiter));
 	}
+      }
       
       if (objective_curr > objective_best) {
 	score_best     = score_curr->clone();
@@ -1490,6 +1553,8 @@ struct Oracle
       score_prev     = score_curr->clone();
       objective_prev = objective_curr;
       oracles_prev   = oracles_curr;
+      
+      std::random_shuffle(ids.begin(), ids.end(), gen);
     }
     
     oracles.clear();

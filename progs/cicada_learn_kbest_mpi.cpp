@@ -106,6 +106,8 @@ int main(int argc, char ** argv)
 
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
+    if (C <= 0.0)
+      throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
