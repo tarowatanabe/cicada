@@ -18,6 +18,14 @@
 // 
 // under a tolerance threshold
 
+//
+// this solver is based on a solver implemented in libocas
+//  (http://jmlr.csail.mit.edu/papers/volume10/franc09a/franc09a.pdf)
+//
+// for details see:
+// ftp://cmp.felk.cvut.cz/pub/cmp/articles/franc/Franc-TR-2006-04.ps
+//
+
 namespace cicada
 {
   namespace optimize
@@ -28,11 +36,11 @@ namespace cicada
       typedef ptrdiff_t difference_type;
       
       template <typename X, typename F, typename H>
-      void operator()(X& x,
-		      F& f,
-		      H& H,
-		      const double C,
-		      const double tolerance)
+      double operator()(X& x,
+			F& f,
+			H& H,
+			const double C,
+			const double tolerance)
       {
 	typedef std::vector<double, std::allocator<double> > d_type;
 	
@@ -58,7 +66,6 @@ namespace cicada
 	
 	double objective_primal = 0.0;
 	double objective_dual   = 0.0;
-	
 	for (int i = 0; i != model_size; ++ i) {
 	  objective_primal += 0.5 * x[i] * (f[i] + d[i]);
 	  objective_dual   += 0.5 * x[i] * (f[i] - d[i]);
@@ -206,6 +213,8 @@ namespace cicada
 	  
 	  if (objective_primal - objective_dual <= tolerance) break;
 	}
+
+	return objective_primal;
       }
     };
   };
