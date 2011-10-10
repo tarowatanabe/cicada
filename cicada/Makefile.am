@@ -100,7 +100,9 @@ libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_optimize_HEADERS = \
 optimize/line_search.hpp \
-optimize/powell.hpp
+optimize/powell.hpp \
+optimize/qp_simplex.hpp \
+optimize/qp_smo.hpp
 
 libcicada_optimize_la_SOURCES = \
 optimize/line_search.cpp
