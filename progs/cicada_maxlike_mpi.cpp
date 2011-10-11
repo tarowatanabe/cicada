@@ -45,6 +45,7 @@
 #include "utils/bithack.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -211,7 +212,7 @@ int main(int argc, char ** argv)
       compute_oracles(graphs, features, scorers);
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     weight_set_type weights;
     

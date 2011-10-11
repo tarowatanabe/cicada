@@ -18,6 +18,7 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/random_seed.hpp>
 
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
@@ -506,7 +507,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   boost::mt19937 gen;
-  gen.seed(time(0) * getpid());
+  gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
@@ -715,7 +716,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   boost::mt19937 gen;
-  gen.seed(time(0) * getpid());
+  gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
@@ -837,7 +838,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
 
   boost::mt19937 gen;
-  gen.seed(time(0) * getpid());
+  gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
@@ -953,7 +954,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   queue_ptr_set_type   queues(mpi_size);
   
   boost::mt19937 gen;
-  gen.seed(time(0) * getpid());
+  gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);
@@ -1099,7 +1100,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   
   boost::mt19937 gen;
-  gen.seed(time(0) * getpid());
+  gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
   
   rank_set_type ranks(mpi_size);

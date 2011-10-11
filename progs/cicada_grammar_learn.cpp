@@ -59,6 +59,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/vertical_coded_vector.hpp>
 #include <utils/packed_vector.hpp>
+#include <utils/random_seed.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -527,7 +528,7 @@ int main(int argc, char** argv)
     grammar_learn(treebanks, labels, grammar, zero_function(), Maximize());
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (debug)
       std::cerr << "grammar size: " << grammar.size() << std::endl;

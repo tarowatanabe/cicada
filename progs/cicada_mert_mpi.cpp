@@ -49,6 +49,7 @@
 #include "utils/base64.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -430,7 +431,7 @@ int main(int argc, char ** argv)
     }
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (mpi_rank == 0) {
       double          optimum_objective = std::numeric_limits<double>::infinity();

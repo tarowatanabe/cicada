@@ -64,6 +64,7 @@
 #include <utils/array_power2.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/base64.hpp>
+#include <utils/random_seed.hpp>
 
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
@@ -711,7 +712,7 @@ int main(int argc, char** argv)
     grammar_learn(treebanks, labels, grammar, zero_function(), Maximize());
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (debug && mpi_rank == 0)
       std::cerr << "grammar size: " << grammar.size() << std::endl;

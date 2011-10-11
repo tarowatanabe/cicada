@@ -40,6 +40,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -363,7 +364,7 @@ int main(int argc, char ** argv)
     weight_set_type optimum_weights;
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (debug)
       std::cerr << "start optimization" << std::endl;

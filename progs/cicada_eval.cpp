@@ -19,6 +19,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -220,7 +221,7 @@ int main(int argc, char** argv)
       if (bootstrap) {
       
 	boost::mt19937 gen;
-	gen.seed(time(0) * getpid());
+	gen.seed(utils::random_seed());
 	boost::random_number_generator<boost::mt19937> generator(gen);
       
 	int better1 = 0;
@@ -335,7 +336,7 @@ int main(int argc, char** argv)
 	throw std::runtime_error("no error counts?");
       
       boost::mt19937 gen;
-      gen.seed(time(0) * getpid());
+      gen.seed(utils::random_seed());
       boost::random_number_generator<boost::mt19937> generator(gen);
       
       std::vector<double, std::allocator<double> > sampled;

@@ -41,6 +41,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
@@ -466,7 +467,7 @@ void cicada_learn(operation_set_type& operations,
   
   // random number generator...
   boost::mt19937 generator;
-  generator.seed(time(0) * getpid());
+  generator.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> gen(generator);
   
   hypothesis_set_type kbests;

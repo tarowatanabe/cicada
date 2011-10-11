@@ -17,6 +17,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/sgi_hash_set.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -101,7 +102,7 @@ int main(int argc, char ** argv)
     initialize_score(hypotheses, scorers);
     
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     oracle_map_type oracles(scorers.size());
     const double objective = compute_oracles(scorers, hypotheses, oracles, generator);

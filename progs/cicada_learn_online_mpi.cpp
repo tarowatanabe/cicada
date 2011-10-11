@@ -46,6 +46,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -265,7 +266,7 @@ int main(int argc, char ** argv)
     }
 
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (utils::ipiece(algorithm) == "mira")
       ::optimize<OptimizeMIRA>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average, generator);

@@ -18,6 +18,7 @@
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
 #include <utils/sgi_hash_set.hpp>
+#include <utils/random_seed.hpp>
 
 #include "cicada/symbol.hpp"
 #include "cicada/vocab.hpp"
@@ -356,7 +357,7 @@ struct OptimizeAROW : public Optimizer
     }
 
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
     
     for (int iter = 0; iter < max_iteration; ++ iter) {
@@ -443,7 +444,7 @@ struct OptimizeCW : public Optimizer
     }
     
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
 
     for (int iter = 0; iter < max_iteration; ++ iter) {
@@ -528,7 +529,7 @@ struct OptimizeMIRA : public Optimizer
     }
     
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
 
     for (int iter = 0; iter < max_iteration; ++ iter) {
@@ -630,7 +631,7 @@ struct OptimizeSGD : public Optimizer
     parameter_set_type penalties(x.size(), 0.0);
     
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
 
     for (int iter = 0; iter < max_iteration; ++ iter) {
@@ -736,7 +737,7 @@ struct OptimizeSGD : public Optimizer
     const double lambda = C / sample_size;
 
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
 
     for (int iter = 0; iter < max_iteration; ++ iter) {

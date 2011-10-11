@@ -29,6 +29,7 @@
 #include <utils/space_separator.hpp>
 #include <utils/mathop.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/random_seed.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -134,7 +135,7 @@ int main(int argc, char** argv)
       return 1;
     
     boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
+    gen.seed(utils::random_seed());
     boost::random_number_generator<boost::mt19937> generator(gen);
     
     word_class_count_set_type words;

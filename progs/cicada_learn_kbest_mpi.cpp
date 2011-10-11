@@ -26,6 +26,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -148,7 +149,7 @@ int main(int argc, char ** argv)
     double objective = 0.0;
 
     boost::mt19937 generator;
-    generator.seed(time(0) * getpid());
+    generator.seed(utils::random_seed());
     
     if (learn_sgd) {
       if (regularize_l1)
