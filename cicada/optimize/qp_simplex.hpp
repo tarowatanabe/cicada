@@ -102,12 +102,12 @@ namespace cicada
 	    double tau = 1.0;
 	    
 	    for (int k = 0; k != model_size; ++ k)
-	      if (k != u && x[i] > 0.0) {
+	      if (k != u && x[k] > 0.0) {
 		const double numer = x[k] * (d[k] - d[u]);
 		const double denom = x[k] * x[k] * (H(u, u) - 2.0 * H(k, u) + H(k, k));
 		
 		if (denom > 0.0) {
-		  const double improv = (numer < denom ? (numer * numer) / denom : number - 0.5 * denom);
+		  const double improv = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
 		  
 		  if (improv > max_improv) {
 		    max_improv = improv;
@@ -149,7 +149,7 @@ namespace cicada
 		  d[i] += update * (H(i, u) - H(i, v));
 	      }
 	    } else {
-	      double update = neq * tag;
+	      double update = neq * tau;
 	      if (x[u] + update < 0.0)
 		update = - x[u];
 	      
@@ -169,7 +169,7 @@ namespace cicada
 	    double tau = 1.0;
 	    
 	    for (int k = 0; k != model_size; ++ k)
-	      if (x[i] > 0.0) {
+	      if (x[k] > 0.0) {
 		const double numer = x[k] * d[k];
 		const double denom = x[k] * x[k] * H(k, k);
 		
@@ -201,7 +201,7 @@ namespace cicada
 	    }
 	  }
 	  
-	  if (! upated) break;
+	  if (! updated) break;
 	  
 	  // compute objectives
 	  objective_primal = 0.0;

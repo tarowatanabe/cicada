@@ -340,6 +340,7 @@ ngram_count_set.hpp \
 operation.hpp \
 operation_set.hpp \
 optimize.hpp \
+optimize_qp.hpp \
 parameter.hpp \
 parse.hpp \
 parse_agenda.hpp \
@@ -478,6 +479,7 @@ grammar_unknown_main \
 hypergraph_main \
 lattice_main \
 matcher_main \
+optimize_qp_main \
 parameter_main \
 rule_main \
 sentence_main \
@@ -539,6 +541,9 @@ lattice_main_LDADD = libcicada.la
 
 matcher_main_SOURCES = matcher_main.cpp
 matcher_main_LDADD = libcicada.la
+
+optimize_qp_main_SOURCES = optimize_qp_main.cpp
+optimize_qp_main_LDADD = libcicada.la
 
 parameter_main_SOURCES = parameter_main.cpp
 parameter_main_LDADD = libcicada.la

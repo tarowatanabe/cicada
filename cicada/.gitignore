@@ -40,6 +40,7 @@ grammar_unknown_main
 hypergraph_main
 lattice_main
 matcher_main
+optimize_qp_main
 parameter_main
 rule_main
 sentence_main

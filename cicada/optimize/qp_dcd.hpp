@@ -79,7 +79,7 @@ namespace cicada
 	q_type      QD(model_size, 0.0); // Q + D (we will use H notation, though... for L_1 SVM, D_ii = 0)
 	active_type actives(model_size);
 	for (size_type i = 0; i != model_size; ++ i) {
-	  index[i] = i;
+	  actives[i] = i;
 	  QD[i] = H(i, i);
 	}
 
@@ -93,42 +93,41 @@ namespace cicada
 	  
 	  std::random_shuffle(actives.begin(), actives.begin() + active_size);
 	  
-	  active_type::iterator aiter_end = actives.end();
-	  for (active_type::iterator aiter = actives.begin(); aiter != aiter_end; ++ aiter) {
-	    const size_type i = *aiter;
-	    const double G = M(weights, i) + f[i];
+	  for (size_type s = 0; s < active_size; ++ s) {
+	    const size_type i = actives[s];
+	    const double G = M(w, i) + f[i];
 	    
 	    double PG = 0.0;
 	    if (x[i] == 0.0) {
 	      if (G > PGmax_old) {
 		-- active_size;
-		swap(*aiter, index[active_size]);
-		-- aiter;
+		std::swap(actives[s], actives[active_size]);
+		-- s;
 		continue;
 	      } else if (G < 0.0)
 		PG = G;
 	    } else if (x[i] == C) {
 	      if (G < PGmin_old) {
 		-- active_size;
-		swap(*aiter, index[active_size]);
-		-- aiter;
+		std::swap(actives[s], actives[active_size]);
+		-- s;
 		continue;
 	      } else if (G > 0.0)
 		PG = G;
 	    } else
 	      PG = G;
 	    
-	    PGmax_new = max(PGmax_new, PG);
-	    PGmin_new = min(PGmin_new, PG);
+	    PGmax_new = std::max(PGmax_new, PG);
+	    PGmin_new = std::min(PGmin_new, PG);
 	    
-	    if (std::fabs(PB) > 1e-12) {
-	      const dobule x_old = x[i];
+	    if (std::fabs(PG) > 1e-12) {
+	      const double x_old = x[i];
 	      x[i] = std::min(std::max(x[i] - G / QD[i]), C);
-	      M(weights, x[i] - x_old, i)
+	      M(w, x[i] - x_old, i);
 	    }
 	  }
 	  
-	  if ((PGmax_new - PGmin_new) <= toleranse) {
+	  if ((PGmax_new - PGmin_new) <= tolerance) {
 	    if (active_size == model_size)
 	      break;
 	    else {

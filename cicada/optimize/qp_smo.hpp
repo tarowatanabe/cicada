@@ -62,11 +62,11 @@ namespace cicada
 	  double F_upper = - std::numeric_limits<double>::infinity();
 	  double F_lower =   std::numeric_limits<double>::infinity();
 	  
+	  int u = -1;
+	  int v = -1;
+	  
 	  for (int i = 0; i != model_size; ++ i) {
 	    const double F = d[i];
-	    
-	    int u = -1;
-	    int v = -1;
 	    
 	    if (0.0 < x[i] && x[i] < C) {
 	      if (F < F_lower) {
