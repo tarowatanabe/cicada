@@ -6,6 +6,9 @@
 #ifndef __CICADA__OPTIMIZE__QP_SMO__HPP__
 #define __CICADA__OPTIMIZE__QP_SMO__HPP__ 1
 
+#include <vector>
+#include <stdexcept>
+
 // QP solver based on the SMO:
 //
 // min   x^{\top} H x + f^{\top} * x
@@ -26,10 +29,11 @@ namespace cicada
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
       
-      template <typename X, typename F, typename H>
+      template <typename X, typename F, typename H, typename M>
       double operator()(X& x,
-			F& f,
-			H& H,
+			const F& f,
+			const H& H,
+			const M& M,
 			const double C,
 			const double tolerance)
       {
