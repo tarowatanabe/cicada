@@ -28,9 +28,7 @@
 
 //
 // min   x^{\top} H x + f^{\top} * x
-//
-// sum x = C
-// x \geq 0
+// 0 \leq x[i] \leq C
 //
 
 // H(i, j) = h_i^{\top} \cdot h_j
@@ -39,6 +37,7 @@
 // M(w, i): returns w^{\top} \cdot h_i
 // M(w, update, i): w = w + update h_i
 
+#include <numeric>
 #include <algorithm>
 #include <vector>
 #include <stdexcept>
@@ -122,7 +121,7 @@ namespace cicada
 	    
 	    if (std::fabs(PG) > 1e-12) {
 	      const double x_old = x[i];
-	      x[i] = std::min(std::max(x[i] - G / QD[i]), C);
+	      x[i] = std::min(std::max(x[i] - G / QD[i], 0.0), C);
 	      M(w, x[i] - x_old, i);
 	    }
 	  }
@@ -142,6 +141,22 @@ namespace cicada
 	  PGmax_old = (PGmax_new <= 0.0 ?   std::numeric_limits<double>::infinity() : PGmax_new);
 	  PGmin_old = (PGmin_new >= 0.0 ? - std::numeric_limits<double>::infinity() : PGmin_new);
 	}
+	// normalize x!
+	const double sum = std::accumulate(x.begin(), x.end(), 0.0);
+	if (sum != 0.0)
+	  std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / sum));
+	
+	std::vector<double, std::allocator<double> > d(f.begin(), f.end());
+	for (size_t i = 0; i != model_size; ++ i)
+	  if (x[i] > 0.0)
+	    for (size_t j = 0; j != model_size; ++ j)
+	      d[j] += H(j, i) * x[i];
+	
+	double objective_primal = 0.0;
+	for (size_t i = 0; i != model_size; ++ i)
+	  objective_primal += 0.5 * x[i] * (f[i] + d[i]);
+	
+	return objective_primal;
       }
     };
   };

@@ -6,6 +6,7 @@
 #ifndef __CICADA__OPTIMIZE__QP_SMO__HPP__
 #define __CICADA__OPTIMIZE__QP_SMO__HPP__ 1
 
+#include <cstdlib>
 #include <vector>
 #include <stdexcept>
 
@@ -14,7 +15,7 @@
 // min   x^{\top} H x + f^{\top} * x
 //
 // sum x = C
-// x \geq 0
+// 0 \leq x[i] \leq C
 // 
 // under a tolerance threshold
 //
@@ -47,10 +48,22 @@ namespace cicada
 	// compute gradient...
 	d_type d(f.begin(), f.end());
 	
+	bool found_non_zero = false;
 	for (int i = 0; i != model_size; ++ i)
-	  if (x[i] > 0.0)
+	  if (x[i] > 0.0) {
+	    found_non_zero = true;
 	    for (int j = 0; j != model_size; ++ j)
 	      d[j] += H(j, i) * x[i];
+	  }
+	if (! found_non_zero) {
+	  // randomly select one instance as "fired"
+	  
+	  const int i = random() % model_size;
+	  x[i] = C;
+	  for (int j = 0; j != model_size; ++ j)
+	    d[j] += H(j, i) * x[i];
+	}
+	
 	
 	double objective_primal = 0.0;
 	for (int i = 0; i != model_size; ++ i)
@@ -103,7 +116,7 @@ namespace cicada
 	  x[v] -= tau;
 	  
 	  // update d..
-	  size_type size_active = 0;
+	  //size_type size_active = 0;
 	  for (int i = 0; i != model_size; ++ i)
 	    d[i] += tau * (H(i, u) - H(i, v));
 	  
