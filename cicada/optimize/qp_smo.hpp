@@ -30,11 +30,11 @@ namespace cicada
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
       
-      template <typename X, typename F, typename H, typename M>
-      double operator()(X& x,
-			const F& f,
-			const H& H,
-			const M& M,
+      template <typename __X, typename __F, typename __H, typename __M>
+      double operator()(__X& x,
+			const __F& f,
+			const __H& H,
+			const __M& M,
 			const double C,
 			const double tolerance)
       {
