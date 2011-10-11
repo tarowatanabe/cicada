@@ -10,6 +10,8 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include "utils/random_seed.hpp"
+
 #include "symbol.hpp"
 
 void process(const cicada::Symbol& x, int index)
@@ -60,7 +62,7 @@ int main(int argc, char** argv)
   std::cerr << "pos: " << symbol_type("Good|/[ADJ]").pos() << " terminal: " << symbol_type("Good|/[ADJ]").terminal() << std::endl;
   std::cerr << "pos: " << symbol_type("Good[g]|[ADJ]").pos() << " terminal: " << symbol_type("Good[g]|[ADJ]").terminal() << std::endl;
 
-  srandom(time(0) * getpid());
+  srandom(utils::random_seed());
 
   for (int i = 0; i != 1024 * 4; ++ i) {
     const std::string rnd = boost::lexical_cast<std::string>(random());
