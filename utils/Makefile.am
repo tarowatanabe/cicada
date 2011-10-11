@@ -91,6 +91,7 @@ piece.hpp \
 program_options.hpp \
 python_string_parser.hpp \
 python_string_generator.hpp \
+random_seed.hpp \
 regex_group.hpp \
 repository.hpp \
 resource.hpp \
