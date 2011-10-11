@@ -251,6 +251,8 @@ struct LearnMIRA : public LearnBase
 	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	// or, do we use simple loss == 1?
 	
+	if (loss <= 0.0) continue;
+	
 	labels.push_back(loss);
 	features.insert(feats.begin(), feats.end());
       }
