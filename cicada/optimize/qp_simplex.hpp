@@ -117,7 +117,7 @@ namespace cicada
 		}
 	      }
 	    
-	    // checl auxiliary variable for update...
+	    // check auxiliary variable for update...
 	    if (neq > 0.0) {
 	      const double numer = - neq * d[u];
 	      const double denom = neq * neq * H(u, u);

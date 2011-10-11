@@ -4,6 +4,7 @@
 #include <vector>
 #include <utility>
 #include <stdexcept>
+#include <numeric>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -185,15 +186,24 @@ int main(int argc, char** argv)
     double objective = 0.0;
     if (alg == 0) {
       cicada::optimize::QPSMO solver;
-      objective = solver(alpha, f, h, m, 1.0 / (1e-4 *  model.size()), 1e-4);
+      objective = solver(alpha, f, h, m, 1.0, 1e-4);
     } else if (alg == 1) {
       cicada::optimize::QPDCD solver;
-      objective = solver(alpha, f, h, m, 1.0 / (1e-4 *  model.size()), 1e-4);
+      objective = solver(alpha, f, h, m, 1.0, 1e-4);
     } else if (alg == 2) {
       cicada::optimize::QPSimplex solver;
-      objective = solver(alpha, f, h, m, 1.0 / (1e-4 *  model.size()), 1e-4);
+      objective = solver(alpha, f, h, m, 1.0, 1e-4);
     } else
       throw std::runtime_error("algorithm can be 0 (dcd), 1(smo) or 2(simplex)");
+
+    std::cerr << "objective: " << objective << std::endl;
+    std::cerr << "alpha sum: " << std::accumulate(alpha.begin(), alpha.end(), 0.0) << std::endl;
+    
+    size_t sv = 0;
+    for (size_t i = 0; i != alpha.size(); ++ i)
+      sv += alpha[i] != 0.0;
+    
+    std::cerr << "support vector: " << sv << std::endl;
     
     {
       utils::compress_ostream os(output_alpha_path);
@@ -215,7 +225,7 @@ int main(int argc, char** argv)
     for (size_t i = 0; i != model.size(); ++ i) {
       const double predicted = m(weights, i);
       
-      correct += (predicted * model[i].label) > 0.0;
+      correct += predicted > 0.0;
     }
 
     std::cerr << "correct: " << correct << std::endl;
