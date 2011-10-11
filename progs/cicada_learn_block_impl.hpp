@@ -21,6 +21,7 @@
 #include "cicada/kbest.hpp"
 #include "cicada/operation/traversal.hpp"
 #include "cicada/operation/functional.hpp"
+#include "cicada/optimize_qp.hpp"
 
 #include "utils/sgi_hash_set.hpp"
 #include "utils/base64.hpp"
@@ -120,6 +121,8 @@ struct LearnMIRA : public LearnBase
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
 
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
 
   template <typename FeatureSet>
   struct HMatrix
@@ -133,11 +136,46 @@ struct LearnMIRA : public LearnBase
     
     const FeatureSet& features;
   };
-
-  typedef std::vector<double, std::allocator<double> >    alpha_type;
-  typedef std::vector<double, std::allocator<double> >    gradient_type;
-  typedef std::vector<bool, std::allocator<bool> >        skipped_type;
-
+  
+  template <typename FeatureSet>
+  struct MMatrix
+  {
+    MMatrix(const FeatureSet& __features) : features(__features) {}
+    
+    template <typename W>
+    void operator()(W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = features.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const FeatureSet& features;
+  };
+  
   LearnMIRA() : tolerance(1e-4), lambda(C) {}
   
   void clear()
@@ -231,235 +269,40 @@ struct LearnMIRA : public LearnBase
   
   double learn(weight_set_type& weights)
   {
-    HMatrix<sample_set_type> H(features);
 
     if (features.empty()) return 0.0;
     
     alpha.clear();
-    g.clear();
-    skipped.clear();
+    f.clear();
     
     alpha.reserve(labels.size());
-    g.reserve(labels.size());
-    skipped.reserve(labels.size());
+    f.reserve(labels.size());
     
     alpha.resize(labels.size(), 0.0);
-    g.resize(labels.size(), 0.0);
-    skipped.resize(labels.size(), false);
+    f.resize(labels.size(), 0.0);
     
-    double objective_max = - std::numeric_limits<double>::infinity();
-    double objective_min =   std::numeric_limits<double>::infinity();
     double objective = 0.0;
-    
-    size_type num_instance = 0;
     for (size_t i = 0; i != labels.size(); ++ i) {
-      g[i] = labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0);
-      
-      const bool skipping = (g[i] <= 0 || labels[i] <= 0);
-      
-      skipped[i] = skipping;
-      num_instance += ! skipping;
-      
-      if (! skipping) {
-	objective += g[i];
-	objective_max = std::max(objective_max, g[i]);
-	objective_min = std::min(objective_min, g[i]);
-      }
-    }
-
-    if (! num_instance) {
-      features.clear();
-      labels.clear();
-    
-      return 0.0;
-    }
-
-    objective /= num_instance;
-
-    const int model_size = labels.size();
-    
-    const double C = 1.0 / (lambda * num_instance);
-    
-    double alpha_neq = C;
-    
-    // compute initial primal, dual
-    double obj_primal = 0.0;
-    double obj_dual   = 0.0;
-    for (int k = 0; k != model_size; ++ k) 
-      if (! skipped[k]) {
-	obj_primal += g[k] * C;
-	obj_dual   += g[k] * alpha[k];
-      }
-    
-    if (debug >= 2)
-      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl;
-
-    bool perform_update = false;
-    for (int iter = 0; iter != 100; ++ iter) {
-      bool perform_update_local = false;
-      
-      int u = -1;
-      double max_obj = - std::numeric_limits<double>::infinity();
-      double delta = 0.0;
-      
-      for (int k = 0; k != model_size; ++ k) 
-	if (! skipped[k]) {
-	  delta -= alpha[k] * g[k];
-	  
-	  if (g[k] > max_obj) {
-	    max_obj = g[k];
-	    u = k;
-	  }
-	}
-      
-      if (g[u] < 0.0)
-	u = -1;
-      else
-	delta += C * g[u];
-      
-      // quit if delta is below tolerance...
-      if (delta <= tolerance) break;
-      
-      if (u >= 0) {
-	int v = -1;
-	double max_improvement = - std::numeric_limits<double>::infinity();
-	double tau = 1.0;
-	
-	for (int k = 0; k != model_size; ++ k) 
-	  if (! skipped[k] && k != u && alpha[k] > 0.0) {
-	    const double numer = alpha[k] * (g[u] - g[k]);
-	    const double denom = alpha[k] * alpha[k] * (H(u, u) - 2.0 * H(u, k) + H(k, k));
-	    
-	    if (denom > 0.0) {
-	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	      
-	      if (improvement > max_improvement) {
-		max_improvement = improvement;
-		tau = std::max(0.0, std::min(1.0, numer / denom));
-		v = k;
-	      }
-	    }
-	  }
-	
-	if (alpha_neq > 0.0) {
-	  const double numer = alpha_neq * g[u];
-	  const double denom = alpha_neq * alpha_neq * H(u, u);
-	  
-	  if (denom > 0.0) {
-	    const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	    
-	    if (improvement > max_improvement) {
-	      max_improvement = improvement;
-	      tau = std::max(0.0, std::min(1.0, numer / denom));
-	      v = -1;
-	    }
-	  }
-	}
-	
-	if (v >= 0) {
-	  // maximize objective, u and v
-	  double update = alpha[v] * tau;
-	  if (alpha[u] + update < 0.0)
-	    update = - alpha[u];
-	  
-	  if (update != 0.0) {
-	    perform_update_local = true;
-	    
-	    alpha[u] += update;
-	    alpha[v] -= update;
-	    for (int i = 0; i != model_size; ++ i)
-	      if (! skipped[i])
-		g[i] += update * (H(i, v) - H(i, u));
-	  }
-	} else {
-	  // update via alpha_neq
-	  double update = alpha_neq * tau;
-	  if (alpha[u] + update < 0.0)
-	    update = - alpha[u];
-	  
-	  if (update != 0.0) {
-	    perform_update_local = true;
-	    
-	    alpha[u] += update;
-	    alpha_neq -= update;
-	    for (int i = 0; i != model_size; ++ i)
-	      if (! skipped[i])
-		g[i] -= update * H(i, u);
-	  }
-	}
-      } else {
-	int v = -1;
-	double max_improvement = - std::numeric_limits<double>::infinity();
-	double tau = 1.0;
-	
-	for (int k = 0; k != model_size; ++ k) 
-	  if (! skipped[k] && alpha[k] > 0.0) {
-	    const double numer = alpha[k] * g[k];
-	    const double denom = alpha[k] * alpha[k] * H(k, k);
-	    
-	    if (denom > 0.0) {
-	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	      
-	      if (improvement > max_improvement) {
-		max_improvement = improvement;
-		tau = std::max(0.0, std::min(1.0, numer / denom));
-		v = k;
-	      }
-	    }
-	  }
-	
-	if (v >= 0) {
-	  double update = alpha[v] * tau;
-	  if (alpha_neq + update < 0.0)
-	    update = - alpha_neq;
-	  
-	  if (update != 0.0) {
-	    perform_update_local = true;
-	    
-	    alpha_neq += update;
-	    alpha[v] -= update;
-	    for (int i = 0; i != model_size; ++ i)
-	      if (! skipped[i])
-		g[i] += update * H(i, v);
-	  }
-	}
-      }
-
-      perform_update |= perform_update_local;
-      
-      if (! perform_update_local) break;
-
-      // compute primal, dual
-      obj_primal = 0.0;
-      obj_dual   = 0.0;
-      for (int k = 0; k != model_size; ++ k) 
-	if (! skipped[k]) {
-	  obj_primal += g[k] * C;
-	  obj_dual   += g[k] * alpha[k];
-	}
-      
-      // global tolerance
-      if (obj_primal - obj_dual <= tolerance * num_instance)
-	break;
-    }
-
-    if (debug >= 2)
-      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
-
-    if (! perform_update) {
-      features.clear();
-      labels.clear();
-    
-      return objective;
+      f[i] = - (labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+      objective -= f[i];
     }
     
-    for (int k = 0; k != model_size; ++ k)
-      if (! skipped[k] && alpha[k] > 0.0) {
-	// update: weights[fiter->first] += alpha[k] * fiter->second;
+    objective /= labels.size();
+
+    cicada::optimize::QPDCD solver;
+    
+    HMatrix<sample_set_type> H(features);
+    MMatrix<sample_set_type> M(features);
+    
+    solver(alpha, f, H, M, 1.0 / (lambda * labels.size()), tolerance);
+    
+    for (size_t i = 0; i != labels.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	// update: weights[fiter->first] += alpha[i] * fiter->second;
 	
-	sample_set_type::value_type::const_iterator fiter_end = features[k].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter)
-	  weights[fiter->first] += alpha[k] * fiter->second;
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	  weights[fiter->first] += alpha[i] * fiter->second;
       }
     
     features.clear();
@@ -477,8 +320,7 @@ struct LearnMIRA : public LearnBase
   sentence_unique_type sentences;
   
   alpha_type    alpha;
-  gradient_type g;
-  skipped_type  skipped;
+  f_type        f;
 };
 
 // logistic regression base...
