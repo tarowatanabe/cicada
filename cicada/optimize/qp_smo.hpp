@@ -44,6 +44,7 @@ namespace cicada
 	  throw std::runtime_error("size does not match");
 	
 	const int model_size = x.size();
+	int active_size = x.size();
 	
 	// compute gradient...
 	d_type d(f.begin(), f.end());
@@ -55,20 +56,19 @@ namespace cicada
 	    for (int j = 0; j != model_size; ++ j)
 	      d[j] += H(j, i) * x[i];
 	  }
+	
 	if (! found_non_zero) {
-	  // randomly select one instance as "fired"
-	  
-	  const int i = random() % model_size;
-	  x[i] = C;
+	  // choose the first vector...
+	  x[0] = C;
 	  for (int j = 0; j != model_size; ++ j)
-	    d[j] += H(j, i) * x[i];
+	    d[j] += H(j, 0) * x[0];
 	}
 	
 	
 	double objective_primal = 0.0;
 	for (int i = 0; i != model_size; ++ i)
 	  objective_primal += 0.5 * x[i] * (f[i] + d[i]);
-	
+
 	for (int iter = 0; iter != 1000; ++ iter) {
 	  
 	  // find the most violating pair
@@ -80,27 +80,18 @@ namespace cicada
 	  
 	  for (int i = 0; i != model_size; ++ i) {
 	    const double F = d[i];
+
+	    if (x[i] < C)
+	      if (F < F_lower) {
+		F_lower = F;
+		u = i;
+	      }
 	    
-	    if (0.0 < x[i] && x[i] < C) {
-	      if (F < F_lower) {
-		F_lower = F;
-		u = i;
-	      }
+	    if (0.0 < x[i])
 	      if (F > F_upper) {
 		F_upper = F;
 		v = i;
 	      }
-	    } else if (x[i] == 0.0) {
-	      if (F < F_lower) {
-		F_lower = F;
-		u = i;
-	      }
-	    } else if (x[i] == C) {
-	      if (F > F_upper) {
-		F_upper = F;
-		v = i;
-	      }
-	    }
 	  }
 	  
 	  if (F_upper - F_lower <= tolerance) break;
@@ -116,11 +107,20 @@ namespace cicada
 	  x[v] -= tau;
 	  
 	  // update d..
-	  //size_type size_active = 0;
-	  for (int i = 0; i != model_size; ++ i)
+	  // size_type size_active = 0;
+	  double lambda_eq = 0.0;
+	  size_type size_active = 0;
+	  for (int i = 0; i != model_size; ++ i) {
 	    d[i] += tau * (H(i, u) - H(i, v));
+	    
+	    if (0.0 < x[i] && x[i] < C) {
+	      lambda_eq -= d[i];
+	      ++ size_active;
+	    }
+	  }
 	  
 	  // compute shrinking and re-compute active size
+	  
 	}
 	
 	objective_primal = 0.0;

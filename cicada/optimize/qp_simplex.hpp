@@ -73,7 +73,7 @@ namespace cicada
 	  objective_dual   += C * d[i];
 	}
 	
-	for (int iter = 0; iter != 100; ++ iter) {
+	for (int iter = 0; iter != 1000; ++ iter) {
 	  bool updated = false;
 	  
 	  int u = -1;

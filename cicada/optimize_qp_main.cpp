@@ -1,5 +1,5 @@
 
-
+#include <cstdlib>
 #include <iostream>
 #include <vector>
 #include <utility>
@@ -13,6 +13,7 @@
 
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
 
 #include "weight_vector.hpp"
 #include "feature_vector.hpp"
@@ -150,6 +151,9 @@ int main(int argc, char** argv)
   }
   
   try {
+    
+    ::srandom(utils::random_seed());
+
     const int alg = utils::lexical_cast<int>(argv[1]);
     const path_type input_path(argv[2]);
     const path_type output_alpha_path(argv[3]);
