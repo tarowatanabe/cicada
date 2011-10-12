@@ -209,11 +209,12 @@ struct LearnDCD : public LearnBase
 
   void clear()
   {
-    if (features.empty()) {
+    if (features.empty())
       features.resize(1);
+    if (labels.empty())
       labels.resize(1);
+    if (alphas.empty())
       alphas.resize(1);
-    }
     
     features.front().clear();
     labels.front().clear();
@@ -222,11 +223,80 @@ struct LearnDCD : public LearnBase
   
   std::ostream& encode(std::ostream& os)
   {
+    if (features.empty()) return os;
+    
+    for (size_type id = 1; id != features.size(); ++ id)
+      if (! features[id].empty()) {
+	
+	if (features[id].size() != labels[id].size())
+	  throw std::runtime_error("labels size differ");
+	
+	for (size_type i = 0; i != features[id].size(); ++ id) {
+	  utils::encode_base64(labels[id][i], std::ostream_iterator<char>(os));
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features[id][i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[id][i].begin(); fiter != fiter_end; ++ fiter) {
+	    os << ' ' << fiter->first << ' ';
+	    utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
+	  }
+	  
+	  os << '\n';
+	}
+      }
+    
     return os;
   }
   
   std::istream& decode(std::istream& is)
   {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+
+    if (features.empty())
+      features.resize(1);
+    if (labels.empty())
+      labels.resize(1);
+    if (alphas.empty())
+      alphas.resize(1);
+    
+    std::string line;
+    features_type feats;
+    
+    while (std::getline(is, line)) {
+      feats.clear();
+      
+      const utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+      
+      tokenizer_type::iterator iter     = tokenizer.begin();
+      tokenizer_type::iterator iter_end = tokenizer.end();
+      
+      if (iter == iter_end) continue;
+      
+      const utils::piece label_str = *iter;
+      ++ iter;
+      
+      if (iter == iter_end) continue;
+      
+      while (iter != iter_end) {
+	const utils::piece feature = *iter;
+	++ iter;
+	
+	if (iter == iter_end) break;
+	
+	const utils::piece value = *iter;
+	++ iter;
+	
+	feats.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
+      }
+      
+      if (feats.empty()) continue;
+      
+      features.front().insert(feats.begin(), feats.end());
+      alphas.front().push_back(0.0);
+      labels.front().push_back(utils::decode_base64<double>(label_str));
+    }
+    
     return is;
   }
 
