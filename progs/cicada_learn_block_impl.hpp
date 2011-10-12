@@ -205,7 +205,7 @@ struct LearnDCD : public LearnBase
     const sample_map_type&   features;
   };
   
-  LearnDCD() : tolerance(1e-4), lambda(C) {}
+  LearnDCD() : tolerance(0.1), lambda(C) {}
 
   void clear()
   {
@@ -231,7 +231,7 @@ struct LearnDCD : public LearnBase
 	if (features[id].size() != labels[id].size())
 	  throw std::runtime_error("labels size differ");
 	
-	for (size_type i = 0; i != features[id].size(); ++ id) {
+	for (size_type i = 0; i != features[id].size(); ++ i) {
 	  utils::encode_base64(labels[id][i], std::ostream_iterator<char>(os));
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[id][i].end();
