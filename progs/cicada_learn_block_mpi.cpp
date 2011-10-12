@@ -904,7 +904,7 @@ void options(int argc, char** argv)
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
     ("block",     po::value<int>(&block_size)->default_value(block_size), "block (or batch, bin) size")
-    ("kbset",     po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
+    ("kbest",     po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
