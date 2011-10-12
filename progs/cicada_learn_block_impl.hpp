@@ -291,6 +291,8 @@ struct LearnDCD : public LearnBase
       }
       
       if (feats.empty()) continue;
+
+      std::sort(feats.begin(), feats.end());
       
       features.front().insert(feats.begin(), feats.end());
       alphas.front().push_back(0.0);
