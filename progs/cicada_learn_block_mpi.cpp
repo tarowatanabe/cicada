@@ -584,13 +584,13 @@ void cicada_learn(operation_set_type& operations,
 	if (rank == mpi_rank) {
 	  boost::iostreams::filtering_ostream os;
 	  os.push(boost::iostreams::zlib_compressor());
-	  os.push(utils::mpi_device_bcast_sink(rank, 1024 * 16));
+	  os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
 	  
 	  learner.encode(os);
 	} else {
 	  boost::iostreams::filtering_istream is;
 	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(utils::mpi_device_bcast_source(rank, 1024 * 16));
+	  is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
 	  
 	  learner.decode(is);
 	}
