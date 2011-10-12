@@ -412,7 +412,7 @@ struct LearnDCD : public LearnBase
       }
     }
     
-    cicada::optimize::QPDCD solver;
+    cicada::optimize::QPSimplex solver;
 
     HMatrix H(positions, features);
     MMatrix M(positions, features);
