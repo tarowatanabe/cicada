@@ -418,7 +418,7 @@ struct LearnDCD : public LearnBase
     solver(alpha, f, H, M, 1.0 / (lambda * positions.size()), tolerance);
     
     weights.clear();
-    alpha_set_type::iterator aiter = alpha.begin();
+    alpha_set_type::const_iterator aiter = alpha.begin();
     for (size_type i = 0; i != features.size(); ++ i) {
       
       if (features[i].size() != alphas[i].size())
