@@ -97,6 +97,293 @@ struct LearnBase
   typedef SampleSet sample_set_type;
 };
 
+
+//
+// dual coordinate descent, an algorithm used in liblinear
+// a large difference to the liblinear learner is the re-use of alpha values for faster
+// training
+
+struct LearnDCD : public LearnBase
+{
+  typedef std::vector<double, std::allocator<double> > label_set_type;
+  typedef std::vector<double, std::allocator<double> > alpha_set_type;
+  typedef std::vector<double, std::allocator<double> > f_set_type;
+  
+  typedef utils::chunk_vector<sample_set_type, 4096 / sizeof(sample_set_type), std::allocator<sample_set_type> > sample_map_type;
+  typedef utils::chunk_vector<label_set_type, 4096 / sizeof(label_set_type), std::allocator<label_set_type> >    label_map_type;
+  typedef utils::chunk_vector<alpha_set_type, 4096 / sizeof(alpha_set_type), std::allocator<alpha_set_type> >    alpha_map_type;
+
+  typedef std::pair<size_type, size_type> pos_pair_type;
+  typedef std::vector<pos_pair_type, std::allocator<pos_pair_type> > pos_pair_set_type;
+  
+  //
+  // typedef for unique sentences
+  //
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+    
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+  
+  
+  struct HMatrix
+  {
+    HMatrix(const pos_pair_set_type& __positions,
+	    const sample_map_type& __features)
+      : positions(__positions), features(__features) {}
+
+    double operator()(int i, int j) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      const pos_pair_type& pos_j = positions[j];
+      
+      return cicada::dot_product(features[pos_i.first][pos_i.second].begin(), features[pos_i.first][pos_i.second].end(),
+				 features[pos_j.first][pos_j.second].begin(), features[pos_j.first][pos_j.second].end(),
+				 0.0);
+    }
+    
+    const pos_pair_set_type& positions;
+    const sample_map_type&   features;
+  };
+  
+  struct MMatrix
+  {
+    MMatrix(const pos_pair_set_type& __positions,
+	    const sample_map_type&   __features)
+      : positions(__positions), features(__features) {}
+    
+    template <typename W>
+    void operator()(W& w, const alpha_set_type& alpha) const
+    {
+      alpha_set_type::const_iterator aiter = alpha.begin();
+      
+      const size_type model_size = features.size();
+      for (size_type i = 0; i != model_size; ++ i) {
+	const size_type features_size = features[i].size();
+	
+	for (size_type j = 0; j != features_size; ++ j, ++ aiter)
+	  if (*aiter > 0.0) {
+	    sample_set_type::value_type::const_iterator fiter_end = features[i][j].end();
+	    for (sample_set_type::value_type::const_iterator fiter = features[i][j].begin(); fiter != fiter_end; ++ fiter) 
+	      w[fiter->first] += (*aiter) * fiter->second;
+	  }
+      }
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = features[pos_i.first][pos_i.second].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[pos_i.first][pos_i.second].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      
+      sample_set_type::value_type::const_iterator fiter_end = features[pos_i.first][pos_i.second].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[pos_i.first][pos_i.second].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const pos_pair_set_type& positions;
+    const sample_map_type&   features;
+  };
+  
+  LearnDCD() : tolerance(1e-4), lambda(C) {}
+
+  void clear()
+  {
+    if (features.empty()) {
+      features.resize(1);
+      labels.resize(1);
+      alphas.resize(1);
+    }
+    
+    features.front().clear();
+    labels.front().clear();
+    alphas.front().clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    
+    if (kbests.empty() || oracles.empty()) return;
+
+    const size_type id_pos = id + 1;
+    
+    if (id_pos >= features.size())
+      features.resize(id_pos + 1);
+    if (id_pos >= labels.size())
+      labels.resize(id_pos + 1);
+    if (id_pos >= alphas.size())
+      alphas.resize(id_pos + 1);
+    
+    if (! merge) {
+      features[id_pos].clear();
+      labels[id_pos].clear();
+      alphas[id_pos].clear();
+    }
+    
+    sentences.clear();
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      sentences.insert(oracles[o].sentence);
+    
+    const double error_factor = (error_metric ? - 1.0 : 1.0);
+    
+    features_type feats;
+    
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      for (size_t k = 0; k != kbests.size(); ++ k) {
+	const hypothesis_type& oracle = oracles[o];
+	const hypothesis_type& kbest  = kbests[k];
+	
+	if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	
+	hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	
+	hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	
+	feats.clear();
+	
+	while (oiter != oiter_end && kiter != kiter_end) {
+	  if (oiter->first < kiter->first) {
+	    feats.push_back(*oiter);
+	    ++ oiter;
+	  } else if (kiter->first < oiter->first) {
+	    feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    ++ kiter;
+	  } else {
+	    const double value = oiter->second - kiter->second;
+	    if (value != 0.0)
+	      feats.push_back(feature_value_type(kiter->first, value));
+	    ++ oiter;
+	    ++ kiter;
+	  }
+	}
+	
+	for (/**/; oiter != oiter_end; ++ oiter)
+	  feats.push_back(*oiter);
+	
+	for (/**/; kiter != kiter_end; ++ kiter)
+	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	
+	if (feats.empty()) continue;
+	
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
+	// or, do we use simple loss == 1?
+	
+	if (loss <= 0.0) continue;
+	
+	features[id_pos].insert(feats.begin(), feats.end());
+	alphas[id_pos].push_back(0.0);
+	labels[id_pos].push_back(loss);
+      }
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+    
+    
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    positions.clear();
+    alpha.clear();
+    f.clear();
+    
+    for (size_type i = 0; i != features.size(); ++ i) {
+      
+      if (features[i].size() != alphas[i].size())
+	throw std::runtime_error("alpha size differ");
+      if (features[i].size() != labels[i].size())
+	throw std::runtime_error("label size differ");
+      
+      for (size_type j = 0; j != features[i].size(); ++ j) {
+	positions.push_back(std::make_pair(i, j));
+	f.push_back(- labels[i][j]);
+	alpha.push_back(alphas[i][j]);
+      }
+    }
+    
+    cicada::optimize::QPDCD solver;
+
+    HMatrix H(positions, features);
+    MMatrix M(positions, features);
+    
+    solver(alpha, f, H, M, 1.0 / (lambda * positions.size()), tolerance);
+    
+    weights.clear();
+    alpha_set_type::iterator aiter = alpha.begin();
+    for (size_type i = 0; i != features.size(); ++ i) {
+      
+      if (features[i].size() != alphas[i].size())
+	throw std::runtime_error("alpha size differ");
+      if (features[i].size() != labels[i].size())
+	throw std::runtime_error("label size differ");
+      
+      for (size_type j = 0; j != features[i].size(); ++ j, ++ aiter) {
+	if (*aiter > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = features[i][j].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i][j].begin(); fiter != fiter_end; ++ fiter)
+	    weights[fiter->first] += (*aiter) * fiter->second;
+	}
+	
+	alphas[i][j] = *aiter;
+      }
+    }
+    
+    return 0.0;
+  }
+  
+  double tolerance;
+  double lambda;
+  
+  sample_map_type features;
+  label_map_type  labels;
+  alpha_map_type  alphas;
+  
+  sentence_unique_type sentences;
+  
+  pos_pair_set_type positions;
+  alpha_set_type alpha;
+  f_set_type     f;
+};
+
 // MIRA learner
 // We will run a qp solver and determine the alpha, then, translate this into w
 struct LearnMIRA : public LearnBase
@@ -197,7 +484,6 @@ struct LearnMIRA : public LearnBase
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
     if (kbests.empty() || oracles.empty()) return;
     
