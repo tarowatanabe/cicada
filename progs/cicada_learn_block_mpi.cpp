@@ -580,6 +580,7 @@ void cicada_learn(operation_set_type& operations,
 	std::cerr << "merge vectors" << std::endl;
       
       learner.clear();
+      
       for (int rank = 0; rank != mpi_size; ++ rank)
 	if (rank == mpi_rank) {
 	  boost::iostreams::filtering_ostream os;
@@ -594,6 +595,9 @@ void cicada_learn(operation_set_type& operations,
 	  
 	  learner.decode(is);
 	}
+      
+      if (debug && mpi_rank == 0)
+	std::cerr << "learning by merged vectors" << std::endl;
       
       // perform learning...
       learner.learn(weights);
