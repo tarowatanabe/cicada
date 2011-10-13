@@ -89,6 +89,18 @@ struct LearnBase
     
     size_type size() const { return offsets.size() - 1; }
     bool empty() const { return offsets.size() == 1; }
+
+    void swap(SampleSet& x)
+    {
+      features.swap(x.features);
+      offsets.swap(x.offsets);
+    }
+
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
     
     features_type features;
     offsets_type  offsets;
@@ -1336,8 +1348,6 @@ struct LearnLinear
 	    features.push_back(feature);
 	  }
 	}
-
-      shrink();
     }
     
     void clear()
@@ -1374,8 +1384,8 @@ struct LearnLinear
       for (size_type pos = 0; pos != encoders[id].offsets.size(); ++ pos) {
 	encoder_type::feature_node_set_type::const_iterator fiter     = encoders[id].features.begin() + encoders[id].offsets[pos];
 	encoder_type::feature_node_set_type::const_iterator fiter_end = (pos + 1 < encoders[id].offsets.size()
-							   ? encoders[id].features.begin() + encoders[id].offsets[pos + 1] - 1
-							   : encoders[id].features.end() - 1);
+									 ? encoders[id].features.begin() + encoders[id].offsets[pos + 1] - 1
+									 : encoders[id].features.end() - 1);
 	for (/**/; fiter != fiter_end; ++ fiter) {
 	  os << weight_set_type::feature_type(fiter->index - 1) << ' ';
 	  utils::encode_base64(fiter->value, std::ostream_iterator<char>(os));
