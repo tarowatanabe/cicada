@@ -682,7 +682,7 @@ struct LearnMIRA : public LearnBase
 	
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
-	  weights[fiter->first] += alpha[i] * fiter->second;
+	  weights[fiter->first] += alpha[i] * fiter->second * lambda;
       }
     
     features.clear();
