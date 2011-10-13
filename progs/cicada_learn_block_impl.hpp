@@ -738,19 +738,19 @@ struct LearnLR : public LearnBase
     }
     
     template <typename Expectations>
-    double encode(const weight_set_type& weights, Expectations& expectations) const
+    double encode(const weight_set_type& weights, Expectations& expectations, const double scale) const
     {
       weight_type Z_oracle;
       weight_type Z_kbest; 
       
       for (size_type o = 0; o != oracles.size(); ++ o)
-	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0));
+	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale);
       
       for (size_type k = 0; k != kbests.size(); ++ k)
-	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0));
+	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale);
       
       for (size_type o = 0; o != oracles.size(); ++ o) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0)) / Z_oracle;
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale) / Z_oracle;
 	
 	sample_set_type::value_type::const_iterator fiter_end = oracles[o].end();
 	for (sample_set_type::value_type::const_iterator fiter = oracles[o].begin(); fiter != fiter_end; ++ fiter)
@@ -758,7 +758,7 @@ struct LearnLR : public LearnBase
       }
       
       for (size_type k = 0; k != kbests.size(); ++ k) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0)) / Z_kbest;	
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale) / Z_kbest;	
 	
 	sample_set_type::value_type::const_iterator fiter_end = kbests[k].end();
 	for (sample_set_type::value_type::const_iterator fiter = kbests[k].begin(); fiter != fiter_end; ++ fiter)
@@ -838,7 +838,7 @@ struct LearnSGDL1 : public LearnLR
     double objective = 0.0;
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
-      objective += siter->encode(weights, expectations);
+      objective += siter->encode(weights, expectations, 1.0);
     objective /= samples.size();
     
     // update by expectations...
@@ -940,7 +940,7 @@ struct LearnSGDL2 : public LearnLR
     double objective = 0.0;
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
-      objective += siter->encode(weights, expectations);
+      objective += siter->encode(weights, expectations, weight_scale);
     objective /= samples.size();
     
     // update by expectations...
@@ -1161,7 +1161,7 @@ struct LearnLBFGS : public LearnLR
     for (size_t i = 0; i != samples_other.size(); ++ i) {
       const sample_pair_type& sample = samples_other[i];
       
-      const double margin = sample.encode(weights, expectations);
+      const double margin = sample.encode(weights, expectations, 1.0);
       objective -= margin;
       ++ instances;
     }
@@ -1172,7 +1172,7 @@ struct LearnLBFGS : public LearnLR
 	for (sample_pair_set_type::const_iterator siter = samples[id].begin(); siter != siter_end; ++ siter) {
 	  const sample_pair_type& sample = *siter;
 	  
-	  const double margin = sample.encode(weights, expectations);
+	  const double margin = sample.encode(weights, expectations, 1.0);
 	  objective -= margin;
 	  ++ instances;
 	}
