@@ -1,6 +1,7 @@
-2011-9-X
+2011-10-13
 New: Support moses training using the cicada tools (cicada-learn-moses.sh): learn by LBFGS or liblinear with kbests
-New: parse variant of phrasal composition: we do forward lazy graph constructin + backward filtering
+New: parse variant of phrasal composition: we do forward lazy graph constructin + backward filtering (but very slow at this moment)
+New: Better online learning by computing oracles in block-wise fashion.
 Updated scripts for tuning: You should revise cicada.config file so that decoder's output should be ${file} not directory=${directory}
 Serious bugfix: grammar indexing with attributes
 Added kbest filter for moses
