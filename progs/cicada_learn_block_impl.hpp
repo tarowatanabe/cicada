@@ -423,12 +423,11 @@ struct LearnSVM : public LearnBase
     HMatrix H(positions, features);
     MMatrix M(positions, features);
     
-    solver(alpha, f, H, M, 1.0 / (lambda * positions.size()), tolerance);
+    solver(alpha, f, H, M, 1.0 / lambda, tolerance);
     
     weights.clear();
     alpha_set_type::const_iterator aiter = alpha.begin();
     for (size_type i = 0; i != features.size(); ++ i) {
-      
       if (features[i].size() != alphas[i].size())
 	throw std::runtime_error("alpha size differ");
       if (features[i].size() != labels[i].size())
@@ -666,7 +665,7 @@ struct LearnMIRA : public LearnBase
     }
     
     objective /= labels.size();
-
+    
     cicada::optimize::QPDCD solver;
     
     HMatrix<sample_set_type> H(features);
