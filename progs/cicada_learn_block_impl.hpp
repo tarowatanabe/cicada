@@ -553,7 +553,7 @@ struct LearnMIRA : public LearnBase
     const FeatureSet& features;
   };
   
-  LearnMIRA() : tolerance(0.01), lambda(C) {}
+  LearnMIRA() : tolerance(0.1), lambda(C) {}
   
   void clear()
   {
