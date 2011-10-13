@@ -828,7 +828,8 @@ struct LearnSGDL1 : public LearnLR
     
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
-    const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
+    //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
+    const double eta = 0.2 * std::pow(0.85, double(epoch) * k_norm); // eta from SGD-L1
     ++ epoch;
     
     penalty += eta * lambda * k_norm;
@@ -929,7 +930,8 @@ struct LearnSGDL2 : public LearnLR
     
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
-    const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const double eta = 0.2 * std::pow(0.85, double(epoch) * k_norm); // eta from SGD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
