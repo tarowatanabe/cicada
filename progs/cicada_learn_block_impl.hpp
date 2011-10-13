@@ -397,7 +397,7 @@ struct LearnSVM : public LearnBase
     alpha.clear();
     f.clear();
     
-    double alpha_sum = 0.0;
+    //double alpha_sum = 0.0;
     for (size_type i = 0; i != features.size(); ++ i) {
       
       if (features[i].size() != alphas[i].size())
@@ -409,14 +409,16 @@ struct LearnSVM : public LearnBase
 	positions.push_back(std::make_pair(i, j));
 	f.push_back(- labels[i][j]);
 	alpha.push_back(alphas[i][j]);
-	alpha_sum += alphas[i][j];
+	//alpha_sum += alphas[i][j];
       }
     }
 
+#if 0
     if (alpha_sum != 0.0) {
-      const double factor = 1.0 / (alpha_sum * lambda * positions.size());
+      const double factor = 1.0 / (alpha_sum * lambda);
       std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
     }
+#endif
     
     cicada::optimize::QPSMO solver;
 
