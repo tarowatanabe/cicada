@@ -111,9 +111,8 @@ struct LearnBase
 
 
 //
-// dual coordinate descent, an algorithm used in liblinear
-// a large difference to the liblinear learner is the re-use of alpha values for faster
-// training
+// SVM for structured output learning  
+//
 
 struct LearnSVM : public LearnBase
 {
