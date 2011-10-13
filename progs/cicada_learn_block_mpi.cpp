@@ -111,6 +111,7 @@ double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
 
 // additional misc parameters...
+bool loss_rank = false; // loss by rank
 bool merge_vectors_mode  = false; // merge all the vectors from others
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
@@ -935,6 +936,7 @@ void options(int argc, char** argv)
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
     
+    ("loss-rank",    po::bool_switch(&loss_rank),          "rank loss")
     ("merge-vector", po::bool_switch(&merge_vectors_mode), "merge vectors from others")
     ("dump-weights", po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;

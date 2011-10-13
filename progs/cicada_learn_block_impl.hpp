@@ -369,14 +369,10 @@ struct LearnSVM : public LearnBase
 	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
 	
 	if (feats.empty()) continue;
-	
-#if 0
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
-	// or, do we use simple loss == 1?
+
+	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
 	
 	if (loss <= 0.0) continue;
-#endif
-	const double loss = 1.0;
 	
 	features[id_pos].insert(feats.begin(), feats.end());
 	alphas[id_pos].push_back(0.0);
@@ -629,8 +625,7 @@ struct LearnMIRA : public LearnBase
 	
 	if (feats.empty()) continue;
 	
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
-	// or, do we use simple loss == 1?
+	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
 	
 	if (loss <= 0.0) continue;
 	
