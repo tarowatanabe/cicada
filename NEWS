@@ -1,3 +1,6 @@
+2011-10-x
+
+
 2011-10-13
 New: Support moses training using the cicada tools (cicada-learn-moses.sh): learn by LBFGS or liblinear with kbests
 New: parse variant of phrasal composition: we do forward lazy graph constructin + backward filtering (but very slow at this moment)
