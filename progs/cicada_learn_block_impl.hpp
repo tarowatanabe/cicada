@@ -107,6 +107,7 @@ struct LearnDCD : public LearnBase
 {
   typedef std::vector<double, std::allocator<double> > label_set_type;
   typedef std::vector<double, std::allocator<double> > alpha_set_type;
+  typedef std::vector<double, std::allocator<double> > bound_map_type;
   typedef std::vector<double, std::allocator<double> > f_set_type;
   
   typedef utils::chunk_vector<sample_set_type, 4096 / sizeof(sample_set_type), std::allocator<sample_set_type> > sample_map_type;
@@ -215,10 +216,13 @@ struct LearnDCD : public LearnBase
       labels.resize(1);
     if (alphas.empty())
       alphas.resize(1);
+    if (bounds.empty())
+      bounds.resize(1, 0.0);
     
     features.front().clear();
     labels.front().clear();
     alphas.front().clear();
+    bounds.front() = 0.0;
   }
   
   std::ostream& encode(std::ostream& os)
@@ -316,11 +320,14 @@ struct LearnDCD : public LearnBase
       labels.resize(id_pos + 1);
     if (id_pos >= alphas.size())
       alphas.resize(id_pos + 1);
+    if (id_pos >= bounds.size())
+      bounds.resize(id_pos + 1, 0.0);
     
     if (! merge) {
       features[id_pos].clear();
       labels[id_pos].clear();
       alphas[id_pos].clear();
+      bounds[id_pos] = 0.0;
     }
     
     sentences.clear();
@@ -398,6 +405,7 @@ struct LearnDCD : public LearnBase
     alpha.clear();
     f.clear();
     
+    double alpha_sum = 0.0;
     for (size_type i = 0; i != features.size(); ++ i) {
       
       if (features[i].size() != alphas[i].size())
@@ -409,10 +417,16 @@ struct LearnDCD : public LearnBase
 	positions.push_back(std::make_pair(i, j));
 	f.push_back(- labels[i][j]);
 	alpha.push_back(alphas[i][j]);
+	alpha_sum += alphas[i][j];
       }
     }
+
+    if (alpha_sum != 0.0) {
+      const double factor = 1.0 / (alpha_sum * lambda * positions.size());
+      std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
+    }
     
-    cicada::optimize::QPSimplex solver;
+    cicada::optimize::QPSMO solver;
 
     HMatrix H(positions, features);
     MMatrix M(positions, features);
@@ -448,6 +462,7 @@ struct LearnDCD : public LearnBase
   sample_map_type features;
   label_map_type  labels;
   alpha_map_type  alphas;
+  bound_map_type  bounds;
   
   sentence_unique_type sentences;
   
