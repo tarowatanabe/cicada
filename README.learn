@@ -1,6 +1,6 @@
 Learning component in cicada:
 
-Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE (may change in the future)
+Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE/LEARN_BLOCK (may change in the future)
 
 MERT: cicada_mert{,_kbest}{,_mpi}
 
@@ -11,6 +11,10 @@ LEARN: ciada_learn{,_kbest}{,_mpi}
        The hyperparameter C is independent of data size, and is used as a scaling for L_{1,2} regularizer.
 
 LEARN_ONLINE: cicada_learn_online{,_mpi}
+
+LEARN_BLOCK: cicada_learn_block_mpi:
+	     This is a variant of cicada-learn.sh, or cicada-learn-linear.sh in that it works in an online fashion.
+	     Oracle translations are not computed globally, but only locally inside "block."
 
 We can easily tune weights by using tree scripts:
 
