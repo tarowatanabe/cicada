@@ -8,11 +8,6 @@ Do we allow state-less features applied during composition???
 	
 	We have "parse" variant of "compose". Do we allow stateless features during "parsing" ????
 
-Better MIRA training
-    Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
-    Sharding to reduce memory for each rank
-    Separate averaging and non-averaging code during optimization...
-
 Systematic symbols:
   - So forth, we have abused many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
@@ -35,13 +30,6 @@ Support word alignment training!
   Intersection with the supplied alignment: supervised training!
     Can we do this, given that word alignment space is rather constrained...
 
-Reimplement cicada-learn-online:
-  Distribute sentences and oracle translations first, then, run online learning
-  instead of distributing sentences on the fly... This will potentially speed up
-  learning at the cost of slow decoding at some sentences... We can potentially avoid this by 
-  sorting training data wrt its length.
-  
-  or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
 
 Implement scalable training by L1 regularized feature selection:
   1. Collect features.. it is the hardest part...
@@ -129,3 +117,7 @@ Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
 
 Support joshua training?
 Support cicada forest converter?
+
+Deprecate old learn-online code...?
+  since it is very complicated and error-prone, almost impossible to maintain.
+  or, simply deprecate non-mpi version?
