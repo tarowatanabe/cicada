@@ -439,7 +439,7 @@ struct LearnSVM : public LearnBase
 	if (*aiter > 0.0) {
 	  sample_set_type::value_type::const_iterator fiter_end = features[i][j].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[i][j].begin(); fiter != fiter_end; ++ fiter)
-	    weights[fiter->first] += (*aiter) * fiter->second * lambda;
+	    weights[fiter->first] += (*aiter) * fiter->second;
 	}
 	
 	alphas[i][j] = *aiter;
@@ -682,7 +682,7 @@ struct LearnMIRA : public LearnBase
 	
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
-	  weights[fiter->first] += alpha[i] * fiter->second * lambda;
+	  weights[fiter->first] += alpha[i] * fiter->second;
       }
     
     features.clear();
