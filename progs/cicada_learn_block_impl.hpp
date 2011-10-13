@@ -370,10 +370,13 @@ struct LearnSVM : public LearnBase
 	
 	if (feats.empty()) continue;
 	
+#if 0
 	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	// or, do we use simple loss == 1?
 	
 	if (loss <= 0.0) continue;
+#endif
+	const double loss = 1.0;
 	
 	features[id_pos].insert(feats.begin(), feats.end());
 	alphas[id_pos].push_back(0.0);
