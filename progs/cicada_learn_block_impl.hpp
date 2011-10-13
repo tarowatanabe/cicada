@@ -103,7 +103,7 @@ struct LearnBase
 // a large difference to the liblinear learner is the re-use of alpha values for faster
 // training
 
-struct LearnDCD : public LearnBase
+struct LearnSVM : public LearnBase
 {
   typedef std::vector<double, std::allocator<double> > label_set_type;
   typedef std::vector<double, std::allocator<double> > alpha_set_type;
@@ -206,7 +206,7 @@ struct LearnDCD : public LearnBase
     const sample_map_type&   features;
   };
   
-  LearnDCD() : tolerance(0.1), lambda(C) {}
+  LearnSVM() : tolerance(0.1), lambda(C) {}
 
   void clear()
   {
@@ -217,12 +217,12 @@ struct LearnDCD : public LearnBase
     if (alphas.empty())
       alphas.resize(1);
     if (bounds.empty())
-      bounds.resize(1, 0.0);
+      bounds.resize(1, - std::numeric_limits<double>::infinity());
     
     features.front().clear();
     labels.front().clear();
     alphas.front().clear();
-    bounds.front() = 0.0;
+    bounds.front() = - std::numeric_limits<double>::infinity();
   }
   
   std::ostream& encode(std::ostream& os)
@@ -306,7 +306,7 @@ struct LearnDCD : public LearnBase
     return is;
   }
 
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     
@@ -321,15 +321,8 @@ struct LearnDCD : public LearnBase
     if (id_pos >= alphas.size())
       alphas.resize(id_pos + 1);
     if (id_pos >= bounds.size())
-      bounds.resize(id_pos + 1, 0.0);
-    
-    if (! merge) {
-      features[id_pos].clear();
-      labels[id_pos].clear();
-      alphas[id_pos].clear();
-      bounds[id_pos] = 0.0;
-    }
-    
+      bounds.resize(id_pos + 1, - std::numeric_limits<double>::infinity());
+        
     sentences.clear();
     for (size_t o = 0; o != oracles.size(); ++ o)
       sentences.insert(oracles[o].sentence);
@@ -453,6 +446,18 @@ struct LearnDCD : public LearnBase
       }
     }
     
+#if 0
+    // re-initialize upper bound...
+    std::fill(bounds.begin(), bounds.end(), - std::numeric_limits<double>::infinity());
+    
+    for (size_type i = 0; i != features.size(); ++ i) {
+      double& bound = bounds[i];
+      
+      for (size_type j = 0; j != features[i].size(); ++ j, ++ aiter)
+	bound = std::max(bound, labels[i][j] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+    }
+#endif
+    
     return 0.0;
   }
   
@@ -568,7 +573,7 @@ struct LearnMIRA : public LearnBase
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     
@@ -784,7 +789,7 @@ struct LearnSGDL1 : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -885,7 +890,7 @@ struct LearnSGDL2 : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -1080,15 +1085,12 @@ struct LearnLBFGS : public LearnLR
     return is;
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
     if (id >= samples.size())
       samples.resize(id + 1);
-    
-    if (! merge)
-      samples[id].clear();
     
     samples[id].push_back(sample_pair_type());
     
@@ -1356,13 +1358,10 @@ struct LearnLinear
   typedef Encoder encoder_type;
   typedef utils::chunk_vector<encoder_type, 4096 / sizeof(encoder_type), std::allocator<encoder_type> > encoder_set_type; 
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false, const bool merge=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (id >= encoders.size())
       encoders.resize(id + 1);
-    
-    if (! merge)
-      encoders[id].clear();
     
     encoders[id].encode(kbests, oracles);
   }

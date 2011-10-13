@@ -102,7 +102,7 @@ int kbest_size = 1000;
 bool learn_lbfgs  = false;
 bool learn_mira   = false;
 bool learn_sgd    = false;
-bool learn_dcd    = false;
+bool learn_svm    = false;
 bool learn_linear = false;
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 bool regularize_l1 = false;
@@ -111,7 +111,6 @@ double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
 
 // additional misc parameters...
-bool merge_samples_mode  = false; // merge all the samples, instead of "replacing"
 bool merge_vectors_mode  = false; // merge all the vectors from others
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
@@ -183,9 +182,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_dcd > 1)
-      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,dcd}");
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_dcd == 0)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm > 1)
+      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm == 0)
       learn_lbfgs = true;
     
     if (int(regularize_l1) + regularize_l2 > 1)
@@ -288,7 +287,7 @@ int main(int argc, char ** argv)
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
       else
-	cicada_learn<LearnDCD, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, samples, scorers, weights);
     } else if (yield_alignment) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
@@ -301,7 +300,7 @@ int main(int argc, char ** argv)
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
       else
-	cicada_learn<LearnDCD, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, samples, scorers, weights);
     } else if (yield_dependency) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
@@ -314,7 +313,7 @@ int main(int argc, char ** argv)
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
       else
-	cicada_learn<LearnDCD, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, samples, scorers, weights);
     } else
       throw std::runtime_error("invalid yield");
     
@@ -554,7 +553,7 @@ void cicada_learn(operation_set_type& operations,
       
       // encode into learner...
       for (size_t i = 0; i != kbests_block.size(); ++ i)
-	learner.encode(segments_block[i], kbests_block[i], oracles_block[i], error_metric, merge_samples_mode);
+	learner.encode(segments_block[i], kbests_block[i], oracles_block[i], error_metric);
       
       // perform learning...
       learner.learn(weights);
@@ -921,7 +920,7 @@ void options(int argc, char** argv)
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
-    ("learn-dcd",    po::bool_switch(&learn_dcd),    "dual coordinate descent algorithm")
+    ("learn-svm",    po::bool_switch(&learn_svm),    "SVM for structured output")
     ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"
@@ -936,7 +935,6 @@ void options(int argc, char** argv)
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
     
-    ("merge-sample", po::bool_switch(&merge_samples_mode), "merge samples across iterations")
     ("merge-vector", po::bool_switch(&merge_vectors_mode), "merge vectors from others")
     ("dump-weights", po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
