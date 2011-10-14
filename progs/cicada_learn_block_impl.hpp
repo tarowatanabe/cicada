@@ -116,13 +116,13 @@ struct LearnBase
 
 struct LearnSVM : public LearnBase
 {
-  typedef std::vector<double, std::allocator<double> > label_set_type;
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
   typedef std::vector<double, std::allocator<double> > alpha_set_type;
   typedef std::vector<double, std::allocator<double> > bound_map_type;
   typedef std::vector<double, std::allocator<double> > f_set_type;
   
   typedef utils::chunk_vector<sample_set_type, 4096 / sizeof(sample_set_type), std::allocator<sample_set_type> > sample_map_type;
-  typedef utils::chunk_vector<label_set_type, 4096 / sizeof(label_set_type), std::allocator<label_set_type> >    label_map_type;
+  typedef utils::chunk_vector<loss_set_type, 4096 / sizeof(loss_set_type), std::allocator<loss_set_type> >    loss_map_type;
   typedef utils::chunk_vector<alpha_set_type, 4096 / sizeof(alpha_set_type), std::allocator<alpha_set_type> >    alpha_map_type;
 
   typedef std::pair<size_type, size_type> pos_pair_type;
@@ -223,15 +223,15 @@ struct LearnSVM : public LearnBase
   {
     if (features.empty())
       features.resize(1);
-    if (labels.empty())
-      labels.resize(1);
+    if (losses.empty())
+      losses.resize(1);
     if (alphas.empty())
       alphas.resize(1);
     if (bounds.empty())
       bounds.resize(1, - std::numeric_limits<double>::infinity());
     
     features.front().clear();
-    labels.front().clear();
+    losses.front().clear();
     alphas.front().clear();
     bounds.front() = - std::numeric_limits<double>::infinity();
   }
@@ -243,11 +243,11 @@ struct LearnSVM : public LearnBase
     for (size_type id = 1; id != features.size(); ++ id)
       if (! features[id].empty()) {
 	
-	if (features[id].size() != labels[id].size())
-	  throw std::runtime_error("labels size differ");
+	if (features[id].size() != losses[id].size())
+	  throw std::runtime_error("losses size differ");
 	
 	for (size_type i = 0; i != features[id].size(); ++ i) {
-	  utils::encode_base64(labels[id][i], std::ostream_iterator<char>(os));
+	  utils::encode_base64(losses[id][i], std::ostream_iterator<char>(os));
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[id][i].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[id][i].begin(); fiter != fiter_end; ++ fiter) {
@@ -269,8 +269,8 @@ struct LearnSVM : public LearnBase
 
     if (features.empty())
       features.resize(1);
-    if (labels.empty())
-      labels.resize(1);
+    if (losses.empty())
+      losses.resize(1);
     if (alphas.empty())
       alphas.resize(1);
     
@@ -288,7 +288,7 @@ struct LearnSVM : public LearnBase
       
       if (iter == iter_end) continue;
       
-      const utils::piece label_str = *iter;
+      const utils::piece loss_str = *iter;
       ++ iter;
       
       if (iter == iter_end) continue;
@@ -311,7 +311,7 @@ struct LearnSVM : public LearnBase
       
       features.front().insert(feats.begin(), feats.end());
       alphas.front().push_back(0.0);
-      labels.front().push_back(utils::decode_base64<double>(label_str));
+      losses.front().push_back(utils::decode_base64<double>(loss_str));
     }
     
     return is;
@@ -327,8 +327,8 @@ struct LearnSVM : public LearnBase
     
     if (id_pos >= features.size())
       features.resize(id_pos + 1);
-    if (id_pos >= labels.size())
-      labels.resize(id_pos + 1);
+    if (id_pos >= losses.size())
+      losses.resize(id_pos + 1);
     if (id_pos >= alphas.size())
       alphas.resize(id_pos + 1);
     if (id_pos >= bounds.size())
@@ -387,7 +387,7 @@ struct LearnSVM : public LearnBase
 	
 	features[id_pos].insert(feats.begin(), feats.end());
 	alphas[id_pos].push_back(0.0);
-	labels[id_pos].push_back(loss);
+	losses[id_pos].push_back(loss);
       }
   }
   
@@ -413,12 +413,12 @@ struct LearnSVM : public LearnBase
       
       if (features[i].size() != alphas[i].size())
 	throw std::runtime_error("alpha size differ");
-      if (features[i].size() != labels[i].size())
-	throw std::runtime_error("label size differ");
+      if (features[i].size() != losses[i].size())
+	throw std::runtime_error("loss size differ");
       
       for (size_type j = 0; j != features[i].size(); ++ j) {
 	positions.push_back(std::make_pair(i, j));
-	f.push_back(- labels[i][j]);
+	f.push_back(- losses[i][j]);
 	alpha.push_back(alphas[i][j]);
 	alpha_sum += alphas[i][j];
       }
@@ -441,8 +441,8 @@ struct LearnSVM : public LearnBase
     for (size_type i = 0; i != features.size(); ++ i) {
       if (features[i].size() != alphas[i].size())
 	throw std::runtime_error("alpha size differ");
-      if (features[i].size() != labels[i].size())
-	throw std::runtime_error("label size differ");
+      if (features[i].size() != losses[i].size())
+	throw std::runtime_error("loss size differ");
       
       for (size_type j = 0; j != features[i].size(); ++ j, ++ aiter) {
 	if (*aiter > 0.0) {
@@ -463,7 +463,7 @@ struct LearnSVM : public LearnBase
       double& bound = bounds[i];
       
       for (size_type j = 0; j != features[i].size(); ++ j, ++ aiter)
-	bound = std::max(bound, labels[i][j] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+	bound = std::max(bound, losses[i][j] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
     }
 #endif
     
@@ -474,7 +474,7 @@ struct LearnSVM : public LearnBase
   double lambda;
   
   sample_map_type features;
-  label_map_type  labels;
+  loss_map_type  losses;
   alpha_map_type  alphas;
   bound_map_type  bounds;
   
@@ -489,7 +489,7 @@ struct LearnSVM : public LearnBase
 // We will run a qp solver and determine the alpha, then, translate this into w
 struct LearnMIRA : public LearnBase
 {
-  typedef std::vector<double, std::allocator<double> > label_set_type;
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
   
   //
   // typedef for unique sentences
@@ -569,7 +569,7 @@ struct LearnMIRA : public LearnBase
   void clear()
   {
     features.clear();
-    labels.clear();
+    losses.clear();
   }
   
   std::ostream& encode(std::ostream& os)
@@ -639,7 +639,7 @@ struct LearnMIRA : public LearnBase
 	
 	if (loss <= 0.0) continue;
 	
-	labels.push_back(loss);
+	losses.push_back(loss);
 	features.insert(feats.begin(), feats.end());
       }
   }
@@ -663,28 +663,28 @@ struct LearnMIRA : public LearnBase
     alpha.clear();
     f.clear();
     
-    alpha.reserve(labels.size());
-    f.reserve(labels.size());
+    alpha.reserve(losses.size());
+    f.reserve(losses.size());
     
-    alpha.resize(labels.size(), 0.0);
-    f.resize(labels.size(), 0.0);
+    alpha.resize(losses.size(), 0.0);
+    f.resize(losses.size(), 0.0);
     
     double objective = 0.0;
-    for (size_t i = 0; i != labels.size(); ++ i) {
-      f[i] = - (labels[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+    for (size_t i = 0; i != losses.size(); ++ i) {
+      f[i] = - (losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
       objective -= f[i];
     }
     
-    objective /= labels.size();
+    objective /= losses.size();
     
     cicada::optimize::QPDCD solver;
     
     HMatrix<sample_set_type> H(features);
     MMatrix<sample_set_type> M(features);
     
-    solver(alpha, f, H, M, 1.0 / (lambda * labels.size()), tolerance);
+    solver(alpha, f, H, M, 1.0 / (lambda * losses.size()), tolerance);
     
-    for (size_t i = 0; i != labels.size(); ++ i)
+    for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
 	// update: weights[fiter->first] += alpha[i] * fiter->second;
 	
@@ -694,7 +694,7 @@ struct LearnMIRA : public LearnBase
       }
     
     features.clear();
-    labels.clear();
+    losses.clear();
     
     return objective;
   }
@@ -703,7 +703,7 @@ struct LearnMIRA : public LearnBase
   double lambda;
 
   sample_set_type features;
-  label_set_type  labels;
+  loss_set_type  losses;
   
   sentence_unique_type sentences;
   
@@ -715,41 +715,56 @@ struct LearnMIRA : public LearnBase
 struct LearnLR : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
+
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
   
   struct sample_pair_type
   {
-    sample_pair_type() : kbests(), oracles() {}
+    sample_pair_type() : kbests(), oracles(), loss_kbests(), loss_oracles() {}
     
     sample_set_type kbests;
     sample_set_type oracles;
 
-    void encode(const hypothesis_set_type& __kbests, const hypothesis_set_type& __oracles)
+    loss_set_type loss_kbests;
+    loss_set_type loss_oracles;
+
+    void encode(const hypothesis_set_type& __kbests, const hypothesis_set_type& __oracles, const bool error_metric)
     {
       if (__kbests.empty() || __oracles.empty()) return;
       
+      const double error_factor = (error_metric ? 1.0 : - 1.0);
+      
       hypothesis_set_type::const_iterator kiter_end = __kbests.end();
-      for (hypothesis_set_type::const_iterator kiter = __kbests.begin(); kiter != kiter_end; ++ kiter)
+      for (hypothesis_set_type::const_iterator kiter = __kbests.begin(); kiter != kiter_end; ++ kiter) {
 	kbests.insert(kiter->features.begin(), kiter->features.end());
+	loss_kbests.push_back(kiter->score->score() * error_factor);
+      }
       
       hypothesis_set_type::const_iterator oiter_end = __oracles.end();
-      for (hypothesis_set_type::const_iterator oiter = __oracles.begin(); oiter != oiter_end; ++ oiter)
+      for (hypothesis_set_type::const_iterator oiter = __oracles.begin(); oiter != oiter_end; ++ oiter) {
 	oracles.insert(oiter->features.begin(), oiter->features.end());
+	loss_oracles.push_back(oiter->score->score() * error_factor);
+      }
     }
     
     template <typename Expectations>
     double encode(const weight_set_type& weights, Expectations& expectations, const double scale) const
     {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+      
       weight_type Z_oracle;
-      weight_type Z_kbest; 
+      weight_type Z_kbest;
+      
+      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
       
       for (size_type o = 0; o != oracles.size(); ++ o)
-	Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale);
+	Z_oracle += traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]);
       
       for (size_type k = 0; k != kbests.size(); ++ k)
-	Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale);
+	Z_kbest += traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]);
       
       for (size_type o = 0; o != oracles.size(); ++ o) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale) / Z_oracle;
+	const weight_type weight = traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]) / Z_oracle;
 	
 	sample_set_type::value_type::const_iterator fiter_end = oracles[o].end();
 	for (sample_set_type::value_type::const_iterator fiter = oracles[o].begin(); fiter != fiter_end; ++ fiter)
@@ -757,7 +772,7 @@ struct LearnLR : public LearnBase
       }
       
       for (size_type k = 0; k != kbests.size(); ++ k) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale) / Z_kbest;	
+	const weight_type weight = traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]) / Z_kbest;	
 	
 	sample_set_type::value_type::const_iterator fiter_end = kbests[k].end();
 	for (sample_set_type::value_type::const_iterator fiter = kbests[k].begin(); fiter != fiter_end; ++ fiter)
@@ -802,7 +817,7 @@ struct LearnSGDL1 : public LearnLR
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    samples.back().encode(kbests, oracles);
+    samples.back().encode(kbests, oracles, error_metric);
   }
   
   void initialize(weight_set_type& weights)
@@ -904,7 +919,7 @@ struct LearnSGDL2 : public LearnLR
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    samples.back().encode(kbests, oracles);
+    samples.back().encode(kbests, oracles, error_metric);
   }
   
   void initialize(weight_set_type& weights)
@@ -1012,7 +1027,8 @@ struct LearnLBFGS : public LearnLR
 	  if (sample.oracles.empty() || sample.kbests.empty()) continue;
 	  
 	  for (size_type o = 0; o != sample.oracles.size(); ++ o) {
-	    os << "oracle:";
+	    os << "oracle: ";
+	    utils::encode_base64(sample.loss_oracles[o], std::ostream_iterator<char>(os));
 	    
 	    sample_set_type::value_type::const_iterator fiter_end = sample.oracles[o].end();
 	    for (sample_set_type::value_type::const_iterator fiter = sample.oracles[o].begin(); fiter != fiter_end; ++ fiter) {
@@ -1023,7 +1039,8 @@ struct LearnLBFGS : public LearnLR
 	  }
 	  
 	  for (size_type k = 0; k != sample.kbests.size(); ++ k) {
-	    os << "kbest:";
+	    os << "kbest: ";
+	    utils::encode_base64(sample.loss_kbests[k], std::ostream_iterator<char>(os));
 	    
 	    sample_set_type::value_type::const_iterator fiter_end = sample.kbests[k].end();
 	    for (sample_set_type::value_type::const_iterator fiter = sample.kbests[k].begin(); fiter != fiter_end; ++ fiter) {
@@ -1046,6 +1063,7 @@ struct LearnLBFGS : public LearnLR
     std::string mode = "kbest:";
 
     sample_set_type* psample;
+    loss_set_type*   ploss;
     
     std::string line;
     feature_set_type features;
@@ -1069,11 +1087,17 @@ struct LearnLBFGS : public LearnLR
 	if (mode_curr == "oracle:") {
 	  samples_other.push_back(sample_pair_type());
 	  psample = &(samples_other.back().oracles);
-	} else
+	  ploss = &(samples_other.back().loss_oracles);
+	} else {
 	  psample = &(samples_other.back().kbests);
+	  ploss = &(samples_other.back().loss_kbests);
+	}
 	
 	mode = mode_curr;
       }
+
+      const utils::piece loss_str = *iter;
+      ++ iter;
       
       while (iter != iter_end) {
 	const utils::piece feature = *iter;
@@ -1090,6 +1114,7 @@ struct LearnLBFGS : public LearnLR
       if (features.empty()) continue;
       
       psample->insert(features.begin(), features.end());
+      ploss->push_back(utils::decode_base64<double>(loss_str));
     }
     
     return is;
@@ -1104,7 +1129,7 @@ struct LearnLBFGS : public LearnLR
     
     samples[id].push_back(sample_pair_type());
     
-    samples[id].back().encode(kbests, oracles);
+    samples[id].back().encode(kbests, oracles, error_metric);
   }
   
   void initialize(weight_set_type& weights)
@@ -1217,7 +1242,7 @@ struct LearnLinear
   typedef size_t offset_type;
   
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
-  typedef std::vector<int, std::allocator<int> > label_set_type;
+  typedef std::vector<int, std::allocator<int> > loss_set_type;
 
   //
   // typedef for unique sentences
@@ -1450,7 +1475,7 @@ struct LearnLinear
     for (size_type id = 0; id != encoders.size(); ++ id)
       data_size += encoders[id].offsets.size();
     
-    label_set_type        labels(data_size, 1);
+    loss_set_type        losses(data_size, 1);
     feature_node_map_type features;
     features.reserve(data_size);
 
@@ -1462,16 +1487,16 @@ struct LearnLinear
 	features.push_back(const_cast<feature_node_type*>(&(*encoders[id].features.begin())) + encoders[id].offsets[pos]);
     
     problem_type problem;
-    problem.l = labels.size();
+    problem.l = losses.size();
     problem.n = feature_type::allocated();
-    problem.y = &(*labels.begin());
+    problem.y = &(*losses.begin());
     problem.x = &(*features.begin());
     problem.bias = -1;
     
     parameter_type parameter;
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
-    parameter.C = 1.0 / (C * labels.size()); // renormalize!
+    parameter.C = 1.0 / (C * losses.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
