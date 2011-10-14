@@ -122,7 +122,7 @@ struct LearnSVM : public LearnBase
   typedef std::vector<double, std::allocator<double> > f_set_type;
   
   typedef utils::chunk_vector<sample_set_type, 4096 / sizeof(sample_set_type), std::allocator<sample_set_type> > sample_map_type;
-  typedef utils::chunk_vector<loss_set_type, 4096 / sizeof(loss_set_type), std::allocator<loss_set_type> >    loss_map_type;
+  typedef utils::chunk_vector<loss_set_type, 4096 / sizeof(loss_set_type), std::allocator<loss_set_type> >       loss_map_type;
   typedef utils::chunk_vector<alpha_set_type, 4096 / sizeof(alpha_set_type), std::allocator<alpha_set_type> >    alpha_map_type;
 
   typedef std::pair<size_type, size_type> pos_pair_type;
