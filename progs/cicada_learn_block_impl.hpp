@@ -474,7 +474,7 @@ struct LearnSVM : public LearnBase
   double lambda;
   
   sample_map_type features;
-  loss_map_type  losses;
+  loss_map_type   losses;
   alpha_map_type  alphas;
   bound_map_type  bounds;
   
@@ -703,7 +703,7 @@ struct LearnMIRA : public LearnBase
   double lambda;
 
   sample_set_type features;
-  loss_set_type  losses;
+  loss_set_type   losses;
   
   sentence_unique_type sentences;
   
@@ -1242,7 +1242,7 @@ struct LearnLinear
   typedef size_t offset_type;
   
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
-  typedef std::vector<int, std::allocator<int> > loss_set_type;
+  typedef std::vector<int, std::allocator<int> > label_set_type;
 
   //
   // typedef for unique sentences
@@ -1475,7 +1475,7 @@ struct LearnLinear
     for (size_type id = 0; id != encoders.size(); ++ id)
       data_size += encoders[id].offsets.size();
     
-    loss_set_type        losses(data_size, 1);
+    label_set_type        labels(data_size, 1);
     feature_node_map_type features;
     features.reserve(data_size);
 
@@ -1487,16 +1487,16 @@ struct LearnLinear
 	features.push_back(const_cast<feature_node_type*>(&(*encoders[id].features.begin())) + encoders[id].offsets[pos]);
     
     problem_type problem;
-    problem.l = losses.size();
+    problem.l = labels.size();
     problem.n = feature_type::allocated();
-    problem.y = &(*losses.begin());
+    problem.y = &(*labels.begin());
     problem.x = &(*features.begin());
     problem.bias = -1;
     
     parameter_type parameter;
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
-    parameter.C = 1.0 / (C * losses.size()); // renormalize!
+    parameter.C = 1.0 / (C * labels.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;

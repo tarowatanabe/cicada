@@ -121,3 +121,5 @@ Support cicada forest converter?
 Deprecate old learn-online code...?
   since it is very complicated and error-prone, almost impossible to maintain.
   or, simply deprecate non-mpi version?
+
+hypergraph variant of learn-block?
