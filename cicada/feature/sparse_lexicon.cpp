@@ -363,9 +363,6 @@ namespace cicada
       
       if (! lattice.empty())
 	pimpl->assign(lattice);
-      else if (hypergraph.is_valid())
-	pimpl->assign(hypergraph);
-
     }
     
   };
