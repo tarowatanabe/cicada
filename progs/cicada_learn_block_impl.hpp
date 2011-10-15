@@ -217,7 +217,7 @@ struct LearnSVM : public LearnBase
     const sample_map_type&   features;
   };
   
-  LearnSVM() : tolerance(0.1), lambda(C) {}
+  LearnSVM(const size_type __instances) : tolerance(0.1), lambda(C) {}
 
   void clear()
   {
@@ -564,7 +564,7 @@ struct LearnMIRA : public LearnBase
     const FeatureSet& features;
   };
   
-  LearnMIRA() : tolerance(0.1), lambda(C) {}
+  LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
   void clear()
   {
@@ -795,7 +795,7 @@ struct LearnSGDL1 : public LearnLR
   // L_w =  \sum \log p(y | x) - C |w|
   // 
   
-  LearnSGDL1() : epoch(0), lambda(C), penalties(), penalty(0.0) {}
+  LearnSGDL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   void clear()
   {
@@ -843,7 +843,7 @@ struct LearnSGDL1 : public LearnLR
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const double eta = 0.2 * std::pow(0.85, double(epoch) * k_norm); // eta from SGD-L1
+    const double eta = 0.2 * std::pow(0.85, double(epoch) * (double(block_size) / instances)); // eta from SGD-L1
     ++ epoch;
     
     penalty += eta * lambda * k_norm;
@@ -884,6 +884,8 @@ struct LearnSGDL1 : public LearnLR
   }
   
   sample_pair_set_type samples;
+
+  size_type instances;
   
   size_type epoch;
   double    lambda;
@@ -897,7 +899,7 @@ struct LearnSGDL2 : public LearnLR
 {
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnSGDL2() : epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnSGDL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   void clear()
   {
@@ -945,7 +947,7 @@ struct LearnSGDL2 : public LearnLR
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const double eta = 0.2 * std::pow(0.85, double(epoch) * k_norm); // eta from SGD-L1
+    const double eta = 0.2 * std::pow(0.85, double(epoch) * (double(block_size) / instances)); // eta from SGD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
@@ -995,6 +997,8 @@ struct LearnSGDL2 : public LearnLR
   }
   
   sample_pair_set_type samples;
+
+  size_type instances;
   
   size_type epoch;
   double    lambda;
@@ -1010,6 +1014,8 @@ struct LearnLBFGS : public LearnLR
   typedef utils::chunk_vector<sample_pair_set_type, 4096 / sizeof(sample_pair_set_type), std::allocator<sample_pair_set_type> > sample_pair_map_type;
   
   typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
+
+  LearnLBFGS(const size_type __instances) {}
   
   void clear()
   {
@@ -1390,6 +1396,8 @@ struct LearnLinear
   };
   typedef Encoder encoder_type;
   typedef utils::chunk_vector<encoder_type, 4096 / sizeof(encoder_type), std::allocator<encoder_type> > encoder_set_type; 
+
+  LearnLinear(const size_type __instances) {}
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {

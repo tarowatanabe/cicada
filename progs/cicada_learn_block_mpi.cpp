@@ -466,7 +466,7 @@ void cicada_learn(operation_set_type& operations,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  Learner         learner;
+  Learner         learner(samples.size());
   KBestGenerator  kbest_generator;
   OracleGenerator oracle_generator;
   
