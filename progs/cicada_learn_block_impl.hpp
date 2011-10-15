@@ -861,7 +861,7 @@ struct LearnOPegasos : public LearnBase
     
     double objective = 0.0;
     for (size_t i = 0; i != losses.size(); ++ i) {
-      f[i] = - (losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+      f[i] = - (losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
       objective -= f[i];
     }
     objective /= losses.size();
