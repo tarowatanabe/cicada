@@ -485,6 +485,185 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
+// Pegasos learner
+struct LearnPegasos : public LearnBase
+{
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+  
+  
+  //
+  // typedef for unique sentences
+  //
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+  
+  LearnPegasos(const size_type __instances) : instances(__instances), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  
+  void clear()
+  {
+    features.clear();
+    losses.clear();
+  }
+
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    
+    if (kbests.empty() || oracles.empty()) return;
+    
+    sentences.clear();
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      sentences.insert(oracles[o].sentence);
+
+    const double error_factor = (error_metric ? - 1.0 : 1.0);
+
+    features_type feats;
+    
+    for (size_t o = 0; o != oracles.size(); ++ o)
+      for (size_t k = 0; k != kbests.size(); ++ k) {
+	const hypothesis_type& oracle = oracles[o];
+	const hypothesis_type& kbest  = kbests[k];
+	
+	if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	
+	hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	
+	hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	
+	feats.clear();
+	
+	while (oiter != oiter_end && kiter != kiter_end) {
+	  if (oiter->first < kiter->first) {
+	    feats.push_back(*oiter);
+	    ++ oiter;
+	  } else if (kiter->first < oiter->first) {
+	    feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    ++ kiter;
+	  } else {
+	    const double value = oiter->second - kiter->second;
+	    if (value != 0.0)
+	      feats.push_back(feature_value_type(kiter->first, value));
+	    ++ oiter;
+	    ++ kiter;
+	  }
+	}
+	
+	for (/**/; oiter != oiter_end; ++ oiter)
+	  feats.push_back(*oiter);
+	
+	for (/**/; kiter != kiter_end; ++ kiter)
+	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	
+	if (feats.empty()) continue;
+	
+	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
+	
+	if (loss <= 0.0) continue;
+	
+	losses.push_back(loss);
+	features.insert(feats.begin(), feats.end());
+      }
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    if (features.empty()) return 0.0;
+    
+    const size_type k = features.size();
+    const double k_norm = 1.0 / k;
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    rescale(weights, 1.0 - eta * lambda);
+    // udpate...
+    
+    for (size_t i = 0; i != features.size(); ++ i) {
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	double& x = weights[fiter->first];
+	const double alpha = eta * k_norm * fiter->second;
+	
+	weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+	x += alpha / weight_scale;
+      }
+    }
+    
+    if (weight_norm > 1.0 / lambda)
+      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.01 || 100 < weight_scale)
+      finalize(weights);
+    
+    features.clear();
+    losses.clear();
+    
+    return 0.0;
+  }
+  
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+  
+  size_type instances;
+  size_type epoch;
+  double    lambda;
+  double    weight_scale;
+  double    weight_norm;
+  
+
+  sample_set_type features;
+  loss_set_type   losses;
+  
+  sentence_unique_type sentences;
+};
+
 // MIRA learner
 // We will run a qp solver and determine the alpha, then, translate this into w
 struct LearnMIRA : public LearnBase

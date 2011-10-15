@@ -100,6 +100,7 @@ int kbest_size = 1000;
 
 // solver parameters
 bool learn_lbfgs  = false;
+bool learn_pegasos = false;
 bool learn_mira   = false;
 bool learn_sgd    = false;
 bool learn_svm    = false;
@@ -184,9 +185,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm > 1)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos > 1)
       throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm == 0)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos == 0)
       learn_lbfgs = true;
     
     if (int(regularize_l1) + regularize_l2 > 1)
@@ -288,8 +289,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, samples, scorers, weights);      
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
-      else
+      else if (learn_svm)
 	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, samples, scorers, weights);
     } else if (yield_alignment) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
@@ -301,8 +304,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, samples, scorers, weights);      
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
-      else
+      else if (learn_svm)
 	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, samples, scorers, weights);
     } else if (yield_dependency) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
@@ -314,8 +319,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, samples, scorers, weights);      
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
-      else
+      else if (learn_pegasos)
 	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else
+	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, samples, scorers, weights);
     } else
       throw std::runtime_error("invalid yield");
     
@@ -919,12 +926,13 @@ void options(int argc, char** argv)
     ("block",     po::value<int>(&block_size)->default_value(block_size), "block (or batch, bin) size")
     ("kbest",     po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     
-    ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
-    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
-    ("learn-svm",    po::bool_switch(&learn_svm),    "SVM for structured output")
-    ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
-    ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
+    ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")
+    ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
+    ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    ("learn-svm",     po::bool_switch(&learn_svm),     "SVM for structured output")
+    ("learn-linear",  po::bool_switch(&learn_linear),  "liblinear algorithm")
+    ("solver",        po::value<int>(&linear_solver),  "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"
      " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
      " 2: \tL2-regularized L2-loss support vector classification (primal)\n"
