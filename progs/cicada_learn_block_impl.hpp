@@ -866,7 +866,7 @@ struct LearnOPegasos : public LearnBase
     }
     objective /= losses.size();
     
-    cicada::optimize::QPDCD solver;
+    cicada::optimize::QPSMO solver;
     
     HMatrix<sample_set_type> H(features);
     MMatrix<sample_set_type> M(features);
