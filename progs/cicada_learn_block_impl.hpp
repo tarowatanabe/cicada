@@ -871,7 +871,7 @@ struct LearnOPegasos : public LearnBase
     HMatrix<sample_set_type> H(features);
     MMatrix<sample_set_type> M(features);
     
-    solver(alpha, f, H, M, eta * k_norm, tolerance);
+    solver(alpha, f, H, M, eta, tolerance);
     
     for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
