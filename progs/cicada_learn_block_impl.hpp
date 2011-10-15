@@ -617,21 +617,29 @@ struct LearnPegasos : public LearnBase
     rescale(weights, 1.0 - eta * lambda);
     // udpate...
     
+    double a_norm = 0.0;
+    double pred = 0.0;
     for (size_t i = 0; i != features.size(); ++ i) {
       sample_set_type::value_type::const_iterator fiter_end = features[i].end();
       for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	double& x = weights[fiter->first];
 	const double alpha = eta * k_norm * fiter->second;
 	
-	weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+	a_norm += alpha * alpha;
+	pred += 2.0 * x * alpha;
+	
+	//weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
 	x += alpha / weight_scale;
       }
     }
     
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
+    
     if (weight_norm > 1.0 / lambda)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.01 || 100 < weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     features.clear();
@@ -873,6 +881,8 @@ struct LearnOPegasos : public LearnBase
     
     solver(alpha, f, H, M, eta, tolerance);
     
+    double a_norm = 0.0;
+    double pred = 0.0;
     for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -880,15 +890,21 @@ struct LearnOPegasos : public LearnBase
 	  double& x = weights[fiter->first];
 	  const double a = alpha[i] * fiter->second;
 	  
-	  weight_norm += 2.0 * x * a * weight_scale + a * a;
+	  a_norm += a * a;
+	  pred += 2.0 * x * a;
+	  
+	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
 	}
       }
     
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
+    
     if (weight_norm > 1.0 / lambda)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.01 || 100 < weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     features.clear();
@@ -1392,7 +1408,8 @@ struct LearnSGDL2 : public LearnLR
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
+    // no lambda scaling...?
+    rescale(weights, 1.0 - eta);
     
     expectation_type expectations;
     
@@ -1404,6 +1421,8 @@ struct LearnSGDL2 : public LearnLR
     objective /= samples.size();
     
     // update by expectations...
+    double a_norm = 0.0;
+    double pred = 0.0;
     expectation_type::const_iterator eiter_end = expectations.end();
     for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
       // we will update "minus" value...
@@ -1411,14 +1430,20 @@ struct LearnSGDL2 : public LearnLR
       double& x = weights[eiter->first];
       const double alpha = - static_cast<double>(eiter->second) * eta * k_norm;
       
-      weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+      a_norm += alpha * alpha;
+      pred += 2.0 * x * alpha;
+      
+      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
       x += alpha / weight_scale;
     }
+    
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.01 || 100 < weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     // clear current training events..
