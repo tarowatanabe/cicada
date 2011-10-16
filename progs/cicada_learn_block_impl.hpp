@@ -879,7 +879,7 @@ struct LearnOPegasos : public LearnBase
     HMatrix<sample_set_type> H(features);
     MMatrix<sample_set_type> M(features);
     
-    solver(alpha, f, H, M, eta * k_norm, tolerance);
+    solver(alpha, f, H, M, eta, tolerance);
     
     double a_norm = 0.0;
     double pred = 0.0;
@@ -888,7 +888,7 @@ struct LearnOPegasos : public LearnBase
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
-	  const double a = alpha[i] * fiter->second * k;
+	  const double a = alpha[i] * fiter->second;
 	  
 	  a_norm += a * a;
 	  pred += 2.0 * x * a;
