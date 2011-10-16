@@ -609,12 +609,13 @@ struct LearnPegasos : public LearnBase
     
     const size_type k = features.size();
     const double k_norm = 1.0 / k;
-    const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    //const size_type num_samples = (instances + block_size - 1) / block_size;
-    //const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
+    // no lambda scaling...
+    rescale(weights, 1.0 - eta);
     // udpate...
     
     double a_norm = 0.0;
@@ -850,12 +851,13 @@ struct LearnOPegasos : public LearnBase
     
     const size_type k = features.size();
     const double k_norm = 1.0 / k;
-    const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    //const size_type num_samples = (instances + block_size - 1) / block_size;
-    //const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
+    // no lambda scaling...
+    rescale(weights, 1.0 - eta);
     // udpate...
     
     alpha.clear();
