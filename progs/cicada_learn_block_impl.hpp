@@ -851,12 +851,12 @@ struct LearnOPegasos : public LearnBase
     
     const size_type k = features.size();
     const double k_norm = 1.0 / k;
-    const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    //const size_type num_samples = (instances + block_size - 1) / block_size;
-    //const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
+    rescale(weights, 1.0 - eta);
     // udpate...
     
     alpha.clear();
@@ -875,12 +875,12 @@ struct LearnOPegasos : public LearnBase
     }
     objective /= losses.size();
     
-    cicada::optimize::QPSMO solver;
+    cicada::optimize::QPDCD solver;
     
     HMatrix<sample_set_type> H(features);
     MMatrix<sample_set_type> M(features);
     
-    solver(alpha, f, H, M, eta, tolerance);
+    solver(alpha, f, H, M, eta * k_norm, tolerance);
     
     double a_norm = 0.0;
     double pred = 0.0;
@@ -889,7 +889,7 @@ struct LearnOPegasos : public LearnBase
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
-	  const double a = alpha[i] * fiter->second;
+	  const double a = alpha[i] * fiter->second * k;
 	  
 	  a_norm += a * a;
 	  pred += 2.0 * x * a;
