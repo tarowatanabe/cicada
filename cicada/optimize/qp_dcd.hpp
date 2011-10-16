@@ -92,39 +92,40 @@ namespace cicada
 	  
 	  std::random_shuffle(actives.begin(), actives.begin() + active_size);
 	  
-	  for (size_type s = 0; s != active_size; ++ s) {
-	    const size_type i = actives[s];
-	    const double G = M(w, i) + f[i];
+	  if (active_size)
+	    for (size_type s = 0; s != active_size; ++ s) {
+	      const size_type i = actives[s];
+	      const double G = M(w, i) + f[i];
 	    
-	    double PG = 0.0;
-	    if (x[i] == 0.0) {
-	      if (G > PGmax_old) {
-		-- active_size;
-		std::swap(actives[s], actives[active_size]);
-		-- s;
-		continue;
-	      } else if (G < 0.0)
+	      double PG = 0.0;
+	      if (x[i] == 0.0) {
+		if (G > PGmax_old) {
+		  -- active_size;
+		  std::swap(actives[s], actives[active_size]);
+		  -- s;
+		  continue;
+		} else if (G < 0.0)
+		  PG = G;
+	      } else if (x[i] == C) {
+		if (G < PGmin_old) {
+		  -- active_size;
+		  std::swap(actives[s], actives[active_size]);
+		  -- s;
+		  continue;
+		} else if (G > 0.0)
+		  PG = G;
+	      } else
 		PG = G;
-	    } else if (x[i] == C) {
-	      if (G < PGmin_old) {
-		-- active_size;
-		std::swap(actives[s], actives[active_size]);
-		-- s;
-		continue;
-	      } else if (G > 0.0)
-		PG = G;
-	    } else
-	      PG = G;
 	    
-	    PGmax_new = std::max(PGmax_new, PG);
-	    PGmin_new = std::min(PGmin_new, PG);
+	      PGmax_new = std::max(PGmax_new, PG);
+	      PGmin_new = std::min(PGmin_new, PG);
 	    
-	    if (std::fabs(PG) > 1e-12) {
-	      const double x_old = x[i];
-	      x[i] = std::min(std::max(x[i] - G / QD[i], 0.0), C);
-	      M(w, x[i] - x_old, i);
+	      if (std::fabs(PG) > 1e-12) {
+		const double x_old = x[i];
+		x[i] = std::min(std::max(x[i] - G / QD[i], 0.0), C);
+		M(w, x[i] - x_old, i);
+	      }
 	    }
-	  }
 	  
 	  if ((PGmax_new - PGmin_new) <= tolerance || active_size == 0) {
 	    if (active_size == model_size)
