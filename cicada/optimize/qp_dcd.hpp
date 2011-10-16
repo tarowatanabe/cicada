@@ -92,7 +92,7 @@ namespace cicada
 	  
 	  std::random_shuffle(actives.begin(), actives.begin() + active_size);
 	  
-	  for (size_type s = 0; s < active_size; ++ s) {
+	  for (size_type s = 0; s != active_size; ++ s) {
 	    const size_type i = actives[s];
 	    const double G = M(w, i) + f[i];
 	    
