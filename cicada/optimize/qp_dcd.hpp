@@ -126,7 +126,7 @@ namespace cicada
 	    }
 	  }
 	  
-	  if ((PGmax_new - PGmin_new) <= tolerance) {
+	  if ((PGmax_new - PGmin_new) <= tolerance || active_size == 0) {
 	    if (active_size == model_size)
 	      break;
 	    else {
