@@ -614,8 +614,7 @@ struct LearnPegasos : public LearnBase
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    // no lambda scaling...
-    rescale(weights, 1.0 - eta);
+    rescale(weights, 1.0 - eta * lambda);
     // udpate...
     
     double a_norm = 0.0;
@@ -856,7 +855,7 @@ struct LearnOPegasos : public LearnBase
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta);
+    rescale(weights, 1.0 - eta * lambda);
     // udpate...
     
     alpha.clear();
@@ -1409,8 +1408,7 @@ struct LearnSGDL2 : public LearnLR
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    // no lambda scaling...?
-    rescale(weights, 1.0 - eta);
+    rescale(weights, 1.0 - eta * lambda);
     
     expectation_type expectations;
     
