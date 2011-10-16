@@ -381,13 +381,13 @@ struct LearnSVM : public LearnBase
 	
 	if (feats.empty()) continue;
 
-	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	
 	if (loss <= 0.0) continue;
 	
 	features[id_pos].insert(feats.begin(), feats.end());
 	alphas[id_pos].push_back(0.0);
-	losses[id_pos].push_back(loss);
+	losses[id_pos].push_back(loss_rank ? 1.0 : loss);
       }
   }
   
@@ -580,11 +580,11 @@ struct LearnPegasos : public LearnBase
 	
 	if (feats.empty()) continue;
 	
-	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	
 	if (loss <= 0.0) continue;
 	
-	losses.push_back(loss);
+	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
       }
   }
@@ -821,11 +821,11 @@ struct LearnOPegasos : public LearnBase
 	
 	if (feats.empty()) continue;
 	
-	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	
 	if (loss <= 0.0) continue;
 	
-	losses.push_back(loss);
+	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
       }
   }
@@ -1091,11 +1091,11 @@ struct LearnMIRA : public LearnBase
 	
 	if (feats.empty()) continue;
 	
-	const double loss = (loss_rank ? 1.0 : (oracle.score->score() - kbest.score->score()) * error_factor);
+	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
 	
 	if (loss <= 0.0) continue;
 	
-	losses.push_back(loss);
+	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
       }
   }
