@@ -92,42 +92,43 @@ namespace cicada
 	  
 	  std::random_shuffle(actives.begin(), actives.begin() + active_size);
 	  
-	  if (active_size)
-	    for (size_type s = 0; s != active_size; ++ s) {
-	      const size_type i = actives[s];
-	      const double G = M(w, i) + f[i];
+	  bool assigned = false;
+	  for (size_type s = 0; active_size && s != active_size; ++ s) {
+	    const size_type i = actives[s];
+	    const double G = M(w, i) + f[i];
 	    
-	      double PG = 0.0;
-	      if (x[i] == 0.0) {
-		if (G > PGmax_old) {
-		  -- active_size;
-		  std::swap(actives[s], actives[active_size]);
-		  -- s;
-		  continue;
-		} else if (G < 0.0)
-		  PG = G;
-	      } else if (x[i] == C) {
-		if (G < PGmin_old) {
-		  -- active_size;
-		  std::swap(actives[s], actives[active_size]);
-		  -- s;
-		  continue;
-		} else if (G > 0.0)
-		  PG = G;
-	      } else
+	    double PG = 0.0;
+	    if (x[i] == 0.0) {
+	      if (G > PGmax_old) {
+		-- active_size;
+		std::swap(actives[s], actives[active_size]);
+		-- s;
+		continue;
+	      } else if (G < 0.0)
 		PG = G;
+	    } else if (x[i] == C) {
+	      if (G < PGmin_old) {
+		-- active_size;
+		std::swap(actives[s], actives[active_size]);
+		-- s;
+		continue;
+	      } else if (G > 0.0)
+		PG = G;
+	    } else
+	      PG = G;
 	    
-	      PGmax_new = std::max(PGmax_new, PG);
-	      PGmin_new = std::min(PGmin_new, PG);
+	    PGmax_new = std::max(PGmax_new, PG);
+	    PGmin_new = std::min(PGmin_new, PG);
+	    assigned = true;
 	    
-	      if (std::fabs(PG) > 1e-12) {
-		const double x_old = x[i];
-		x[i] = std::min(std::max(x[i] - G / QD[i], 0.0), C);
-		M(w, x[i] - x_old, i);
-	      }
+	    if (std::fabs(PG) > 1e-12) {
+	      const double x_old = x[i];
+	      x[i] = std::min(std::max(x[i] - G / QD[i], 0.0), C);
+	      M(w, x[i] - x_old, i);
 	    }
+	  }
 	  
-	  if ((PGmax_new - PGmin_new) <= tolerance || active_size == 0) {
+	  if ((PGmax_new - PGmin_new) <= tolerance || ! assigned) {
 	    if (active_size == model_size)
 	      break;
 	    else {
@@ -142,6 +143,7 @@ namespace cicada
 	  PGmax_old = (PGmax_new <= 0.0 ?   std::numeric_limits<double>::infinity() : PGmax_new);
 	  PGmin_old = (PGmin_new >= 0.0 ? - std::numeric_limits<double>::infinity() : PGmin_new);
 	}
+	
 	// normalize x!
 	const double sum = std::accumulate(x.begin(), x.end(), 0.0);
 	if (sum != 0.0)
