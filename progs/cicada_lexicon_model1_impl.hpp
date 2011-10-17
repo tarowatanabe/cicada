@@ -1949,6 +1949,7 @@ typedef __DependencyModel1Base<DependencyDegree2SingleRoot> DependencyDegree2Sin
 
 typedef __DependencyModel1Base<DependencyPermutation>       DependencyPermutationModel1;
 
+#if 0
 struct PermutationModel1
 {
   typedef utils::vector2<double, std::allocator<double> > matrix_type;
@@ -2174,5 +2175,6 @@ struct PermutationModel1
   posterior_set_type posterior_source_target;
   posterior_set_type posterior_target_source;  
 };
+#endif
 
 #endif
