@@ -28,7 +28,7 @@ struct DependencyPermutation
     {
       // first is head, second is dependent
       
-      dependency[edge.second] = edge.first + 1;
+      dependency[edge.second - 1] = edge.first;
       
       return *this;
     }

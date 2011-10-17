@@ -149,6 +149,7 @@ int main(int argc, char** argv)
     
     utils::compress_istream is(input_file);
     utils::compress_ostream os(output_file);
+    os.precision(10);
 
     feature_consumed_type features_consumed;
     
