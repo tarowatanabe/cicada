@@ -776,7 +776,8 @@ static double solve_l2r_l1l2_svc(
 			int j = i+rand()%(active_size-i);
 			swap(index[i], index[j]);
 		}
-
+		
+		bool assigned = false;
 		for (s=0; s<active_size; s++)
 		{
 			i = index[s];
@@ -824,6 +825,7 @@ static double solve_l2r_l1l2_svc(
 
 			PGmax_new = max(PGmax_new, PG);
 			PGmin_new = min(PGmin_new, PG);
+			assigned = true;
 
 			if(fabs(PG) > 1.0e-12)
 			{
@@ -843,7 +845,7 @@ static double solve_l2r_l1l2_svc(
 		if(iter % 10 == 0)
 			info(".");
 
-		if(PGmax_new - PGmin_new <= eps)
+		if(PGmax_new - PGmin_new <= eps || ! assigned)
 		{
 			if(active_size == l)
 				break;
