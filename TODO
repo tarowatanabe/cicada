@@ -123,3 +123,6 @@ Deprecate old learn-online code...?
   or, simply deprecate non-mpi version?
 
 hypergraph variant of learn-block?
+
+Add softmax-margin... How? (assume duplicates as in mert code?)
+

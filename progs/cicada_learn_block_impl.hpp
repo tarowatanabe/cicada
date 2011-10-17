@@ -438,16 +438,16 @@ struct LearnSVM : public LearnBase
     }
 
     if (alpha_sum != 0.0) {
-      //const double factor = 1.0 / (alpha_sum * lambda * positions.size());
-      // std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
+      const double factor = 1.0 / (alpha_sum * lambda * positions.size());
+      std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
       
       // hack for DCD: since we have no summation constraint, we do not have to normalize by positions.size()
-      const double factor = 1.0 / (alpha_sum * lambda);
-      const double clip = 1.0 / (lambda * positions.size());
-      std::transform(alpha.begin(), alpha.end(), alpha.begin(), multiplies_min(factor, clip));
+      //const double factor = 1.0 / (alpha_sum * lambda);
+      //const double clip = 1.0 / (lambda * positions.size());
+      //std::transform(alpha.begin(), alpha.end(), alpha.begin(), multiplies_min(factor, clip));
     }
     
-    cicada::optimize::QPDCD solver;
+    cicada::optimize::QPSMO solver;
     
     HMatrix H(positions, features);
     MMatrix M(positions, features);
