@@ -47,6 +47,7 @@ bool moses_mode = false;
 bool itg_mode = false;
 bool max_match_mode = false;
 
+bool permutation_mode = false;
 bool hybrid_mode = false;
 bool degree2_mode = false;
 bool single_root_mode = false;
@@ -114,10 +115,10 @@ int main(int argc, char ** argv)
       if (dependency_target_file != "-" && ! boost::filesystem::exists(dependency_target_file))
 	throw std::runtime_error("no target side dependency");
     
-    if (hybrid_mode && degree2_mode)
-      throw std::runtime_error("you cannot specify both of Hybrid and Degree2 dependency parsing");
+    if (int(hybrid_mode) + degree2_mode + permutation_mode > 1)
+      throw std::runtime_error("you cannot specify both of Hybrid and Degree2 dependency, permutation parsing");
     
-    if (int(hybrid_mode) + degree2_mode == 0)
+    if (int(hybrid_mode) + degree2_mode + permutation_mode == 0)
       hybrid_mode = true;
     
     threads = utils::bithack::max(threads, 1);
@@ -445,7 +446,16 @@ int main(int argc, char ** argv)
 						   atable_target_source,
 						   classes_source,
 						   classes_target);
-	  
+      } else if (permutation_mode) {
+	if (debug)
+	  std::cerr << "permutation" << std::endl;
+	
+	project_dependency<DependencyPermutationHMM>(ttable_source_target,
+						     ttable_target_source,
+						     atable_source_target,
+						     atable_target_source,
+						     classes_source,
+						     classes_target);
       } else
 	throw std::runtime_error("no dependency algorithm?");
     }
@@ -1547,6 +1557,7 @@ void options(int argc, char** argv)
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     ("moses",     po::bool_switch(&moses_mode),     "Moses alignment foramt")
 
+    ("permutation", po::bool_switch(&permutation_mode), "permutation")
     ("hybrid",      po::bool_switch(&hybrid_mode),      "hybrid projective dependency parsing")
     ("degree2",     po::bool_switch(&degree2_mode),     "degree2 non-projective dependency parsing")
     ("single-root", po::bool_switch(&single_root_mode), "single root dependency")

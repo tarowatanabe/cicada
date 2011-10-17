@@ -19,6 +19,7 @@
 #include "itg_alignment.hpp"
 #include "dependency_hybrid.hpp"
 #include "dependency_degree2.hpp"
+#include "dependency_permutation.hpp"
 
 struct LearnHMM : public LearnBase
 {
@@ -1840,5 +1841,6 @@ typedef __DependencyHMMBase<DependencyHybrid>            DependencyHybridHMM;
 typedef __DependencyHMMBase<DependencyHybridSingleRoot>  DependencyHybridSingleRootHMM;
 typedef __DependencyHMMBase<DependencyDegree2>           DependencyDegree2HMM;
 typedef __DependencyHMMBase<DependencyDegree2SingleRoot> DependencyDegree2SingleRootHMM;
+typedef __DependencyHMMBase<DependencyPermutation>       DependencyPermutationHMM;
 
 #endif

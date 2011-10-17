@@ -311,6 +311,7 @@ cicada_lexicon_hmm_SOURCES = \
 	cicada_lexicon_maximize_impl.hpp \
 	dependency_hybrid.hpp \
 	dependency_degree2.hpp \
+	dependency_permutation.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp
 cicada_lexicon_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -321,6 +322,7 @@ cicada_lexicon_model1_SOURCES = \
 	cicada_lexicon_maximize_impl.hpp \
 	dependency_hybrid.hpp \
 	dependency_degree2.hpp \
+	dependency_permutation.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
 cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

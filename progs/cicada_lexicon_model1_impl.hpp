@@ -16,6 +16,7 @@
 #include "itg_alignment.hpp"
 #include "dependency_hybrid.hpp"
 #include "dependency_degree2.hpp"
+#include "dependency_permutation.hpp"
 
 struct LearnModel1 : public LearnBase
 {
@@ -1945,5 +1946,6 @@ typedef __DependencyModel1Base<DependencyHybrid>            DependencyHybridMode
 typedef __DependencyModel1Base<DependencyHybridSingleRoot>  DependencyHybridSingleRootModel1;
 typedef __DependencyModel1Base<DependencyDegree2>           DependencyDegree2Model1;
 typedef __DependencyModel1Base<DependencyDegree2SingleRoot> DependencyDegree2SingleRootModel1;
+typedef __DependencyModel1Base<DependencyPermutation>       DependencyPermutationModel1;
 
 #endif
