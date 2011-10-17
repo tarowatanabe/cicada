@@ -401,6 +401,19 @@ struct LearnSVM : public LearnBase
   {
     
   }
+
+  struct multiplies_min
+  {
+    multiplies_min(const double& __factor, const double& __clip) : factor(__factor), clip(__clip) {}
+    
+    double operator()(const double& x) const
+    {
+      return std::min(x * factor, clip);
+    }
+    
+    double factor;
+    double clip;
+  };
   
   double learn(weight_set_type& weights)
   {
@@ -425,8 +438,13 @@ struct LearnSVM : public LearnBase
     }
 
     if (alpha_sum != 0.0) {
-      const double factor = 1.0 / (alpha_sum * lambda * positions.size());
-      std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
+      //const double factor = 1.0 / (alpha_sum * lambda * positions.size());
+      // std::transform(alpha.begin(), alpha.end(), alpha.begin(), std::bind2nd(std::multiplies<double>(), factor));
+      
+      // hack for DCD: since we have no summation constraint, we do not have to normalize by positions.size()
+      const double factor = 1.0 / (alpha_sum * lambda);
+      const double clip = 1.0 / (lambda * positions.size());
+      std::transform(alpha.begin(), alpha.end(), alpha.begin(), multiplies_min(factor, clip));
     }
     
     cicada::optimize::QPDCD solver;

@@ -74,14 +74,14 @@ namespace cicada
 	// initialize w by \sum x[i] M[i]
 	weights_type w;
 	M(w, x);
-	
+
 	q_type      QD(model_size, 0.0); // Q + D (we will use H notation, though... for L_1 SVM, D_ii = 0)
 	active_type actives(model_size);
 	for (size_type i = 0; i != model_size; ++ i) {
 	  actives[i] = i;
 	  QD[i] = H(i, i);
 	}
-
+		
 	double PGmax_old =   std::numeric_limits<double>::infinity();
 	double PGmin_old = - std::numeric_limits<double>::infinity();
 	
