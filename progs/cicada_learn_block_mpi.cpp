@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <deque>
 #include <sstream>
+#include <cstdlib>
 
 #include "cicada_impl.hpp"
 #include "cicada_kbest_impl.hpp"
@@ -492,6 +493,8 @@ void cicada_learn(operation_set_type& operations,
   boost::mt19937 generator;
   generator.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> gen(generator);
+  ::srand(utils::random_seed());
+  ::srandom(utils::random_seed());
   
   hypothesis_set_type kbests;
   
