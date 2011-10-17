@@ -92,6 +92,7 @@ namespace cicada
 	  
 	  std::random_shuffle(actives.begin(), actives.begin() + active_size);
 	  
+	  bool assigned = false;
 	  for (size_type s = 0; active_size && s != active_size; ++ s) {
 	    const size_type i = actives[s];
 	    const double G = M(w, i) + f[i];
@@ -118,6 +119,7 @@ namespace cicada
 	    
 	    PGmax_new = std::max(PGmax_new, PG);
 	    PGmin_new = std::min(PGmin_new, PG);
+	    assigned = true;
 	    
 	    if (std::fabs(PG) > 1e-12) {
 	      const double x_old = x[i];
@@ -126,7 +128,7 @@ namespace cicada
 	    }
 	  }
 	  
-	  if ((PGmax_new - PGmin_new) <= tolerance || active_size == 0) {
+	  if ((PGmax_new - PGmin_new) <= tolerance || ! assigned) {
 	    if (active_size == model_size)
 	      break;
 	    else {
