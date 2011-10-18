@@ -195,7 +195,7 @@ int main(int argc, char ** argv)
 	if (debug)
 	  std::cerr << "permutation" << std::endl;
 	
-	project_dependency<DependencyPermutationModel1>(ttable_source_target, ttable_target_source);
+	project_dependency<PermutationModel1>(ttable_source_target, ttable_target_source);
       } else
 	throw std::runtime_error("no dependency algorithm?");
     }

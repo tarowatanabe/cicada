@@ -450,12 +450,12 @@ int main(int argc, char ** argv)
 	if (debug)
 	  std::cerr << "permutation" << std::endl;
 	
-	project_dependency<DependencyPermutationHMM>(ttable_source_target,
-						     ttable_target_source,
-						     atable_source_target,
-						     atable_target_source,
-						     classes_source,
-						     classes_target);
+	project_dependency<PermutationHMM>(ttable_source_target,
+					   ttable_target_source,
+					   atable_source_target,
+					   atable_target_source,
+					   classes_source,
+					   classes_target);
       } else
 	throw std::runtime_error("no dependency algorithm?");
     }

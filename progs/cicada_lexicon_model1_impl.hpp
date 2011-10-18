@@ -16,7 +16,6 @@
 #include "itg_alignment.hpp"
 #include "dependency_hybrid.hpp"
 #include "dependency_degree2.hpp"
-#include "dependency_permutation.hpp"
 
 struct LearnModel1 : public LearnBase
 {
@@ -1947,10 +1946,7 @@ typedef __DependencyModel1Base<DependencyHybridSingleRoot>  DependencyHybridSing
 typedef __DependencyModel1Base<DependencyDegree2>           DependencyDegree2Model1;
 typedef __DependencyModel1Base<DependencyDegree2SingleRoot> DependencyDegree2SingleRootModel1;
 
-typedef __DependencyModel1Base<DependencyPermutation>       DependencyPermutationModel1;
-
-#if 0
-struct PermutationModel1
+struct PermutationModel1 : public ViterbiBase
 {
   typedef utils::vector2<double, std::allocator<double> > matrix_type;
   typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
@@ -2061,7 +2057,8 @@ struct PermutationModel1
 		
 		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
 		
-		scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+		// transposed!
+		scores_target(trg_dep, trg_head) = utils::mathop::logsum(scores_target(trg_dep, trg_head), score);
 	      }
       
       // this is for the root...
@@ -2074,8 +2071,11 @@ struct PermutationModel1
 	    
 	    const double score = scores(src_dep, trg_dep);
 	    
-	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
+	    scores_target(trg_dep, trg_head) = utils::mathop::logsum(scores_target(trg_dep, trg_head), score);
 	  }
+      
+      // dummy
+      scores_target(0, target_size) = 0.0;
     }
     
     if (! dependency_target.empty()) {
@@ -2097,7 +2097,7 @@ struct PermutationModel1
 		
 		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
 		
-		scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+		scores_source(src_dep, src_head) = utils::mathop::logsum(scores_source(src_dep, src_head), score);
 	      }
       
       // this is for the root.
@@ -2110,11 +2110,34 @@ struct PermutationModel1
 	    
 	    const double score = scores(src_dep, trg_dep);
 	    
-	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
+	    scores_source(src_dep, src_head) = utils::mathop::logsum(scores_source(src_dep, src_head), score);
 	  }
+      
+      // dummy
+      scores_source(0, source_size) = 0.0;
     }
   }
   
+  template <typename Dependency>
+  struct insert_dependency
+  {
+    Dependency& dependency;
+    
+    insert_dependency(Dependency& __dependency) : dependency(__dependency) {}
+
+    template <typename Edge>
+    insert_dependency& operator=(const Edge& edge)
+    {
+      if (edge.first)
+	dependency[edge.first - 1] = edge.second;
+      return *this;
+    }
+    
+    insert_dependency& operator*() { return *this; }
+    insert_dependency& operator++() { return *this; }
+    insert_dependency operator++(int) { return *this; }
+  };
+
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -2133,14 +2156,14 @@ struct PermutationModel1
     
     if (! dependency_source.empty()) {
       projected_target.resize(target_size, - 1);
-      
-      //analyzer(scores_target, projected_target);
+
+      kuhn_munkres_assignment(scores_target, insert_dependency<dependency_type>(projected_target));
     }
     
     if (! dependency_target.empty()) {
       projected_source.resize(source_size, - 1);
       
-      //analyzer(scores_source, projected_source);
+      kuhn_munkres_assignment(scores_source, insert_dependency<dependency_type>(projected_source));
     }
   }
 
@@ -2175,6 +2198,5 @@ struct PermutationModel1
   posterior_set_type posterior_source_target;
   posterior_set_type posterior_target_source;  
 };
-#endif
 
 #endif
