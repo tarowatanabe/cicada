@@ -1395,9 +1395,16 @@ struct PosteriorReducer : public PosteriorMapReduce
     else {
       os << '(';
       for (size_type i = 0; i != matrix.size1(); ++ i) {
+	if (i)
+	  os << ", ";
 	os << '(';
-	std::copy(matrix.begin(i), matrix.end(i), std::ostream_iterator<double>(os, ", "));
-	os << ')' << ", ";
+	matrix_type::const_iterator iter_begin = matrix.begin(i);
+	matrix_type::const_iterator iter_end   = matrix.end(i);
+	if (iter_begin != iter_end) {
+	  std::copy(iter_begin, iter_end - 1, std::ostream_iterator<double>(os, ", "));
+	  os << *(iter_end - 1);
+	}
+	os << ')';
       }
       os << ')' << '\n';
     }
