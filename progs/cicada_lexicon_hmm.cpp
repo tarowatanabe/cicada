@@ -9,6 +9,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -37,6 +38,7 @@ path_type projected_source_file;
 path_type projected_target_file;
 path_type posterior_source_target_file;
 path_type posterior_target_source_file;
+path_type posterior_combined_file;
 
 int iteration_model1 = 5;
 int iteration_hmm = 5;
@@ -471,7 +473,7 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("no dependency algorithm?");
     }
     
-    if (! posterior_source_target_file.empty() || ! posterior_target_source_file.empty()) {
+    if (! posterior_source_target_file.empty() || ! posterior_target_source_file.empty() || ! posterior_combined_file.empty()) {
       if (debug)
 	std::cerr << "compute posterior" << std::endl;
       
@@ -1158,8 +1160,8 @@ void viterbi(const ttable_type& ttable_source_target,
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
   queue_type queue(threads * 4096);
-  queue_type queue_source_target(threads * 4096);
-  queue_type queue_target_source(threads * 4096);
+  queue_type queue_source_target;
+  queue_type queue_target_source;
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
@@ -1451,8 +1453,8 @@ void project_dependency(const ttable_type& ttable_source_target,
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
   
   queue_mapper_type  queue(threads * 4096);
-  queue_reducer_type queue_source(threads * 4096);
-  queue_reducer_type queue_target(threads * 4096);
+  queue_reducer_type queue_source;
+  queue_reducer_type queue_target;
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
@@ -1607,15 +1609,18 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
   queue_mapper_type&  mapper;
   queue_reducer_type& reducer_source_target;
   queue_reducer_type& reducer_target_source;
+  queue_reducer_type& reducer_combined;
   
   PosteriorMapper(const Infer& __infer,
 		  queue_mapper_type& __mapper,
 		  queue_reducer_type& __reducer_source_target,
-		  queue_reducer_type& __reducer_target_source)
+		  queue_reducer_type& __reducer_target_source,
+		  queue_reducer_type& __reducer_combined)
     : Infer(__infer),
       mapper(__mapper),
       reducer_source_target(__reducer_source_target),
-      reducer_target_source(__reducer_target_source)
+      reducer_target_source(__reducer_target_source),
+      reducer_combined(__reducer_combined)
   {}
   
   void operator()()
@@ -1623,6 +1628,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
     bitext_type    bitext;
     posterior_type posterior_source_target;
     posterior_type posterior_target_source;
+    posterior_type posterior_combined;
     
     const int iter_mask = (1 << 12) - 1;
     
@@ -1632,15 +1638,35 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
       
       posterior_source_target.clear();
       posterior_target_source.clear();
+      posterior_combined.clear();
       
-      if (! bitext.source.empty() && ! bitext.target.empty())
+      if (! bitext.source.empty() && ! bitext.target.empty()) {
 	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
+	
+	// merging...
+	const size_type source_size = bitext.source.size();
+	const size_type target_size = bitext.target.size();
+	
+	posterior_combined.matrix.resize(target_size + 1, source_size + 1);
+	
+	for (size_type src = 1; src <= source_size; ++ src)
+	  for (size_type trg = 1; trg <= target_size; ++ trg)
+	    posterior_combined.matrix(trg, src) = utils::mathop::sqrt(posterior_source_target.matrix(trg, src) * posterior_target_source.matrix(src, trg));
+	
+	for (size_type trg = 1; trg <= target_size; ++ trg)
+	  posterior_combined.matrix(trg, 0) = posterior_source_target.matrix(trg, 0);
+	
+	for (size_type src = 1; src <= source_size; ++ src)
+	  posterior_combined.matrix(0, src) = posterior_target_source.matrix(src, 0);
+      }
       
       posterior_source_target.id = bitext.id;
       posterior_target_source.id = bitext.id;
+      posterior_combined.id      = bitext.id;
       
       reducer_source_target.push_swap(posterior_source_target);
       reducer_target_source.push_swap(posterior_target_source);
+      reducer_combined.push_swap(posterior_combined);
       
       if ((iter & iter_mask) == iter_mask)
 	Infer::shrink();
@@ -1758,8 +1784,9 @@ void posterior(const ttable_type& ttable_source_target,
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
   
   queue_mapper_type  queue(threads * 4096);
-  queue_reducer_type queue_source(threads * 4096);
-  queue_reducer_type queue_target(threads * 4096);
+  queue_reducer_type queue_source_target;
+  queue_reducer_type queue_target_source;
+  queue_reducer_type queue_combined;
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
@@ -1767,12 +1794,14 @@ void posterior(const ttable_type& ttable_source_target,
 							  atable_source_target, atable_target_source,
 							  classes_source, classes_target),
 						    queue,
-						    queue_source,
-						    queue_target)));
+						    queue_source_target,
+						    queue_target_source,
+						    queue_combined)));
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source)));
-  reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source_target)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target_source)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_combined_file,      queue_combined)));
   
   bitext_type bitext;
   bitext.id = 0;
@@ -1814,8 +1843,10 @@ void posterior(const ttable_type& ttable_source_target,
   }
   mapper.join_all();
   
-  queue_source.push(posterior_type());
-  queue_target.push(posterior_type());
+  queue_source_target.push(posterior_type());
+  queue_target_source.push(posterior_type());
+  queue_combined.push(posterior_type());
+
   reducer.join_all();
 
   utils::resource posterior_end;
@@ -1865,6 +1896,7 @@ void options(int argc, char** argv)
     
     ("posterior-source-target", po::value<path_type>(&posterior_source_target_file), "posterior for P(target | source)")
     ("posterior-target-source", po::value<path_type>(&posterior_target_source_file), "posterior for P(source | target)")
+    ("posterior-combined",      po::value<path_type>(&posterior_combined_file),      "posterior for P(source | target) P(target | source)")
 
     ("iteration-model1", po::value<int>(&iteration_model1)->default_value(iteration_model1), "max Model1 iteration")
     ("iteration-hmm", po::value<int>(&iteration_hmm)->default_value(iteration_hmm), "max HMM iteration")
