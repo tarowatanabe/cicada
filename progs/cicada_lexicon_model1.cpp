@@ -1549,8 +1549,8 @@ void options(int argc, char** argv)
     ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
     ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
     
-    ("projected-source", po::value<path_type>(&projected_source_file), "source projected dependency file")
-    ("projected-target", po::value<path_type>(&projected_target_file), "target projected dependency file")
+    ("projected-source", po::value<path_type>(&projected_source_file), "source dependnecy projected from target")
+    ("projected-target", po::value<path_type>(&projected_target_file), "target dependency projected from source")
     
     ("posterior-source-target", po::value<path_type>(&posterior_source_target_file), "posterior for P(target | source)")
     ("posterior-target-source", po::value<path_type>(&posterior_target_source_file), "posterior for P(source | target)")
