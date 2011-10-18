@@ -1411,6 +1411,67 @@ struct ViterbiHMM : public ViterbiBase
   sentence_type target_class;
 };
 
+
+
+struct PosteriorHMM : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  
+  PosteriorHMM(const ttable_type& __ttable_source_target,
+	       const ttable_type& __ttable_target_source,
+	       const atable_type& __atable_source_target,
+	       const atable_type& __atable_target_source,
+	       const classes_type& __classes_source,
+	       const classes_type& __classes_target)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		  __atable_source_target, __atable_target_source,
+		  __classes_source, __classes_target) {}
+  
+  typedef LearnHMM::hmm_data_type hmm_data_type;
+  
+  
+  template <typename Matrix>
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  Matrix& posterior_source_target,
+		  Matrix& posterior_target_source)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm_source_target.prepare(source, target, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, ttable_target_source, atable_target_source, classes_target, classes_source);
+    
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
+
+    hmm_source_target.estimate_posterior(source, target);
+    hmm_target_source.estimate_posterior(target, source);
+
+    posterior_source_target.reserve(target_size + 1, source_size + 1);
+    posterior_target_source.reserve(source_size + 1, target_size + 1);
+
+    posterior_source_target.resize(target_size + 1, source_size + 1);
+    posterior_target_source.resize(source_size + 1, target_size + 1);
+    
+    for (size_type trg = 0; trg <= target_size; ++ trg)
+      std::copy(hmm_source_target.posterior.begin(trg), hmm_source_target.posterior.end(trg), posterior_source_target.begin(trg));
+    
+    for (size_type src = 0; src <= source_size; ++ src)
+      std::copy(hmm_target_source.posterior.begin(src), hmm_target_source.posterior.end(src), posterior_target_source.begin(src));
+  }
+
+  void shrink()
+  {
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
+  }
+
+  hmm_data_type hmm_source_target;
+  hmm_data_type hmm_target_source;
+};
+
+
 struct ITGHMM : public ViterbiBase
 {
   typedef utils::vector2<double, std::allocator<double> > matrix_type;

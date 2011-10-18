@@ -29,6 +29,8 @@ path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
 path_type projected_source_file;
 path_type projected_target_file;
+path_type posterior_source_target_file;
+path_type posterior_target_source_file;
 
 int iteration = 5;
 
@@ -72,6 +74,10 @@ void viterbi(const ttable_type& ttable_source_target,
 template <typename Analyzer>
 void project_dependency(const ttable_type& ttable_source_target,
 			const ttable_type& ttable_target_source);
+
+template <typename Infer>
+void posterior(const ttable_type& ttable_source_target,
+	       const ttable_type& ttable_target_source);
 
 void options(int argc, char** argv);
 
@@ -198,6 +204,13 @@ int main(int argc, char ** argv)
 	project_dependency<PermutationModel1>(ttable_source_target, ttable_target_source);
       } else
 	throw std::runtime_error("no dependency algorithm?");
+    }
+
+    if (! posterior_source_target_file.empty() || ! posterior_target_source_file.empty()) {
+      if (debug)
+	std::cerr << "compute posterior" << std::endl;
+      
+      posterior<PosteriorModel1>(ttable_source_target, ttable_target_source);
     }
       
     // final writing
@@ -1192,6 +1205,287 @@ void project_dependency(const ttable_type& ttable_source_target,
 	      << "user time: " << projection_end.user_time() - projection_start.user_time() << std::endl;
 }
 
+struct PosteriorMapReduce
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  
+  struct bitext_type
+  {
+    size_type       id;
+    sentence_type   source;
+    sentence_type   target;
+
+    bitext_type() : id(size_type(-1)), source(), target() {}
+    
+    void clear()
+    {
+      id = size_type(-1);
+      source.clear();
+      target.clear();
+    }
+    
+    void swap(bitext_type& x)
+    {
+      std::swap(id, x.id);
+      source.swap(x.source);
+      target.swap(x.target);
+    }
+  };
+  
+  struct posterior_type
+  {
+    size_type id;
+    matrix_type matrix;
+    
+    posterior_type() : id(size_type(-1)), matrix() {}
+    
+    void clear()
+    {
+      id = size_type(-1);
+      matrix.clear();
+    }
+    
+    void swap(posterior_type& x)
+    {
+      std::swap(id, x.id);
+      matrix.swap(x.matrix);
+    }
+  };
+  
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> >       queue_mapper_type;
+  typedef utils::lockfree_list_queue<posterior_type, std::allocator<posterior_type> > queue_reducer_type;
+};
+
+namespace std
+{
+  inline
+  void swap(PosteriorMapReduce::bitext_type& x, PosteriorMapReduce::bitext_type& y)
+  {
+    x.swap(y);
+  }
+  
+  inline
+  void swap(PosteriorMapReduce::posterior_type& x, PosteriorMapReduce::posterior_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+template <typename Infer>
+struct PosteriorMapper : public PosteriorMapReduce, public Infer
+{
+  queue_mapper_type&  mapper;
+  queue_reducer_type& reducer_source_target;
+  queue_reducer_type& reducer_target_source;
+  
+  PosteriorMapper(const Infer& __infer,
+		  queue_mapper_type& __mapper,
+		  queue_reducer_type& __reducer_source_target,
+		  queue_reducer_type& __reducer_target_source)
+    : Infer(__infer),
+      mapper(__mapper),
+      reducer_source_target(__reducer_source_target),
+      reducer_target_source(__reducer_target_source)
+  {}
+  
+  void operator()()
+  {
+    bitext_type    bitext;
+    posterior_type posterior_source_target;
+    posterior_type posterior_target_source;
+    
+    const int iter_mask = (1 << 12) - 1;
+    
+    for (int iter = 0; /**/; ++ iter) {
+      mapper.pop_swap(bitext);
+      if (bitext.id == size_type(-1)) break;
+      
+      posterior_source_target.clear();
+      posterior_target_source.clear();
+      
+      if (! bitext.source.empty() && ! bitext.target.empty())
+	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
+      
+      posterior_source_target.id = bitext.id;
+      posterior_target_source.id = bitext.id;
+      
+      reducer_source_target.push_swap(posterior_source_target);
+      reducer_target_source.push_swap(posterior_target_source);
+      
+      if ((iter & iter_mask) == iter_mask)
+	Infer::shrink();
+    }
+  }
+};
+
+struct PosteriorReducer : public PosteriorMapReduce
+{
+  struct less_posterior
+  {
+    bool operator()(const posterior_type& x, const posterior_type& y) const
+    {
+      return x.id < y.id;
+    }
+  };
+  typedef std::set<posterior_type, less_posterior, std::allocator<posterior_type> > posterior_set_type;
+  
+  path_type   path;
+  queue_reducer_type& queue;
+  
+  PosteriorReducer(const path_type& __path, queue_reducer_type& __queue) : path(__path), queue(__queue) {}
+  
+  void operator()()
+  {
+    if (path.empty()) {
+      posterior_type posterior;
+      for (;;) {
+	queue.pop_swap(posterior);
+	if (posterior.id == size_type(-1)) break;
+      }
+    } else {
+      posterior_set_type posteriors;
+      
+      const bool flush_output = (path == "-"
+				 || (boost::filesystem::exists(path)
+				     && ! boost::filesystem::is_regular_file(path)));
+      
+      utils::compress_ostream os(path, 1024 * 1024 * (! flush_output));
+      os.precision(20);
+      
+      size_type      id = 0;
+      posterior_type posterior;
+      
+      for (;;) {
+	queue.pop_swap(posterior);
+	if (posterior.id == size_type(-1)) break;
+	
+	if (posterior.id == id) {
+	  write(os, posterior);
+	  ++ id;
+	} else
+	  posteriors.insert(posterior);
+	
+	while (! posteriors.empty() && posteriors.begin()->id == id) {
+	  write(os, *posteriors.begin());
+	  posteriors.erase(posteriors.begin());
+	  ++ id;
+	}
+      }
+      
+      while (! posteriors.empty() && posteriors.begin()->id == id) {
+	write(os, *posteriors.begin());
+	posteriors.erase(posteriors.begin());
+	++ id;
+      }
+      
+      if (! posteriors.empty())
+	throw std::runtime_error("error while writeing posterior output?");
+    }
+  }
+  
+  void write(std::ostream& os, const posterior_type& posterior)
+  {
+    const matrix_type& matrix = posterior.matrix;
+    
+    if (matrix.empty())
+      os << '\n';
+    else {
+      os << '(';
+      for (size_type i = 0; i != matrix.size1(); ++ i) {
+	os << '(';
+	for (size_type j = 0; j != matrix.size2(); ++ j)
+	  os << matrix(i, j) << ',';
+	os << ')' << ',';
+      }
+      os << ')' << '\n';
+    }
+  }
+};
+
+template <typename Infer>
+void posterior(const ttable_type& ttable_source_target,
+	       const ttable_type& ttable_target_source)
+{
+  typedef PosteriorMapper<Infer> mapper_type;
+  typedef PosteriorReducer       reducer_type;
+  
+  typedef reducer_type::bitext_type    bitext_type;
+  typedef reducer_type::posterior_type posterior_type;
+  
+  typedef reducer_type::queue_mapper_type  queue_mapper_type;
+  typedef reducer_type::queue_reducer_type queue_reducer_type;
+  
+  typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
+  
+  queue_mapper_type  queue(threads * 4096);
+  queue_reducer_type queue_source(threads * 4096);
+  queue_reducer_type queue_target(threads * 4096);
+  
+  boost::thread_group mapper;
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(mapper_type(Infer(ttable_source_target, ttable_target_source),
+						    queue,
+						    queue_source,
+						    queue_target)));
+  
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target)));
+  
+  bitext_type bitext;
+  bitext.id = 0;
+  
+  utils::resource posterior_start;
+  
+  utils::compress_istream is_src(source_file, 1024 * 1024);
+  utils::compress_istream is_trg(target_file, 1024 * 1024);
+  
+  for (;;) {
+    is_src >> bitext.source;
+    is_trg >> bitext.target;
+    
+    if (! is_src || ! is_trg) break;
+    
+    queue.push(bitext);
+    
+    ++ bitext.id;
+    
+    if (debug) {
+      if (bitext.id % 10000 == 0)
+	std::cerr << '.';
+      if (bitext.id % 1000000 == 0)
+	std::cerr << '\n';
+    }
+  }
+  
+  if (debug && bitext.id >= 10000)
+    std::cerr << std::endl;
+  if (debug)
+    std::cerr << "# of bitexts: " << bitext.id << std::endl;
+
+  if (is_src || is_trg)
+    throw std::runtime_error("# of samples do not match");
+  
+  for (int i = 0; i != threads; ++ i) {
+    bitext.clear();
+    queue.push_swap(bitext);
+  }
+  mapper.join_all();
+  
+  queue_source.push(posterior_type());
+  queue_target.push(posterior_type());
+  reducer.join_all();
+
+  utils::resource posterior_end;
+  
+  if (debug)
+    std::cerr << "cpu time:  " << posterior_end.cpu_time() - posterior_start.cpu_time() << std::endl
+	      << "user time: " << posterior_end.user_time() - posterior_start.user_time() << std::endl;
+}
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -1221,6 +1515,9 @@ void options(int argc, char** argv)
     
     ("projected-source", po::value<path_type>(&projected_source_file), "source projected dependency file")
     ("projected-target", po::value<path_type>(&projected_target_file), "target projected dependency file")
+    
+    ("posterior-source-target", po::value<path_type>(&posterior_source_target_file), "posterior for P(target | source)")
+    ("posterior-target-source", po::value<path_type>(&posterior_target_source_file), "posterior for P(source | target)")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
     
