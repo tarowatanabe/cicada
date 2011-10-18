@@ -256,7 +256,12 @@ cicadapath() {
 cicadas="cicada_filter_config_moses cicada_filter_kbest_moses cicada_filter_weights cicada_eval cicada_oracle_kbest cicada_learn_kbest cicada-moses.sh"
 
 for prog in $cicadas; do
-  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
+  tmptmp=`cicadapath $prog`
+  
+  if test ! -e $tmptmp; then
+    echo "no $prog at $tmptmp... no --cicada | --cicada-dir?" >&2
+    exit 1
+  fi
 done
 
 if test "$weights_init" != ""; then

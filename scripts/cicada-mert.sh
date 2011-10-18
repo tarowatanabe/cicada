@@ -234,7 +234,12 @@ cicadapath() {
 cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_mert cicada_mert_mpi cicada_mert_kbest cicada_mert_kbest_mpi"
 
 for prog in $cicadas; do
-  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
+  tmptmp=`cicadapath $prog`
+
+  if test ! -e $tmptmp; then
+    echo "no $prog at $tmptmp... no --cicada | --cicada-dir?" >&2
+    exit 1
+  fi
 done
 
 if test "forest" = "no" -a $kbest -le 0; then

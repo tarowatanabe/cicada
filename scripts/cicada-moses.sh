@@ -206,7 +206,12 @@ cicadapath() {
 cicadas="cicada_filter_kbest_moses mpimap mpipe mpish"
 
 for prog in $cicadas; do
-  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
+  tmptmp=`cicadapath $prog`
+
+  if test ! -e $tmptmp; then
+    echo "no $prog at $tmptmp... no --cicada | --cicada-dir?" >&2
+    exit 1
+  fi
 done
 
 if test "$openmpi" != ""; then

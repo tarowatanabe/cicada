@@ -213,7 +213,7 @@ cicadapath() {
       if test ! -e $path; then
         path=$cicada/scripts/$file
 	if test ! -e $path; then
-	  echo $file
+	  echo $path
 	  return 1
 	fi
       fi
@@ -226,7 +226,12 @@ cicadapath() {
 cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle_kbest cicada_oracle_kbest_mpi cicada_learn_kbest"
 
 for prog in $cicadas; do
-  tmptmp=`cicadapath $prog` || (echo "no $prog... no --cicada | --cicada-dir?" >&2; exit 1)
+  tmptmp=`cicadapath $prog`
+
+  if test ! -e $tmptmp; then
+    echo "no $prog at $tmptmp... no --cicada | --cicada-dir?" >&2
+    exit 1
+  fi
 done
 
 if test "$weights_init" != ""; then
