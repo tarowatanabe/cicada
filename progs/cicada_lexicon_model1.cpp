@@ -842,6 +842,10 @@ void viterbi(const ttable_type& ttable_source_target,
   queue_type queue(threads * 4096);
   queue_type queue_source_target;
   queue_type queue_target_source;
+
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
+  reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
@@ -849,10 +853,6 @@ void viterbi(const ttable_type& ttable_source_target,
 						    queue,
 						    queue_source_target,
 						    queue_target_source)));
-
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
-  reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
   
   bitext_type bitext;
   bitext.id = 0;
@@ -1131,17 +1131,17 @@ void project_dependency(const ttable_type& ttable_source_target,
   queue_reducer_type queue_source;
   queue_reducer_type queue_target;
   
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(projected_source_file, queue_source)));
+  reducer.add_thread(new boost::thread(reducer_type(projected_target_file, queue_target)));
+
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
     mapper.add_thread(new boost::thread(mapper_type(Analyzer(ttable_source_target, ttable_target_source),
 						    queue,
 						    queue_source,
 						    queue_target)));
-  
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(projected_source_file, queue_source)));
-  reducer.add_thread(new boost::thread(reducer_type(projected_target_file, queue_target)));
-  
+    
   bitext_type bitext;
   bitext.id = 0;
 
@@ -1456,6 +1456,11 @@ void posterior(const ttable_type& ttable_source_target,
   queue_reducer_type queue_target_source;
   queue_reducer_type queue_combined;
   
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source_target)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target_source)));
+  reducer.add_thread(new boost::thread(reducer_type(posterior_combined_file,      queue_combined)));
+
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
     mapper.add_thread(new boost::thread(mapper_type(Infer(ttable_source_target, ttable_target_source),
@@ -1463,12 +1468,7 @@ void posterior(const ttable_type& ttable_source_target,
 						    queue_source_target,
 						    queue_target_source,
 						    queue_combined)));
-  
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source_target)));
-  reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target_source)));
-  reducer.add_thread(new boost::thread(reducer_type(posterior_combined_file,      queue_combined)));
-  
+    
   bitext_type bitext;
   bitext.id = 0;
   
