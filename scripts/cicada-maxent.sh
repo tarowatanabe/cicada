@@ -33,6 +33,8 @@ compose="compose-cky"
 
 ### linear learning
 C=1e-3
+regularize_l1=no
+regularize_l2=no
 oracle_cube=400
 scorer="bleu:order=4,exact=true"
 
@@ -64,6 +66,8 @@ $me [options]
   
   Training options
   -C, --C                   hyperparameter                   (default: $C)
+  --regularize-l1           L1 regularization
+  --regularize-l2           L2 regularization                (default)
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
   --scorer                  scorer                           (default: $scorer)
 
@@ -117,6 +121,12 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
     shift; shift ;;
+  --regularize-l1 )
+    regularize_l1=yes
+    shift ;;
+  --regularize-l2 )
+    regularize_l2=yes
+    shift ;;
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
     oracle_cube=$2
@@ -173,6 +183,15 @@ fi
 if test "$cicada" = ""; then
   echo "no cicada dir?" >&2
   exit 1
+fi
+
+if test "$regularize_l1" = no -a "$regularize_l2" = no; then
+  regularize_l2=yes
+fi
+
+if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
+  echo "both L1 and L2?" >&2
+  exit 1  
 fi
 
 ## check cicada...
@@ -394,6 +413,11 @@ qsubwrapper oracle -t -l ${root}oracle.maxent.log `cicadapath cicada_oracle_mpi`
         \
         --debug || exit 1
 
+regularize=" --regularize-l2"
+if test "$regularize_l1" = yes; then
+  regularize=" --regularize-l1"
+fi
+
 echo "learning ${root}weights.maxent" >&2
 qsubwrapper learn -t -l ${root}learn.maxent.log `cicadapath cicada_learn_mpi` \
          --forest ${root}forest-maxent \
@@ -402,5 +426,6 @@ qsubwrapper learn -t -l ${root}learn.maxent.log `cicadapath cicada_learn_mpi` \
          \
          --learn-lbfgs \
          --C $C \
+         $regularize \
          \
          --debug=2 || exit 1

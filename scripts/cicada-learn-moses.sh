@@ -40,6 +40,8 @@ iteration=20
 iteration_first=1
 weights_init=""
 C=1e-3
+regularize_l1=no
+regularize_l2=no
 scorer="bleu:order=4,exact=true"
 liblinear="no"
 solver=1
@@ -79,6 +81,8 @@ $me [options]
   --iteration-first         The first iteration (default: $iteration_first)
   -w, --weights             initial weights
   -C, --C                   hyperparameter    (default: $C)
+  --regularize-l1           L1 regularization
+  --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
   --liblinear               use liblinear solver (default: use lbfgs)
   --solver                  liblinear solver type. See liblinear FAQ,
@@ -154,6 +158,12 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
     shift; shift ;;
+  --regularize-l1 )
+    regularize_l1=yes
+    shift ;;
+  --regularize-l2 )
+    regularize_l2=yes
+    shift ;;
   --scorer )
     test $# = 1 && eval "$exit_missing_arg"
     scorer=$2
@@ -228,6 +238,15 @@ fi
 if test "$moses" = "" -o ! -x "$moses"; then
   echo "no moses" >&2
   exit 1
+fi
+
+if test "$regularize_l1" = no -a "$regularize_l2" = no; then
+  regularize_l2=yes
+fi
+
+if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
+  echo "both L1 and L2?" >&2
+  exit 1  
 fi
 
 cicadapath() {
@@ -564,6 +583,11 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     weights_option=" --weights $weights_last"
   fi
 
+  regularize=" --regularize-l2"
+  if test "$regularize_l1" = yes; then
+    regularize=" --regularize-l1"
+  fi
+
   echo "learning ${root}weights.$iter" >&2
   qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
@@ -574,6 +598,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
                         $weights_option \
                         $learn_option \
                         --C $C \
+                        $regularize \
                         \
                         --debug=2 || exit 1
 

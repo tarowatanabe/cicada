@@ -34,6 +34,8 @@ config=""
 iteration=20
 weights_init=""
 C=1e-3
+regularize_l1=no
+regularize_l2=no
 oracle_cube=400
 scorer="bleu:order=4,exact=true"
 kbest=0
@@ -70,6 +72,8 @@ $me [options]
   -i, --iteration           PRO iterations                   (default: $iteration)
   -w, --weights             initial weights
   -C, --C                   hyperparameter                   (default: $C)
+  --regularize-l1           L1 regularization
+  --regularize-l2           L2 regularization                (default)
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
   --scorer                  scorer                           (default: $scorer)
   --kbest                   kbest size                       (default: $kbest)
@@ -135,6 +139,12 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
     shift; shift ;;
+  --regularize-l1 )
+    regularize_l1=yes
+    shift ;;
+  --regularize-l2 )
+    regularize_l2=yes
+    shift ;;
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
     oracle_cube=$2
@@ -201,6 +211,15 @@ fi
 if test "$cicada" = ""; then
   echo "no cicada dir?" >&2
   exit 1
+fi
+
+if test "$regularize_l1" = no -a "$regularize_l2" = no; then
+  regularize_l2=yes
+fi
+
+if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
+  echo "both L1 and L2?" >&2
+  exit 1  
 fi
 
 ## check cicada...
@@ -536,6 +555,11 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     weights_learn=${root}weights.${iter}.learn
   fi
 
+  regularize=" --regularize-l2"
+  if test "$regularize_l1" = yes; then
+    regularize=" --regularize-l1"
+  fi
+
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
     qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath cicada_learn_mpi` \
@@ -546,6 +570,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
                         --learn-lbfgs \
+	                $regularize \
                         --C $C \
                         \
                         --debug=2 || exit 1
@@ -559,6 +584,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
                         --learn-lbfgs \
+	                $regularize \
                         --C $C \
                         \
                         --debug=2 || exit 1
