@@ -245,10 +245,7 @@ void score_counts(const path_type& output_file,
     mapped_files[i % threads].push_back(counts_files[i]);
   
   root_count_map_type root_counts(threads);
-  
-  boost::thread_group mappers;
-  boost::thread_group reducers;
-  
+    
   queue_ptr_map_type   queues_mapper(threads, queue_ptr_set_type(threads));
   queue_ptr_map_type   queues_reducer(threads, queue_ptr_set_type(threads));
   ostream_ptr_set_type ostreams(threads);
@@ -260,11 +257,7 @@ void score_counts(const path_type& output_file,
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
-  for (int shard = 0; shard != threads; ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
-						     queues_mapper[shard],
-						     max_malloc,
-						     debug)));
+  boost::thread_group reducers;
   for (int shard = 0; shard != threads; ++ shard) {
     const path_type path = output_file / (utils::lexical_cast<std::string>(shard) + ".gz");
     
@@ -279,9 +272,15 @@ void score_counts(const path_type& output_file,
 						       debug)));
   }
   
+  boost::thread_group mappers;
+  for (int shard = 0; shard != threads; ++ shard)
+    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						     queues_mapper[shard],
+						     max_malloc,
+						     debug)));
+  
   mappers.join_all();
   reducers.join_all();
-  
   
   // merge root_sources...
   for (size_t shard = 0; shard != root_counts.size(); ++ shard) {
@@ -318,16 +317,14 @@ void reverse_counts(const path_map_type& modified_files,
   reversed_files.clear();
   reversed_files.reserve(threads);
   reversed_files.resize(threads);
-
-  boost::thread_group mappers;
-  boost::thread_group reducers;
-  queue_ptr_set_type  queues(threads);
   
+  queue_ptr_set_type  queues(threads);
   root_count_map_type root_counts(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     queues[shard].reset(new queue_type(1024 * threads));
   
+  boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
 						       utils::tempfile::tmp_dir(),
@@ -335,7 +332,8 @@ void reverse_counts(const path_map_type& modified_files,
 						       threads,
 						       max_malloc,
 						       debug)));
-
+  
+  boost::thread_group mappers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(modified_files[shard],
 						     queues,
@@ -380,13 +378,12 @@ void modify_counts(const path_set_type& counts_files,
   modified_files.reserve(threads);
   modified_files.resize(threads);
 
-  boost::thread_group mappers;
-  boost::thread_group reducers;
   queue_ptr_set_type  queues(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     queues[shard].reset(new queue_type(1024 * threads));
   
+  boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
 						       utils::tempfile::tmp_dir(),
@@ -394,7 +391,8 @@ void modify_counts(const path_set_type& counts_files,
 						       threads,
 						       max_malloc,
 						       debug)));
-  
+
+  boost::thread_group mappers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
 						     queues,
