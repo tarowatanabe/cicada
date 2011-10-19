@@ -93,7 +93,7 @@ namespace cicada
 	    const int edge_source = (src != trg ? src + 1 : 0);
 	    const int edge_target = trg + 1;
 
-	    if (matrix(src, trg) == logprob_zero) continue;
+	    if (matrix(src, trg) <= logprob_zero) continue;
 	  
 	    boost::add_edge(vertices[edge_source], vertices[edge_target], matrix(src, trg), graph);
 	  }
@@ -140,7 +140,7 @@ namespace cicada
 	      const int edge_source = src + 1;
 	      const int edge_target = trg + 1;
 
-	      if (matrix(src, trg) == logprob_zero) continue;
+	      if (matrix(src, trg) <= logprob_zero) continue;
 	    
 	      boost::add_edge(vertices[edge_source], vertices[edge_target], matrix(src, trg), graph);
 	    
@@ -149,11 +149,13 @@ namespace cicada
       
 	// diagonal... first compute sum...
 	for (int i = 0; i < matrix_size; ++ i)
-	  sum_weights += std::fabs(matrix(i, i));
-      
+	  if (matrix(i, i) > logprob_zero)
+	    sum_weights += std::fabs(matrix(i, i));
+	
 	// then, subtract...
 	for (int i = 0; i < matrix_size; ++ i)
-	  boost::add_edge(vertices[0], vertices[i + 1], matrix(i, i) - sum_weights, graph);
+	  if (matrix(i, i) > logprob_zero)
+	    boost::add_edge(vertices[0], vertices[i + 1], matrix(i, i) - sum_weights, graph);
       
 	const boost::property_map<graph_type, boost::edge_weight_t>::type&  weights = boost::get(boost::edge_weight_t(), graph);
 	const boost::property_map<graph_type, boost::vertex_index_t>::type& vertex_indices = boost::get(boost::vertex_index_t(), graph);
