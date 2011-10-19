@@ -15,23 +15,27 @@
 
 struct DependencyMST
 {
-  typedef std::pair<int, int> dep_type;
-  typedef std::vector<dep_type, std::allocator<dep_type> > dep_set_type;
-  
+  typedef std::vector<int, std::allocator<int> > dep_type;
+
   template <typename Scores, typename Dependency>
   void operator()(const Scores& scores,
 		  Dependency& dependency)
   {
     const size_t sentence_size = dependency.size();
     
+    mst.viterbi_forest(scores, deps);
     
+    for (size_t i = 0; i != sentence_size; ++ i)
+      dependency[i] = (deps[i + 1] ? deps[i + 1] - 1 : 0);
   }
+
+  cicada::optimize::MST mst;
+  dep_type deps;
 };
 
 struct DependencyMSTSingleRoot
 {
-  typedef std::pair<int, int> dep_type;
-  typedef std::vector<dep_type, std::allocator<dep_type> > dep_set_type;
+  typedef std::vector<int, std::allocator<int> > dep_type;
   
   template <typename Scores, typename Dependency>
   void operator()(const Scores& scores,
@@ -39,8 +43,14 @@ struct DependencyMSTSingleRoot
   {
     const size_t sentence_size = dependency.size();
     
+    mst.viterbi_tree(scores, deps);
     
+    for (size_t i = 0; i != sentence_size; ++ i)
+      dependency[i] = (deps[i + 1] ? deps[i + 1] - 1 : 0);
   }
+
+  cicada::optimize::MST mst;
+  dep_type deps;
 };
 
 #endif

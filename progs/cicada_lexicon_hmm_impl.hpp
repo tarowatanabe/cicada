@@ -1902,6 +1902,8 @@ typedef __DependencyHMMBase<DependencyHybrid>            DependencyHybridHMM;
 typedef __DependencyHMMBase<DependencyHybridSingleRoot>  DependencyHybridSingleRootHMM;
 typedef __DependencyHMMBase<DependencyDegree2>           DependencyDegree2HMM;
 typedef __DependencyHMMBase<DependencyDegree2SingleRoot> DependencyDegree2SingleRootHMM;
+typedef __DependencyHMMBase<DependencyMST>               DependencyMSTHMM;
+typedef __DependencyHMMBase<DependencyMSTSingleRoot>     DependencyMSTSingleRootHMM;
 
 struct PermutationHMM : public ViterbiBase
 {
