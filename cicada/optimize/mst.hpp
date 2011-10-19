@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include <utils/mathop.hpp>
-
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <boost/numeric/ublas/lu.hpp>
@@ -16,6 +14,8 @@
 #include <boost/graph/adjacency_matrix.hpp>
 
 #include <cicada/cicada/optimize/edmonds_optimum_branching.hpp>
+
+#include <utils/mathop.hpp>
 
 namespace cicada
 {
