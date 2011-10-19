@@ -1924,8 +1924,8 @@ struct PermutationHMM : public ViterbiBase
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
-		  const dependency_type& dependency_source,
-		  const dependency_type& dependency_target)
+		  const dependency_type& permutation_source,
+		  const dependency_type& permutation_target)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -1950,30 +1950,25 @@ struct PermutationHMM : public ViterbiBase
 	scores(src, trg) = 0.5 * (utils::mathop::log(hmm_source_target.posterior(trg, src)) 
 				  + utils::mathop::log(hmm_target_source.posterior(src, trg)));
     
-    if (! dependency_source.empty()) {
-      if (dependency_source.size() != source_size)
-	throw std::runtime_error("dependency size do not match");
+    if (! permutation_source.empty()) {
+      if (permutation_source.size() != source_size)
+	throw std::runtime_error("permutation size do not match");
       
       scores_target.clear();
       scores_target.reserve(target_size + 1, target_size + 1);
       scores_target.resize(target_size + 1, target_size + 1, lowest);
       
-      // checking...
-      assigned.clear();
-      assigned.resize(source_size, false);
+      // transform permutation into dependency...
+      dependency_source.clear();
+      dependency_source.resize(source_size, 0);
       
-      for (size_type src = 0; src != dependency_source.size(); ++ src) {
-	if (dependency_source[src] >= source_size)
-	  throw std::runtime_error("invalid permutation: out of range");
-	
-	if (assigned[dependency_source[src]])
-	  throw std::runtime_error("invalid permutation: duplicates");
-	
-	assigned[dependency_source[src]] = true;
-      }
+      const size_type src_leaf = project_permutation(permutation_source, dependency_source);
+      
+      if (src_leaf == size_type(-1))
+	throw std::runtime_error("no leaf?");
       
       // we will compute the score matrix...
-      for (size_type trg_head = 1; trg_head != target_size; ++ trg_head)
+      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
 	for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
 	  if (trg_head != trg_dep)
 	    for (size_type src = 0; src != dependency_source.size(); ++ src) 
@@ -1983,7 +1978,7 @@ struct PermutationHMM : public ViterbiBase
 		
 		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
 		
-		scores_target(trg_dep, trg_head) = utils::mathop::logsum(scores_target(trg_dep, trg_head), score);
+		scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	      }
       
       // this is for the root...
@@ -1995,37 +1990,34 @@ struct PermutationHMM : public ViterbiBase
 	    const size_type src_dep  = src + 1;
 	    
 	    const double score = scores(src_dep, trg_dep);
-
-	    scores_target(trg_dep, trg_head) = utils::mathop::logsum(scores_target(trg_dep, trg_head), score);
+	    
+	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	  }
       
-      scores_target(0, target_size) = 0;
+      // this is for the leaf...
+      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
+	scores_target(trg_head, 0) = scores(src_leaf, trg_head);
     }
     
-    if (! dependency_target.empty()) {
-      if (dependency_target.size() != target_size)
-	throw std::runtime_error("dependency size do not match");
+    if (! permutation_target.empty()) {
+      if (permutation_target.size() != target_size)
+	throw std::runtime_error("permutation size do not match");
 
       scores_source.clear();
       scores_source.reserve(source_size + 1, source_size + 1);
       scores_source.resize(source_size + 1, source_size + 1, lowest);
       
-      // checking...
-      assigned.clear();
-      assigned.resize(target_size, false);
+      // transform permutation into dependency...
+      dependency_target.clear();
+      dependency_target.resize(target_size, 0);
       
-      for (size_type trg = 0; trg != dependency_target.size(); ++ trg) {
-	if (dependency_target[trg] >= target_size)
-	  throw std::runtime_error("invalid permutation: out of range");
-	
-	if (assigned[dependency_target[trg]])
-	  throw std::runtime_error("invalid permutation: duplicates");
-	
-	assigned[dependency_target[trg]] = true;
-      }
+      const size_type trg_leaf = project_permutation(permutation_target, dependency_target);
+      
+      if (trg_leaf == size_type(-1))
+	throw std::runtime_error("no leaf?");
       
       // we will compute the score matrix...
-      for (size_type src_head = 1; src_head != source_size; ++ src_head)
+      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
 	for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
 	  if (src_head != src_dep)
 	    for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
@@ -2035,7 +2027,7 @@ struct PermutationHMM : public ViterbiBase
 		
 		const double score = scores(src_head, trg_head) + scores(src_dep, trg_dep);
 		
-		scores_source(src_dep, src_head) = utils::mathop::logsum(scores_source(src_dep, src_head), score);
+		scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
 	      }
       
       // this is for the root.
@@ -2048,10 +2040,12 @@ struct PermutationHMM : public ViterbiBase
 	    
 	    const double score = scores(src_dep, trg_dep);
 	    
-	    scores_source(src_dep, src_head) = utils::mathop::logsum(scores_source(src_dep, src_head), score);
+	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
 	  }
-
-      scores_source(0, source_size) = 0.0;
+      
+      // this is for the leaf...
+      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
+	scores_source(src_head, 0) = scores(src_head, trg_leaf);
     }
   }
   
@@ -2065,8 +2059,8 @@ struct PermutationHMM : public ViterbiBase
     template <typename Edge>
     insert_dependency& operator=(const Edge& edge)
     {
-      if (edge.first)
-	dependency[edge.first - 1] = edge.second;
+      if (edge.second)
+	dependency[edge.second - 1] = edge.first;
       return *this;
     }
     
@@ -2077,12 +2071,14 @@ struct PermutationHMM : public ViterbiBase
 
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
-		  const dependency_type& dependency_source,
-		  const dependency_type& dependency_target,
+		  const dependency_type& permutation_source,
+		  const dependency_type& permutation_target,
 		  dependency_type& projected_source,
 		  dependency_type& projected_target)
   {
-    operator()(source, target, dependency_source, dependency_target);
+    std::cerr << "posterior" << std::endl;
+    
+    operator()(source, target, permutation_source, permutation_target);
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -2090,17 +2086,101 @@ struct PermutationHMM : public ViterbiBase
     projected_source.clear();
     projected_target.clear();
     
-    if (! dependency_source.empty()) {
+    if (! permutation_source.empty()) {
+      dependency_target.resize(target_size, - 1);
       projected_target.resize(target_size, - 1);
       
-      kuhn_munkres_assignment(scores_target, insert_dependency<dependency_type>(projected_target));
+      std::cerr << "optimal dependency" << std::endl;
+
+      kuhn_munkres_assignment(scores_target, insert_dependency<dependency_type>(dependency_target));
+
+      std::cerr << "project dependency" << std::endl;
+
+      project_dependency(dependency_target, projected_target);
     }
     
-    if (! dependency_target.empty()) {
+    if (! permutation_target.empty()) {
+      dependency_source.resize(source_size, - 1);
       projected_source.resize(source_size, - 1);
       
-      kuhn_munkres_assignment(scores_source, insert_dependency<dependency_type>(projected_source));
+      kuhn_munkres_assignment(scores_source, insert_dependency<dependency_type>(dependency_source));
+      
+      project_dependency(dependency_source, projected_source);
     }
+  }
+
+  size_type project_permutation(const dependency_type& permutation, dependency_type& dependency)
+  {
+    const size_type size = permutation.size();
+
+    dependency.resize(size);
+
+    if (size == 1) {
+      dependency.front() = 0;
+      return 1;
+    }
+    
+    assigned.clear();
+    assigned.resize(size, false);
+
+    size_type leaf = size_type(-1);
+    
+    for (size_type pos = 0; pos != size; ++ pos) {
+      if (permutation[pos] >= size)
+	throw std::runtime_error("invalid permutation: out of range");
+      
+      if (assigned[permutation[pos]])
+	throw std::runtime_error("invalid permutation: duplicates");
+      
+      assigned[permutation[pos]] = true;
+      
+      if (permutation[pos] == size - 1)
+	leaf = pos + 1;
+      
+      if (! permutation[pos]) continue;
+      
+      dependency_type::const_iterator iter = std::find(permutation.begin(), permutation.end(), permutation[pos] - 1);
+      if (iter == permutation.end())
+	throw std::runtime_error("invalid permutation: no previous index?");
+      
+      dependency[pos] = (iter - permutation.begin()) + 1;
+    }
+    
+    return leaf;
+  }
+
+  void project_dependency(const dependency_type& dependency, dependency_type& permutation)
+  {
+    const size_type size = dependency.size();
+    
+    permutation.resize(size);
+    
+    if (size == 1) {
+      permutation.front() = 0;
+      return;
+    }
+
+    std::cerr << "dependency: " << dependency << std::endl;
+    
+    dependency_type::const_iterator diter_begin = dependency.begin();
+    dependency_type::const_iterator diter_end   = dependency.end();
+    
+    size_type pos_head = 0;
+    for (size_type i = 0; i != size; ++ i) {
+      dependency_type::const_iterator diter = std::find(diter_begin, diter_end, pos_head);
+      if (diter == diter_end)
+	throw std::runtime_error("no head?");
+      
+      const size_type pos_dep = (diter - diter_begin) + 1;
+      
+      std::cerr << "pos-dep: " << pos_dep << std::endl;
+
+      permutation[pos_dep - 1] = i;
+      pos_head = pos_dep;
+    }
+
+    std::cerr << "permutation: " << permutation << std::endl;
+    
   }
 
   void shrink()
@@ -2124,7 +2204,9 @@ struct PermutationHMM : public ViterbiBase
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
 
-  assigned_type assigned;
+  assigned_type   assigned;
+  dependency_type dependency_source;
+  dependency_type dependency_target;
 };
 
 
