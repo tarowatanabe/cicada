@@ -130,7 +130,7 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("no target side dependency");
     
     if (int(hybrid_mode) + degree2_mode + mst_mode + permutation_mode > 1)
-      throw std::runtime_error("you cannot specify both of Hybrid and Degree2 dependency, permutation parsing");
+      throw std::runtime_error("you cannot specify both of Hybrid, Degree2 and MST dependency, permutation parsing");
     
     if (int(hybrid_mode) + degree2_mode + mst_mode + permutation_mode == 0)
       hybrid_mode = true;

@@ -46,6 +46,7 @@ bool max_match_mode = false;
 bool permutation_mode = false;
 bool hybrid_mode = false;
 bool degree2_mode = false;
+bool mst_mode = false;
 bool single_root_mode = false;
 
 // parameter...
@@ -98,10 +99,10 @@ int main(int argc, char ** argv)
       if (dependency_target_file != "-" && ! boost::filesystem::exists(dependency_target_file))
 	throw std::runtime_error("no target side dependency");
     
-    if (int(hybrid_mode) + degree2_mode + permutation_mode > 1)
-      throw std::runtime_error("you cannot specify both of Hybrid and Degree2 dependency, permutation parsing");
+    if (int(hybrid_mode) + degree2_mode + mst_mode + permutation_mode > 1)
+      throw std::runtime_error("you cannot specify both of Hybrid, Degree2 and MST dependency, permutation parsing");
     
-    if (int(hybrid_mode) + degree2_mode + permutation_mode == 0)
+    if (int(hybrid_mode) + degree2_mode + mst_mode + permutation_mode == 0)
       hybrid_mode = true;
 
     threads = utils::bithack::max(threads, 1);
@@ -198,6 +199,14 @@ int main(int argc, char ** argv)
 	  project_dependency<DependencyDegree2SingleRootModel1>(ttable_source_target, ttable_target_source);
 	else
 	  project_dependency<DependencyDegree2Model1>(ttable_source_target, ttable_target_source);
+      } else if (mst_mode) {
+	if (debug)
+	  std::cerr << "MST non-projective dependency" << std::endl;
+	
+	if (single_root_mode)
+	  project_dependency<DependencyMSTSingleRootModel1>(ttable_source_target, ttable_target_source);
+	else
+	  project_dependency<DependencyMSTModel1>(ttable_source_target, ttable_target_source);
       } else if (permutation_mode) {
 	if (debug)
 	  std::cerr << "permutation" << std::endl;
@@ -1569,6 +1578,7 @@ void options(int argc, char** argv)
     ("permutation", po::bool_switch(&permutation_mode), "permutation")
     ("hybrid",      po::bool_switch(&hybrid_mode),      "hybrid projective dependency parsing")
     ("degree2",     po::bool_switch(&degree2_mode),     "degree2 non-projective dependency parsing")
+    ("mst",         po::bool_switch(&mst_mode),         "MST non-projective dependency parsing")
     ("single-root", po::bool_switch(&single_root_mode), "single root dependency")
     
     ("p0",             po::value<double>(&p0)->default_value(p0),                         "parameter for NULL alignment")
