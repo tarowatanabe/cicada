@@ -13,7 +13,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/adjacency_matrix.hpp>
 
-#include <cicada/cicada/optimize/edmonds_optimum_branching.hpp>
+#include <cicada/optimize/edmonds_optimum_branching.hpp>
 
 #include <utils/mathop.hpp>
 
@@ -103,12 +103,12 @@ namespace cicada
 
 	double score = 0.0;
       
-	edmonds_optimum_branching<true, true, true>(graph,
-						    vertex_indices,
-						    weights,
-						    vertices.begin(),
-						    vertices.begin() + 1,
-						    insert_align_type<Vector>(graph, viterbi, score));
+	::edmonds_optimum_branching<true, true, true>(graph,
+						      vertex_indices,
+						      weights,
+						      vertices.begin(),
+						      vertices.begin() + 1,
+						      insert_align_type<Vector>(graph, viterbi, score));
       
 	return score;
       }
@@ -160,12 +160,12 @@ namespace cicada
 
 	double score = sum_weights;
       
-	edmonds_optimum_branching<true, true, true>(graph,
-						    vertex_indices,
-						    weights,
-						    vertices.begin(),
-						    vertices.begin() + 1,
-						    insert_align_type<Vector>(graph, viterbi, score));
+	::edmonds_optimum_branching<true, true, true>(graph,
+						      vertex_indices,
+						      weights,
+						      vertices.begin(),
+						      vertices.begin() + 1,
+						      insert_align_type<Vector>(graph, viterbi, score));
       
 	return score;
       }

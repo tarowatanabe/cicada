@@ -19,6 +19,7 @@
 #include "itg_alignment.hpp"
 #include "dependency_hybrid.hpp"
 #include "dependency_degree2.hpp"
+#include "dependency_mst.hpp"
 
 struct LearnHMM : public LearnBase
 {
