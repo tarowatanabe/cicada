@@ -2041,7 +2041,7 @@ typedef __DependencyModel1Base<DependencyHybrid>            DependencyHybridMode
 typedef __DependencyModel1Base<DependencyHybridSingleRoot>  DependencyHybridSingleRootModel1;
 typedef __DependencyModel1Base<DependencyDegree2>           DependencyDegree2Model1;
 typedef __DependencyModel1Base<DependencyDegree2SingleRoot> DependencyDegree2SingleRootModel1;
-typedef __DependencyModel1Base<DependencyMST>               DependencyMSTModel1
+typedef __DependencyModel1Base<DependencyMST>               DependencyMSTModel1;
 typedef __DependencyModel1Base<DependencyMSTSingleRoot>     DependencyMSTSingleRootModel1;
 
 struct PermutationModel1 : public ViterbiBase
