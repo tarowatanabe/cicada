@@ -1907,6 +1907,8 @@ struct PermutationHMM : public ViterbiBase
   typedef utils::vector2<double, std::allocator<double> > matrix_type;
   typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
+
+  typedef std::vector<bool, std::allocator<bool > > assigned_type;
   
   PermutationHMM(const ttable_type& __ttable_source_target,
 		 const ttable_type& __ttable_target_source,
@@ -1956,8 +1958,22 @@ struct PermutationHMM : public ViterbiBase
       scores_target.reserve(target_size + 1, target_size + 1);
       scores_target.resize(target_size + 1, target_size + 1, lowest);
       
+      // checking...
+      assigned.clear();
+      assigned.resize(source_size, false);
+      
+      for (size_type src = 0; src != dependency_source.size(); ++ src) {
+	if (dependency_source[src] >= source_size)
+	  throw std::runtime_error("invalid permutation: out of range");
+	
+	if (assigned[dependency_source[src]])
+	  throw std::runtime_error("invalid permutation: duplicates");
+	
+	assigned[dependency_source[src]] = true;
+      }
+      
       // we will compute the score matrix...
-      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
+      for (size_type trg_head = 1; trg_head != target_size; ++ trg_head)
 	for (size_type trg_dep = 1; trg_dep <= target_size; ++ trg_dep)
 	  if (trg_head != trg_dep)
 	    for (size_type src = 0; src != dependency_source.size(); ++ src) 
@@ -1994,8 +2010,22 @@ struct PermutationHMM : public ViterbiBase
       scores_source.reserve(source_size + 1, source_size + 1);
       scores_source.resize(source_size + 1, source_size + 1, lowest);
       
+      // checking...
+      assigned.clear();
+      assigned.resize(target_size, false);
+      
+      for (size_type trg = 0; trg != dependency_target.size(); ++ trg) {
+	if (dependency_target[trg] >= target_size)
+	  throw std::runtime_error("invalid permutation: out of range");
+	
+	if (assigned[dependency_target[trg]])
+	  throw std::runtime_error("invalid permutation: duplicates");
+	
+	assigned[dependency_target[trg]] = true;
+      }
+      
       // we will compute the score matrix...
-      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
+      for (size_type src_head = 1; src_head != source_size; ++ src_head)
 	for (size_type src_dep = 1; src_dep <= source_size; ++ src_dep)
 	  if (src_head != src_dep)
 	    for (size_type trg = 0; trg != dependency_target.size(); ++ trg)
@@ -2093,6 +2123,8 @@ struct PermutationHMM : public ViterbiBase
   
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
+
+  assigned_type assigned;
 };
 
 

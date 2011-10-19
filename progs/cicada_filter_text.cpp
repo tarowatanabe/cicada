@@ -23,6 +23,7 @@
 
 #include <cicada/vocab.hpp>
 #include <cicada/stemmer.hpp>
+#include <cicada/dependency.hpp>
 
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
@@ -31,7 +32,9 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
 
-typedef cicada::Vocab     vocab_type;
+typedef cicada::Vocab      vocab_type;
+typedef cicada::Dependency dependency_type;
+typedef dependency_type    permutation_type;
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -86,7 +89,7 @@ struct sentence_generator : boost::spirit::karma::grammar<Iterator, sentence_typ
 
 
 path_set_type input_files;
-path_type list_file;
+path_set_type permutation_files;
 path_type output_file = "-";
 
 std::string stemmer_spec;
@@ -96,7 +99,6 @@ int max_length = 0;
 
 bool add_bos_eos = false;
 
-void read_list(const path_type& path, path_set_type& files);
 void options(int argc, char** argv);
 
 template <typename Iterator, typename Grammar>
@@ -126,10 +128,12 @@ int main(int argc, char** argv)
 
     cicada::Stemmer* stemmer = (! stemmer_spec.empty() ? &cicada::Stemmer::create(stemmer_spec) : 0);
     
-    read_list(list_file, input_files);
-
     if (input_files.empty())
       input_files.push_back("-");
+    
+    if (! permutation_files.empty())
+      if (permutation_files.size() != input_files.size())
+	throw std::runtime_error("# of permutation files does not match");
     
     const std::string bos = static_cast<const std::string&>(vocab_type::BOS);
     const std::string eos = static_cast<const std::string&>(vocab_type::EOS);
@@ -137,7 +141,7 @@ int main(int argc, char** argv)
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
-
+    
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
     typedef boost::spirit::istream_iterator iiter_type;
@@ -146,41 +150,112 @@ int main(int argc, char** argv)
     sentence_parser<iiter_type>    parser;
     sentence_generator<oiter_type> generator;
     non_terminal_parser<std::string::const_iterator> non_terminal_parser;
+    
+    if (! permutation_files.empty()) {
+      permutation_type permutation;
+      sentence_type   sentence;
+      sentence_type   sentence_permuted;
 
-    for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
+      std::vector<bool, std::allocator<bool> > assigned;
       
-      iiter_type iter(is);
-      iiter_type iter_end;
-      
-      sentence_type sentence;
-      
-      for (size_t line_no = 0; iter != iter_end; ++ line_no) {
-	sentence.clear();
+      for (size_t i = 0; i != input_files.size(); ++ i) {
+	utils::compress_istream ps(permutation_files[i], 1024 * 1024);
+	utils::compress_istream is(input_files[i], 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
-	  throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	iiter_type iter(is);
+	iiter_type iter_end;
 	
-	if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
-	  throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
+	  sentence.clear();
 	
-	if (sentence.size() == 0) continue;
-	if (max_length > 0 && sentence.size() > max_length) continue;
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  
+	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+
+	  ps >> permutation;
+	  if (! ps)
+	    throw std::runtime_error("no permutation?");
+	  
+	  if (sentence.size() != permutation.size())
+	    throw std::runtime_error("sentence size do not match with permutation size");
+	  
+	  if (sentence.size() == 0) continue;
+	  if (max_length > 0 && sentence.size() > max_length) continue;
+	  
+	  // perform permutation
+	  sentence_permuted.resize(sentence.size());
+	  
+	  assigned.clear();
+	  assigned.resize(sentence.size(), false);
+	  
+	  for (size_t pos = 0; pos != sentence.size(); ++ pos) {
+	    if (permutation[pos] >= sentence.size())
+	      throw std::runtime_error("invalid permutation: out of range");
+	    
+	    if (assigned[permutation[pos]])
+	      throw std::runtime_error("invalid permutation: duplicates");
+	    
+	    assigned[permutation[pos]] = true;
+	    
+	    sentence_permuted[pos] = sentence[permutation[pos]];
+	  }
+	  
+	  sentence.swap(sentence_permuted);
+	  
+	  if (stemmer) {
+	    sentence_type::iterator siter_end = sentence.end();
+	    for (sentence_type::iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+	      *siter = stemmer->operator()(*siter);
+	  }
 	
-	if (stemmer) {
-	  sentence_type::iterator siter_end = sentence.end();
-	  for (sentence_type::iterator siter = sentence.begin(); siter != siter_end; ++ siter)
-	    *siter = stemmer->operator()(*siter);
+	  if (add_bos_eos) {
+	    sentence.insert(sentence.begin(), bos);
+	    sentence.push_back(eos);
+	  }
+	  
+	  if (! boost::spirit::karma::generate(oiter_type(os), generator, sentence))
+	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	}
+      }
+    } else {
+      for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
+	utils::compress_istream is(*fiter, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+      
+	iiter_type iter(is);
+	iiter_type iter_end;
+      
+	sentence_type sentence;
+      
+	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
+	  sentence.clear();
 	
-	if (add_bos_eos) {
-	  sentence.insert(sentence.begin(), bos);
-	  sentence.push_back(eos);
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	
+	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	
+	  if (sentence.size() == 0) continue;
+	  if (max_length > 0 && sentence.size() > max_length) continue;
+	
+	  if (stemmer) {
+	    sentence_type::iterator siter_end = sentence.end();
+	    for (sentence_type::iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+	      *siter = stemmer->operator()(*siter);
+	  }
+	
+	  if (add_bos_eos) {
+	    sentence.insert(sentence.begin(), bos);
+	    sentence.push_back(eos);
+	  }
+	  
+	  if (! boost::spirit::karma::generate(oiter_type(os), generator, sentence))
+	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	}
-	
-	if (! boost::spirit::karma::generate(oiter_type(os), generator, sentence))
-	  throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
       }
     }
   }
@@ -191,22 +266,6 @@ int main(int argc, char** argv)
   return 0;
 }
 
-void read_list(const path_type& path, path_set_type& files)
-{
-  if (path.empty()) return;
-  if (path != "-" && ! boost::filesystem::exists(path))
-    throw std::runtime_error("no file? " + path.string());
-  
-  utils::compress_istream is(path);
-  std::string file;
-  while (std::getline(is, file)) {
-    if (file.empty()) continue;
-    if (! boost::filesystem::exists(file))
-      throw std::runtime_error("no file? " + file);
-    files.push_back(file);
-  }
-}
-
 
 void options(int argc, char** argv)
 {
@@ -214,9 +273,9 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<path_set_type>(&input_files)->multitoken(),           "input file(s)")
-    ("list",   po::value<path_type>(&list_file),                               "list file")
-    ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+    ("input",       po::value<path_set_type>(&input_files)->multitoken(),           "input file(s)")
+    ("permutation", po::value<path_set_type>(&permutation_files)->multitoken(),     "permutation file(s)")
+    ("output",      po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
     ("stemmer",      po::value<std::string>(&stemmer_spec), "stemmer")
     ("stemmer-list", po::bool_switch(&stemmer_list),        "list of stemmers")
