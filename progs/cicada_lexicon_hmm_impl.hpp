@@ -1965,10 +1965,7 @@ struct PermutationHMM : public ViterbiBase
       dependency_source.clear();
       dependency_source.resize(source_size, 0);
       
-      const size_type src_leaf = project_permutation(permutation_source, dependency_source);
-      
-      if (src_leaf == size_type(-1))
-	throw std::runtime_error("no leaf?");
+      project_permutation(permutation_source, dependency_source);
       
       // we will compute the score matrix...
       for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
@@ -1997,9 +1994,8 @@ struct PermutationHMM : public ViterbiBase
 	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	  }
       
-      // this is for the leaf...
       for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
-	scores_target(trg_head, 0) = scores(src_leaf, trg_head);
+	scores_target(trg_head, 0) = 0.0;
     }
     
     if (! permutation_target.empty()) {
@@ -2014,10 +2010,7 @@ struct PermutationHMM : public ViterbiBase
       dependency_target.clear();
       dependency_target.resize(target_size, 0);
       
-      const size_type trg_leaf = project_permutation(permutation_target, dependency_target);
-      
-      if (trg_leaf == size_type(-1))
-	throw std::runtime_error("no leaf?");
+      project_permutation(permutation_target, dependency_target);
       
       // we will compute the score matrix...
       for (size_type src_head = 1; src_head <= source_size; ++ src_head)
@@ -2046,9 +2039,8 @@ struct PermutationHMM : public ViterbiBase
 	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
 	  }
       
-      // this is for the leaf...
       for (size_type src_head = 1; src_head <= source_size; ++ src_head)
-	scores_source(src_head, 0) = scores(src_head, trg_leaf);
+	scores_source(src_head, 0) = 0.0;
     }
   }
   
@@ -2099,22 +2091,54 @@ struct PermutationHMM : public ViterbiBase
       scores_perm = scores_target;
       scores_mst = scores_target;
       
-      //std::cerr << "optimal dependency" << std::endl;
+      std::cerr << "optimal dependency" << std::endl;
       
       // we will perform dual decomposition!
       // we will minimize the loss...
-      double loss = std::numeric_limits<double>::infinity();
+      static const double inf = std::numeric_limits<double>::infinity();
+
+      double dual = inf;
       size_type epoch = 0;
       for (;;) {
 	kuhn_munkres_assignment(scores_perm, insert_dependency<dependency_type>(dependency_perm));
 	mst(scores_mst, dependency_mst);
 	
-	//std::cerr << "permutation: " << dependency_perm << std::endl;
-	//std::cerr << "mst: " << dependency_mst << std::endl;
+	std::cerr << "permutation: " << dependency_perm << std::endl;
+	std::cerr << "mst: " << dependency_mst << std::endl;
+
+	double dual_perm = 0.0;
+	double dual_mst = 0.0;
+	double primal_perm = 0.0;
+	double primal_mst = 0.0;
+	for (size_type i = 1; i <= target_size; ++ i) {
+	  dual_perm += scores_perm(dependency_perm[i - 1], i);
+	  dual_mst  += scores_mst(dependency_mst[i - 1], i);
+	  primal_perm += scores_target(dependency_perm[i - 1], i);
+	  primal_mst  += scores_target(dependency_mst[i - 1], i);
+	}
+
+	const double dual_curr = dual_perm + dual_mst;
+	const double primal_curr = primal_perm + primal_mst;
+	
+#if 1
+	std::cerr << "dual: " << dual_curr
+		  << " per: " << dual_perm
+		  << " mst: " << dual_mst << std::endl;
+	std::cerr << "primal: " << primal_curr
+		  << " per: " << primal_perm
+		  << " mst: " << primal_mst << std::endl;
+#endif
 	
 	//
 	// if either dependency_perm is sound, we will use the dependency_perm
 	//
+
+	// if equal, simply quit.
+	if (dependency_mst == dependency_perm) {
+	  dependency_target = dependency_mst;
+	  break;
+	}
+	
 	const bool sound_perm = is_permutation(dependency_perm);
 	const bool sound_mst  = is_permutation(dependency_mst);
 	
@@ -2141,37 +2165,27 @@ struct PermutationHMM : public ViterbiBase
 	  break;
 	}
 	
-	// if equal, simply quit.
-	if (dependency_mst == dependency_perm) {
-	  dependency_target = dependency_mst;
-	  break;
-	}
-	
-	double loss_curr = 0.0;
-	for (size_type i = 1; i <= target_size; ++ i) {
-	  loss_curr += scores_perm(dependency_perm[i - 1], i);
-	  loss_curr += scores_mst(dependency_mst[i - 1], i);
-	}
-	
-	//std::cerr << "loss: " << loss_curr << std::endl;
-	
+	//const double alpha = std::fabs(primal_perm - primal_mst) / (1.0 + epoch);
 	const double alpha = 1.0 / (1.0 + epoch);
 
 	for (size_type i = 1; i <= target_size; ++ i)
-	  for (size_type j = 0; j <= target_size; ++ j) {
-	    const int y = (dependency_perm[i - 1] == j);
-	    const int z = (dependency_mst[i - 1] == j);
-	    
-	    const double update = - alpha * (y - z);
-	    
-	    scores_perm(i, j) += update;
-	    scores_mst(i, j)  -= update;
-	  }
+	  for (size_type j = 0; j <= target_size; ++ j) 
+	    if (i != j) {
+	      const int y = (dependency_perm[i - 1] == j);
+	      const int z = (dependency_mst[i - 1] == j);
+	      
+	      const double update = - alpha * (y - z);
+	      
+	      scores_perm(i, j) += update;
+	      scores_mst(i, j)  -= update;
+	    }
 	
 	// increase time when dual increased..
-	//epoch += (loss_curr > loss);
-	loss = loss_curr;
+	//epoch += (dual_curr > dual);
+	dual = dual_curr;
       }
+      
+      std::cerr << "finished" << std::endl;
       
       //
       // we will fall-back to hill-climbing solution...
@@ -2193,7 +2207,7 @@ struct PermutationHMM : public ViterbiBase
     }
   }
 
-  size_type project_permutation(const dependency_type& permutation, dependency_type& dependency)
+  void project_permutation(const dependency_type& permutation, dependency_type& dependency)
   {
     const size_type size = permutation.size();
 
@@ -2201,14 +2215,12 @@ struct PermutationHMM : public ViterbiBase
 
     if (size == 1) {
       dependency.front() = 0;
-      return 1;
+      return;
     }
     
     assigned.clear();
     assigned.resize(size, false);
 
-    size_type leaf = size_type(-1);
-    
     for (size_type pos = 0; pos != size; ++ pos) {
       if (permutation[pos] >= size)
 	throw std::runtime_error("invalid permutation: out of range");
@@ -2218,9 +2230,6 @@ struct PermutationHMM : public ViterbiBase
       
       assigned[permutation[pos]] = true;
       
-      if (permutation[pos] == size - 1)
-	leaf = pos + 1;
-      
       if (! permutation[pos]) continue;
       
       dependency_type::const_iterator iter = std::find(permutation.begin(), permutation.end(), permutation[pos] - 1);
@@ -2229,8 +2238,6 @@ struct PermutationHMM : public ViterbiBase
       
       dependency[pos] = (iter - permutation.begin()) + 1;
     }
-    
-    return leaf;
   }
 
   bool is_permutation(const dependency_type& dependency)
@@ -2317,7 +2324,7 @@ struct PermutationHMM : public ViterbiBase
   dependency_type dependency_mst;
   dependency_type dependency_perm;
   
-  DependencyMST   mst;
+  DependencyMSTSingleRoot mst;
 };
 
 
