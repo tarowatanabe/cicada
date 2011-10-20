@@ -2079,7 +2079,7 @@ struct PermutationHMM : public ViterbiBase
 		  dependency_type& projected_source,
 		  dependency_type& projected_target)
   {
-    std::cerr << "posterior" << std::endl;
+    //std::cerr << "posterior" << std::endl;
     
     operator()(source, target, permutation_source, permutation_target);
     
@@ -2093,11 +2093,88 @@ struct PermutationHMM : public ViterbiBase
       dependency_target.resize(target_size, - 1);
       projected_target.resize(target_size, - 1);
       
-      std::cerr << "optimal dependency" << std::endl;
+      dependency_perm.resize(target_size);
+      dependency_mst.resize(target_size);
 
-      kuhn_munkres_assignment(scores_target, insert_dependency<dependency_type>(dependency_target));
+      scores_perm = scores_target;
+      scores_mst = scores_target;
+      
+      //std::cerr << "optimal dependency" << std::endl;
+      
+      // we will perform dual decomposition!
+      // we will minimize the loss...
+      double loss = std::numeric_limits<double>::infinity();
+      size_type epoch = 0;
+      for (;;) {
+	kuhn_munkres_assignment(scores_perm, insert_dependency<dependency_type>(dependency_perm));
+	mst(scores_mst, dependency_mst);
+	
+	//std::cerr << "permutation: " << dependency_perm << std::endl;
+	//std::cerr << "mst: " << dependency_mst << std::endl;
+	
+	//
+	// if either dependency_perm is sound, we will use the dependency_perm
+	//
+	const bool sound_perm = is_permutation(dependency_perm);
+	const bool sound_mst  = is_permutation(dependency_mst);
+	
+	if (sound_perm || sound_mst) {
+	  if (sound_perm && sound_mst) {
+	    // find the maximum
+	    double score_perm = 0.0;
+	    double score_mst = 0.0;
+	    
+	    for (size_type i = 1; i <= target_size; ++ i) {
+	      score_perm += scores_target(dependency_perm[i - 1], i);
+	      score_mst  += scores_target(dependency_mst[i - 1], i);
+	    }
+	    
+	    if (score_perm > score_mst)
+	      dependency_target = dependency_perm;
+	    else
+	      dependency_target = dependency_mst;
+	  } else if (sound_perm)
+	    dependency_target = dependency_perm;
+	  else
+	    dependency_target = dependency_mst;
+	  
+	  break;
+	}
+	
+	// if equal, simply quit.
+	if (dependency_mst == dependency_perm) {
+	  dependency_target = dependency_mst;
+	  break;
+	}
+	
+	double loss_curr = 0.0;
+	for (size_type i = 1; i <= target_size; ++ i) {
+	  loss_curr += scores_perm(dependency_perm[i - 1], i);
+	  loss_curr += scores_mst(dependency_mst[i - 1], i);
+	}
+	
+	//std::cerr << "loss: " << loss_curr << std::endl;
+	
+	const double alpha = 1.0 / (1.0 + epoch);
 
-      std::cerr << "project dependency" << std::endl;
+	for (size_type i = 1; i <= target_size; ++ i)
+	  for (size_type j = 0; j <= target_size; ++ j) {
+	    const int y = (dependency_perm[i - 1] == j);
+	    const int z = (dependency_mst[i - 1] == j);
+	    
+	    const double update = - alpha * (y - z);
+	    
+	    scores_perm(i, j) += update;
+	    scores_mst(i, j)  -= update;
+	  }
+	
+	// increase time when dual increased..
+	//epoch += (loss_curr > loss);
+	loss = loss_curr;
+      }
+      
+      
+      //std::cerr << "project dependency" << std::endl;
 
       project_dependency(dependency_target, projected_target);
     }
@@ -2152,6 +2229,25 @@ struct PermutationHMM : public ViterbiBase
     return leaf;
   }
 
+  bool is_permutation(const dependency_type& dependency)
+  {
+    const size_type size = dependency.size();
+    
+    if (size <= 1) return true;
+    
+    dependency_type::const_iterator diter_begin = dependency.begin();
+    dependency_type::const_iterator diter_end   = dependency.end();
+    
+    size_type pos_head = 0;
+    for (size_type i = 0; i != size; ++ i) {
+      dependency_type::const_iterator diter = std::find(diter_begin, diter_end, pos_head);
+      if (diter == diter_end)
+	return false;
+      pos_head = (diter - diter_begin) + 1;
+    }
+    return true;
+  }
+
   void project_dependency(const dependency_type& dependency, dependency_type& permutation)
   {
     const size_type size = dependency.size();
@@ -2163,7 +2259,7 @@ struct PermutationHMM : public ViterbiBase
       return;
     }
 
-    std::cerr << "dependency: " << dependency << std::endl;
+    //std::cerr << "dependency: " << dependency << std::endl;
     
     dependency_type::const_iterator diter_begin = dependency.begin();
     dependency_type::const_iterator diter_end   = dependency.end();
@@ -2176,13 +2272,13 @@ struct PermutationHMM : public ViterbiBase
       
       const size_type pos_dep = (diter - diter_begin) + 1;
       
-      std::cerr << "pos-dep: " << pos_dep << std::endl;
+      //std::cerr << "pos-dep: " << pos_dep << std::endl;
 
       permutation[pos_dep - 1] = i;
       pos_head = pos_dep;
     }
 
-    std::cerr << "permutation: " << permutation << std::endl;
+    //std::cerr << "permutation: " << permutation << std::endl;
     
   }
 
@@ -2210,6 +2306,14 @@ struct PermutationHMM : public ViterbiBase
   assigned_type   assigned;
   dependency_type dependency_source;
   dependency_type dependency_target;
+  
+  matrix_type scores_perm;
+  matrix_type scores_mst;
+
+  dependency_type dependency_mst;
+  dependency_type dependency_perm;
+  
+  DependencyMST   mst;
 };
 
 
