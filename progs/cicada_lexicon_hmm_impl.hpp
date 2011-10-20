@@ -2173,6 +2173,10 @@ struct PermutationHMM : public ViterbiBase
 	loss = loss_curr;
       }
       
+      //
+      // we will fall-back to hill-climbing solution...
+      //
+      
       
       //std::cerr << "project dependency" << std::endl;
 
