@@ -2085,13 +2085,14 @@ struct PermutationHMM : public ViterbiBase
       dependency_target.resize(target_size, - 1);
       projected_target.resize(target_size, - 1);
       
-      dependency_perm.resize(target_size);
+      dependency_per.resize(target_size);
       dependency_mst.resize(target_size);
-
-      scores_perm = scores_target;
+      
+      scores_per = scores_target;
       scores_mst = scores_target;
       
       std::cerr << "optimal dependency" << std::endl;
+      
       
       // we will perform dual decomposition!
       // we will minimize the loss...
@@ -2100,84 +2101,83 @@ struct PermutationHMM : public ViterbiBase
       double dual = inf;
       size_type epoch = 0;
       for (;;) {
-	kuhn_munkres_assignment(scores_perm, insert_dependency<dependency_type>(dependency_perm));
+	kuhn_munkres_assignment(scores_per, insert_dependency<dependency_type>(dependency_per));
 	mst(scores_mst, dependency_mst);
 	
-	std::cerr << "permutation: " << dependency_perm << std::endl;
+	std::cerr << "permutation: " << dependency_per << std::endl;
 	std::cerr << "mst: " << dependency_mst << std::endl;
 
-	double dual_perm = 0.0;
+	double dual_per = 0.0;
 	double dual_mst = 0.0;
-	double primal_perm = 0.0;
+	double primal_per = 0.0;
 	double primal_mst = 0.0;
 	for (size_type i = 1; i <= target_size; ++ i) {
-	  dual_perm += scores_perm(dependency_perm[i - 1], i);
-	  dual_mst  += scores_mst(dependency_mst[i - 1], i);
-	  primal_perm += scores_target(dependency_perm[i - 1], i);
-	  primal_mst  += scores_target(dependency_mst[i - 1], i);
+	  dual_per += scores_per(dependency_per[i - 1], i);
+	  dual_mst += scores_mst(dependency_mst[i - 1], i);
+	  primal_per += scores_target(dependency_per[i - 1], i);
+	  primal_mst += scores_target(dependency_mst[i - 1], i);
 	}
 
-	const double dual_curr = dual_perm + dual_mst;
-	const double primal_curr = primal_perm + primal_mst;
+	const double dual_curr = dual_per + dual_mst;
+	const double primal_curr = primal_per + primal_mst;
 	
 #if 1
 	std::cerr << "dual: " << dual_curr
-		  << " per: " << dual_perm
+		  << " per: " << dual_per
 		  << " mst: " << dual_mst << std::endl;
 	std::cerr << "primal: " << primal_curr
-		  << " per: " << primal_perm
+		  << " per: " << primal_per
 		  << " mst: " << primal_mst << std::endl;
 #endif
 	
 	//
-	// if either dependency_perm is sound, we will use the dependency_perm
+	// if either dependency_per is sound, we will use the dependency_per
 	//
 
 	// if equal, simply quit.
-	if (dependency_mst == dependency_perm) {
+	if (dependency_mst == dependency_per) {
 	  dependency_target = dependency_mst;
 	  break;
 	}
 	
-	const bool sound_perm = is_permutation(dependency_perm);
-	const bool sound_mst  = is_permutation(dependency_mst);
+	const bool sound_per = is_permutation(dependency_per);
+	const bool sound_mst = is_permutation(dependency_mst);
 	
-	if (sound_perm || sound_mst) {
-	  if (sound_perm && sound_mst) {
+	if (sound_per || sound_mst) {
+	  if (sound_per && sound_mst) {
 	    // find the maximum
-	    double score_perm = 0.0;
+	    double score_per = 0.0;
 	    double score_mst = 0.0;
 	    
 	    for (size_type i = 1; i <= target_size; ++ i) {
-	      score_perm += scores_target(dependency_perm[i - 1], i);
-	      score_mst  += scores_target(dependency_mst[i - 1], i);
+	      score_per += scores_target(dependency_per[i - 1], i);
+	      score_mst += scores_target(dependency_mst[i - 1], i);
 	    }
 	    
-	    if (score_perm > score_mst)
-	      dependency_target = dependency_perm;
+	    if (score_per > score_mst)
+	      dependency_target = dependency_per;
 	    else
 	      dependency_target = dependency_mst;
-	  } else if (sound_perm)
-	    dependency_target = dependency_perm;
+	  } else if (sound_per)
+	    dependency_target = dependency_per;
 	  else
 	    dependency_target = dependency_mst;
 	  
 	  break;
 	}
 	
-	//const double alpha = std::fabs(primal_perm - primal_mst) / (1.0 + epoch);
-	const double alpha = 1.0 / (1.0 + epoch);
-
+	const double alpha = std::fabs(primal_mst - primal_per) / (1.0 + epoch);
+	
 	for (size_type i = 1; i <= target_size; ++ i)
 	  for (size_type j = 0; j <= target_size; ++ j) 
 	    if (i != j) {
-	      const int y = (dependency_perm[i - 1] == j);
-	      const int z = (dependency_mst[i - 1] == j);
+	      const int y = (dependency_mst[i - 1] == j);
+	      const int z = (dependency_per[i - 1] == j);
 	      
 	      const double update = - alpha * (y - z);
 	      
-	      scores_perm(i, j) += update;
-	      scores_mst(i, j)  -= update;
+	      scores_mst(i, j) += update;
+	      scores_per(i, j) -= update;
 	    }
 	
 	// increase time when dual increased..
@@ -2318,11 +2318,11 @@ struct PermutationHMM : public ViterbiBase
   dependency_type dependency_source;
   dependency_type dependency_target;
   
-  matrix_type scores_perm;
+  matrix_type scores_per;
   matrix_type scores_mst;
 
   dependency_type dependency_mst;
-  dependency_type dependency_perm;
+  dependency_type dependency_per;
   
   DependencyMSTSingleRoot mst;
 };
