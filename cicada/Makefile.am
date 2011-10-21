@@ -99,7 +99,10 @@ head/collins_modified.cpp
 libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_optimize_HEADERS = \
+optimize/edmonds_optimum_branching.hpp \
+optimize/edmonds_optimum_branching_impl.hpp \
 optimize/line_search.hpp \
+optimize/mst.hpp \
 optimize/powell.hpp \
 optimize/qp_dcd.hpp \
 optimize/qp_simplex.hpp \
