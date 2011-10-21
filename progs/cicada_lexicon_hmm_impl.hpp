@@ -1996,8 +1996,10 @@ struct PermutationHMM : public ViterbiBase
 	    scores_target(trg_head, trg_dep) = utils::mathop::logsum(scores_target(trg_head, trg_dep), score);
 	  }
       
+#if 0
       for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
 	scores_target(trg_head, 0) = scores(src_leaf, trg_head);
+#endif
     }
     
     if (! permutation_target.empty()) {
@@ -2042,9 +2044,10 @@ struct PermutationHMM : public ViterbiBase
 	    
 	    scores_source(src_head, src_dep) = utils::mathop::logsum(scores_source(src_head, src_dep), score);
 	  }
-      
+#if 0
       for (size_type src_head = 1; src_head <= source_size; ++ src_head)
 	scores_source(src_head, 0) = scores(src_head, trg_leaf);
+#endif
     }
   }
   
@@ -2095,7 +2098,7 @@ struct PermutationHMM : public ViterbiBase
       scores_per = scores_target;
       scores_mst = scores_target;
       
-      //std::cerr << "optimal dependency" << std::endl;
+      std::cerr << "optimal dependency" << std::endl;
       
       // we will perform dual decomposition!
       // we will minimize the loss...
@@ -2103,12 +2106,15 @@ struct PermutationHMM : public ViterbiBase
 
       double dual = inf;
       size_type epoch = 0;
+      
+      // 50 iteratins will be fine...?
+      bool converged = false;
       for (;;) {
 	kuhn_munkres_assignment(scores_per, insert_dependency<dependency_type>(dependency_per));
 	mst(scores_mst, dependency_mst);
 	
-	//std::cerr << "permutation: " << dependency_per << std::endl;
-	//std::cerr << "mst: " << dependency_mst << std::endl;
+	std::cerr << "permutation: " << dependency_per << std::endl;
+	std::cerr << "mst: " << dependency_mst << std::endl;
 
 	double dual_per = 0.0;
 	double dual_mst = 0.0;
@@ -2132,7 +2138,7 @@ struct PermutationHMM : public ViterbiBase
 	const double dual_curr = dual_per + dual_mst;
 	const double primal_curr = primal_per + primal_mst;
 	
-#if 0
+#if 1
 	std::cerr << "dual: " << dual_curr
 		  << " per: " << dual_per
 		  << " mst: " << dual_mst << std::endl;
@@ -2148,6 +2154,7 @@ struct PermutationHMM : public ViterbiBase
 	// if equal, simply quit.
 	if (dependency_mst == dependency_per) {
 	  dependency_target = dependency_mst;
+	  converged = true;
 	  break;
 	}
 	
@@ -2174,6 +2181,7 @@ struct PermutationHMM : public ViterbiBase
 	  else
 	    dependency_target = dependency_mst;
 	  
+	  converged = true;
 	  break;
 	}
 	
@@ -2196,11 +2204,15 @@ struct PermutationHMM : public ViterbiBase
 	dual = dual_curr;
       }
       
-      //std::cerr << "finished" << std::endl;
+      std::cerr << "finished" << std::endl;
       
-      //
-      // we will fall-back to hill-climbing solution...
-      //
+      
+      if (! converged) {
+	//
+	// we will fall-back to hill-climbing solution, starting from the permutation solution... HOW?
+	//
+	
+      }
       
       
       //std::cerr << "project dependency" << std::endl;
