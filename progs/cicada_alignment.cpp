@@ -1169,15 +1169,15 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
   queue_alignment_ptr_set_type queues(threads);
   queue_bitext_type            queue_bitext;
 
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(os, queues)));
+  
   boost::thread_group mappers;
   for (int i = 0; i != threads; ++ i) {
     queues[i].reset(new queue_alignment_type(1024));
     mappers.add_thread(new boost::thread(mapper_type(queue_bitext, *queues[i])));
   }
-  
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(os, queues)));
-  
+    
   alignment_parser<iter_type> parser_alignment;
   bitext_giza_parser<iter_type> parser_giza;
   
@@ -1623,8 +1623,72 @@ struct ReducerPosterior
 // input is posterior probability matrix...
 void process_posterior(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os)
 {
+  // actual implementation!
+  typedef MapReducePosterior map_reduce_type;
+  
+  typedef map_reduce_type::posterior_pair_type  posterior_pair_type;
+  typedef map_reduce_type::id_alignment_type    id_alignment_type;
+  
+  typedef map_reduce_type::queue_posterior_type queue_posterior_type;
+  typedef map_reduce_type::queue_alignment_type queue_alignment_type;
   
   
+  typedef MapperPosterior  mapper_type;
+  typedef ReducerPosterior reducer_type;
+  
+  queue_posterior_type queue_posterior(threads * 4096);
+  queue_alignment_type queue_alignment;
+  
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(os, queue_alignment)));
+  
+  boost::thread_group mapper;
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(mapper_type(queue_posterior, queue_alignment)));
+  
+  posterior_pair_type posteriors;
+  size_t id = 0;
+
+  while (is_src_trg && is_trg_src && (! is_src || *is_src) && (! is_trg || *is_trg)) {
+    std::getline(is_src_trg, posteriors.source_target);
+    std::getline(is_trg_src, posteriors.target_source);
+    
+    if (is_src)
+      std::getline(*is_src, posteriors.span_source);
+    if (is_trg)
+      std::getline(*is_trg, posteriors.span_target);
+    
+    if (! is_src_trg || ! is_trg_src || (is_src && ! *is_src) || (is_trg && ! *is_trg)) break;
+    
+    posteriors.id = id;
+    queue_posterior.push_swap(posteriors);
+    ++ id;
+
+    if (debug) {
+      if (id % 10000 == 0)
+	std::cerr << '.';
+      if (id % 1000000 == 0)
+	std::cerr << '\n';
+    }
+  }
+  
+  if (debug && id >= 10000)
+    std::cerr << std::endl;
+  if (debug)
+    std::cerr << "# of bitexts: " << id << std::endl;
+  
+  if (is_src_trg || is_trg_src || (is_src && *is_src) || (is_trg && *is_trg))
+    throw std::runtime_error("# of lines do not match");
+  
+  for (int i = 0; i != threads; ++ i) {
+    posteriors.clear();
+    queue_posterior.push_swap(posteriors);
+  }
+  
+  mapper.join_all();
+  
+  queue_alignment.push(id_alignment_type(size_t(-1), alignment_type()));
+  reducer.join_all();
 }
 
 void options(int argc, char** argv)
