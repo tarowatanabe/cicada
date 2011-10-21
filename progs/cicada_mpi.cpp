@@ -400,6 +400,8 @@ struct MapStdout
 	  queue.push(std::make_pair(utils::lexical_cast<std::string>(id) + " ||| " + line, false));
 	
 	++ id;
+	// increment further to avoid size_t(-1) id assignment...
+	//id += (id == size_t(-1));
       }
     }
     
@@ -479,30 +481,41 @@ struct ReduceStdout
       if (buffer_id == id) {
 	os << buffer_tokenized;
 	dump = true;
+	
 	++ id;
+	//id += (id == id_type(-1));
       } else
 	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
       
-      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
 	os << iter->second;
 	dump = true;
 	maps.erase(iter ++);
+
+	++ id;
+	//id += (id == id_type(-1));
       }
       
       if (dump)
 	os << std::flush;
     }
     
-    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
       os << iter->second;
       maps.erase(iter ++);
+      
+      ++ id;
+      //id += (id == id_type(-1));
     }
     
     // we will do twice, in case we have wrap-around for id...!
     if (! maps.empty())
-      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
 	os << iter->second;
 	maps.erase(iter ++);
+	
+	++ id;
+	//id += (id == id_type(-1));
       }
     
     os << std::flush;

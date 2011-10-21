@@ -431,10 +431,12 @@ viterbi: compute viterbi tree\n\
       
       if (! qi::phrase_parse(iter, end, id_parser >> "|||", standard::space, data.id))
 	throw std::runtime_error("invalid id-prefixed format: " + line);
-    } else
+    } else {
       ++ data.id;
-
-
+      // increment further to avoid size_t(-1) id assignment....?
+      //data.id += (data.id == size_t(-1));
+    }
+    
     if (input_lattice && input_forest) {
       {
 	utils::resource start;
