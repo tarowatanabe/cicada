@@ -118,6 +118,7 @@ path_type input_file;
 path_type output_file = "-";
 
 bool posterior_mode = false;
+double posterior_threshold = 0.1;
 
 bool source_target_mode = false;
 bool target_source_mode = false;
@@ -1381,6 +1382,8 @@ struct MapperPosterior
 
     span_set_type span_source;
     span_set_type span_target;
+
+    alignment_type alignment;
     
     for (;;) {
       queue_posterior.pop_swap(posteriors);
@@ -1405,9 +1408,40 @@ struct MapperPosterior
       
       if (! posteriors.span_target.empty())
 	span_target.assign(posteriors.span_target);
+
+      if (matrix_source_target.size() <= 1 || matrix_target_source.size() <= 1) {
+	queue_alignment.push(id_alignment_type(posteriors.id, alignment_type()));
+	continue;
+      }
+
+      alignment.clear();
       
+      const size_t source_size = matrix_target_source.size() - 1;
+      const size_t target_size = matrix_source_target.size() - 1;
       
+      if (itg_mode) {
+	// itg
+	
+	
+	
+	
+      } else if (max_match_mode) {
+	// max-matching
+	
+	
+	
+      } else {
+	// simple thresholding...
+	for (size_t src = 1; src != matrix_target_source.size(); ++ src)
+	  for (size_t trg = 1; trg != matrix_source_target.size(); ++ trg) {
+	    const double score = utils::mathop::sqrt(matrix_target_source[src][trg] * matrix_source_target[trg][src]);
+	    
+	    if (score > posterior_threshold)
+	      alignment.push_back(std::make_pair(src - 1, trg - 1));
+	  }
+      }
       
+      queue_alignment.push(id_alignment_type(posteriors.id, alignment));
     }
   }
 };
@@ -1484,7 +1518,9 @@ void options(int argc, char** argv)
     ("input",         po::value<path_type>(&input_file),                      "input alignment")
     ("output",        po::value<path_type>(&output_file)->default_value("-"), "output alignment")
     
-    ("posterior", po::bool_switch(&posterior_mode), "alignment computation using posteriors")
+    ("posterior",           po::bool_switch(&posterior_mode),                                            "alignment computation using posteriors")
+    ("posterior-threshold", po::value<double>(&posterior_threshold)->default_value(posterior_threshold), "threshold for posterior")
+    
     
     ("f2e", po::bool_switch(&source_target_mode), "source target")
     ("e2f", po::bool_switch(&target_source_mode), "target source")
