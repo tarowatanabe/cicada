@@ -1660,6 +1660,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
       posterior_combined.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty()) {
+	
 	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
 	
 	// merging...
@@ -1678,7 +1679,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
 	for (size_type src = 1; src <= source_size; ++ src)
 	  posterior_combined.matrix(0, src) = posterior_target_source.matrix(src, 0);
       }
-      
+
       posterior_source_target.id = bitext.id;
       posterior_target_source.id = bitext.id;
       posterior_combined.id      = bitext.id;
@@ -1707,9 +1708,10 @@ struct PosteriorReducer : public PosteriorMapReduce
   path_type   path;
   queue_reducer_type& queue;
   
-  PosteriorReducer(const path_type& __path, queue_reducer_type& __queue) : path(__path), queue(__queue) {}
+  PosteriorReducer(const path_type& __path, queue_reducer_type& __queue)
+    : path(__path), queue(__queue) {}
   
-  void operator()()
+  void operator()() throw()
   {
     if (path.empty()) {
       posterior_type posterior;
@@ -1733,7 +1735,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       for (;;) {
 	queue.pop_swap(posterior);
 	if (posterior.id == size_type(-1)) break;
-	
+
 	if (posterior.id == id) {
 	  write(os, posterior);
 	  ++ id;
@@ -1806,12 +1808,12 @@ void posterior(const ttable_type& ttable_source_target,
   queue_reducer_type queue_source_target;
   queue_reducer_type queue_target_source;
   queue_reducer_type queue_combined;
-
+  
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source_target)));
   reducer.add_thread(new boost::thread(reducer_type(posterior_target_source_file, queue_target_source)));
   reducer.add_thread(new boost::thread(reducer_type(posterior_combined_file,      queue_combined)));
-  
+
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
     mapper.add_thread(new boost::thread(mapper_type(Infer(ttable_source_target, ttable_target_source,
@@ -1820,7 +1822,7 @@ void posterior(const ttable_type& ttable_source_target,
 						    queue,
 						    queue_source_target,
 						    queue_target_source,
-						    queue_combined)));
+						    queue_combined)));  
   
   bitext_type bitext;
   bitext.id = 0;
