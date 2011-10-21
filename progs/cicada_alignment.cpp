@@ -1297,8 +1297,8 @@ struct MapReducePosterior
     {
       namespace qi = boost::spirit::qi;
       
-      vector %= ('(' >> -(qi::double_ % ',') >> ')') | ('[' >> -(qi::double_ % ',') >> ']');
-      matrix %= ('(' >> -(vector % ',') >> ')') | ('[' >> -(vector % ',') >> ']');
+      vector %= ('(' >> -(qi::double_ % ',') >> -(qi::lit(',')) >> ')') | ('[' >> -(qi::double_ % ',') >> -(qi::lit(',')) >> ']');
+      matrix %= ('(' >> -(vector % ',') >> -(qi::lit(',')) >> ')') | ('[' >> -(vector % ',') >> -(qi::lit(',')) >> ']');
     }
     
     typedef boost::spirit::standard::blank_type blank_type;
