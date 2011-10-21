@@ -1358,6 +1358,8 @@ struct MapperPosterior
   typedef map_reduce_type::posterior_pair_type posterior_pair_type;
   typedef map_reduce_type::id_alignment_type   id_alignment_type;
   
+  typedef map_reduce_type::matrix_parsed_type matrix_type;
+  
   typedef map_reduce_type::queue_posterior_type queue_posterior_type;
   typedef map_reduce_type::queue_alignment_type queue_alignment_type;
 
@@ -1368,6 +1370,130 @@ struct MapperPosterior
   
   queue_posterior_type& queue_posterior;
   queue_alignment_type& queue_alignment;
+
+  struct ITG
+  {
+    typedef utils::vector2<double, std::allocator<double> > scores_type;
+    
+    class insert_align
+    {
+      alignment_type& alignment;
+      
+    public:
+      insert_align(alignment_type& __alignment)
+	: alignment(__alignment) {}
+      
+      template <typename Edge>
+      insert_align& operator=(const Edge& edge)
+      {	
+	alignment.push_back(edge);
+	return *this;
+      }
+      
+      insert_align& operator*() { return *this; }
+      insert_align& operator++() { return *this; }
+      insert_align operator++(int) { return *this; }
+    };
+    
+    void operator()(const matrix_type& matrix_source_target,
+		    const matrix_type& matrix_target_source,
+		    const span_set_type& span_source,
+		    const span_set_type& span_target,
+		    alignment_type& alignment)
+    {
+      const size_t source_size = matrix_target_source.size() - 1;
+      const size_t target_size = matrix_source_target.size() - 1;
+      
+      scores.clear();
+      scores.reserve(source_size + 1, target_size + 1);
+      scores.resize(source_size + 1, target_size + 1, boost::numeric::bounds<double>::lowest());
+      
+      for (size_t src = 1; src <= source_size; ++ src)
+	for (size_t trg = 1; trg <= target_size; ++ trg)
+	  scores(src, trg) = 0.5 * (utils::mathop::log(matrix_source_target[trg][src]) 
+				    + utils::mathop::log(matrix_target_source[src][trg]));
+      
+      for (size_t trg = 1; trg <= target_size; ++ trg)
+	scores(0, trg) = utils::mathop::log(matrix_source_target[trg][0]);
+      
+      for (size_t src = 1; src <= source_size; ++ src)
+	scores(src, 0) = utils::mathop::log(matrix_target_source[src][0]);
+
+      alignment.clear();
+      
+      if (span_source.empty() && span_target.empty())
+	aligner(scores, insert_align(alignment));
+      else
+	aligner(scores, span_source, span_target, insert_align(alignment));
+
+      std::sort(alignment.begin(), alignment.end());
+    }
+    
+    scores_type scores;
+    detail::ITGAlignment aligner;
+  };
+
+  struct MaxMatch
+  {
+    typedef utils::vector2<double, std::allocator<double> > scores_type;
+    
+    class insert_align
+    {
+      int source_size;
+      int target_size;
+    
+      alignment_type& alignment;
+    
+    public:
+      insert_align(const int& _source_size,
+		   const int& _target_size,
+		   alignment_type& __alignment)
+	: source_size(_source_size), target_size(_target_size),
+	  alignment(__alignment) {}
+      
+      template <typename Edge>
+      insert_align& operator=(const Edge& edge)
+      {	
+	if (edge.first < source_size && edge.second < target_size)
+	  alignment.push_back(edge);
+      
+	return *this;
+      }
+    
+      insert_align& operator*() { return *this; }
+      insert_align& operator++() { return *this; }
+      insert_align operator++(int) { return *this; }
+    };
+    
+    void operator()(const matrix_type& matrix_source_target,
+		    const matrix_type& matrix_target_source,
+		    alignment_type& alignment)
+    {
+      const size_t source_size = matrix_target_source.size() - 1;
+      const size_t target_size = matrix_source_target.size() - 1;
+      
+      scores.clear();
+      scores.reserve(source_size + target_size, target_size + source_size);
+      scores.resize(source_size + target_size, target_size + source_size, 0.0);
+      
+      for (size_t src = 0; src != source_size; ++ src)
+	for (size_t trg = 0; trg != target_size; ++ trg) {
+	  scores(src, trg) = 0.5 * (utils::mathop::log(matrix_source_target[trg + 1][src + 1])
+				    + utils::mathop::log(matrix_target_source[src + 1][trg + 1]));
+	  
+	  scores(src, trg + source_size) = utils::mathop::log(matrix_target_source[src + 1][0]);
+	  scores(src + target_size, trg) = utils::mathop::log(matrix_source_target[trg + 1][0]);
+	}
+      
+      alignment.clear();
+      
+      kuhn_munkres_assignment(scores, insert_align(source_size, target_size, alignment));
+      
+      std::sort(alignment.begin(), alignment.end());
+    }
+    
+    scores_type scores;
+  };
   
   void operator()()
   {
@@ -1377,13 +1503,16 @@ struct MapperPosterior
     posterior_pair_type posteriors;
 
     map_reduce_type::matrix_parser<std::string::const_iterator> parser;
-    map_reduce_type::matrix_parsed_type matrix_source_target;
-    map_reduce_type::matrix_parsed_type matrix_target_source;
+    matrix_type matrix_source_target;
+    matrix_type matrix_target_source;
 
     span_set_type span_source;
     span_set_type span_target;
 
     alignment_type alignment;
+
+    ITG      __itg;
+    MaxMatch __max_match;
     
     for (;;) {
       queue_posterior.pop_swap(posteriors);
@@ -1403,9 +1532,11 @@ struct MapperPosterior
       if (! qi::phrase_parse(titer, titer_end, parser, standard::blank, matrix_target_source) || titer != titer_end)
 	throw std::runtime_error("parsing failed");
       
+      span_source.clear();
       if (! posteriors.span_source.empty())
 	span_source.assign(posteriors.span_source);
       
+      span_target.clear();
       if (! posteriors.span_target.empty())
 	span_target.assign(posteriors.span_target);
 
@@ -1416,21 +1547,14 @@ struct MapperPosterior
 
       alignment.clear();
       
-      const size_t source_size = matrix_target_source.size() - 1;
-      const size_t target_size = matrix_source_target.size() - 1;
-      
-      if (itg_mode) {
-	// itg
+      if (itg_mode)
+	__itg(matrix_source_target, matrix_target_source, span_source, span_target, alignment);
+      else if (max_match_mode)
+	__max_match(matrix_source_target, matrix_target_source, alignment);
+      else {
+	const size_t source_size = matrix_target_source.size() - 1;
+	const size_t target_size = matrix_source_target.size() - 1;
 	
-	
-	
-	
-      } else if (max_match_mode) {
-	// max-matching
-	
-	
-	
-      } else {
 	// simple thresholding...
 	for (size_t src = 1; src != matrix_target_source.size(); ++ src)
 	  for (size_t trg = 1; trg != matrix_source_target.size(); ++ trg) {
