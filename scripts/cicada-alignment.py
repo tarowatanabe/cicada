@@ -12,6 +12,7 @@ import multiprocessing
 import time
 import sys
 import os, os.path
+import stat
 import string
 import re
 import subprocess
@@ -487,6 +488,85 @@ class AlignmentPosterior:
     def run(self):
         run_command(self.command)
 
+class Aligner:
+
+    def __init__(self,
+                 cicada=None,
+                 cluster=None,
+                 giza=None,
+                 alignment_dir="",
+                 threads=8,
+                 debug=0):
+
+        if not os.path.exists(alignment_dir):
+            os.makedirs(alignment_dir)
+            
+        learn_hmm = None
+        if hasattr(giza, 'alignment_source_target'):
+            learn_hmm = 1
+            
+        command = cicada.cicada_lexicon_model1
+        if learn_hmm:
+            command = cicada.cicada_lexicon_hmm
+        command += " \\\n"
+
+        if learn_hmm:
+            command += " --classes-source \"%s\"" %(os.path.realpath(compressed_file(cluster.source.cluster)))
+            command += " \\\n"
+            command += " --classes-target \"%s\"" %(os.path.realpath(compressed_file(cluster.target.cluster)))
+            command += " \\\n"
+
+        command += " --lexicon-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.lexicon_source_target)))
+        command += " \\\n"
+        command += " --lexicon-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.lexicon_target_source)))
+        command += " \\\n"
+
+        if learn_hmm:
+            command += " --alignment-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.alignment_source_target)))
+            command += " \\\n"
+            command += " --alignment-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.alignment_target_source)))
+            command += " \\\n"
+
+        if learn_hmm:
+            command += " --iteration-model1 0"
+            command += " \\\n"
+            command += " --iteration-hmm 0"
+            command += " \\\n"
+        else:
+            command += " --iteration 0"
+            command += " \\\n"
+            
+        command += " --p0 %.20g" %(giza.p0)
+        command += " \\\n"
+        command += " --prior-lexicon %.20g"  %(giza.prior_lexicon)
+        command += " \\\n"
+        command += " --smooth-lexicon %.20g" %(giza.smooth_lexicon)
+        command += " \\\n"
+        if learn_hmm:
+            command += " --prior-alignment %.20g"  %(giza.prior_alignment)
+            command += " \\\n"
+            command += " --smooth-alignment %.20g" %(giza.smooth_alignment)
+            command += " \\\n"
+        
+        if debug:
+            command += " --debug=%d" %(debug)
+            command += " \\\n"
+        else:
+            command += " --debug"
+            command += " \\\n"
+        
+        self.command = command
+
+    def run(self, fp):
+        fp.write("#!/bin/sh\n")
+        fp.write("\n")
+        fp.write("exec ")
+        fp.write(self.command)
+        fp.write(" \"$@\"")
+        #run_command(self.command)
+        
+        
+
 class Lexicon:
     def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
                  inverse=None,
@@ -604,10 +684,24 @@ giza = Giza(cicada=cicada,
 
 ## run giza++ in two directions
 if options.first_step <= 2 and options.last_step >= 2:
+    
+    # dump aligner...
+    aligner = Aligner(cicada=cicada,
+                      cluster=prepare,
+                      giza=giza,
+                      alignment_dir=options.alignment_dir,
+                      threads=options.threads,
+                      debug=options.debug)
+    
+    aligner_path = os.path.join(options.alignment_dir, "aligner.sh")
+    aligner.run(open(aligner_path, 'w'))
+    os.chmod(aligner_path, os.stat(aligner_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    
     print "(2) running giza started  @", time.ctime()
     giza.run()
     print "(2) running giza finished @", time.ctime()
-
+    
+    
 alignment=None
 if "posterior" in options.alignment:
     alignment = AlignmentPosterior(cicada=cicada,
