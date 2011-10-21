@@ -1286,7 +1286,179 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
 
 struct MapReducePosterior
 {
+  typedef std::vector<double, std::allocator<double> > vector_parsed_type;
+  typedef std::vector<vector_parsed_type, std::allocator<vector_parsed_type> > matrix_parsed_type;
   
+  template <typename Iterator>
+  struct matrix_parser : boost::spirit::qi::grammar<Iterator, matrix_parsed_type(), boost::spirit::standard::blank_type>
+  {
+    matrix_parser() : matrix_parser::base_type(matrix)
+    {
+      namespace qi = boost::spirit::qi;
+      
+      vector %= ('(' >> -(qi::double_ % ',') >> ')') | ('[' >> -(qi::double_ % ',') >> ']');
+      matrix %= ('(' >> -(vector % ',') >> ')') | ('[' >> -(vector % ',') >> ']');
+    }
+    
+    typedef boost::spirit::standard::blank_type blank_type;
+    
+    boost::spirit::qi::rule<Iterator, vector_parsed_type(), blank_type> vector;
+    boost::spirit::qi::rule<Iterator, matrix_parsed_type(), blank_type> matrix;
+  };
+  
+  struct posterior_pair_type
+  {
+    size_t id;
+    std::string source_target;
+    std::string target_source;
+    std::string span_source;
+    std::string span_target;
+    
+    posterior_pair_type() : id(size_t(-1)), source_target(), target_source(), span_source(), span_target() {}
+
+    void clear()
+    {
+      id = size_t(-1);
+      source_target.clear();
+      target_source.clear();
+      span_source.clear();
+      span_target.clear();
+    }
+    
+    void swap(posterior_pair_type& x)
+    {
+      std::swap(id, x.id);
+      source_target.swap(x.source_target);
+      target_source.swap(x.target_source);
+      span_source.swap(x.span_source);
+      span_target.swap(x.span_target);
+    }
+  };
+
+  typedef std::pair<size_t, alignment_type> id_alignment_type;
+  
+  typedef utils::lockfree_list_queue<posterior_pair_type, std::allocator<posterior_pair_type> > queue_posterior_type;
+  typedef utils::lockfree_list_queue<id_alignment_type, std::allocator<id_alignment_type> > queue_alignment_type;
+};
+
+namespace std
+{
+  inline
+  void swap(MapReducePosterior::posterior_pair_type& x, MapReducePosterior::posterior_pair_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+struct MapperPosterior
+{
+  typedef MapReducePosterior map_reduce_type;
+  
+  typedef map_reduce_type::posterior_pair_type posterior_pair_type;
+  typedef map_reduce_type::id_alignment_type   id_alignment_type;
+  
+  typedef map_reduce_type::queue_posterior_type queue_posterior_type;
+  typedef map_reduce_type::queue_alignment_type queue_alignment_type;
+
+  MapperPosterior(queue_posterior_type& __queue_posterior,
+		  queue_alignment_type& __queue_alignment)
+    : queue_posterior(__queue_posterior),
+      queue_alignment(__queue_alignment) {}
+  
+  queue_posterior_type& queue_posterior;
+  queue_alignment_type& queue_alignment;
+  
+  void operator()()
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    posterior_pair_type posteriors;
+
+    map_reduce_type::matrix_parser<std::string::const_iterator> parser;
+    map_reduce_type::matrix_parsed_type matrix_source_target;
+    map_reduce_type::matrix_parsed_type matrix_target_source;
+
+    span_set_type span_source;
+    span_set_type span_target;
+    
+    for (;;) {
+      queue_posterior.pop_swap(posteriors);
+      if (posteriors.id == size_t(-1)) break;
+      
+      matrix_source_target.clear();
+      matrix_target_source.clear();
+      
+      std::string::const_iterator siter     = posteriors.source_target.begin();
+      std::string::const_iterator siter_end = posteriors.source_target.end();
+      std::string::const_iterator titer     = posteriors.target_source.begin();
+      std::string::const_iterator titer_end = posteriors.target_source.end();
+      
+      if (! qi::phrase_parse(siter, siter_end, parser, standard::blank, matrix_source_target) || siter != siter_end)
+	throw std::runtime_error("parsing failed");
+      
+      if (! qi::phrase_parse(titer, titer_end, parser, standard::blank, matrix_target_source) || titer != titer_end)
+	throw std::runtime_error("parsing failed");
+      
+      if (! posteriors.span_source.empty())
+	span_source.assign(posteriors.span_source);
+      
+      if (! posteriors.span_target.empty())
+	span_target.assign(posteriors.span_target);
+      
+      
+      
+    }
+  }
+};
+
+struct ReducerPosterior
+{
+  typedef MapReducePosterior map_reduce_type;
+  
+  typedef map_reduce_type::id_alignment_type   id_alignment_type;
+  typedef map_reduce_type::queue_alignment_type queue_type;
+  
+  typedef std::map<size_t, alignment_type, std::less<size_t>,
+		   std::allocator<std::pair<const size_t, alignment_type> > > alignment_set_type;
+
+  ReducerPosterior(std::ostream& __os,
+		   queue_type& __queue)
+    : os(__os), queue(__queue) {}
+  
+  std::ostream& os;
+  queue_type& queue;
+  
+  void operator()()
+  {
+    id_alignment_type  alignment;
+    alignment_set_type aligns;
+    size_t id = 0;
+    
+    for (;;) {
+      queue.pop(alignment);
+      if (alignment.first == size_t(-1)) break;
+      
+      if (alignment.first == id) {
+	os << alignment.second << '\n';
+	++ id;
+      } else
+	aligns.insert(alignment);
+      
+      for (/**/; ! aligns.empty() && aligns.begin()->first == id; ++ id) {
+	os << aligns.begin()->second << '\n';
+	aligns.erase(aligns.begin());
+      }
+    }
+    
+    for (/**/; ! aligns.empty() && aligns.begin()->first == id; ++ id) {
+      os << aligns.begin()->second << '\n';
+      aligns.erase(aligns.begin());
+    }
+    
+    if (! aligns.empty())
+      throw std::runtime_error("invlaid id?");
+  }
   
 };
 
