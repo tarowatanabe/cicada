@@ -2000,6 +2000,10 @@ struct PermutationHMM : public ViterbiBase
       for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
 	scores_target(trg_head, 0) = scores(src_leaf, trg_head);
 #endif
+#if 1
+      for (size_type trg_head = 1; trg_head <= target_size; ++ trg_head)
+	scores_target(trg_head, 0) = 0.0;
+#endif
     }
     
     if (! permutation_target.empty()) {
@@ -2048,6 +2052,11 @@ struct PermutationHMM : public ViterbiBase
       for (size_type src_head = 1; src_head <= source_size; ++ src_head)
 	scores_source(src_head, 0) = scores(src_head, trg_leaf);
 #endif
+#if 1
+      for (size_type src_head = 1; src_head <= source_size; ++ src_head)
+	scores_source(src_head, 0) = 0.0;
+#endif
+
     }
   }
   

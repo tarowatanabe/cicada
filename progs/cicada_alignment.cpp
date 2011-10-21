@@ -117,6 +117,8 @@ path_type span_target_file;
 path_type input_file;
 path_type output_file = "-";
 
+bool posterior_mode = false;
+
 bool source_target_mode = false;
 bool target_source_mode = false;
 
@@ -143,6 +145,7 @@ double score_intersection = 0.0;
 int threads = 1;
 int debug = 0;
 
+void process_posterior(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os);
 void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os);
 void process_giza(std::istream& is, std::ostream& os);
 void process_alignment(std::istream& is, std::ostream& os);
@@ -164,7 +167,24 @@ int main(int argc, char ** argv)
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
     
-    if (source_target_mode || target_source_mode) {
+    if (posterior_mode) {
+      utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
+      utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+
+      if (! span_source_file.empty())
+	if (span_source_file != "-" && ! boost::filesystem::exists(span_source_file))
+	  throw std::runtime_error("no spna source file: " + span_source_file.string());
+      
+      if (! span_target_file.empty())
+	if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
+	  throw std::runtime_error("no spna target file: " + span_target_file.string());
+      
+      std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+      std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
+      
+      process_posterior(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
+    } else if (source_target_mode || target_source_mode) {
       if (source_target_mode && target_source_mode)
 	throw std::runtime_error("which mode f2e or e2f?");
       
@@ -179,13 +199,13 @@ int main(int argc, char ** argv)
       } else {
 	if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
 	  throw std::runtime_error("no e2f file?" + target_source_file.string());
-
+	
 	utils::compress_istream is(target_source_file, 1024 * 1024);
 	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
 	
 	process_giza(is, os);
       }
-    } if (input_file == "-" || boost::filesystem::exists(input_file)) {
+    } else if (input_file == "-" || boost::filesystem::exists(input_file)) {
       utils::compress_istream is(input_file, 1024 * 1024);
       utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
@@ -1258,11 +1278,24 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
     throw std::runtime_error("# of samples do not match");
   if (is_trg && (*is_trg >> span_target))
     throw std::runtime_error("# of samples do not match");
-
+  
   mappers.join_all();
   reducer.join_all();
 }
 
+
+struct MapReducePosterior
+{
+  
+  
+};
+
+// input is posterior probability matrix...
+void process_posterior(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os)
+{
+  
+  
+}
 
 void options(int argc, char** argv)
 {
@@ -1272,12 +1305,14 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("source-target", po::value<path_type>(&source_target_file), "P(target | source) viterbi output")
-    ("target-source", po::value<path_type>(&target_source_file), "P(source | target) viterbi output")
+    ("source-target", po::value<path_type>(&source_target_file), "P(target | source) viterbi alignment")
+    ("target-source", po::value<path_type>(&target_source_file), "P(source | target) viterbi alignment")
     ("span-source",   po::value<path_type>(&span_source_file),   "source span data")
     ("span-target",   po::value<path_type>(&span_target_file),   "target span data")
     ("input",         po::value<path_type>(&input_file),                      "input alignment")
     ("output",        po::value<path_type>(&output_file)->default_value("-"), "output alignment")
+    
+    ("posterior", po::bool_switch(&posterior_mode), "alignment computation using posteriors")
     
     ("f2e", po::bool_switch(&source_target_mode), "source target")
     ("e2f", po::bool_switch(&target_source_mode), "target source")
