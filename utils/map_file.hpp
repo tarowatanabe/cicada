@@ -64,7 +64,7 @@ namespace utils
     {
       filename = file;
       filesize = static_cast<off_type>(boost::filesystem::file_size(file));
-      modifiable = flag;
+      modifiable = (flag & MAP_FILE_WRITE);
       
 #ifndef MAP_POPULATE
       #define MAP_POPULATE 0
