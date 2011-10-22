@@ -22,7 +22,16 @@
 
 namespace utils
 {
-  class __map_file_impl
+  struct __map_file_enum
+  {
+    typedef enum {
+      MAP_FILE_NONE     = 0,
+      MAP_FILE_WRITE    = (1 << 0),
+      MAP_FILE_POPULATE = (1 << 1), // on Linux, forced "map-failure" at load time..
+    } flag_type;    
+  };
+
+  class __map_file_impl : public __map_file_enum
   {
   public:
     typedef std::streamoff off_type;
@@ -32,10 +41,10 @@ namespace utils
     typedef boost::filesystem::path path_type;
     
   public:
-    __map_file_impl(const std::string& file, const bool writable=false)
-      : mmapped(), filesize(), mmap_size(), filename() { open(file, writable); }
-    __map_file_impl(const boost::filesystem::path& file, const bool writable=false)
-      : mmapped(), filesize(), mmap_size(), filename() { open(file, writable); }
+    __map_file_impl(const std::string& file, const flag_type flag=MAP_FILE_NONE)
+      : mmapped(), filesize(), mmap_size(), filename() { open(file, flag); }
+    __map_file_impl(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
+      : mmapped(), filesize(), mmap_size(), filename() { open(file, flag); }
     ~__map_file_impl() { close(); }
     
   public:
@@ -51,11 +60,16 @@ namespace utils
     const boost::filesystem::path& path() const { return filename; }
     
   private:
-    void open(const boost::filesystem::path& file, const bool writable=false)
+    void open(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
     {
       filename = file;
       filesize = static_cast<off_type>(boost::filesystem::file_size(file));
-      modifiable = writable;
+      modifiable = flag;
+      
+#ifndef MAP_POPULATE
+      #define MAP_POPULATE 0
+#endif
+      const bool writable = (flag & MAP_FILE_WRITE);
       
 #if BOOST_FILESYSTEM_VERSION == 2
       int fd = ::open(file.file_string().c_str(), (writable ? O_RDWR | O_NDELAY : O_RDONLY | O_NDELAY));
@@ -72,13 +86,21 @@ namespace utils
       
       const size_t page_size = getpagesize();
       mmap_size = static_cast<off_type>(std::max(off_type((filesize + page_size - 1) / page_size), off_type(1)) * page_size);
-	
+
+      int mmap_flag = MAP_SHARED;
+      if (flag & MAP_FILE_POPULATE)
+	mmap_flag |= MAP_POPULATE;
+      
       // First, try map_shared
-      byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_SHARED, fd, 0));
+      byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       
       // Second, try map_private
-      if (! (x + 1))
-	x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_PRIVATE, fd, 0));
+      if (! (x + 1)) {
+	mmap_flag = MAP_PRIVATE;
+	if (flag & MAP_FILE_POPULATE)
+	  mmap_flag |= MAP_POPULATE;
+	x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
+      }
 	
       // no need to keep file-descriptor
       ::close(fd);
@@ -115,7 +137,7 @@ namespace utils
   };
   
   template <typename _Tp, typename _Alloc=std::allocator<_Tp> >
-  class map_file
+  class map_file : public __map_file_enum
   {
   private:
     typedef __map_file_impl impl_type;
@@ -131,11 +153,11 @@ namespace utils
     typedef impl_type::size_type size_type;
     typedef impl_type::byte_type byte_type;
     typedef impl_type::path_type path_type;
-    
+
   public:
     // we will allow copying, but actually, this will not be copied...
     
-    map_file(const path_type& file, const bool writable=false) : pimpl(new impl_type(file, writable)) { }
+    map_file(const path_type& file, const flag_type flag=MAP_FILE_NONE) : pimpl(new impl_type(file, flag)) { }
     map_file() {}
     
   public:
@@ -165,8 +187,8 @@ namespace utils
       return boost::filesystem::exists(path);
     }
     
-    void open(const std::string& file, const bool writable=false) { pimpl.reset(new impl_type(file, writable)); }
-    void open(const path_type& file, const bool writable=false) { pimpl.reset(new impl_type(file, writable)); }
+    void open(const std::string& file, const flag_type flag=MAP_FILE_NONE) { pimpl.reset(new impl_type(file, flag)); }
+    void open(const path_type& file, const flag_type flag=MAP_FILE_NONE) { pimpl.reset(new impl_type(file, flag)); }
     
     void write(const path_type& file) const
     {

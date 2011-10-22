@@ -1704,16 +1704,28 @@ struct PosteriorReducer : public PosteriorMapReduce
     }
   };
   typedef std::set<posterior_type, less_posterior, std::allocator<posterior_type> > posterior_set_type;
+
+  typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
-  path_type   path;
+  ostream_ptr_type os;
   queue_reducer_type& queue;
   
-  PosteriorReducer(const path_type& __path, queue_reducer_type& __queue)
-    : path(__path), queue(__queue) {}
+  PosteriorReducer(const path_type& path, queue_reducer_type& __queue)
+    : os(), queue(__queue)
+  {
+    if (! path.empty()) {
+      const bool flush_output = (path == "-"
+				 || (boost::filesystem::exists(path)
+				     && ! boost::filesystem::is_regular_file(path)));
+      
+      os.reset(new utils::compress_ostream(path, 1024 * 1024 * (! flush_output)));
+      os->precision(20);
+    }
+  }
   
   void operator()() throw()
   {
-    if (path.empty()) {
+    if (! os) {
       posterior_type posterior;
       for (;;) {
 	queue.pop_swap(posterior);
@@ -1721,13 +1733,6 @@ struct PosteriorReducer : public PosteriorMapReduce
       }
     } else {
       posterior_set_type posteriors;
-      
-      const bool flush_output = (path == "-"
-				 || (boost::filesystem::exists(path)
-				     && ! boost::filesystem::is_regular_file(path)));
-      
-      utils::compress_ostream os(path, 1024 * 1024 * (! flush_output));
-      os.precision(20);
       
       size_type      id = 0;
       posterior_type posterior;
@@ -1737,20 +1742,20 @@ struct PosteriorReducer : public PosteriorMapReduce
 	if (posterior.id == size_type(-1)) break;
 
 	if (posterior.id == id) {
-	  write(os, posterior);
+	  write(*os, posterior);
 	  ++ id;
 	} else
 	  posteriors.insert(posterior);
 	
 	while (! posteriors.empty() && posteriors.begin()->id == id) {
-	  write(os, *posteriors.begin());
+	  write(*os, *posteriors.begin());
 	  posteriors.erase(posteriors.begin());
 	  ++ id;
 	}
       }
       
       while (! posteriors.empty() && posteriors.begin()->id == id) {
-	write(os, *posteriors.begin());
+	write(*os, *posteriors.begin());
 	posteriors.erase(posteriors.begin());
 	++ id;
       }
