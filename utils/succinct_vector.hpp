@@ -190,7 +190,7 @@ namespace utils
       size_type result(size_type first, size_type last, const Data& data, const size_type& value)
       {
 	size_type offset = first;
-	for (/**/; first != last && (first - offset + 1) * ReverseScale - data[first] < value; ++ first);
+	for (/**/; first != last && (first - offset + 1) * ReverseScale - data[first] < value; ++ first) {}
 	return first;
       }
     };
@@ -201,7 +201,7 @@ namespace utils
       static inline
       size_type result(size_type first, size_type last, const Data& data, const size_type& value)
       {
-	for (/**/; first != last && data[first] < value; ++ first);
+	for (/**/; first != last && data[first] < value; ++ first) {}
 	return first;
       }
     };
@@ -215,7 +215,7 @@ namespace utils
 	size_type offset = first;
 	size_type length = last - first;
 	if (length <= 64) {
-	  for (/**/; first != last && (first - offset + 1) * ReverseScale - data[first] < value; ++ first);
+	  for (/**/; first != last && (first - offset + 1) * ReverseScale - data[first] < value; ++ first) {}
 	  return first;
 	} else {
 	  while (length > 0) {
@@ -247,7 +247,7 @@ namespace utils
       {
 	size_type length = last - first;
 	if (length <= 64) {
-	  for (/**/; first != last && data[first] < value; ++ first);
+	  for (/**/; first != last && data[first] < value; ++ first) {}
 	  return first;
 	} else {
 	  while (length > 0) {

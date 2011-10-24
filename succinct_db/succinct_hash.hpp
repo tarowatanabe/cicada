@@ -219,7 +219,7 @@ namespace succinctdb
       const size_type hash_mask = bins.size() - 1;
       const size_type key = hash & hash_mask;
       pos_type i = bins[key];
-      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]);
+      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]) {}
       return i - 1;
     }
 
@@ -544,7 +544,7 @@ namespace succinctdb
       const size_type hash_mask = bins.size() - 1;
       const size_type key = hash & hash_mask;
       pos_type i = bins[key];
-      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]);
+      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]) {}
       if (i)
 	return i - 1;
       
@@ -563,7 +563,7 @@ namespace succinctdb
       const size_type hash_mask = bins.size() - 1;
       const size_type key = hash & hash_mask;
       pos_type i = bins[key];
-      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]);
+      for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]) {}
       return i - 1;
     }
   

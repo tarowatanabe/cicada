@@ -184,7 +184,7 @@ namespace utils
       size_type length = last - first;
       if (length < 128) {
 	typename Compressed::const_iterator iter = compressed.begin() + first;
-	for (/**/; first != last && (*iter) <= value; ++ first, ++ iter);
+	for (/**/; first != last && (*iter) <= value; ++ first, ++ iter) {}
 	return first;
       } else {
 	typename Compressed::const_iterator __data = compressed.begin();

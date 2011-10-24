@@ -376,7 +376,7 @@ namespace utils
       const size_type key = hash()(x);
       
       index_type index = bins[key & (bins.size() - 1)];
-      for (/**/; index && ! equal()(extract_key()(nodes[index - 1].data()), x); index = nodes[index - 1].next);
+      for (/**/; index && ! equal()(extract_key()(nodes[index - 1].data()), x); index = nodes[index - 1].next) {}
       return (index ? begin() + index - 1 : end());
     }
     
@@ -384,7 +384,7 @@ namespace utils
     {
       const size_type key = hash()(extract_key()(x));
       index_type index = bins[key & (bins.size() - 1)];
-      for (/**/; index && ! equal()(extract_key()(nodes[index - 1].data()), extract_key()(x)); index = nodes[index - 1].next);
+      for (/**/; index && ! equal()(extract_key()(nodes[index - 1].data()), extract_key()(x)); index = nodes[index - 1].next) {}
       if (index) return std::make_pair(begin() + index - 1, false);
       
       // not found...
