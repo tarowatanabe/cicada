@@ -360,9 +360,18 @@ namespace utils {
     {
       const size_type __size = size();
       
-      if (__n == __size)
-	std::fill(begin(), end(), __value);
-      else {
+      if (base_type::capacity(__n) == base_type::capacity(__size)) {
+	if (__n == __size)
+	  std::fill(begin(), end(), __value);
+	else if (__n < __size) { 
+	  std::fill(begin(), begin() + __n, __value);
+	  utils::destroy_range(begin() + __n, end());
+	} else if (__n > __size) {
+	  std::fill(begin(), end(), __value);
+	  std::uninitialized_fill(end(), begin() + __n, __value);
+	}
+	__base.size() = __n;
+      } else {
 	base_type __base_new(__n);
 	std::uninitialized_fill(__base_new.begin(), __base_new.end(), __value);
 	__base.swap(__base_new);
@@ -376,9 +385,18 @@ namespace utils {
       const size_type __n = std::distance(first, last);
       const size_type __size = size();
       
-      if (__n == __size)
-	std::copy(first, last, __base.begin());
-      else {
+      if (base_type::capacity(__n) == base_type::capacity(__size)) {
+	if (__n == __size)
+	  std::copy(first, last, begin());
+	else if (__n < __size) {
+	  std::copy(first, last, begin());
+	  utils::destroy_range(begin() + __n, end());
+	} else if (__n > __size) {
+	  utils::destroy_range(begin(), end());
+	  std::uninitialized_copy(first, last, begin());
+	}
+	__base.size() = __n;
+      } else {
 	base_type __base_new(__n);
 	std::uninitialized_copy(first, last, __base_new.begin());
 	__base.swap(__base_new);
