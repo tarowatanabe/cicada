@@ -109,6 +109,8 @@ namespace cicada
   public:
     void clear() { trie.clear();  edges.clear(); }
     void read(const std::string& parameter);
+
+    bool is_cky() const { return cky; }
     
   public:
     trie_type      trie;
@@ -545,12 +547,18 @@ namespace cicada
 
   TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const symbol_type& symbol) const
   {
+    if (! pimpl->is_cky())
+      throw std::runtime_error("the tree grammar is not indexed for CKY");
+
     return pimpl->next(node, symbol.non_terminal().id());
   }
   
   
   TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const edge_type& edge) const
   {
+    if (pimpl->is_cky())
+      throw std::runtime_error("the tree grammar is indexed for CKY");
+
     return pimpl->next(node, edge.id);
   }
   

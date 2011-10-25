@@ -393,6 +393,8 @@ namespace cicada
 
     void read_text(const std::string& path);
     void read_binary(const std::string& path);
+
+    bool is_cky() const { return cky; }
     
   private:
     edge_db_type          edge_db;
@@ -1254,6 +1256,9 @@ namespace cicada
   
   TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const edge_type& edge) const
   {
+    if (pimpl->is_cky())
+      throw std::runtime_error("the tree grammar is indexed for CKY");
+    
     const impl_type::size_type pos = pimpl->find(edge.id, node);
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
@@ -1261,6 +1266,9 @@ namespace cicada
 
   TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const symbol_type& symbol) const
   {
+    if (! pimpl->is_cky())
+      throw std::runtime_error("the tree grammar is not indexed for CKY");
+
     const impl_type::size_type pos = pimpl->find(symbol.non_terminal(), node);
     
     //std::cerr << "next: " << node << " pos: " << pos << std::endl;
