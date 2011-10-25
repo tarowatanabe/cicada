@@ -168,10 +168,10 @@ namespace cicada
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
 	if (iter == last) return 0.0;
-
+	
 	first = std::max(first, iter - order + 1);
 	
-	const size_t cache_pos = hash_phrase(first, iter, hash_phrase(iter, last)) & (cache_logprob.size() - 1);
+	const size_t cache_pos = hash_phrase(first, last, last - iter) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
 	if (! equal_phrase(first, iter, cache.context) || ! equal_phrase(iter, last, cache.ngram)) {
 	  cache.context.assign(first, iter);
