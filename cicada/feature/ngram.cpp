@@ -60,11 +60,11 @@ namespace cicada
       {
 	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
 
-	phrase_type context;
 	phrase_type ngram;
 	double logprob;
+	int pos;
 	
-	CacheContext() : context(), ngram(), logprob(0.0) {}
+	CacheContext() : ngram(), logprob(0.0), pos(0) {}
       };
       
       struct CacheNGram
@@ -163,6 +163,13 @@ namespace cicada
       {
 	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
+
+      template <typename Iterator1, typename Iterator2>
+      inline
+      bool equal_phrase(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2) const
+      {
+	return std::distance(first1, last1) == std::distance(first2, last2) && std::equal(first1, last1, first2);
+      }
       
       template <typename Iterator>
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
@@ -173,9 +180,14 @@ namespace cicada
 	
 	const size_t cache_pos = hash_phrase(first, last, last - iter) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
-	if (! equal_phrase(first, iter, cache.context) || ! equal_phrase(iter, last, cache.ngram)) {
-	  cache.context.assign(first, iter);
-	  cache.ngram.assign(iter, last);
+	
+	cache_context_type::phrase_type::const_iterator citer_begin = cache.ngram.begin();
+	cache_context_type::phrase_type::const_iterator citer       = citer_begin + cache.pos;
+	cache_context_type::phrase_type::const_iterator citer_end   = cache.ngram.end();
+
+	if (citer_begin == citer_end || ! equal_phrase(first, iter, citer_begin, citer) || ! equal_phrase(iter, last, citer, citer_end)) {
+	  cache.ngram.assign(first, last);
+	  cache.pos = iter - first;
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
@@ -184,14 +196,17 @@ namespace cicada
 	  
 	  for (/**/; first != iter; ++ first)
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
-	  
-	  for (/**/; iter != last; ++ iter) {
-	    buffer_id.push_back(ngram.index.vocab()[*iter]);
-	    
-	    if (coarse)
+
+	  if (coarse) {
+	    for (/**/; iter != last; ++ iter) {
+	      buffer_id.push_back(ngram.index.vocab()[*iter]);
 	      cache.logprob += ngram.logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
-	    else
+	    }
+	  } else {
+	    for (/**/; iter != last; ++ iter) {
+	      buffer_id.push_back(ngram.index.vocab()[*iter]);
 	      cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	    }
 	  }
 	}
 	
