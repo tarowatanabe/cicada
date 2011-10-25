@@ -366,7 +366,7 @@ namespace utils {
 	else if (__n < __size) { 
 	  std::fill(begin(), begin() + __n, __value);
 	  utils::destroy_range(begin() + __n, end());
-	} else if (__n > __size) {
+	} else {
 	  std::fill(begin(), end(), __value);
 	  std::uninitialized_fill(end(), begin() + __n, __value);
 	}
@@ -391,7 +391,7 @@ namespace utils {
 	else if (__n < __size) {
 	  std::copy(first, last, begin());
 	  utils::destroy_range(begin() + __n, end());
-	} else if (__n > __size) {
+	} else {
 	  utils::destroy_range(begin(), end());
 	  std::uninitialized_copy(first, last, begin());
 	}
