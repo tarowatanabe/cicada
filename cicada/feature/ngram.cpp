@@ -273,7 +273,8 @@ namespace cicada
       double ngram_estimate(Iterator first, Iterator last) const
       {
 	if (first == last) return 0.0;
-	if (std::distance(first, last) == 1) return ngram.logbound(first, last);
+	if (std::distance(first, last) == 1)
+	  return (vocab_type::BOS == *first ? 0.0 : ngram.logbound(first, last));
 
 	const size_t cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
