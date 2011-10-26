@@ -1,9 +1,10 @@
-2011-10-x
+2011-10-26
 Support posterior matrix dumping in cicada_lexicon_{model1,hmm}
 Support MST dependency in cicada_lexicon_{model1,hmm}
 Support for aligner script: cicada-alignment.py will generate aligner.sh so that you can align arbitrary data, or dump posterior matrix
 Support alignment combination from posteriors in two directions
 Better caching for ngram language model feature: cache only for higher order + longer phrases
+Warn CKY-style indexing in tree-grammars
 
 2011-10-17
 Added softmax-margin to cicada_learn_block
