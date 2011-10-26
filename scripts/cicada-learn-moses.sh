@@ -494,7 +494,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   if test "$moses_thread" = yes; then
     
-    kbest_file=${root}/kbest.$kbest.$iter
+    kbest_file=${root}kbest.$kbest.$iter
     
     qsubwrapper moses -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
 	$moses \
