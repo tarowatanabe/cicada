@@ -31,8 +31,8 @@ namespace cicada
     typedef utils::array_power2<uint8_t, cache_size, std::allocator<uint8_t> >          length_set_type;
     
   public:
-    NGramCache(const int __order=3)
-      : contexts(cache_size, __order), scores(), length(), order(__order) {}
+    NGramCache(const int order=3)
+      : contexts(cache_size, order), scores(), length() {}
     
   public:
     void clear()
@@ -67,7 +67,6 @@ namespace cicada
     context_set_type contexts;
     score_set_type   scores;
     length_set_type  length;
-    int order;
   };
 };
 

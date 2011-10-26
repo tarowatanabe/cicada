@@ -183,7 +183,7 @@ namespace cicada
       {
 	if (first == last) return 0.0;
 
-	first = std::max(first, last - order);
+	first = std::max(first, last - ngram.index.order());
 	
 	if (std::distance(first, last) <= 2)
 	  return ngram.logprob(first, last);
@@ -202,7 +202,7 @@ namespace cicada
       {
 	if (first == last) return 0.0;
 	
-	first = std::max(first, last - order);
+	first = std::max(first, last - ngram.index.order());
 	
 	if (std::distance(first, last) <= 2)
 	  return ngram.logbound(first, last);
