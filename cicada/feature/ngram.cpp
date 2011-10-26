@@ -220,9 +220,18 @@ namespace cicada
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
 	if (iter == last) return 0.0;
-	if (std::distance(iter, last) == 1) return ngram.logprob(first, last);
 	
 	first = std::max(first, iter - order + 1);
+	
+	if (std::distance(iter, last) == 1) {
+	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
+	  buffer_id.clear();
+	  
+	  for (/**/; first != last; ++ first)
+	    buffer_id.push_back(ngram.index.vocab()[*first]);
+	  
+	  return ngram_logprob(buffer_id.begin(), buffer_id.end());
+	}
 	
 	const size_t cache_pos = hash_phrase(first, last, last - iter) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
@@ -238,11 +247,10 @@ namespace cicada
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
-	  buffer_id.reserve(last - first);
 	  
 	  for (/**/; first != iter; ++ first)
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
-
+	  
 	  if (coarse) {
 	    for (/**/; iter != last; ++ iter) {
 	      buffer_id.push_back(ngram.index.vocab()[*iter]);
