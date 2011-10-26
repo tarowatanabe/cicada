@@ -254,13 +254,13 @@ namespace cicada
 	  if (coarse) {
 	    for (/**/; iter != last; ++ iter) {
 	      buffer_id.push_back(ngram.index.vocab()[*iter]);
-	      //cache.logprob += ngram.logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      
 	      cache.logprob += ngram_logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	    }
 	  } else {
 	    for (/**/; iter != last; ++ iter) {
 	      buffer_id.push_back(ngram.index.vocab()[*iter]);
-	      //cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      
 	      cache.logprob += ngram_logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	    }
 	  }
@@ -278,6 +278,13 @@ namespace cicada
 	  return 0.0;
 	else if (length == 1)
 	  return (vocab_type::BOS == *first ? 0.0 : ngram.logbound(first, last));
+	else if (length == 2) {
+	  const symbol_type::id_type buffer[2] = {ngram.index.vocab()[*first], ngram.index.vocab()[*(first + 1)]};
+	  
+	  return (vocab_type::BOS == *first
+		  ? ngram.logbound(buffer, buffer + 2)
+		  : ngram.logbound(buffer, buffer + 1) + ngram.logbound(buffer, buffer + 2));
+	}
 
 	const size_type cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
@@ -289,10 +296,14 @@ namespace cicada
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
 	  
+	  // skip BOS scoring...
+	  if (vocab_type::BOS == *first) {
+	    buffer_id.push_back(ngram.index.vocab()[*first]);
+	    ++ first;
+	  }
+	  
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
-	    
-	    if (buffer_id.size() == 1 && vocab_type::BOS == *first) continue;
 	    
 	    cache.logprob += ngram_logbound(buffer_id.begin(), buffer_id.end());
 	  }
