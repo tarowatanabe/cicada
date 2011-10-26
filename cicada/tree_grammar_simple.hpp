@@ -50,6 +50,7 @@ namespace cicada
     {
       rules.set_empty_key(graph_rule_ptr_type());
       features["tree-insertion-penalty"] = -1.0;
+      attributes["insertion"] = attribute_set_type::int_type(1);
     }
     
     TreeGrammarFallback()
@@ -81,15 +82,21 @@ namespace cicada
 	
 	if (! rules.insert(edge.rule).second) continue;
 	
+	bool has_terminal = false;
 	non_terminals.clear();
 	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
 	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(riter->non_terminal_index()) : *riter);
+	  has_terminal |= (! riter->is_non_terminal());
+	}
 	
 	rule_ptr_type rule_source(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, non_terminals.begin(), non_terminals.end())));
 	
-	insert(rule_pair_type(rule_source, rule_target, features));
+	if (has_terminal)
+	  insert(rule_pair_type(rule_source, rule_target, features, attributes));
+	else
+	  insert(rule_pair_type(rule_source, rule_target, features));
       }
     }
     
@@ -104,10 +111,18 @@ namespace cicada
 	const hypergraph_type::edge_type& edge = *eiter;
 	
 	if (! rules.insert(edge.rule).second) continue;
+
+	bool has_terminal = false;
+	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	  has_terminal |= (! riter->is_non_terminal());
 	
 	rule_ptr_type rule(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	
-	insert(rule_pair_type(rule, rule, features));
+	if (has_terminal)
+	  insert(rule_pair_type(rule, rule, features, attributes));
+	else
+	  insert(rule_pair_type(rule, rule, features));
       }
     }
     
@@ -116,8 +131,8 @@ namespace cicada
 
     graph_rule_ptr_set_type rules;
     feature_set_type        features;
+    attribute_set_type      attributes;
     non_terminal_set_type   non_terminals;
-    
   };
   
 };
