@@ -33,6 +33,7 @@ hosts_file=""
 ### decoding config
 moses=""
 moses_options=""
+moses_thread=no
 config=""
 
 ### linear learning
@@ -75,6 +76,7 @@ $me [options]
   Decoding options
   -c, --config              Configuration file (required)
   -o, --options             Moses options
+  --thread                  run moses with multiple threads
   
   Training options
   -i, --iteration           PRO iterations    (default: $iteration)
@@ -195,6 +197,9 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     moses_options=$2
     shift; shift ;;
+  --thread )
+    moses_thread=yes
+    shift ;;
 
 ### test set and reference set
   --dev | -d | --devset )
@@ -486,32 +491,51 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   if test ! -e $output; then
     mkdir -p $output || exit 1
   fi
-  
-  mkdir -p $output/kbests || exit 1
 
-  ### generate scripts for kbest generation
-  kbest_generation=${output}/kbests/kbest-generation
-  for ((i=0;i<$np;++i)); do
-    kbest_file=${output}/kbests/kbest.$i
-
-    filter=`cicadapath cicada_filter_kbest_moses`
-  
-    kbest_option="-n-best-list $kbest_file $kbest distinct"
-    moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
-    filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np"
+  if test "$moses_thread" = yes; then
     
-    echo  "$moses_cmd && $filter_cmd" >> $kbest_generation
-  done  
+    kbest_file=${root}/kbest.$kbest.$iter
+    
+    qsubwrapper moses -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
+	$moses \
+	-config $moses_ini \
+	$moses_options \
+	-n-best-list $kbest_file $kbest distinct \
+	-threads $nc
+    
+    # kbest filtering..
+    qsubwrapper kbest \
+	`cicadapath cicada_filter_kbest_moses` \
+	--input $kbest_file \
+	--output $output \
+	--directory
+  else
+    mkdir -p $output/kbests || exit 1
+
+    ### generate scripts for kbest generation
+    kbest_generation=${output}/kbests/kbest-generation
+    for ((i=0;i<$np;++i)); do
+      kbest_file=${output}/kbests/kbest.$i
+
+      filter=`cicadapath cicada_filter_kbest_moses`
   
-  ### actually run
-  qsubwrapper kbest -m -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
-      `cicadapath mpimap` \
-      --prog `cicadapath mpimap` \
-      --even \
-      --input $devset \
-      $kbest_generation || exit 1
+      kbest_option="-n-best-list $kbest_file $kbest distinct"
+      moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
+      filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np"
+    
+      echo  "$moses_cmd && $filter_cmd" >> $kbest_generation
+    done  
   
-  rm -rf ${output}/kbests || exit 1
+    ### actually run
+    qsubwrapper kbest -m -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
+        `cicadapath mpimap` \
+        --prog `cicadapath mpimap` \
+        --even \
+        --input $devset \
+        $kbest_generation || exit 1
+  
+    rm -rf ${output}/kbests || exit 1
+  fi
 
   ### END of moses specific changes...
 
