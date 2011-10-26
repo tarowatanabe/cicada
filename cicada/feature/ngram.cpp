@@ -60,10 +60,10 @@ namespace cicada
 	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
 
 	phrase_type ngram;
+	size_type length;
 	double logprob;
-	int pos;
 	
-	CacheContext() : ngram(), logprob(0.0), pos(0) {}
+	CacheContext() : ngram(), length(0), logprob(0.0) {}
       };
       
       struct CacheNGram
@@ -147,22 +147,17 @@ namespace cicada
       {
 	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
-
-      template <typename Iterator1, typename Iterator2>
-      inline
-      bool equal_phrase(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2) const
-      {
-	return std::distance(first1, last1) == std::distance(first2, last2) && std::equal(first1, last1, first2);
-      }
       
       template <typename Iterator>
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
-	if (iter == last) return 0.0;
+	const size_type length = std::distance(iter, last);
+
+	if (length == 0) return 0.0;
 	
 	first = std::max(first, iter - order + 1);
 	
-	if (std::distance(iter, last) == 1) {
+	if (length == 1) {
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
 	  
@@ -174,16 +169,12 @@ namespace cicada
 		  : ngram.logprob(buffer_id.begin(), buffer_id.end()));
 	}
 	
-	const size_t cache_pos = hash_phrase(first, last, last - iter) & (cache_logprob.size() - 1);
+	const size_t cache_pos = hash_phrase(first, last, length) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
 	
-	cache_context_type::phrase_type::const_iterator citer_begin = cache.ngram.begin();
-	cache_context_type::phrase_type::const_iterator citer       = citer_begin + cache.pos;
-	cache_context_type::phrase_type::const_iterator citer_end   = cache.ngram.end();
-	
-	if (citer_begin == citer_end || ! equal_phrase(first, iter, citer_begin, citer) || ! equal_phrase(iter, last, citer, citer_end)) {
+	if (cache.length != length || ! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
-	  cache.pos = std::distance(first, iter);
+	  cache.length = length;
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
