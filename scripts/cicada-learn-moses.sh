@@ -501,14 +501,14 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 	-config $moses_ini \
 	$moses_options \
 	-n-best-list $kbest_file $kbest distinct \
-	-threads $nc
+	-threads $nc || exit 1
     
     # kbest filtering..
     qsubwrapper kbest \
 	`cicadapath cicada_filter_kbest_moses` \
 	--input $kbest_file \
 	--output $output \
-	--directory
+	--directory || exit 1
   else
     mkdir -p $output/kbests || exit 1
 
