@@ -53,18 +53,12 @@ namespace cicada
     template <typename Iterator>
     bool equal_to(size_type pos, Iterator first, Iterator last) const
     {
-      if (last - first > order)
-	throw std::runtime_error("exceed the capacity");
-      
       return std::distance(first, last) == length[pos] && std::equal(first, last, contexts.begin(pos));
     }
     
     template <typename Iterator>
     void assign(size_type pos, Iterator first, Iterator last)
     {
-      if (last - first > order)
-	throw std::runtime_error("exceed the capacity");
-      
       std::copy(first, last, contexts.begin(pos));
       length[pos] = last - first;
     }

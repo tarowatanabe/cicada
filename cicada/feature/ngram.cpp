@@ -182,6 +182,8 @@ namespace cicada
       double ngram_logprob(Iterator first, Iterator last) const
       {
 	if (first == last) return 0.0;
+
+	first = std::max(first, last - order);
 	
 	if (std::distance(first, last) <= 2)
 	  return ngram.logprob(first, last);
@@ -199,6 +201,8 @@ namespace cicada
       double ngram_logbound(Iterator first, Iterator last) const
       {
 	if (first == last) return 0.0;
+	
+	first = std::max(first, last - order);
 	
 	if (std::distance(first, last) <= 2)
 	  return ngram.logbound(first, last);
