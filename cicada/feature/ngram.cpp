@@ -272,11 +272,14 @@ namespace cicada
       template <typename Iterator>
       double ngram_estimate(Iterator first, Iterator last) const
       {
-	if (first == last) return 0.0;
-	if (std::distance(first, last) == 1)
+	const size_type length = std::distance(first, last);
+	
+	if (length == 0)
+	  return 0.0;
+	else if (length == 1)
 	  return (vocab_type::BOS == *first ? 0.0 : ngram.logbound(first, last));
 
-	const size_t cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
+	const size_type cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
 	
 	if (! equal_phrase(first, last, cache.ngram)) {
