@@ -169,7 +169,9 @@ namespace cicada
 	  for (/**/; first != last; ++ first)
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	  
-	  return ngram.logprob(buffer_id.begin(), buffer_id.end());
+	  return (coarse
+		  ? ngram.logbound(buffer_id.begin(), buffer_id.end())
+		  : ngram.logprob(buffer_id.begin(), buffer_id.end()));
 	}
 	
 	const size_t cache_pos = hash_phrase(first, last, last - iter) & (cache_logprob.size() - 1);
@@ -178,7 +180,7 @@ namespace cicada
 	cache_context_type::phrase_type::const_iterator citer_begin = cache.ngram.begin();
 	cache_context_type::phrase_type::const_iterator citer       = citer_begin + cache.pos;
 	cache_context_type::phrase_type::const_iterator citer_end   = cache.ngram.end();
-
+	
 	if (citer_begin == citer_end || ! equal_phrase(first, iter, citer_begin, citer) || ! equal_phrase(iter, last, citer, citer_end)) {
 	  cache.ngram.assign(first, last);
 	  cache.pos = iter - first;
