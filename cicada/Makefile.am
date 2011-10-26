@@ -338,6 +338,7 @@ lattice.hpp \
 matcher.hpp \
 model.hpp \
 ngram.hpp \
+ngram_cache.hpp \
 ngram_index.hpp \
 ngram_count_set.hpp \
 operation.hpp \

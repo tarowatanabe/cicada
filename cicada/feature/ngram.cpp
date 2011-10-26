@@ -6,11 +6,13 @@
 #include <memory>
 
 #include "cicada/ngram.hpp"
+#include "cicada/ngram_cache.hpp"
 #include "cicada/feature/ngram.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 #include "cicada/cluster.hpp"
 
+#include "utils/vector2.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/piece.hpp"
@@ -30,7 +32,8 @@ namespace cicada
       typedef cicada::Symbol symbol_type;
       typedef cicada::Vocab  vocab_type;
       
-      typedef cicada::NGram ngram_type;
+      typedef cicada::NGram      ngram_type;
+      typedef cicada::NGramCache ngram_cache_type;
 
       typedef cicada::Cluster cluster_type;
       
@@ -82,7 +85,7 @@ namespace cicada
       
       typedef utils::array_power2<cache_context_type,  1024 * 128, std::allocator<cache_context_type> >  cache_context_set_type;
       typedef utils::array_power2<cache_ngram_type,    1024 * 64,  std::allocator<cache_ngram_type> >    cache_ngram_set_type;
-            
+      
     public:
       typedef boost::filesystem::path path_type;
       
@@ -91,11 +94,9 @@ namespace cicada
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
-	cache_logprob.clear();
-	cache_estimate.clear();
-	
 	initialize_decay();
-
+	initialize_cache();
+	
 	id_oov = ngram.index.vocab()[vocab_type::UNK];
       }
 
@@ -111,10 +112,8 @@ namespace cicada
 	  id_oov(x.id_oov)
 	  
       {
-	cache_logprob.clear();
-	cache_estimate.clear();
-	
 	initialize_decay();
+	initialize_cache();
       }
 
       NGramImpl& operator=(const NGramImpl& x)
@@ -129,11 +128,9 @@ namespace cicada
 	feature_name     = x.feature_name;
 	feature_name_oov = x.feature_name_oov;
 	id_oov           = x.id_oov;
-	
-	cache_logprob.clear();
-	cache_estimate.clear();
-	
+		
 	initialize_decay();
+	initialize_cache();
 	
 	return *this;
       }
@@ -150,6 +147,15 @@ namespace cicada
 	}
       }
 
+      void initialize_cache()
+      {
+	cache_logprob.clear();
+	cache_estimate.clear();
+	
+	ngram_cache_logprob  = ngram_cache_type(ngram.index.order());
+	ngram_cache_logbound = ngram_cache_type(ngram.index.order());
+      }
+      
       template <typename Iterator>
       inline
       size_t hash_phrase(Iterator first, Iterator last, size_t seed=0) const
@@ -169,6 +175,41 @@ namespace cicada
       bool equal_phrase(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2) const
       {
 	return std::distance(first1, last1) == std::distance(first2, last2) && std::equal(first1, last1, first2);
+      }
+      
+      
+      template <typename Iterator>
+      double ngram_logprob(Iterator first, Iterator last) const
+      {
+	if (first == last) return 0.0;
+	
+	if (std::distance(first, last) <= 2)
+	  return ngram.logprob(first, last);
+	
+	const size_type cache_pos = ngram_cache_logprob(first, last);
+	if (! ngram_cache_logprob.equal_to(cache_pos, first, last)) {
+	  const_cast<ngram_cache_type&>(ngram_cache_logprob).score(cache_pos) = ngram.logprob(first, last);
+	  const_cast<ngram_cache_type&>(ngram_cache_logprob).assign(cache_pos, first, last);
+	}
+	
+	return ngram_cache_logprob.score(cache_pos);
+      }
+      
+      template <typename Iterator>
+      double ngram_logbound(Iterator first, Iterator last) const
+      {
+	if (first == last) return 0.0;
+	
+	if (std::distance(first, last) <= 2)
+	  return ngram.logbound(first, last);
+	
+	const size_type cache_pos = ngram_cache_logbound(first, last);
+	if (! ngram_cache_logbound.equal_to(cache_pos, first, last)) {
+	  const_cast<ngram_cache_type&>(ngram_cache_logbound).score(cache_pos) = ngram.logbound(first, last);
+	  const_cast<ngram_cache_type&>(ngram_cache_logbound).assign(cache_pos, first, last);
+	}
+	
+	return ngram_cache_logbound.score(cache_pos);
       }
       
       template <typename Iterator>
@@ -200,12 +241,14 @@ namespace cicada
 	  if (coarse) {
 	    for (/**/; iter != last; ++ iter) {
 	      buffer_id.push_back(ngram.index.vocab()[*iter]);
-	      cache.logprob += ngram.logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      //cache.logprob += ngram.logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      cache.logprob += ngram_logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	    }
 	  } else {
 	    for (/**/; iter != last; ++ iter) {
 	      buffer_id.push_back(ngram.index.vocab()[*iter]);
-	      cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      //cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	      cache.logprob += ngram_logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	    }
 	  }
 	}
@@ -232,7 +275,7 @@ namespace cicada
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	    
 	    if (buffer_id.size() == 1 && vocab_type::BOS == *first) continue;
-	    
+#if 0
 	    bool estimated = false;
 	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	    
@@ -240,6 +283,8 @@ namespace cicada
 	      logbound *= decays[buffer_id.size()];
 	    
 	    cache.logprob += logbound;
+#endif
+	    cache.logprob += ngram_logbound(buffer_id.begin(), buffer_id.end());
 	  }
 	}
 	  
@@ -548,7 +593,7 @@ namespace cicada
 	
 	const symbol_type* citer_end = context;
 	
-	for (/**/; citer_end != context_end && *citer_end != vocab_type::STAR && *citer_end != vocab_type::EMPTY; ++ citer_end);
+	for (/**/; citer_end != context_end && *citer_end != vocab_type::STAR && *citer_end != vocab_type::EMPTY; ++ citer_end) {}
 	
 	return ngram_estimate(context, citer_end);
       }
@@ -615,6 +660,9 @@ namespace cicada
       // caching...
       cache_context_set_type  cache_logprob;
       cache_ngram_set_type    cache_estimate;
+      
+      ngram_cache_type  ngram_cache_logprob;
+      ngram_cache_type  ngram_cache_logbound;
       
       // actual buffers...
       buffer_type    buffer_impl;
