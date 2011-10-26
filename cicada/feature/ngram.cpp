@@ -183,7 +183,7 @@ namespace cicada
 	
 	if (citer_begin == citer_end || ! equal_phrase(first, iter, citer_begin, citer) || ! equal_phrase(iter, last, citer, citer_end)) {
 	  cache.ngram.assign(first, last);
-	  cache.pos = iter - first;
+	  cache.pos = std::distance(first, iter);
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
