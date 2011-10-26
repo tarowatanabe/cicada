@@ -498,6 +498,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     
     qsubwrapper moses -l ${root}decode.$iter.log -o ${root}decode.$iter.out \
 	$moses \
+	-input-file $devset \
 	-config $moses_ini \
 	$moses_options \
 	-n-best-list $kbest_file $kbest distinct \
