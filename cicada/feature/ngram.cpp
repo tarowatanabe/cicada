@@ -220,6 +220,7 @@ namespace cicada
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
 	if (iter == last) return 0.0;
+	if (std::distance(iter, last) == 1) return ngram.logprob(first, last);
 	
 	first = std::max(first, iter - order + 1);
 	
@@ -264,30 +265,23 @@ namespace cicada
       double ngram_estimate(Iterator first, Iterator last) const
       {
 	if (first == last) return 0.0;
+	if (std::distance(first, last) == 1) return ngram.logbound(first, last);
 
 	const size_t cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
-	  
+	
 	if (! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
-
+	  
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	    
 	    if (buffer_id.size() == 1 && vocab_type::BOS == *first) continue;
-#if 0
-	    bool estimated = false;
-	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	    
-	    if (! ngram.bound_exact && estimated && logbound < 0.0)
-	      logbound *= decays[buffer_id.size()];
-	    
-	    cache.logprob += logbound;
-#endif
 	    cache.logprob += ngram_logbound(buffer_id.begin(), buffer_id.end());
 	  }
 	}
