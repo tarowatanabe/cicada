@@ -199,7 +199,6 @@ namespace cicada
 	if (cache.length != length || ! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
 	  cache.length = length;
-	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
@@ -207,11 +206,14 @@ namespace cicada
 	  for (/**/; first != iter; ++ first)
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	  
+	  double score = 0.0;
 	  for (/**/; iter != last; ++ iter) {
 	    buffer_id.push_back(ngram.index.vocab()[*iter]);
 	    
-	    cache.logprob += scorer(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	    score += scorer(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	  }
+	  
+	  cache.logprob = score;
 	}
 	
 	return cache.logprob;
@@ -244,7 +246,9 @@ namespace cicada
 		  : scorer(buffer, buffer + 1) + scorer(buffer, buffer + 2));
 	}
 	
+	
 	const size_type cache_pos = cache_estimate(first, last);
+	
 	if (! cache_estimate.equal_to(cache_pos, first, last)) {
 	  ngram_cache_type& cache = const_cast<ngram_cache_type&>(cache_estimate);
 	  cache.assign(cache_pos, first, last);
@@ -267,6 +271,7 @@ namespace cicada
 	  
 	  cache.score(cache_pos) = score;
 	}
+	
 	return cache_estimate.score(cache_pos);
       }
 
@@ -362,7 +367,7 @@ namespace cicada
 	
 	if (states.empty()) {
 	  symbol_type* context = reinterpret_cast<symbol_type*>(state);
-	  std::fill(context, context + order * 2, vocab_type::EMPTY);
+	  symbol_type* context_end = context + order * 2;
 	  
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
@@ -373,7 +378,9 @@ namespace cicada
 	  
 	  if (static_cast<int>(buffer.size()) <= context_size) {
 	    std::copy(buffer.begin(), buffer.end(), context);
-	    return 0.0;
+	    std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
+	    
+	    return ngram_estimate(buffer.begin(), buffer.end());
 	  } else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
 	    buffer_type::const_iterator biter_end   = buffer.end();
@@ -384,8 +391,9 @@ namespace cicada
 	    std::copy(prefix.first, prefix.second, context);
 	    context[prefix.second - prefix.first] = vocab_type::STAR;
 	    std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	    std::fill(context + (prefix.second - prefix.first) + 1 + (suffix.second - suffix.first), context_end, vocab_type::EMPTY);
 	    
-	    return ngram_score(prefix.first, prefix.second, suffix.second);
+	    return ngram_estimate(prefix.first, prefix.second) + ngram_score(prefix.first, prefix.second, suffix.second);
 	  }
 	}
 
@@ -442,7 +450,7 @@ namespace cicada
 	
 	// construct state vector..
 	symbol_type* context = reinterpret_cast<symbol_type*>(state);
-	std::fill(context, context + order * 2, vocab_type::EMPTY);
+	symbol_type* context_end = context + order * 2;
 	
 	if (star_first >= 0) {
 	  const int prefix_size = utils::bithack::min(star_first, context_size);
@@ -457,12 +465,15 @@ namespace cicada
 	  std::copy(prefix.first, prefix.second, context);
 	  context[prefix.second - prefix.first] = vocab_type::STAR;
 	  std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	  std::fill(context + (prefix.second - prefix.first) + 1 + (suffix.second - suffix.first), context_end, vocab_type::EMPTY);
 	  
 	  score += ngram_estimate(prefix.first, prefix.second);
 	  score += ngram_score(prefix.first, prefix.second, biter_begin + prefix_size);
 	} else {
 	  if (static_cast<int>(buffer.size()) <= context_size) {
 	    std::copy(buffer.begin(), buffer.end(), context);
+	    std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
+	    
 	    score += ngram_estimate(buffer.begin(), buffer.end());
 	  } else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
@@ -474,6 +485,7 @@ namespace cicada
 	    std::copy(prefix.first, prefix.second, context);
 	    context[prefix.second - prefix.first] = vocab_type::STAR;
 	    std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	    std::fill(context + (prefix.second - prefix.first) + 1 + (suffix.second - suffix.first), context_end, vocab_type::EMPTY);
 	    
 	    score += ngram_estimate(prefix.first, prefix.second);
 	    score += ngram_score(prefix.first, prefix.second, biter_begin + context_size);
