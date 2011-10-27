@@ -60,7 +60,7 @@ namespace cicada
     void assign(size_type pos, Iterator first, Iterator last)
     {
       std::copy(first, last, contexts.begin(pos));
-      length[pos] = last - first;
+      length[pos] = std::distance(first, last);
     }
     
   private:
