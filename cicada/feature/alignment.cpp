@@ -70,7 +70,6 @@ namespace cicada
 					const state_ptr_set_type& states,
 					const edge_type& edge,
 					feature_set_type& features,
-					feature_set_type& estimates,
 					const bool final) const
       {
 	attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_position);
@@ -294,7 +293,6 @@ namespace cicada
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
 			    feature_set_type& features,
-			    feature_set_type& estimates,
 			    const bool final) const
       {
 	if (states.empty()) {
@@ -422,7 +420,6 @@ namespace cicada
 				const state_ptr_set_type& states,
 				const edge_type& edge,
 				feature_set_type& features,
-				feature_set_type& estimates,
 				const bool final) const
       {
 	// how do we define distortion covered by forest...
@@ -522,7 +519,6 @@ namespace cicada
 				      const state_ptr_set_type& states,
 				      const edge_type& edge,
 				      feature_set_type& features,
-				      feature_set_type& estimates,
 				      const bool final) const
       {
 	
@@ -575,7 +571,6 @@ namespace cicada
 				    const state_ptr_set_type& states,
 				    const edge_type& edge,
 				    feature_set_type& features,
-				    feature_set_type& estimates,
 				    const bool final) const
       {
 	symbol_type* context = reinterpret_cast<symbol_type*>(state);
@@ -756,7 +751,6 @@ namespace cicada
 				const state_ptr_set_type& states,
 				const edge_type& edge,
 				feature_set_type& features,
-				feature_set_type& estimates,
 				const bool final) const
       {
 	if (! states.empty()) return;

@@ -140,14 +140,12 @@ namespace cicada
     state_type apply(const state_set_type& node_states,
 		     const edge_type& edge,
 		     feature_set_type& features,
-		     feature_set_type& estimates,
 		     const bool final=false) const;
     
     // score with coarse states
     state_type apply_coarse(const state_set_type& node_states,
 			    const edge_type& edge,
 			    feature_set_type& features,
-			    feature_set_type& estimates,
 			    const bool final=false) const;
     
     // score by incremental application
@@ -155,20 +153,17 @@ namespace cicada
 		       const state_set_type& node_states,
 		       const edge_type& edge,
 		       feature_set_type& features,
-		       feature_set_type& estimates,
 		       const bool final=false) const;
     void apply_scan(state_type& state,
 		    const state_set_type& node_states,
 		    const edge_type& edge,
 		    const int dot,
 		    feature_set_type& features,
-		    feature_set_type& estimates,
 		    const bool final=false) const;
     void apply_complete(state_type& state,
 			const state_set_type& node_states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final=false) const;
     
     void deallocate(const state_type& state) const;

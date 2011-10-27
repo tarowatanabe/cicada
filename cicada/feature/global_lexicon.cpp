@@ -167,7 +167,6 @@ namespace cicada
 			      const state_ptr_set_type& states,
 			      const edge_type& edge,
 			      feature_set_type& features,
-			      feature_set_type& estimates,
 			      const bool final) const
     {
       const double score = pimpl->global_lexicon_score(edge);
@@ -182,20 +181,18 @@ namespace cicada
 				     const state_ptr_set_type& states,
 				     const edge_type& edge,
 				     feature_set_type& features,
-				     feature_set_type& estimates,
 				     const bool final) const
     {
-      apply(state, states, edge, features, estimates, final);
+      apply(state, states, edge, features, final);
     }
 
     void GlobalLexicon::apply_predict(state_ptr_type& state,
 				      const state_ptr_set_type& states,
 				      const edge_type& edge,
 				      feature_set_type& features,
-				      feature_set_type& estimates,
 				      const bool final) const
     {
-      apply(state, states, edge, features, estimates, final);
+      apply(state, states, edge, features, final);
     }
     
     void GlobalLexicon::apply_scan(state_ptr_type& state,
@@ -203,14 +200,12 @@ namespace cicada
 				   const edge_type& edge,
 				   const int dot,
 				   feature_set_type& features,
-				   feature_set_type& estimates,
 				   const bool final) const
     {}
     void GlobalLexicon::apply_complete(state_ptr_type& state,
 				       const state_ptr_set_type& states,
 				       const edge_type& edge,
 				       feature_set_type& features,
-				       feature_set_type& estimates,
 				       const bool final) const
     {}
 

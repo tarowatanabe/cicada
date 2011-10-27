@@ -114,8 +114,7 @@ namespace cicada
 	  edge_new.features   = edge.features;
 	  edge_new.attributes = edge.attributes;
 
-	  feature_set_type estimates;
-	  const state_type state = model.apply(node_states, edge_new, edge_new.features, estimates, is_goal);
+	  const state_type state = model.apply(node_states, edge_new, edge_new.features, is_goal);
 	  
 	  // hypothesis recombination
 	  

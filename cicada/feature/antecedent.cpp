@@ -371,7 +371,6 @@ namespace cicada
 			   const state_ptr_set_type& states,
 			   const edge_type& edge,
 			   feature_set_type& features,
-			   feature_set_type& estimates,
 			   const bool final) const
     {
       features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
@@ -388,7 +387,6 @@ namespace cicada
 				  const state_ptr_set_type& states,
 				  const edge_type& edge,
 				  feature_set_type& features,
-				  feature_set_type& estimates,
 				  const bool final) const
     {
       
@@ -398,7 +396,6 @@ namespace cicada
 				   const state_ptr_set_type& states,
 				   const edge_type& edge,
 				   feature_set_type& features,
-				   feature_set_type& estimates,
 				   const bool final) const
     {}
     
@@ -407,17 +404,15 @@ namespace cicada
 				const edge_type& edge,
 				const int dot,
 				feature_set_type& features,
-				feature_set_type& estimates,
 				const bool final) const
     {}
     void Antecedent::apply_complete(state_ptr_type& state,
 				    const state_ptr_set_type& states,
 				    const edge_type& edge,
 				    feature_set_type& features,
-				    feature_set_type& estimates,
 				    const bool final) const
     {
-      apply(state, states, edge, features, estimates, final);
+      apply(state, states, edge, features, final);
     }
 
     void Antecedent::initialize()

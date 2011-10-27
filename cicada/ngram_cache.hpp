@@ -26,9 +26,9 @@ namespace cicada
 
     static const size_type cache_size = 1024 * 64;
     
-    typedef utils::vector2<symbol_type::id_type, std::allocator<symbol_type::id_type> > context_set_type;
-    typedef utils::array_power2<double, cache_size, std::allocator<double> >            score_set_type;
-    typedef utils::array_power2<uint8_t, cache_size, std::allocator<uint8_t> >          length_set_type;
+    typedef utils::vector2<symbol_type, std::allocator<symbol_type> >          context_set_type;
+    typedef utils::array_power2<double, cache_size, std::allocator<double> >   score_set_type;
+    typedef utils::array_power2<uint8_t, cache_size, std::allocator<uint8_t> > length_set_type;
     
   public:
     NGramCache(const int order=3)

@@ -92,6 +92,7 @@ ngram: ngram language model\n\
 \torder=<order>\n\
 \tcluster=<word class>\n\
 \tname=feature-name(default: ngram)\n\
+\tapproximate=[true|false] approximated upper-bound estimates\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tcoarse-order=<order> ngram order for coarse heuristic\n\

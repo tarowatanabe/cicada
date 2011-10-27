@@ -79,7 +79,6 @@ namespace cicada
       index_set_type j;
       
       score_type score;
-      score_type estimate;
       
       Candidate(const index_set_type& __j)
 	: in_edge(0), j(__j) {}
@@ -95,12 +94,11 @@ namespace cicada
     {
       id_type node;
       score_type score;
-      score_type estimate;
 
-      node_score_type() : node(), score(), estimate() {}
+      node_score_type() : node(), score() {}
 
-      node_score_type(const id_type __node, const score_type& __score, const score_type& __estimate)
-	: node(__node), score(__score), estimate(__estimate) {}
+      node_score_type(const id_type __node, const score_type& __score)
+	: node(__node), score(__score) {}
     };
     
     typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
@@ -126,7 +124,7 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->estimate < y->estimate;
+	return x->score < y->score;
       }
     };
     
@@ -135,12 +133,12 @@ namespace cicada
       // we will use greater, so that simple sort will yield estimated score order...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->estimate > y->estimate;
+	return x->score > y->score;
       }
 
       bool operator()(const node_score_type& x, const node_score_type& y) const
       {
-	return x.estimate > y.estimate;
+	return x.score > y.score;
       }
     };
 
@@ -247,7 +245,7 @@ namespace cicada
       
       typename state_node_map_type::const_iterator biter_end = buf.end();
       for (typename state_node_map_type::const_iterator biter = buf.begin(); biter != biter_end; ++ biter)
-	D[v].push_back(node_score_type(biter->second->out_edge.head, biter->second->score, biter->second->estimate));
+	D[v].push_back(node_score_type(biter->second->out_edge.head, biter->second->score));
       
       std::sort(D[v].begin(), D[v].end(), compare_estimate_type());
 
@@ -307,10 +305,8 @@ namespace cicada
 	
 	// check if we found better derivation.. 
 	// it may happen due to insufficient contextual information during parsing...
-	if (item.score > item_graph.score) {
+	if (item.score > item_graph.score)
 	  item_graph.score  = item.score;
-	  item_graph.estimate = item.estimate;
-	}
       }
       
       //std::cerr << "finished append-item" << std::endl;
@@ -505,7 +501,6 @@ namespace cicada
       candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
       candidate.score = semiring::traits<score_type>::one();
-      candidate.estimate = semiring::traits<score_type>::one();
       for (size_t i = 0; i != j.size(); ++ i) {
 	const node_score_type& antecedent = D[edge.tails[i]][j[i]];
 	
@@ -515,12 +510,8 @@ namespace cicada
       
       // perform actual model application...
       
-      feature_set_type estimates;
-      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, estimates, is_goal);
-      
-      candidate.score    *= function(candidate.out_edge.features);
-      candidate.estimate *= function(estimates);
-      candidate.estimate *= candidate.score;
+      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
+      candidate.score *= function(candidate.out_edge.features);
 
       //std::cerr << "make candidate done" << std::endl;
       

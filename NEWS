@@ -1,3 +1,6 @@
+2011-10-x
+Better feature application: completely removed "estimates." Now, we should encode estiamted score in each hypothesis
+
 2011-10-26
 Support posterior matrix dumping in cicada_lexicon_{model1,hmm}
 Support MST dependency in cicada_lexicon_{model1,hmm}

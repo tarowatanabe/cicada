@@ -84,7 +84,6 @@ namespace cicada
       int dot_antecedent;
       
       score_type score;
-      score_type estimate;
       
       Candidate() : parent(0), in_edge(0), dot(0), dot_antecedent(0) {}
       Candidate(const edge_type& __edge)
@@ -146,7 +145,7 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->estimate < y->estimate;
+	return x->score < y->score;
       }
     };
     
@@ -235,12 +234,9 @@ namespace cicada
 
 	candidate_type& candidate = candidates.back();
 	
-	feature_set_type estimates;
-	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, estimates, true);
+	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, true);
 	
-	candidate.score    = function(candidate.out_edge.features);
-	candidate.estimate = function(estimates);
-	candidate.estimate *= candidate.score;
+	candidate.score = function(candidate.out_edge.features);
 	
 	states.front().buf.push(&candidate);
       }
@@ -280,22 +276,18 @@ namespace cicada
 	    }
 
 	    feature_set_type features;
-	    feature_set_type estimates;
 	    
 	    //std::cerr << "scan" << std::endl;
 	    
-	    model.apply_scan(item->state, node_states, item->out_edge, item->dot, features, estimates, is_goal);
+	    model.apply_scan(item->state, node_states, item->out_edge, item->dot, features, is_goal);
 	    
 	    //std::cerr << "scan done" << std::endl;
 	    
 	    item->out_edge.features += features;
 	    
 	    const score_type score    = function(features);
-	    const score_type estimate = function(estimates);
 	    
 	    item->score    *= score;
-	    item->estimate *= score;
-	    item->estimate *= estimate;
 	    
 	    // proceed dot(s)
 	    for (/**/; item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal(); ++ item->dot);
@@ -310,23 +302,19 @@ namespace cicada
 	    
 	    // complete...
 	    feature_set_type features;
-	    feature_set_type estimates;
 	    
 	    // scoring
 	    //std::cerr << "complete: " << (is_goal ? "goal" : "non-goal") << std::endl;
 	    
-	    model.apply_complete(item->state, node_states, item->out_edge, features, estimates, is_goal);
+	    model.apply_complete(item->state, node_states, item->out_edge, features, is_goal);
 
 	    //std::cerr << "complete done" << std::endl;
 	    
 	    item->out_edge.features += features;
 	    
 	    const score_type score    = function(features);
-	    const score_type estimate = function(estimates);
 	    
 	    item->score    *= score;
-	    item->estimate *= score;
-	    item->estimate *= estimate;
 	    
 	    //
 	    // graph_out's node is differentiated by in_edge->head and current state...
@@ -367,7 +355,6 @@ namespace cicada
 	      if (! propagate) break;
 	      
 	      const score_type score    = item->score;
-	      const score_type estimate = item->estimate;
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
@@ -377,7 +364,6 @@ namespace cicada
 	      *item = *(item->parent);
 	      item->state = model.clone(siter->first);
 	      item->score    *= score;
-	      item->estimate *= estimate;
 	      
 #if 0
 	      std::cerr << "parent head: " << item->in_edge->head
@@ -419,19 +405,12 @@ namespace cicada
 	      
 	      candidate.state = model.clone(item->state);
 	      
-	      feature_set_type estimates;
+	      model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
 	      
-	      model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, estimates, false);
+	      const score_type score = function(candidate.out_edge.features);
 	      
-	      const score_type score    = function(candidate.out_edge.features);
-	      const score_type estimate = function(estimates);
-	      
-	      candidate.score    = parent.score;
-	      candidate.estimate = parent.estimate;
-	      
-	      candidate.score    *= score;
-	      candidate.estimate *= score;
-	      candidate.estimate *= estimate;
+	      candidate.score = parent.score;
+	      candidate.score *= score;
 	      
 	      states[step + 1].buf.push(&candidate);
 	    }

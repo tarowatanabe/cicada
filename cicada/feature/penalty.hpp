@@ -24,7 +24,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -34,7 +33,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -44,7 +42,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -55,14 +52,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
 
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new WordPenalty(*this)); }
@@ -93,7 +88,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -102,7 +96,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -112,7 +105,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -123,14 +115,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
       
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new RulePenalty(*this)); }
@@ -152,7 +142,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -161,7 +150,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -171,7 +159,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -182,14 +169,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
       
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new ArityPenalty(*this)); }
@@ -211,7 +196,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -220,7 +204,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -230,7 +213,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -241,14 +223,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
       
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new GlueTreePenalty(*this)); }
@@ -284,7 +264,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -293,7 +272,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -303,7 +281,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -314,14 +291,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
       
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new NonLatinPenalty(*this)); }
@@ -345,7 +320,6 @@ namespace cicada
 		 const state_ptr_set_type& states,
 		 const edge_type& edge,
 		 feature_set_type& features,
-		 feature_set_type& estimates,
 		 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -354,7 +328,6 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			feature_set_type& features,
-			feature_set_type& estimates,
 			const bool final) const
       {
 	apply_estimate(edge, features);
@@ -364,7 +337,6 @@ namespace cicada
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
 			 feature_set_type& features,
-			 feature_set_type& estimates,
 			 const bool final) const
       {
 	apply_estimate(edge, features);
@@ -375,14 +347,12 @@ namespace cicada
 		      const edge_type& edge,
 		      const int dot,
 		      feature_set_type& features,
-		      feature_set_type& estimates,
 		      const bool final) const {}
       
       void apply_complete(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new InternalNodePenalty(*this)); }

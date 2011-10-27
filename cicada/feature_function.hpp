@@ -81,13 +81,11 @@ namespace cicada
     // features: accumulated features.
     //           You should assign by features[feature-name] = score (see feature/ngram.cc), not like features[feature-name] += score
     //           since "apply" can be applied multiple times for the same edge depending on the algorithms
-    // estiamtes: upper bound estiamates
     // final:     final flag indicating that the edge's head is goal
     virtual void apply(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
 		       feature_set_type& features,
-		       feature_set_type& estimates,
 		       const bool final) const = 0;
     
     // similar to apply, but used for coarse-heuristic functions used in cube-growing
@@ -95,7 +93,6 @@ namespace cicada
 			      const state_ptr_set_type& states,
 			      const edge_type& edge,
 			      feature_set_type& features,
-			      feature_set_type& estimates,
 			      const bool final) const = 0;
 
 
@@ -104,20 +101,17 @@ namespace cicada
 			       const state_ptr_set_type& states,
 			       const edge_type& edge,
 			       feature_set_type& features,
-			       feature_set_type& estimates,
 			       const bool final) const = 0;
     virtual void apply_scan(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
 			    const int dot,
 			    feature_set_type& features,
-			    feature_set_type& estimates,
 			    const bool final) const = 0;
     virtual void apply_complete(state_ptr_type& state,
 				const state_ptr_set_type& states,
 				const edge_type& edge,
 				feature_set_type& features,
-				feature_set_type& estimates,
 				const bool final) const = 0;
         
     // cloning.. You should be careful for copying objects so that different threads 

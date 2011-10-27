@@ -103,7 +103,6 @@ namespace cicada
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates,
 			  const bool final) const
     {
       state_ptr_type     state_bleu;
@@ -115,7 +114,7 @@ namespace cicada
 	for (size_t k = 0; k != states.size(); ++ k)
 	  states_bleu[k] = static_cast<char*>(states[k]) + size;
 	
-	bleus[i]->apply(state_bleu, states_bleu, edge, features, estimates, final);
+	bleus[i]->apply(state_bleu, states_bleu, edge, features, final);
 	size += bleus[i]->state_size();
       }
     }
@@ -123,7 +122,6 @@ namespace cicada
 				 const state_ptr_set_type& states,
 				 const edge_type& edge,
 				 feature_set_type& features,
-				 feature_set_type& estimates,
 				 const bool final) const
     {
 
@@ -132,7 +130,6 @@ namespace cicada
 				  const state_ptr_set_type& states,
 				  const edge_type& edge,
 				  feature_set_type& features,
-				  feature_set_type& estimates,
 				  const bool final) const
     {
     }
@@ -141,7 +138,6 @@ namespace cicada
 			       const edge_type& edge,
 			       const int dot,
 			       feature_set_type& features,
-			       feature_set_type& estimates,
 			       const bool final) const
     {
     }
@@ -149,7 +145,6 @@ namespace cicada
 				   const state_ptr_set_type& states,
 				   const edge_type& edge,
 				   feature_set_type& features,
-				   feature_set_type& estimates,
 				   const bool final) const
     {
       state_ptr_type     state_bleu;
@@ -161,7 +156,7 @@ namespace cicada
 	for (size_t k = 0; k != states.size(); ++ k)
 	  states_bleu[k] = static_cast<char*>(states[k]) + size;
 	
-	bleus[i]->apply_complete(state_bleu, states_bleu, edge, features, estimates, final);
+	bleus[i]->apply_complete(state_bleu, states_bleu, edge, features, final);
 	size += bleus[i]->state_size();
       }
     }

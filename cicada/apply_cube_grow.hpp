@@ -78,7 +78,6 @@ namespace cicada
       index_set_type j;
       
       score_type score;
-      score_type estimate;
       
       Candidate(const index_set_type& __j)
 	: in_edge(0), j(__j) {}
@@ -111,7 +110,7 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->estimate < y->estimate;
+	return x->score < y->score;
       }
     };
     
@@ -249,7 +248,7 @@ namespace cicada
 	
 	// enum item with current bound
 	if (! state.cand.empty())
-	  enum_item(state, state.cand.top()->estimate, is_goal, graph_out);
+	  enum_item(state, state.cand.top()->score, is_goal, graph_out);
       }
       
       // enum item with zero bound
@@ -299,7 +298,7 @@ namespace cicada
     {
       // while |buf| and min(buf) < bound (min-cost)
       //  append pop-min to D
-      while (! state.buf.empty() && state.buf.top()->estimate > bound) {
+      while (! state.buf.empty() && state.buf.top()->score > bound) {
 	const candidate_type* item = state.buf.top();
 	state.buf.pop();
 	
@@ -349,7 +348,6 @@ namespace cicada
       candidate_type& candidate = const_cast<candidate_type&>(__item);
       
       candidate.score = semiring::traits<score_type>::one();
-      candidate.estimate = semiring::traits<score_type>::one();
       for (size_t i = 0; i != candidate.j.size(); ++ i) {
 	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
 	
@@ -363,14 +361,11 @@ namespace cicada
       // assign node-id of in-graph for scoring...
       const_cast<id_type&>(candidate.out_edge.head) = candidate.in_edge->head;
       
-      feature_set_type estimates;
-      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, estimates, is_goal);
+      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
       
       const_cast<id_type&>(candidate.out_edge.head) = node_id_coarse;
       
       candidate.score    *= function(candidate.out_edge.features);
-      candidate.estimate *= function(estimates);
-      candidate.estimate *= candidate.score;
       
       state.buf.push(&candidate);
     }
@@ -384,7 +379,6 @@ namespace cicada
       candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
       candidate.score = semiring::traits<score_type>::one();
-      candidate.estimate = semiring::traits<score_type>::one();
       for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
@@ -395,12 +389,9 @@ namespace cicada
       
       // perform "estimated" coarse model application
       feature_set_type features(candidate.out_edge.features);
-      feature_set_type estimates;
-      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, features, estimates, is_goal);
+      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, features, is_goal);
       
-      candidate.score    *= function(features);
-      candidate.estimate *= function(estimates);
-      candidate.estimate *= candidate.score;
+      candidate.score *= function(features);
       
       // no state merging...
       //candidate.node = node_states_coarse.size();
