@@ -100,12 +100,19 @@ namespace cicada
   public:
     
     state_type root() const { return index.root(); }
-    
-    template <typename _Word>
-    state_type next(const state_type& state, const _Word& word) const { return index.next(state, word); }
-    
-    state_type suffix(const state_type& state) const { return index.suffix(state); }
 
+    template <typename Iterator>
+    std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
+    {
+      return index.prefix(first, last);
+    }
+    
+    template <typename Iterator>
+    state_type suffix(Iterator first, Iterator last) const
+    {
+      return index.suffix(first, last);
+    }
+    
     template <typename _Word>
     std::pair<logprob_type, state_type> logbound(const state_type& state, const _Word& word) const
     {
@@ -190,8 +197,6 @@ namespace cicada
 	state = index.suffix(state);
       }
     }
-
-    
     
     template <typename Iterator>
     std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const

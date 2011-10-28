@@ -180,6 +180,7 @@ namespace cicada
       {
 	return (pos < offsets[1] ? size_type(-1) : positions.select(pos + 1 - offsets[1], true) + (offsets[1] + 1) - pos - 1);
       }
+      
       size_type children_first(size_type pos) const
       {
 	if (pos == size_type(-1) || pos == 0)
@@ -187,6 +188,7 @@ namespace cicada
 	else
 	  return children_last(pos - 1);
       }
+      
       size_type children_last(size_type pos) const
       {
 	if (pos == size_type(-1) || pos >= position_size()) {
@@ -416,6 +418,20 @@ namespace cicada
   public:
     state_type root() const { return state_type(); }
     
+    template <typename Iterator>
+    std::pair<Iterator, state_type> next(state_type state, Iterator first, Iterator last) const
+    {
+      for (/**/; first != last; ++ first) {
+	const state_type state_next = next(state, *first);
+	if (state_next.is_root_node())
+	  return std::make_pair(first, state);
+	
+	state = state_next;
+      }
+      
+      return std::make_pair(first, state);
+    }
+    
     template <typename _Word>
     state_type next(const state_type& state, const _Word& word) const
     {
@@ -451,11 +467,79 @@ namespace cicada
 	const shard_type& shard = __shards[state.shard()];
 	const size_type node = state.node();
 	
-	size_type order = 2;
-	for (/**/; order != shard.offsets.size() && node < shard.offsets[order]; ++ order) {}
+	size_type order = 3;
+	for (/**/; order < shard.offsets.size() && node < shard.offsets[order]; ++ order) {}
 	return order - 1;
       }
     }
+
+    template <typename Iterator>
+    std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
+    {
+      if (first == last || first + 1 == last) return std::make_pair(first, last);
+      
+      return std::make_pair(first, std::min(next(state_type(), first, last).first + 1, last));
+    }
+
+    template <typename Iterator>
+    state_type suffix(Iterator first, Iterator last) const 
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
+      
+      return __suffix(first, last, value_type());
+    }
+
+    template <typename Iterator, typename _Word>
+    state_type __suffix(Iterator first, Iterator last, _Word) const 
+    {
+      typedef std::vector<id_type, std::allocator<id_type> > buffer_type;
+      
+      const size_type length = std::distance(first, last);
+
+      if (length == 0)
+	return state_type();
+      else if (length == 1) {
+	const state_type state = next(state_type(), *first);
+	return (state.is_root_node() ? state_type() : state);
+      }
+
+      buffer_type buffer(length);
+      for (typename buffer_type::iterator biter = buffer.begin(); first != last; ++ first, ++ biter)
+	*biter = vocab[*first];
+      
+      return __suffix(buffer.begin(), buffer.end(), id_type());
+    }
+    
+    template <typename Iterator>
+    state_type __suffix(Iterator first, Iterator last, id_type) const 
+    {
+      const size_type length = std::distance(first, last);
+      
+      if (length == 0)
+	return state_type();
+      else if (length == 1) {
+	const state_type state = next(state_type(), *first);
+	return (state.is_root_node() ? state_type() : state);
+      }
+      
+      first = std::max(first, last - order());
+      
+      state_type state;
+      
+      while (first != last) {
+	std::pair<Iterator, state_type> result = next(state, first, last);
+	
+	if (result.first == last)
+	  return result.second;
+	else {
+	  first = result.first;
+	  state = suffix(result.second);
+	}
+      }
+      
+      return state_type();
+    }
+    
     
     state_type suffix(const state_type& state) const
     {
