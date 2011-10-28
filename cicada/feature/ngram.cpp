@@ -35,6 +35,8 @@ namespace cicada
       typedef cicada::NGram      ngram_type;
       typedef cicada::NGramCache ngram_cache_type;
       
+      typedef ngram_type::state_type ngram_state_type;
+      
       typedef cicada::Cluster cluster_type;
       
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
@@ -146,9 +148,15 @@ namespace cicada
 	__ngram_score_logprob(const ngram_type& __ngram) : ngram(__ngram) {}
 	
 	template <typename Iterator>
-	double operator()(Iterator first, Iterator last) const
+	ngram_type::logprob_type operator()(Iterator first, Iterator last) const
 	{
 	  return ngram.logprob(first, last);
+	}
+
+	template <typename Word>
+	std::pair<ngram_type::logprob_type, ngram_state_type> operator()(const ngram_state_type& state, const Word& word) const
+	{
+	  return ngram.logprob(state, word);
 	}
       };
 
@@ -159,9 +167,15 @@ namespace cicada
 	__ngram_score_logbound(const ngram_type& __ngram) : ngram(__ngram) {}
 	
 	template <typename Iterator>
-	double operator()(Iterator first, Iterator last) const
+	ngram_type::logprob_type operator()(Iterator first, Iterator last) const
 	{
 	  return ngram.logbound(first, last);
+	}
+	
+	template <typename Word>
+	std::pair<ngram_type::logprob_type, ngram_state_type> operator()(const ngram_state_type& state, const Word& word) const
+	{
+	  return ngram.logbound(state, word);
 	}
       };
 
@@ -255,9 +269,13 @@ namespace cicada
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
+
+	  //ngram_state_type ngram_state;
 	  
 	  // skip BOS scoring...
 	  if (vocab_type::BOS == *first) {
+	    //ngram_state = ngram.index.next(ngram_state, *first);
+	    
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	    ++ first;
 	  }
@@ -265,8 +283,17 @@ namespace cicada
 	  double score = 0.0;
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
+
+	    const float score_old = scorer(buffer_id.begin(), buffer_id.end());
 	    
-	    score += scorer(buffer_id.begin(), buffer_id.end());
+	    //std::pair<float, ngram_state_type> result = scorer(ngram_state, buffer_id.back());
+	    // if (score_old != result.first)
+	    //   std::cerr << "upper bound differ: " << score_old << " " << result.first << std::endl;
+	    
+	    
+	    score += score_old;
+	    
+	    //ngram_state = result.second;
 	  }
 	  
 	  cache.score(cache_pos) = score;

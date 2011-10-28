@@ -435,7 +435,7 @@ namespace cicada
     template <typename _Word>
     state_type next(const state_type& state, const _Word& word) const
     {
-      return next(state, vocab[word]);
+      return next(state, __vocab[word]);
     }
     
     state_type next(const state_type& state, const id_type& word) const
@@ -505,7 +505,7 @@ namespace cicada
 
       buffer_type buffer(length);
       for (typename buffer_type::iterator biter = buffer.begin(); first != last; ++ first, ++ biter)
-	*biter = vocab[*first];
+	*biter = __vocab[*first];
       
       return __suffix(buffer.begin(), buffer.end(), id_type());
     }
