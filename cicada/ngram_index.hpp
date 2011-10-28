@@ -180,6 +180,11 @@ namespace cicada
       {
 	return (pos < offsets[1] ? size_type(-1) : positions.select(pos + 1 - offsets[1], true) + (offsets[1] + 1) - pos - 1);
       }
+
+      bool has_child(size_type pos) const
+      {
+	return children_first(pos) != children_last(pos);
+      }
       
       size_type children_first(size_type pos) const
       {
@@ -232,6 +237,8 @@ namespace cicada
       {
 	const size_type pos_first = children_first(pos);
 	const size_type pos_last  = children_last(pos);
+	
+	if (pos_first == pos_last) return size_type(-1);
 	
 	const size_type child = lower_bound(pos_first, pos_last, id);
 	const size_type found_child_mask = size_type(child != pos_last && ! (id < operator[](child))) - 1;
@@ -417,6 +424,15 @@ namespace cicada
     
   public:
     state_type root() const { return state_type(); }
+
+    bool has_next(const state_type& state) const
+    {
+      if (state.is_root()) return true;
+      
+      const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
+      
+      return __shards[shard_index].has_child(state.node());
+    }
     
     template <typename Iterator>
     std::pair<Iterator, state_type> next(state_type state, Iterator first, Iterator last) const
@@ -467,9 +483,11 @@ namespace cicada
 	const shard_type& shard = __shards[state.shard()];
 	const size_type node = state.node();
 	
-	size_type order = 3;
-	for (/**/; order < shard.offsets.size() && node < shard.offsets[order]; ++ order) {}
-	return order - 1;
+	size_type order = 2;
+	for (/**/; order < shard.offsets.size(); ++ order)
+	  if (node < shard.offsets[order])
+	    return order;
+	return order;
       }
     }
 
@@ -576,7 +594,7 @@ namespace cicada
 	}
       }
       
-      context_type::const_iterator first = riter.base();
+      context_type::const_iterator first = riter.base() + 1;
       context_type::const_iterator last  = context.end();
       
       int       shard_prev = state.shard();

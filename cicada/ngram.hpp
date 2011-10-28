@@ -137,7 +137,7 @@ namespace cicada
 	  if (state_ret.is_root())
 	    state_ret = (order == index.order() ? index.suffix(state_next) : state_next);
 	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state.shard());
+	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
 	  const logprob_type __logprob = (! backoffed && state_next.node() < logbounds[shard_index].size()
 					  ? logbounds[shard_index](state_next.node(), order)
 					  : logprobs[shard_index](state_next.node(), order));
@@ -181,7 +181,7 @@ namespace cicada
 	  if (state_ret.is_root())
 	    state_ret = (order == index.order() ? index.suffix(state_next) : state_next);
 	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state.shard());
+	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
 	  const logprob_type __logprob = logprobs[shard_index](state_next.node(), order);
 	  
 	  if (__logprob != logprob_min())
