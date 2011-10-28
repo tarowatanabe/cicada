@@ -9,7 +9,6 @@
 #include <string>
 
 #include <cicada/feature_function.hpp>
-#include <cicada/ngram.hpp>
 
 #include <boost/filesystem.hpp>
 

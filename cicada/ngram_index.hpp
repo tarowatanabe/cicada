@@ -48,6 +48,54 @@ namespace cicada
     typedef utils::hashmurmur<hash_value_type> hasher_type;
 
   public:
+    // root:    is_root_shard() && is_root_node()
+    // unigram: is_root_shard() && ! is_root_node()
+    // bigram, trigram etc: ! is_root_shard() && ! is_root_node()
+
+    struct State
+    {
+      typedef uint64_t state_type;
+      
+      State() : state(state_type(-1)) {}
+      State(const state_type shard, const state_type node)
+	: state(((shard & 0xffff) << 48) | (node & 0xffffffffffffll)) {}
+      
+      size_type shard() const
+      {
+	return utils::bithack::branch(((state >> 48) & 0xffff) == 0xffff, size_type(-1), size_type((state >> 48) & 0xffff));
+      }
+      
+      size_type node() const
+      {
+	return utils::bithack::branch((state & 0xffffffffffffll) == 0xffffffffffffll, size_type(-1), size_type(state & 0xffffffffffffll));
+      }
+      
+      bool is_root() const { return state == state_type(-1); }
+      bool is_root_shard() const { return ((state >> 48) & 0xffff) == 0xffff; }
+      bool is_root_node() const { return (state & 0xffffffffffffll) == 0xffffffffffffll; } 
+      
+      friend
+      bool operator==(const State& x, const State& y) { return x.state == y.state; }
+      friend
+      bool operator!=(const State& x, const State& y) { return x.state != y.state; }
+      friend
+      bool operator<(const State& x, const State& y) { return x.state < y.state; }
+      friend
+      bool operator>(const State& x, const State& y) { return x.state > y.state; }
+      friend
+      bool operator<=(const State& x, const State& y) { return x.state <= y.state; }
+      friend
+      bool operator>=(const State& x, const State& y) { return x.state >= y.state; }
+      
+      friend
+      size_t  hash_value(State const& x) { return utils::hashmurmur<size_t>()(x.state); }
+      
+    private:
+      state_type state;
+    };
+
+    typedef State state_type;
+
     struct Shard : public hasher_type
     {
     public:
@@ -55,7 +103,7 @@ namespace cicada
       typedef utils::succinct_vector_mapped<std::allocator<int32_t> >          position_set_type;
       typedef std::vector<size_type, std::allocator<size_type> >               off_set_type;
 
-    private:
+    public:
       typedef utils::spinlock spinlock_type;
       typedef spinlock_type::scoped_lock     lock_type;
       typedef spinlock_type::scoped_try_lock trylock_type;
@@ -78,8 +126,17 @@ namespace cicada
 	cache_backoff_type() : pos(size_type(-1)), pos_prev(size_type(-1)), shard_prev(-1) {}
       };
 
-      typedef utils::array_power2<cache_pos_type,     1024 * 64, std::allocator<cache_pos_type> > cache_pos_set_type;
+      struct cache_suffix_type
+      {
+	state_type state;
+	state_type suffix;
+	
+	cache_suffix_type() : state(), suffix() {}
+      };
+
+      typedef utils::array_power2<cache_pos_type,     1024 * 64, std::allocator<cache_pos_type> >     cache_pos_set_type;
       typedef utils::array_power2<cache_backoff_type, 1024 * 64, std::allocator<cache_backoff_type> > cache_backoff_set_type;
+      typedef utils::array_power2<cache_suffix_type,  1024 * 64, std::allocator<cache_suffix_type> >  cache_suffix_set_type;
       
     public:
       Shard() {}
@@ -93,9 +150,9 @@ namespace cicada
 	offsets = x.offsets;
 	caches_pos.clear();
 	caches_backoff.clear();
+	caches_suffix.clear();
 	return *this;
       }
-      
       
     public:
       void close() { clear(); }
@@ -106,6 +163,7 @@ namespace cicada
 	offsets.clear();
 	caches_pos.clear();
 	caches_backoff.clear();
+	caches_suffix.clear();
       };
       
       void open(const path_type& path);
@@ -166,7 +224,8 @@ namespace cicada
 	} else
 	  return traverse(first, last, vocab);
       }
-
+      
+      
       size_type __find(size_type pos, const id_type& id) const
       {
 	const size_type pos_first = children_first(pos);
@@ -333,8 +392,11 @@ namespace cicada
       
       spinlock_type          spinlock_pos;
       spinlock_type          spinlock_backoff;
+      spinlock_type          spinlock_suffix;
+      
       cache_pos_set_type     caches_pos;
       cache_backoff_set_type caches_backoff;
+      cache_suffix_set_type  caches_suffix;
     };
 
     
@@ -352,6 +414,130 @@ namespace cicada
     NGramIndex(const path_type& path) { open(path); }
     
   public:
+    state_type root() const { return state_type(); }
+    
+    template <typename _Word>
+    state_type next(const state_type& state, const _Word& word) const
+    {
+      return next(state, vocab[word]);
+    }
+    
+    state_type next(const state_type& state, const id_type& word) const
+    {
+      if (state.is_root())
+	return state_type(state.shard(), __shards[0].find(state.node(), word));
+      else {
+	if (state.is_root_node())
+	  throw std::runtime_error("invalid state");
+	
+	if (! state.is_root_shard())
+	  return state_type(state.shard(), __shards[state.shard()].find(state.node(), word));
+	else {
+	  // state.node() is equal to unigram's id
+	  const size_type shard = shard_index(state.node(), word);
+	  
+	  return state_type(shard, __shards[shard].find(state.node(), word));
+	}
+      }
+    }
+
+    int order(const state_type& state) const
+    {
+      if (state.is_root())
+	return 0;
+      else if (state.is_root_shard())
+	return 1;
+      else {
+	const shard_type& shard = __shards[state.shard()];
+	const size_type node = state.node();
+	
+	size_type order = 2;
+	for (/**/; order != shard.offsets.size() && node < shard.offsets[order]; ++ order) {}
+	return order - 1;
+      }
+    }
+    
+    state_type suffix(const state_type& state) const
+    {
+      typedef std::vector<id_type, std::allocator<id_type> > context_type;
+      
+      // root or unigram's suffix is root
+      if (state.is_root() || state.is_root_shard()) return state_type();
+      
+      shard_type& shard = const_cast<shard_type&>(__shards[state.shard()]);
+      
+      // if we are bigram, we will simply take root_shard + current id
+      if (state.node() < shard.offsets[2])
+	return state_type(size_type(-1), shard[state.node()]);
+      
+      const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
+      
+      // trylock...
+      {
+	shard_type::trylock_type lock(shard.spinlock_suffix);
+	
+	if (lock && shard.caches_suffix[cache_pos].state == state)
+	  return shard.caches_suffix[cache_pos].suffix;
+      }
+      
+      // we will push in reverse order...
+      context_type context(order());
+      context_type::reverse_iterator riter = context.rbegin();
+	
+      {
+	size_type node = state.node();
+	for (/**/; node != size_type(-1); ++ riter) {
+	  *riter = shard[node];
+	  node = shard.parent(node);
+	}
+      }
+      
+      context_type::const_iterator first = riter.base();
+      context_type::const_iterator last  = context.end();
+      
+      int       shard_prev = state.shard();
+      size_type node_prev  = state.node();
+      
+      size_type shard_index = 0;
+      size_type node = 0;
+      for (/**/; first != last - 1; ++ first) {
+	shard_index = this->shard_index(first, last);
+	
+	std::pair<context_type::const_iterator, size_type> result = traverse(shard_index, first, last, shard_prev, node_prev);
+	
+	if (result.first == last) {
+	  node = result.second;
+	  break;
+	} else if (result.first == last - 1) {
+	  shard_prev = shard_index;
+	  node_prev = result.second;
+	} else {
+	  shard_prev = -1;
+	  node_prev  = size_type(-1);
+	}
+      }
+      
+      // we will never reach root, since unigram will contains all the vocabulary...
+      
+      const state_type suffix(first + 1 == last ? state_type(size_type(-1), *first) : state_type(shard_index, node));
+      
+      // trylock...
+      {
+	shard_type::trylock_type lock(shard.spinlock_suffix);
+	
+	if (lock) {
+	  shard.caches_suffix[cache_pos].state  = state;
+	  shard.caches_suffix[cache_pos].suffix = suffix;
+	}
+      }
+      
+      return suffix;
+    }
+
+    size_type shard_index(const id_type& first, const id_type& second) const
+    {
+      return __hasher(first, __hasher(second, 0)) % __shards.size();
+    }
     
     template <typename Iterator>
     size_type shard_index(Iterator first, Iterator last) const

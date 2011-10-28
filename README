@@ -73,6 +73,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
       + syntax augmented rule extraction is also supported [15]
    - Tree-to-string/strint-to-tree extractin from forest [16,27]
    - Tree-to-tree rule extraction from forest [17] (TODO!)
+   - max-scope constraints to limit the grammar size [34]
    
    - After count extraction, you can perform map/reduce to compute model scores [19]
 
@@ -511,4 +512,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {1352--1362},
   url       = {http://www.aclweb.org/anthology/D11-1125}
+}
+
+[34]
+@InProceedings{hopkins-langmead:2010:EMNLP,
+  author    = {Hopkins, Mark  and  Langmead, Greg},
+  title     = {{SCFG} Decoding Without Binarization},
+  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
+  month     = {October},
+  year      = {2010},
+  address   = {Cambridge, MA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {646--655},
+  url       = {http://www.aclweb.org/anthology/D10-1063}
 }
