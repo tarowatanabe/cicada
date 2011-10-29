@@ -406,7 +406,7 @@ namespace cicada
 	ngram_state_type state_rule = state_invalid;
 	double score = 0.0;
 	bool filled_prefix = false;
-	
+	bool estimated_prefix = false;
 	
 	int non_terminal_pos = 0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
@@ -424,8 +424,6 @@ namespace cicada
 	    
 	    buffer.insert(buffer.end(), context_antecedent, context_antecedent_end);
 
-	    bool short_prefix = false;
-	    
 	    if (! buffer.empty()) {
 	      if (state_rule != state_invalid) {
 		// state_rule is "valid". we will compute anyway
@@ -445,7 +443,10 @@ namespace cicada
 		  if (filled_prefix)
 		    throw std::runtime_error("prefix is already filled??");
 		  filled_prefix = true;
-		  short_prefix = true;
+		  
+		  if (estimated_prefix)
+		    throw std::runtime_error("prefix is already estimated??");
+		  estimated_prefix = true;
 		  
 		  score += state_bound.second;
 		} else {
@@ -465,6 +466,9 @@ namespace cicada
 		    throw std::runtime_error("prefix is already filled??");
 		  filled_prefix = true;
 		  
+		  if (estimated_prefix)
+		    throw std::runtime_error("prefix is already estimated??");
+		  estimated_prefix = true;
 		  
 		  score += state_bound.second;
 		  score += state_score.second;
@@ -476,9 +480,6 @@ namespace cicada
 	    
 	    if (*ngram_state_antecedent != state_invalid)
 	      state_rule = *ngram_state_antecedent;
-
-	    if (short_prefix && state_rule == state_invalid)
-	      throw std::runtime_error("we have a short context, but state is invalid..?");
 	    
 	  } else if (! skipper(*titer)) {
 	    buffer.push_back(extract(*titer));
@@ -495,6 +496,10 @@ namespace cicada
 	    if (filled_prefix)
 	      throw std::runtime_error("prefix is already filled??");
 	    filled_prefix = true;
+
+	    if (estimated_prefix)
+	      throw std::runtime_error("prefix is already estimated??");
+	    estimated_prefix = true;
 	  }
 	} else if (state_rule != state_invalid) {
 	  const state_score_type state_score = ngram_score(state_rule, buffer.begin(), buffer.end());
@@ -512,6 +517,10 @@ namespace cicada
 	  if (filled_prefix)
 	    throw std::runtime_error("prefix is already filled??");
 	  filled_prefix = true;
+
+	  if (estimated_prefix)
+	    throw std::runtime_error("prefix is already estimated??");
+	  estimated_prefix = true;
 	  
 	  score += state_bound.second;
 	} else {
@@ -531,12 +540,19 @@ namespace cicada
 	    throw std::runtime_error("prefix is already filled??");
 	  filled_prefix = true;
 	  
+	  if (estimated_prefix)
+	    throw std::runtime_error("prefix is already estimated??");
+	  estimated_prefix = true;
+	  
 	  score += state_bound.second;
 	  score += state_score.second;
 	}
 
 	if (! filled_prefix)
-	  throw std::runtime_error("no prefix filled?");;
+	  throw std::runtime_error("no prefix filled?");
+	if (! estimated_prefix)
+	  throw std::runtime_error("no prefix estimated?");
+	
 	
 	return score;
       }
