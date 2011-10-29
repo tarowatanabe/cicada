@@ -392,9 +392,6 @@ namespace cicada
 	    
 	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_begin + context_size);
 	    
-	    if (prefix != ngram.ngram_prefix(biter_begin, biter_begin + context_size))
-	      throw std::runtime_error("prefix differ???");
-	    
 	    const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
 	    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
 	    
@@ -408,7 +405,6 @@ namespace cicada
 	
 	ngram_state_type state_rule = state_invalid;
 	double score = 0.0;
-	bool filled_prefix = false;
 	
 	int non_terminal_pos = 0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
@@ -433,6 +429,8 @@ namespace cicada
 		
 		state_rule = state_score.first;
 		score     += state_score.second;
+		
+		buffer.clear();
 	      } else if (static_cast<int>(buffer.size()) > context_size || *ngram_state_antecedent != state_invalid) {
 		// state_rule is invalid, but we have enough context or we have 'star' at antecedent
 		
@@ -442,19 +440,13 @@ namespace cicada
 		  std::copy(buffer.begin(), buffer.end(), context);
 		  std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
 		  
-		  if (filled_prefix)
-		    throw std::runtime_error("prefix is already filled??");
-		  filled_prefix = true;
-		  		  
 		  score += state_bound.second;
+		  
 		} else {
 		  buffer_type::const_iterator biter_begin = buffer.begin();
 		  buffer_type::const_iterator biter_end   = buffer.end();
 		  
 		  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_begin + context_size);
-		  if (prefix != ngram.ngram_prefix(biter_begin, biter_begin + context_size))
-		    throw std::runtime_error("prefix differ???");
-			    
 		  
 		  const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
 		  const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
@@ -463,15 +455,11 @@ namespace cicada
 		  std::copy(prefix.first, prefix.second, context);
 		  std::fill(context + (prefix.second - prefix.first), context_end, vocab_type::EMPTY);
 		  
-		  if (filled_prefix)
-		    throw std::runtime_error("prefix is already filled??");
-		  filled_prefix = true;
-		  
 		  score += state_bound.second + state_score.second;
 		}
+		
+		buffer.clear();
 	      }
-	      
-	      buffer.clear();
 	    }
 	    
 	    if (*ngram_state_antecedent != state_invalid)
@@ -486,13 +474,8 @@ namespace cicada
 	if (buffer.empty()) {
 	  *ngram_state = state_rule;
 	  
-	  if (state_rule == state_invalid) {
+	  if (state_rule == state_invalid)
 	    std::fill(context, context_end, vocab_type::EMPTY);
-	    
-	    if (filled_prefix)
-	      throw std::runtime_error("prefix is already filled??");
-	    filled_prefix = true;
-	  }
 	} else if (state_rule != state_invalid) {
 	  const state_score_type state_score = ngram_score(state_rule, buffer.begin(), buffer.end());
 	  
@@ -506,18 +489,12 @@ namespace cicada
 	  std::copy(buffer.begin(), buffer.end(), context);
 	  std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
 
-	  if (filled_prefix)
-	    throw std::runtime_error("prefix is already filled??");
-	  filled_prefix = true;
-	  
 	  score += state_bound.second;
 	} else {
 	  buffer_type::const_iterator biter_begin = buffer.begin();
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  
 	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_begin + context_size);
-	  if (prefix != ngram.ngram_prefix(biter_begin, biter_begin + context_size))
-	    throw std::runtime_error("prefix differ???");
 	  
 	  const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
 	  const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
@@ -526,16 +503,9 @@ namespace cicada
 	  std::copy(prefix.first, prefix.second, context);
 	  std::fill(context + (prefix.second - prefix.first), context_end, vocab_type::EMPTY);
 
-	  if (filled_prefix)
-	    throw std::runtime_error("prefix is already filled??");
-	  filled_prefix = true;
-	  
 	  score += state_bound.second + state_score.second;
 	}
 
-	if (! filled_prefix)
-	  throw std::runtime_error("no prefix filled?");
-	
 	return score;
       }
       
