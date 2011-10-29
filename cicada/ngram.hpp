@@ -114,28 +114,31 @@ namespace cicada
     }
     
     template <typename _Word>
-    std::pair<logprob_type, state_type> logbound(const state_type& state, const _Word& word) const
+    std::pair<state_type, logprob_type> logbound(state_type state, const _Word& word, int max_order=0, bool backoffed=false) const
     {
-      return logbound(state, index.vocab()[word]);
+      return logbound(state, index.vocab()[word], max_order, backoffed);
     }
     
-    std::pair<logprob_type, state_type> logbound(state_type state, const id_type& word) const
+    std::pair<state_type, logprob_type> logbound(state_type state, const id_type& word, int max_order=0, bool backoffed=false) const
     {
       // returned state... maximum suffix of state + word, since we may forced backoff :-)
-      state_type state_ret;
+      max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
       
-      bool backoffed = false;
+      int order = index.order(state) + 1;
+      while (order > max_order) {
+	state = index.suffix(state);
+	order = index.order(state) + 1;
+      }
+      
+      state_type state_ret;
       logprob_type logbackoff = 0.0;
       for (;;) {
-	const int order = index.order(state) + 1;
-	
-	state_type state_next = index.next(state, word);
+	const state_type state_next = index.next(state, word);
 	
 	if (! state_next.is_root_node()) {
 	  
-	  // if we are the maximum, set to "prefix"
 	  if (state_ret.is_root())
-	    state_ret = (order == index.order() ? index.suffix(state_next) : state_next);
+	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
 	  
 	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
 	  const logprob_type __logprob = (! backoffed && state_next.node() < logbounds[shard_index].size()
@@ -143,58 +146,67 @@ namespace cicada
 					  : logprobs[shard_index](state_next.node(), order));
 	  
 	  if (__logprob != logprob_min())
-	    return std::make_pair(__logprob + logbackoff, state_ret);
+	    return std::make_pair(state_ret, __logprob + logbackoff);
 	}
 	
 	backoffed = true;
 	
 	if (state.is_root())
-	  return std::make_pair((index.is_bos(word) ? logprob_bos() : smooth) + logbackoff, state_ret);
+	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
 	
 	// we will backoff
 	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
 	logbackoff += backoffs[shard_index](state.node(), order - 1);
 	state = index.suffix(state);
+	order = index.order(state) + 1;
       }
     }
     
     template <typename _Word>
-    std::pair<logprob_type, state_type> logprob(const state_type& state, const _Word& word) const
+    std::pair<state_type, logprob_type> logprob(state_type state, const _Word& word, int max_order = 0, bool backoffed = false) const
     {
-      return logprob(state, index.vocab()[word]);
+      return logprob(state, index.vocab()[word], max_order, backoffed);
     }
     
-    std::pair<logprob_type, state_type> logprob(state_type state, const id_type& word) const
+    std::pair<state_type, logprob_type> logprob(state_type state, const id_type& word, int max_order = 0, bool backoffed = false) const
     {
       // returned state... maximum suffix of state + word, since we may forced backoff :-)
-      state_type state_ret;
+      max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
       
+      int order = index.order(state) + 1;
+      while (order > max_order) {
+	state = index.suffix(state);
+	order = index.order(state) + 1;
+      }
+
+      state_type state_ret;
+
       logprob_type logbackoff = 0.0;
       for (;;) {
-	const int order = index.order(state) + 1;
-	
-	state_type state_next = index.next(state, word);
-	
+	const state_type state_next = index.next(state, word);
+
 	if (! state_next.is_root_node()) {
 	  
-	  // if we are the maximum, set to "prefix"
 	  if (state_ret.is_root())
-	    state_ret = (order == index.order() ? index.suffix(state_next) : state_next);
+	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
 	  
 	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
 	  const logprob_type __logprob = logprobs[shard_index](state_next.node(), order);
 	  
 	  if (__logprob != logprob_min())
-	    return std::make_pair(__logprob + logbackoff, state_ret);
+	    return std::make_pair(state_ret, __logprob + logbackoff);
 	}
+
+	backoffed = true;
 	
 	if (state.is_root())
-	  return std::make_pair((index.is_bos(word) ? logprob_bos() : smooth) + logbackoff, state_ret);
+	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
 	
 	// we will backoff
 	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
 	logbackoff += backoffs[shard_index](state.node(), order - 1);
 	state = index.suffix(state);
+	order = index.order(state) + 1;
       }
     }
     

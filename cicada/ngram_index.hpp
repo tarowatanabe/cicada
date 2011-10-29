@@ -73,6 +73,8 @@ namespace cicada
       bool is_root() const { return state == state_type(-1); }
       bool is_root_shard() const { return ((state >> 48) & 0xffff) == 0xffff; }
       bool is_root_node() const { return (state & 0xffffffffffffll) == 0xffffffffffffll; } 
+
+      const state_type& value() const { return state; }
       
       friend
       bool operator==(const State& x, const State& y) { return x.state == y.state; }
@@ -597,25 +599,16 @@ namespace cicada
       context_type::const_iterator first = riter.base() + 1;
       context_type::const_iterator last  = context.end();
       
-      int       shard_prev = state.shard();
-      size_type node_prev  = state.node();
-      
       size_type shard_index = 0;
       size_type node = 0;
       for (/**/; first != last - 1; ++ first) {
 	shard_index = this->shard_index(first, last);
 	
-	std::pair<context_type::const_iterator, size_type> result = traverse(shard_index, first, last, shard_prev, node_prev);
+	std::pair<context_type::const_iterator, size_type> result = traverse(shard_index, first, last);
 	
 	if (result.first == last) {
 	  node = result.second;
 	  break;
-	} else if (result.first == last - 1) {
-	  shard_prev = shard_index;
-	  node_prev = result.second;
-	} else {
-	  shard_prev = -1;
-	  node_prev  = size_type(-1);
 	}
       }
       
