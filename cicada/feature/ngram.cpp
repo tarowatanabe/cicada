@@ -407,6 +407,7 @@ namespace cicada
 	double score = 0.0;
 	bool filled_prefix = false;
 	
+	
 	int non_terminal_pos = 0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	  if (titer->is_non_terminal()) {
@@ -422,6 +423,8 @@ namespace cicada
 	    score -= ngram_estimate(context_antecedent, context_antecedent_end).second;
 	    
 	    buffer.insert(buffer.end(), context_antecedent, context_antecedent_end);
+
+	    bool short_prefix = false;
 	    
 	    if (! buffer.empty()) {
 	      if (state_rule != state_invalid) {
@@ -442,6 +445,7 @@ namespace cicada
 		  if (filled_prefix)
 		    throw std::runtime_error("prefix is already filled??");
 		  filled_prefix = true;
+		  short_prefix = true;
 		  
 		  score += state_bound.second;
 		} else {
@@ -472,6 +476,9 @@ namespace cicada
 	    
 	    if (*ngram_state_antecedent != state_invalid)
 	      state_rule = *ngram_state_antecedent;
+
+	    if (short_prefix && state_ruel == state_invalid)
+	      throw std::runtime_error("we have a short context, but state is invalid..?");
 	    
 	  } else if (! skipper(*titer)) {
 	    buffer.push_back(extract(*titer));
