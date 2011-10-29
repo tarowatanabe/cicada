@@ -236,7 +236,7 @@ namespace cicada
 	  }
 	  
 	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) != bound_order, order);
+	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) < bound_order, order);
 	    
 	    state_score.first   = result.first;
 	    state_score.second += result.second;
@@ -262,7 +262,7 @@ namespace cicada
 	  }
 	  
 	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) != bound_order, order);
+	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) < bound_order, order);
 	    
 	    state_score.first   = result.first;
 	    state_score.second += result.second;
@@ -405,6 +405,7 @@ namespace cicada
 	
 	ngram_state_type state_rule = state_invalid;
 	double score = 0.0;
+	bool filled_prefix = false;
 	
 	int non_terminal_pos = 0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
@@ -438,6 +439,10 @@ namespace cicada
 		  std::copy(buffer.begin(), buffer.end(), context);
 		  std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
 		  
+		  if (filled_prefix)
+		    throw std::runtime_error("prefix is already filled??");
+		  filled_prefix = true;
+		  
 		  score += state_bound.second;
 		} else {
 		  buffer_type::const_iterator biter_begin = buffer.begin();
@@ -452,7 +457,13 @@ namespace cicada
 		  std::copy(prefix.first, prefix.second, context);
 		  std::fill(context + (prefix.second - prefix.first), context_end, vocab_type::EMPTY);
 		  
-		  score += state_bound.second + state_score.second;
+		  if (filled_prefix)
+		    throw std::runtime_error("prefix is already filled??");
+		  filled_prefix = true;
+		  
+		  
+		  score += state_bound.second;
+		  score += state_score.second;
 		}
 	      }
 	      
@@ -471,24 +482,31 @@ namespace cicada
 	if (buffer.empty()) {
 	  *ngram_state = state_rule;
 	  
-	  if (state_rule == state_invalid)
+	  if (state_rule == state_invalid) {
 	    std::fill(context, context_end, vocab_type::EMPTY);
-	  
-	  return score;
+	    
+	    if (filled_prefix)
+	      throw std::runtime_error("prefix is already filled??");
+	    filled_prefix = true;
+	  }
 	} else if (state_rule != state_invalid) {
 	  const state_score_type state_score = ngram_score(state_rule, buffer.begin(), buffer.end());
 	  
 	  *ngram_state = state_score.first;
 	  
-	  return score + state_score.second;
+	  score += state_score.second;
 	} else if (static_cast<int>(buffer.size()) <= context_size) {
 	  const state_score_type state_bound = ngram_estimate(buffer.begin(), buffer.end());
 	  
 	  *ngram_state = state_invalid;
 	  std::copy(buffer.begin(), buffer.end(), context);
 	  std::fill(context + buffer.size(), context_end, vocab_type::EMPTY);
+
+	  if (filled_prefix)
+	    throw std::runtime_error("prefix is already filled??");
+	  filled_prefix = true;
 	  
-	  return score + state_bound.second;
+	  score += state_bound.second;
 	} else {
 	  buffer_type::const_iterator biter_begin = buffer.begin();
 	  buffer_type::const_iterator biter_end   = buffer.end();
@@ -501,9 +519,19 @@ namespace cicada
 	  *ngram_state = state_score.first;
 	  std::copy(prefix.first, prefix.second, context);
 	  std::fill(context + (prefix.second - prefix.first), context_end, vocab_type::EMPTY);
+
+	  if (filled_prefix)
+	    throw std::runtime_error("prefix is already filled??");
+	  filled_prefix = true;
 	  
-	  return score + state_bound.second + state_score.second;
+	  score += state_bound.second;
+	  score += state_score.second;
 	}
+
+	if (! filled_context)
+	  throw std::runtime_error("no prefix filled?");;
+	
+	return score;
       }
       
       template <typename Extract, typename Skipper>
