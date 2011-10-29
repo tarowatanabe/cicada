@@ -1,5 +1,5 @@
 2011-10-x
-
+New: Better ngram state handling, inspired by Sorensen and Allauzen (2011) and Pauls and Klein (2011)
 
 2011-10-27
 Better feature application: completely removed "estimates." Now, we should encode estiamted score in each hypothesis.
