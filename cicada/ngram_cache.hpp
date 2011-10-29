@@ -14,21 +14,25 @@
 
 namespace cicada
 {
+
+  template <typename Key, typename Score>
   class NGramCache : public utils::hashmurmur<size_t>
   {
   public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef cicada::Symbol symbol_type;
+    typedef Key   key_type;
+    typedef Key   symbol_type;
+    typedef Score score_type;
     
     typedef utils::hashmurmur<size_t> hasher_type;
 
     static const size_type cache_size = 1024 * 64;
     
-    typedef utils::vector2<symbol_type, std::allocator<symbol_type> >          context_set_type;
-    typedef utils::array_power2<double, cache_size, std::allocator<double> >   score_set_type;
-    typedef utils::array_power2<uint8_t, cache_size, std::allocator<uint8_t> > length_set_type;
+    typedef utils::vector2<symbol_type, std::allocator<symbol_type> >                context_set_type;
+    typedef utils::array_power2<score_type, cache_size, std::allocator<score_type> > score_set_type;
+    typedef utils::array_power2<uint8_t, cache_size, std::allocator<uint8_t> >       length_set_type;
     
   public:
     NGramCache(const int order=3)
@@ -47,8 +51,8 @@ namespace cicada
       return hasher_type::operator()(first, last, 0) & (cache_size - 1);
     }
     
-    inline       double& score(size_type pos) { return scores[pos]; }
-    inline const double& score(size_type pos) const { return scores[pos]; }
+    inline       score_type& score(size_type pos) { return scores[pos]; }
+    inline const score_type& score(size_type pos) const { return scores[pos]; }
     
     template <typename Iterator>
     bool equal_to(size_type pos, Iterator first, Iterator last) const

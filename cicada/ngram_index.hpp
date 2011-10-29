@@ -499,7 +499,7 @@ namespace cicada
     {
       if (first == last || first + 1 == last) return std::make_pair(first, last);
       
-      return std::make_pair(first, std::min(next(state_type(), first, last).first + 1, last));
+      return std::make_pair(first, std::min(next(state_type(), first, last).second + 1, last));
     }
 
     template <typename Iterator>
