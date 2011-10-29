@@ -477,7 +477,7 @@ namespace cicada
 	    if (*ngram_state_antecedent != state_invalid)
 	      state_rule = *ngram_state_antecedent;
 
-	    if (short_prefix && state_ruel == state_invalid)
+	    if (short_prefix && state_rule == state_invalid)
 	      throw std::runtime_error("we have a short context, but state is invalid..?");
 	    
 	  } else if (! skipper(*titer)) {
