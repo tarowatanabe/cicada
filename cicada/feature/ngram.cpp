@@ -587,25 +587,7 @@ namespace cicada
 		  + ngram_score(*ngram_state != state_invalid ? *ngram_state : state_score.first, &vocab_type::EOS, (&vocab_type::EOS) + 1).second);
 	}
       }
-      
-      double ngram_estimate(const state_ptr_type& state) const
-      {
-#if 0
-	const symbol_type* context = reinterpret_cast<const symbol_type*>(state);
-	const symbol_type* context_end = context + order - 1;
-	
-	if (*context == vocab_type::EMPTY)
-	  return 0.0;
-	
-	const symbol_type* citer_end = context;
-	
-	for (/**/; citer_end != context_end && *citer_end != vocab_type::STAR && *citer_end != vocab_type::EMPTY; ++ citer_end) {}
-	
-	return ngram_estimate(context, citer_end);
-#endif
-	return 0.0;
-      }
-      
+            
       double ngram_predict_score(const state_ptr_type& state)
       {
 #if 0
