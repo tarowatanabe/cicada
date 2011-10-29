@@ -437,18 +437,19 @@ namespace cicada
     }
     
     template <typename Iterator>
-    std::pair<Iterator, state_type> next(state_type state, Iterator first, Iterator last) const
+    std::pair<state_type, Iterator> next(state_type state, Iterator first, Iterator last) const
     {
       for (/**/; first != last; ++ first) {
 	const state_type state_next = next(state, *first);
 	if (state_next.is_root_node())
-	  return std::make_pair(first, state);
+	  return std::make_pair(state, first);
 	
 	state = state_next;
       }
       
-      return std::make_pair(first, state);
+      return std::make_pair(state, first);
     }
+
     
     template <typename _Word>
     state_type next(const state_type& state, const _Word& word) const
@@ -547,13 +548,13 @@ namespace cicada
       state_type state;
       
       while (first != last) {
-	std::pair<Iterator, state_type> result = next(state, first, last);
+	std::pair<state_type, Iterator> result = next(state, first, last);
 	
-	if (result.first == last)
-	  return result.second;
+	if (result.second == last)
+	  return result.first;
 	else {
-	  first = result.first;
-	  state = suffix(result.second);
+	  state = suffix(result.first);
+	  first = result.second;
 	}
       }
       

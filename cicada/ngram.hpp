@@ -114,12 +114,12 @@ namespace cicada
     }
     
     template <typename _Word>
-    std::pair<state_type, logprob_type> logbound(state_type state, const _Word& word, int max_order=0, bool backoffed=false) const
+    std::pair<state_type, logprob_type> logbound(state_type state, const _Word& word, bool backoffed=false, int max_order=0) const
     {
-      return logbound(state, index.vocab()[word], max_order, backoffed);
+      return logbound(state, index.vocab()[word], backoffed, max_order);
     }
     
-    std::pair<state_type, logprob_type> logbound(state_type state, const id_type& word, int max_order=0, bool backoffed=false) const
+    std::pair<state_type, logprob_type> logbound(state_type state, const id_type& word, bool backoffed=false, int max_order=0) const
     {
       // returned state... maximum suffix of state + word, since we may forced backoff :-)
       max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
@@ -163,12 +163,12 @@ namespace cicada
     }
     
     template <typename _Word>
-    std::pair<state_type, logprob_type> logprob(state_type state, const _Word& word, int max_order = 0, bool backoffed = false) const
+    std::pair<state_type, logprob_type> logprob(state_type state, const _Word& word, bool backoffed = false, int max_order = 0) const
     {
-      return logprob(state, index.vocab()[word], max_order, backoffed);
+      return logprob(state, index.vocab()[word], backoffed, max_order);
     }
     
-    std::pair<state_type, logprob_type> logprob(state_type state, const id_type& word, int max_order = 0, bool backoffed = false) const
+    std::pair<state_type, logprob_type> logprob(state_type state, const id_type& word, bool backoffed = false, int max_order = 0) const
     {
       // returned state... maximum suffix of state + word, since we may forced backoff :-)
       max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
