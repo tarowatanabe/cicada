@@ -528,7 +528,7 @@ namespace cicada
 	  score += state_score.second;
 	}
 
-	if (! filled_context)
+	if (! filled_prefix)
 	  throw std::runtime_error("no prefix filled?");;
 	
 	return score;
