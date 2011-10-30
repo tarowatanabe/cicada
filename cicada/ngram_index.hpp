@@ -250,7 +250,9 @@ namespace cicada
             
       size_type find(size_type pos, const id_type& id) const
       {
-	if (pos == size_type(-1)) {
+	if (id == id_type(-1))
+	  return size_type(-1);
+	else if (pos == size_type(-1)) {
           const size_type child_mask = size_type(id < offsets[1]) - 1;
           return (~child_mask & size_type(id)) | child_mask;
         } else {
