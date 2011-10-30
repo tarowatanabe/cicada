@@ -127,3 +127,5 @@ hypergraph variant of learn-block?
 Add softmax-margin... How? (assume duplicates as in mert code?)
 
 octavian support?
+
+ngram feature should use id-based encoding, not word based for efficient oov computation

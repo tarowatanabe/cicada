@@ -619,7 +619,8 @@ namespace cicada
 
       double ngram_scan_score(state_ptr_type& state,
 			      const edge_type& edge,
-			      const int dot)
+			      const int dot,
+			      int& oov)
       {
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& phrase = rule.rhs;
@@ -631,8 +632,10 @@ namespace cicada
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
-	  if (*piter != vocab_type::EPSILON)
+	  if (*piter != vocab_type::EPSILON) {
 	    buffer.push_back(*piter);
+	    oov += (ngram.index.vocab()[buffer.back()] == id_oov);
+	  }
 	
 	const state_score_type state_score = ngram_score(*ngram_state, buffer.begin(), buffer.end());
 	
@@ -909,12 +912,18 @@ namespace cicada
 			   feature_set_type& features,
 			   const bool final) const
     {
-      const double score = pimpl->ngram_scan_score(state, edge, dot);
+      int oov = 0;
+      const double score = pimpl->ngram_scan_score(state, edge, dot, oov);
       
       if (score != 0.0)
 	features[pimpl->feature_name] = score;
       else
 	features.erase(pimpl->feature_name);
+      
+      if (oov)
+	features[pimpl->feature_name_oov] = - oov;
+      else
+	features.erase(pimpl->feature_name_oov);
     }
     
     void NGram::apply_complete(state_ptr_type& state,
