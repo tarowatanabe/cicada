@@ -41,7 +41,7 @@ scorer="bleu:order=4,exact=true"
 kbest=1000
 iterative="no"
 iteration=20
-iteration_first=0
+iteration_first=1
 weights_init=""
 direction=8
 restart=2
