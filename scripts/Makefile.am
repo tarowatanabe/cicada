@@ -12,5 +12,6 @@ dist_bin_SCRIPTS = \
 	cicada-learn-linear.sh \
 	cicada-maxent.sh \
 	cicada-mert.sh \
+	cicada-mert-moses.sh \
 	cicada-moses.sh \
 	cicada-qsub.sh
