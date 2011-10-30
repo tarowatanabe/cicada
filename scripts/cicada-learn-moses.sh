@@ -492,6 +492,8 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     mkdir -p $output || exit 1
   fi
 
+  echo "decoding $output" >&2
+
   if test "$moses_thread" = yes; then
     
     kbest_file=${root}kbest.$kbest.$iter
