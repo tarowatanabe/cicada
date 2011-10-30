@@ -229,14 +229,6 @@ if test "$moses" = "" -o ! -x "$moses"; then
   exit 1
 fi
 
-if test "$regularize_l1" = no -a "$regularize_l2" = no; then
-  regularize_l2=yes
-fi
-
-if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
-  echo "both L1 and L2?" >&2
-  exit 1  
-fi
 
 cicadapath() {
   file=$1
@@ -298,8 +290,6 @@ if test "$root" != ""; then
     mkdir -p $root
   fi
 fi
-
-do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`
 
 ### check np and nc
 if test $np -le 1; then
