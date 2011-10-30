@@ -610,15 +610,10 @@ namespace cicada
             
       double ngram_predict_score(const state_ptr_type& state)
       {
-#if 0
-	symbol_type* context = reinterpret_cast<symbol_type*>(state);
+	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
 	
-	std::fill(context, context + order * 2, vocab_type::EMPTY);
+	*ngram_state = ngram.index.next(ngram_state_type(), vocab_type::BOS);
 	
-	context[0] = vocab_type::BOS;
-	
-	return 0.0;
-#endif
 	return 0.0;
       }
 
@@ -626,51 +621,39 @@ namespace cicada
 			      const edge_type& edge,
 			      const int dot)
       {
-#if 0
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& phrase = rule.rhs;
-	
-	symbol_type* context = reinterpret_cast<symbol_type*>(state);
-	symbol_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
+
+	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
 	
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
-	buffer.reserve(order + phrase.size());
-	buffer.insert(buffer.end(), context, context_end);
-	
-	buffer_type::iterator biter = buffer.end();
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
 	  if (*piter != vocab_type::EPSILON)
 	    buffer.push_back(*piter);
 	
-	const double score = ngram_score(buffer.begin(), biter, buffer.end());
+	const state_score_type state_score = ngram_score(*ngram_state, buffer.begin(), buffer.end());
 	
-	std::pair<buffer_type::iterator, buffer_type::iterator> suffix = ngram.ngram_suffix(buffer.begin(), buffer.end());
+	*ngram_state = state_score.first;
 	
-	std::copy(suffix.first, suffix.second, context);
-	std::fill(context + (suffix.second - suffix.first), context + order * 2, vocab_type::EMPTY);
-	
-	return score;
-#endif
-	return 0.0;
+	return state_score.second;
       }
       
       double ngram_complete_score(state_ptr_type& state)
       {
-#if 0
-	symbol_type* context = reinterpret_cast<symbol_type*>(state);
-	symbol_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
-	
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	buffer.clear();
-	buffer.insert(buffer.end(), context, context_end);
-	buffer.push_back(vocab_type::EOS);
-	
-	return ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
-#endif
-	return 0.0;
+	if (no_bos_eos)
+	  return 0.0;
+	else {
+	  ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
+	  
+	  const state_score_type state_score = ngram_score(*ngram_state, &vocab_type::EOS, (&vocab_type::EOS) + 1);
+	  
+	  *ngram_state = state_score.first;
+	  
+	  return state_score.second;
+	}
       }
 
       
