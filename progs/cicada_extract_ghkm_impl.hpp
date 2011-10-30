@@ -450,6 +450,8 @@ struct ExtractGHKM
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
   typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> > rule_pair_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
+
+  typedef std::vector<symbol_type, std::allocator<symbol_type> > frontier_symbol_set_type;
   
   typedef std::pair<range_type, int> range_pos_type;
   typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
@@ -483,6 +485,7 @@ struct ExtractGHKM
 	      const bool __constrained,
 	      const bool __inverse,
 	      const bool __swap_source_target,
+	      const bool __project_non_terminal,
 	      const bool __collapse)
     : non_terminal(__non_terminal),
       max_sentence_length(__max_sentence_length),
@@ -494,6 +497,7 @@ struct ExtractGHKM
       constrained(__constrained),
       inverse(__inverse),
       swap_source_target(__swap_source_target),
+      project_non_terminal(__project_non_terminal),
       collapse(__collapse),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
@@ -509,6 +513,7 @@ struct ExtractGHKM
   bool constrained;
   bool inverse;
   bool swap_source_target;
+  bool project_non_terminal;
   bool collapse;
   
   attribute_type attr_span_first;
@@ -881,7 +886,7 @@ struct ExtractGHKM
   }
   
   // construct rule-pair related data
-  
+  frontier_symbol_set_type frontier_symbols;
   point_set_type positions_source;
   point_set_type positions_target;
   tree_rule_set_type trees;
@@ -938,6 +943,7 @@ struct ExtractGHKM
 			   const node_set_type& tails,
 			   rule_pair_type& rule_pair)
   {
+    frontier_symbols.clear();
     positions_source.clear();
     covered.clear();
     covered.resize(alignment_source_target.size(), false);
@@ -945,14 +951,13 @@ struct ExtractGHKM
     tree_rule_type rule_source;
     weight_type weight = weights_outside[node.node] / weights_inside.back();
     
-
     //std::cerr << "construct source" << std::endl;
     {
       int frontier_pos = 0;
       int index = 1;
       edge_set_type::const_iterator iter = edges.begin();
       edge_set_type::const_iterator iter_end = edges.end();
-      construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, weight);
+      construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, frontier_symbols, covered, weight);
     }
 
     //std::cerr << "source: " << rule_source << std::endl;
@@ -999,7 +1004,11 @@ struct ExtractGHKM
 	  positions_target[i] = mapped_pos;
 	
 	trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
-	trees.push_back(non_terminal.non_terminal(riter->second));
+	
+	if (project_non_terminal)
+	  trees.push_back(frontier_symbols[riter->second - 1].non_terminal(riter->second));
+	else
+	  trees.push_back(non_terminal.non_terminal(riter->second));
 	
 	pos_first = riter->first.second;
       }
@@ -1012,7 +1021,8 @@ struct ExtractGHKM
       trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
     }
     
-    tree_rule_type rule_target(non_terminal, trees.begin(), trees.end());
+    // this non-terminal can be derived from the root of rule_target
+    tree_rule_type rule_target(project_non_terminal ? rule_source.label : non_terminal, trees.begin(), trees.end());
 
     //std::cerr << "target: " << rule_target << std::endl;
 
@@ -1099,7 +1109,7 @@ struct ExtractGHKM
   
 
   
-  template <typename Iterator, typename PosMap, typename Covered>
+  template <typename Iterator, typename PosMap, typename Frontiers, typename Covered>
   void construct_rule(const hypergraph_type& graph,
 		      Iterator& iter,
 		      Iterator last,
@@ -1107,6 +1117,7 @@ struct ExtractGHKM
 		      int& index,
 		      int& frontier_pos,
 		      PosMap& pos_map,
+		      Frontiers& frontiers,
 		      Covered& covered,
 		      weight_type& weight)
   {
@@ -1140,7 +1151,7 @@ struct ExtractGHKM
 	const id_type node_id = edge.tails[tail_pos];
 	
 	if (iter != last && node_id == graph.edges[*iter].head)
-	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
+	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, frontiers, covered, weight);
 	else {
 	  for (int pos = ranges[node_id].first; pos != ranges[node_id].second; ++ pos)
 	    covered[pos] = false;
@@ -1148,6 +1159,7 @@ struct ExtractGHKM
 	  weight *= weights_inside[node_id];
 	  
 	  titer->label = titer->label.non_terminal(index ++);
+	  frontiers.push_back(titer->label.non_terminal());
 	  ++ frontier_pos;
 	}
 	
@@ -1733,11 +1745,12 @@ struct Task
        const bool constrained,
        const bool inverse,
        const bool swap,
+       const bool project,
        const bool collapse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, collapse),
+      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, project, collapse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

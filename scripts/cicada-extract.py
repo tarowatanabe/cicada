@@ -108,6 +108,8 @@ opt_parser = OptionParser(
                 help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
                 help="constrained extraction in SCFG, GHKM and Tree"),
+    make_option("--project", default=None, action="store_true",
+                help="project non-terminal symbols in GHKM"),
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
@@ -560,6 +562,7 @@ class ExtractGHKM(Extract):
                  collapse=None,
                  exhaustive=None,
                  constrained=None,
+                 project=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -623,6 +626,8 @@ class ExtractGHKM(Extract):
             command += " --exhaustive"
         if constrained:
             command += " --constrained"
+        if project:
+            command += " --project"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -837,6 +842,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               collapse=options.collapse,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
+                              project=options.project,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.tree:
