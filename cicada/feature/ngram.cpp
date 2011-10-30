@@ -612,7 +612,7 @@ namespace cicada
       {
 	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
 	
-	*ngram_state = ngram.index.next(ngram_state_type(), vocab_type::BOS);
+	*ngram_state = (no_bos_eos ? ngram_state_type() : ngram.index.next(ngram_state_type(), vocab_type::BOS));
 	
 	return 0.0;
       }
