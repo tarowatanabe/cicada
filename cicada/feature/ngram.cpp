@@ -180,8 +180,7 @@ namespace cicada
 
 	__ngram_score_logprob(const ngram_type& __ngram) : ngram(__ngram) {}
 	
-	template <typename Word>
-	state_score_type operator()(const ngram_state_type& state, const Word& word, const bool backoffed, const int max_order) const
+	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
 	{
 	  return ngram.logprob(state, word, backoffed, max_order);
 	}
@@ -193,8 +192,7 @@ namespace cicada
 
 	__ngram_score_logbound(const ngram_type& __ngram) : ngram(__ngram) {}
 	
-	template <typename Word>
-	state_score_type operator()(const ngram_state_type& state, const Word& word, const bool backoffed, const int max_order) const
+	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
 	{
 	  return ngram.logbound(state, word, backoffed, max_order);
 	}
@@ -203,14 +201,16 @@ namespace cicada
       template <typename Iterator>
       state_score_type ngram_score(const ngram_state_type& state, Iterator first, Iterator last) const
       {
+	typedef typename std::iterator_traits<Iterator>::value_type value_type;
+
 	if (coarse)
-	  return ngram_score(state, first, last, __ngram_score_logbound(ngram));
+	  return ngram_score(state, first, last, __ngram_score_logbound(ngram), value_type());
 	else
-	  return ngram_score(state, first, last, __ngram_score_logprob(ngram));
+	  return ngram_score(state, first, last, __ngram_score_logprob(ngram), value_type());
       }
       
       template <typename Iterator, typename Scorer>
-      state_score_type ngram_score(ngram_state_type state, Iterator first, Iterator last, Scorer scorer) const
+      state_score_type ngram_score(ngram_state_type state, Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
       {
 	const size_type length = std::distance(first, last);
 	
@@ -243,14 +243,16 @@ namespace cicada
       template <typename Iterator>
       state_score_type ngram_estimate(Iterator first, Iterator last) const
       {
+	typedef typename std::iterator_traits<Iterator>::value_type value_type;
+
 	if (approximate)
-	  return ngram_estimate(first, last, __ngram_score_logprob(ngram));
+	  return ngram_estimate(first, last, __ngram_score_logprob(ngram), value_type());
 	else
-	  return ngram_estimate(first, last, __ngram_score_logbound(ngram));
+	  return ngram_estimate(first, last, __ngram_score_logbound(ngram), value_type());
       }
       
       template <typename Iterator, typename Scorer>
-      state_score_type ngram_estimate(Iterator first, Iterator last, Scorer scorer) const
+      state_score_type ngram_estimate(Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
       {
 	const size_type length = std::distance(first, last);
 	
