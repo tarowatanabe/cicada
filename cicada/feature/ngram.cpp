@@ -82,7 +82,7 @@ namespace cicada
 
       struct CacheContext
       {
-	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	typedef utils::simple_vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > phrase_type;
 
 	ngram_state_type state;
 	phrase_type      ngram;
