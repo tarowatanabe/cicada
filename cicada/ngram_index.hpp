@@ -601,23 +601,16 @@ namespace cicada
       
       context_type::const_iterator first = riter.base() + 1;
       context_type::const_iterator last  = context.end();
-      
-      size_type shard_index = 0;
-      size_type node = 0;
+
+      state_type state_suffix;
       for (/**/; first != last - 1; ++ first) {
-	shard_index = this->shard_index(first, last);
+	std::pair<state_type, context_type::const_iterator> result = next(state_type(), first, last);
 	
-	std::pair<context_type::const_iterator, size_type> result = traverse(shard_index, first, last);
-	
-	if (result.first == last) {
-	  node = result.second;
+	if (result.second == last) {
+	  state_suffix = result.first;
 	  break;
 	}
       }
-      
-      // we will never reach root, since unigram will contains all the vocabulary...
-      
-      const state_type suffix(first + 1 == last ? state_type(size_type(-1), *first) : state_type(shard_index, node));
       
       // trylock...
       {
@@ -625,11 +618,11 @@ namespace cicada
 	
 	if (lock) {
 	  shard.caches_suffix[cache_pos].state  = state;
-	  shard.caches_suffix[cache_pos].suffix = suffix;
+	  shard.caches_suffix[cache_pos].suffix = state_suffix;
 	}
       }
       
-      return suffix;
+      return state_suffix;
     }
 
     size_type shard_index(const id_type& first, const id_type& second) const
