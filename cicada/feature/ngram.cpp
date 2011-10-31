@@ -412,13 +412,27 @@ namespace cicada
 	    }
 	  
 	  if (static_cast<int>(buffer.size()) <= context_size) {
-	    const state_score_type state_bound = ngram_estimate(buffer.begin(), buffer.end());
+	    buffer_type::const_iterator biter_begin = buffer.begin();
+	    buffer_type::const_iterator biter_end   = buffer.end();
 	    
-	    *ngram_state = state_invalid;
-	    std::copy(buffer.begin(), buffer.end(), context);
-	    std::fill(context + buffer.size(), context_end, id_empty);
-	    
-	    return state_bound.second;
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_end);
+
+	    if (prefix.second == biter_end) {
+	      const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
+	      
+	      *ngram_state = state_invalid;
+	      std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
+	      
+	      return state_bound.second;
+	    } else {
+	      const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
+	      const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
+	      
+	      *ngram_state = state_score.first;
+	      std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
+	      
+	      return state_bound.second + state_score.second;
+	    }
 	  } else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
 	    buffer_type::const_iterator biter_end   = buffer.end();
@@ -429,8 +443,7 @@ namespace cicada
 	    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
 	    
 	    *ngram_state = state_score.first;
-	    std::copy(prefix.first, prefix.second, context);
-	    std::fill(context + (prefix.second - prefix.first), context_end, id_empty);
+	    std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
 	    
 	    return state_bound.second + state_score.second;
 	  }
@@ -470,13 +483,24 @@ namespace cicada
 		if (static_cast<int>(buffer.size()) <= context_size) {
 		  buffer_type::const_iterator biter_begin = buffer.begin();
 		  buffer_type::const_iterator biter_end   = buffer.end();
-		  
-		  const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
-		  
-		  std::copy(biter_begin, biter_end, context);
-		  std::fill(context + buffer.size(), context_end, id_empty);
-		  
-		  score += state_bound.second;
+
+		  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_end);
+
+		  if (prefix.second == biter_end) {
+		    const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
+		    
+		    std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
+		    
+		    score += state_bound.second;
+		  } else {
+		    const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
+		    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
+		    
+		    state_rule = state_score.first;
+		    std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
+		    
+		    score += state_bound.second + state_score.second;
+		  }
 		} else {
 		  buffer_type::const_iterator biter_begin = buffer.begin();
 		  buffer_type::const_iterator biter_end   = buffer.end();
@@ -487,8 +511,7 @@ namespace cicada
 		  const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
 		  
 		  state_rule = state_score.first;
-		  std::copy(prefix.first, prefix.second, context);
-		  std::fill(context + (prefix.second - prefix.first), context_end, id_empty);
+		  std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
 		  
 		  score += state_bound.second + state_score.second;
 		}
@@ -524,13 +547,24 @@ namespace cicada
 	  buffer_type::const_iterator biter_begin = buffer.begin();
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  
-	  const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_end);
 	  
-	  *ngram_state = state_invalid;
-	  std::copy(biter_begin, biter_end, context);
-	  std::fill(context + buffer.size(), context_end, id_empty);
-	  
-	  score += state_bound.second;
+	  if (prefix.second == biter_end) {
+	    const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
+	    
+	    *ngram_state = state_invalid;
+	    std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
+	    
+	    score += state_bound.second;
+	  } else {
+	    const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
+	    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
+	    
+	    *ngram_state = state_score.first;
+	    std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
+	    
+	    score += state_bound.second + state_score.second;
+	  }
 	} else {
 	  buffer_type::const_iterator biter_begin = buffer.begin();
 	  buffer_type::const_iterator biter_end   = buffer.end();
@@ -541,8 +575,7 @@ namespace cicada
 	  const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
 	  
 	  *ngram_state = state_score.first;
-	  std::copy(prefix.first, prefix.second, context);
-	  std::fill(context + (prefix.second - prefix.first), context_end, id_empty);
+	  std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
 	  
 	  score += state_bound.second + state_score.second;
 	}
