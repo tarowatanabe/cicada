@@ -471,6 +471,8 @@ namespace cicada
 		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter);
 		
 		if (prefix.second == biter_end) {
+		  // implicitly, invalid state, but we do not have to make an assignment, since state_rule will be assinged from antecedent.
+		  // state_rule = state_invalid;
 		  std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
 		  
 		  score += ngram_estimate(biter_begin, biter_end).second;
