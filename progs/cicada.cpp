@@ -148,6 +148,10 @@ int main(int argc, char ** argv)
     else
       cicada_directory(operations, model, grammar, tree_grammar, stats);
     
+    if (debug)
+      std::cerr << "statistics"<< '\n'
+		<< stats;
+    
 #if 0
     // we will force non directory-input-mode....
     if (input_directory_mode) {
