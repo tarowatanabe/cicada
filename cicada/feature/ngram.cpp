@@ -468,13 +468,15 @@ namespace cicada
 		// state_rule is invalid, but we have enough context or we have 'star' at antecedent
 		
 		if (static_cast<int>(buffer.size()) <= context_size) {
-		  const state_score_type state_bound = ngram_estimate(buffer.begin(), buffer.end());
+		  buffer_type::const_iterator biter_begin = buffer.begin();
+		  buffer_type::const_iterator biter_end   = buffer.end();
 		  
-		  std::copy(buffer.begin(), buffer.end(), context);
+		  const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
+		  
+		  std::copy(biter_begin, biter_end, context);
 		  std::fill(context + buffer.size(), context_end, id_empty);
 		  
 		  score += state_bound.second;
-		  
 		} else {
 		  buffer_type::const_iterator biter_begin = buffer.begin();
 		  buffer_type::const_iterator biter_end   = buffer.end();
@@ -516,12 +518,18 @@ namespace cicada
 	  
 	  score += state_score.second;
 	} else if (static_cast<int>(buffer.size()) <= context_size) {
-	  const state_score_type state_bound = ngram_estimate(buffer.begin(), buffer.end());
+	  // do we compute prefix?
+	  // if computed prefix is shorter, we will use state!
+	  
+	  buffer_type::const_iterator biter_begin = buffer.begin();
+	  buffer_type::const_iterator biter_end   = buffer.end();
+	  
+	  const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
 	  
 	  *ngram_state = state_invalid;
-	  std::copy(buffer.begin(), buffer.end(), context);
+	  std::copy(biter_begin, biter_end, context);
 	  std::fill(context + buffer.size(), context_end, id_empty);
-
+	  
 	  score += state_bound.second;
 	} else {
 	  buffer_type::const_iterator biter_begin = buffer.begin();
@@ -535,7 +543,7 @@ namespace cicada
 	  *ngram_state = state_score.first;
 	  std::copy(prefix.first, prefix.second, context);
 	  std::fill(context + (prefix.second - prefix.first), context_end, id_empty);
-
+	  
 	  score += state_bound.second + state_score.second;
 	}
 

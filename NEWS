@@ -1,3 +1,6 @@
+2011-11-x
+Better ngram feature computation by pre-transforming into word-id
+
 2011-10-29
 New: Better ngram state handling, inspired by Sorensen and Allauzen (2011) and Pauls and Klein (2011)
 Serious bugfix for ngram access: we may hit ngrams which do not exist (very rare, though)
