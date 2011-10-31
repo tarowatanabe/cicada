@@ -98,7 +98,8 @@ namespace cicada
       
     public:
       // we will use -2, since -1 may be used for OOV
-      static const symbol_type::id_type id_empty = symbol_type::id_type(-2);
+      //static const symbol_type::id_type id_empty = symbol_type::id_type(-2);
+      static const symbol_type::id_type id_empty;
 
     public:
       
@@ -764,6 +765,8 @@ namespace cicada
       symbol_type::id_type id_bos;
       symbol_type::id_type id_eos;
     };
+
+    const NGramImpl::symbol_type::id_type NGramImpl::id_empty = NGramImpl::symbol_type::id_type(-2);
     
     
     NGram::NGram(const std::string& parameter)
