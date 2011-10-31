@@ -411,7 +411,7 @@ void cicada_file(const operation_set_type& operations,
   std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue_is, queue_os, model, grammar, tree_grammar));
   
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(tasks[i]));
+    mapper.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   if (input_directory_mode) {
     std::string line;
@@ -475,7 +475,7 @@ void cicada_directory(const operation_set_type& operations,
   std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue, model, grammar, tree_grammar));
   
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(tasks[i]));
+    mapper.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   if (input_directory_mode) {
     std::string line;
