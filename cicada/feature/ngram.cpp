@@ -416,7 +416,7 @@ namespace cicada
 	    buffer_type::const_iterator biter_end   = buffer.end();
 	    
 	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter_end);
-
+	    
 	    if (prefix.second == biter_end) {
 	      const state_score_type state_bound = ngram_estimate(biter_begin, biter_end);
 	      
