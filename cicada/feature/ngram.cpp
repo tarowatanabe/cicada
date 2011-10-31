@@ -664,6 +664,8 @@ namespace cicada
             
       double ngram_predict_score(const state_ptr_type& state)
       {
+	// for no-bos-eos, we need to keep track of whether P(bos) was scored or not...
+	
 	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
 	
 	*ngram_state = (no_bos_eos ? ngram_state_type() : ngram.index.next(ngram_state_type(), id_bos));
