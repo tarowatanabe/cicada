@@ -53,6 +53,16 @@ int threads = 1;
 
 int debug = 0;
 
+void cicada_file(const operation_set_type& operations,
+		 const model_type& model,
+		 const grammar_type& grammar,
+		 const tree_grammar_type& tree_grammar,
+		 operation_set_type::statistics_type& stats);
+void cicada_directory(const operation_set_type& operations,
+		      const model_type& model,
+		      const grammar_type& grammar,
+		      const tree_grammar_type& tree_grammar,
+		      operation_set_type::statistics_type& stats);
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
@@ -99,6 +109,7 @@ int main(int argc, char ** argv)
       model.push_back(feature_function_type::create(*piter));
     model.initialize();
 
+
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
 				  grammar,
@@ -129,7 +140,15 @@ int main(int argc, char ** argv)
       
       ::sync();
     }
+
+    operation_set_type::statistics_type stats;
     
+    if (! operations.get_output_data().file.empty())
+      cicada_file(operations, model, grammar, tree_grammar, stats);
+    else
+      cicada_directory(operations, model, grammar, tree_grammar, stats);
+    
+#if 0
     // we will force non directory-input-mode....
     if (input_directory_mode) {
       std::string line;
@@ -149,18 +168,6 @@ int main(int argc, char ** argv)
 	}
       }
       
-#if 0
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
-	utils::compress_istream is(*iter, 1024 * 1024);
-	
-	if (std::getline(is, line)) {
-	  operations(line);
-	  operations.clear();
-	}
-      }
-#endif
-      
     } else {
       utils::compress_istream is(input_file, 1024 * 1024);
       
@@ -174,6 +181,7 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "statistics"<< '\n'
 		<< operations.get_statistics();
+#endif
     
   }
   catch (const std::exception& err) {
@@ -181,6 +189,326 @@ int main(int argc, char ** argv)
     return 1;
   }
   return 0;
+}
+
+struct TaskFile
+{
+  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+
+  TaskFile(queue_type&   __queue_is,
+	   queue_type&   __queue_os,
+	   const model_type& __model,
+	   const grammar_type& __grammar,
+	   const tree_grammar_type& __tree_grammar)
+    : queue_is(__queue_is),
+      queue_os(__queue_os),
+      _model(__model),
+      _grammar(__grammar),
+      _tree_grammar(__tree_grammar) {}
+  
+  void operator()()
+  {
+    // cloning should be performed in thread... otherwise, strangething may happen
+    const model_type        model(_model.clone());
+    const grammar_type      grammar(_grammar.clone());
+    const tree_grammar_type tree_grammar(_tree_grammar.clone());
+    
+    operation_set_type operations(ops.begin(), ops.end(),
+				  model,
+				  grammar,
+				  tree_grammar,
+				  symbol_goal,
+				  true,
+				  input_sentence_mode,
+				  input_lattice_mode,
+				  input_forest_mode,
+				  input_span_mode,
+				  input_alignment_mode,
+				  input_dependency_mode,
+				  input_bitext_mode,
+				  true,
+				  debug);
+    
+    std::string line;
+    while (1) {
+      queue_is.pop_swap(line);
+      if (line.empty()) break;
+      
+      operations(line);
+      
+      queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+    }
+    
+    operations.clear();
+
+    stats = operations.get_statistics();
+  }
+  
+  queue_type&   queue_is;
+  queue_type&   queue_os;
+  const model_type& _model;
+  const grammar_type& _grammar;
+  const tree_grammar_type& _tree_grammar;  
+  
+  operation_set_type::statistics_type stats;
+};
+
+struct ReduceFile
+{
+  typedef TaskFile::queue_type queue_type;
+  
+  ReduceFile(queue_type& __queue, const path_type& __path)
+    : queue(__queue), path(__path) {}
+  
+  void operator()()
+  {
+    typedef size_t id_type;
+    typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
+    
+    buffer_map_type maps;
+    std::string buffer;
+    
+    id_type     id = 0;
+    
+    utils::compress_ostream os(path, 1024 * 1024);
+    
+    for (;;) {
+      queue.pop_swap(buffer);
+      
+      if (buffer.empty()) break;
+
+      bool dump = false;
+      
+      utils::piece buffer_piece(buffer);
+      
+      utils::piece::const_iterator iter = buffer_piece.begin();
+      for (/**/; iter != buffer_piece.end() && ! std::isspace(*iter); ++ iter);
+      
+      // tokenize here...
+      const id_type      buffer_id        = utils::lexical_cast<id_type>(buffer_piece.substr(0, iter - buffer_piece.begin()));
+      const utils::piece buffer_tokenized = buffer_piece.substr(iter + 1 - buffer_piece.begin());
+      
+      if (buffer_id == id) {
+	os << buffer_tokenized;
+	dump = true;
+	
+	++ id;
+      } else
+	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
+      
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+	os << iter->second;
+	dump = true;
+	maps.erase(iter ++);
+      }
+      
+      if (dump)
+	os << std::flush;
+    }
+    
+    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      os << iter->second;
+      maps.erase(iter ++);
+    }
+    
+    // we will do twice, in case we have wrap-around for id...!
+    if (! maps.empty())
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+	os << iter->second;
+	maps.erase(iter ++);
+      }
+    
+    os << std::flush;
+    
+    if (! maps.empty())
+      throw std::runtime_error("id mismatch! expecting: " + utils::lexical_cast<std::string>(id)
+			       + " next: " + utils::lexical_cast<std::string>(maps.begin()->first));
+  }
+  
+  queue_type& queue;
+  path_type   path;
+};
+
+struct TaskDirectory
+{
+  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  
+  TaskDirectory(queue_type&   __queue,
+		const model_type& __model,
+		const grammar_type& __grammar,
+		const tree_grammar_type& __tree_grammar)
+    : queue(__queue),
+      _model(__model),
+      _grammar(__grammar),
+      _tree_grammar(__tree_grammar) {}
+
+  void operator()()
+  {
+    // cloning should be performed in thread... otherwise, strangething may happen
+    const model_type        model(_model.clone());
+    const grammar_type      grammar(_grammar.clone());
+    const tree_grammar_type tree_grammar(_tree_grammar.clone());
+    
+    operation_set_type operations(ops.begin(), ops.end(),
+				  model,
+				  grammar,
+				  tree_grammar,
+				  symbol_goal,
+				  true,
+				  input_sentence_mode,
+				  input_lattice_mode,
+				  input_forest_mode,
+				  input_span_mode,
+				  input_alignment_mode,
+				  input_dependency_mode,
+				  input_bitext_mode,
+				  true,
+				  debug);
+    
+    std::string line;
+    
+    while (1) {
+      queue.pop_swap(line);
+      if (line.empty()) break;
+      
+      operations(line);
+    }
+    
+    operations.clear();
+
+    stats = operations.get_statistics();
+  }
+  
+  queue_type&   queue;
+  const model_type& _model;
+  const grammar_type& _grammar;
+  const tree_grammar_type& _tree_grammar;
+
+  operation_set_type::statistics_type stats;
+};
+
+
+void cicada_file(const operation_set_type& operations,
+		 const model_type& model,
+		 const grammar_type& grammar,
+		 const tree_grammar_type& tree_grammar,
+		 operation_set_type::statistics_type& stats)
+{
+  typedef TaskFile   task_type;
+  typedef ReduceFile reducer_type;
+  
+  task_type::queue_type queue_is(threads);
+  task_type::queue_type queue_os;
+  
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(queue_os, operations.get_output_data().file)));
+  
+  boost::thread_group mapper;
+  std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue_is, queue_os, model, grammar, tree_grammar));
+  
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(tasks[i]));
+  
+  if (input_directory_mode) {
+    std::string line;
+    
+    for (size_t i = 0; /**/; ++ i) {
+      const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+      
+      const path_type path_input = input_file / file_name;
+      
+      if (! boost::filesystem::exists(path_input)) break;
+      
+      utils::compress_istream is(path_input, 1024 * 1024);
+      
+      if (std::getline(is, line) && ! line.empty())
+	queue_is.push_swap(line);
+    }
+    
+  } else {
+    utils::compress_istream is(input_file, 1024 * 1024);
+    
+    size_t id = 0;
+    std::string line;
+    
+    while (std::getline(is, line)) {
+
+      if (! line.empty()) {
+	if (input_id_mode)
+	  queue_is.push_swap(line);
+	else
+	  queue_is.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
+      }
+      
+      ++ id;
+    }
+  }
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_is.push(std::string());
+  
+  mapper.join_all();
+  
+  queue_os.push(std::string());
+  reducer.join_all();
+
+  for (int i = 0; i != threads; ++ i)
+    stats += tasks[i].stats;
+}
+
+
+void cicada_directory(const operation_set_type& operations,
+		      const model_type& model,
+		      const grammar_type& grammar,
+		      const tree_grammar_type& tree_grammar,
+		      operation_set_type::statistics_type& stats)
+{
+  typedef TaskDirectory task_type;
+  
+  task_type::queue_type queue(threads);
+  
+  boost::thread_group mapper;
+  std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue, model, grammar, tree_grammar));
+  
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(tasks[i]));
+  
+  if (input_directory_mode) {
+    std::string line;
+    
+    boost::filesystem::directory_iterator iter_end;
+    for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
+      utils::compress_istream is(*iter, 1024 * 1024);
+      
+      if (std::getline(is, line) && ! line.empty())
+	queue.push_swap(line);
+    }
+  } else {
+    utils::compress_istream is(input_file, 1024 * 1024);
+    
+    size_t id = 0;
+    std::string line;
+    
+    while (std::getline(is, line)) {
+
+      if (! line.empty()) {
+	if (input_id_mode)
+	  queue.push_swap(line);
+	else
+	  queue.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
+      }
+      
+      ++ id;
+    }
+  }
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(std::string());
+  
+  mapper.join_all();
+
+  for (int i = 0; i != threads; ++ i)
+    stats += tasks[i].stats;
 }
 
 struct deprecated

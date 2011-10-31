@@ -689,7 +689,8 @@ struct Task
 
   void operator()()
   {
-    std::string       line;
+    std::string line;
+    
     while (1) {
       queue.pop_swap(line);
       if (line.empty()) break;
