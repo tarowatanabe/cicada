@@ -260,7 +260,6 @@ double compute_oracles(const scorer_document_type& scorers,
     if (! hypotheses[id].empty())
       ids.push_back(id);
   
-
   score_ptr_type  score_optimum;
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
