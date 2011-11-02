@@ -569,7 +569,7 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
-    ("segment",   po::bool_swithc(&initialize_segment), "initialize by segment score")
+    ("segment",   po::bool_switch(&initialize_segment), "initialize by segment score")
     ("directory", po::bool_switch(&directory_mode),     "output in directory")
         
     ("scorer",    po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
