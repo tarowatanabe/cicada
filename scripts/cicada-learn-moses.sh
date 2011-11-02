@@ -291,7 +291,7 @@ case $learn in
     learn_option=" --learn-svm"
     break ;;
   * )
-    echo "learning algorithm can be either lbfgs, linear, svm, sgd"
+    echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos"
     exit 1 ;;
 esac
 

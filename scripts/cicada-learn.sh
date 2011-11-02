@@ -79,7 +79,7 @@ $me [options]
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
-  --learn                   learner (lbfgs, svm, linear, sgd)
+  --learn                   learner (lbfgs, svm, linear, sgd, pegasos)
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
@@ -281,6 +281,14 @@ case $learn in
     fi
     learn_option=" --learn-sgd"
     break ;;
+  pegasos )
+    if test $kbest -gt 0; then
+      learner="cicada_learn_kbest_mpi"
+    else
+      learner="cicada_learn_mpi"
+    fi
+    learn_option=" --learn-pegasos"
+    break ;;
   linear )
     if test $kbest -gt 0; then
       learner="cicada_learn_kbest"
@@ -300,7 +308,7 @@ case $learn in
     learn_option=" --learn-svm"
     break ;;
   * )
-    echo "learning algorithm can be either lbfgs, linear, svm, sgd"
+    echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos"
     exit 1 ;;
 esac
 
