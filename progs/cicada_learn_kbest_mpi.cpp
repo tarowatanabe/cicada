@@ -869,7 +869,7 @@ void read_kbest(const scorer_document_type& scorers,
 	    oracle.score = scorers[i]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
 	    oracle.loss  = oracle.score->score() * loss_factor;
 	  } else
-	    oracle.loss = 1;
+	    oracle.loss = 0;
 	}
       }
     }

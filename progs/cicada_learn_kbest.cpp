@@ -760,7 +760,7 @@ struct OptimizeSVM
     
     alpha_set_type alpha(data_size, 0.0);
     
-    cicada::optimize::DCD solver;
+    cicada::optimize::QPDCD solver;
     
     HMatrix H(positions, encoders);
     MMatrix M(positions, encoders);
