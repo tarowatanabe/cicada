@@ -574,7 +574,8 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
         --even \
         --input $devset \
         $kbest_generation || exit 1
-  
+    
+    ## remove unused directory...
     rm -rf ${output}/kbests || exit 1
   fi
 
