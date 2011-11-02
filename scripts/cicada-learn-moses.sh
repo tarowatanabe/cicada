@@ -88,7 +88,7 @@ $me [options]
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
-  --learn                   learner (lbfgs, svm, linear, sgd)
+  --learn                   learner (lbfgs, svm, linear, sgd, pegasos)
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
@@ -277,6 +277,10 @@ case $learn in
   sgd )
     learner="cicada_learn_kbest_mpi"
     learn_option=" --learn-sgd"
+    break ;;
+  pegasos )
+    learner="cicada_learn_kbest_mpi"
+    learn_option=" --learn-pegasos"
     break ;;
   linear )
     learner="cicada_learn_kbest"
