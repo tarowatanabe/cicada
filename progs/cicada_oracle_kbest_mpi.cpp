@@ -358,28 +358,38 @@ double compute_oracles(const scorer_document_type& scorers,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
+#if 1
   // initialize...
-  {
-    boost::random_number_generator<Generator> gen(generator);
-    
-    for (size_t id = 0; id != hypotheses.size(); ++ id)
-      if (! hypotheses[id].empty()) {
-	oracles[id].clear();
-	oracles[id].push_back(hypotheses[id][gen(hypotheses[id].size())]);
-      }
-
-    bcast_kbest(oracles);
-    
-    for (size_t id = 0; id != oracles.size(); ++ id) {
-      hypothesis_set_type::iterator oiter_end = oracles[id].end();
-      for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	hypothesis_type& hyp = *oiter;
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      double objective_best = - std::numeric_limits<double>::infinity();
+      
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	const double score = hiter->score->score() * score_factor;
 	
-	if (! hyp.score)
-	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	if (score > objective_best) {
+	  oracles[id].clear();
+	  oracles[id].push_back(*hiter);
+	    
+	  objective_best = score;
+	} else if (score == objective_best)
+	  oracles[id].push_back(*hiter);
       }
     }
+    
+  bcast_kbest(oracles);
+    
+  for (size_t id = 0; id != oracles.size(); ++ id) {
+    hypothesis_set_type::iterator oiter_end = oracles[id].end();
+    for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+      hypothesis_type& hyp = *oiter;
+	
+      if (! hyp.score)
+	hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+    }
   }
+#endif
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)

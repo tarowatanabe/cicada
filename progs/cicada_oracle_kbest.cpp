@@ -264,27 +264,38 @@ double compute_oracles(const scorer_document_type& scorers,
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
 
-  // initialize...
-  {
-    boost::random_number_generator<Generator> gen(generator);
-    
-    for (size_t id = 0; id != hypotheses.size(); ++ id)
-      if (! hypotheses[id].empty()) {
-	oracles[id].clear();
-	oracles[id].push_back(&hypotheses[id][gen(hypotheses[id].size())]);
-	
-	if (! score_optimum)
-	  score_optimum = oracles[id].front()->score->clone();
-	else
-	  *score_optimum += *oracles[id].front()->score;
-      }
-  }
-  
-  oracle_map_type oracles_best(oracles.size());
-  
+#if 1
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
-    
+
+  // initialize...
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      
+      double objective_best = - std::numeric_limits<double>::infinity();
+      
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	const double score = hiter->score->score() * score_factor;
+	
+	if (score > objective_best) {
+	  oracles[id].clear();
+	  oracles[id].push_back(&(*hiter));
+	  
+	  objective_best = score;
+	} else if (score == objective_best)
+	  oracles[id].push_back(&(*hiter));
+      }
+      
+      if (! score_optimum)
+	score_optimum = oracles[id].front()->score->clone();
+      else
+	*score_optimum += *oracles[id].front()->score;
+    }
+#endif
+  
+  oracle_map_type oracles_best(oracles.size());
+      
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
