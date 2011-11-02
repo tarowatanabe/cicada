@@ -260,15 +260,29 @@ double compute_oracles(const scorer_document_type& scorers,
     if (! hypotheses[id].empty())
       ids.push_back(id);
   
+
   score_ptr_type  score_optimum;
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
+
+  // initialize...
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      oracles[id].clear();
+      oracles[id].push_back(&hypotheses[id].front());
+      
+      if (! score_optimum)
+	score_optimum = hypotheses[id].front().score->clone();
+      else
+	*score_optimum += *hypotheses[id].front().score;
+    }
+  
   
   oracle_map_type oracles_best(oracles.size());
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
-  
+    
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
