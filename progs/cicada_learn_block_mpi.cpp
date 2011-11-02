@@ -633,6 +633,7 @@ void cicada_learn(operation_set_type& operations,
       
       weights *= 1.0 / mpi_size;
     } else {
+      ++ updated; // avoid zero...
       weights *= updated;
       
       reduce_weights(weights);
