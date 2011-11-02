@@ -59,6 +59,7 @@ bool learn_sgd = false;
 bool learn_mira = false;
 bool learn_arow = false;
 bool learn_cw = false;
+bool learn_pegasos = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -109,9 +110,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -171,6 +172,8 @@ int main(int argc, char ** argv)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(graphs_forest, graphs_intersected, weights, generator);
     else if (learn_cw)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(graphs_forest, graphs_intersected, weights, generator);
+    else if (learn_pegasos)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(graphs_forest, graphs_intersected, weights, generator);
     else
       objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
 
@@ -1188,11 +1191,12 @@ void options(int argc, char** argv)
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
-    ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
-    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
-    ("learn-arow",   po::bool_switch(&learn_arow),   "online AROW algorithm")
-    ("learn-cw",     po::bool_switch(&learn_cw),     "online CW algorithm")
+    ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
+    ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
+    ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
+    ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
