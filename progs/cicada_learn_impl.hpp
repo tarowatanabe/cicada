@@ -243,7 +243,7 @@ struct OptimizerSGDL1 : public OptimizerBase
 struct OptimizerMIRA : public OptimizerBase
 {
   OptimizerMIRA(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+		const double& C) : instances(__instances), samples(0), lambda(C) {}
 
   void initialize()
   {
@@ -307,7 +307,7 @@ struct OptimizerMIRA : public OptimizerBase
 struct OptimizerAROW : public OptimizerBase
 {
   OptimizerAROW(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+		const double& C) : instances(__instances), samples(0), lambda(C) {}
 
   void initialize()
   {
@@ -388,7 +388,7 @@ struct OptimizerAROW : public OptimizerBase
 struct OptimizerCW : public OptimizerBase
 {
   OptimizerCW(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+		const double& C) : instances(__instances), samples(0), lambda(C) {}
 
   void initialize()
   {
