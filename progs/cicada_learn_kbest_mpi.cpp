@@ -564,7 +564,7 @@ struct OptimizeOnlineMargin
   void operator()(const weight_set_type& weights, double& objective, double& instances) const
   {
     for (size_t id = 0; id != losses.size(); ++ id)
-      objective += losses[id] - cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0);
+      objective += std::max(0.0, losses[id] - cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0));
     
     instances += losses.size();
   }
