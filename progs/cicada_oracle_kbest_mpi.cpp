@@ -369,6 +369,16 @@ double compute_oracles(const scorer_document_type& scorers,
       }
 
     bcast_kbest(oracles);
+    
+    for (size_t id = 0; id != oracles.size(); ++ id) {
+      hypothesis_set_type::iterator oiter_end = oracles[id].end();
+      for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	hypothesis_type& hyp = *oiter;
+	
+	if (! hyp.score)
+	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+      }
+    }
   }
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
