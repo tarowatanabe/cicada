@@ -1165,16 +1165,19 @@ struct TaskReadUnite
 
 struct TaskReadSync
 {
-  typedef std::pair<path_type, path_type> path_pair_type;
+  typedef boost::fusion::tuple<path_type, path_type, size_t> path_pair_type;
   typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
   
-  TaskReadSync(queue_type& __queue)
-    : queue(__queue) {}
+  TaskReadSync(queue_type& __queue, const scorer_document_type& __scorers)
+    : queue(__queue), scorers(__scorers) {}
   
   void operator()()
   {
     typedef boost::spirit::istream_iterator iter_type;
     typedef kbest_feature_parser<iter_type> parser_type;
+    
+    const bool error_metric = scorers.error_metric();
+    const double loss_factor = (error_metric ? 1.0 : - 1.0);
     
     parser_type parser;
     kbest_feature_type kbest;
@@ -1183,15 +1186,21 @@ struct TaskReadSync
       path_pair_type paths;
       queue.pop(paths);
       
-      if (paths.first.empty()) break;
+      if (boost::fusion::get<0>(paths).empty()) break;
       
       // we will perform paired reading...
       
       kbests.resize(kbests.size() + 1);
       oracles.resize(oracles.size() + 1);
+
+      const size_t refpos = boost::fusion::get<2>(paths);
+      
+      if (! scorers.empty())
+	if (refpos >= scorers.size())
+	  throw std::runtime_error("reference positions outof index");
       
       {
-	utils::compress_istream is(paths.first, 1024 * 1024);
+	utils::compress_istream is(boost::fusion::get<0>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	  
 	iter_type iter(is);
@@ -1206,11 +1215,19 @@ struct TaskReadSync
 	      throw std::runtime_error("kbest parsing failed");
 	  
 	  kbests.back().push_back(hypothesis_type(kbest));
+	  
+	  hypothesis_type& kbest = kbests.back().back();
+	  
+	  if (! scorers.empty()) {
+	    kbest.score = scorers[refpos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
+	    kbest.loss  = kbest.score->score() * loss_factor;
+	  } else
+	    kbest.loss = 1;
 	}
       }
 
       {
-	utils::compress_istream is(paths.second, 1024 * 1024);
+	utils::compress_istream is(boost::fusion::get<1>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	  
 	iter_type iter(is);
@@ -1219,18 +1236,28 @@ struct TaskReadSync
 	while (iter != iter_end) {
 	  boost::fusion::get<1>(kbest).clear();
 	  boost::fusion::get<2>(kbest).clear();
-	    
+	  
 	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
 	  oracles.back().push_back(hypothesis_type(kbest));
+
+	  hypothesis_type& oracle = oracles.back().back();
+
+	  if (! scorers.empty()) {
+	    oracle.score = scorers[refpos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
+	    oracle.loss  = oracle.score->score() * loss_factor;
+	  } else
+	    oracle.loss = 0.0;
 	}
       }
     }
   }
   
   queue_type& queue;
+  const scorer_document_type& scorers;
+  
   hypothesis_map_type kbests;
   hypothesis_map_type oracles;
 };
@@ -1331,11 +1358,27 @@ void read_kbest(const scorer_document_type& scorers,
       
       loss_kbest(kbests, scorers);
       loss_kbest(oracles, scorers);
+    } else {
+      // fill zero loss to oracles, and one loss to kbests.
+      
+      for (size_t id = 0; id != kbests.size(); ++ id) {
+	hypothesis_set_type::iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	  kiter->loss = 1.0;
+      }
+      
+      for (size_t id = 0; id != oracles.size(); ++ id) {
+	hypothesis_set_type::iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
+	  oiter->loss = 0.0;
+      }
     }
     
   } else {
     typedef TaskReadSync task_type;
-    typedef task_type::queue_type queue_type;
+    
+    typedef task_type::queue_type     queue_type;
+    typedef task_type::path_pair_type path_pair_type;
     
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
     
@@ -1344,13 +1387,13 @@ void read_kbest(const scorer_document_type& scorers,
       throw std::runtime_error("# of kbests does not match");
     
     queue_type queue(threads);
-    task_set_type tasks(threads, task_type(queue));
+    task_set_type tasks(threads, task_type(queue, scorers));
     
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    
+    size_t refpos = 0;
     for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
       if (debug)
 	std::cerr << "reading kbest: " << kbest_path[pos].string() << " with " << oracle_path[pos].string() << std::endl;
@@ -1363,13 +1406,13 @@ void read_kbest(const scorer_document_type& scorers,
 	
 	if (! boost::filesystem::exists(path_kbest)) break;
 	if (! boost::filesystem::exists(path_oracle)) continue;
-
-	queue.push(std::make_pair(path_kbest, path_oracle));
+	
+	queue.push(path_pair_type(path_kbest, path_oracle, refpos ++));
       }
     }
     
     for (int i = 0; i != threads; ++ i)
-      queue.push(std::make_pair(path_type(), path_type()));
+      queue.push(path_pair_type(path_type(), path_type(), size_t(-1)));
     
     workers.join_all();
 
