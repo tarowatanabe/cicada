@@ -264,19 +264,21 @@ double compute_oracles(const scorer_document_type& scorers,
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
 
-#if 0
   // initialize...
-  for (size_t id = 0; id != hypotheses.size(); ++ id)
-    if (! hypotheses[id].empty()) {
-      oracles[id].clear();
-      oracles[id].push_back(&hypotheses[id].front());
-      
-      if (! score_optimum)
-	score_optimum = hypotheses[id].front().score->clone();
-      else
-	*score_optimum += *hypotheses[id].front().score;
-    }
-#endif
+  {
+    boost::random_number_generator<Generator> gen(generator);
+    
+    for (size_t id = 0; id != hypotheses.size(); ++ id)
+      if (! hypotheses[id].empty()) {
+	oracles[id].clear();
+	oracles[id].push_back(&hypotheses[id][gen(hypotheses[id].size())]);
+	
+	if (! score_optimum)
+	  score_optimum = oracles[id].front()->score->clone();
+	else
+	  *score_optimum += *oracles[id].front()->score;
+      }
+  }
   
   oracle_map_type oracles_best(oracles.size());
   
