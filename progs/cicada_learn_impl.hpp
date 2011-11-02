@@ -257,11 +257,11 @@ struct OptimizerMIRA : public OptimizerBase
   }
 
   void operator()(const feature_set_type& features_reward,
-		  const feature_set_type& features_penalty)
+		  const feature_set_type& features_penalty,
+		  const double loss=1.0)
   {
     const feature_set_type features(features_reward - features_penalty);
     
-    const double loss = 1.0;
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, features);
     
@@ -303,13 +303,13 @@ struct OptimizerAROW : public OptimizerBase
   }
 
   void operator()(const feature_set_type& features_reward,
-		  const feature_set_type& features_penalty)
+		  const feature_set_type& features_penalty,
+		  const double loss=1.0)
   {
     feature_set_type features(features_reward - features_penalty);
     
     covariances.allocate(1.0);
     
-    const double loss = 1.0;
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     
@@ -359,13 +359,13 @@ struct OptimizerCW : public OptimizerBase
   }
 
   void operator()(const feature_set_type& features_reward,
-		  const feature_set_type& features_penalty)
+		  const feature_set_type& features_penalty,
+		  const double loss=1.0)
   {
     feature_set_type features(features_reward - features_penalty);
     
     covariances.allocate(1.0);
     
-    const double loss = 1.0;
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     

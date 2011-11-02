@@ -260,32 +260,33 @@ struct OptimizeOnline
   typedef typename optimizer_type::gradient_type gradient_type;    
 
   template <typename Iterator>
-  weight_type function(Iterator first, Iterator last)
+  weight_type function(Iterator first, Iterator last, const double init)
   {
-    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale);
+    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, init) * optimizer.weight_scale);
   }
   
   
   void operator()(const hypothesis_set_type& oracles,
 		  const hypothesis_set_type& kbests)
   {
+    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
     
     weight_type Z_oracle;
     weight_type Z_kbest;
     
     hypothesis_set_type::const_iterator oiter_end = oracles.end();
     for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-      Z_oracle += function(oiter->features.begin(), oiter->features.end());
-			   
+      Z_oracle += function(oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss);
+    
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-      Z_kbest += function(kiter->features.begin(), kiter->features.end());
+      Z_kbest += function(kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss);
     
     gradient_type gradient_oracles;
     gradient_type gradient_kbests;
     
     for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
-      const weight_type weight = function(oiter->features.begin(), oiter->features.end()) / Z_oracle;
+      const weight_type weight = function(oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss) / Z_oracle;
       
       hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
       for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
@@ -293,7 +294,7 @@ struct OptimizeOnline
     }
     
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
-      const weight_type weight = function(kiter->features.begin(), kiter->features.end()) / Z_kbest;
+      const weight_type weight = function(kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss) / Z_kbest;
       
       hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
       for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
@@ -359,9 +360,17 @@ struct OptimizeOnlineMargin
 	kiter_best = kiter;
       }
     }
-    
-    optimizer(feature_set_type(oiter_best->features.begin(), oiter_best->features.end()),
-	      feature_set_type(kiter_best->features.begin(), kiter_best->features.end()));
+
+    if (loss_margin) {
+      const double loss = kiter_best->loss - oiter_best->loss;
+      
+      if (loss > 0.0)
+	optimizer(feature_set_type(oiter_best->features.begin(), oiter_best->features.end()),
+		  feature_set_type(kiter_best->features.begin(), kiter_best->features.end()),
+		  loss);
+    } else
+      optimizer(feature_set_type(oiter_best->features.begin(), oiter_best->features.end()),
+		feature_set_type(kiter_best->features.begin(), kiter_best->features.end()));
   }
 
   Optimizer& optimizer;
@@ -553,6 +562,8 @@ struct OptimizeLBFGS
       
       const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
 
+      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
+      
       for (size_t id = 0; id != id_max; ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
 	  
@@ -561,14 +572,14 @@ struct OptimizeLBFGS
 	  
 	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	    Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), 0.0));
+	    Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss));
 	
 	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	    Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), 0.0));
+	    Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss));
 	
 	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), 0.0)) / Z_oracle;
+	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss)) / Z_oracle;
 	  
 	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
 	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
@@ -576,7 +587,7 @@ struct OptimizeLBFGS
 	  }
 	
 	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), 0.0)) / Z_kbest;
+	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss)) / Z_kbest;
 	  
 	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
 	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
