@@ -79,6 +79,7 @@ path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 
+bool initialize_segment = false;
 bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
@@ -358,38 +359,38 @@ double compute_oracles(const scorer_document_type& scorers,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
-#if 1
-  // initialize...
-  for (size_t id = 0; id != hypotheses.size(); ++ id)
-    if (! hypotheses[id].empty()) {
-      double objective_best = - std::numeric_limits<double>::infinity();
+  if (initialize_segment) {
+    // initialize...
+    for (size_t id = 0; id != hypotheses.size(); ++ id)
+      if (! hypotheses[id].empty()) {
+	double objective_best = - std::numeric_limits<double>::infinity();
       
-      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
-      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
-	const double score = hiter->score->score() * score_factor;
+	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	  const double score = hiter->score->score() * score_factor;
 	
-	if (score > objective_best) {
-	  oracles[id].clear();
-	  oracles[id].push_back(*hiter);
+	  if (score > objective_best) {
+	    oracles[id].clear();
+	    oracles[id].push_back(*hiter);
 	    
-	  objective_best = score;
-	} else if (score == objective_best)
-	  oracles[id].push_back(*hiter);
+	    objective_best = score;
+	  } else if (score == objective_best)
+	    oracles[id].push_back(*hiter);
+	}
+      }
+    
+    bcast_kbest(oracles);
+    
+    for (size_t id = 0; id != oracles.size(); ++ id) {
+      hypothesis_set_type::iterator oiter_end = oracles[id].end();
+      for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	hypothesis_type& hyp = *oiter;
+	
+	if (! hyp.score)
+	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
       }
     }
-    
-  bcast_kbest(oracles);
-    
-  for (size_t id = 0; id != oracles.size(); ++ id) {
-    hypothesis_set_type::iterator oiter_end = oracles[id].end();
-    for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-      hypothesis_type& hyp = *oiter;
-	
-      if (! hyp.score)
-	hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
-    }
   }
-#endif
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)
@@ -672,7 +673,8 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
-    ("directory", po::bool_switch(&directory_mode), "output in directory")
+    ("segment",   po::bool_swithc(&initialize_segment), "initialize by segment score")
+    ("directory", po::bool_switch(&directory_mode),     "output in directory")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     

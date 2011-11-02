@@ -47,6 +47,7 @@ path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 
+bool initialize_segment = false;
 bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
@@ -264,35 +265,36 @@ double compute_oracles(const scorer_document_type& scorers,
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
 
-#if 1
+
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
 
-  // initialize...
-  for (size_t id = 0; id != hypotheses.size(); ++ id)
-    if (! hypotheses[id].empty()) {
+  if (initialize_segment) {
+    // initialize...
+    for (size_t id = 0; id != hypotheses.size(); ++ id)
+      if (! hypotheses[id].empty()) {
       
-      double objective_best = - std::numeric_limits<double>::infinity();
+	double objective_best = - std::numeric_limits<double>::infinity();
       
-      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
-      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
-	const double score = hiter->score->score() * score_factor;
+	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	  const double score = hiter->score->score() * score_factor;
 	
-	if (score > objective_best) {
-	  oracles[id].clear();
-	  oracles[id].push_back(&(*hiter));
+	  if (score > objective_best) {
+	    oracles[id].clear();
+	    oracles[id].push_back(&(*hiter));
 	  
-	  objective_best = score;
-	} else if (score == objective_best)
-	  oracles[id].push_back(&(*hiter));
-      }
+	    objective_best = score;
+	  } else if (score == objective_best)
+	    oracles[id].push_back(&(*hiter));
+	}
       
-      if (! score_optimum)
-	score_optimum = oracles[id].front()->score->clone();
-      else
-	*score_optimum += *oracles[id].front()->score;
-    }
-#endif
+	if (! score_optimum)
+	  score_optimum = oracles[id].front()->score->clone();
+	else
+	  *score_optimum += *oracles[id].front()->score;
+      }
+  }
   
   oracle_map_type oracles_best(oracles.size());
       
@@ -567,7 +569,8 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
-    ("directory", po::bool_switch(&directory_mode), "output in directory")
+    ("segment",   po::bool_swithc(&initialize_segment), "initialize by segment score")
+    ("directory", po::bool_switch(&directory_mode),     "output in directory")
         
     ("scorer",    po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
