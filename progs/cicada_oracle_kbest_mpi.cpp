@@ -367,6 +367,8 @@ double compute_oracles(const scorer_document_type& scorers,
 	oracles[id].clear();
 	oracles[id].push_back(hypotheses[id][gen(hypotheses[id].size())]);
       }
+
+    bcast_kbest(oracles);
   }
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
