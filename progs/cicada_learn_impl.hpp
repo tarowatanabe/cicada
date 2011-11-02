@@ -255,6 +255,24 @@ struct OptimizerMIRA : public OptimizerBase
   {
     
   }
+  
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const double loss)
+  {
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, first, last, 0.0);
+    
+    objective += loss - margin;
+    
+    const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+    
+    if (alpha > 1e-10) {
+      for (/**/; first != last; ++ first)
+	weights[first->first] += alpha * first->second;
+    
+      ++ samples;
+    }
+  }
 
   void operator()(const feature_set_type& features_reward,
 		  const feature_set_type& features_penalty,
@@ -297,9 +315,35 @@ struct OptimizerAROW : public OptimizerBase
     objective = 0.0;
     weight_scale = 1.0;
   }
+  
   void finalize()
   {
     
+  }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += loss - margin;
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      for (/**/; first != last; ++ first) {
+	const double var = covariances[first->first];
+	
+	weights[first->first]     += alpha * first->second * var;
+	covariances[first->first] -= beta * (var * var) * (first->second * first->second);
+      }
+      
+      ++ samples;
+    }
   }
 
   void operator()(const feature_set_type& features_reward,
@@ -358,6 +402,36 @@ struct OptimizerCW : public OptimizerBase
     
   }
 
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += loss - margin;
+    
+    if (loss - margin > 0.0) {
+      const double theta = 1.0 + 2.0 * C * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
+      const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+      
+      if (alpha > 1e-10 && beta > 0.0) {
+	for (/**/; first != last; ++ first) {
+	  const double var = covariances[first->first];
+	  
+	  weights[first->first]     += alpha * first->second * var;
+	  covariances[first->first] -= beta * (var * var) * (first->second * first->second);
+	}
+	
+	++ samples;
+      }
+    }
+    
+    
+  }
+
   void operator()(const feature_set_type& features_reward,
 		  const feature_set_type& features_penalty,
 		  const double loss=1.0)
@@ -386,6 +460,7 @@ struct OptimizerCW : public OptimizerBase
 	}
       }
     }
+    
     ++ samples;
   }
   
@@ -421,6 +496,35 @@ struct OptimizerPegasos : public OptimizerBase
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
 
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const double loss)
+  {
+    const double margin = cicada::dot_product(weights, first, last, 0.0) * weight_scale;
+    
+    objective += loss - margin;
+    
+    if (loss - margin > 0.0) {
+      const double eta = 1.0 / (lambda * (epoch + 2));
+      // exponential decay...
+      //const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+      ++ epoch;
+      
+      rescale(1.0 - eta * lambda);
+      
+      ++ samples;
+      
+      for (/**/; first != last; ++ first) 
+	update(weights[first->first], double(first->second) * eta);
+      
+      // projection...
+      if (weight_norm > 1.0 / lambda)
+	rescale(std::sqrt(1.0 / (lambda * weight_norm)));
+      
+      if (weight_scale < 0.001 || 1000 < weight_scale)
+	finalize();
+    }
+  }
+
   void operator()(const feature_set_type& features_reward,
 		  const feature_set_type& features_penalty,
 		  const double loss=1.0)
@@ -446,11 +550,8 @@ struct OptimizerPegasos : public OptimizerBase
     if (weight_norm > 1.0 / lambda)
       rescale(std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.001 || 1000 < weight_scale) {
-      weights *= weight_scale;
-      weight_scale = 1.0;
-      weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-    }
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize();
   }
 
   void update(double& x, const double& alpha)

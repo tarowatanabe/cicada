@@ -253,9 +253,32 @@ int loop_sleep(bool found, int non_found_iter)
 template <typename Optimizer>
 struct OptimizeOnline
 {
+  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
-  OptimizeOnline(Optimizer& __optimizer)
-    : optimizer(__optimizer) {}
+  OptimizeOnline(Optimizer& __optimizer,
+		 const hypothesis_map_type& __kbests,
+		 const hypothesis_map_type& __oracles)
+    : optimizer(__optimizer),
+      kbests(__kbests),
+      oracles(__oracles)
+  {
+    ids.reserve(kbests.size());
+    ids.resize(kbests.size());
+    
+    for (size_t id = 0; id != ids.size(); ++ id)
+      ids[id] = id;
+  }
+  
+  template <typename Generator>
+  void operator()(Generator& generator)
+  {
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
+    
+    for (size_t id = 0; id != ids.size(); ++ id)
+      if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
+	operator()(oracles[ids[id]], kbests[ids[id]]);
+  }
   
   typedef Optimizer optimizer_type;
   
@@ -311,19 +334,202 @@ struct OptimizeOnline
   }
   
   Optimizer& optimizer;
+
+  const hypothesis_map_type& kbests;
+  const hypothesis_map_type& oracles;
+
+  id_set_type ids;
 };
 
 template <typename Optimizer>
 struct OptimizeOnlineMargin
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
   
-  OptimizeOnlineMargin(Optimizer& __optimizer)
-    : optimizer(__optimizer) {}
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef features_type::const_iterator const_iterator;
+
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+
+    void swap(SampleSet& x)
+    {
+      features.swap(x.features);
+      offsets.swap(x.offsets);
+    }
+
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+  
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+
+  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
+  
+  OptimizeOnlineMargin(Optimizer& __optimizer,
+		       const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles)
+    : optimizer(__optimizer)
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    
+    features_type feats;
+    sentence_unique_type  sentences;
+    
+    for (size_type id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	sentences.clear();
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  sentences.insert(oracles[id][o].sentence);
+	
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	    const hypothesis_type& oracle = oracles[id][o];
+	    const hypothesis_type& kbest  = kbests[id][k];
+	    
+	    // ignore oracle translations
+	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    
+	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    
+	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    
+	    feats.clear();
+	
+	    while (oiter != oiter_end && kiter != kiter_end) {
+	      if (oiter->first < kiter->first) {
+		feats.push_back(*oiter);
+		++ oiter;
+	      } else if (kiter->first < oiter->first) {
+		feats.push_back(feature_value_type(kiter->first, - kiter->second));
+		++ kiter;
+	      } else {
+		const double value = oiter->second - kiter->second;
+		if (value != 0.0)
+		  feats.push_back(feature_value_type(kiter->first, value));
+		++ oiter;
+		++ kiter;
+	      }
+	    }
+	
+	    for (/**/; oiter != oiter_end; ++ oiter)
+	      feats.push_back(*oiter);
+	
+	    for (/**/; kiter != kiter_end; ++ kiter)
+	      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    
+	    if (feats.empty()) continue;
+
+	    if (loss_margin) {
+	      const double loss = kbest.loss - oracle.loss;
+	      
+	      // checking...
+	      if (loss > 0.0) {
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(loss);
+	      }
+	    } else {
+	      features.insert(feats.begin(), feats.end());
+	      losses.push_back(1.0);
+	    }
+	  }
+      }
+    
+    loss_set_type(losses).swap(losses);
+    
+    ids.reserve(losses.size());
+    ids.resize(losses.size());
+    
+    for (size_t id = 0; id != ids.size(); ++ id)
+      ids[id] = id;
+  }
   
   typedef Optimizer optimizer_type;
   
   typedef typename optimizer_type::weight_type   weight_type;
   typedef typename optimizer_type::gradient_type gradient_type;
+
+  template <typename Generator>
+  void operator()(Generator& generator)
+  {
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
+    
+    for (size_t i = 0; i != ids.size(); ++ i) {
+      const size_type id = ids[i];
+      
+      optimizer(features[id].begin(), features[id].end(), losses[id]);
+    }
+  }
   
   template <typename Iterator>
   double function(Iterator first, Iterator last)
@@ -377,6 +583,10 @@ struct OptimizeOnlineMargin
   }
 
   Optimizer& optimizer;
+  
+  sample_set_type features;
+  loss_set_type   losses;
+  id_set_type     ids;
 };
 
 template <typename Optimize, typename Generator>
@@ -403,7 +613,7 @@ double optimize_online(const hypothesis_map_type& kbests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   optimizer_type optimizer(instances, C);
-  Optimize opt(optimizer);
+  Optimize opt(optimizer, kbests, oracles);
   
   optimizer.weights = weights;
 
@@ -418,15 +628,19 @@ double optimize_online(const hypothesis_map_type& kbests,
       bcast_weights(0, optimizer.weights);
       
       optimizer.initialize();
-      
+
+      opt(generator);
+
+#if 0      
       for (size_t id = 0; id != ids.size(); ++ id)
 	if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
 	  opt(oracles[ids[id]], kbests[ids[id]]);
+#endif
       
       optimizer.finalize();
       
-      boost::random_number_generator<Generator> gen(generator);
-      std::random_shuffle(ids.begin(), ids.end(), gen);
+      //boost::random_number_generator<Generator> gen(generator);
+      //std::random_shuffle(ids.begin(), ids.end(), gen);
       
       optimizer.weights *= optimizer.samples;
       reduce_weights(optimizer.weights);
