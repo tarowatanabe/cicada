@@ -265,6 +265,7 @@ double compute_oracles(const scorer_document_type& scorers,
   double          objective_prev = - std::numeric_limits<double>::infinity();
   double          objective_best = - std::numeric_limits<double>::infinity();
 
+#if 0
   // initialize...
   for (size_t id = 0; id != hypotheses.size(); ++ id)
     if (! hypotheses[id].empty()) {
@@ -276,7 +277,7 @@ double compute_oracles(const scorer_document_type& scorers,
       else
 	*score_optimum += *hypotheses[id].front().score;
     }
-  
+#endif
   
   oracle_map_type oracles_best(oracles.size());
   

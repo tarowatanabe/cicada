@@ -358,12 +358,14 @@ double compute_oracles(const scorer_document_type& scorers,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
 
+#if 0
   // initialize...
   for (size_t id = 0; id != hypotheses.size(); ++ id)
     if (! hypotheses[id].empty()) {
       oracles[id].clear();
       oracles[id].push_back(hypotheses[id].front());
     }
+#endif
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)
