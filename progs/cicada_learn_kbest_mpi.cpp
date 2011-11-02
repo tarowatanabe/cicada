@@ -642,14 +642,14 @@ double optimize_online(const hypothesis_map_type& kbests,
       //boost::random_number_generator<Generator> gen(generator);
       //std::random_shuffle(ids.begin(), ids.end(), gen);
       
-      optimizer.weights *= optimizer.samples;
+      optimizer.weights *= (optimizer.samples + 1);
       reduce_weights(optimizer.weights);
       
       objective = 0.0;
       MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
       
       int samples = 0;
-      int samples_local = optimizer.samples;
+      int samples_local = (optimizer.samples + 1);
       MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
       
       optimizer.weights *= (1.0 / samples);
