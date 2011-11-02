@@ -353,10 +353,10 @@ struct OptimizeOnline
       
       typename optimizer_set_type::iterator oiter_end = optimizers.end();
       for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
-	oiter->weights *= oiter->samples;
+	oiter->weights *= (oiter->samples + 1);
 	
 	weights_mixed += oiter->weights;
-	samples       += oiter->samples;
+	samples       += (oiter->samples + 1);
       }
       
       weights_mixed *= (1.0 / samples);

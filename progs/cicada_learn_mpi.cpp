@@ -572,14 +572,14 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	boost::random_number_generator<Generator> gen(generator);
 	std::random_shuffle(ids.begin(), ids.end(), gen);
 	
-	optimizer.weights *= optimizer.samples;
+	optimizer.weights *= (optimizer.samples + 1);
 	send_weights(optimizer.weights);
 	
 	double objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
 	
 	int samples = 0;
-	int samples_local = optimizer.samples;
+	int samples_local = (optimizer.samples + 1);
 	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
       }
     }

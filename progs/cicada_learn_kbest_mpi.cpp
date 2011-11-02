@@ -595,19 +595,15 @@ double optimize_online(const hypothesis_map_type& kbests,
 		       weight_set_type& weights,
 		       Generator& generator)
 {
-  typedef std::vector<int, std::allocator<int> > id_set_type;
   typedef typename Optimize::optimizer_type optimizer_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  id_set_type ids(kbests.size());
   int instances_local = 0;
   
-  for (size_t id = 0; id != ids.size(); ++ id) {
-    ids[id] = id;
+  for (size_t id = 0; id != ids.size(); ++ id)
     instances_local += ! kbests[id].empty() && ! oracles[id].empty();
-  }
   
   int instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
@@ -630,17 +626,8 @@ double optimize_online(const hypothesis_map_type& kbests,
       optimizer.initialize();
 
       opt(generator);
-
-#if 0      
-      for (size_t id = 0; id != ids.size(); ++ id)
-	if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
-	  opt(oracles[ids[id]], kbests[ids[id]]);
-#endif
-      
+            
       optimizer.finalize();
-      
-      //boost::random_number_generator<Generator> gen(generator);
-      //std::random_shuffle(ids.begin(), ids.end(), gen);
       
       optimizer.weights *= (optimizer.samples + 1);
       reduce_weights(optimizer.weights);
@@ -690,23 +677,18 @@ double optimize_online(const hypothesis_map_type& kbests,
 	
 	optimizer.initialize();
 	
-	for (size_t id = 0; id != ids.size(); ++ id)
-	  if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
-	    opt(oracles[ids[id]], kbests[ids[id]]);
+	opt(generator);
 	
 	optimizer.finalize();
 	
-	boost::random_number_generator<Generator> gen(generator);
-	std::random_shuffle(ids.begin(), ids.end(), gen);
-	
-	optimizer.weights *= optimizer.samples;
+	optimizer.weights *= (optimizer.samples + 1);
 	send_weights(optimizer.weights);
 	
 	double objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
 	
 	int samples = 0;
-	int samples_local = optimizer.samples;
+	int samples_local = (optimizer.samples + 1);
 	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
       }
     }
