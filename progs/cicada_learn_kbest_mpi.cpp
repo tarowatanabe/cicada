@@ -262,7 +262,7 @@ struct OptimizeOnline
   template <typename Iterator>
   weight_type function(Iterator first, Iterator last, const double init)
   {
-    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last) * optimizer.weight_scale + init);
+    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale + init);
   }
   
   
