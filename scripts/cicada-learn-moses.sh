@@ -90,6 +90,7 @@ $me [options]
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
   --learn                   learner (lbfgs, svm, linear, sgd)
+                            (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)

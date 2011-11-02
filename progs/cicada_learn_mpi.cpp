@@ -63,6 +63,9 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+bool loss_margin = false; // margin by loss, not rank-loss
+bool softmax_margin = false;
+
 bool unite_forest = false;
 
 int debug = 0;

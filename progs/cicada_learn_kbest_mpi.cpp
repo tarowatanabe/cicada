@@ -12,6 +12,7 @@
 
 #include "cicada_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_text_impl.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -37,6 +38,9 @@
 #include <boost/random.hpp>
 
 #include "lbfgs.h"
+
+typedef cicada::eval::Scorer         scorer_type;
+typedef cicada::eval::ScorerDocument scorer_document_type;
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -72,10 +76,13 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
-void read_kbest(const path_set_type& kbest_path,
+void read_kbest(const  scorer_document_type& scorers,
+		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles);
+void read_refset(const path_set_type& file,
+		 scorer_document_type& scorers);
 
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
@@ -122,11 +129,28 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no kbest?");
     if (oracle_path.empty())
       throw std::runtime_error("no oracke kbest?");
+
+    scorer_document_type scorers(scorer_name);
+    
+    if (! refset_files.empty()) {
+      read_refset(refset_files, scorers);
+      
+      if (! unite_kbest && kbest_path.size() > 1) {
+	scorer_document_type scorers_iterative(scorer_name);
+	scorers_iterative.resize(scorers.size() * kbest_path.size());
+	
+	for (size_t i = 0; i != kbest_path.size(); ++ i)
+	  std::copy(scorers.begin(), scorers.end(), scorers_iterative.begin() + scorers.size() * i);
+	
+	scorers.swap(scorers_iterative);
+      }
+    }
+
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
     
-    read_kbest(kbest_path, oracle_path, kbests, oracles);
+    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles);
     
     weight_set_type weights;
     if (mpi_rank ==0 && ! weights_path.empty()) {
@@ -736,7 +760,8 @@ void unique_kbest(hypothesis_map_type& kbests)
     }
 }
 
-void read_kbest(const path_set_type& kbest_path,
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles)
@@ -747,6 +772,9 @@ void read_kbest(const path_set_type& kbest_path,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
+  const bool error_metric = scorers.error_metric();
+  const double loss_factor = (error_metric ? 1.0 : - 1.0);
+  
   parser_type parser;
   kbest_feature_type kbest;
   
@@ -785,6 +813,17 @@ void read_kbest(const path_set_type& kbest_path,
 	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(id));
 	  	  
 	  kbests[i].push_back(hypothesis_type(kbest));
+
+	  hypothesis_type& kbest = kbests[i].back();
+	  
+	  if (! scorers.empty()) {
+	    if (i >= scorers.size())
+	      throw std::runtime_error("reference positions outof index");
+	    
+	    kbest.score = scorers[i]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
+	    kbest.loss  = kbest.score->score() * loss_factor;
+	  } else
+	    kbest.loss = 1;
 	}
       }
     }
@@ -820,6 +859,17 @@ void read_kbest(const path_set_type& kbest_path,
 	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
 	  
 	  oracles[i].push_back(hypothesis_type(kbest));
+
+	  hypothesis_type& oracle = oracles[i].back();
+	  
+	  if (! scorers.empty()) {
+	    if (i >= scorers.size())
+	      throw std::runtime_error("reference positions outof index");
+	    
+	    oracle.score = scorers[i]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
+	    oracle.loss  = oracle.score->score() * loss_factor;
+	  } else
+	    oracle.loss = 1;
 	}
       }
     }
@@ -829,9 +879,13 @@ void read_kbest(const path_set_type& kbest_path,
     if (kbest_path.size() != oracle_path.size())
       throw std::runtime_error("# of kbests does not match");
     
+    const size_type refset_size = scorers.size() / kbest_path.size();
+    
     for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
       if (mpi_rank == 0 && debug)
 	std::cerr << "reading kbest: " << kbest_path[pos].string() << " with " << oracle_path[pos].string() << std::endl;
+      
+      const size_type refset_offset = refset_size * pos;
       
       for (size_t i = mpi_rank; /**/; i += mpi_size) {
 	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
@@ -844,6 +898,8 @@ void read_kbest(const path_set_type& kbest_path,
 
 	kbests.resize(kbests.size() + 1);
 	oracles.resize(oracles.size() + 1);
+
+	const size_type refset_pos = refset_offset + i;
 	
 	{
 	  utils::compress_istream is(path_kbest, 1024 * 1024);
@@ -864,6 +920,14 @@ void read_kbest(const path_set_type& kbest_path,
 	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
 	    
 	    kbests.back().push_back(hypothesis_type(kbest));
+
+	    hypothesis_type& kbest = kbests.back().back();
+	    
+	    if (! scorers.empty()) {
+	    kbest.score = scorers[refset_pos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
+	    kbest.loss  = kbest.score->score() * loss_factor;
+	  } else
+	    kbest.loss = 1;
 	  }
 	}
 
@@ -886,6 +950,14 @@ void read_kbest(const path_set_type& kbest_path,
 	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
 	    
 	    oracles.back().push_back(hypothesis_type(kbest));
+	    
+	    hypothesis_type& oracle = oracles.back().back();
+
+	    if (! scorers.empty()) {
+	      oracle.score = scorers[refset_pos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
+	      oracle.loss  = oracle.score->score() * loss_factor;
+	    } else
+	      oracle.loss = 0.0;
 	  }
 	}
       }
@@ -1019,6 +1091,47 @@ void bcast_weights(const int rank, weight_set_type& weights)
   }
 }
 
+void read_refset(const path_set_type& files, scorer_document_type& scorers)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
+    
+  scorers.clear();
+
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
+      if (id >= static_cast<int>(scorers.size()))
+	scorers.resize(id + 1);
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+      
+      scorers[id]->insert(id_sentence.second);
+    }
+  }
+}
 
 void options(int argc, char** argv)
 {
