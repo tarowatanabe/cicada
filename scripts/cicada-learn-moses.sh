@@ -44,7 +44,10 @@ C=1e-3
 regularize_l1=no
 regularize_l2=no
 scorer="bleu:order=4,exact=true"
+learn="lbfgs"
 liblinear="no"
+softmax_margin=""
+loss_margin=""
 solver=1
 kbest=1000
 merge="no"
@@ -86,10 +89,12 @@ $me [options]
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
-  --liblinear               use liblinear solver (default: use lbfgs)
+  --learn                   learner (lbfgs, svm, linear, sgd)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
+  --softmax-margin          softmax margin
+  --loss-margin             loss margin (not rank margin)
   --kbest                   kbest size             (default: $kbest)
   --merge                   perform kbest merging
   --interpolate             weights interpolation
@@ -170,13 +175,21 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     scorer=$2
     shift; shift ;;
-  --liblinear )
-    liblinear=yes
-    shift ;;
+  --learn )
+    test $# = 1 && eval "$exit_missing_arg"
+    learn=$2
+    shift; shift ;;
   --solver )
     test $# = 1 && eval "$exit_missing_arg"
     solver=$2
     shift; shift ;;
+  --softmax-margin )
+    softmax_margin=" --softmax-margin"
+    shift ;;
+  --loss-margin )
+    loss_margin=" --loss-margin"
+    shift ;;
+
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
     kbest=$2
@@ -253,6 +266,30 @@ if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
   echo "both L1 and L2?" >&2
   exit 1  
 fi
+
+learner="cicada_learn_kbest_mpi"
+learn_option=""
+case $learn in
+  lbfgs )
+    learner="cicada_learn_kbest_mpi"
+    learn_option=" --learn-lbfgs"
+  break ;;
+  sgd )
+    learner="cicada_learn_kbest_mpi"
+    learn_option=" --learn-sgd"
+    break ;;
+  linear )
+    learner="cicada_learn_kbest"
+    learn_option=" --learn-linear --solver $solver"
+    break ;;
+  svm )
+    learner="cicada_learn_kbest_mpi"
+    learn_option=" --learn-svm"
+    break ;;
+  * )
+    echo "learning algorithm can be either lbfgs, linear, svm, sgd"
+    exit 1 ;;
+esac
 
 cicadapath() {
   file=$1
@@ -597,13 +634,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
     
   ## liblinear learning
-  learn_option=" --learn-lbfgs"
-  learner="cicada_learn_kbest_mpi"
-  if test "$liblinear" = "yes"; then
-    learn_option=" --learn-linear --solver $solver"
-    learner="cicada_learn_kbest"
-  fi
- 
+  
   ### option for previous weights
   weights_option=""
   if test "$weights_last" != ""; then
@@ -619,11 +650,14 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
+                        --refset $refset \
 	                $unite \
                         --output $weights_learn \
                         \
                         $weights_option \
                         $learn_option \
+                        $softmax_margin \
+                        $loss_margin \
                         --C $C \
                         $regularize \
                         \

@@ -14,6 +14,9 @@
 
 #include "cicada_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_text_impl.hpp"
+
+#include "cicada/optimize_qp.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -35,6 +38,9 @@
 #include "lbfgs.h"
 #include "liblinear/linear.h"
 
+typedef cicada::eval::Scorer         scorer_type;
+typedef cicada::eval::ScorerDocument scorer_document_type;
+
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 path_set_type kbest_path;
@@ -43,11 +49,14 @@ path_type weights_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
+path_set_type refset_files;
+
 int iteration = 100;
 bool learn_sgd = false;
 bool learn_lbfgs = false;
 bool learn_mira = false;
 bool learn_linear = false;
+bool learn_svm = false;
 
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 
@@ -56,6 +65,12 @@ bool regularize_l2 = false;
 
 double C = 1.0;
 double eps = std::numeric_limits<double>::infinity();
+
+bool loss_margin = false; // margin by loss, not rank-loss
+bool softmax_margin = false;
+
+std::string scorer_name = "bleu:order=4";
+bool scorer_list = false;
 
 bool unite_kbest = false;
 
@@ -67,21 +82,26 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
-void read_kbest(const path_set_type& kbest_path,
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles);
+
+void read_refset(const path_set_type& file,
+		 scorer_document_type& scorers);
 
 template <typename Optimizer>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
 template <typename Optimizer>
-double optimize_linear(const hypothesis_map_type& kbests,
-		       const hypothesis_map_type& oracles,
-		       weight_set_type& weights);
+double optimize_svm(const hypothesis_map_type& kbests,
+		    const hypothesis_map_type& oracles,
+		    weight_set_type& weights);
 
 struct OptimizeLinear;
+struct OptimizeSVM;
 struct OptimizeLBFGS;
 
 int main(int argc, char ** argv)
@@ -89,9 +109,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_linear > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,linear}");
-    if (int(learn_lbfgs) + learn_linear == 0)
+    if (int(learn_lbfgs) + learn_linear + learn_svm > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,linear,svm}");
+    if (int(learn_lbfgs) + learn_linear + learn_svm == 0)
       learn_lbfgs = true;
     
     if (learn_lbfgs && regularize_l1 && regularize_l2)
@@ -105,14 +125,33 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no oracke kbest?");
     
     threads = utils::bithack::max(1, threads);
+
+    scorer_document_type scorers(scorer_name);
+
+    if (! refset_files.empty()) {
+      read_refset(refset_files, scorers);
+      
+      if (! unite_kbest && kbest_path.size() > 1) {
+	scorer_document_type scorers_iterative(scorer_name);
+	scorers_iterative.resize(scorers.size() * kbest_path.size());
+	
+	for (size_t i = 0; i != kbest_path.size(); ++ i)
+	  std::copy(scorers.begin(), scorers.end(), scorers_iterative.begin() + scorers.size() * i);
+	
+	scorers.swap(scorers_iterative);
+      }
+    }
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
     
-    read_kbest(kbest_path, oracle_path, kbests, oracles);
+    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles);
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+    
+    
+    
 
     weight_set_type weights;
     if (! weights_path.empty()) {
@@ -131,7 +170,9 @@ int main(int argc, char ** argv)
     generator.seed(utils::random_seed());
     
     if (learn_linear)
-      objective = optimize_linear<OptimizeLinear>(kbests, oracles, weights);
+      objective = optimize_svm<OptimizeLinear>(kbests, oracles, weights);
+    if (learn_svm)
+      objective = optimize_svm<OptimizeSVM>(kbests, oracles, weights);
     else
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
     
@@ -406,9 +447,9 @@ public:
 };
 
 template <typename Optimizer>
-double optimize_linear(const hypothesis_map_type& kbests,
-		       const hypothesis_map_type& oracles,
-		       weight_set_type& weights)
+double optimize_svm(const hypothesis_map_type& kbests,
+		    const hypothesis_map_type& oracles,
+		    weight_set_type& weights)
 {
   Optimizer optimizer(kbests, oracles);
   
@@ -416,6 +457,331 @@ double optimize_linear(const hypothesis_map_type& kbests,
   
   return optimizer.objective;
 }
+
+struct OptimizeSVM
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef hypothesis_type::feature_value_type feature_value_type;
+
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef features_type::const_iterator const_iterator;
+
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+
+    void swap(SampleSet& x)
+    {
+      features.swap(x.features);
+      offsets.swap(x.offsets);
+    }
+
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+  typedef std::vector<double, std::allocator<double> > alpha_set_type;
+  typedef std::vector<double, std::allocator<double> > f_set_type;
+  
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+  
+  typedef std::pair<size_type, size_type> pos_pair_type;
+  typedef std::vector<pos_pair_type, std::allocator<pos_pair_type> > pos_pair_set_type;
+
+  struct Encoder
+  {
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+    
+    Encoder(queue_type& __queue,
+	    const hypothesis_map_type& __kbests,
+	    const hypothesis_map_type& __oracles)
+      : queue(__queue), kbests(__kbests), oracles(__oracles) {}
+    
+    void operator()()
+    {
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+      
+      features_type feats;
+      sentence_unique_type  sentences;
+      
+      int id = 0;
+      
+      for (;;) {
+	queue.pop(id);
+	if (id < 0) break;
+
+	sentences.clear();
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  sentences.insert(oracles[id][o].sentence);
+	
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	    const hypothesis_type& oracle = oracles[id][o];
+	    const hypothesis_type& kbest  = kbests[id][k];
+	    
+	    // ignore oracle translations
+	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    
+	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    
+	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    
+	    feats.clear();
+	
+	    while (oiter != oiter_end && kiter != kiter_end) {
+	      if (oiter->first < kiter->first) {
+		feats.push_back(*oiter);
+		++ oiter;
+	      } else if (kiter->first < oiter->first) {
+		feats.push_back(feature_value_type(kiter->first, - kiter->second));
+		++ kiter;
+	      } else {
+		const double value = oiter->second - kiter->second;
+		if (value != 0.0)
+		  feats.push_back(feature_value_type(kiter->first, value));
+		++ oiter;
+		++ kiter;
+	      }
+	    }
+	
+	    for (/**/; oiter != oiter_end; ++ oiter)
+	      feats.push_back(*oiter);
+	
+	    for (/**/; kiter != kiter_end; ++ kiter)
+	      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    
+	    if (feats.empty()) continue;
+	    
+	    if (loss_margin) {
+	      const double loss = kbest.loss - oracle.loss;
+	      
+	      // checking...
+	      if (loss > 0.0) {
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(loss);
+	      }
+	    } else {
+	      features.insert(feats.begin(), feats.end());
+	      losses.push_back(1.0);
+	    }
+	  }
+      }
+    }
+    
+    queue_type& queue;
+    const hypothesis_map_type& kbests;
+    const hypothesis_map_type& oracles;
+    
+    sample_set_type features;
+    loss_set_type   losses;
+  };
+
+  typedef Encoder encoder_type;
+  typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
+  
+  
+  struct HMatrix
+  {
+    HMatrix(const pos_pair_set_type& __positions,
+	    const encoder_set_type&   __encoders)
+      : positions(__positions), encoders(__encoders) {}
+
+    double operator()(int i, int j) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      const pos_pair_type& pos_j = positions[j];
+      
+      return cicada::dot_product(encoders[pos_i.first].features[pos_i.second].begin(), encoders[pos_i.first].features[pos_i.second].end(),
+				 encoders[pos_j.first].features[pos_j.second].begin(), encoders[pos_j.first].features[pos_j.second].end(),
+				 0.0);
+    }
+    
+    const pos_pair_set_type& positions;
+    const encoder_set_type& encoders;
+  };
+  
+  struct MMatrix
+  {
+    MMatrix(const pos_pair_set_type& __positions,
+	    const encoder_set_type&   __encoders)
+      : positions(__positions), encoders(__encoders) {}
+    
+    template <typename W>
+    void operator()(W& w, const alpha_set_type& alpha) const
+    {
+      alpha_set_type::const_iterator aiter = alpha.begin();
+      
+      const size_type model_size = encoders.size();
+      for (size_type i = 0; i != model_size; ++ i) {
+	const size_type features_size = encoders[i].features.size();
+	
+	for (size_type j = 0; j != features_size; ++ j, ++ aiter)
+	  if (*aiter > 0.0) {
+	    sample_set_type::value_type::const_iterator fiter_end = encoders[i].features[j].end();
+	    for (sample_set_type::value_type::const_iterator fiter = encoders[i].features[j].begin(); fiter != fiter_end; ++ fiter) 
+	      w[fiter->first] += (*aiter) * fiter->second;
+	  }
+      }
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
+      for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      const pos_pair_type& pos_i = positions[i];
+      
+      sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
+      for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const pos_pair_set_type& positions;
+    const encoder_set_type&  encoders;
+  };
+
+  OptimizeSVM(const hypothesis_map_type& kbests,
+	      const hypothesis_map_type& oracles)
+    : weights(), objective(0.0), tolerance(0.1)
+  {
+    encoder_type::queue_type queue;
+    encoder_set_type encoders(threads, encoder_type(queue, kbests, oracles));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(encoders[i])));
+    
+    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+    for (size_t id = 0; id != id_max; ++ id)
+      if (! kbests[id].empty() && ! oracles[id].empty())
+	queue.push(id);
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    workers.join_all();
+    
+    // encoding finished!
+    
+    size_type data_size = 0;
+    for (size_type i = 0; i != encoders.size(); ++ i)
+      data_size += encoders[i].losses.size();
+    
+    pos_pair_set_type positions;
+    f_set_type        f;
+
+    positions.reserve(data_size);
+    f.reserve(data_size);
+    
+    for (size_type i = 0; i != encoders.size(); ++ i)
+      for (size_type j = 0; j != encoders[i].features.size(); ++ j) {
+	positions.push_back(std::make_pair(i, j));
+	f.push_back(- encoders[i].losses[j]);
+      }
+    
+    alpha_set_type alpha(data_size, 0.0);
+    
+    cicada::optimize::QPSMO solver;
+    
+    HMatrix H(positions, encoders);
+    MMatrix M(positions, encoders);
+    
+    objective = solver(alpha, f, H, M, 1.0 / (C * data_size), tolerance);
+    objective *= C;
+    
+    weights.clear();
+    alpha_set_type::const_iterator aiter = alpha.begin();
+    for (size_type i = 0; i != encoders.size(); ++ i)
+      for (size_type j = 0; j != encoders[i].features.size(); ++ j, ++ aiter) 
+	if (*aiter > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = encoders[i].features[j].end();
+	  for (sample_set_type::value_type::const_iterator fiter = encoders[i].features[j].begin(); fiter != fiter_end; ++ fiter)
+	    weights[fiter->first] += (*aiter) * fiter->second; 
+	}
+  }
+  
+public:
+  weight_set_type weights;
+  double objective;
+
+  const double tolerance;
+};
 
 
 struct OptimizeLBFGS
@@ -478,6 +844,8 @@ struct OptimizeLBFGS
       
       expectations.allocate();
       expectations.clear();
+
+      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
       
       while (1) {
 	int id = 0;
@@ -489,14 +857,14 @@ struct OptimizeLBFGS
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	  Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), 0.0));
+	  Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss));
 	
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	  Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), 0.0));
+	  Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss));
 	
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), 0.0)) / Z_oracle;
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss)) / Z_oracle;
 	  
 	  hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
 	  for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
@@ -504,7 +872,7 @@ struct OptimizeLBFGS
 	}
 	
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), 0.0)) / Z_kbest;
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss)) / Z_kbest;
 	  
 	  hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
 	  for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
@@ -615,10 +983,63 @@ double optimize_batch(const hypothesis_map_type& kbests,
   return Optimizer(kbests, oracles, weights)();
 }
 
+struct TaskLoss
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  TaskLoss(queue_type& __queue,
+	   hypothesis_map_type& __kbests,
+	   const scorer_document_type& __scorers)
+    : queue(__queue), kbests(__kbests), scorers(__scorers) {}
+
+  void operator()()
+  {
+    const bool error_metric = scorers.error_metric();
+    const double loss_factor = (error_metric ? 1.0 : - 1.0);
+    
+    for (;;) {
+      int id = 0;
+      queue.pop(id);
+      if (id < 0) break;
+
+      hypothesis_set_type::iterator kiter_end = kbests[id].end();
+      for (hypothesis_set_type::iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	kiter->score = scorers[id]->score(sentence_type(sentence_type(kiter->sentence.begin(), kiter->sentence.end())));
+	kiter->loss = kiter->score->score() * loss_factor;
+      }
+    }
+  }
+  
+  queue_type& queue;
+  hypothesis_map_type&        kbests;
+  const scorer_document_type& scorers;
+};
+
+
+void loss_kbest(hypothesis_map_type& kbests, const scorer_document_type& scorers)
+{
+  typedef TaskLoss task_type;
+  typedef task_type::queue_type queue_type;
+  
+  queue_type queue;
+  boost::thread_group workers;
+  for (int i = 0; i < threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(queue, kbests, scorers)));
+  
+  for (size_t id = 0; id != kbests.size(); ++ id)
+    if (! kbests[id].empty())
+      queue.push(id);
+  
+  for (int i = 0; i < threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+}
+
 struct TaskUnique
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
-
+  
   TaskUnique(queue_type& __queue,
 	     hypothesis_map_type& __kbests)
     : queue(__queue), kbests(__kbests) {}
@@ -803,7 +1224,8 @@ struct TaskReadSync
   hypothesis_map_type oracles;
 };
 
-void read_kbest(const path_set_type& kbest_path,
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles)
@@ -889,6 +1311,16 @@ void read_kbest(const path_set_type& kbest_path,
     }
     
     unique_kbest(oracles);
+
+    if (! scorers.empty()) {
+      if (scorers.size() != kbests.size())
+	throw std::runtime_error("refset size do not match with kbest size");
+      if (scorers.size() != oracles.size())
+	throw std::runtime_error("refset size do not match with oracle size");
+      
+      loss_kbest(kbests, scorers);
+      loss_kbest(oracles, scorers);
+    }
     
   } else {
     typedef TaskReadSync task_type;
@@ -957,6 +1389,48 @@ void read_kbest(const path_set_type& kbest_path,
   }
 }
 
+void read_refset(const path_set_type& files, scorer_document_type& scorers)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
+    
+  scorers.clear();
+
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
+      if (id >= static_cast<int>(scorers.size()))
+	scorers.resize(id + 1);
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+      
+      scorers[id]->insert(id_sentence.second);
+    }
+  }
+}
+
 
 void options(int argc, char** argv)
 {
@@ -964,10 +1438,11 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("kbest",   po::value<path_set_type>(&kbest_path)->multitoken(),  "kbest path")
-    ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(), "oracle kbest path")
-    ("weights", po::value<path_type>(&weights_path),                  "initial parameter")
-    ("output",  po::value<path_type>(&output_path),                   "output parameter")
+    ("kbest",   po::value<path_set_type>(&kbest_path)->multitoken(),   "kbest path")
+    ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(),  "oracle kbest path")
+    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
+    ("weights", po::value<path_type>(&weights_path),                   "initial parameter")
+    ("output",  po::value<path_type>(&output_path),                    "output parameter")
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
@@ -975,6 +1450,7 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
+    ("learn-svm",    po::bool_switch(&learn_svm),    "structural SVM")
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"
      " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
@@ -987,7 +1463,13 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
+
+    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
+    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
     
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
+
     ("unite",    po::bool_switch(&unite_kbest), "unite kbest sharing the same id")
 
     ("threads", po::value<int>(&threads), "# of threads")

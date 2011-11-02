@@ -46,6 +46,8 @@ path_type weights_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
+path_set_type refset_files;
+
 int iteration = 100;
 bool learn_lbfgs = false;
 bool learn_sgd = false;
@@ -55,6 +57,12 @@ bool learn_cw = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+
+bool loss_margin = false; // margin by loss, not rank-loss
+bool softmax_margin = false;
+
+std::string scorer_name = "bleu:order=4";
+bool scorer_list = false;
 
 bool unite_kbest = false;
 
@@ -1023,6 +1031,7 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("kbest",   po::value<path_set_type>(&kbest_path)->multitoken(),  "kbest path")
     ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(), "oracle kbest path")
+    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     ("weights", po::value<path_type>(&weights_path),      "initial parameter")
     ("output",  po::value<path_type>(&output_path),       "output parameter")
     
@@ -1039,7 +1048,13 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
-
+    
+    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
+    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
+    
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
+    
     ("unite",    po::bool_switch(&unite_kbest), "unite kbest sharing the same id")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")

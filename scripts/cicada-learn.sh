@@ -36,6 +36,8 @@ weights_init=""
 C=1e-3
 regularize_l1=no
 regularize_l2=no
+learn="lbfgs"
+solver=1
 oracle_cube=400
 scorer="bleu:order=4,exact=true"
 kbest=0

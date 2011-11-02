@@ -48,11 +48,12 @@ struct hypothesis_type
   typedef utils::simple_vector<word_type, std::allocator<word_type> >                   sentence_type;
   typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
   
-  hypothesis_type() : sentence(), features(), score() {}
+  hypothesis_type() : sentence(), features(), score(), loss(0) {}
   hypothesis_type(const kbest_feature_type& x)
     : sentence(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end()),
       features(boost::fusion::get<2>(x).begin(), boost::fusion::get<2>(x).end()),
-      score()
+      score(),
+      loss(0)
   {
     std::sort(features.begin(), features.end());
   }
@@ -61,7 +62,8 @@ struct hypothesis_type
 		  IteratorFeature  ffirst, IteratorFeature  flast)
     : sentence(sfirst, slast),
       features(ffirst, flast),
-      score()
+      score(),
+      loss(0)
   {
     std::sort(features.begin(), features.end());
   }
@@ -69,6 +71,7 @@ struct hypothesis_type
   sentence_type    sentence;
   feature_set_type features;
   score_ptr_type   score;
+  double           loss;
 };
 
 
