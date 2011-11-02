@@ -504,9 +504,9 @@ struct OptimizerPegasos : public OptimizerBase
     objective += loss - margin;
     
     if (loss - margin > 0.0) {
-      const double eta = 1.0 / (lambda * (epoch + 2));
+      //const double eta = 1.0 / (lambda * (epoch + 2));
       // exponential decay...
-      //const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+      const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
       ++ epoch;
       
       rescale(1.0 - eta * lambda);
