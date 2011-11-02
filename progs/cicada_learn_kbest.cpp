@@ -742,6 +742,9 @@ struct OptimizeSVM
     size_type data_size = 0;
     for (size_type i = 0; i != encoders.size(); ++ i)
       data_size += encoders[i].losses.size();
+
+    if (debug)
+      std::cerr << "# of support vectors: " << data_size << std::endl;
     
     pos_pair_set_type positions;
     f_set_type        f;
@@ -765,6 +768,8 @@ struct OptimizeSVM
     objective = solver(alpha, f, H, M, 1.0 / (C * data_size), tolerance);
     objective *= C;
     
+    size_type actives = 0;
+
     weights.clear();
     alpha_set_type::const_iterator aiter = alpha.begin();
     for (size_type i = 0; i != encoders.size(); ++ i)
@@ -773,7 +778,13 @@ struct OptimizeSVM
 	  sample_set_type::value_type::const_iterator fiter_end = encoders[i].features[j].end();
 	  for (sample_set_type::value_type::const_iterator fiter = encoders[i].features[j].begin(); fiter != fiter_end; ++ fiter)
 	    weights[fiter->first] += (*aiter) * fiter->second; 
+
+	  ++ actives;
 	}
+
+    if (debug)
+      std::cerr << "# of active vectors: " << actives << std::endl;
+    
   }
   
 public:

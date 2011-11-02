@@ -283,7 +283,7 @@ case $learn in
     learn_option=" --learn-linear --solver $solver"
     break ;;
   svm )
-    learner="cicada_learn_kbest_mpi"
+    learner="cicada_learn_kbest"
     learn_option=" --learn-svm"
     break ;;
   * )
