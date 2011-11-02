@@ -602,7 +602,7 @@ double optimize_online(const hypothesis_map_type& kbests,
   
   int instances_local = 0;
   
-  for (size_t id = 0; id != ids.size(); ++ id)
+  for (size_t id = 0; id != kbests.size(); ++ id)
     instances_local += ! kbests[id].empty() && ! oracles[id].empty();
   
   int instances = 0;
