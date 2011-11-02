@@ -414,14 +414,14 @@ struct OptimizeOnlineMargin
     typedef cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> > function_type;
     
     if (margin_kbest > 0)
-      cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_kbest);
+      cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.weight_scale), margin_kbest);
     else
-      cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_beam);
+      cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.weight_scale), margin_beam);
     
     if (margin_kbest > 0)
-      cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_kbest);
+      cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.weight_scale), margin_kbest);
     else
-      cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_beam);
+      cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.weight_scale), margin_beam);
     
     counts_intersected.clear();
     counts_forest.clear();

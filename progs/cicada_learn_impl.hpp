@@ -400,5 +400,88 @@ struct OptimizerCW : public OptimizerBase
   weight_set_type covariances;
 };
 
+struct OptimizerPegasos : public OptimizerBase
+{
+  OptimizerPegasos(const size_t& __instances,
+		   const double& C) : instances(__instances), samples(0), epoch(0), weight_scale(1.0), weight_norm(0.0), lambda(C) {}
+  
+  void initialize()
+  {
+    samples = 0;
+    objective = 0.0;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  void finalize()
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  void operator()(const feature_set_type& features_reward,
+		  const feature_set_type& features_penalty,
+		  const double loss=1.0)
+  {
+    // exponential decay...
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    ++ epoch;
+    
+    rescale(1.0 - eta * lambda);
+    
+    const feature_set_type features(features_reward - features_penalty);
+    
+    const double margin = cicada::dot_product(weights, features) * weight_scale;
+    
+    objective += loss - margin;
+    ++ samples;
+    
+    feature_set_type::const_iterator fiter_end = features.end();
+    for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+      update(weights[fiter->first], double(fiter->second) * eta);
+    
+    // projection...
+    if (weight_norm > 1.0 / lambda)
+      rescale(std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.001 || 1000 < weight_scale) {
+      weights *= weight_scale;
+      weight_scale = 1.0;
+      weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    }
+  }
+
+  void update(double& x, const double& alpha)
+  {
+    weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+    x += alpha / weight_scale;
+  }
+  
+  void rescale(const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+  
+  size_t instances;
+  size_t samples;
+  size_t epoch;
+  
+  double objective;
+  weight_set_type weights;
+
+  double weight_scale;
+  double weight_norm;
+  
+  double lambda;
+};
+
 
 #endif
