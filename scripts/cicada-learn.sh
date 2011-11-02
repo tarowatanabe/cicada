@@ -294,7 +294,7 @@ case $learn in
     if test $kbest -gt 0; then
       learner="cicada_learn_kbest"
     else
-      echo "libliner solver does not support forest translation" >&2
+      echo "sructured-svm solver does not support forest translation" >&2
       exit 1	
     else
     learn_option=" --learn-svm"
