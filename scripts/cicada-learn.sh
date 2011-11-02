@@ -41,6 +41,7 @@ learn="lbfgs"
 softmax_margin=""
 loss_margin=""
 solver=1
+learn_iteration=100
 oracle_cube=400
 kbest=0
 forest="no"
@@ -84,6 +85,7 @@ $me [options]
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
+  --learn-iteration         iteration for learning (default: $learn_iteration)
   --softmax-margin          softmax margin
   --loss-margin             loss margin (not rank margin)
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
@@ -168,6 +170,10 @@ while test $# -gt 0 ; do
   --solver )
     test $# = 1 && eval "$exit_missing_arg"
     solver=$2
+    shift; shift ;;
+  --learn-iteration )
+    test $# = 1 && eval "$exit_missing_arg"
+    learn_iteration=$2
     shift; shift ;;
   --softmax-margin )
     softmax_margin=" --softmax-margin"
@@ -652,6 +658,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         \
 	                $regularize \
 	                $learn_option\
+                        --iteration $learn_iteration \
                         --C $C \
                         \
                         --debug=2 || exit 1
@@ -669,6 +676,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	                $softmax_margin \
 	                $loss_margin \
 	                $regularize \
+                        --iteration $learn_iteration \
                         --C $C \
                         \
                         --debug=2 || exit 1
