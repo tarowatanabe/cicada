@@ -36,10 +36,12 @@ weights_init=""
 C=1e-3
 regularize_l1=no
 regularize_l2=no
+scorer="bleu:order=4,exact=true"
 learn="lbfgs"
+softmax_margin=""
+loss_margin=""
 solver=1
 oracle_cube=400
-scorer="bleu:order=4,exact=true"
 kbest=0
 forest="no"
 merge="no"
@@ -76,6 +78,14 @@ $me [options]
   -C, --C                   hyperparameter                   (default: $C)
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
+  --scorer                  scorer            (default: $scorer)
+  --learn                   learner (lbfgs, svm, linear, sgd)
+                            (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
+  --solver                  liblinear solver type. See liblinear FAQ,
+                            or run cicada_learn_kbest --help
+                            (Default: 1, L2-reg, L2-loss SVM)
+  --softmax-margin          softmax margin
+  --loss-margin             loss margin (not rank margin)
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
   --scorer                  scorer                           (default: $scorer)
   --kbest                   kbest size                       (default: $kbest)
@@ -147,6 +157,25 @@ while test $# -gt 0 ; do
   --regularize-l2 )
     regularize_l2=yes
     shift ;;
+  --scorer )
+    test $# = 1 && eval "$exit_missing_arg"
+    scorer=$2
+    shift; shift ;;
+  --learn )
+    test $# = 1 && eval "$exit_missing_arg"
+    learn=$2
+    shift; shift ;;
+  --solver )
+    test $# = 1 && eval "$exit_missing_arg"
+    solver=$2
+    shift; shift ;;
+  --softmax-margin )
+    softmax_margin=" --softmax-margin"
+    shift ;;
+  --loss-margin )
+    loss_margin=" --loss-margin"
+    shift ;;
+
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
     oracle_cube=$2
@@ -224,6 +253,57 @@ if test "$regularize_l1" = yes -a "$regularize_l2" = yes; then
   exit 1  
 fi
 
+if test "$forest" = "no" -a $kbest -le 0; then
+  kbest=0
+  forest=yes
+fi
+if test "$forest" = "yes" -a $kbest -gt 0; then
+  echo "forest-mode or kbest-mode?" >&2
+  exit 1
+fi
+
+learner="cicada_learn_mpi"
+learn_option=""
+case $learn in
+  lbfgs )
+    if test $kbest -gt 0; then
+      learner="cicada_learn_kbest_mpi"
+    else 
+      learner="cicada_learn_mpi"
+    fi
+    learn_option=" --learn-lbfgs"
+  break ;;
+  sgd )
+    if test $kbest -gt 0; then
+      learner="cicada_learn_kbest_mpi"
+    else
+      learner="cicada_learn_mpi"
+    fi
+    learn_option=" --learn-sgd"
+    break ;;
+  linear )
+    if test $kbest -gt 0; then
+      learner="cicada_learn_kbest"
+    else
+      echo "libliner solver does not support forest translation" >&2
+      exit 1
+    fi
+    learn_option=" --learn-linear --solver $solver"
+    break ;;
+  svm )
+    if test $kbest -gt 0; then
+      learner="cicada_learn_kbest"
+    else
+      echo "libliner solver does not support forest translation" >&2
+      exit 1	
+    else
+    learn_option=" --learn-svm"
+    break ;;
+  * )
+    echo "learning algorithm can be either lbfgs, linear, svm, sgd"
+    exit 1 ;;
+esac
+
 ## check cicada...
 cicadapath() {
   file=$1
@@ -257,15 +337,6 @@ for prog in $cicadas; do
     exit 1
   fi
 done
-
-if test "forest" = "no" -a $kbest -le 0; then
-  kbest=0
-  forest=yes
-fi
-if test "forest" = "yes" -a $kbest -gt 0; then
-  echo "forest-mode or kbest-mode?" >&2
-  exit 1
-fi
 
 if test "$weights_init" != ""; then
   if test ! -e $weights_init; then
@@ -564,28 +635,31 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
-    qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath cicada_learn_mpi` \
+    qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --forest $tstset \
                         --oracle $learn_oracle \
                         $unite \
 	                $weights_option \
                         --output $weights_learn \
                         \
-                        --learn-lbfgs \
 	                $regularize \
+	                $learn_option\
                         --C $C \
                         \
                         --debug=2 || exit 1
   else
     echo "learning ${root}weights.$iter" >&2
-    qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath cicada_learn_kbest_mpi` \
+    qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
+	                --refset $refset \
                         --oracle $learn_oracle \
 	                $unite \
 	                $weights_option \
                         --output $weights_learn \
                         \
-                        --learn-lbfgs \
+	                $learn_option \
+	                $softmax_margin \
+	                $loss_margin \
 	                $regularize \
                         --C $C \
                         \

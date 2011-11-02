@@ -1,5 +1,6 @@
 2011-11-x
 Better ngram feature computation by pre-transforming into word-id
+New: added softmax-margin and loss-margin in cicaa_learn_kbest{,_mpi} (probably, we will deprecate cicada_maxlike{,mpi})
 
 2011-10-29
 New: Better ngram state handling, inspired by Sorensen and Allauzen (2011) and Pauls and Klein (2011)

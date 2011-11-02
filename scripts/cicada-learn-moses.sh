@@ -45,7 +45,6 @@ regularize_l1=no
 regularize_l2=no
 scorer="bleu:order=4,exact=true"
 learn="lbfgs"
-liblinear="no"
 softmax_margin=""
 loss_margin=""
 solver=1

@@ -9,7 +9,6 @@ dist_bin_SCRIPTS = \
 	cicada-index.py \
 	cicada-learn.sh \
 	cicada-learn-moses.sh \
-	cicada-learn-linear.sh \
 	cicada-maxent.sh \
 	cicada-mert.sh \
 	cicada-mert-moses.sh \
