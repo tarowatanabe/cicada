@@ -279,16 +279,46 @@ struct OptimizeOnline
       if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
 	operator()(oracles[ids[id]], kbests[ids[id]]);
   }
-  
+
   typedef Optimizer optimizer_type;
   
   typedef typename optimizer_type::weight_type   weight_type;
   typedef typename optimizer_type::gradient_type gradient_type;    
+  
+  void operator()(const weight_set_type& weights, double& objective, double& instances) const
+  {
+    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
 
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! oracles[id].empty() && ! kbests[id].empty()){
+	weight_type Z_oracle;
+	weight_type Z_kbest;
+	
+	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
+	  Z_oracle += function(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss);
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	  Z_kbest += function(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss);
+	
+	objective -= log(Z_oracle) - log(Z_kbest);
+	++ instances;
+      }
+  }
+  
+  
+  
   template <typename Iterator>
-  weight_type function(Iterator first, Iterator last, const double init)
+  weight_type function(Iterator first, Iterator last, const double init) const
   {
     return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale + init);
+  }
+  
+  template <typename Iterator>
+  weight_type function(const weight_set_type& weights, Iterator first, Iterator last, const double init) const
+  {
+    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, first, last, 0.0) + init);
   }
   
   
@@ -531,6 +561,14 @@ struct OptimizeOnlineMargin
     }
   }
   
+  void operator()(const weight_set_type& weights, double& objective, double& instances) const
+  {
+    for (size_t id = 0; id != losses.size(); ++ id)
+      objective += losses[id] - cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0);
+    
+    instances += losses.size();
+  }
+  
   template <typename Iterator>
   double function(Iterator first, Iterator last)
   {
@@ -651,6 +689,33 @@ double optimize_online(const hypothesis_map_type& kbests,
 
     weights.swap(optimizer.weights);
     
+    bcast_weights(0, weights);
+    
+    double objective_local = 0.0;
+    double norm_local = 0;
+    opt(weights, objective_local, norm_local);
+    
+    objective = 0.0;
+    MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+
+    double norm = 0.0;
+    MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    objective /= norm;
+    
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < weights.size(); ++ i)
+	norm += weights[i] * weights[i];
+      
+      objective += 0.5 * C * norm;
+    } else {
+      double norm = 0.0;
+      for (size_t i = 0; i < weights.size(); ++ i)
+	norm += std::fabs(weights[i]);
+      objective += C * norm;
+    }
+    
     return objective;
     
   } else {
@@ -696,6 +761,18 @@ double optimize_online(const hypothesis_map_type& kbests,
     if (requests[NOTIFY].Test())
       requests[NOTIFY].Cancel();
     
+    bcast_weights(0, weights);
+
+    double objective_local = 0.0;
+    double norm_local = 0.0;
+    opt(weights, objective_local, norm_local);
+    
+    double objective = 0.0;
+    MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    double norm = 0.0;
+    MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+
     return 0.0;
   }
 
