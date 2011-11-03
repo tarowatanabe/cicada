@@ -262,7 +262,7 @@ struct OptimizerMIRA : public OptimizerBase
     const double margin = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, first, last, 0.0);
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
     
@@ -283,7 +283,7 @@ struct OptimizerMIRA : public OptimizerBase
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, features);
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
     
@@ -329,7 +329,7 @@ struct OptimizerAROW : public OptimizerBase
     const double margin = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     const double beta = 1.0 / (variance + C);
     const double alpha = std::max(0.0, (loss - margin) * beta);
@@ -357,7 +357,7 @@ struct OptimizerAROW : public OptimizerBase
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     const double beta = 1.0 / (variance + C);
     const double alpha = std::max(0.0, (loss - margin) * beta);
@@ -410,7 +410,7 @@ struct OptimizerCW : public OptimizerBase
     const double margin = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
       const double theta = 1.0 + 2.0 * C * (margin - loss);
@@ -443,7 +443,7 @@ struct OptimizerCW : public OptimizerBase
     const double margin = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
       const double theta = 1.0 + 2.0 * C * (margin - loss);
@@ -501,7 +501,7 @@ struct OptimizerPegasos : public OptimizerBase
   {
     const double margin = cicada::dot_product(weights, first, last, 0.0) * weight_scale;
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
       //const double eta = 1.0 / (lambda * (epoch + 2));
@@ -539,7 +539,7 @@ struct OptimizerPegasos : public OptimizerBase
     
     const double margin = cicada::dot_product(weights, features) * weight_scale;
     
-    objective += loss - margin;
+    objective += (loss - margin) * (loss - margin > 0.0);
     ++ samples;
     
     feature_set_type::const_iterator fiter_end = features.end();
