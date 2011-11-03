@@ -65,6 +65,8 @@ double C = 1.0;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+bool line_search_local = false;
+bool line_search_global = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -307,6 +309,11 @@ struct OptimizeOnline
       }
   }
   
+  template <typename Iterator>
+  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return 0.0;
+  }
   
   
   template <typename Iterator>
@@ -576,6 +583,13 @@ struct OptimizeOnlineMargin
   }
   
   template <typename Iterator>
+  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return 0.0;
+  }
+  
+  
+  template <typename Iterator>
   double function(Iterator first, Iterator last)
   {
     return cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale;
@@ -640,6 +654,9 @@ double optimize_online(const hypothesis_map_type& kbests,
 		       Generator& generator)
 {
   typedef typename Optimize::optimizer_type optimizer_type;
+
+  typedef std::pair<double, double> point_type;
+  typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -655,8 +672,11 @@ double optimize_online(const hypothesis_map_type& kbests,
   optimizer_type optimizer(instances, C);
   Optimize opt(optimizer, kbests, oracles);
   
+  weight_set_type weights_init = weights;
+  point_set_type points;
+  
   optimizer.weights = weights;
-
+  
   if (mpi_rank == 0) {
     double objective_prev = 0.0;
     double objective = 0.0;
@@ -667,6 +687,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
       
       bcast_weights(0, optimizer.weights);
+      
+      const weight_set_type weights_prev = optimizer.weights;
       
       optimizer.initialize();
 
@@ -690,6 +712,51 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       optimizer.weights *= (1.0 / samples);
       
+      // optimizer.weights is the new weights.
+
+      if (line_search_local) {
+	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
+	
+	bcast_weights(0, optimizer.weights);
+
+	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
+	const double dot_prod    = cicada::dot_product(optimizer.weights, weights_prev);
+	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
+	
+	const double a0 = norm_w - 2.0 * dot_prod + norm_w_prev;
+	const double b0 = dot_prod - norm_w_prev;
+	
+	points.clear();
+	const double grad_local = opt(optimizer.weights, weights_prev, std::back_inserter(points));
+	
+	double grad = 0.0;
+	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	grad += b0;
+	
+	if (! points.empty() && grad < 0.0) {
+	  double k = 0.0;
+	  
+	  std::sort(points.begin(), points.end());
+	  
+	  point_set_type::const_iterator piter_end = points.end();
+	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
+	    const double k_new = piter->first;
+	    const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
+	    
+	    if (grad_new >= 0)
+	      k += grad * (k - k_new) / (grad_new - grad);
+	    else
+	      k = k_new;
+	    
+	    grad = grad_new;
+	  }
+	  
+	  k = std::max(k, 0.0);
+	  
+	  // move to optimizer.weights * k + weights_prev * (1.0 - k)
+	}
+      }
+      
       if (debug >= 2)
 	std::cerr << "objective: " << objective << std::endl;
       
@@ -705,6 +772,14 @@ double optimize_online(const hypothesis_map_type& kbests,
     weights.swap(optimizer.weights);
     
     bcast_weights(0, weights);
+    
+    if (line_search_global) {
+      // perform line-search between weights_init and weights, and update weights
+      
+      bcast_weights(0, weights_init);
+      
+    }
+
     
     double objective_local = 0.0;
     double norm_local = 0;
@@ -754,6 +829,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	requests[NOTIFY].Start();
 	
 	bcast_weights(0, optimizer.weights);
+
+	const weight_set_type weights_prev = optimizer.weights;
 	
 	optimizer.initialize();
 	
@@ -770,6 +847,13 @@ double optimize_online(const hypothesis_map_type& kbests,
 	int samples = 0;
 	int samples_local = optimizer.samples;
 	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+	
+	if (line_search_local) {
+	  // perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
+	  
+	  bcast_weights(0, optimizer.weights);
+	  
+	}
       }
     }
     
@@ -777,6 +861,14 @@ double optimize_online(const hypothesis_map_type& kbests,
       requests[NOTIFY].Cancel();
     
     bcast_weights(0, weights);
+
+    if (line_search_global) {
+      // perform line-search between weights_init and weights, and update weights
+      
+      bcast_weights(0, weights_init);
+      
+      
+    }
 
     double objective_local = 0.0;
     double norm_local = 0.0;
@@ -1467,6 +1559,9 @@ void options(int argc, char** argv)
     
     ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
+
+    ("line-search-local",  po::bool_switch(&line_search_local),  "perform line search locally in each iteration")
+    ("line-search-global", po::bool_switch(&line_search_global), "perform line search globally")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
