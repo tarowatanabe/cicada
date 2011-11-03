@@ -541,6 +541,8 @@ struct OptimizeOnlineMargin
     
     for (size_t id = 0; id != ids.size(); ++ id)
       ids[id] = id;
+
+    optimizer.instances = losses.size();
   }
   
   typedef Optimizer optimizer_type;
