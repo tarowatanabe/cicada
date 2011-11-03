@@ -680,13 +680,19 @@ double optimize_online(const hypothesis_map_type& kbests,
       MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
       
       int samples = 0;
-      int samples_local = (optimizer.samples + 1);
+      int samples_local = optimizer.samples;
       MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+      
+      const bool converged = (samples == 0);
+      
+      samples += mpi_size;
       
       optimizer.weights *= (1.0 / samples);
       
       if (debug >= 2)
 	std::cerr << "objective: " << objective << std::endl;
+      
+      if (converged) break;
     }
     
     // send termination!
