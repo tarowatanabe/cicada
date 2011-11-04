@@ -904,7 +904,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       increased = utils::bithack::branch(iter && (objective > objective_prev), increased + 1, 0);
       
       const double norm_x = std::max(1.0, l2norm(optimizer.weights));
-      const dobule norm_d = l2norm_diff(optimizer.weights, weights_prev);
+      const double norm_d = l2norm_diff(optimizer.weights, weights_prev);
       
       const bool converged = (active_size == 0 || (iter && (norm_d / norm_x < 1e-5)) || increased > 10);
       
