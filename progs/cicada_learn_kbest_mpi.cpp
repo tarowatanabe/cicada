@@ -897,6 +897,9 @@ double optimize_online(const hypothesis_map_type& kbests,
 	      grad_pos = grad_new;
 	    }
 	  }
+
+	  if (debug >= 3)
+	    std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 	  
 	  if (k > 0.0) {
 	    weight_set_type weights_prev_saved = weights_prev;
@@ -930,6 +933,9 @@ double optimize_online(const hypothesis_map_type& kbests,
 	      grad_neg = grad_new;
 	    }
 	  }
+	  
+	  if (debug >= 3)
+	    std::cerr << "grad: " << grad_neg << "  k: " << k << std::endl;
 	  
 	  if (k > 0.0) {
 	    weight_set_type weights_prev_saved = weights_prev;
