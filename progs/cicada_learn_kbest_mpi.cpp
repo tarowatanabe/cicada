@@ -859,7 +859,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	objective += C * norm;
       }
       
-      const bool converged = (samples_zero || (iter && std::fabs(objective - objective_prev) < 1e-6));
+      const bool converged = (samples_zero || (iter && std::fabs((objective - objective_prev) / objective) < 1e-7));
       
       if (debug >= 2)
 	std::cerr << "objective: " << objective << std::endl;

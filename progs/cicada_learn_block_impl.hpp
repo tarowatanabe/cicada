@@ -407,8 +407,10 @@ struct LearnSVM : public LearnBase
   {
     return std::make_pair(0.0, 0.0);
   }
-
-  void clear_history() {}
+  
+  void clear_history()
+  {
+  }
 
   struct multiplies_min
   {
@@ -614,6 +616,10 @@ struct LearnPegasos : public LearnBase
 	
 	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
+	
+	// for history...
+	history_losses.push_back(loss_rank ? 1.0 : loss);
+	history_features.insert(feats.begin(), feats.end());
       }
   }
   
@@ -634,10 +640,33 @@ struct LearnPegasos : public LearnBase
   template <typename Iterator>
   std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    double grad = 0.0;
+    for (size_t i = 0; i != features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+      
+      const double bi = margin_prev - margin;
+      const double ci = losses[i]   - margin_prev;
+      
+      const double ki = - ci / bi;
+      
+      if (ki > 0) {
+	*iter = std::make_pair(ki, bi);
+	++ iter;
+      }
+      
+      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
+	grad += bi;
+    }
+    
+    return std::make_pair(grad, history_losses.size());
   }
 
-  void clear_history() {}
+  void clear_history()
+  {
+    history_features.clear();
+    history_losses.clear();
+  }
 
   double learn(weight_set_type& weights)
   {
@@ -701,9 +730,11 @@ struct LearnPegasos : public LearnBase
   double    weight_scale;
   double    weight_norm;
   
-
   sample_set_type features;
   loss_set_type   losses;
+
+  sample_set_type history_features;
+  loss_set_type   history_losses;
   
   sentence_unique_type sentences;
 };
@@ -863,6 +894,10 @@ struct LearnOPegasos : public LearnBase
 	
 	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
+	
+	// for history...
+	history_losses.push_back(loss_rank ? 1.0 : loss);
+	history_features.insert(feats.begin(), feats.end());
       }
   }
   
@@ -883,10 +918,33 @@ struct LearnOPegasos : public LearnBase
   template <typename Iterator>
   std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    double grad = 0.0;
+    for (size_t i = 0; i != features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+      
+      const double bi = margin_prev - margin;
+      const double ci = losses[i]   - margin_prev;
+      
+      const double ki = - ci / bi;
+      
+      if (ki > 0) {
+	*iter = std::make_pair(ki, bi);
+	++ iter;
+      }
+      
+      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
+	grad += bi;
+    }
+    
+    return std::make_pair(grad, history_losses.size());
   }
 
-  void clear_history() {}
+  void clear_history()
+  {
+    history_features.clear();
+    history_losses.clear();
+  }
 
   double learn(weight_set_type& weights)
   {
@@ -978,6 +1036,9 @@ struct LearnOPegasos : public LearnBase
 
   sample_set_type features;
   loss_set_type   losses;
+  
+  sample_set_type history_features;
+  loss_set_type   history_losses;
   
   sentence_unique_type sentences;
   
@@ -1141,6 +1202,10 @@ struct LearnMIRA : public LearnBase
 	
 	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
+
+	// for history...
+	history_losses.push_back(loss_rank ? 1.0 : loss);
+	history_features.insert(feats.begin(), feats.end());
       }
   }
   
@@ -1158,10 +1223,33 @@ struct LearnMIRA : public LearnBase
   template <typename Iterator>
   std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    double grad = 0.0;
+    for (size_t i = 0; i != features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+      
+      const double bi = margin_prev - margin;
+      const double ci = losses[i]   - margin_prev;
+      
+      const double ki = - ci / bi;
+      
+      if (ki > 0) {
+	*iter = std::make_pair(ki, bi);
+	++ iter;
+      }
+      
+      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
+	grad += bi;
+    }
+    
+    return std::make_pair(grad, history_losses.size());
   }
 
-  void clear_history() {}
+  void clear_history()
+  {
+    history_features.clear();
+    history_losses.clear();
+  }
   
   double learn(weight_set_type& weights)
   {
@@ -1212,6 +1300,9 @@ struct LearnMIRA : public LearnBase
 
   sample_set_type features;
   loss_set_type   losses;
+
+  sample_set_type history_features;
+  loss_set_type   history_losses;
   
   sentence_unique_type sentences;
   
