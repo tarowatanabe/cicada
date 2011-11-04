@@ -1066,14 +1066,16 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       double grad = 0.0;
       MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-            
-      boost::iostreams::filtering_ostream os;
-      os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
       
-      point_set_type::const_iterator piter_end = points.end();
-      for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
-	os.write((char*) &(piter->first), sizeof(double));
-	os.write((char*) &(piter->second), sizeof(double));
+      {
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
+	
+	point_set_type::const_iterator piter_end = points.end();
+	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+	  os.write((char*) &(piter->first), sizeof(double));
+	  os.write((char*) &(piter->second), sizeof(double));
+	}
       }
       
       // re-bcast again...
