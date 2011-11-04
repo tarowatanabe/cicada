@@ -693,6 +693,7 @@ double optimize_online(const hypothesis_map_type& kbests,
   
   weight_set_type weights_init = weights;
   point_set_type points;
+  point_set_type points_next;
   
   optimizer.weights = weights;
   
@@ -742,8 +743,9 @@ double optimize_online(const hypothesis_map_type& kbests,
 	double norm_local = 0;
 	points.clear();
 	opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
-
-	// merge points from others
+	std::sort(points.begin(), points.end());
+	
+	// merge points from others... we assume that we will consume in sorted order!
 	for (int rank = 1; rank < mpi_size; ++ rank) {
 	  boost::iostreams::filtering_istream is;
 	  is.push(boost::iostreams::zlib_decompressor());
@@ -752,8 +754,21 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  double point;
 	  double b;
 	  
-	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double)))
-	    points.push_back(std::make_pair(point, b));
+	  points_next.clear();
+	  point_set_type::const_iterator piter = points.begin();
+	  point_set_type::const_iterator piter_end = points.end();
+	  
+	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
+	    for (/**/; piter != piter_end && *piter->first < point; ++ piter)
+	      points_next.push_back(*piter);
+	    points_next.push_back(std::make_pair(point, b));
+	  }
+	  
+	  // final insertion...
+	  points_next.insert(points_next.end(), piter, piter_end);
+	  
+	  points.swap(points_next);
+	  points_next.clear();
 	}
 	
 	double grad = 0.0;
@@ -773,8 +788,6 @@ double optimize_online(const hypothesis_map_type& kbests,
 	
 	if (! points.empty() && grad < 0.0) {
 	  double k = 0.0;
-	  
-	  std::sort(points.begin(), points.end());
 	  
 	  point_set_type::const_iterator piter_end = points.end();
 	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; /**/) {
@@ -902,7 +915,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  double norm_local = 0;
 	  points.clear();
 	  opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
-	  	  
+	  std::sort(points.begin(), points.end());
+	  
 	  boost::iostreams::filtering_ostream os;
 	  os.push(boost::iostreams::zlib_compressor());
 	  os.push(utils::mpi_device_sink(0, point_tag, 4096));
