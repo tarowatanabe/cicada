@@ -128,6 +128,9 @@ int main(int argc, char ** argv)
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
+    if ((line_search_local || line_search_global) && (learn_lbfgs || learn_sgd))
+      throw std::runtime_error("line-search is applicable only for non-maxent based loss");
+
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
     if (oracle_path.empty())
@@ -156,7 +159,7 @@ int main(int argc, char ** argv)
     read_kbest(scorers, kbest_path, oracle_path, kbests, oracles);
     
     weight_set_type weights;
-    if (mpi_rank ==0 && ! weights_path.empty()) {
+    if (mpi_rank == 0 && ! weights_path.empty()) {
       if (! boost::filesystem::exists(weights_path))
 	throw std::runtime_error("no path? " + weights_path.string());
       
@@ -695,7 +698,6 @@ double optimize_online(const hypothesis_map_type& kbests,
   weight_set_type weights_init = weights;
   point_set_type points;
   point_set_type points_next;
-  point_set_type points_buffer;
   
   optimizer.weights = weights;
   
@@ -855,8 +857,95 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       bcast_weights(0, weights_init);
       
-    }
+      if (debug >= 3)
+	std::cerr << "line-search" << std::endl;
+      
+      double grad_local = 0;
+      double norm_local = 0;
+      points.clear();
+      opt(weights, weights_init, grad_local, norm_local, std::back_inserter(points));
+      std::sort(points.begin(), points.end());
+      
+      double grad = 0.0;
+      MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+      double norm = 0.0;
+      MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+      // merge points from others... we assume that we will consume in sorted order!
+      for (int rank = 1; rank < mpi_size; ++ rank) {
+	boost::iostreams::filtering_istream is;
+	is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
+	  
+	double point;
+	double b;
+	  
+	points_next.clear();
+	point_set_type::const_iterator piter = points.begin();
+	point_set_type::const_iterator piter_end = points.end();
+	  
+	while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
+	  for (/**/; piter != piter_end && piter->first < point; ++ piter)
+	    points_next.push_back(*piter);
+	  points_next.push_back(std::make_pair(point, b));
+	}
+	  
+	// final insertion...
+	points_next.insert(points_next.end(), piter, piter_end);
+	  
+	points.swap(points_next);
+	points_next.clear();
+      }
+      
+      if (debug >= 3)
+	std::cerr << "point size: " << points.size() << std::endl;
+      
+      const double norm_w      = cicada::dot_product(weights, weights);
+      const double dot_prod    = cicada::dot_product(weights_init, weights);
+      const double norm_w_prev = cicada::dot_product(weights_init, weights_init);
+      
+      const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
+      const double b0 = (dot_prod - norm_w_prev) * C * norm;
+      
+      grad += b0;
 
+      if (debug >= 3)
+	std::cerr << "gradient: " << grad << std::endl;
+
+      double k = 0.0;
+	
+      if (! points.empty() && grad < 0.0) {
+	point_set_type::const_iterator piter_end = points.end();
+	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; /**/) {
+	  const double k_new = piter->first;
+	  const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
+	    
+	  if (grad_new >= 0)
+	    k += grad * (k - k_new) / (grad_new - grad);
+	  else {
+	    k = k_new;
+	    ++ piter;
+	  }
+	    
+	  grad = grad_new;
+	}
+	  
+	if (debug >= 3)
+	  std::cerr << "searched gradient: " << grad << " k: " << k << std::endl;
+	
+	k = std::max(k, 0.0);
+      }
+      
+      const double merge_ratio = k + 0.1 * (1.0 - k);
+      
+      weights *= merge_ratio;
+      weights_init *= (1.0 - merge_ratio);
+      
+      weights += weights_init;
+
+      // re-bcast again...
+      bcast_weights(0, weights);
+    }
     
     double objective_local = 0.0;
     double norm_local = 0;
@@ -964,7 +1053,29 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       bcast_weights(0, weights_init);
       
+      double grad_local = 0;
+      double norm_local = 0;
+      points.clear();
+      opt(weights, weights_init, grad_local, norm_local, std::back_inserter(points));
+      std::sort(points.begin(), points.end());
       
+      double grad = 0.0;
+      MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      double norm = 0.0;
+      MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      boost::iostreams::filtering_ostream os;
+      os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
+      
+      point_set_type::const_iterator piter_end = points.end();
+      for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+	os.write((char*) &(piter->first), sizeof(double));
+	os.write((char*) &(piter->second), sizeof(double));
+      }
+      
+      // re-bcast again...
+      bcast_weights(0, weights);
     }
 
     double objective_local = 0.0;
