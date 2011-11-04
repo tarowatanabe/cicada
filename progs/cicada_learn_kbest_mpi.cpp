@@ -878,7 +878,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  k = std::max(k, 0.0);
 	}
 	
-	const double merge_ratio = k + 0.1 * (1.0 - k);
+	//const double merge_ratio = k + 0.1 * (1.0 - k);
+	const double merge_ratio = std::max(0.1, k);
 	
 	// move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
 
