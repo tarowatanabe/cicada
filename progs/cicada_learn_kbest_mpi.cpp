@@ -877,20 +877,22 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  
 	  k = std::max(k, 0.0);
 	}
-	
-	//const double merge_ratio = k + 0.1 * (1.0 - k);
-	const double merge_ratio = (k == 0.0 ? 0.1 : k);
-	
-	// move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
 
-	weight_set_type weights_prev_saved = weights_prev;
+	if (k > 0.0)  {
+	  //const double merge_ratio = k + 0.1 * (1.0 - k);
+	  const double merge_ratio = k;
 	
-	optimizer.weights *= merge_ratio;
-	weights_prev *= (1.0 - merge_ratio);
-	
-	optimizer.weights += weights_prev;
-	
-	weights_prev.swap(weights_prev_saved);
+	  // move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
+	  
+	  weight_set_type weights_prev_saved = weights_prev;
+	  
+	  optimizer.weights *= merge_ratio;
+	  weights_prev *= (1.0 - merge_ratio);
+	  
+	  optimizer.weights += weights_prev;
+	  
+	  weights_prev.swap(weights_prev_saved);
+	}
       }
 
       if (regularize_l2)
@@ -1005,14 +1007,16 @@ double optimize_online(const hypothesis_map_type& kbests,
 	k = std::max(k, 0.0);
       }
       
-      //const double merge_ratio = k + 0.1 * (1.0 - k);
-      const double merge_ratio = (k == 0.0 ? 0.1 : k);
+      if (k > 0.0) {
+	//const double merge_ratio = k + 0.1 * (1.0 - k);
+	const double merge_ratio = k;
+	
+	weights *= merge_ratio;
+	weights_init *= (1.0 - merge_ratio);
+	
+	weights += weights_init;
+      }
       
-      weights *= merge_ratio;
-      weights_init *= (1.0 - merge_ratio);
-      
-      weights += weights_init;
-
       // re-bcast again...
       bcast_weights(0, weights);
     }
