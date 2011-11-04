@@ -721,6 +721,7 @@ double optimize_online(const hypothesis_map_type& kbests,
   optimizer.weights = weights;
   
   if (mpi_rank == 0) {
+    double objective_total = 0.0;
     double objective_prev = 0.0;
     double objective = 0.0;
     
@@ -859,11 +860,18 @@ double optimize_online(const hypothesis_map_type& kbests,
 	objective += C * norm;
       }
       
+      const double objective_average_prev = objective_total / iter;
+      
+      objective_total += objective;
+      
+      const double objective_average = objective_total / (iter + 1);
+
       const bool converged = (samples_zero || (iter && std::fabs((objective - objective_prev) / objective) < 1e-5));
       
       if (debug >= 2)
-	std::cerr << "objective: " << objective << std::endl;
+	std::cerr << "objective: " << objective << " average: " << objective_average << std::endl;
       
+
       
       if (converged) break;
       
