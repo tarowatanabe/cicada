@@ -230,6 +230,7 @@ enum {
   gradients_tag,
   notify_tag,
   termination_tag,
+  point_tag,
 };
 
 inline
@@ -310,9 +311,9 @@ struct OptimizeOnline
   }
   
   template <typename Iterator>
-  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  void operator()(const weight_set_type& weights, const weight_set_type& weights_prev, double& grad, double& instances, Iterator iter) const
   {
-    return 0.0;
+    
   }
   
   
@@ -583,9 +584,27 @@ struct OptimizeOnlineMargin
   }
   
   template <typename Iterator>
-  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  void operator()(const weight_set_type& weights, const weight_set_type& weights_prev, double& grad, double& instances, Iterator iter) const
   {
-    return 0.0;
+    for (size_t id = 0; id != losses.size(); ++ id) {
+      const double margin      = cicada::dot_product(weights,      features[id].begin(), features[id].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, features[id].begin(), features[id].end(), 0.0);
+      
+      const double bi = margin_prev - margin;
+      const double ci = losses[id]  - margin_prev;
+      
+      const double ki = - ci / bi;
+      
+      if (ki > 0) {
+	*iter = std::make_pair(ki, bi);
+	++ iter;
+      }
+      
+      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
+	grad += bi;
+    }
+    
+    instances += losses.size();
   }
   
   
@@ -688,7 +707,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       bcast_weights(0, optimizer.weights);
       
-      const weight_set_type weights_prev = optimizer.weights;
+      weight_set_type weights_prev = optimizer.weights;
       
       optimizer.initialize();
 
@@ -718,19 +737,38 @@ double optimize_online(const hypothesis_map_type& kbests,
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
 	bcast_weights(0, optimizer.weights);
-
-	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
-	const double dot_prod    = cicada::dot_product(optimizer.weights, weights_prev);
-	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0 = norm_w - 2.0 * dot_prod + norm_w_prev;
-	const double b0 = dot_prod - norm_w_prev;
-	
+	double grad_local = 0;
+	double norm_local = 0;
 	points.clear();
-	const double grad_local = opt(optimizer.weights, weights_prev, std::back_inserter(points));
+	opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
+
+	// merge points from others
+	for (int rank = 1; rank < mpi_size; ++ rank) {
+	  boost::iostreams::filtering_istream is;
+	  is.push(boost::iostreams::zlib_decompressor());
+	  is.push(utils::mpi_device_source(rank, point_tag, 4096));
+	  
+	  double point;
+	  double b;
+	  
+	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double)))
+	    points.push_back(std::make_pair(point, b));
+	}
 	
 	double grad = 0.0;
 	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	double norm = 0.0;
+	MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
+	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
+	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
+	
+	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
+	const double b0 = (dot_prod - norm_w_prev) * C * norm;
+	
 	grad += b0;
 	
 	if (! points.empty() && grad < 0.0) {
@@ -739,21 +777,28 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  std::sort(points.begin(), points.end());
 	  
 	  point_set_type::const_iterator piter_end = points.end();
-	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
+	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; /**/) {
 	    const double k_new = piter->first;
 	    const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
 	    
 	    if (grad_new >= 0)
 	      k += grad * (k - k_new) / (grad_new - grad);
-	    else
+	    else {
 	      k = k_new;
+	      ++ piter;
+	    }
 	    
 	    grad = grad_new;
 	  }
 	  
-	  k = std::max(k, 0.0);
-	  
-	  // move to optimizer.weights * k + weights_prev * (1.0 - k)
+	  if (k > 0.0) {
+	    // move to optimizer.weights * k + weights_prev * (1.0 - k)
+	    
+	    optimizer.weights *= k;
+	    weights_prev *= (1.0 - k);
+	    
+	    optimizer.weights += weights_prev;
+	  }
 	}
       }
       
@@ -853,6 +898,26 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  
 	  bcast_weights(0, optimizer.weights);
 	  
+	  double grad_local = 0;
+	  double norm_local = 0;
+	  points.clear();
+	  opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
+	  	  
+	  boost::iostreams::filtering_ostream os;
+	  os.push(boost::iostreams::zlib_compressor());
+	  os.push(utils::mpi_device_sink(0, point_tag, 4096));
+	  
+	  point_set_type::const_iterator piter_end = points.end();
+	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+	    os.write((char*) &(piter->first), sizeof(double));
+	    os.write((char*) &(piter->second), sizeof(double));
+	  }
+	  
+	  double grad = 0.0;
+	  MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	  
+	  double norm = 0.0;
+	  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
 	}
       }
     }
