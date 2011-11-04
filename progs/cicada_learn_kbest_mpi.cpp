@@ -329,9 +329,9 @@ struct OptimizeOnline
   }
   
   template <typename Iterator>
-  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  std::pair<double, double> operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return 0.0;
+    return std::make_pair(0.0, 0.0);
   }
   
   
@@ -607,27 +607,43 @@ struct OptimizeOnlineMargin
   }
   
   template <typename Iterator>
-  double operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  std::pair<double, double> operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    double grad = 0.0;
+    static const double inf = std::numeric_limits<double>::infinity();
+
+    double grad_pos = 0.0;
+    double grad_neg = 0.0;
     for (size_t id = 0; id != losses.size(); ++ id) {
       const double margin      = cicada::dot_product(weights,      features[id].begin(), features[id].end(), 0.0);
       const double margin_prev = cicada::dot_product(weights_prev, features[id].begin(), features[id].end(), 0.0);
       
-      const double bi = margin_prev - margin;
-      const double ci = losses[id]  - margin_prev;
+      const double bi_pos = margin_prev - margin;
+      const double ci_pos = losses[id]  - margin_prev;
+      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
       
-      const double ki = - ci / bi;
+      const double bi_neg = margin_prev + margin;
+      const double ci_neg = losses[id]  - margin_prev;
+      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
       
-      if (ki > 0) {
-	*iter = std::make_pair(ki, bi);
+      if (ki_pos > 0) {
+	*iter = std::make_pair(ki_pos, bi_pos);
 	++ iter;
       }
       
-      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
-	grad += bi;
+      if (ki_neg > 0) {
+	*iter = std::make_pair(- ki_neg, bi_neg);
+	++ iter;
+      }
+      
+      
+      if ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0))
+	grad_pos += bi_pos;
+      
+      if ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0))
+	grad_neg += bi_neg;
     }
-    return grad;
+    
+    return std::make_pair(grad_pos, grad_neg);
   }
   
   template <typename Iterator>
@@ -805,28 +821,26 @@ double optimize_online(const hypothesis_map_type& kbests,
 	bcast_weights(0, optimizer.weights);
 	
 	points.clear();
-	const double grad_local = opt(optimizer.weights, weights_prev, std::back_inserter(points));
-	std::sort(points.begin(), points.end());
 	
-	double grad = 0.0;
-	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	const std::pair<double, double> grads = opt(optimizer.weights, weights_prev, std::back_inserter(points));
+	
+	std::sort(points.begin(), points.end());
 	
 	// merge points from others... we assume that we will consume in sorted order!
 	for (int rank = 1; rank < mpi_size; ++ rank) {
 	  boost::iostreams::filtering_istream is;
 	  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
 	  
-	  double point;
-	  double b;
+	  std::pair<double, double> point;
 	  
 	  points_next.clear();
 	  point_set_type::const_iterator piter = points.begin();
 	  point_set_type::const_iterator piter_end = points.end();
 	  
-	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
-	    for (/**/; piter != piter_end && piter->first < point; ++ piter)
+	  while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
+	    for (/**/; piter != piter_end && *piter < point; ++ piter)
 	      points_next.push_back(*piter);
-	    points_next.push_back(std::make_pair(point, b));
+	    points_next.push_back(point);
 	  }
 	  
 	  // final insertion...
@@ -838,60 +852,95 @@ double optimize_online(const hypothesis_map_type& kbests,
 
 	if (debug >= 3)
 	  std::cerr << "point size: " << points.size() << std::endl;
-		
+	
+	double grad_pos = 0.0;
+	double grad_neg = 0.0;
+	
+	MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
 	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
-	const double b0 = (dot_prod - norm_w_prev) * C * norm;
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
+	const double b0_pos = (dot_prod - norm_w_prev) * C * norm;
+	
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * norm;
+	const double b0_neg = (- dot_prod - norm_w_prev) * C * norm;
 
 	//std::cerr << "a0: "  << a0 << " b0: " << b0 << std::endl;
 	
-	grad += b0;
-
-	if (debug >= 3)
-	  std::cerr << "gradient: " << grad << std::endl;
-
-	double k = 0.0;
+	grad_pos += b0_pos;
+	grad_neg += b0_neg;
 	
-	if (! points.empty() && grad < 0.0) {
-	  point_set_type::const_iterator piter_end = points.end();
-	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
+	if (debug >= 3)
+	  std::cerr << "gradient: " << grad_pos << ' ' << grad_neg << std::endl;
+	
+	if (grad_pos < 0.0) {
+	  double k = 0.0;
+	  
+	  point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), 0.0);
+	  point_set_type::const_iterator piter_end = pints.end();
+
+	  for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
 	    const double k_new = piter->first;
-	    const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
+	    const double grad_new = grad_pos + std::fabs(piter->second) + a0_pos * (k_new - k);
 	    
 	    if (grad_new >= 0) {
 	      // compute intersection...
-	      k = k + grad * (k - k_new) / (grad_new - grad);
-	      grad = grad_new;
+	      k = k + grad_pos * (k - k_new) / (grad_new - grad_pos);
+	      grad_pos = grad_new;
 	      break;
 	    } else {
 	      k = k_new;
-	      grad = grad_new;
+	      grad_pos = grad_new;
 	    }
 	  }
 	  
-	  if (debug >= 3)
-	    std::cerr << "searched gradient: " << grad << " k: " << k << std::endl;
+	  if (k > 0.0) {
+	    weight_set_type weights_prev_saved = weights_prev;
+	    
+	    optimizer.weights *= k;
+	    weights_prev *= (1.0 - k);
+	    
+	    optimizer.weights += weights_prev;
+	    
+	    weights_prev.swap(weights_prev_saved);
+	  }
 	  
-	  k = std::max(k, 0.0);
-	}
-
-	if (k > 0.0)  {
-	  //const double merge_ratio = k + 0.1 * (1.0 - k);
-	  const double merge_ratio = k;
-	
-	  // move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
 	  
-	  weight_set_type weights_prev_saved = weights_prev;
+	} else if (grad_neg < 0.0) {
+	  double k = 0.0;
 	  
-	  optimizer.weights *= merge_ratio;
-	  weights_prev *= (1.0 - merge_ratio);
+	  point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), 0.0));
+	  point_set_type::const_reverse_iterator piter_end = points.rend();
 	  
-	  optimizer.weights += weights_prev;
+	  for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
+	    const double k_new = - piter->first;
+	    const double grad_new = grad_neg + std::fabs(piter->second) + a0_neg * (k_new - k);
+	    
+	    if (grad_new >= 0) {
+	      // compute intersection...
+	      k = k + grad_neg * (k - k_new) / (grad_new - grad_pneg);
+	      grad_neg = grad_new;
+	      break;
+	    } else {
+	      k = k_new;
+	      grad_neg = grad_new;
+	    }
+	  }
 	  
-	  weights_prev.swap(weights_prev_saved);
+	  if (k > 0.0) {
+	    weight_set_type weights_prev_saved = weights_prev;
+	    
+	    optimizer.weights *= - k;
+	    weights_prev *= (1.0 + k);
+	    
+	    optimizer.weights += weights_prev;
+	    
+	    weights_prev.swap(weights_prev_saved);
+	  }
 	}
       }
 
@@ -928,97 +977,7 @@ double optimize_online(const hypothesis_map_type& kbests,
     bcast_weights(0, weights);
     
     if (line_search_global) {
-      // perform line-search between weights_init and weights, and update weights
-      
-      bcast_weights(0, weights_init);
-      
-      if (debug >= 3)
-	std::cerr << "line-search" << std::endl;
-      
-      points.clear();
-      const double grad_local = opt(weights, weights_init, std::back_inserter(points));
-      std::sort(points.begin(), points.end());
-      
-      double grad = 0.0;
-      MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-      
-      // merge points from others... we assume that we will consume in sorted order!
-      for (int rank = 1; rank < mpi_size; ++ rank) {
-	boost::iostreams::filtering_istream is;
-	is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
-	
-	double point;
-	double b;
-	
-	points_next.clear();
-	point_set_type::const_iterator piter = points.begin();
-	point_set_type::const_iterator piter_end = points.end();
-	  
-	while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
-	  for (/**/; piter != piter_end && piter->first < point; ++ piter)
-	    points_next.push_back(*piter);
-	  points_next.push_back(std::make_pair(point, b));
-	}
-	  
-	// final insertion...
-	points_next.insert(points_next.end(), piter, piter_end);
-	
-	points.swap(points_next);
-	points_next.clear();
-      }
-      
-      if (debug >= 3)
-	std::cerr << "point size: " << points.size() << std::endl;
-      
-      const double norm_w      = cicada::dot_product(weights, weights);
-      const double dot_prod    = cicada::dot_product(weights_init, weights);
-      const double norm_w_prev = cicada::dot_product(weights_init, weights_init);
-      
-      const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
-      const double b0 = (dot_prod - norm_w_prev) * C * norm;
-      
-      grad += b0;
-
-      if (debug >= 3)
-	std::cerr << "gradient: " << grad << std::endl;
-
-      double k = 0.0;
-	
-      if (! points.empty() && grad < 0.0) {
-	point_set_type::const_iterator piter_end = points.end();
-	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
-	  const double k_new = piter->first;
-	  const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
-	  
-	  if (grad_new >= 0) {
-	    // compute intersection...
-	    k = k + grad * (k - k_new) / (grad_new - grad);
-	    grad = grad_new;
-	    break;
-	  } else {
-	    k = k_new;
-	    grad = grad_new;
-	  }
-	}
-	  
-	if (debug >= 3)
-	  std::cerr << "searched gradient: " << grad << " k: " << k << std::endl;
-	
-	k = std::max(k, 0.0);
-      }
-      
-      if (k > 0.0) {
-	//const double merge_ratio = k + 0.1 * (1.0 - k);
-	const double merge_ratio = k;
-	
-	weights *= merge_ratio;
-	weights_init *= (1.0 - merge_ratio);
-	
-	weights += weights_init;
-      }
-      
-      // re-bcast again...
-      bcast_weights(0, weights);
+      // to be implemented
     }
     
     const double objective_local = opt.objective(weights);
@@ -1084,20 +1043,26 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  bcast_weights(0, optimizer.weights);
 	  
 	  points.clear();
-	  const double grad_local = opt(optimizer.weights, weights_prev, std::back_inserter(points));
+	  const std::pair<double, double> grads = opt(optimizer.weights, weights_prev, std::back_inserter(points));
+	  
 	  std::sort(points.begin(), points.end());
-
-	  double grad = 0.0;
-	  MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
 	  
-	  boost::iostreams::filtering_ostream os;
-	  os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
-	  
-	  point_set_type::const_iterator piter_end = points.end();
-	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
-	    os.write((char*) &(piter->first), sizeof(double));
-	    os.write((char*) &(piter->second), sizeof(double));
+	  {
+	    boost::iostreams::filtering_ostream os;
+	    os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
+	    
+	    point_set_type::const_iterator piter_end = points.end();
+	    for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+	      os.write((char*) &(piter->first), sizeof(double));
+	      os.write((char*) &(piter->second), sizeof(double));
+	    }
 	  }
+	  
+	  double grad_pos = 0.0;
+	  double grad_neg = 0.0;
+	  
+	  MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
+	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
 	}
       }
     }
@@ -1108,30 +1073,7 @@ double optimize_online(const hypothesis_map_type& kbests,
     bcast_weights(0, weights);
 
     if (line_search_global) {
-      // perform line-search between weights_init and weights, and update weights
-      
-      bcast_weights(0, weights_init);
-      
-      points.clear();
-      const double grad_local = opt(weights, weights_init, std::back_inserter(points));
-      std::sort(points.begin(), points.end());
-      
-      double grad = 0.0;
-      MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-      
-      {
-	boost::iostreams::filtering_ostream os;
-	os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
-	
-	point_set_type::const_iterator piter_end = points.end();
-	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
-	  os.write((char*) &(piter->first), sizeof(double));
-	  os.write((char*) &(piter->second), sizeof(double));
-	}
-      }
-      
-      // re-bcast again...
-      bcast_weights(0, weights);
+      // to be filled in
     }
     
     const double objective_local = opt.objective(weights);
