@@ -737,6 +737,8 @@ double optimize_online(const hypothesis_map_type& kbests,
       if (line_search_local) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
+	std::cerr << "line-search" << std::endl;
+
 	bcast_weights(0, optimizer.weights);
 	
 	double grad_local = 0;
@@ -744,6 +746,14 @@ double optimize_online(const hypothesis_map_type& kbests,
 	points.clear();
 	opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
 	std::sort(points.begin(), points.end());
+
+	std::cerr << "merge stats" << std::endl;
+
+	double grad = 0.0;
+	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	double norm = 0.0;
+	MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
 	
 	// merge points from others... we assume that we will consume in sorted order!
 	for (int rank = 1; rank < mpi_size; ++ rank) {
@@ -770,21 +780,21 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  points.swap(points_next);
 	  points_next.clear();
 	}
-	
-	double grad = 0.0;
-	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-	
-	double norm = 0.0;
-	MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
-	
+
+	std::cerr << "point size: " << points.size() << std::endl;
+		
 	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
 	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
 	const double b0 = (dot_prod - norm_w_prev) * C * norm;
+
+	std::cerr << "a0: "  << a0 << " b0: " << b0 << std::endl;
 	
 	grad += b0;
+
+	std::cerr << "grad: " << grad << std::endl;
 	
 	if (! points.empty() && grad < 0.0) {
 	  double k = 0.0;
@@ -803,6 +813,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    
 	    grad = grad_new;
 	  }
+
+	  std::cerr << "final k: " << k << std::endl;
 	  
 	  if (k > 0.0) {
 	    // move to optimizer.weights * k + weights_prev * (1.0 - k)
@@ -916,6 +928,12 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  points.clear();
 	  opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
 	  std::sort(points.begin(), points.end());
+
+	  double grad = 0.0;
+	  MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+	  
+	  double norm = 0.0;
+	  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
 	  
 	  boost::iostreams::filtering_ostream os;
 	  os.push(boost::iostreams::zlib_compressor());
@@ -926,12 +944,6 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    os.write((char*) &(piter->first), sizeof(double));
 	    os.write((char*) &(piter->second), sizeof(double));
 	  }
-	  
-	  double grad = 0.0;
-	  MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-	  
-	  double norm = 0.0;
-	  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
 	}
       }
     }
