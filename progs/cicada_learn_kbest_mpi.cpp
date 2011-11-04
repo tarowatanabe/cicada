@@ -785,7 +785,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       int samples_local = optimizer.samples;
       MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
 
-      const bool active_size = samples;
+      const int active_size = samples;
             
       samples += mpi_size;
       
