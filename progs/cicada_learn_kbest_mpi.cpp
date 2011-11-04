@@ -685,6 +685,39 @@ struct OptimizeOnlineMargin
   id_set_type     ids;
 };
 
+
+double l2norm(const weight_set_type& weights)
+{
+  double norm = 0.0;
+  weight_set_type::const_iterator witer_end = weights.end();
+  for (weight_set_type::const_iterator witer = weights.begin(); witer != witer_end; ++ witer)
+    norm += (*witer) * (*witer);
+  return norm;
+}
+
+double l2norm_diff(const weight_set_type& weights1, const weight_set_type& weights2)
+{
+  weight_set_type::const_iterator witer1 = weights1.begin();
+  weight_set_type::const_iterator witer2 = weights2.begin();
+  weight_set_type::const_iterator witer1_end = weights1.end();
+  weight_set_type::const_iterator witer2_end = weights2.end();
+  
+  double norm = 0.0;
+  if (weights1.size() <= weights2.size()) {
+    for (/**/; witer1 != witer1_end; ++ witer1, ++ witer2)
+      norm += ((*witer1) - (*witer2)) * ((*witer1) - (*witer2));
+    for (/**/; witer2 != witer2_end; ++ witer2)
+      norm += (*witer2) * (*witer2);
+  } else {
+    for (/**/; witer2 != witer2_end; ++ witer1, ++ witer2)
+      norm += ((*witer1) - (*witer2)) * ((*witer1) - (*witer2));
+    for (/**/; witer1 != witer1_end; ++ witer1)
+      norm += (*witer1) * (*witer1);
+  }
+  
+  return norm;
+}
+
 template <typename Optimize, typename Generator>
 double optimize_online(const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
@@ -858,7 +891,6 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  norm += std::fabs(optimizer.weights[i]);
 	objective += C * norm;
       }
-      
       
       const bool converged = (samples_zero || (iter && std::fabs((objective - objective_prev) / objective) < 1e-5));
       
