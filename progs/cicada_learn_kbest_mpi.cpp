@@ -739,8 +739,9 @@ double optimize_online(const hypothesis_map_type& kbests,
       if (line_search_local) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
-	//std::cerr << "line-search" << std::endl;
-
+	if (debug >= 3)
+	  std::cerr << "line-search" << std::endl;
+	
 	bcast_weights(0, optimizer.weights);
 	
 	double grad_local = 0;
@@ -782,7 +783,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  points_next.clear();
 	}
 
-	//std::cerr << "point size: " << points.size() << std::endl;
+	if (debug >= 3)
+	  std::cerr << "point size: " << points.size() << std::endl;
 		
 	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
@@ -795,7 +797,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	
 	grad += b0;
 
-	//std::cerr << "grad: " << grad << std::endl;
+	if (debug >= 3)
+	  std::cerr << "gradient: " << grad << std::endl;
 
 	double k = 0.0;
 	
@@ -815,7 +818,9 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    grad = grad_new;
 	  }
 	  
-	  //std::cerr << "final k: " << k << std::endl;
+	  if (debug >= 3)
+	    std::cerr << "searched gradient: " << grad << " k: " << k << std::endl;
+	  
 	  k = std::max(k, 0.0);
 	}
 	
