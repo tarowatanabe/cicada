@@ -757,6 +757,8 @@ double optimize_online(const hypothesis_map_type& kbests,
     double objective_prev = 0.0;
     double objective = 0.0;
     
+    int increased = 0;
+    
     for (int iter = 0; iter < iteration; ++ iter) {
       
       for (int rank = 1; rank < mpi_size; ++ rank)
@@ -783,7 +785,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       int samples_local = optimizer.samples;
       MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
 
-      const bool samples_zero = (samples == 0);
+      const bool active_size = samples;
             
       samples += mpi_size;
       
@@ -876,11 +878,15 @@ double optimize_online(const hypothesis_map_type& kbests,
 	const double merge_ratio = k + 0.1 * (1.0 - k);
 	
 	// move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
+
+	weight_set_type weights_prev_saved = weights_prev;
 	
 	optimizer.weights *= merge_ratio;
 	weights_prev *= (1.0 - merge_ratio);
 	
 	optimizer.weights += weights_prev;
+	
+	weights_prev.swap(weights_prev_saved);
       }
 
       if (regularize_l2)
@@ -892,10 +898,12 @@ double optimize_online(const hypothesis_map_type& kbests,
 	objective += C * norm;
       }
       
-      const bool converged = (samples_zero || (iter && std::fabs((objective - objective_prev) / objective) < 1e-5));
+      increased = utils::bithack::branch(iter && (objective > objective_prev), increased + 1, 0);
+      
+      const bool converged = (active_size == 0 || (iter && std::fabs((objective - objective_prev) / objective) < 1e-5) || increased > 10);
       
       if (debug >= 2)
-	std::cerr << "objective: " << objective << std::endl;
+	std::cerr << "objective: " << objective << " active size: " << active_size << std::endl;
       
       if (converged) break;
       
