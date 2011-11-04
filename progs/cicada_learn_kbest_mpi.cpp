@@ -230,6 +230,7 @@ enum {
   gradients_tag,
   notify_tag,
   termination_tag,
+  point_size_tag,
   point_tag,
 };
 
@@ -694,6 +695,7 @@ double optimize_online(const hypothesis_map_type& kbests,
   weight_set_type weights_init = weights;
   point_set_type points;
   point_set_type points_next;
+  point_set_type points_buffer;
   
   optimizer.weights = weights;
   
@@ -758,8 +760,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	// merge points from others... we assume that we will consume in sorted order!
 	for (int rank = 1; rank < mpi_size; ++ rank) {
 	  boost::iostreams::filtering_istream is;
-	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(utils::mpi_device_source(rank, point_tag, 4096));
+	  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
 	  
 	  double point;
 	  double b;
@@ -937,8 +938,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
 	  
 	  boost::iostreams::filtering_ostream os;
-	  os.push(boost::iostreams::zlib_compressor());
-	  os.push(utils::mpi_device_sink(0, point_tag, 4096));
+	  os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
 	  
 	  point_set_type::const_iterator piter_end = points.end();
 	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
