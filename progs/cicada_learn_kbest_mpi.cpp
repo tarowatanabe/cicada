@@ -737,7 +737,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       if (line_search_local) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
-	std::cerr << "line-search" << std::endl;
+	//std::cerr << "line-search" << std::endl;
 
 	bcast_weights(0, optimizer.weights);
 	
@@ -747,7 +747,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	opt(optimizer.weights, weights_prev, grad_local, norm_local, std::back_inserter(points));
 	std::sort(points.begin(), points.end());
 
-	std::cerr << "merge stats" << std::endl;
+	//std::cerr << "merge stats" << std::endl;
 
 	double grad = 0.0;
 	MPI::COMM_WORLD.Reduce(&grad_local, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
@@ -781,7 +781,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  points_next.clear();
 	}
 
-	std::cerr << "point size: " << points.size() << std::endl;
+	//std::cerr << "point size: " << points.size() << std::endl;
 		
 	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
@@ -790,15 +790,15 @@ double optimize_online(const hypothesis_map_type& kbests,
 	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
 	const double b0 = (dot_prod - norm_w_prev) * C * norm;
 
-	std::cerr << "a0: "  << a0 << " b0: " << b0 << std::endl;
+	//std::cerr << "a0: "  << a0 << " b0: " << b0 << std::endl;
 	
 	grad += b0;
 
-	std::cerr << "grad: " << grad << std::endl;
+	//std::cerr << "grad: " << grad << std::endl;
+
+	double k = 0.0;
 	
 	if (! points.empty() && grad < 0.0) {
-	  double k = 0.0;
-	  
 	  point_set_type::const_iterator piter_end = points.end();
 	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; /**/) {
 	    const double k_new = piter->first;
@@ -813,18 +813,19 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    
 	    grad = grad_new;
 	  }
-
-	  std::cerr << "final k: " << k << std::endl;
 	  
-	  if (k > 0.0) {
-	    // move to optimizer.weights * k + weights_prev * (1.0 - k)
-	    
-	    optimizer.weights *= k;
-	    weights_prev *= (1.0 - k);
-	    
-	    optimizer.weights += weights_prev;
-	  }
+	  //std::cerr << "final k: " << k << std::endl;
+	  k = std::max(k, 0.0);
 	}
+	
+	const double merge_ratio = k + 0.1 * (1.0 - k);
+	
+	// move to optimizer.weights * merge_ratio + weights_prev * (1.0 - merge_ratio)
+	
+	optimizer.weights *= merge_ratio;
+	weights_prev *= (1.0 - merge_ratio);
+	
+	optimizer.weights += weights_prev;
       }
       
       if (debug >= 2)
