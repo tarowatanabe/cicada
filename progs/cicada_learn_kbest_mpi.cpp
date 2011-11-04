@@ -125,6 +125,9 @@ int main(int argc, char ** argv)
 
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
+    if (int(regularize_l1) + regularize_l2 == 0)
+      regularize_l2 = true;
+
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
