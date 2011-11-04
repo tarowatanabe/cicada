@@ -746,9 +746,6 @@ double optimize_online(const hypothesis_map_type& kbests,
       MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
       objective /= norm;
       
-
-      
-      
       int samples = 0;
       int samples_local = optimizer.samples;
       MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
@@ -862,7 +859,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	objective += C * norm;
       }
       
-      const bool converged = (samples_zero || (iter && std::fabs(objective - objective_prev) < 1e-6));
+      const bool converged = (samples_zero || (iter && std::fabs(objective - objective_prev) < 1e-5));
       
       if (debug >= 2)
 	std::cerr << "objective: " << objective << std::endl;
