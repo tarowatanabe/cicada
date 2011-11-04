@@ -117,7 +117,9 @@ double eps = std::numeric_limits<double>::infinity();
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool merge_vectors_mode  = false; // merge all the vectors from others
+bool line_search_mode = false;    // perform line-search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
+
 
 int debug = 0;
 
@@ -646,6 +648,16 @@ void cicada_learn(operation_set_type& operations,
       weights *= 1.0 / updated_total;
     }
     
+    
+    // perform line-search....
+    if (line_search_mode) {
+      
+      
+    }
+    
+    // clear history for line-search...
+    learner.clear_history();
+    
     // dump...
     if (dump_weights_mode && mpi_rank == 0)
       queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
@@ -958,6 +970,7 @@ void options(int argc, char** argv)
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
     ("merge-vector",   po::bool_switch(&merge_vectors_mode), "merge vectors from others")
+    ("line-search",    po::bool_switch(&line_search_mode),   "perform line search")
     ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
