@@ -759,7 +759,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  point_set_type::const_iterator piter_end = points.end();
 	  
 	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
-	    for (/**/; piter != piter_end && *piter->first < point; ++ piter)
+	    for (/**/; piter != piter_end && piter->first < point; ++ piter)
 	      points_next.push_back(*piter);
 	    points_next.push_back(std::make_pair(point, b));
 	  }
