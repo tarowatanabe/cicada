@@ -354,6 +354,7 @@ enum {
   score_1best_tag,
   score_oracle_tag,
   notify_tag,
+  point_tag,
 };
 
 inline
@@ -476,6 +477,9 @@ void cicada_learn(operation_set_type& operations,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights)
 {
+  typedef std::pair<double, double> point_type;
+  typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
+  
   typedef std::vector<size_t, std::allocator<size_t> > segment_set_type;
   
   typedef Dumper dumper_type;
@@ -510,7 +514,12 @@ void cicada_learn(operation_set_type& operations,
   
   // first, bcast weights...
   bcast_weights(weights);
-  
+
+  // previous weights...
+  weight_set_type weights_prev;
+  point_set_type points;
+  point_set_type points_next;
+    
   // start training
   for (int iter = 0; iter != iteration; ++ iter) {
     // perform learning
@@ -521,6 +530,8 @@ void cicada_learn(operation_set_type& operations,
     int updated = 0;
     score_ptr_type score_1best;
     score_ptr_type score_oracle;
+
+    weights_prev = weights;
 
     learner.initialize(weights);
     
@@ -648,11 +659,97 @@ void cicada_learn(operation_set_type& operations,
       weights *= 1.0 / updated_total;
     }
     
-    
     // perform line-search....
     if (line_search_mode) {
       
+      points.clear();
+      const std::pair<double, double> grad_norm = learner.gradient(weights, weights_prev, std::back_inserter(points));
       
+      double grad = 0.0;
+      MPI::COMM_WORLD.Reduce(&grad_norm.first, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      double loss_norm = 0.0;
+      MPI::COMM_WORLD.Reduce(&grad_norm.second, &loss_norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      std::sort(points.begin(), points.end());
+      
+      // merge points from others...
+      if (mpi_rank == 0) {
+	for (int rank = 1; rank < mpi_size; ++ rank) {
+	  boost::iostreams::filtering_istream is;
+	  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
+	  
+	  double point;
+	  double b;
+	  
+	  points_next.clear();
+	  point_set_type::const_iterator piter = points.begin();
+	  point_set_type::const_iterator piter_end = points.end();
+	  
+	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
+	    for (/**/; piter != piter_end && piter->first < point; ++ piter)
+	      points_next.push_back(*piter);
+	    points_next.push_back(std::make_pair(point, b));
+	  }
+	  
+	  // final insertion...
+	  points_next.insert(points_next.end(), piter, piter_end);
+	  
+	  points.swap(points_next);
+	  points_next.clear();
+	}
+	
+	// compute here...
+	const double norm_w      = cicada::dot_product(weights, weights);
+	const double dot_prod    = cicada::dot_product(weights_prev, weights);
+	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
+	
+	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * loss_norm;
+	const double b0 = (dot_prod - norm_w_prev) * C * loss_norm;
+	
+	grad += b0;
+	
+	double k = 0.0;
+	
+	if (! points.empty() && grad < 0.0) {
+	  point_set_type::const_iterator piter_end = points.end();
+	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
+	    const double k_new = piter->first;
+	    const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
+	  
+	    if (grad_new >= 0) {
+	      // compute intersection...
+	      k = k + grad * (k - k_new) / (grad_new - grad);
+	      grad = grad_new;
+	      break;
+	    } else {
+	      k = k_new;
+	      grad = grad_new;
+	    }
+	  }
+	
+	  k = std::max(k, 0.0);
+	}
+	
+	const double merge_ratio = k + 0.1 * (1.0 - k);
+	
+	weights *= merge_ratio;
+	weights_prev *= (1.0 - merge_ratio);
+	
+	weights += weights_prev;
+      } else {
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
+	
+	point_set_type::const_iterator piter_end = points.end();
+	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+	  os.write((char*) &(piter->first), sizeof(double));
+	  os.write((char*) &(piter->second), sizeof(double));
+	}
+      }
+      
+      // receive new weights...
+      bcast_weights(weights);
     }
     
     // clear history for line-search...

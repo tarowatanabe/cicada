@@ -402,6 +402,12 @@ struct LearnSVM : public LearnBase
     
   }
 
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
+  }
+
   void clear_history() {}
 
   struct multiplies_min
@@ -623,6 +629,12 @@ struct LearnPegasos : public LearnBase
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
   }
 
   void clear_history() {}
@@ -866,6 +878,12 @@ struct LearnOPegasos : public LearnBase
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
   }
 
   void clear_history() {}
@@ -1137,6 +1155,12 @@ struct LearnMIRA : public LearnBase
     
   }
 
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
+  }
+
   void clear_history() {}
   
   double learn(weight_set_type& weights)
@@ -1314,6 +1338,12 @@ struct LearnSGDL1 : public LearnLR
     
   }
   
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
+  }
+
   void clear_history() {}
 
   double learn(weight_set_type& weights)
@@ -1423,6 +1453,12 @@ struct LearnSGDL2 : public LearnLR
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
   }
 
   void clear_history() {}
@@ -1644,6 +1680,12 @@ struct LearnLBFGS : public LearnLR
   void finalize(weight_set_type& weights)
   {
     
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
   }
 
   void clear_history() {}
@@ -1975,6 +2017,12 @@ struct LearnLinear
   void finalize(weight_set_type& weights)
   {
     
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
   }
 
   void clear_history() {}
