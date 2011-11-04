@@ -732,7 +732,8 @@ void cicada_learn(operation_set_type& operations,
 	  k = std::max(k, 0.0);
 	}
 	
-	const double merge_ratio = k + 0.1 * (1.0 - k);
+	//const double merge_ratio = k + 0.1 * (1.0 - k);
+	const double merge_ratio = (k == 0.0 ? 0.1 : k);
 	
 	weights *= merge_ratio;
 	weights_prev *= (1.0 - merge_ratio);
