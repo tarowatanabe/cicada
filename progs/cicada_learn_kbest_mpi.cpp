@@ -935,7 +935,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  }
 	  
 	  if (debug >= 3)
-	    std::cerr << "grad: " << grad_neg << "  k: " << k << std::endl;
+	    std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	  if (k > 0.0) {
 	    weight_set_type weights_prev_saved = weights_prev;
