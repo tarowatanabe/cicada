@@ -880,8 +880,8 @@ double optimize_online(const hypothesis_map_type& kbests,
 	if (grad_pos < 0.0) {
 	  double k = 0.0;
 	  
-	  point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), 0.0);
-	  point_set_type::const_iterator piter_end = pints.end();
+	  point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0));
+	  point_set_type::const_iterator piter_end = points.end();
 
 	  for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
 	    const double k_new = piter->first;
@@ -913,7 +913,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	} else if (grad_neg < 0.0) {
 	  double k = 0.0;
 	  
-	  point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), 0.0));
+	  point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0)));
 	  point_set_type::const_reverse_iterator piter_end = points.rend();
 	  
 	  for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
@@ -922,7 +922,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    
 	    if (grad_new >= 0) {
 	      // compute intersection...
-	      k = k + grad_neg * (k - k_new) / (grad_new - grad_pneg);
+	      k = k + grad_neg * (k - k_new) / (grad_new - grad_neg);
 	      grad_neg = grad_new;
 	      break;
 	    } else {
