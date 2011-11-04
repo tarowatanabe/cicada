@@ -45,10 +45,8 @@ regularize_l1=no
 regularize_l2=no
 scorer="bleu:order=4,exact=true"
 learn="lbfgs"
-softmax_margin=""
-loss_margin=""
+learn_options=""
 solver=1
-learn_iteration=100
 kbest=1000
 merge="no"
 interpolate=0.0
@@ -94,9 +92,7 @@ $me [options]
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
-  --learn-iteration         iteration for learning (default: $learn_iteration)
-  --softmax-margin          softmax margin
-  --loss-margin             loss margin (not rank margin)
+  --learn-options           other learning options
   --kbest                   kbest size             (default: $kbest)
   --merge                   perform kbest merging
   --interpolate             weights interpolation
@@ -185,16 +181,10 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     solver=$2
     shift; shift ;;
-  --learn-iteration )
+  --learn-options )
     test $# = 1 && eval "$exit_missing_arg"
-    learn_iteration=$2
+    learn_options=$2
     shift; shift ;;
-  --softmax-margin )
-    softmax_margin=" --softmax-margin"
-    shift ;;
-  --loss-margin )
-    loss_margin=" --loss-margin"
-    shift ;;
 
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
@@ -660,9 +650,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
                         \
                         $weights_option \
                         $learn_option \
-                        $softmax_margin \
-                        $loss_margin \
-                        --iteration $learn_iteration \
+                        $learn_options \
                         --C $C \
                         $regularize \
                         \

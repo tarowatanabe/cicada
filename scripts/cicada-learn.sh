@@ -38,10 +38,8 @@ regularize_l1=no
 regularize_l2=no
 scorer="bleu:order=4,exact=true"
 learn="lbfgs"
-softmax_margin=""
-loss_margin=""
+learn_options=""
 solver=1
-learn_iteration=100
 oracle_cube=400
 kbest=0
 forest="no"
@@ -85,9 +83,7 @@ $me [options]
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
-  --learn-iteration         iteration for learning (default: $learn_iteration)
-  --softmax-margin          softmax margin
-  --loss-margin             loss margin (not rank margin)
+  --learn-options           other learning options
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
   --scorer                  scorer                           (default: $scorer)
   --kbest                   kbest size                       (default: $kbest)
@@ -171,16 +167,10 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     solver=$2
     shift; shift ;;
-  --learn-iteration )
+  --learn-options )
     test $# = 1 && eval "$exit_missing_arg"
-    learn_iteration=$2
+    learn_options=$2
     shift; shift ;;
-  --softmax-margin )
-    softmax_margin=" --softmax-margin"
-    shift ;;
-  --loss-margin )
-    loss_margin=" --loss-margin"
-    shift ;;
 
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
@@ -641,8 +631,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
 	                $regularize \
-	                $learn_option\
-                        --iteration $learn_iteration \
+	                $learn_option \
+                        $learn_options \
                         --C $C \
                         \
                         --debug=2 || exit 1
@@ -657,10 +647,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
 	                $learn_option \
-	                $softmax_margin \
-	                $loss_margin \
+                        $learn_options \
 	                $regularize \
-                        --iteration $learn_iteration \
                         --C $C \
                         \
                         --debug=2 || exit 1
