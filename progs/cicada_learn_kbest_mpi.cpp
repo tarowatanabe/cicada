@@ -964,7 +964,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       //const double norm_x = std::max(1.0, l2norm(optimizer.weights));
       //const double norm_d = l2norm_diff(optimizer.weights, weights_prev);
       
-      const bool converged = (active_size == 0 || (iter && (std::fabs((objective - objective_prev) / objective) < 1e-7)) || increased > 10);
+      const bool converged = (active_size == 0 || (iter && (std::fabs((objective - objective_prev) / objective) < 1e-6)) || increased > 4);
       
       if (debug >= 2)
 	std::cerr << "objective: " << objective << " active size: " << active_size << std::endl;
