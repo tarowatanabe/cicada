@@ -472,6 +472,105 @@ struct Dumper
   queue_type& queue;
 };
 
+template <typename Points>
+void reduce_points(const int rank, Points& points)
+{
+  Points points_next;
+  
+  typename Points::const_iterator piter     = points.begin();
+  typename Points::const_iterator piter_end = points.end();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
+  
+  std::pair<double, double> point;
+  
+  while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
+    for (/**/; piter != piter_end && *piter < point; ++ piter)
+      points_next.push_back(*piter);
+    points_next.push_back(point);
+  }
+  
+  points_next.insert(points_next.end(), piter, piter_end);
+  
+  points.swap(points_next);
+}
+
+template <typename Iterator, typename Points>
+void reduce_points(Iterator first, Iterator last, Points& points)
+{
+  Points points_next;
+  
+  for (/**/; first != last; ++ first) {
+    typename Points::const_iterator piter     = points.begin();
+    typename Points::const_iterator piter_end = points.end();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_source(*first, point_tag, 1024 * 1024));
+    
+    std::pair<double, double> point;
+    
+    while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
+      for (/**/; piter != piter_end && *piter < point; ++ piter)
+	points_next.push_back(*piter);
+      points_next.push_back(point);
+    }
+    
+    points_next.insert(points_next.end(), piter, piter_end);
+    
+    points.swap(points_next);
+    points_next.clear();
+  }
+}
+
+template <typename Points>
+void send_points(const int rank, const Points& points)
+{
+  boost::iostreams::filtering_ostream os;
+  os.push(utils::mpi_device_sink(rank, point_tag, 1024 * 1024));
+  
+  typename Points::const_iterator piter_end = points.end();
+  for (typename Points::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+    os.write((char*) &(piter->first), sizeof(double));
+    os.write((char*) &(piter->second), sizeof(double));
+  }
+}
+
+
+template <typename Points>
+void reduce_points(Points& points)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+  
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_points(ranks.front(), points);
+      else
+	reduce_points(ranks.begin(), ranks.end(), points);
+      
+    } else
+      send_points(mpi_rank % reduce_size, points);
+    
+    merge_size = reduce_size;
+  }
+}
+
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const sample_set_type& samples,
@@ -664,91 +763,91 @@ void cicada_learn(operation_set_type& operations,
     if (line_search_mode) {
       
       points.clear();
-      const std::pair<double, double> grad_norm = learner.gradient(weights, weights_prev, std::back_inserter(points));
-      
-      double grad = 0.0;
-      MPI::COMM_WORLD.Reduce(&grad_norm.first, &grad, 1, MPI::DOUBLE, MPI::SUM, 0);
-      
+      const boost::fusion::tuple<double, double, double> grad_norm = learner.gradient(weights, weights_prev, std::back_inserter(points));
+
+      double grad_pos = 0.0;
+      double grad_neg = 0.0;
       double loss_norm = 0.0;
-      MPI::COMM_WORLD.Reduce(&grad_norm.second, &loss_norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<0>(grad_norm), &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<1>(grad_norm), &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<2>(grad_norm), &loss_norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      // merge points from others...
       
       std::sort(points.begin(), points.end());
       
-      // merge points from others...
+      reduce_points(points);
+    
       if (mpi_rank == 0) {
-	for (int rank = 1; rank < mpi_size; ++ rank) {
-	  boost::iostreams::filtering_istream is;
-	  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
-	  
-	  double point;
-	  double b;
-	  
-	  points_next.clear();
-	  point_set_type::const_iterator piter = points.begin();
-	  point_set_type::const_iterator piter_end = points.end();
-	  
-	  while (is.read((char*) &point, sizeof(double)) && is.read((char*) &b, sizeof(double))) {
-	    for (/**/; piter != piter_end && piter->first < point; ++ piter)
-	      points_next.push_back(*piter);
-	    points_next.push_back(std::make_pair(point, b));
-	  }
-	  
-	  // final insertion...
-	  points_next.insert(points_next.end(), piter, piter_end);
-	  
-	  points.swap(points_next);
-	  points_next.clear();
-	}
-	
 	// compute here...
 	const double norm_w      = cicada::dot_product(weights, weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0 = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * loss_norm;
-	const double b0 = (dot_prod - norm_w_prev) * C * loss_norm;
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * loss_norm;
+	const double b0_pos = (dot_prod - norm_w_prev) * C * loss_norm;
 	
-	grad += b0;
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * loss_norm;
+	const double b0_neg = (- dot_prod - norm_w_prev) * C * loss_norm;
 	
-	double k = 0.0;
+	grad_pos += b0_pos;
+	grad_neg += b0_neg;
 	
-	if (! points.empty() && grad < 0.0) {
-	  point_set_type::const_iterator piter_end = points.end();
-	  for (point_set_type::const_iterator piter = points.begin(); piter != piter_end && grad < 0.0; ++ piter) {
-	    const double k_new = piter->first;
-	    const double grad_new = grad + std::fabs(piter->second) + a0 * (k_new - k);
+	if (grad_pos < 0.0) {
+	  double k = 0.0;
 	  
+	  point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0));
+	  point_set_type::const_iterator piter_end = points.end();
+
+	  for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
+	    const double k_new = piter->first;
+	    const double grad_new = grad_pos + std::fabs(piter->second) + a0_pos * (k_new - k);
+	    
 	    if (grad_new >= 0) {
 	      // compute intersection...
-	      k = k + grad * (k - k_new) / (grad_new - grad);
-	      grad = grad_new;
+	      k = k + grad_pos * (k - k_new) / (grad_new - grad_pos);
+	      grad_pos = grad_new;
 	      break;
 	    } else {
 	      k = k_new;
-	      grad = grad_new;
+	      grad_pos = grad_new;
 	    }
 	  }
-	
-	  k = std::max(k, 0.0);
-	}
-	
-	if (k > 0.0) {
-	  //const double merge_ratio = k + 0.1 * (1.0 - k);
-	  const double merge_ratio = k;
+
+	  if (k > 0.0) {
+	    weights *= k;
+	    weights_prev *= (1.0 - k);
+	    
+	    weights += weights_prev;
+	  }
 	  
-	  weights *= merge_ratio;
-	  weights_prev *= (1.0 - merge_ratio);
+	} else if (grad_neg < 0.0) {
+	  double k = 0.0;
 	  
-	  weights += weights_prev;
-	}
-      } else {
-	boost::iostreams::filtering_ostream os;
-	os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
-	
-	point_set_type::const_iterator piter_end = points.end();
-	for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
-	  os.write((char*) &(piter->first), sizeof(double));
-	  os.write((char*) &(piter->second), sizeof(double));
+	  point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0)));
+	  point_set_type::const_reverse_iterator piter_end = points.rend();
+	  
+	  for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
+	    const double k_new = - piter->first;
+	    const double grad_new = grad_neg + std::fabs(piter->second) + a0_neg * (k_new - k);
+	    
+	    if (grad_new >= 0) {
+	      // compute intersection...
+	      k = k + grad_neg * (k - k_new) / (grad_new - grad_neg);
+	      grad_neg = grad_new;
+	      break;
+	    } else {
+	      k = k_new;
+	      grad_neg = grad_new;
+	    }
+	  }
+	  
+	  if (k > 0.0) {
+	    weights *= - k;
+	    weights_prev *= (1.0 + k);
+	    
+	    weights += weights_prev;
+	  }
 	}
       }
       

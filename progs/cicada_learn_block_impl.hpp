@@ -403,9 +403,9 @@ struct LearnSVM : public LearnBase
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
   void clear_history()
@@ -638,28 +638,40 @@ struct LearnPegasos : public LearnBase
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    double grad = 0.0;
-    for (size_t i = 0; i != features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+    static const double inf = std::numeric_limits<double>::infinity();
+    
+    double grad_pos = 0.0;
+    double grad_neg = 0.0;
+    for (size_t i = 0; i != history_features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
+      const double loss = history_losses[i];
       
-      const double bi = margin_prev - margin;
-      const double ci = losses[i]   - margin_prev;
+      const double bi_pos = margin_prev - margin;
+      const double ci_pos = loss - margin_prev;
+      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
       
-      const double ki = - ci / bi;
+      const double bi_neg = margin_prev + margin;
+      const double ci_neg = loss - margin_prev;
+      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
       
-      if (ki > 0) {
-	*iter = std::make_pair(ki, bi);
+      if (ki_pos > 0) {
+	*iter = std::make_pair(ki_pos, bi_pos);
 	++ iter;
       }
       
-      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
-	grad += bi;
+      if (ki_neg > 0) {
+	*iter = std::make_pair(- ki_neg, bi_neg);
+	++ iter;
+      }
+      
+      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
     }
     
-    return std::make_pair(grad, history_losses.size());
+    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
   }
 
   void clear_history()
@@ -916,28 +928,40 @@ struct LearnOPegasos : public LearnBase
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    double grad = 0.0;
-    for (size_t i = 0; i != features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+    static const double inf = std::numeric_limits<double>::infinity();
+    
+    double grad_pos = 0.0;
+    double grad_neg = 0.0;
+    for (size_t i = 0; i != history_features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
+      const double loss = history_losses[i];
       
-      const double bi = margin_prev - margin;
-      const double ci = losses[i]   - margin_prev;
+      const double bi_pos = margin_prev - margin;
+      const double ci_pos = loss - margin_prev;
+      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
       
-      const double ki = - ci / bi;
+      const double bi_neg = margin_prev + margin;
+      const double ci_neg = loss - margin_prev;
+      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
       
-      if (ki > 0) {
-	*iter = std::make_pair(ki, bi);
+      if (ki_pos > 0) {
+	*iter = std::make_pair(ki_pos, bi_pos);
 	++ iter;
       }
       
-      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
-	grad += bi;
+      if (ki_neg > 0) {
+	*iter = std::make_pair(- ki_neg, bi_neg);
+	++ iter;
+      }
+      
+      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
     }
     
-    return std::make_pair(grad, history_losses.size());
+    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
   }
 
   void clear_history()
@@ -1221,28 +1245,40 @@ struct LearnMIRA : public LearnBase
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    double grad = 0.0;
-    for (size_t i = 0; i != features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      features[i].begin(), features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, features[i].begin(), features[i].end(), 0.0);
+    static const double inf = std::numeric_limits<double>::infinity();
+    
+    double grad_pos = 0.0;
+    double grad_neg = 0.0;
+    for (size_t i = 0; i != history_features.size(); ++ i) {
+      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
+      const double loss = history_losses[i];
       
-      const double bi = margin_prev - margin;
-      const double ci = losses[i]   - margin_prev;
+      const double bi_pos = margin_prev - margin;
+      const double ci_pos = loss - margin_prev;
+      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
       
-      const double ki = - ci / bi;
+      const double bi_neg = margin_prev + margin;
+      const double ci_neg = loss - margin_prev;
+      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
       
-      if (ki > 0) {
-	*iter = std::make_pair(ki, bi);
+      if (ki_pos > 0) {
+	*iter = std::make_pair(ki_pos, bi_pos);
 	++ iter;
       }
       
-      if ((bi < 0.0 && ki > 0.0) || (bi > 0.0 && ki <= 0.0))
-	grad += bi;
+      if (ki_neg > 0) {
+	*iter = std::make_pair(- ki_neg, bi_neg);
+	++ iter;
+      }
+      
+      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
     }
     
-    return std::make_pair(grad, history_losses.size());
+    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
   }
 
   void clear_history()
@@ -1430,9 +1466,9 @@ struct LearnSGDL1 : public LearnLR
   }
   
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
   void clear_history() {}
@@ -1547,9 +1583,9 @@ struct LearnSGDL2 : public LearnLR
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
   void clear_history() {}
@@ -1774,9 +1810,9 @@ struct LearnLBFGS : public LearnLR
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
   void clear_history() {}
@@ -2111,9 +2147,9 @@ struct LearnLinear
   }
 
   template <typename Iterator>
-  std::pair<double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
-    return std::make_pair(0.0, 0.0);
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
   void clear_history() {}
