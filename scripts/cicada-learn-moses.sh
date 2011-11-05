@@ -269,7 +269,7 @@ case $learn in
   lbfgs | sgd | pegasos | mira | cw | arow )
     learner="cicada_learn_kbest_mpi"
     learn_option=" --learn-$learn"
-  break ;;
+    break ;;
   linear )
     learner="cicada_learn_kbest"
     learn_option=" --learn-linear --solver $solver"

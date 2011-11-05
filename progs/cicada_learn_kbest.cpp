@@ -174,7 +174,7 @@ int main(int argc, char ** argv)
     
     if (learn_linear)
       objective = optimize_svm<OptimizeLinear>(kbests, oracles, weights);
-    if (learn_svm)
+    else if (learn_svm)
       objective = optimize_svm<OptimizeSVM>(kbests, oracles, weights);
     else
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
