@@ -737,6 +737,105 @@ double l2norm_diff(const weight_set_type& weights1, const weight_set_type& weigh
   return norm;
 }
 
+template <typename Points>
+void reduce_points(const int rank, Points& points)
+{
+  Points points_next;
+  
+  typename Points::const_iterator piter     = points.begin();
+  typename Points::const_iterator piter_end = points.end();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
+  
+  std::pair<double, double> point;
+  
+  while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
+    for (/**/; piter != piter_end && *piter < point; ++ piter)
+      points_next.push_back(*piter);
+    points_next.push_back(point);
+  }
+  
+  points_next.insert(points_next.end(), piter, piter_end);
+  
+  points.swap(points_next);
+}
+
+template <typename Iterator, typename Points>
+void reduce_points(Iterator first, Iterator last, Points& points)
+{
+  Points points_next;
+  
+  for (/**/; first != last; ++ first) {
+    typename Points::const_iterator piter     = points.begin();
+    typename Points::const_iterator piter_end = points.end();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_source(*first, point_tag, 1024 * 1024));
+    
+    std::pair<double, double> point;
+    
+    while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
+      for (/**/; piter != piter_end && *piter < point; ++ piter)
+	points_next.push_back(*piter);
+      points_next.push_back(point);
+    }
+    
+    points_next.insert(points_next.end(), piter, piter_end);
+    
+    points.swap(points_next);
+    points_next.clear();
+  }
+}
+
+template <typename Points>
+void send_points(const int rank, const Points& points)
+{
+  boost::iostreams::filtering_ostream os;
+  os.push(utils::mpi_device_sink(rank, point_tag, 1024 * 1024));
+  
+  typename Points::const_iterator piter_end = points.end();
+  for (typename Points::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
+    os.write((char*) &(piter->first), sizeof(double));
+    os.write((char*) &(piter->second), sizeof(double));
+  }
+}
+
+
+template <typename Points>
+void reduce_points(Points& points)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+  
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_points(ranks.front(), points);
+      else
+	reduce_points(ranks.begin(), ranks.end(), points);
+      
+    } else
+      send_points(mpi_rank % reduce_size, points);
+    
+    merge_size = reduce_size;
+  }
+}
+
 template <typename Optimize, typename Generator>
 double optimize_online(const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
@@ -768,7 +867,6 @@ double optimize_online(const hypothesis_map_type& kbests,
   
   weight_set_type weights_init = weights;
   point_set_type points;
-  point_set_type points_next;
   
   optimizer.weights = weights;
   
@@ -826,29 +924,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	
 	std::sort(points.begin(), points.end());
 	
-	// merge points from others... we assume that we will consume in sorted order!
-	for (int rank = 1; rank < mpi_size; ++ rank) {
-	  boost::iostreams::filtering_istream is;
-	  is.push(utils::mpi_device_source(rank, point_tag, 1024 * 1024));
-	  
-	  std::pair<double, double> point;
-	  
-	  points_next.clear();
-	  point_set_type::const_iterator piter = points.begin();
-	  point_set_type::const_iterator piter_end = points.end();
-	  
-	  while (is.read((char*) &point.first, sizeof(double)) && is.read((char*) &point.second, sizeof(double))) {
-	    for (/**/; piter != piter_end && *piter < point; ++ piter)
-	      points_next.push_back(*piter);
-	    points_next.push_back(point);
-	  }
-	  
-	  // final insertion...
-	  points_next.insert(points_next.end(), piter, piter_end);
-	  
-	  points.swap(points_next);
-	  points_next.clear();
-	}
+	reduce_points(points);
 
 	if (debug >= 3)
 	  std::cerr << "point size: " << points.size() << std::endl;
@@ -1053,16 +1129,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  
 	  std::sort(points.begin(), points.end());
 	  
-	  {
-	    boost::iostreams::filtering_ostream os;
-	    os.push(utils::mpi_device_sink(0, point_tag, 1024 * 1024));
-	    
-	    point_set_type::const_iterator piter_end = points.end();
-	    for (point_set_type::const_iterator piter = points.begin(); piter != piter_end; ++ piter) {
-	      os.write((char*) &(piter->first), sizeof(double));
-	      os.write((char*) &(piter->second), sizeof(double));
-	    }
-	  }
+	  reduce_points(points);
 	  
 	  double grad_pos = 0.0;
 	  double grad_neg = 0.0;

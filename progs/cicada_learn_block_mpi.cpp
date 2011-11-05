@@ -618,7 +618,6 @@ void cicada_learn(operation_set_type& operations,
   // previous weights...
   weight_set_type weights_prev;
   point_set_type points;
-  point_set_type points_next;
     
   // start training
   for (int iter = 0; iter != iteration; ++ iter) {
