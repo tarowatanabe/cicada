@@ -516,7 +516,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     cp $config $moses_ini
   else
 
-    if "$features_bias" != ""; then
+    if test "$features_bias" != ""; then
       qsubwrapper config `cicadapath cicada_filter_config_moses` \
 	--bias-features $features_bias \
 	--weights $weights_process \
@@ -556,7 +556,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 	-threads $nc || exit 1
     
     # kbest filtering..
-    if "$features_bias" != ""; then
+    if test "$features_bias" != ""; then
       qsubwrapper kbest \
 	`cicadapath cicada_filter_kbest_moses` \
 	--input $kbest_file \
@@ -584,7 +584,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
       moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
       
       filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np "
-      if "$features_bias" != ""; then
+      if test "$features_bias" != ""; then
         $filter_cmd="$filter_cmd --erase-features $features_bias"
       fi
     
