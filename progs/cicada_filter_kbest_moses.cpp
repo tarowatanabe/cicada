@@ -34,6 +34,8 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/sgi_hash_set.hpp"
+#include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -67,11 +69,32 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   boost::spirit::qi::rule<Iterator, kbest_type(), blank_type>  kbest;
 };
 
+typedef std::vector<std::string, std::allocator<std::string> > feature_set_type;
+
+struct hash_feature : public utils::hashmurmur<size_t>
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  size_t operator()(const std::string& x) const
+  {
+    return hasher_type()(x.begin(), x.end(), 0);
+  }
+};
+
+#ifdef HAVE_TR1_UNORDERED_SET
+typedef std::tr1::unordered_set<std::string, hash_feature, std::equal_to<std::string>, std::allocator<std::string> > feature_unique_type;
+#else
+typedef sgi::hash_set<std::string, hash_feature, std::equal_to<std::string>, std::allocator<std::string> > feature_unique_type;
+#endif
+
+
 path_type input_file = "-";
 path_type output_file = "-";
 
 bool directory_mode = false;
 bool keep_mode = false;
+
+feature_set_type features_erase;
 
 int offset = 0;
 int stride = 1;
@@ -84,6 +107,8 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    feature_unique_type features_remove(features_erase.begin(), features_erase.end());
     
     if (directory_mode) {
       typedef boost::spirit::istream_iterator iter_type;
@@ -155,7 +180,10 @@ int main(int argc, char** argv)
 	      feature_name = *fiter;
 	      id = 0;
 	    } else {
-	      features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
+	      const std::string feat = feature_name + utils::lexical_cast<std::string>(id);
+	      
+	      if (features_remove.find(feat) != features_remove.end())
+		features_new.push_back(feat + "=" + *fiter);
 	      ++ id;
 	    }
 	  }
@@ -228,7 +256,10 @@ int main(int argc, char** argv)
 	      feature_name = *fiter;
 	      id = 0;
 	    } else {
-	      features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
+	      const std::string feat = feature_name + utils::lexical_cast<std::string>(id);
+	      
+	      if (features_remove.find(feat) != features_remove.end())
+		features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
 	      ++ id;
 	    }
 	  }
@@ -265,6 +296,8 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output")
+
+    ("erase-features", po::value<feature_set_type>(&features_erase)->multitoken(), "remove featues")
     
     ("directory", po::bool_switch(&directory_mode),            "output in directory")
     ("keep",      po::bool_switch(&keep_mode),                 "keep contents in the directory (when exists)")

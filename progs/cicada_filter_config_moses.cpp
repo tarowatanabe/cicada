@@ -78,13 +78,15 @@ struct feature_weight_parser : boost::spirit::qi::grammar<Iterator, feature_weig
   boost::spirit::qi::rule<Iterator, feature_weight_type()>  feature_weight;
 };
 
-
+typedef std::vector<std::string, std::allocator<std::string> > feature_set_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
 
 path_type weights_file;
 
+
+feature_set_type features_biased;
 
 void options(int argc, char** argv);
 
@@ -110,6 +112,8 @@ int main(int argc, char** argv)
     feature_map["slm"] = "weight-slm";
 
     feature_weight_set_type feature_weights;
+    feature_weight_type feature_weight;
+      
     {
       typedef boost::spirit::istream_iterator iter_type;
       
@@ -120,14 +124,12 @@ int main(int argc, char** argv)
       iter_type iter(is);
       iter_type iter_end;
       
-      feature_weight_type feature_weight;
-      
       while (iter != iter_end) {
 	boost::fusion::get<0>(feature_weight).clear();
 	
 	if (! boost::spirit::qi::parse(iter, iter_end, parser, feature_weight))
 	  if (iter != iter_end)
-	    throw std::runtime_error("kbest parsing failed");
+	    throw std::runtime_error("weight parsing failed");
 	
 	const std::string& feature = boost::fusion::get<0>(feature_weight);
 	const int&         pos     = boost::fusion::get<1>(feature_weight);
@@ -146,6 +148,40 @@ int main(int argc, char** argv)
 	weights[pos] = value;
       }
     }
+    
+    if (! features_biased.empty()) {
+      feature_weight_parser<std::string::const_iterator> parser;
+
+      for (feature_set_type::const_iterator fiter = features_biased.begin(); fiter != features_biased.end(); ++ fiter) {
+	const std::string line = *fiter + " -1";
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+
+	boost::fusion::get<0>(feature_weight).clear();
+
+	if (! boost::spirit::qi::parse(iter, end, parser, feature_weight))
+	  if (iter != end)
+	    throw std::runtime_error("weight parsing failed");
+	
+	const std::string& feature = boost::fusion::get<0>(feature_weight);
+	const int&         pos     = boost::fusion::get<1>(feature_weight);
+	const double&      value   = boost::fusion::get<2>(feature_weight);
+	
+	if (feature.empty()) continue;
+	
+	std::string feat = feature;
+	feature_map_type::const_iterator miter = feature_map.find(feature);
+	if (miter != feature_map.end())
+	  feat = miter->second;
+	
+	weight_set_type& weights = feature_weights[feat];
+	if (pos >= weights.size())
+	  weights.resize(pos + 1);
+	weights[pos] = value;
+      }
+    }
+    
     
     utils::compress_istream is(input_file);
     utils::compress_ostream os(output_file);
@@ -235,6 +271,8 @@ void options(int argc, char** argv)
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("weights",   po::value<path_type>(&weights_file),                            "weights file")
+
+    ("biased-features", po::value<feature_set_type>(&features_biased)->multitoken(), "biased features")
     
     ("help", "help message");
   
