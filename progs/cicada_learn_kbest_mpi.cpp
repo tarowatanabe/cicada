@@ -1660,7 +1660,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
 
     // check termination condition...
     
-    int terminate = ((objectiv_master - objective_dual) < 1e-5);
+    int terminate = ((objective_master - objective_reduced) < 1e-5);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
