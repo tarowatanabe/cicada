@@ -1666,7 +1666,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     // check termination condition...
     
-    int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 1e-3);
+    int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 1e-5);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
