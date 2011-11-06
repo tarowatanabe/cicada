@@ -876,8 +876,13 @@ double optimize_online(const hypothesis_map_type& kbests,
   point_set_type points;
   
   optimizer.weights = weights;
+
+  bcast_weights(0, optimizer.weights);
   
   if (mpi_rank == 0) {
+    weight_set_type weights_min;
+    double objective_min = std::numeric_limits<double>::infinity();
+    
     double objective_prev = 0.0;
     double objective = 0.0;
     
@@ -888,14 +893,12 @@ double optimize_online(const hypothesis_map_type& kbests,
       for (int rank = 1; rank < mpi_size; ++ rank)
 	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
       
-      bcast_weights(0, optimizer.weights);
-      
       weight_set_type weights_prev = optimizer.weights;
       
       optimizer.initialize();
-
+      
       opt(generator);
-            
+      
       optimizer.finalize();
       
       optimizer.weights *= (optimizer.samples + 1);
@@ -1032,7 +1035,16 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  }
 	}
       }
-
+      
+      // compute objective
+      bcast_weights(0, optimizer.weights);
+      
+      const double objective_local = opt.objective(optimizer.weights);
+      
+      objective = 0.0;
+      MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      objective /= norm;
+      
       if (regularize_l2)
 	objective += 0.5 * C * cicada::dot_product(optimizer.weights, optimizer.weights);
       else {
@@ -1052,6 +1064,11 @@ double optimize_online(const hypothesis_map_type& kbests,
       if (debug >= 2)
 	std::cerr << "objective: " << objective << " active size: " << active_size << std::endl;
       
+      if (objective < objective_min) {
+	objective_min = objective;
+	weights_min = optimizer.weights;
+      }
+      
       if (converged) break;
       
       objective_prev = objective;
@@ -1061,30 +1078,9 @@ double optimize_online(const hypothesis_map_type& kbests,
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
 
-    weights.swap(optimizer.weights);
+    weights.swap(weights_min);
     
-    bcast_weights(0, weights);
-    
-    if (line_search_global) {
-      // to be implemented
-    }
-    
-    const double objective_local = opt.objective(weights);
-    
-    objective = 0.0;
-    MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
-    objective /= norm;
-    
-    if (regularize_l2)
-      objective += 0.5 * C * cicada::dot_product(weights, weights);
-    else {
-      double norm = 0.0;
-      for (size_t i = 0; i < weights.size(); ++ i)
-	norm += std::fabs(weights[i]);
-      objective += C * norm;
-    }
-    
-    return objective;
+    return objective_min;
     
   } else {
     enum {
@@ -1105,8 +1101,6 @@ double optimize_online(const hypothesis_map_type& kbests,
 	break;
       else {
 	requests[NOTIFY].Start();
-	
-	bcast_weights(0, optimizer.weights);
 
 	const weight_set_type weights_prev = optimizer.weights;
 	
@@ -1144,21 +1138,18 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
 	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
 	}
+	
+	// compute objective
+	bcast_weights(0, optimizer.weights);
+	
+	const double objective_local = opt.objective(optimizer.weights);
+	objective = 0.0;
+	MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
       }
     }
     
     if (requests[NOTIFY].Test())
       requests[NOTIFY].Cancel();
-    
-    bcast_weights(0, weights);
-
-    if (line_search_global) {
-      // to be filled in
-    }
-    
-    const double objective_local = opt.objective(weights);
-    double objective = 0.0;
-    MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
 
     return 0.0;
   }
