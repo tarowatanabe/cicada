@@ -1605,6 +1605,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	    }
 	  }
 	  
+	  if (debug >= 3)
+	    std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
+
 	  if (k > 0.0) {
 	    weights *= k;
 	    weights_prev *= (1.0 - k);
@@ -1630,6 +1633,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	      grad_neg = grad_new;
 	    }
 	  }
+	  
+	  if (debug >= 3)
+	    std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	  if (k > 0.0) {
 	    weights *= - k;
