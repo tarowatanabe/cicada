@@ -14,6 +14,8 @@
 #include "cicada_kbest_impl.hpp"
 #include "cicada_text_impl.hpp"
 
+#include "cicada/optimize_qp.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -59,6 +61,7 @@ bool learn_mira = false;
 bool learn_arow = false;
 bool learn_cw = false;
 bool learn_pegasos = false;
+bool learn_cp = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -88,6 +91,10 @@ void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
 
 template <typename Optimize>
+double optimize_cp(const hypothesis_map_type& kbests,
+		   const hypothesis_map_type& oracles,
+		   weight_set_type& weights);
+template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
@@ -101,6 +108,7 @@ template <typename Optimizer>
 struct OptimizeOnline;
 template <typename Optimizer>
 struct OptimizeOnlineMargin;
+struct OptimizeCP;
 struct OptimizeLBFGS;
 
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -118,9 +126,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -205,6 +213,8 @@ int main(int argc, char ** argv)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(kbests, oracles, weights, generator);
     else if (learn_pegasos)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(kbests, oracles, weights, generator);
+    else if (learn_cp)
+      objective = optimize_cp<OptimizeCP>(kbests, oracles, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
 
@@ -560,6 +570,7 @@ struct OptimizeOnlineMargin
 	  }
       }
     
+    features.shrink();
     loss_set_type(losses).swap(losses);
     
     ids.reserve(losses.size());
@@ -635,12 +646,8 @@ struct OptimizeOnlineMargin
 	++ iter;
       }
       
-      
-      if ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0))
-	grad_pos += bi_pos;
-      
-      if ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0))
-	grad_neg += bi_neg;
+      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
     }
     
     return std::make_pair(grad_pos, grad_neg);
@@ -1156,6 +1163,482 @@ double optimize_online(const hypothesis_map_type& kbests,
     return 0.0;
   }
 
+}
+
+struct OptimizeCP
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef hypothesis_type::feature_value_type feature_value_type;
+
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef features_type::const_iterator const_iterator;
+
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+
+    void swap(SampleSet& x)
+    {
+      features.swap(x.features);
+      offsets.swap(x.offsets);
+    }
+
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+  
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+
+  OptimizeCP(const hypothesis_map_type& kbests,
+	     const hypothesis_map_type& oracles) 
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    
+    features_type feats;
+    sentence_unique_type  sentences;
+    
+    for (size_type id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	sentences.clear();
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  sentences.insert(oracles[id][o].sentence);
+	
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	    const hypothesis_type& oracle = oracles[id][o];
+	    const hypothesis_type& kbest  = kbests[id][k];
+	    
+	    // ignore oracle translations
+	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    
+	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    
+	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    
+	    feats.clear();
+	
+	    while (oiter != oiter_end && kiter != kiter_end) {
+	      if (oiter->first < kiter->first) {
+		feats.push_back(*oiter);
+		++ oiter;
+	      } else if (kiter->first < oiter->first) {
+		feats.push_back(feature_value_type(kiter->first, - kiter->second));
+		++ kiter;
+	      } else {
+		const double value = oiter->second - kiter->second;
+		if (value != 0.0)
+		  feats.push_back(feature_value_type(kiter->first, value));
+		++ oiter;
+		++ kiter;
+	      }
+	    }
+	
+	    for (/**/; oiter != oiter_end; ++ oiter)
+	      feats.push_back(*oiter);
+	
+	    for (/**/; kiter != kiter_end; ++ kiter)
+	      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    
+	    if (feats.empty()) continue;
+
+	    if (loss_margin) {
+	      const double loss = kbest.loss - oracle.loss;
+	      
+	      // checking...
+	      if (loss > 0.0) {
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(loss);
+	      }
+	    } else {
+	      features.insert(feats.begin(), feats.end());
+	      losses.push_back(1.0);
+	    }
+	  }
+      }
+    
+    features.shrink();
+    loss_set_type(losses).swap(losses);
+  }
+  
+
+  double operator()(const weight_set_type& weights, weight_set_type& acc) const
+  {
+    const double factor = 1.0 / samples;
+    
+    double objective = 0.0;
+    for (size_t id = 0; id != losses.size(); ++ id) {
+      const double margin = cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0);
+      const double loss = losses[id];
+      
+      const double suffered = loss - margin;
+      
+      if (suffered > 0.0) { 
+	sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+	  acc[fiter->first] += factor * fiter->second;
+	
+	objective += factor * suffered;
+      }
+    }
+    
+    return objective;
+  }
+
+  double objective(const weight_set_type& weights) const
+  {
+    const double factor = 1.0 / samples;
+
+    double obj = 0.0;
+    for (size_t id = 0; id != losses.size(); ++ id) {
+      const double margin = cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0);
+      const double loss = losses[id];
+      
+      obj += (loss - margin) * (loss - margin > 0.0);
+    }
+    
+    return obj * factor;
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    static const double inf = std::numeric_limits<double>::infinity();
+
+    double grad_pos = 0.0;
+    double grad_neg = 0.0;
+    for (size_t id = 0; id != losses.size(); ++ id) {
+      const double margin      = cicada::dot_product(weights,      features[id].begin(), features[id].end(), 0.0);
+      const double margin_prev = cicada::dot_product(weights_prev, features[id].begin(), features[id].end(), 0.0);
+      
+      const double bi_pos = margin_prev - margin;
+      const double ci_pos = losses[id]  - margin_prev;
+      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
+      
+      const double bi_neg = margin_prev + margin;
+      const double ci_neg = losses[id]  - margin_prev;
+      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
+      
+      if (ki_pos > 0) {
+	*iter = std::make_pair(ki_pos, bi_pos);
+	++ iter;
+      }
+      
+      if (ki_neg > 0) {
+	*iter = std::make_pair(- ki_neg, bi_neg);
+	++ iter;
+      }
+      
+      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
+    }
+    
+    return std::make_pair(grad_pos, grad_neg);
+  }
+ 
+  double instances() const
+  {
+    return losses.size();
+  }
+  
+  template <typename Features>
+  struct HMatrix
+  {
+    HMatrix(const Features& __features) : features(__features) {}
+
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[i], features[j]);
+    }
+    
+    const Features& features;
+  };
+  
+  template <typename Features>
+  struct MMatrix
+  {
+    MMatrix(const Features& __features) : features(__features) {}
+    
+    template <typename W, typename Alphas>
+    void operator()(W& w, const Alphas& alpha) const
+    {
+      typename Alphas::const_iterator aiter = alpha.begin();
+      
+      for (size_type id = 0; id != features.size(); ++ id, ++ aiter)
+	if (*aiter > 0.0)
+	  operator()(w, *aiter, id);
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      return cicada::dot_product(w, features[i]);
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      for (size_t j = 0; j != features[i].size(); ++ j)
+	w[j] += update * features[i][j];
+    }
+
+    const Features& features;
+  };
+  
+  sample_set_type features;
+  loss_set_type   losses;
+  double samples;
+};
+
+template <typename Optimize>
+double optimize_cp(const hypothesis_map_type& kbests,
+		   const hypothesis_map_type& oracles,
+		   weight_set_type& weights)
+{
+  typedef std::deque<weight_set_type, std::allocator<weight_set_type> > weight_queue_type;
+  typedef std::vector<double, std::allocator<double> > f_set_type;
+  typedef std::vector<double, std::allocator<double> > alpha_set_type;
+
+  typedef std::pair<double, double> point_type;
+  typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  Optimize opt(kbests, oracles);
+  
+  // setup norm...
+  const double instances_local = opt.instances();
+  opt.samples = 0.0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &opt.samples, 1, MPI::DOUBLE, MPI::SUM);
+
+  // synchronize weights...
+  bcast_weights(0, weights);
+  
+  weight_queue_type a;
+  f_set_type        f;
+  alpha_set_type    alpha;
+
+  weight_set_type weights_prev;
+  point_set_type points;
+
+  double objective_master = 0.0;
+  double objective_reduced = 0.0;
+  
+  for (int iter = 0; iter != iteration; ++ iter) {
+    // keep previous best...
+    weights_prev = weights;
+    
+    if (mpi_rank == 0)
+      a.push_back(weight_set_type());
+    else
+      a.resize(1);
+    a.back().clear();
+    
+    const double risk_local = opt(weights, a.back());
+    
+    reduce_weights(a.back());
+    
+    double risk = 0.0;
+    MPI::COMM_WORLD.Reduce(&risk_local, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    if (mpi_rank == 0) {
+    
+      // b = risk + a \cdot w
+      f.push_back(- risk - cicada::dot_product(a.back(), weights));
+      alpha.push_back(0.0);
+      
+      // peform maximization...
+      
+      cicada::optimize::QPSMO solver;
+      
+      typename Optimize::template HMatrix<weight_queue_type> H(a);
+      typename Optimize::template MMatrix<weight_queue_type> M(a);
+      
+      objective_reduced = solver(alpha, f, H, M, 1.0 / C, 1e-4);
+      objective_reduced *= C;
+      
+      weights.clear();
+      alpha_set_type::const_iterator aiter = alpha.begin();
+      for (size_t id = 0; id != a.size(); ++ id, ++ aiter)
+	if (*aiter > 0.0) {
+	  for (size_t j = 0; j != a[id].size(); ++ j)
+	    weights[j] += (*aiter) * a[id][j];
+	}
+    }
+    
+    if (line_search_local) {
+      bcast_weights(0, weights);
+      
+      points.clear();
+      const std::pair<double, double> grads = opt(weights, weights_prev, std::back_inserter(points));
+      
+      std::sort(points.begin(), points.end());
+      
+      reduce_points(points);
+
+      if (mpi_rank == 0) {
+	double grad_pos = 0.0;
+	double grad_neg = 0.0;
+	
+	MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	const double norm_w      = cicada::dot_product(weights, weights);
+	const double dot_prod    = cicada::dot_product(weights_prev, weights);
+	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
+	
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * opt.samples;
+	const double b0_pos = (dot_prod - norm_w_prev) * C * opt.samples;
+	
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * opt.samples;
+	const double b0_neg = (- dot_prod - norm_w_prev) * C * opt.samples;
+	
+	grad_pos += b0_pos;
+	grad_neg += b0_neg;
+	
+	if (grad_pos < 0.0) {
+	  double k = 0.0;
+	  
+	  point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0));
+	  point_set_type::const_iterator piter_end = points.end();
+	  
+	  for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
+	    const double k_new = piter->first;
+	    const double grad_new = grad_pos + std::fabs(piter->second) + a0_pos * (k_new - k);
+	    
+	    if (grad_new >= 0) {
+	      // compute intersection...
+	      k = k + grad_pos * (k - k_new) / (grad_new - grad_pos);
+	      grad_pos = grad_new;
+	      break;
+	    } else {
+	      k = k_new;
+	      grad_pos = grad_new;
+	    }
+	  }
+	  
+	  if (k > 0.0) {
+	    weights *= k;
+	    weights_prev *= (1.0 - k);
+	    weights += weights_prev;
+	  }
+	} else if (grad_neg < 0.0) {
+	  double k = 0.0;
+	  
+	  point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0)));
+	  point_set_type::const_reverse_iterator piter_end = points.rend();
+	  
+	  for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
+	    const double k_new = - piter->first;
+	    const double grad_new = grad_neg + std::fabs(piter->second) + a0_neg * (k_new - k);
+	    
+	    if (grad_new >= 0) {
+	      // compute intersection...
+	      k = k + grad_neg * (k - k_new) / (grad_new - grad_neg);
+	      grad_neg = grad_new;
+	      break;
+	    } else {
+	      k = k_new;
+	      grad_neg = grad_new;
+	    }
+	  }
+	  
+	  if (k > 0.0) {
+	    weights *= - k;
+	    weights_prev *= (1.0 + k);
+	    weights += weights_prev;
+	  }
+	}
+      }
+      
+      // finished line-search
+    }
+    
+    // current weights is the master problems weights...
+    bcast_weights(0, weights);
+    
+    objective_master = 0.0;
+    
+    const double objective_master_local = opt.objective(weights);
+    
+    MPI::COMM_WORLD.Reduce(&objective_master_local, &objective_master, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    objective_master += 0.5 * C * cicada::dot_product(weights, weights);
+
+    if (mpi_rank == 0 && debug >= 2)
+      std::cerr << "objective master: " << objective_master << " reduced: " << objective_reduced << std::endl;
+
+    // check termination condition...
+  }
+  
+  return objective_master;
 }
 
 struct OptimizeLBFGS
@@ -1825,6 +2308,7 @@ void options(int argc, char** argv)
     ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
     ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
+    ("learn-cp",      po::bool_switch(&learn_cp),      "cutting place algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
