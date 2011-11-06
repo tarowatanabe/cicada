@@ -272,7 +272,7 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("weights",   po::value<path_type>(&weights_file),                            "weights file")
 
-    ("biase-features", po::value<feature_set_type>(&features_biased)->multitoken(), "biased features")
+    ("bias-features", po::value<feature_set_type>(&features_biased)->multitoken(), "biased features")
     
     ("help", "help message");
   
