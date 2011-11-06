@@ -1487,6 +1487,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
 
   weight_set_type weights_prev;
   point_set_type points;
+  
+  weight_set_type weights_min;
+  double objective_master_min = std::numeric_limits<double>::infinity();
 
   double objective_master = 0.0;
   double objective_reduced = 0.0;
@@ -1659,6 +1662,11 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
 
+    if (objective_master < objective_master_min) {
+      weights_min = weights;
+      objective_master_min = objective_master;
+    }
+
     if (mpi_rank == 0 && debug >= 2)
       std::cerr << "objective master: " << objective_master
 		<< " reduced: " << objective_reduced
@@ -1671,8 +1679,10 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     if (terminate) break;
   }
+
+  weights = weights_min
   
-  return objective_master;
+  return objective_master_min;
 }
 
 struct OptimizeLBFGS
