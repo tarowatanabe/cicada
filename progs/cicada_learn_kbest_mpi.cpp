@@ -1680,7 +1680,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
     if (terminate) break;
   }
 
-  weights = weights_min
+  weights = weights_min;
   
   return objective_master_min;
 }
