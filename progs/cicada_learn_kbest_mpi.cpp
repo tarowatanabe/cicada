@@ -1507,6 +1507,8 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     double risk = 0.0;
     MPI::COMM_WORLD.Reduce(&risk_local, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+
+    size_t active_size = 0;
     
     if (mpi_rank == 0) {
     
@@ -1525,11 +1527,14 @@ double optimize_cp(const hypothesis_map_type& kbests,
       objective_reduced *= C;
       
       weights.clear();
+      active_size = 0;
       alpha_set_type::const_iterator aiter = alpha.begin();
       for (size_t id = 0; id != a.size(); ++ id, ++ aiter)
 	if (*aiter > 0.0) {
 	  for (size_t j = 0; j != a[id].size(); ++ j)
 	    weights[j] += (*aiter) * a[id][j];
+
+	  ++ active_size;
 	}
     }
     
@@ -1633,7 +1638,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
 
     if (mpi_rank == 0 && debug >= 2)
-      std::cerr << "objective master: " << objective_master << " reduced: " << objective_reduced << std::endl;
+      std::cerr << "objective master: " << objective_master
+		<< " reduced: " << objective_reduced
+		<< " actives: " << active_size << std::endl;
 
     // check termination condition...
   }
