@@ -1492,6 +1492,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
   double objective_reduced = 0.0;
   
   for (int iter = 0; iter != iteration; ++ iter) {
+    if (mpi_rank == 0)
+      std::cerr << "iter: " << (iter + 1) << std::endl;
+
     // keep previous best...
     weights_prev = weights;
     
@@ -1500,13 +1503,24 @@ double optimize_cp(const hypothesis_map_type& kbests,
     else
       a.resize(1);
     a.back().clear();
+
+    std::cerr << "compute risk" << std::endl;
     
     const double risk_local = opt(weights, a.back());
+
+    std::cerr << "reduce a" << std::endl;
     
-    reduce_weights(a.back());
+    if (mpi_rank == 0)
+      reduce_weights(a.back());
+    else
+      send_weights(a.back());
     
     double risk = 0.0;
     MPI::COMM_WORLD.Reduce(&risk_local, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+
+    if (mpi_rank == 0)
+      std::cerr << "risk: " << risk << std::endl;
+    
 
     size_t active_size = 0;
     
@@ -1536,9 +1550,13 @@ double optimize_cp(const hypothesis_map_type& kbests,
 
 	  ++ active_size;
 	}
+
+      std::cerr << "active size: " << active_size << std::endl;
     }
     
     if (line_search_local) {
+      std::cerr << "line search"  << std::endl;
+
       bcast_weights(0, weights);
       
       points.clear();
@@ -1549,6 +1567,10 @@ double optimize_cp(const hypothesis_map_type& kbests,
       reduce_points(points);
 
       if (mpi_rank == 0) {
+
+	if (debug >= 3)
+	  std::cerr << "point size: " << points.size() << std::endl;
+
 	double grad_pos = 0.0;
 	double grad_neg = 0.0;
 	
@@ -1567,6 +1589,9 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	
 	grad_pos += b0_pos;
 	grad_neg += b0_neg;
+
+	if (debug >= 3)
+	  std::cerr << "gradient: " << grad_pos << ' ' << grad_neg << std::endl;
 	
 	if (grad_pos < 0.0) {
 	  double k = 0.0;
