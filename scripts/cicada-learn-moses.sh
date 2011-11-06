@@ -46,6 +46,7 @@ regularize_l2=no
 scorer="bleu:order=4,exact=true"
 learn="lbfgs"
 learn_options=""
+zero_weights=no
 solver=1
 kbest=1000
 merge="no"
@@ -93,6 +94,7 @@ $me [options]
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
   --learn-options           other learning options
+  --zero-weights           learning weights from zero weights
   --kbest                   kbest size             (default: $kbest)
   --merge                   perform kbest merging
   --interpolate             weights interpolation
@@ -185,6 +187,9 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     learn_options=$2
     shift; shift ;;
+  --zero-weights )
+    zero_weights=yes
+    shift ;;
 
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
@@ -633,6 +638,9 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   weights_option=""
   if test "$weights_last" != ""; then
     weights_option=" --weights $weights_last"
+  fi
+  if test "$zero_weights" = "yes"; then
+    weights_option=""
   fi
 
   regularize=" --regularize-l2"
