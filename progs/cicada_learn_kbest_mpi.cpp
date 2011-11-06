@@ -1492,9 +1492,6 @@ double optimize_cp(const hypothesis_map_type& kbests,
   double objective_reduced = 0.0;
   
   for (int iter = 0; iter != iteration; ++ iter) {
-    if (mpi_rank == 0)
-      std::cerr << "iter: " << (iter + 1) << std::endl;
-
     // keep previous best...
     weights_prev = weights;
     
@@ -1504,12 +1501,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
       a.resize(1);
     a.back().clear();
 
-    std::cerr << "compute risk" << std::endl;
-    
     const double risk_local = opt(weights, a.back());
-
-    std::cerr << "reduce a" << std::endl;
-    
     if (mpi_rank == 0)
       reduce_weights(a.back());
     else
@@ -1517,10 +1509,6 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     double risk = 0.0;
     MPI::COMM_WORLD.Reduce(&risk_local, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
-
-    if (mpi_rank == 0)
-      std::cerr << "risk: " << risk << std::endl;
-    
 
     size_t active_size = 0;
     
@@ -1537,8 +1525,8 @@ double optimize_cp(const hypothesis_map_type& kbests,
       typename Optimize::template HMatrix<weight_queue_type> H(a);
       typename Optimize::template MMatrix<weight_queue_type> M(a);
       
-      objective_reduced = solver(alpha, f, H, M, 1.0 / C, 1e-4);
-      objective_reduced *= C;
+      objective_reduced = solver(alpha, f, H, M, 1.0 / C, 1e-5);
+      objective_reduced *= - C;
       
       weights.clear();
       active_size = 0;
@@ -1550,12 +1538,15 @@ double optimize_cp(const hypothesis_map_type& kbests,
 
 	  ++ active_size;
 	}
-
-      std::cerr << "active size: " << active_size << std::endl;
+      
+      if (debug >= 3)
+	std::cerr << "active size: " << active_size << std::endl;
     }
     
     if (line_search_local) {
-      std::cerr << "line search"  << std::endl;
+      
+      if (debug >= 3 && mpi_rank == 0)
+	std::cerr << "line search"  << std::endl;
 
       bcast_weights(0, weights);
       
@@ -1668,6 +1659,11 @@ double optimize_cp(const hypothesis_map_type& kbests,
 		<< " actives: " << active_size << std::endl;
 
     // check termination condition...
+    
+    int terminate = ((objectiv_master - objective_dual) < 1e-5);
+    MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
+    
+    if (terminate) break;
   }
   
   return objective_master;
