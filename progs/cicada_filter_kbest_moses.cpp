@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 	    } else {
 	      const std::string feat = feature_name + utils::lexical_cast<std::string>(id);
 	      
-	      if (features_remove.find(feat) != features_remove.end())
+	      if (features_remove.find(feat) == features_remove.end())
 		features_new.push_back(feat + "=" + *fiter);
 	      ++ id;
 	    }
@@ -258,7 +258,7 @@ int main(int argc, char** argv)
 	    } else {
 	      const std::string feat = feature_name + utils::lexical_cast<std::string>(id);
 	      
-	      if (features_remove.find(feat) != features_remove.end())
+	      if (features_remove.find(feat) == features_remove.end())
 		features_new.push_back(feature_name + utils::lexical_cast<std::string>(id) + "=" + *fiter);
 	      ++ id;
 	    }
