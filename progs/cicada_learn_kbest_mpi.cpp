@@ -1566,16 +1566,16 @@ double optimize_cp(const hypothesis_map_type& kbests,
       
       reduce_points(points);
 
+      double grad_pos = 0.0;
+      double grad_neg = 0.0;
+      
+      MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
       if (mpi_rank == 0) {
-
+	
 	if (debug >= 3)
 	  std::cerr << "point size: " << points.size() << std::endl;
-
-	double grad_pos = 0.0;
-	double grad_neg = 0.0;
-	
-	MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
 	
 	const double norm_w      = cicada::dot_product(weights, weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, weights);
