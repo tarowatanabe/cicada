@@ -1425,10 +1425,10 @@ struct OptimizeCP
   {
     MMatrix(const Features& __features) : features(__features) {}
     
-    template <typename W, typename Alphas>
-    void operator()(W& w, const Alphas& alpha) const
+    template <typename W>
+    void operator()(W& w, const std::vector<double, std::allocator<double> >& alpha) const
     {
-      typename Alphas::const_iterator aiter = alpha.begin();
+      std::vector<double, std::allocator<double> >::const_iterator aiter = alpha.begin();
       
       for (size_type id = 0; id != features.size(); ++ id, ++ aiter)
 	if (*aiter > 0.0)
