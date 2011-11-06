@@ -1520,7 +1520,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
       
       // peform maximization...
       
-      cicada::optimize::QPDCD solver;
+      cicada::optimize::QPSMO solver;
       
       typename Optimize::template HMatrix<weight_queue_type> H(a);
       typename Optimize::template MMatrix<weight_queue_type> M(a);
