@@ -452,9 +452,9 @@ double compute_oracles(const scorer_document_type& scorers,
 	    if (objective > objective_max) {
 	      oracles_tmp.clear();
 	      oracles_tmp.push_back(hyp);
-	    
+	      
 	      objective_max = objective;
-	    } else if (objective > objective_max)
+	    } else if (objective == objective_max)
 	      oracles_tmp.push_back(hyp);
 	  }
 	
