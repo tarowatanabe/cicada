@@ -519,7 +519,7 @@ struct OptimizeLinear
 	if (norms[i] == 0.0)
 	  norms[i] = 1.0;
 	else
-	  norms[i] = 1.0 / std::sqrt(norms[i]);
+	  norms[i] = 1.0 / std::sqrt(norms[i] / data_size);
       }
       
       normalizer_type::queue_type queue;
