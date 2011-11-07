@@ -263,7 +263,7 @@ struct TaskOracle
     score.reset();
     
     for (size_t id = 0; id != oracles.size(); ++ id) 
-      if (! oracles[id].empty()) {
+      if (! oracles[id].empty() && hypotheses[id].empty()) {
 	if (! score)
 	  score = oracles[id].front().score->clone();
 	else
@@ -296,7 +296,7 @@ struct TaskOracle
       const size_t id = *iiter;
       
       score_ptr_type score_curr = (score ? score->clone() : score_ptr_type());
-	
+      
       if (score_curr && ! oracles[id].empty())
 	*score_curr -= *(oracles[id].front().score);
       
