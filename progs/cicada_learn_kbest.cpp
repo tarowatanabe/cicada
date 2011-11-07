@@ -69,6 +69,7 @@ double eps = std::numeric_limits<double>::infinity();
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
+bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -258,11 +259,13 @@ struct OptimizeLinear
     
     offset_set_type       offsets;
     feature_node_set_type features;
+    weight_set_type       norms;
     
     void operator()()
     {
       offsets.clear();
       features.clear();
+      norms.clear();
       
       sentence_unique_type  sentences;
       feature_node_type     feature;
@@ -298,17 +301,26 @@ struct OptimizeLinear
 		feature.index = oiter->first.id() + 1;
 		feature.value = oiter->second;
 		features.push_back(feature);
+
+		norms[oiter->first] += feature.value * feature.value;
+		
 		++ oiter;
 	      } else if (kiter->first < oiter->first) {
 		feature.index = kiter->first.id() + 1;
 		feature.value = - kiter->second;
 		features.push_back(feature);
+		
+		norms[kiter->first] += feature.value * feature.value;
+
 		++ kiter;
 	      } else {
 		feature.index = oiter->first.id() + 1;
 		feature.value = oiter->second - kiter->second;
-		if (feature.value != 0.0)
+		if (feature.value != 0.0) {
 		  features.push_back(feature);
+		  
+		  norms[oiter->first] += feature.value * feature.value;
+		}
 		++ oiter;
 		++ kiter;
 	      }
@@ -318,12 +330,16 @@ struct OptimizeLinear
 	      feature.index = oiter->first.id() + 1;
 	      feature.value = oiter->second;
 	      features.push_back(feature);
+	      
+	      norms[oiter->first] += feature.value * feature.value;
 	    }
 	    
 	    for (/**/; kiter != kiter_end; ++ kiter) {
 	      feature.index = kiter->first.id() + 1;
 	      feature.value = - kiter->second;
 	      features.push_back(feature);
+	      
+	      norms[kiter->first] += feature.value * feature.value;
 	    }
 	    
 	    // termination...
@@ -343,6 +359,33 @@ struct OptimizeLinear
   };
   typedef Encoder encoder_type;
   typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
+
+  struct Normalize
+  {
+    typedef utils::lockfree_list_queue<size_t, std::allocator<size_t> > queue_type;
+    
+    Normalize(queue_type& __queue,
+	      feature_node_map_type& __features,
+	      const weight_set_type& __norms)
+      : queue(__queue), features(__features), norms(__norms) {}
+
+    void operator()()
+    {
+      for (;;) {
+	size_t id = 0;
+	queue.pop(id);
+	if (id == size_t(-1)) break;
+	
+	for (feature_node_type* feat = features[id]; feat->index != -1; ++ feat)
+	  feat->value *= (norms[feat->index - 1] == 0.0 ? 1.0 : norms[feat->index - 1]);
+      }
+    }
+    
+    queue_type&    queue;
+    
+    feature_node_map_type& features;
+    const weight_set_type& norms;
+  };
   
   struct Gradient
   {
@@ -440,10 +483,15 @@ struct OptimizeLinear
       queue.push(-1);
     
     workers.join_all();
+
+    weight_set_type norms;
     
     size_t data_size = 0;
-    for (int i = 0; i < threads; ++ i)
+    for (int i = 0; i < threads; ++ i) {
       data_size += encoders[i].offsets.size();
+      norms += encoders[i].norms;
+    }
+
     
     if (debug)
       std::cerr << "liblinear data size: " << data_size << std::endl;
@@ -461,6 +509,31 @@ struct OptimizeLinear
       
       encoders[i].offsets.clear();
       offset_set_type(encoders[i].offsets).swap(encoders[i].offsets);
+    }
+    
+    if (normalize_vector) {
+      typedef Normalize normalizer_type;
+
+      norms.allocate(0.0);
+      for (size_t i = 0; i != norms.size(); ++ i) {
+	if (norms[i] == 0.0)
+	  norms[i] = 1.0;
+	else
+	  norms[i] = 1.0 / std::sqrt(norms[i]);
+      }
+      
+      normalizer_type::queue_type queue;
+      
+      boost::thread_group workers;
+      for (int i = 0; i < threads; ++ i)
+	workers.add_thread(new boost::thread(normalizer_type(queue, features, norms)));
+      
+      for (size_t i = 0; i != features.size(); ++ i)
+	queue.push(i);
+      for (int i = 0; i < threads; ++ i)
+	queue.push(size_t(-1));
+      
+      workers.join_all();
     }
     
     problem_type problem;
@@ -524,7 +597,7 @@ struct OptimizeLinear
 
       gradient_type::queue_type queue;
       gradient_set_type gradients(threads, gradient_type(queue, features, labels, weights, weights_prev));
-
+      
       boost::thread_group workers;
       for (int i = 0; i < threads; ++ i)
 	workers.add_thread(new boost::thread(boost::ref(gradients[i])));
@@ -646,6 +719,10 @@ struct OptimizeLinear
 	}
       }
     }
+    
+    if (normalize_vector)
+      for (size_t i = 0; i != weights.size(); ++ i)
+	weights[i] *= (norms[i] == 0.0 ? 1.0 : 1.0 / norms[i]);
   }
   
 public:
@@ -1886,9 +1963,10 @@ void options(int argc, char** argv)
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
 
-    ("loss-margin",    po::bool_switch(&loss_margin),    "direct loss margin")
-    ("softmax-margin", po::bool_switch(&softmax_margin), "softmax margin")
-    ("line-search",    po::bool_switch(&line_search),    "perform line search in each iteration")
+    ("loss-margin",      po::bool_switch(&loss_margin),      "direct loss margin")
+    ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
+    ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
+    ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

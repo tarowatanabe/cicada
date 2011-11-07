@@ -69,6 +69,7 @@ double C = 1.0;
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
+bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -2348,9 +2349,10 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     
-    ("loss-margin",    po::bool_switch(&loss_margin),    "direct loss margin")
-    ("softmax-margin", po::bool_switch(&softmax_margin), "softmax margin")
-    ("line-search",    po::bool_switch(&line_search),    "perform line search in each iteration")
+    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
+    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
+    ("line-search",    po::bool_switch(&line_search),        "perform line search in each iteration")
+    ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
