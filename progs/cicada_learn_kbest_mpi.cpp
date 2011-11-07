@@ -1063,7 +1063,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       if (debug >= 2)
 	std::cerr << "objective: " << objective << " active size: " << active_size << std::endl;
       
-      if (objective < objective_min) {
+      if (objective <= objective_min) {
 	objective_min = objective;
 	weights_min = optimizer.weights;
       }
@@ -1652,7 +1652,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
     
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
 
-    if (objective_master < objective_master_min) {
+    if (objective_master <= objective_master_min) {
       weights_min = weights;
       objective_master_min = objective_master;
     }
