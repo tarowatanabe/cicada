@@ -732,21 +732,19 @@ void bcast_kbest(hypothesis_map_type& kbests)
     os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_bcast_sink(0, 4096));
     
-    for (size_t id = 0; id != kbests.size(); ++ id)
-      if (static_cast<int>(id % mpi_size) == mpi_rank) {
-	
-	hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
-	  if (! karma::generate(oiter_type(os),
-				(generator.size
-				 << " ||| " << -(standard::string % ' ')
-				 << " ||| " << -((standard::string << '=' << double_inf) % ' ')
-				 << '\n'),
-				id,
-				oiter->sentence,
-				oiter->features))
-	    throw std::runtime_error("error in generating kbest");
-      }
+    for (size_t id = 0; id != kbests.size(); ++ id) {
+      hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
+      for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
+	if (! karma::generate(oiter_type(os),
+			      (generator.size
+			       << " ||| " << -(standard::string % ' ')
+			       << " ||| " << -((standard::string << '=' << double_inf) % ' ')
+			       << '\n'),
+			      id,
+			      oiter->sentence,
+			      oiter->features))
+	  throw std::runtime_error("error in generating kbest");
+    }
     
   } else {
     for (size_t id = 0; id != kbests.size(); ++ id)
@@ -776,79 +774,6 @@ void bcast_kbest(hypothesis_map_type& kbests)
       kbests[id].push_back(hypothesis_type(kbest));
     }
   }
-  
-#if 0
-  typedef boost::spirit::istream_iterator  iiter_type;
-  typedef std::ostream_iterator<char>      oiter_type;
-  
-  typedef kbest_feature_parser<iiter_type>    parser_type;
-  typedef kbest_feature_generator<oiter_type> generator_type;
-  
-  namespace qi       = boost::spirit::qi;
-  namespace karma    = boost::spirit::karma;
-  namespace standard = boost::spirit::standard;
-  
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  parser_type    parser;
-  generator_type generator;
-  
-  boost::spirit::karma::real_generator<double, real_precision_inf> double_inf;
-
-  kbest_feature_type kbest;
-
-  // clear non-rank kbests
-  for (size_t id = 0; id != kbests.size(); ++ id)
-    if (static_cast<int>(id % mpi_size) != mpi_rank)
-      kbests[id].clear();
-  
-  for (int rank = 0; rank < mpi_size; ++ rank) {
-    if (rank == mpi_rank) {
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::zlib_compressor());
-      os.push(utils::mpi_device_bcast_sink(rank, 4096));
-      
-      for (size_t id = 0; id != kbests.size(); ++ id)
-	if (static_cast<int>(id % mpi_size) == mpi_rank) {
-	  
-	  hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
-	    if (! karma::generate(oiter_type(os),
-				  (generator.size
-				   << " ||| " << -(standard::string % ' ')
-				   << " ||| " << -((standard::string << '=' << double_inf) % ' ')
-				   << '\n'),
-				  id,
-				  oiter->sentence,
-				  oiter->features))
-	      throw std::runtime_error("error in generating kbest");
-	}
-      
-    } else {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::zlib_decompressor());
-      is.push(utils::mpi_device_bcast_source(rank, 4096));
-      is.unsetf(std::ios::skipws);
-      
-      iiter_type iter(is);
-      iiter_type iter_end;
-      
-      while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
-	
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	  if (iter != iter_end)
-	    throw std::runtime_error("kbest parsing failed");
-	
-	const size_t& id = boost::fusion::get<0>(kbest);
-	
-	kbests[id].push_back(hypothesis_type(kbest));
-      }
-    }
-  }
-#endif
 }
 
 void options(int argc, char** argv)
