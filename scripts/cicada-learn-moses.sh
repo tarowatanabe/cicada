@@ -519,21 +519,25 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   if test "$weights_process" = ""; then
-    cp $config $moses_ini
-  else
-    if test "$bias_features" != ""; then
-      qsubwrapper config `cicadapath cicada_filter_config_moses` \
+    qsubwrapper weights `cicadapath cicada_filter_config_moses` \
+	--input $config
+        --output weights.moses.init
+    
+    weights_process=weights.moses.init
+  fi
+    
+  if test "$bias_features" != ""; then
+    qsubwrapper config `cicadapath cicada_filter_config_moses` \
 	--weights $weights_process \
 	--bias-features $bias_features \
 	--bias-weight   $bias_weight \
 	--input $config \
 	--output $moses_ini || exit 1
-    else
-      qsubwrapper config `cicadapath cicada_filter_config_moses` \
+  else
+    qsubwrapper config `cicadapath cicada_filter_config_moses` \
 	--weights $weights_process \
 	--input $config \
 	--output $moses_ini || exit 1
-    fi
   fi
   
   ### run cicada wrapped moses...
