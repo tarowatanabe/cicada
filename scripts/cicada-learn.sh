@@ -85,7 +85,7 @@ $me [options]
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
   --learn-options           other learning options
-  --zero-weights           learning weights from zero weights
+  --zero-weights            learning from zero weights in each iteration
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
   --scorer                  scorer                           (default: $scorer)
   --kbest                   kbest size                       (default: $kbest)

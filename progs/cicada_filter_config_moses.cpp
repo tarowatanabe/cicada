@@ -22,6 +22,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/xpressive/xpressive.hpp>
 
+#include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
@@ -85,8 +86,8 @@ path_type output_file = "-";
 
 path_type weights_file;
 
-
 feature_set_type features_biased;
+double           weight_biased = -1;
 
 void options(int argc, char** argv);
 
@@ -153,7 +154,7 @@ int main(int argc, char** argv)
       feature_weight_parser<std::string::const_iterator> parser;
 
       for (feature_set_type::const_iterator fiter = features_biased.begin(); fiter != features_biased.end(); ++ fiter) {
-	const std::string line = *fiter + " -1";
+	const std::string line = *fiter + " " + utils::lexical_cast<std::string>(weight_biased);
 	
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end  = line.end();
@@ -272,7 +273,8 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("weights",   po::value<path_type>(&weights_file),                            "weights file")
 
-    ("bias-features", po::value<feature_set_type>(&features_biased)->multitoken(), "biased features")
+    ("bias-features", po::value<feature_set_type>(&features_biased)->multitoken(),     "biased features")
+    ("bias-weight",   po::value<double>(&weight_biased)->default_value(weight_biased), "bias weight")
     
     ("help", "help message");
   

@@ -68,6 +68,7 @@ double eps = std::numeric_limits<double>::infinity();
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+bool line_search = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -153,9 +154,6 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
-    
-    
-
     weight_set_type weights;
     if (! weights_path.empty()) {
       if (! boost::filesystem::exists(weights_path))
@@ -347,7 +345,8 @@ struct OptimizeLinear
   typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
   
   OptimizeLinear(const hypothesis_map_type& kbests,
-		 const hypothesis_map_type& oracles)
+		 const hypothesis_map_type& oracles,
+		 const weight_set_type& weights_prev)
     : weights(), objective(0.0)
   {
     // compute unique before processing
@@ -442,6 +441,12 @@ struct OptimizeLinear
       weights[weight_set_type::feature_type(j)] = model->w[j];
     
     free_and_destroy_model(const_cast<model_type**>(&model));
+    
+    // line search...
+    
+    if (line_search) {
+      
+    }
   }
   
 public:
@@ -454,7 +459,7 @@ double optimize_svm(const hypothesis_map_type& kbests,
 		    const hypothesis_map_type& oracles,
 		    weight_set_type& weights)
 {
-  Optimizer optimizer(kbests, oracles);
+  Optimizer optimizer(kbests, oracles, weights);
   
   weights = optimizer.weights;
   
@@ -649,6 +654,7 @@ struct OptimizeSVM
   typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
   
   
+  
   struct HMatrix
   {
     HMatrix(const pos_pair_set_type& __positions,
@@ -720,7 +726,8 @@ struct OptimizeSVM
   };
 
   OptimizeSVM(const hypothesis_map_type& kbests,
-	      const hypothesis_map_type& oracles)
+	      const hypothesis_map_type& oracles,
+	      const weight_set_type& weights_prev)
     : weights(), objective(0.0), tolerance(0.1)
   {
     encoder_type::queue_type queue;
@@ -781,13 +788,19 @@ struct OptimizeSVM
 	  sample_set_type::value_type::const_iterator fiter_end = encoders[i].features[j].end();
 	  for (sample_set_type::value_type::const_iterator fiter = encoders[i].features[j].begin(); fiter != fiter_end; ++ fiter)
 	    weights[fiter->first] += (*aiter) * fiter->second; 
-
+	  
 	  ++ actives;
 	}
-
+    
     if (debug)
       std::cerr << "# of active vectors: " << actives << std::endl;
     
+    // line search between the previous solution and the current solution
+    if (line_search) {
+      
+      
+      
+    }
   }
   
 public:
@@ -1521,8 +1534,9 @@ void options(int argc, char** argv)
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
 
-    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
-    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
+    ("loss-margin",    po::bool_switch(&loss_margin),    "direct loss margin")
+    ("softmax-margin", po::bool_switch(&softmax_margin), "softmax margin")
+    ("line-search",    po::bool_switch(&line_search),    "perform line search in each iteration")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

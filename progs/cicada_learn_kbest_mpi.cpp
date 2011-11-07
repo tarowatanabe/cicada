@@ -68,8 +68,7 @@ double C = 1.0;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
-bool line_search_local = false;
-bool line_search_global = false;
+bool line_search = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -139,7 +138,7 @@ int main(int argc, char ** argv)
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
-    if ((line_search_local || line_search_global) && (learn_lbfgs || learn_sgd))
+    if (line_search && (learn_lbfgs || learn_sgd))
       throw std::runtime_error("line-search is applicable only for non-maxent based loss");
 
     if (kbest_path.empty())
@@ -920,7 +919,7 @@ double optimize_online(const hypothesis_map_type& kbests,
       
       // optimizer.weights is the new weights.
 
-      if (line_search_local) {
+      if (line_search) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
 	if (debug >= 3)
@@ -1120,7 +1119,7 @@ double optimize_online(const hypothesis_map_type& kbests,
 	int samples_local = optimizer.samples;
 	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
 	
-	if (line_search_local) {
+	if (line_search) {
 	  // perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	  
 	  bcast_weights(0, optimizer.weights);
@@ -1514,7 +1513,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
       
       // peform maximization...
       
-      cicada::optimize::QPSMO solver;
+      cicada::optimize::QPDCD solver;
       
       typename Optimize::template HMatrix<weight_queue_type> H(a);
       typename Optimize::template MMatrix<weight_queue_type> M(a);
@@ -1537,7 +1536,7 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	std::cerr << "active size: " << active_size << std::endl;
     }
     
-    if (line_search_local) {
+    if (line_search) {
       
       if (debug >= 3 && mpi_rank == 0)
 	std::cerr << "line search"  << std::endl;
@@ -2349,11 +2348,9 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     
-    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
-    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
-
-    ("line-search-local",  po::bool_switch(&line_search_local),  "perform line search locally in each iteration")
-    ("line-search-global", po::bool_switch(&line_search_global), "perform line search globally")
+    ("loss-margin",    po::bool_switch(&loss_margin),    "direct loss margin")
+    ("softmax-margin", po::bool_switch(&softmax_margin), "softmax margin")
+    ("line-search",    po::bool_switch(&line_search),    "perform line search in each iteration")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
