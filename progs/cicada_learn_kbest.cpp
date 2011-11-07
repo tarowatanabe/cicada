@@ -344,9 +344,81 @@ struct OptimizeLinear
   typedef Encoder encoder_type;
   typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
   
+  struct Gradient
+  {
+    typedef std::pair<double, double> point_type;
+    typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
+    
+    typedef utils::lockfree_list_queue<size_t, std::allocator<size_t> > queue_type;
+    
+    Gradient(queue_type& __queue,
+	     const feature_node_map_type& __features,
+	     const label_set_type&        __labels,
+	     const weight_set_type&       __weights,
+	     const weight_set_type&       __weights_prev)
+      : queue(__queue), features(__features), labels(__labels), weights(__weights), weights_prev(__weights_prev) {}
+
+    void operator()()
+    {
+      static const double inf = std::numeric_limits<double>::infinity();
+
+      points.clear();
+      
+      double& grad_pos = grads.first;
+      double& grad_neg = grads.second;
+      
+      grad_pos = 0.0;
+      grad_neg = 0.0;
+      
+      for (;;) {
+	size_t id = 0;
+	queue.pop(id);
+	if (id == size_t(-1)) break;
+	
+	double margin      = 0.0;
+	double margin_prev = 0.0;
+	
+	for (const feature_node_type* feat = features[id]; feat->index != -1; ++ feat) {
+	  margin      += weights[feat->index - 1]      * feat->value;
+	  margin_prev += weights_prev[feat->index - 1] * feat->value;
+	}
+	
+	const double bi_pos = margin_prev - margin;
+	const double ci_pos = labels[id]  - margin_prev;
+	const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
+	
+	const double bi_neg = margin_prev + margin;
+	const double ci_neg = labels[id]  - margin_prev;
+	const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
+	
+	if (ki_pos > 0)
+	  points.push_back(std::make_pair(ki_pos, bi_pos));
+	
+	if (ki_neg > 0)
+	  points.push_back(std::make_pair(- ki_neg, bi_neg));
+	
+	grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+	grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
+      }
+      
+      std::sort(points.begin(), points.end());
+    }
+
+    queue_type&    queue;
+    
+    const feature_node_map_type& features;
+    const label_set_type&        labels;
+    const weight_set_type&       weights;
+    const weight_set_type&       weights_prev;
+    
+    point_type     grads;
+    point_set_type points;
+  };
+  
+  
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles,
-		 const weight_set_type& weights_prev)
+		 weight_set_type& weights_prev)
     : weights(), objective(0.0)
   {
     // compute unique before processing
@@ -445,7 +517,134 @@ struct OptimizeLinear
     // line search...
     
     if (line_search) {
+      typedef Gradient gradient_type;
+      typedef std::vector<gradient_type, std::allocator<gradient_type> > gradient_set_type;
+
+      typedef gradient_type::point_set_type point_set_type;
+
+      gradient_type::queue_type queue;
+      gradient_set_type gradients(threads, gradient_type(queue, features, labels, weights, weights_prev));
+
+      boost::thread_group workers;
+      for (int i = 0; i < threads; ++ i)
+	workers.add_thread(new boost::thread(boost::ref(gradients[i])));
       
+      for (size_t i = 0; i != features.size(); ++ i)
+	queue.push(i);
+      for (int i = 0; i < threads; ++ i)
+	queue.push(size_t(-1));
+      
+      workers.join_all();
+      
+      // merge points...
+      point_set_type points;
+      point_set_type points_next;
+
+      double grad_pos = 0.0;
+      double grad_neg = 0.0;
+      size_t samples = 0;
+      for (int i = 0; i < threads; ++ i) {
+	grad_pos += gradients[i].grads.first;
+	grad_neg += gradients[i].grads.second;
+	samples += gradients[i].labels.size();
+
+	if (points.empty())
+	  points.swap(gradients[i].points);
+	else {
+	  points_next.clear();
+	  std::merge(points.begin(), points.end(), gradients[i].points.begin(), gradients[i].points.end(), std::back_inserter(points_next));
+	  points.swap(points_next);
+	}
+      }
+      
+      const double norm_w      = cicada::dot_product(weights, weights);
+      const double dot_prod    = cicada::dot_product(weights_prev, weights);
+      const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
+      
+      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * samples;
+      const double b0_pos = (dot_prod - norm_w_prev) * C * samples;
+      
+      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * samples;
+      const double b0_neg = (- dot_prod - norm_w_prev) * C * samples;
+      
+      grad_pos += b0_pos;
+      grad_neg += b0_neg;
+      
+      if (grad_pos < 0.0) {
+	double k = 0.0;
+	  
+	point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0));
+	point_set_type::const_iterator piter_end = points.end();
+	  
+	for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
+	  const double k_new = piter->first;
+	  const double grad_new = grad_pos + std::fabs(piter->second) + a0_pos * (k_new - k);
+	    
+	  if (grad_new >= 0) {
+	    // compute intersection...
+	    k = k + grad_pos * (k - k_new) / (grad_new - grad_pos);
+	    grad_pos = grad_new;
+	    break;
+	  } else {
+	    k = k_new;
+	    grad_pos = grad_new;
+	  }
+	}
+	  
+	if (debug >= 3)
+	  std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
+
+	if (k > 0.0) {
+	  if (debug >= 3)
+	    std::cerr << "current weights" << std::endl
+		      << weights;
+
+	  weights      *= k;
+	  weights_prev *= (1.0 - k);
+	  weights += weights_prev;
+
+	  if (debug >= 3)
+	    std::cerr << "updated weights" << std::endl
+		      << weights;
+	}
+      } else if (grad_neg < 0.0) {
+	double k = 0.0;
+	  
+	point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0)));
+	point_set_type::const_reverse_iterator piter_end = points.rend();
+	  
+	for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
+	  const double k_new = - piter->first;
+	  const double grad_new = grad_neg + std::fabs(piter->second) + a0_neg * (k_new - k);
+	    
+	  if (grad_new >= 0) {
+	    // compute intersection...
+	    k = k + grad_neg * (k - k_new) / (grad_new - grad_neg);
+	    grad_neg = grad_new;
+	    break;
+	  } else {
+	    k = k_new;
+	    grad_neg = grad_new;
+	  }
+	}
+	  
+	if (debug >= 3)
+	  std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
+	  
+	if (k > 0.0) {
+	  if (debug >= 3)
+	    std::cerr << "current weights" << std::endl
+		      << weights;
+	  
+	  weights      *= - k;
+	  weights_prev *= (1.0 + k);
+	  weights += weights_prev;
+
+	  if (debug >= 3)
+	    std::cerr << "updated weights" << std::endl
+		      << weights;
+	}
+      }
     }
   }
   
@@ -563,6 +762,9 @@ struct OptimizeSVM
   struct Encoder
   {
     typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+
+    typedef std::pair<double, double> point_type;
+    typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
     
     Encoder(queue_type& __queue,
 	    const hypothesis_map_type& __kbests,
@@ -648,6 +850,9 @@ struct OptimizeSVM
     
     sample_set_type features;
     loss_set_type   losses;
+
+    point_set_type points;
+    point_type     grads;
   };
 
   typedef Encoder encoder_type;
@@ -724,10 +929,60 @@ struct OptimizeSVM
     const pos_pair_set_type& positions;
     const encoder_set_type&  encoders;
   };
+  
+  struct Gradient
+  {
+    Gradient(encoder_type& __encoder,
+	     const weight_set_type& __weights,
+	     const weight_set_type& __weights_prev)
+      : encoder(__encoder), weights(__weights), weights_prev(__weights_prev) {}
+
+    void operator()()
+    {
+      static const double inf = std::numeric_limits<double>::infinity();
+
+      encoder.points.clear();
+      
+      double& grad_pos = encoder.grads.first;
+      double& grad_neg = encoder.grads.second;
+      
+      grad_pos = 0.0;
+      grad_neg = 0.0;
+      
+      for (size_t id = 0; id != encoder.losses.size(); ++ id) {
+	const double margin      = cicada::dot_product(weights,      encoder.features[id].begin(), encoder.features[id].end(), 0.0);
+	const double margin_prev = cicada::dot_product(weights_prev, encoder.features[id].begin(), encoder.features[id].end(), 0.0);
+	
+	const double bi_pos = margin_prev - margin;
+	const double ci_pos = encoder.losses[id]  - margin_prev;
+	const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
+	
+	const double bi_neg = margin_prev + margin;
+	const double ci_neg = encoder.losses[id]  - margin_prev;
+	const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
+	
+	if (ki_pos > 0)
+	  encoder.points.push_back(std::make_pair(ki_pos, bi_pos));
+	
+	if (ki_neg > 0)
+	  encoder.points.push_back(std::make_pair(- ki_neg, bi_neg));
+	
+	grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
+	grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
+      }
+
+      std::sort(encoder.points.begin(), encoder.points.end());
+    }
+    
+    encoder_type&          encoder;
+    const weight_set_type& weights;
+    const weight_set_type& weights_prev;
+  };
+
 
   OptimizeSVM(const hypothesis_map_type& kbests,
 	      const hypothesis_map_type& oracles,
-	      const weight_set_type& weights_prev)
+	      weight_set_type& weights_prev)
     : weights(), objective(0.0), tolerance(0.1)
   {
     encoder_type::queue_type queue;
@@ -797,9 +1052,106 @@ struct OptimizeSVM
     
     // line search between the previous solution and the current solution
     if (line_search) {
+      typedef encoder_type::point_set_type point_set_type;
+
+      boost::thread_group workers;
+      for (int i = 0; i < threads; ++ i)
+	workers.add_thread(new boost::thread(Gradient(encoders[i], weights, weights_prev)));
+      workers.join_all();
       
+      // merge points...
+      point_set_type points;
+      point_set_type points_next;
+
+      double grad_pos = 0.0;
+      double grad_neg = 0.0;
+      size_t samples = 0;
+      for (int i = 0; i < threads; ++ i) {
+	grad_pos += encoders[i].grads.first;
+	grad_neg += encoders[i].grads.second;
+	samples += encoders[i].losses.size();
+
+	if (points.empty())
+	  points.swap(encoders[i].points);
+	else {
+	  points_next.clear();
+	  std::merge(points.begin(), points.end(), encoders[i].points.begin(), encoders[i].points.end(), std::back_inserter(points_next));
+	  points.swap(points_next);
+	}
+      }
       
+      const double norm_w      = cicada::dot_product(weights, weights);
+      const double dot_prod    = cicada::dot_product(weights_prev, weights);
+      const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
       
+      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * samples;
+      const double b0_pos = (dot_prod - norm_w_prev) * C * samples;
+      
+      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * samples;
+      const double b0_neg = (- dot_prod - norm_w_prev) * C * samples;
+      
+      grad_pos += b0_pos;
+      grad_neg += b0_neg;
+      
+      if (grad_pos < 0.0) {
+	double k = 0.0;
+	  
+	point_set_type::const_iterator piter = std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0));
+	point_set_type::const_iterator piter_end = points.end();
+	  
+	for (/**/; piter != piter_end && grad_pos < 0.0; ++ piter) {
+	  const double k_new = piter->first;
+	  const double grad_new = grad_pos + std::fabs(piter->second) + a0_pos * (k_new - k);
+	    
+	  if (grad_new >= 0) {
+	    // compute intersection...
+	    k = k + grad_pos * (k - k_new) / (grad_new - grad_pos);
+	    grad_pos = grad_new;
+	    break;
+	  } else {
+	    k = k_new;
+	    grad_pos = grad_new;
+	  }
+	}
+	  
+	if (debug >= 3)
+	  std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
+
+	if (k > 0.0) {
+	  weights      *= k;
+	  weights_prev *= (1.0 - k);
+	  weights += weights_prev;
+	}
+      } else if (grad_neg < 0.0) {
+	double k = 0.0;
+	  
+	point_set_type::const_reverse_iterator piter(std::lower_bound(points.begin(), points.end(), std::make_pair(0.0, 0.0)));
+	point_set_type::const_reverse_iterator piter_end = points.rend();
+	  
+	for (/**/; piter != piter_end && grad_neg < 0.0; ++ piter) {
+	  const double k_new = - piter->first;
+	  const double grad_new = grad_neg + std::fabs(piter->second) + a0_neg * (k_new - k);
+	    
+	  if (grad_new >= 0) {
+	    // compute intersection...
+	    k = k + grad_neg * (k - k_new) / (grad_new - grad_neg);
+	    grad_neg = grad_new;
+	    break;
+	  } else {
+	    k = k_new;
+	    grad_neg = grad_new;
+	  }
+	}
+	  
+	if (debug >= 3)
+	  std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
+	  
+	if (k > 0.0) {
+	  weights      *= - k;
+	  weights_prev *= (1.0 + k);
+	  weights += weights_prev;
+	}
+      }
     }
   }
   
