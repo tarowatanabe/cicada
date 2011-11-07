@@ -720,11 +720,9 @@ struct OptimizeLinear
       }
     }
     
-#if 0
     if (normalize_vector)
       for (size_t i = 0; i != weights.size(); ++ i)
 	weights[i] *= (norms[i] == 0.0 ? 1.0 : 1.0 / norms[i]);
-#endif
   }
   
 public:
