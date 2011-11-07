@@ -350,6 +350,12 @@ double compute_oracles(const scorer_document_type& scorers,
   //
   // we need sentence+feature bcast to keep oracles consistent
   //
+
+  typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
+  
+  id_set_type ids;
+  for (size_t id = 0; id != scorers.size(); ++ id)
+    ids.push_back(id);
   
   score_ptr_type score_optimum;
   double objective_prev = - std::numeric_limits<double>::infinity();
@@ -405,58 +411,70 @@ double compute_oracles(const scorer_document_type& scorers,
     
     // we will recompute oracles...
     // since we will merge from previous iterations, we need to compute the best again...
-
-    hypothesis_set_type oracles_tmp;
     
-    score_optimum.reset();
-    for (size_t id = 0; id != oracles.size(); ++ id)
-      if (! oracles[id].empty()) {
-	oracles_tmp.clear();
+    double objective = 0.0;
+    
+    if (mpi_rank == 0) {
+      hypothesis_set_type oracles_tmp;
+    
+      score_optimum.reset();
+    
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
+    
+      id_set_type::const_iterator iiter_end = ids.end();
+      for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+	const size_t id = *iiter;
+      
+	if (! oracles[id].empty()) {
+	  oracles_tmp.clear();
 	
-	double objective_max = - std::numeric_limits<double>::infinity();
+	  double objective_max = - std::numeric_limits<double>::infinity();
 	
-	// recompute score!
-	hypothesis_set_type::iterator oiter_end = oracles[id].end();
-	for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	  hypothesis_type& hyp = *oiter;
+	  // recompute score!
+	  hypothesis_set_type::iterator oiter_end = oracles[id].end();
+	  for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	    hypothesis_type& hyp = *oiter;
 	  
-	  if (! hyp.score)
-	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	    if (! hyp.score)
+	      hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
 	  
-	  score_ptr_type score_sample;
+	    score_ptr_type score_sample;
 	  
-	  if (score_optimum) {
-	    score_sample = score_optimum->clone();
-	    *score_sample += *hyp.score;
-	  } else
-	    score_sample = hyp.score->clone();
+	    if (score_optimum) {
+	      score_sample = score_optimum->clone();
+	      *score_sample += *hyp.score;
+	    } else
+	      score_sample = hyp.score->clone();
 	  
-	  const double objective = score_sample->score() * score_factor;
+	    const double objective = score_sample->score() * score_factor;
 	  
-	  if (objective > objective_max) {
-	    oracles_tmp.clear();
-	    oracles_tmp.push_back(hyp);
+	    if (objective > objective_max) {
+	      oracles_tmp.clear();
+	      oracles_tmp.push_back(hyp);
 	    
-	    objective_max = objective;
-	  } else if (objective > objective_max)
-	    oracles_tmp.push_back(hyp);
+	      objective_max = objective;
+	    } else if (objective > objective_max)
+	      oracles_tmp.push_back(hyp);
+	  }
+	
+	  oracles[id].swap(oracles_tmp);
+	
+	  if (! score_optimum)
+	    score_optimum = oracles[id].front().score->clone();
+	  else
+	    *score_optimum += *oracles[id].front().score;
 	}
-	
-	oracles[id].swap(oracles_tmp);
-	
-	if (! score_optimum)
-	  score_optimum = oracles[id].front().score->clone();
-	else
-	  *score_optimum += *oracles[id].front().score;
       }
-    
-    const double objective = score_optimum->score() * score_factor;
-    if (mpi_rank == 0 && debug)
-      std::cerr << "oracle score: " << objective << std::endl;
-
-    if (objective > objective_best) {
-      objective_best = objective;
-      oracles_best   = oracles;
+      
+      objective = score_optimum->score() * score_factor;
+      if (debug)
+	std::cerr << "oracle score: " << objective << std::endl;
+      
+      if (objective > objective_best) {
+	objective_best = objective;
+	oracles_best   = oracles;
+      }
     }
     
     int terminate = (objective <= objective_prev) && (iter >= min_iteration);
