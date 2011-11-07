@@ -48,6 +48,8 @@ learn_options=""
 zero_weights=no
 solver=1
 kbest=1000
+bias_features=""
+bias_weight=-1
 merge="no"
 interpolate=0.0
 
@@ -95,6 +97,8 @@ $me [options]
   --learn-options           other learning options
   --zero-weights            learning from zero weights in each iteration
   --kbest                   kbest size             (default: $kbest)
+  --bias-features           bias features
+  --bias-weight             bias weight
   --merge                   perform kbest merging
   --interpolate             weights interpolation
 
@@ -194,6 +198,15 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     kbest=$2
     shift; shift ;;
+  --bias-features )
+    test $# = 1 && eval "$exit_missing_arg"
+    bias_features=$2
+    shift; shift ;;
+  --bias-weight )
+    test $# = 1 && eval "$exit_missing_arg"
+    bias_weight=$2
+    shift; shift ;;
+
   --merge )
     merge=yes
     shift ;;
@@ -508,10 +521,19 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   if test "$weights_process" = ""; then
     cp $config $moses_ini
   else
-    qsubwrapper config `cicadapath cicada_filter_config_moses` \
+    if test "$bias_features" != ""; then
+      qsubwrapper config `cicadapath cicada_filter_config_moses` \
+	--weights $weights_process \
+	--bias-features $bias_features \
+	--bias-weight   $bias_weight \
+	--input $config \
+	--output $moses_ini || exit 1
+    else
+      qsubwrapper config `cicadapath cicada_filter_config_moses` \
 	--weights $weights_process \
 	--input $config \
 	--output $moses_ini || exit 1
+    fi
   fi
   
   ### run cicada wrapped moses...
@@ -540,11 +562,20 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 	-threads $nc || exit 1
     
     # kbest filtering..
-    qsubwrapper kbest \
+    if test "$bias_features" != ""; then
+      qsubwrapper kbest \
+	`cicadapath cicada_filter_kbest_moses` \
+	--input $kbest_file \
+	--output $output \
+        --erase-features $bias_features \
+	--directory || exit 1
+    else
+      qsubwrapper kbest \
 	`cicadapath cicada_filter_kbest_moses` \
 	--input $kbest_file \
 	--output $output \
 	--directory || exit 1
+    fi
   else
     mkdir -p $output/kbests || exit 1
 
@@ -559,6 +590,9 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
       moses_cmd="$moses -config $moses_ini $moses_options $kbest_option"
       
       filter_cmd="$filter --input $kbest_file --output $output --directory --keep --offset $i --stride $np "
+      if test "$bias_features" != ""; then
+        filter_cmd="$filter_cmd --erase-features $bias_features"
+      fi
     
       echo  "$moses_cmd && $filter_cmd" >> $kbest_generation
     done  
