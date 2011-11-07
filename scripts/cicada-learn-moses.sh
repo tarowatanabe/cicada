@@ -520,7 +520,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   if test "$weights_process" = ""; then
     qsubwrapper weights `cicadapath cicada_filter_config_moses` \
-	--input $config
+	--input $config \
         --output weights.moses.init
     
     weights_process=weights.moses.init
