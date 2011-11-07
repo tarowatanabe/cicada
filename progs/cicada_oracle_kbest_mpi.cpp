@@ -102,6 +102,7 @@ double compute_oracles(const scorer_document_type& scorers,
 		       hypothesis_map_type& oracles,
 		       Generator& generator);
 
+void reduce_kbest(hypothesis_map_type& kbests);
 void bcast_kbest(hypothesis_map_type& kbests);
 void options(int argc, char** argv);
 
@@ -222,8 +223,7 @@ int main(int argc, char ** argv)
 
 enum {
   weights_tag = 1000,
-  sentence_tag,
-  gradients_tag,
+  kbest_tag,
   notify_tag,
   termination_tag,
 };
@@ -379,8 +379,16 @@ double compute_oracles(const scorer_document_type& scorers,
 	}
       }
     
+    reduce_kbest(oracles);
+  }
+  
+  for (int iter = 0; iter < max_iteration; ++ iter) {
+    if (debug && mpi_rank == 0)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+    
     bcast_kbest(oracles);
     
+    // make sure score is already compued
     for (size_t id = 0; id != oracles.size(); ++ id) {
       hypothesis_set_type::iterator oiter_end = oracles[id].end();
       for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
@@ -390,28 +398,56 @@ double compute_oracles(const scorer_document_type& scorers,
 	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
       }
     }
-  }
-  
-  for (int iter = 0; iter < max_iteration; ++ iter) {
-    if (debug && mpi_rank == 0)
-      std::cerr << "iteration: " << (iter + 1) << std::endl;
     
     task_type(scorers, hypotheses, oracles, generator)();
     
-    bcast_kbest(oracles);
+    reduce_kbest(oracles);
+    
+    // we will recompute oracles...
+    // since we will merge from previous iterations, we need to compute the best again...
+
+    hypothesis_set_type oracles_tmp;
     
     score_optimum.reset();
     for (size_t id = 0; id != oracles.size(); ++ id)
       if (! oracles[id].empty()) {
-	hypothesis_type& hyp = oracles[id].front();
-
-	if (! hyp.score)
-	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	oracles_tmp.clear();
+	
+	double objective_max = - std::numeric_limits<double>::infinity();
+	
+	// recompute score!
+	hypothesis_set_type::iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	  hypothesis_type& hyp = *oiter;
+	  
+	  if (! hyp.score)
+	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	  
+	  score_ptr_type score_sample;
+	  
+	  if (score_optimum) {
+	    score_sample = score_optimum->clone();
+	    *score_sample += *hyp.score;
+	  } else
+	    score_sample = hyp.score->clone();
+	  
+	  const double objective = score_sample->score() * score_factor;
+	  
+	  if (objective > objective_max) {
+	    oracles_tmp.clear();
+	    oracles_tmp.push_back(hyp);
+	    
+	    objective_max = objective;
+	  } else if (objective > objective_max)
+	    oracles_tmp.push_back(hyp);
+	}
+	
+	oracles[id].swap(oracles_tmp);
 	
 	if (! score_optimum)
-	  score_optimum = hyp.score->clone();
+	  score_optimum = oracles[id].front().score->clone();
 	else
-	  *score_optimum += *hyp.score;
+	  *score_optimum += *oracles[id].front().score;
       }
     
     const double objective = score_optimum->score() * score_factor;
@@ -587,8 +623,143 @@ void read_refset(const path_set_type& files,
   }
 }
 
+void reduce_kbest(hypothesis_map_type& kbests)
+{
+  typedef boost::spirit::istream_iterator  iiter_type;
+  typedef std::ostream_iterator<char>      oiter_type;
+  
+  typedef kbest_feature_parser<iiter_type>    parser_type;
+  typedef kbest_feature_generator<oiter_type> generator_type;
+  
+  namespace qi       = boost::spirit::qi;
+  namespace karma    = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    parser_type    parser;
+    kbest_feature_type kbest;
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::zlib_decompressor());
+      is.push(utils::mpi_device_source(rank, kbest_tag, 4096));
+      is.unsetf(std::ios::skipws);
+      
+      iiter_type iter(is);
+      iiter_type iter_end;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+	
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	kbests[id].push_back(hypothesis_type(kbest));
+      }
+    }
+  } else {
+    generator_type generator;
+    
+    boost::spirit::karma::real_generator<double, real_precision_inf> double_inf;
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_sink(0, kbest_tag, 4096));
+    
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (static_cast<int>(id % mpi_size) == mpi_rank) {
+	hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
+	  if (! karma::generate(oiter_type(os),
+				(generator.size
+				 << " ||| " << -(standard::string % ' ')
+				 << " ||| " << -((standard::string << '=' << double_inf) % ' ')
+				 << '\n'),
+				id,
+				oiter->sentence,
+				oiter->features))
+	    throw std::runtime_error("error in generating kbest");
+      }
+  }
+}
+
 void bcast_kbest(hypothesis_map_type& kbests)
 {
+  typedef boost::spirit::istream_iterator  iiter_type;
+  typedef std::ostream_iterator<char>      oiter_type;
+  
+  typedef kbest_feature_parser<iiter_type>    parser_type;
+  typedef kbest_feature_generator<oiter_type> generator_type;
+  
+  namespace qi       = boost::spirit::qi;
+  namespace karma    = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  if (mpi_rank == 0) {
+    generator_type generator;
+    
+    boost::spirit::karma::real_generator<double, real_precision_inf> double_inf;
+  
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_bcast_sink(0, 4096));
+    
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (static_cast<int>(id % mpi_size) == mpi_rank) {
+	
+	hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
+	  if (! karma::generate(oiter_type(os),
+				(generator.size
+				 << " ||| " << -(standard::string % ' ')
+				 << " ||| " << -((standard::string << '=' << double_inf) % ' ')
+				 << '\n'),
+				id,
+				oiter->sentence,
+				oiter->features))
+	    throw std::runtime_error("error in generating kbest");
+      }
+    
+  } else {
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      kbests[id].clear();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::zlib_decompressor());
+    is.push(utils::mpi_device_bcast_source(0, 4096));
+    is.unsetf(std::ios::skipws);
+    
+    kbest_feature_type kbest;
+    parser_type    parser;
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
+    
+    while (iter != iter_end) {
+      boost::fusion::get<1>(kbest).clear();
+      boost::fusion::get<2>(kbest).clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	if (iter != iter_end)
+	  throw std::runtime_error("kbest parsing failed");
+      
+      const size_t& id = boost::fusion::get<0>(kbest);
+      
+      kbests[id].push_back(hypothesis_type(kbest));
+    }
+  }
+  
+#if 0
   typedef boost::spirit::istream_iterator  iiter_type;
   typedef std::ostream_iterator<char>      oiter_type;
   
@@ -659,6 +830,7 @@ void bcast_kbest(hypothesis_map_type& kbests)
       }
     }
   }
+#endif
 }
 
 void options(int argc, char** argv)
