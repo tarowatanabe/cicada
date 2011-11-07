@@ -657,6 +657,14 @@ void reduce_kbest(hypothesis_map_type& kbests)
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   if (mpi_rank == 0) {
+#ifdef HAVE_TR1_UNORDERED_SET
+     typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				     std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+     typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			   std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+  
     parser_type    parser;
     kbest_feature_type kbest;
     
@@ -682,6 +690,21 @@ void reduce_kbest(hypothesis_map_type& kbests)
 	kbests[id].push_back(hypothesis_type(kbest));
       }
     }
+    
+    hypothesis_unique_type uniques;
+    for (size_t id = 0; id != kbests.size(); ++ id)
+    if (! kbests[id].empty()) {
+      uniques.clear();
+      uniques.insert(kbests[id].begin(), kbests[id].end());
+      
+      kbests[id].clear();
+      hypothesis_set_type(kbests[id]).swap(kbests[id]);
+      
+      kbests[id].reserve(uniques.size());
+      kbests[id].insert(kbests[id].end(), uniques.begin(), uniques.end());
+    }
+    
+    
   } else {
     generator_type generator;
     
