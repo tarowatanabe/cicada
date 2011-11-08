@@ -73,6 +73,7 @@ bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
 bool mert_search = false;
+bool sample_vector = false;
 bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -174,6 +175,8 @@ int main(int argc, char ** argv)
     
     if (mert_search && scorers.empty())
       throw std::runtime_error("mert search requires evaluation scores");
+    if (sample_vector && scorers.empty())
+      throw std::runtime_error("sampling requires evaluation scores");
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
@@ -518,76 +521,182 @@ struct OptimizeOnlineMargin
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
+  template <typename Iterator1, typename Iterator2, typename Features>
+  void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
+		      Iterator2 kiter, Iterator2 kiter_end,
+		      Features& feats)
+  {
+    while (oiter != oiter_end && kiter != kiter_end) {
+      if (oiter->first < kiter->first) {
+	feats.push_back(*oiter);
+	++ oiter;
+      } else if (kiter->first < oiter->first) {
+	feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	++ kiter;
+      } else {
+	const double value = oiter->second - kiter->second;
+	if (value != 0.0)
+	  feats.push_back(feature_value_type(kiter->first, value));
+	++ oiter;
+	++ kiter;
+      }
+    }
+      
+    for (/**/; oiter != oiter_end; ++ oiter)
+      feats.push_back(*oiter);
+      
+    for (/**/; kiter != kiter_end; ++ kiter)
+      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+  }
+    
+  struct greater_loss
+  {
+    greater_loss(const loss_set_type&   __losses) : losses(__losses) {}
+
+    bool operator()(const size_type& x, const size_type& y) const
+    {
+      return losses[x] > losses[y];
+    }
+      
+    const loss_set_type&   losses;
+  };
+  
   OptimizeOnlineMargin(Optimizer& __optimizer,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles)
     : optimizer(__optimizer)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
     
     features_type feats;
     sentence_unique_type  sentences;
     
-    for (size_type id = 0; id != kbests.size(); ++ id)
-      if (! kbests[id].empty() && ! oracles[id].empty()) {
-	sentences.clear();
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  sentences.insert(oracles[id][o].sentence);
-	
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
-	    const hypothesis_type& oracle = oracles[id][o];
-	    const hypothesis_type& kbest  = kbests[id][k];
+    boost::mt19937 generator;
+    generator.seed(utils::random_seed());
+    boost::random_number_generator<boost::mt19937> gen(generator);
+    
+    pos_set_type    positions;
+    sample_set_type features_oracle;
+    sample_set_type features_kbest;
+    loss_set_type   losses_oracle;
+    loss_set_type   losses_kbest;
+
+    if (sample_vector) {
+      for (size_type id = 0; id != kbests.size(); ++ id)
+	if (! kbests[id].empty() && ! oracles[id].empty()) {
+	  features_oracle.clear();
+	  losses_oracle.clear();
+	  
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+	  
+	  positions.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
+	      
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	      
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
+	      
+	      feats.clear();
+	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
+	      
+	      if (feats.empty()) continue;
+	      
+	      features_oracle.insert(feats.begin(), feats.end());
+	      losses_oracle.push_back(loss);
+	      
+	      positions.push_back(positions.size());
+	    }
+	  
+	  // second, collect data from kbests onlly, which is the same as the first examples
+	  const size_type sample_size = losses_oracle.size();
+	  
+	  features_kbest.clear();
+	  losses_kbest.clear();
+	  
+	  while (losses_kbest.size() < sample_size) {
+	    const hypothesis_type& oracle = kbests[id][gen(kbests[id].size())];
 	    
-	    // ignore oracle translations
+	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
+	    
+	    const hypothesis_type& kbest = kbests[id][gen(kbests[id].size())];
+	    
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
-	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
-	    
-	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    const double loss = kbest.loss - oracle.loss;
+	    if (loss <= 1e-4) continue;
 	    
 	    feats.clear();
-	
-	    while (oiter != oiter_end && kiter != kiter_end) {
-	      if (oiter->first < kiter->first) {
-		feats.push_back(*oiter);
-		++ oiter;
-	      } else if (kiter->first < oiter->first) {
-		feats.push_back(feature_value_type(kiter->first, - kiter->second));
-		++ kiter;
-	      } else {
-		const double value = oiter->second - kiter->second;
-		if (value != 0.0)
-		  feats.push_back(feature_value_type(kiter->first, value));
-		++ oiter;
-		++ kiter;
-	      }
-	    }
-	
-	    for (/**/; oiter != oiter_end; ++ oiter)
-	      feats.push_back(*oiter);
-	
-	    for (/**/; kiter != kiter_end; ++ kiter)
-	      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
 	    if (feats.empty()) continue;
-
-	    if (loss_margin) {
-	      const double loss = kbest.loss - oracle.loss;
-	      
-	      // checking...
-	      if (loss > 0.0) {
-		features.insert(feats.begin(), feats.end());
-		losses.push_back(loss);
-	      }
-	    } else {
-	      features.insert(feats.begin(), feats.end());
-	      losses.push_back(1.0);
-	    }
+	    
+	    features_kbest.insert(feats.begin(), feats.end());
+	    losses_kbest.push_back(loss);
 	  }
-      }
+	  
+	  // third, collect vector with larger loss drawn from two sets
+	  const size_type kbest_size  = (sample_size >> 1);
+	  const size_type oracle_size = (sample_size - kbest_size);
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
+	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
+	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+	  }
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
+	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
+	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
+	  }
+	}
+      
+    } else {
+      for (size_type id = 0; id != kbests.size(); ++ id)
+	if (! kbests[id].empty() && ! oracles[id].empty()) {
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+	
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
+	    
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	      
+	      feats.clear();
+	      
+	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
+	    
+	      if (feats.empty()) continue;
+
+	      if (loss_margin) {
+		const double loss = kbest.loss - oracle.loss;
+	      
+		// checking...
+		if (loss > 0.0) {
+		  features.insert(feats.begin(), feats.end());
+		  losses.push_back(loss);
+		}
+	      } else {
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(1.0);
+	      }
+	    }
+	}
+    }
     
     features.shrink();
     loss_set_type(losses).swap(losses);
@@ -1264,74 +1373,180 @@ struct OptimizeCP
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
 
+  template <typename Iterator1, typename Iterator2, typename Features>
+  void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
+		      Iterator2 kiter, Iterator2 kiter_end,
+		      Features& feats)
+  {
+    while (oiter != oiter_end && kiter != kiter_end) {
+      if (oiter->first < kiter->first) {
+	feats.push_back(*oiter);
+	++ oiter;
+      } else if (kiter->first < oiter->first) {
+	feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	++ kiter;
+      } else {
+	const double value = oiter->second - kiter->second;
+	if (value != 0.0)
+	  feats.push_back(feature_value_type(kiter->first, value));
+	++ oiter;
+	++ kiter;
+      }
+    }
+      
+    for (/**/; oiter != oiter_end; ++ oiter)
+      feats.push_back(*oiter);
+      
+    for (/**/; kiter != kiter_end; ++ kiter)
+      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+  }
+    
+  struct greater_loss
+  {
+    greater_loss(const loss_set_type&   __losses) : losses(__losses) {}
+
+    bool operator()(const size_type& x, const size_type& y) const
+    {
+      return losses[x] > losses[y];
+    }
+      
+    const loss_set_type&   losses;
+  };
+
   OptimizeCP(const hypothesis_map_type& kbests,
 	     const hypothesis_map_type& oracles) 
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
     
     features_type feats;
     sentence_unique_type  sentences;
     
-    for (size_type id = 0; id != kbests.size(); ++ id)
-      if (! kbests[id].empty() && ! oracles[id].empty()) {
-	sentences.clear();
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  sentences.insert(oracles[id][o].sentence);
-	
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
-	    const hypothesis_type& oracle = oracles[id][o];
-	    const hypothesis_type& kbest  = kbests[id][k];
+    boost::mt19937 generator;
+    generator.seed(utils::random_seed());
+    boost::random_number_generator<boost::mt19937> gen(generator);
+    
+    pos_set_type    positions;
+    sample_set_type features_oracle;
+    sample_set_type features_kbest;
+    loss_set_type   losses_oracle;
+    loss_set_type   losses_kbest;
+    
+    if (sample_vector) {
+      for (size_type id = 0; id != kbests.size(); ++ id)
+	if (! kbests[id].empty() && ! oracles[id].empty()) {
+	  features_oracle.clear();
+	  losses_oracle.clear();
+	  
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+	  
+	  positions.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
+	      
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	      
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
+	      
+	      feats.clear();
+	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
+	      
+	      if (feats.empty()) continue;
+	      
+	      features_oracle.insert(feats.begin(), feats.end());
+	      losses_oracle.push_back(loss);
+	      
+	      positions.push_back(positions.size());
+	    }
+	  
+	  // second, collect data from kbests onlly, which is the same as the first examples
+	  const size_type sample_size = losses_oracle.size();
+	  
+	  features_kbest.clear();
+	  losses_kbest.clear();
+	  
+	  while (losses_kbest.size() < sample_size) {
+	    const hypothesis_type& oracle = kbests[id][gen(kbests[id].size())];
 	    
-	    // ignore oracle translations
+	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
+	    
+	    const hypothesis_type& kbest = kbests[id][gen(kbests[id].size())];
+	    
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
-	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
-	    
-	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    const double loss = kbest.loss - oracle.loss;
+	    if (loss <= 1e-4) continue;
 	    
 	    feats.clear();
-	
-	    while (oiter != oiter_end && kiter != kiter_end) {
-	      if (oiter->first < kiter->first) {
-		feats.push_back(*oiter);
-		++ oiter;
-	      } else if (kiter->first < oiter->first) {
-		feats.push_back(feature_value_type(kiter->first, - kiter->second));
-		++ kiter;
-	      } else {
-		const double value = oiter->second - kiter->second;
-		if (value != 0.0)
-		  feats.push_back(feature_value_type(kiter->first, value));
-		++ oiter;
-		++ kiter;
-	      }
-	    }
-	
-	    for (/**/; oiter != oiter_end; ++ oiter)
-	      feats.push_back(*oiter);
-	
-	    for (/**/; kiter != kiter_end; ++ kiter)
-	      feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	    construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
 	    if (feats.empty()) continue;
-
-	    if (loss_margin) {
-	      const double loss = kbest.loss - oracle.loss;
-	      
-	      // checking...
-	      if (loss > 0.0) {
-		features.insert(feats.begin(), feats.end());
-		losses.push_back(loss);
-	      }
-	    } else {
-	      features.insert(feats.begin(), feats.end());
-	      losses.push_back(1.0);
-	    }
+	    
+	    features_kbest.insert(feats.begin(), feats.end());
+	    losses_kbest.push_back(loss);
 	  }
-      }
+	  
+	  // third, collect vector with larger loss drawn from two sets
+	  const size_type kbest_size  = (sample_size >> 1);
+	  const size_type oracle_size = (sample_size - kbest_size);
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
+	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
+	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+	  }
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
+	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
+	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
+	  }
+	}
+      
+    } else {
+      for (size_type id = 0; id != kbests.size(); ++ id)
+	if (! kbests[id].empty() && ! oracles[id].empty()) {
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+	
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
+	    
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	      
+	      feats.clear();
+	      
+	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
+	      
+	      if (feats.empty()) continue;
+	      
+	      if (loss_margin) {
+		const double loss = kbest.loss - oracle.loss;
+	      
+		// checking...
+		if (loss > 0.0) {
+		  features.insert(feats.begin(), feats.end());
+		  losses.push_back(loss);
+		}
+	      } else {
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(1.0);
+	      }
+	    }
+	}
+    }
     
     features.shrink();
     loss_set_type(losses).swap(losses);
@@ -2497,6 +2712,7 @@ void options(int argc, char** argv)
     ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
     ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
     ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
+    ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
