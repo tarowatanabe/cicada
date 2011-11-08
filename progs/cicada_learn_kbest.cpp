@@ -15,8 +15,11 @@
 #include "cicada_impl.hpp"
 #include "cicada_kbest_impl.hpp"
 #include "cicada_text_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 #include "cicada/optimize_qp.hpp"
+#include "cicada/optimize.hpp"
+#include "cicada/semiring/envelope.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -69,6 +72,7 @@ double eps = std::numeric_limits<double>::infinity();
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
+bool mert_search = false;
 bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -102,6 +106,11 @@ double optimize_svm(const hypothesis_map_type& kbests,
 		    const hypothesis_map_type& oracles,
 		    weight_set_type& weights);
 
+double optimize_mert(const scorer_document_type& scorers,
+		     const hypothesis_map_type& kbests,
+		     const weight_set_type& weights_prev,
+		     weight_set_type& weights);
+
 struct OptimizeLinear;
 struct OptimizeSVM;
 struct OptimizeLBFGS;
@@ -128,7 +137,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no kbest?");
     if (oracle_path.empty())
       throw std::runtime_error("no oracke kbest?");
-    
+
     threads = utils::bithack::max(1, threads);
 
     scorer_document_type scorers(scorer_name);
@@ -146,6 +155,9 @@ int main(int argc, char ** argv)
 	scorers.swap(scorers_iterative);
       }
     }
+
+    if (mert_search && scorers.empty())
+      throw std::runtime_error("mert search requires evaluation scores");
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
@@ -170,6 +182,8 @@ int main(int argc, char ** argv)
     
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
+
+    const weight_set_type weights_prev = weights;
     
     if (learn_linear)
       objective = optimize_svm<OptimizeLinear>(kbests, oracles, weights);
@@ -180,6 +194,13 @@ int main(int argc, char ** argv)
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
+    
+    if (mert_search) {
+      const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
+      
+      if (debug)
+	std::cerr << "mert objective: " << objective << std::endl;
+    }
     
     utils::compress_ostream os(output_path, 1024 * 1024);
     os.precision(20);
@@ -1439,6 +1460,109 @@ double optimize_batch(const hypothesis_map_type& kbests,
   return Optimizer(kbests, oracles, weights)();
 }
 
+struct EnvelopeTask
+{
+  typedef cicada::optimize::LineSearch line_search_type;
+  
+  typedef line_search_type::segment_type          segment_type;
+  typedef line_search_type::segment_set_type      segment_set_type;
+  typedef line_search_type::segment_document_type segment_document_type;
+
+  typedef cicada::semiring::Envelope envelope_type;
+  typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
+
+  typedef utils::lockfree_list_queue<int, std::allocator<int> >  queue_type;
+  
+  EnvelopeTask(queue_type& __queue,
+	       segment_document_type&      __segments,
+	       const weight_set_type&      __origin,
+	       const weight_set_type&      __direction,
+	       const hypothesis_map_type&  __kbests)
+    : queue(__queue),
+      segments(__segments),
+      origin(__origin),
+      direction(__direction),
+      kbests(__kbests) {}
+
+  void operator()()
+  {
+    EnvelopeKBest::line_set_type lines;
+    int seg;
+    
+    EnvelopeKBest envelopes(origin, direction);
+    
+    while (1) {
+      queue.pop(seg);
+      if (seg < 0) break;
+      
+      envelopes(kbests[seg], lines);
+      
+      EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+      for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	const EnvelopeKBest::line_type& line = *liter;
+	
+	if (debug >= 4)
+	  std::cerr << "segment: " << seg << " x: " << line.x << std::endl;
+	
+	segments[seg].push_back(std::make_pair(line.x, line.hypothesis->score));
+      }
+    }
+  }
+  
+  queue_type& queue;
+  
+  segment_document_type& segments;
+  
+  const weight_set_type& origin;
+  const weight_set_type& direction;
+  
+  const hypothesis_map_type&  kbests;
+};
+
+double optimize_mert(const scorer_document_type& scorers,
+		     const hypothesis_map_type& kbests,
+		     const weight_set_type& weights_prev,
+		     weight_set_type& weights)
+{
+  typedef EnvelopeTask task_type;
+  typedef task_type::queue_type queue_type;
+
+  typedef task_type::line_search_type line_search_type;
+  
+  typedef line_search_type::value_type optimum_type;
+  
+  const weight_set_type& origin = weights_prev;
+  weight_set_type direction = weights;
+  direction -= weights_prev;
+  
+  task_type::segment_document_type segments(kbests.size());
+  queue_type queue;
+  
+  boost::thread_group workers;
+  for (int i = 0; i < threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, kbests)));
+  
+  for (size_t seg = 0; seg != kbests.size(); ++ seg)
+    if (! kbests[seg].empty())
+      queue.push(seg);
+  
+  for (int i = 0; i < threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+  
+  line_search_type line_search;
+  
+  const optimum_type optimum = line_search(segments, -2.0, 2.0, scorers.error_metric());
+  
+  direction *= (optimum.lower + optimum.upper) * 0.5;
+  weights = origin;
+  weights += direction;
+  
+  return optimum.objective;
+}
+
+
 struct TaskLoss
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
@@ -1966,6 +2090,7 @@ void options(int argc, char** argv)
     ("loss-margin",      po::bool_switch(&loss_margin),      "direct loss margin")
     ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
     ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
+    ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
