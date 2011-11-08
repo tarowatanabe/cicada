@@ -509,6 +509,8 @@ struct OptimizeLinear
 	  // third, collect vector with larger loss drawn from two sets
 	  const size_type kbest_size  = (sample_size >> 1);
 	  const size_type oracle_size = (sample_size - kbest_size);
+
+	  std::cerr << "kbest size: " << kbest_size << " oracle size: " << oracle_size << std::endl;
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
 	  
