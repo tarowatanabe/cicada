@@ -13,8 +13,11 @@
 #include "cicada_impl.hpp"
 #include "cicada_kbest_impl.hpp"
 #include "cicada_text_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 #include "cicada/optimize_qp.hpp"
+#include "cicada/optimize.hpp"
+#include "cicada/semiring/envelope.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -69,6 +72,7 @@ double C = 1.0;
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
+bool mert_search = false;
 bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -103,6 +107,11 @@ double optimize_online(const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       weight_set_type& weights,
 		       Generator& generator);
+
+double optimize_mert(const scorer_document_type& scorers,
+		     const hypothesis_map_type& kbests,
+		     const weight_set_type& weights_prev,
+		     weight_set_type& weights);
 
 template <typename Optimizer>
 struct OptimizeOnline;
@@ -162,7 +171,9 @@ int main(int argc, char ** argv)
 	scorers.swap(scorers_iterative);
       }
     }
-
+    
+    if (mert_search && scorers.empty())
+      throw std::runtime_error("mert search requires evaluation scores");
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
@@ -200,6 +211,8 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
     
+    weight_set_type weights_prev = weights;
+    
     if (learn_sgd) {
       if (regularize_l1)
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(kbests, oracles, weights, generator);
@@ -220,6 +233,14 @@ int main(int argc, char ** argv)
 
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
+    
+    if (mert_search) {
+      const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
+      
+      if (debug)
+	std::cerr << "mert objective: " << objective << std::endl;
+    }
+
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_path, 1024 * 1024);
@@ -1920,6 +1941,107 @@ double optimize_batch(const hypothesis_map_type& kbests,
   }
 }
 
+struct EnvelopeTask
+{
+  typedef cicada::optimize::LineSearch line_search_type;
+  
+  typedef line_search_type::segment_type          segment_type;
+  typedef line_search_type::segment_set_type      segment_set_type;
+  typedef line_search_type::segment_document_type segment_document_type;
+
+  typedef cicada::semiring::Envelope envelope_type;
+  typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
+  
+  EnvelopeTask(const weight_set_type&      __origin,
+	       const weight_set_type&      __direction,
+	       const hypothesis_map_type&  __kbests)
+    : origin(__origin),
+      direction(__direction),
+      kbests(__kbests),
+      segments(__kbests.size()) {}
+
+  void operator()()
+  {
+    EnvelopeKBest::line_set_type lines;
+    EnvelopeKBest envelopes(origin, direction);
+    
+    for (size_t seg = 0; seg != kbests.size(); ++ seg) 
+      if (! kbests[seg].empty()) {
+	
+	envelopes(kbests[seg], lines);
+	
+	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	  const EnvelopeKBest::line_type& line = *liter;
+	  
+	  if (debug >= 4)
+	    std::cerr << "segment: " << seg << " x: " << line.x << std::endl;
+	  
+	  segments[seg].push_back(std::make_pair(line.x, line.hypothesis->score));
+	}
+      }
+  }
+  
+  const weight_set_type& origin;
+  const weight_set_type& direction;
+  
+  const hypothesis_map_type&  kbests;
+
+  segment_document_type segments;
+};
+
+double optimize_mert(const scorer_document_type& scorers,
+		     const hypothesis_map_type& kbests,
+		     const weight_set_type& weights_prev,
+		     weight_set_type& weights)
+{
+  typedef EnvelopeTask envelope_type;
+  
+  typedef envelope_type::line_search_type line_search_type;
+  
+  typedef line_search_type::value_type optimum_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  weight_set_type origin = weights_prev;
+  weight_set_type direction = weights;
+  direction -= weights_prev;
+  
+  bcast_weights(0, origin);
+  bcast_weights(0, direction);
+  
+  envelope_type envelope(origin, direction, kbests);
+  envelope();
+  
+  // collect all the segments...
+  if (mpi_rank == 0) {
+    
+  } else {
+    
+    
+  }
+  
+  double objective = 0.0;
+  
+  if (mpi_rank == 0) {
+    line_search_type line_search;
+    
+    const optimum_type optimum = line_search(envelope.segments, -2.0, 2.0, scorers.error_metric());
+    
+    direction *= (optimum.lower + optimum.upper) * 0.5;
+    weights = origin;
+    weights += direction;
+    
+    objective = optimum.objective;
+
+    if (debug >= 2)
+      std::cerr << "mert update: " << ((optimum.lower + optimum.upper) * 0.5) << std::endl;
+  }
+  
+  return objective;
+}
+
 void unique_kbest(hypothesis_map_type& kbests)
 {
 #ifdef HAVE_TR1_UNORDERED_SET
@@ -2349,9 +2471,10 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     
-    ("loss-margin",    po::bool_switch(&loss_margin),        "direct loss margin")
-    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
-    ("line-search",    po::bool_switch(&line_search),        "perform line search in each iteration")
+    ("loss-margin",      po::bool_switch(&loss_margin),      "direct loss margin")
+    ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
+    ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
+    ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")

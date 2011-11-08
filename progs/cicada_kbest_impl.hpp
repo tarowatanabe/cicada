@@ -19,6 +19,7 @@
 #include <boost/fusion/adapted.hpp>
 
 #include <utils/simple_vector.hpp>
+#include <utils/base64.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/eval.hpp"
@@ -101,13 +102,19 @@ typedef std::vector<hypothesis_set_type, std::allocator<hypothesis_set_type> > h
 template <typename Iterator>
 struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature_type(), boost::spirit::standard::blank_type>
 {
+  class double_base64_type : public std::string
+  {
+  public:
+    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
+  };
+
   kbest_feature_parser() : kbest_feature_parser::base_type(kbest)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
     tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-    
+        
     // TODO: we want to handle longest character sequences... HOW?
     feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
     features %= -(feature % (+standard::space));
@@ -116,7 +123,7 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
-  
+    
   boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
   

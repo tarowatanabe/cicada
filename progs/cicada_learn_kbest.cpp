@@ -1553,11 +1553,14 @@ double optimize_mert(const scorer_document_type& scorers,
   
   line_search_type line_search;
   
-  const optimum_type optimum = line_search(segments, -2.0, 2.0, scorers.error_metric());
+  const optimum_type optimum = line_search(segments, -1.0, 1.0, scorers.error_metric());
   
   direction *= (optimum.lower + optimum.upper) * 0.5;
   weights = origin;
   weights += direction;
+
+  if (debug >= 2)
+    std::cerr << "mert update: " << ((optimum.lower + optimum.upper) * 0.5) << std::endl;
   
   return optimum.objective;
 }
