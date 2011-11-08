@@ -73,6 +73,7 @@ bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
 bool mert_search = false;
+bool mert_search_local = false;
 bool sample_vector = false;
 bool normalize_vector = false;
 
@@ -174,6 +175,8 @@ int main(int argc, char ** argv)
     }
     
     if (mert_search && scorers.empty())
+      throw std::runtime_error("mert search requires evaluation scores");
+    if (mert_search_local && scorers.empty())
       throw std::runtime_error("mert search requires evaluation scores");
     if (sample_vector && scorers.empty())
       throw std::runtime_error("sampling requires evaluation scores");
@@ -1116,14 +1119,14 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 	  
 	  if (k > 0.0) {
-	    weight_set_type weights_prev_saved = weights_prev;
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	    
-	    optimizer.weights *= k;
-	    weights_prev *= (1.0 - k);
-	    
-	    optimizer.weights += weights_prev;
-	    
-	    weights_prev.swap(weights_prev_saved);
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 - k) * weights_prev[i];
 	  }
 	  
 	  
@@ -1152,14 +1155,14 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	  if (k > 0.0) {
-	    weight_set_type weights_prev_saved = weights_prev;
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	    
-	    optimizer.weights *= - k;
-	    weights_prev *= (1.0 + k);
-	    
-	    optimizer.weights += weights_prev;
-	    
-	    weights_prev.swap(weights_prev_saved);
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = - k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 + k) * weights_prev[i];
 	  }
 	}
       }
@@ -1837,9 +1840,14 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 
 	  if (k > 0.0) {
-	    weights *= k;
-	    weights_prev *= (1.0 - k);
-	    weights += weights_prev;
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	    
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 - k) * weights_prev[i];
 	  }
 	} else if (grad_neg < 0.0) {
 	  double k = 0.0;
@@ -1866,14 +1874,131 @@ double optimize_cp(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	  if (k > 0.0) {
-	    weights *= - k;
-	    weights_prev *= (1.0 + k);
-	    weights += weights_prev;
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	    
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = - k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 + k) * weights_prev[i];
 	  }
 	}
       }
       
       // finished line-search
+    }
+    
+    if (mert_search_local) {
+      typedef cicada::optimize::LineSearch line_search_type;
+      
+      typedef line_search_type::segment_type          segment_type;
+      typedef line_search_type::segment_set_type      segment_set_type;
+      typedef line_search_type::segment_document_type segment_document_type;
+      
+      typedef line_search_type::value_type optimum_type;
+      
+      const weight_set_type& origin    = weights_prev;
+      weight_set_type direction = weights;
+      direction -= weights_prev;
+      
+      if (mpi_rank == 0) {
+	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+	
+	EnvelopeKBest::line_set_type lines;
+	EnvelopeKBest envelopes(origin, direction);
+	
+	segment_document_type segments;
+	
+	for (size_t id = 0; id != kbests.size(); ++ id) 
+	  if (! kbests[id].empty()) {
+	    segments.push_back(segment_set_type());
+	    
+	    envelopes(kbests[id], lines);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
+	      segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
+	  }
+	
+	
+	for (int rank = 1; rank != mpi_size; ++ rank) {
+	  boost::iostreams::filtering_istream is;
+	  is.push(boost::iostreams::zlib_decompressor());
+	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
+
+	  std::string line;
+	  int id_prev = -1;
+      
+	  while (std::getline(is, line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
+	
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece id_str = *iter; 
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece x_str = *iter;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece score_str = *iter;
+	
+	    const int id = utils::lexical_cast<int>(id_str);
+	    if (id_prev != id)
+	      segments.push_back(segment_set_type());
+	
+	    segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
+						     scorer_type::score_type::decode(score_str)));
+	    
+	    id_prev = id;
+	  }
+	}
+	
+	line_search_type line_search;
+	
+	const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+	
+	direction *= (optimum.lower + optimum.upper) * 0.5;
+	weights = origin;
+	weights += direction;
+    
+	if (debug >= 2)
+	  std::cerr << "mert update: " << ((optimum.lower + optimum.upper) * 0.5)
+		    << " objective: " << optimum.objective << std::endl;
+	
+      } else {
+	EnvelopeKBest::line_set_type lines;
+	EnvelopeKBest envelopes(origin, direction);
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::zlib_compressor());
+	os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
+    
+	for (size_t id = 0; id != kbests.size(); ++ id) 
+	  if (! kbests[id].empty()) {
+	    envelopes(kbests[id], lines);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	      const EnvelopeKBest::line_type& line = *liter;
+	      
+	      os << id << " ||| ";
+	      utils::encode_base64(line.x, std::ostream_iterator<char>(os));
+	      os << " ||| " << line.hypothesis->score->encode() << '\n';
+	    }
+	  }
+      }
+      
+      // finished local mert
     }
     
     // current weights is the master problems weights...
@@ -2708,12 +2833,13 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     
-    ("loss-margin",      po::bool_switch(&loss_margin),      "direct loss margin")
-    ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
-    ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
-    ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
-    ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
-    ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
+    ("loss-margin",       po::bool_switch(&loss_margin),       "direct loss margin")
+    ("softmax-margin",    po::bool_switch(&softmax_margin),    "softmax margin")
+    ("line-search",       po::bool_switch(&line_search),       "perform line search in each iteration")
+    ("mert-search",       po::bool_switch(&mert_search),       "perform one-dimensional mert")
+    ("mert-search-local", po::bool_switch(&mert_search_local), "perform local one-dimensional mert")
+    ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
+    ("normalize-vector",  po::bool_switch(&normalize_vector),  "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
