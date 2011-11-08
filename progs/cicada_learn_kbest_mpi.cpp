@@ -97,7 +97,8 @@ void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
 
 template <typename Optimize>
-double optimize_cp(const hypothesis_map_type& kbests,
+double optimize_cp(const scorer_document_type& scorers,
+		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
 		   weight_set_type& weights);
 template <typename Optimize>
@@ -233,7 +234,7 @@ int main(int argc, char ** argv)
     else if (learn_pegasos)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(kbests, oracles, weights, generator);
     else if (learn_cp)
-      objective = optimize_cp<OptimizeCP>(kbests, oracles, weights);
+      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
 
@@ -1685,7 +1686,8 @@ struct OptimizeCP
 };
 
 template <typename Optimize>
-double optimize_cp(const hypothesis_map_type& kbests,
+double optimize_cp(const scorer_document_type& scorers,
+		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
 		   weight_set_type& weights)
 {
