@@ -1899,6 +1899,8 @@ double optimize_cp(const scorer_document_type& scorers,
       typedef line_search_type::segment_document_type segment_document_type;
       
       typedef line_search_type::value_type optimum_type;
+
+      bcast_weights(0, weights);
       
       const weight_set_type& origin    = weights_prev;
       weight_set_type direction = weights;
