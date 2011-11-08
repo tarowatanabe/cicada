@@ -73,6 +73,7 @@ bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
 bool line_search = false;
 bool mert_search = false;
+bool sample_vector = false;
 bool normalize_vector = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -158,6 +159,8 @@ int main(int argc, char ** argv)
 
     if (mert_search && scorers.empty())
       throw std::runtime_error("mert search requires evaluation scores");
+    if (sample_vector && scorers.empty())
+      throw std::runtime_error("sampling requires evaluation scores");
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
@@ -265,6 +268,77 @@ struct OptimizeLinear
 
   struct Encoder
   {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
+    typedef hypothesis_type::feature_value_type feature_value_type;
+
+    struct SampleSet
+    {
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+      typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+      struct Sample
+      {
+	typedef features_type::const_iterator const_iterator;
+
+	Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+
+	const_iterator begin() const { return first; }
+	const_iterator end() const { return last; }
+	size_type size() const { return last - first; }
+	bool emtpy() const { return first == last; }
+      
+	const_iterator first;
+	const_iterator last;
+      };
+
+      typedef Sample sample_type;
+      typedef sample_type value_type;
+    
+      SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+      void clear()
+      {
+	features.clear();
+	offsets.clear();
+	offsets.push_back(0);
+      }
+    
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last)
+      {
+	features.insert(features.end(), first, last);
+	offsets.push_back(features.size());
+      }
+    
+      sample_type operator[](size_type pos) const
+      {
+	return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+      }
+    
+      size_type size() const { return offsets.size() - 1; }
+      bool empty() const { return offsets.size() == 1; }
+
+      void swap(SampleSet& x)
+      {
+	features.swap(x.features);
+	offsets.swap(x.offsets);
+      }
+
+      void shrink()
+      {
+	features_type(features).swap(features);
+	offsets_type(offsets).swap(offsets);
+      }
+    
+      features_type features;
+      offsets_type  offsets;
+    };
+  
+    typedef SampleSet sample_set_type;
+    typedef std::vector<double, std::allocator<double> > loss_set_type;
+
     typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
 
     Encoder(queue_type& __queue,
@@ -282,8 +356,71 @@ struct OptimizeLinear
     feature_node_set_type features;
     weight_set_type       norms;
     
+    template <typename Iterator1, typename Iterator2, typename Features>
+    void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
+			Iterator2 kiter, Iterator2 kiter_end,
+			Features& feats)
+    {
+      while (oiter != oiter_end && kiter != kiter_end) {
+	if (oiter->first < kiter->first) {
+	  feats.push_back(*oiter);
+	  ++ oiter;
+	} else if (kiter->first < oiter->first) {
+	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
+	  ++ kiter;
+	} else {
+	  const double value = oiter->second - kiter->second;
+	  if (value != 0.0)
+	    feats.push_back(feature_value_type(kiter->first, value));
+	  ++ oiter;
+	  ++ kiter;
+	}
+      }
+      
+      for (/**/; oiter != oiter_end; ++ oiter)
+	feats.push_back(*oiter);
+      
+      for (/**/; kiter != kiter_end; ++ kiter)
+	feats.push_back(feature_value_type(kiter->first, - kiter->second));
+    }
+    
+    template <typename Iterator>
+    void transform_pair(Iterator first, Iterator last)
+    {
+      feature_node_type feature;
+      
+      offsets.push_back(features.size());
+      
+      for (/**/; first != last; ++ first) {
+	feature.index = first->first.id() + 1;
+	feature.value = first->second;
+	
+	features.push_back(feature);
+	norms[first->first] += first->second * first->second;
+      }
+      
+      feature.index = -1;
+      feature.value = 0.0;
+      features.push_back(feature);
+    }
+
+    struct greater_loss
+    {
+      greater_loss(const loss_set_type&   __losses) : losses(__losses) {}
+
+      bool operator()(const size_type& x, const size_type& y) const
+      {
+	return losses[x] > losses[y];
+      }
+      
+      const loss_set_type&   losses;
+    };
+    
     void operator()()
     {
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+      typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
+      
       offsets.clear();
       features.clear();
       norms.clear();
@@ -293,86 +430,175 @@ struct OptimizeLinear
       
       int id = 0;
       
+      boost::mt19937 generator;
+      generator.seed(utils::random_seed());
+      boost::random_number_generator<boost::mt19937> gen(generator);
+      
+      features_type feats;
+      
+      pos_set_type    positions;
+      sample_set_type features_oracle;
+      sample_set_type features_kbest;
+      loss_set_type   losses_oracle;
+      loss_set_type   losses_kbest;
+      
       for (;;) {
 	queue.pop(id);
 	if (id < 0) break;
 	
-	sentences.clear();
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  sentences.insert(oracles[id][o].sentence);
-	
-	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
-	    const hypothesis_type& oracle = oracles[id][o];
-	    const hypothesis_type& kbest  = kbests[id][k];
+	if (sample_vector) {
+	  // first, we collect instances from oracle <-> non-oracle pairs
+
+	  features_oracle.clear();
+	  losses_oracle.clear();
+	  
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+
+	  positions.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
 	    
-	    // ignore oracle translations
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
+	      
+	      feats.clear();
+	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
+	      
+	      if (feats.empty()) continue;
+	      
+	      features_oracle.insert(feats.begin(), feats.end());
+	      losses_oracle.push_back(loss);
+
+	      positions.push_back(positions.size());
+	    }
+	  
+	  // second, collect data from kbests onlly, which is the same as the first examples
+	  const size_type sample_size = losses_oracle.size();
+	  
+	  features_kbest.clear();
+	  losses_kbest.clear();
+	  
+	  while (losses_kbest.size() < sample_size) {
+	    const hypothesis_type& oracle = kbests[id][gen(kbests.size())];
+	    
+	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
+	    
+	    const hypothesis_type& kbest = kbests[id][gen(kbests.size())];
+	    
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
-	    offsets.push_back(features.size());
+	    const double loss = kbest.loss - oracle.loss;
+	    if (loss <= 1e-4) continue;
 	    
-	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    feats.clear();
+	    construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
-	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
-	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    if (feats.empty()) continue;
 	    
-	    while (oiter != oiter_end && kiter != kiter_end) {
-	      if (oiter->first < kiter->first) {
+	    features_kbest.insert(feats.begin(), feats.end());
+	    losses_kbest.push_back(loss);
+	  }
+	  
+	  // third, collect vector with larger loss drawn from two sets
+	  const size_type kbest_size  = (sample_size >> 1);
+	  const size_type oracle_size = (sample_size - kbest_size);
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter)
+	    transform_pair(features_oracle[*piter].begin(), features_oracle[*piter].end());
+	  
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
+	  
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter)
+	    transform_pair(features_kbest[*piter].begin(), features_kbest[*piter].end());
+	  
+	} else {
+	  sentences.clear();
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    sentences.insert(oracles[id][o].sentence);
+	
+	  for (size_t o = 0; o != oracles[id].size(); ++ o)
+	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	      const hypothesis_type& oracle = oracles[id][o];
+	      const hypothesis_type& kbest  = kbests[id][k];
+	    
+	      // ignore oracle translations
+	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    
+	      offsets.push_back(features.size());
+	    
+	      hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	      hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    
+	      hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	      hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    
+	      while (oiter != oiter_end && kiter != kiter_end) {
+		if (oiter->first < kiter->first) {
+		  feature.index = oiter->first.id() + 1;
+		  feature.value = oiter->second;
+		  features.push_back(feature);
+
+		  norms[oiter->first] += feature.value * feature.value;
+		
+		  ++ oiter;
+		} else if (kiter->first < oiter->first) {
+		  feature.index = kiter->first.id() + 1;
+		  feature.value = - kiter->second;
+		  features.push_back(feature);
+		
+		  norms[kiter->first] += feature.value * feature.value;
+
+		  ++ kiter;
+		} else {
+		  feature.index = oiter->first.id() + 1;
+		  feature.value = oiter->second - kiter->second;
+		  if (feature.value != 0.0) {
+		    features.push_back(feature);
+		  
+		    norms[oiter->first] += feature.value * feature.value;
+		  }
+		  ++ oiter;
+		  ++ kiter;
+		}
+	      }
+	    
+	      for (/**/; oiter != oiter_end; ++ oiter) {
 		feature.index = oiter->first.id() + 1;
 		feature.value = oiter->second;
 		features.push_back(feature);
-
+	      
 		norms[oiter->first] += feature.value * feature.value;
-		
-		++ oiter;
-	      } else if (kiter->first < oiter->first) {
+	      }
+	    
+	      for (/**/; kiter != kiter_end; ++ kiter) {
 		feature.index = kiter->first.id() + 1;
 		feature.value = - kiter->second;
 		features.push_back(feature);
-		
+	      
 		norms[kiter->first] += feature.value * feature.value;
-
-		++ kiter;
-	      } else {
-		feature.index = oiter->first.id() + 1;
-		feature.value = oiter->second - kiter->second;
-		if (feature.value != 0.0) {
-		  features.push_back(feature);
-		  
-		  norms[oiter->first] += feature.value * feature.value;
-		}
-		++ oiter;
-		++ kiter;
 	      }
-	    }
 	    
-	    for (/**/; oiter != oiter_end; ++ oiter) {
-	      feature.index = oiter->first.id() + 1;
-	      feature.value = oiter->second;
-	      features.push_back(feature);
+	      // termination...
+	      // if we have no instances, simply erase the last offsets
+	      if (offsets.back() == features.size())
+		offsets.pop_back();
+	      else {
+		feature.index = -1;
+		feature.value = 0.0;
+		features.push_back(feature);
+	      }
 	      
-	      norms[oiter->first] += feature.value * feature.value;
 	    }
-	    
-	    for (/**/; kiter != kiter_end; ++ kiter) {
-	      feature.index = kiter->first.id() + 1;
-	      feature.value = - kiter->second;
-	      features.push_back(feature);
-	      
-	      norms[kiter->first] += feature.value * feature.value;
-	    }
-	    
-	    // termination...
-	    // if we have no instances, simply erase the last offsets
-	    if (offsets.back() == features.size())
-	      offsets.pop_back();
-	    else {
-	      feature.index = -1;
-	      feature.value = 0.0;
-	      features.push_back(feature);
-	    }
-	  }
+	}
       }
       
       feature_node_set_type(features).swap(features);
@@ -2094,6 +2320,7 @@ void options(int argc, char** argv)
     ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
     ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
     ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
+    ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
