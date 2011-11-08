@@ -445,6 +445,8 @@ struct OptimizeLinear
       for (;;) {
 	queue.pop(id);
 	if (id < 0) break;
+
+	if (oracles[id].empty() || kbests[id].empty()) continue;
 	
 	if (sample_vector) {
 	  // first, we collect instances from oracle <-> non-oracle pairs
@@ -486,11 +488,11 @@ struct OptimizeLinear
 	  losses_kbest.clear();
 	  
 	  while (losses_kbest.size() < sample_size) {
-	    const hypothesis_type& oracle = kbests[id][gen(kbests.size())];
+	    const hypothesis_type& oracle = kbests[id][gen(kbests[id].size())];
 	    
 	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
 	    
-	    const hypothesis_type& kbest = kbests[id][gen(kbests.size())];
+	    const hypothesis_type& kbest = kbests[id][gen(kbests[id].size())];
 	    
 	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	    
@@ -510,7 +512,7 @@ struct OptimizeLinear
 	  const size_type kbest_size  = (sample_size >> 1);
 	  const size_type oracle_size = (sample_size - kbest_size);
 
-	  std::cerr << "kbest size: " << kbest_size << " oracle size: " << oracle_size << std::endl;
+	  //std::cerr << "kbest size: " << kbest_size << " oracle size: " << oracle_size << std::endl;
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
 	  
@@ -521,6 +523,8 @@ struct OptimizeLinear
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter)
 	    transform_pair(features_kbest[*piter].begin(), features_kbest[*piter].end());
+
+	  //std::cerr << "sampled: " << id  << " offsets: " << offsets.size() << std::endl;
 	  
 	} else {
 	  sentences.clear();
