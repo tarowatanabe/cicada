@@ -1553,7 +1553,7 @@ double optimize_mert(const scorer_document_type& scorers,
   
   line_search_type line_search;
   
-  const optimum_type optimum = line_search(segments, 1e-4, 1.0 + 1e-4, scorers.error_metric());
+  const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
   
   direction *= (optimum.lower + optimum.upper) * 0.5;
   weights = origin;

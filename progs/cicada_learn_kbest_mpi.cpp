@@ -240,7 +240,6 @@ int main(int argc, char ** argv)
       if (debug && mpi_rank == 0)
 	std::cerr << "mert objective: " << objective << std::endl;
     }
-
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_path, 1024 * 1024);
@@ -264,7 +263,6 @@ int main(int argc, char ** argv)
 
 enum {
   weights_tag = 1000,
-  gradients_tag,
   notify_tag,
   termination_tag,
   point_tag,
@@ -2029,7 +2027,7 @@ double optimize_mert(const scorer_document_type& scorers,
 
     line_search_type line_search;
     
-    const optimum_type optimum = line_search(segments, 1e-4, 1.0 + 1e-4, scorers.error_metric());
+    const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
     
     direction *= (optimum.lower + optimum.upper) * 0.5;
     weights = origin;
