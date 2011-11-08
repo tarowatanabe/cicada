@@ -237,7 +237,7 @@ int main(int argc, char ** argv)
     if (mert_search) {
       const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
       
-      if (debug)
+      if (debug && mpi_rank == 0)
 	std::cerr << "mert objective: " << objective << std::endl;
     }
 
@@ -2026,7 +2026,7 @@ double optimize_mert(const scorer_document_type& scorers,
       }
     }
     
-    
+
     line_search_type line_search;
     
     const optimum_type optimum = line_search(segments, 1e-4, 1.0 + 1e-4, scorers.error_metric());
