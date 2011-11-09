@@ -582,24 +582,21 @@ struct OptimizeOnlineMargin
     boost::random_number_generator<boost::mt19937> gen(generator);
     
     pos_set_type    positions;
-    sample_set_type features_oracle;
-    sample_set_type features_kbest;
-    loss_set_type   losses_oracle;
-    loss_set_type   losses_kbest;
+    sample_set_type features_sample;
+    loss_set_type   losses_sample;
 
     weight_set_type norms;
 
     if (sample_vector) {
       for (size_type id = 0; id != kbests.size(); ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
-	  features_oracle.clear();
-	  losses_oracle.clear();
+	  features_sample.clear();
+	  losses_sample.clear();
 	  
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
 	  
-	  positions.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	      const hypothesis_type& oracle = oracles[id][o];
@@ -616,26 +613,25 @@ struct OptimizeOnlineMargin
 	      
 	      if (feats.empty()) continue;
 	      
-	      features_oracle.insert(feats.begin(), feats.end());
-	      losses_oracle.push_back(loss);
-	      
-	      positions.push_back(positions.size());
+	      features_sample.insert(feats.begin(), feats.end());
+	      losses_sample.push_back(loss);
 	    }
 	  
 	  // second, collect data from kbests onlly, which is the same as the first examples
-	  const size_type sample_size = losses_oracle.size();
-	  
-	  features_kbest.clear();
-	  losses_kbest.clear();
-	  
-	  while (losses_kbest.size() < sample_size) {
-	    const hypothesis_type& oracle = kbests[id][gen(kbests[id].size())];
+	  const size_type sample_size = losses_sample.size();
+	  const size_type sample_size_max = sample_size << 2;
+
+	  while (losses_sample.size() < sample_size_max) {
+	    const hypothesis_type& hyp1 = kbests[id][gen(kbests[id].size())];
 	    
-	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
+	    if (sentences.find(hyp1.sentence) != sentences.end()) continue;
 	    
-	    const hypothesis_type& kbest = kbests[id][gen(kbests[id].size())];
+	    const hypothesis_type& hyp2 = kbests[id][gen(kbests[id].size())];
 	    
-	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    if (sentences.find(hyp2.sentence) != sentences.end()) continue;
+	    
+	    const hypothesis_type& kbest  = (hyp1.loss < hyp2.loss ? hyp2 : hyp1);
+	    const hypothesis_type& oracle = (hyp1.loss < hyp2.loss ? hyp1 : hyp2);
 	    
 	    const double loss = kbest.loss - oracle.loss;
 	    if (loss <= 1e-4) continue;
@@ -645,40 +641,27 @@ struct OptimizeOnlineMargin
 	    
 	    if (feats.empty()) continue;
 	    
-	    features_kbest.insert(feats.begin(), feats.end());
-	    losses_kbest.push_back(loss);
+	    features_sample.insert(feats.begin(), feats.end());
+	    losses_sample.push_back(loss);
 	  }
+
+	  positions.clear();
+	  for (size_type i = 0; i != losses_sample.size(); ++ i)
+	    positions.push_back(i);
 	  
 	  norms.clear();
 
 	  const size_type instances_first = losses.size();
-
-	  // third, collect vector with larger loss drawn from two sets
-	  const size_type kbest_size  = (sample_size >> 1);
-	  const size_type oracle_size = (sample_size - kbest_size);
 	  
-	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
-	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
-	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
+	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
+	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 
 	    if (normalize_vector) {
-	      typename sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
-	      for (typename sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
-		norms[fiter->first] += fiter->second;
-	    }
-	  }
-	  
-	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
-	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
-	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
-	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
-
-	    if (normalize_vector) {
-	      typename sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
-	      for (typename sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      typename sample_set_type::value_type::const_iterator fiter_end = features_sample[*piter].end();
+	      for (typename sample_set_type::value_type::const_iterator fiter = features_sample[*piter].begin(); fiter != fiter_end; ++ fiter) 
 		norms[fiter->first] += fiter->second;
 	    }
 	  }
@@ -1627,24 +1610,21 @@ struct OptimizeCP
     boost::random_number_generator<boost::mt19937> gen(generator);
     
     pos_set_type    positions;
-    sample_set_type features_oracle;
-    sample_set_type features_kbest;
-    loss_set_type   losses_oracle;
-    loss_set_type   losses_kbest;
+    sample_set_type features_sample;
+    loss_set_type   losses_sample;
     
     weight_set_type norms;
     
     if (sample_vector) {
       for (size_type id = 0; id != kbests.size(); ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
-	  features_oracle.clear();
-	  losses_oracle.clear();
+	  features_sample.clear();
+	  losses_sample.clear();
 	  
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
 	  
-	  positions.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	      const hypothesis_type& oracle = oracles[id][o];
@@ -1661,26 +1641,25 @@ struct OptimizeCP
 	      
 	      if (feats.empty()) continue;
 	      
-	      features_oracle.insert(feats.begin(), feats.end());
-	      losses_oracle.push_back(loss);
-	      
-	      positions.push_back(positions.size());
+	      features_sample.insert(feats.begin(), feats.end());
+	      losses_sample.push_back(loss);
 	    }
 	  
 	  // second, collect data from kbests onlly, which is the same as the first examples
-	  const size_type sample_size = losses_oracle.size();
+	  const size_type sample_size = losses_sample.size();
+	  const size_type sample_size_max = sample_size << 2;
 	  
-	  features_kbest.clear();
-	  losses_kbest.clear();
-	  
-	  while (losses_kbest.size() < sample_size) {
-	    const hypothesis_type& oracle = kbests[id][gen(kbests[id].size())];
+	  while (losses_sample.size() < sample_size_max) {
+	    const hypothesis_type& hyp1 = kbests[id][gen(kbests[id].size())];
 	    
-	    if (sentences.find(oracle.sentence) != sentences.end()) continue;
+	    if (sentences.find(hyp1.sentence) != sentences.end()) continue;
 	    
-	    const hypothesis_type& kbest = kbests[id][gen(kbests[id].size())];
+	    const hypothesis_type& hyp2 = kbests[id][gen(kbests[id].size())];
 	    
-	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    if (sentences.find(hyp2.sentence) != sentences.end()) continue;
+	    
+	    const hypothesis_type& kbest  = (hyp1.loss < hyp2.loss ? hyp2 : hyp1);
+	    const hypothesis_type& oracle = (hyp1.loss < hyp2.loss ? hyp1 : hyp2);
 	    
 	    const double loss = kbest.loss - oracle.loss;
 	    if (loss <= 1e-4) continue;
@@ -1690,9 +1669,13 @@ struct OptimizeCP
 	    
 	    if (feats.empty()) continue;
 	    
-	    features_kbest.insert(feats.begin(), feats.end());
-	    losses_kbest.push_back(loss);
+	    features_sample.insert(feats.begin(), feats.end());
+	    losses_sample.push_back(loss);
 	  }
+
+	  positions.clear();
+	  for (size_type i = 0; i != losses_sample.size(); ++ i)
+	    positions.push_back(i);
 
 	  norms.clear();
 
@@ -1702,28 +1685,15 @@ struct OptimizeCP
 	  const size_type kbest_size  = (sample_size >> 1);
 	  const size_type oracle_size = (sample_size - kbest_size);
 	  
-	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
-	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
-	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
+	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	    
 	    if (normalize_vector) {
-	      sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
-	      for (sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
-		norms[fiter->first] += fiter->second;
-	    }
-	  }
-	  
-	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
-	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
-	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
-	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
-
-	    if (normalize_vector) {
-	      sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
-	      for (sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      sample_set_type::value_type::const_iterator fiter_end = features_sample[*piter].end();
+	      for (sample_set_type::value_type::const_iterator fiter = features_sample[*piter].begin(); fiter != fiter_end; ++ fiter) 
 		norms[fiter->first] += fiter->second;
 	    }
 	  }
