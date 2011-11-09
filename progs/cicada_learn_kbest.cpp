@@ -1200,7 +1200,7 @@ struct OptimizeSVM
 	  
 	  const size_type instances_first = losses.size();
 	  
-	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
