@@ -1229,8 +1229,8 @@ struct OptimizeSVM
 	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
 
 	    if (normalize_vector) {
-	      typename sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
-	      for (typename sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
+	      for (sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
 		norms[fiter->first] += fiter->second;
 	    }
 	  }
@@ -1242,8 +1242,8 @@ struct OptimizeSVM
 	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
 	    
 	    if (normalize_vector) {
-	      typename sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
-	      for (typename sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
+	      for (sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
 		norms[fiter->first] += fiter->second;
 	    }
 	  }
@@ -1257,8 +1257,8 @@ struct OptimizeSVM
 	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
 	      
 	      for (size_type id = instances_first; id != instances_last; ++ id) {
-		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
-		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+		sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+		for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
 	      }
 	    }
