@@ -481,12 +481,7 @@ struct OptimizeLinear
 	  
 	  while (losses_sample.size() < sample_size_max) {
 	    const hypothesis_type& hyp1 = kbests[id][gen(kbests[id].size())];
-	    
-	    if (sentences.find(hyp1.sentence) != sentences.end()) continue;
-	    
 	    const hypothesis_type& hyp2 = kbests[id][gen(kbests[id].size())];
-	    
-	    if (sentences.find(hyp2.sentence) != sentences.end()) continue;
 	    
 	    const hypothesis_type& kbest  = (hyp1.loss < hyp2.loss ? hyp2 : hyp1);
 	    const hypothesis_type& oracle = (hyp1.loss < hyp2.loss ? hyp1 : hyp2);
@@ -1170,12 +1165,7 @@ struct OptimizeSVM
 	  
 	  while (losses_sample.size() < sample_size_max) {
 	    const hypothesis_type& hyp1 = kbests[id][gen(kbests[id].size())];
-	    
-	    if (sentences.find(hyp1.sentence) != sentences.end()) continue;
-	    
 	    const hypothesis_type& hyp2 = kbests[id][gen(kbests[id].size())];
-	    
-	    if (sentences.find(hyp2.sentence) != sentences.end()) continue;
 	    
 	    const hypothesis_type& kbest  = (hyp1.loss < hyp2.loss ? hyp2 : hyp1);
 	    const hypothesis_type& oracle = (hyp1.loss < hyp2.loss ? hyp1 : hyp2);
