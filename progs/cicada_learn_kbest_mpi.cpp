@@ -106,7 +106,8 @@ double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
 template <typename Optimize, typename Generator>
-double optimize_online(const hypothesis_map_type& kbests,
+double optimize_online(const scorer_document_type& scorers,
+		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       weight_set_type& weights,
 		       Generator& generator);
@@ -222,17 +223,17 @@ int main(int argc, char ** argv)
     
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(kbests, oracles, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(kbests, oracles, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, weights, generator);
     } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, weights, generator);
     else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, weights, generator);
     else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, weights, generator);
     else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, weights, generator);
     else if (learn_cp)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, weights);
     else 
@@ -976,7 +977,8 @@ void reduce_points(Points& points)
 }
 
 template <typename Optimize, typename Generator>
-double optimize_online(const hypothesis_map_type& kbests,
+double optimize_online(const scorer_document_type& scorers,
+		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       weight_set_type& weights,
 		       Generator& generator)
@@ -1120,14 +1122,14 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 	  
 	  if (k > 0.0) {
-	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	    const size_t weights_size = utils::bithack::min(optimizer.weights.size(), weights_prev.size());
 	    
 	    for (size_t i = 0; i != weights_size; ++ i)
-	      weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
-	    for (size_t i = weights_size; i < weights.size(); ++ i)
-	      weights[i] = k * weights[i];
+	      optimizer.weights[i] = k * optimizer.weights[i] + (1.0 - k) * weights_prev[i];
+	    for (size_t i = weights_size; i < optimizer.weights.size(); ++ i)
+	      optimizer.weights[i] = k * optimizer.weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	      weights[i] = (1.0 - k) * weights_prev[i];
+	      optimizer.weights[i] = (1.0 - k) * weights_prev[i];
 	  }
 	  
 	  
@@ -1156,15 +1158,106 @@ double optimize_online(const hypothesis_map_type& kbests,
 	    std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	  if (k > 0.0) {
-	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	    const size_t weights_size = utils::bithack::min(optimizer.weights.size(), weights_prev.size());
 	    
 	    for (size_t i = 0; i != weights_size; ++ i)
-	      weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
-	    for (size_t i = weights_size; i < weights.size(); ++ i)
-	      weights[i] = - k * weights[i];
+	      optimizer.weights[i] = - k * optimizer.weights[i] + (1.0 + k) * weights_prev[i];
+	    for (size_t i = weights_size; i < optimizer.weights.size(); ++ i)
+	      optimizer.weights[i] = - k * optimizer.weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	      weights[i] = (1.0 + k) * weights_prev[i];
+	      optimizer.weights[i] = (1.0 + k) * weights_prev[i];
 	  }
+	}
+      }
+
+      if (mert_search_local) {
+	typedef cicada::optimize::LineSearch line_search_type;
+	
+	typedef line_search_type::segment_type          segment_type;
+	typedef line_search_type::segment_set_type      segment_set_type;
+	typedef line_search_type::segment_document_type segment_document_type;
+	
+	typedef line_search_type::value_type optimum_type;
+
+	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+	
+	bcast_weights(0, optimizer.weights);
+	
+	const weight_set_type& origin = weights_prev;
+	weight_set_type direction = optimizer.weights;
+	direction -= weights_prev;
+	
+	EnvelopeKBest::line_set_type lines;
+	EnvelopeKBest envelopes(origin, direction);
+	
+	segment_document_type segments;
+	
+	for (size_t id = 0; id != kbests.size(); ++ id) 
+	  if (! kbests[id].empty()) {
+	    segments.push_back(segment_set_type());
+	    
+	    envelopes(kbests[id], lines);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
+	      segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
+	  }
+	
+	for (int rank = 1; rank != mpi_size; ++ rank) {
+	  boost::iostreams::filtering_istream is;
+	  is.push(boost::iostreams::zlib_decompressor());
+	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
+
+	  std::string line;
+	  int id_prev = -1;
+      
+	  while (std::getline(is, line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
+	
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece id_str = *iter; 
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece x_str = *iter;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece score_str = *iter;
+	
+	    const int id = utils::lexical_cast<int>(id_str);
+	    if (id_prev != id)
+	      segments.push_back(segment_set_type());
+	
+	    segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
+						     scorer_type::score_type::decode(score_str)));
+	    
+	    id_prev = id;
+	  }
+	}
+	
+	line_search_type line_search;
+	
+	const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+
+	const double update = (optimum.lower + optimum.upper) * 0.5;
+
+	if (update != 0.0) {
+	  direction *= update;
+	  optimizer.weights = origin;
+	  optimizer.weights += direction;
+	  
+	  if (debug >= 2)
+	    std::cerr << "mert update: " << update
+		      << " objective: " << optimum.objective << std::endl;
 	}
       }
       
@@ -1269,6 +1362,43 @@ double optimize_online(const hypothesis_map_type& kbests,
 	  
 	  MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
 	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+	}
+
+	if (mert_search_local) {
+	  typedef cicada::optimize::LineSearch line_search_type;
+	  
+	  typedef line_search_type::segment_type          segment_type;
+	  typedef line_search_type::segment_set_type      segment_set_type;
+	  typedef line_search_type::segment_document_type segment_document_type;
+	  
+	  typedef line_search_type::value_type optimum_type;
+	  
+	  bcast_weights(0, optimizer.weights);
+	  
+	  const weight_set_type& origin = weights_prev;
+	  weight_set_type direction = optimizer.weights;
+	  direction -= weights_prev;
+	  
+	  EnvelopeKBest::line_set_type lines;
+	  EnvelopeKBest envelopes(origin, direction);
+	  
+	  boost::iostreams::filtering_ostream os;
+	  os.push(boost::iostreams::zlib_compressor());
+	  os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
+    
+	  for (size_t id = 0; id != kbests.size(); ++ id) 
+	    if (! kbests[id].empty()) {
+	      envelopes(kbests[id], lines);
+	      
+	      EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	      for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+		const EnvelopeKBest::line_type& line = *liter;
+		
+		os << id << " ||| ";
+		utils::encode_base64(line.x, std::ostream_iterator<char>(os));
+		os << " ||| " << line.hypothesis->score->encode() << '\n';
+	      }
+	    }
 	}
 	
 	// compute objective
@@ -1902,7 +2032,7 @@ double optimize_cp(const scorer_document_type& scorers,
 
       bcast_weights(0, weights);
       
-      const weight_set_type& origin    = weights_prev;
+      const weight_set_type& origin = weights_prev;
       weight_set_type direction = weights;
       direction -= weights_prev;
       
