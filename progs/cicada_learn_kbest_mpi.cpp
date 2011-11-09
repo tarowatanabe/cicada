@@ -1671,13 +1671,9 @@ struct OptimizeCP
 
 	  const size_type instances_first = losses.size();
 	  
-	  // third, collect vector with larger loss drawn from two sets
-	  const size_type kbest_size  = (sample_size >> 1);
-	  const size_type oracle_size = (sample_size - kbest_size);
-	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	    
