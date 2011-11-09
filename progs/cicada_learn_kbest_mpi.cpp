@@ -695,6 +695,9 @@ struct OptimizeOnlineMargin
 		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
 		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
+		
+		if (loss_margin)
+		  losses[id] *= factor;
 	      }
 	    }
 	  }
@@ -763,6 +766,9 @@ struct OptimizeOnlineMargin
 		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
 		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
+		
+		if (loss_margin)
+		  losses[id] *= factor;
 	      }
 	    }
 	  }
@@ -1740,6 +1746,9 @@ struct OptimizeCP
 		sample_set_type::value_type::const_iterator fiter_end = features[id].end();
 		for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
+		
+		if (loss_margin)
+		  losses[id] *= factor;
 	      }
 	    }
 	  }
@@ -1807,6 +1816,9 @@ struct OptimizeCP
 		sample_set_type::value_type::const_iterator fiter_end = features[id].end();
 		for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
+
+		if (loss_margin)
+		  losses[id] *= factor;
 	      }
 	    }
 	  }

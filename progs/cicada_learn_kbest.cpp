@@ -1145,6 +1145,8 @@ struct OptimizeSVM
       sample_set_type features_kbest;
       loss_set_type   losses_oracle;
       loss_set_type   losses_kbest;
+      
+      weight_set_type norms;
 
       int id = 0;
       
@@ -1212,6 +1214,10 @@ struct OptimizeSVM
 	    losses_kbest.push_back(loss);
 	  }
 	  
+	  norms.clear();
+	  
+	  const size_type instances_first = losses.size();
+	  
 	  // third, collect vector with larger loss drawn from two sets
 	  const size_type kbest_size  = (sample_size >> 1);
 	  const size_type oracle_size = (sample_size - kbest_size);
@@ -1221,6 +1227,12 @@ struct OptimizeSVM
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
 	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
 	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+
+	    if (normalize_vector) {
+	      typename sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
+	      for (typename sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
+		norms[fiter->first] += fiter->second;
+	    }
 	  }
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
@@ -1228,13 +1240,42 @@ struct OptimizeSVM
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
 	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
 	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
+	    
+	    if (normalize_vector) {
+	      typename sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
+	      for (typename sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+		norms[fiter->first] += fiter->second;
+	    }
+	  }
+	  
+	  if (normalize_vector) {
+	    const size_type instances_last = losses.size();
+	    const double norm_sum = cicada::dot_product(norms, norms);
+	    
+	    if (norm_sum != 0.0) {
+	      const double size_scale = instances_last - instances_first;
+	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
+	      
+	      for (size_type id = instances_first; id != instances_last; ++ id) {
+		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+		  const_cast<feature_value_type&>(*fiter).second *= factor;
+		
+		if (loss_margin)
+		  losses[id] *= factor;
+	      }
+	    }
 	  }
 	  
 	} else {
-
+	  
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
+
+	  norms.clear();
+	  
+	  const size_type instances_first = losses.size();
 	
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
@@ -1256,12 +1297,43 @@ struct OptimizeSVM
 		if (loss > 0.0) {
 		  features.insert(feats.begin(), feats.end());
 		  losses.push_back(loss);
+		  
+		  if (normalize_vector) {
+		    features_type::const_iterator fiter_end = feats.end();
+		    for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		      norms[fiter->first] += fiter->second;
+		  }
 		}
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
+		
+		if (normalize_vector) {
+		  features_type::const_iterator fiter_end = feats.end();
+		  for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		    norms[fiter->first] += fiter->second;
+		}
 	      }
 	    }
+	  
+	  if (normalize_vector) {
+	    const size_type instances_last = losses.size();
+	    const double norm_sum = cicada::dot_product(norms, norms);
+	    
+	    if (norm_sum != 0.0) {
+	      const double size_scale = instances_last - instances_first;
+	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
+	      
+	      for (size_type id = instances_first; id != instances_last; ++ id) {
+		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+		  const_cast<feature_value_type&>(*fiter).second *= factor;
+		
+		if (loss_margin)
+		  losses[id] *= factor;
+	      }
+	    }
+	  }
 	}
       }
     }
