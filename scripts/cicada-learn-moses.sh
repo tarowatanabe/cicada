@@ -46,7 +46,6 @@ scorer="bleu:order=4,exact=true"
 learn="lbfgs"
 learn_options=""
 zero_weights=no
-solver=1
 kbest=1000
 bias_features=""
 bias_weight=-1
@@ -91,9 +90,6 @@ $me [options]
   --scorer                  scorer            (default: $scorer)
   --learn                   learner (lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, cp)
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
-  --solver                  liblinear solver type. See liblinear FAQ,
-                            or run cicada_learn_kbest --help
-                            (Default: 1, L2-reg, L2-loss SVM)
   --learn-options           other learning options
   --zero-weights            learning from zero weights in each iteration
   --kbest                   kbest size             (default: $kbest)
@@ -181,10 +177,6 @@ while test $# -gt 0 ; do
   --learn )
     test $# = 1 && eval "$exit_missing_arg"
     learn=$2
-    shift; shift ;;
-  --solver )
-    test $# = 1 && eval "$exit_missing_arg"
-    solver=$2
     shift; shift ;;
   --learn-options )
     test $# = 1 && eval "$exit_missing_arg"
@@ -289,7 +281,7 @@ case $learn in
     break ;;
   linear )
     learner="cicada_learn_kbest"
-    learn_option=" --learn-linear --solver $solver"
+    learn_option=" --learn-linear"
     break ;;
   svm )
     learner="cicada_learn_kbest"
