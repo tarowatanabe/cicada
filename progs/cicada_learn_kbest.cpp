@@ -918,17 +918,14 @@ struct OptimizeLinear
 	  std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 
 	if (k > 0.0) {
-	  if (debug >= 3)
-	    std::cerr << "current weights" << std::endl
-		      << weights;
-
-	  weights      *= k;
-	  weights_prev *= (1.0 - k);
-	  weights += weights_prev;
-
-	  if (debug >= 3)
-	    std::cerr << "updated weights" << std::endl
-		      << weights;
+	  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	  
+	  for (size_t i = 0; i != weights_size; ++ i)
+	    weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	  for (size_t i = weights_size; i < weights.size(); ++ i)
+	    weights[i] = k * weights[i];
+	  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	    weights[i] = (1.0 - k) * weights_prev[i];
 	}
       } else if (grad_neg < 0.0) {
 	double k = 0.0;
@@ -955,17 +952,14 @@ struct OptimizeLinear
 	  std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	if (k > 0.0) {
-	  if (debug >= 3)
-	    std::cerr << "current weights" << std::endl
-		      << weights;
+	  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	  
-	  weights      *= - k;
-	  weights_prev *= (1.0 + k);
-	  weights += weights_prev;
-
-	  if (debug >= 3)
-	    std::cerr << "updated weights" << std::endl
-		      << weights;
+	  for (size_t i = 0; i != weights_size; ++ i)
+	    weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
+	  for (size_t i = weights_size; i < weights.size(); ++ i)
+	    weights[i] = - k * weights[i];
+	  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	    weights[i] = (1.0 + k) * weights_prev[i];
 	}
       }
     }
@@ -1546,9 +1540,14 @@ struct OptimizeSVM
 	  std::cerr << "grad: " << grad_pos << "  k: " << k << std::endl;
 
 	if (k > 0.0) {
-	  weights      *= k;
-	  weights_prev *= (1.0 - k);
-	  weights += weights_prev;
+	  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	  
+	  for (size_t i = 0; i != weights_size; ++ i)
+	    weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	  for (size_t i = weights_size; i < weights.size(); ++ i)
+	    weights[i] = k * weights[i];
+	  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	    weights[i] = (1.0 - k) * weights_prev[i];
 	}
       } else if (grad_neg < 0.0) {
 	double k = 0.0;
@@ -1575,9 +1574,14 @@ struct OptimizeSVM
 	  std::cerr << "grad: " << grad_neg << "  k: " << - k << std::endl;
 	  
 	if (k > 0.0) {
-	  weights      *= - k;
-	  weights_prev *= (1.0 + k);
-	  weights += weights_prev;
+	  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	  
+	  for (size_t i = 0; i != weights_size; ++ i)
+	    weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
+	  for (size_t i = weights_size; i < weights.size(); ++ i)
+	    weights[i] = - k * weights[i];
+	  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	    weights[i] = (1.0 + k) * weights_prev[i];
 	}
       }
     }
