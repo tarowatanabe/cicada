@@ -1565,6 +1565,8 @@ struct OptimizeCP
     sample_set_type features_kbest;
     loss_set_type   losses_oracle;
     loss_set_type   losses_kbest;
+
+    weight_set_type       norms;
     
     if (sample_vector) {
       for (size_type id = 0; id != kbests.size(); ++ id)
@@ -1631,10 +1633,18 @@ struct OptimizeCP
 	  const size_type oracle_size = (sample_size - kbest_size);
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
+
+	  const size_type instances_first = losses.size();
+	  
+	  norms.clear();
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
 	    features.insert(features_oracle[*piter].begin(), features_oracle[*piter].end());
 	    losses.push_back(loss_margin ? losses_oracle[*piter] : 1.0);
+	    
+	    sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
+	    for (sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      norms[fiter->first] += fiter->second * fiter->second;
 	  }
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
@@ -1642,6 +1652,21 @@ struct OptimizeCP
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
 	    features.insert(features_kbest[*piter].begin(), features_kbest[*piter].end());
 	    losses.push_back(loss_margin ? losses_kbest[*piter] : 1.0);
+
+	    sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
+	    for (sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+	      norms[fiter->first] += fiter->second * fiter->second;
+	  }
+	  
+	  const size_type instances_last = losses.size();
+	  
+	  for (size_type i = 0; i != norms.size(); ++ i)
+	    norms[i] = (norms[i] == 0.0 ? 1.0 : 1.0 / std::sqrt(norms[i] / (instances_last - instances_first)));
+	  
+	  for (size_type id = instances_first; id != instances_last; ++ id) {
+	    sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+	    for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+	      const_cast<feature_value_type&>(*fiter).second *= (norms[fiter->first] == 0.0 ? 1.0 : norms[fiter->first]);
 	  }
 	}
       
@@ -1651,12 +1676,16 @@ struct OptimizeCP
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-	
+	  
+	  const size_type instances_first = losses.size();
+	  
+	  norms.clear();
+	  
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	      const hypothesis_type& oracle = oracles[id][o];
 	      const hypothesis_type& kbest  = kbests[id][k];
-	    
+	      
 	      // ignore oracle translations
 	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	      
@@ -1668,17 +1697,36 @@ struct OptimizeCP
 	      
 	      if (loss_margin) {
 		const double loss = kbest.loss - oracle.loss;
-	      
+		
 		// checking...
 		if (loss > 0.0) {
 		  features.insert(feats.begin(), feats.end());
 		  losses.push_back(loss);
+		  
+		  features_type::const_iterator fiter_end = feats.end();
+		  for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		    norms[fiter->first] += fiter->second * fiter->second;
 		}
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
+		
+		features_type::const_iterator fiter_end = feats.end();
+		for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		  norms[fiter->first] += fiter->second * fiter->second;
 	      }
 	    }
+	  
+	  const size_type instances_last = losses.size();
+	  
+	  for (size_type i = 0; i != norms.size(); ++ i)
+	    norms[i] = (norms[i] == 0.0 ? 1.0 : 1.0 / std::sqrt(norms[i] / (instances_last - instances_first)));
+	  
+	  for (size_type id = instances_first; id != instances_last; ++ id) {
+	    sample_set_type::value_type::const_iterator fiter_end = features[id].end();
+	    for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
+	      const_cast<feature_value_type&>(*fiter).second *= (norms[fiter->first] == 0.0 ? 1.0 : norms[fiter->first]);
+	  }
 	}
     }
     
