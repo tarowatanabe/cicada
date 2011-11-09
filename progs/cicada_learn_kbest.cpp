@@ -354,7 +354,6 @@ struct OptimizeLinear
     
     offset_set_type       offsets;
     feature_node_set_type features;
-    weight_set_type       norms;
     
     template <typename Iterator1, typename Iterator2, typename Features>
     void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
@@ -396,7 +395,6 @@ struct OptimizeLinear
 	feature.value = first->second;
 	
 	features.push_back(feature);
-	norms[first->first] += first->second * first->second;
       }
       
       feature.index = -1;
@@ -423,7 +421,6 @@ struct OptimizeLinear
       
       offsets.clear();
       features.clear();
-      norms.clear();
       
       sentence_unique_type  sentences;
       feature_node_type     feature;
@@ -441,6 +438,8 @@ struct OptimizeLinear
       sample_set_type features_kbest;
       loss_set_type   losses_oracle;
       loss_set_type   losses_kbest;
+
+      weight_set_type norms;
       
       for (;;) {
 	queue.pop(id);
@@ -457,6 +456,10 @@ struct OptimizeLinear
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
+
+	  norms.clear();
+
+	  const size_type instances_first = offsets.size();
 
 	  positions.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
@@ -516,21 +519,51 @@ struct OptimizeLinear
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_oracle));
 	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter)
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + oracle_size; ++ piter) {
 	    transform_pair(features_oracle[*piter].begin(), features_oracle[*piter].end());
+	    
+	    if (normalize_vector) {
+	      sample_set_type::value_type::const_iterator fiter_end = features_oracle[*piter].end();
+	      for (sample_set_type::value_type::const_iterator fiter = features_oracle[*piter].begin(); fiter != fiter_end; ++ fiter) 
+		norms[fiter->first] += fiter->second;
+	    }
+	  }
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_kbest));
 	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter)
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + kbest_size; ++ piter) {
 	    transform_pair(features_kbest[*piter].begin(), features_kbest[*piter].end());
-
-	  //std::cerr << "sampled: " << id  << " offsets: " << offsets.size() << std::endl;
+	    
+	    if (normalize_vector) {
+	      sample_set_type::value_type::const_iterator fiter_end = features_kbest[*piter].end();
+	      for (sample_set_type::value_type::const_iterator fiter = features_kbest[*piter].begin(); fiter != fiter_end; ++ fiter) 
+		norms[fiter->first] += fiter->second;
+	    }
+	  }
+	  
+	  if (normalize_vector) {
+	    const size_type instances_last = offsets.size();
+	    const double norm_sum = cicada::dot_product(norms, norms);
+	    
+	    if (norm_sum != 0.0) {
+	      const double size_scale = instances_last - instances_first;
+	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
+	      
+	      // quite easy to access feature-value... for index == -1, value is always zero...
+	      for (size_t i = offsets[instances_first]; i != features.size(); ++ i)
+		features[i].value *= factor;
+	    }
+	  }
 	  
 	} else {
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-	
+
+	  norms.clear();
+	  
+	  const size_type instances_first = offsets.size();
+	  
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	      const hypothesis_type& oracle = oracles[id][o];
@@ -553,24 +586,27 @@ struct OptimizeLinear
 		  feature.value = oiter->second;
 		  features.push_back(feature);
 
-		  norms[oiter->first] += feature.value * feature.value;
-		
+		  if (normalize_vector)
+		    norms[oiter->first] += oiter->second;
+
 		  ++ oiter;
 		} else if (kiter->first < oiter->first) {
 		  feature.index = kiter->first.id() + 1;
 		  feature.value = - kiter->second;
 		  features.push_back(feature);
-		
-		  norms[kiter->first] += feature.value * feature.value;
 
+		  if (normalize_vector)
+		    norms[kiter->first] += kiter->second;
+		
 		  ++ kiter;
 		} else {
 		  feature.index = oiter->first.id() + 1;
 		  feature.value = oiter->second - kiter->second;
 		  if (feature.value != 0.0) {
 		    features.push_back(feature);
-		  
-		    norms[oiter->first] += feature.value * feature.value;
+		    
+		    if (normalize_vector)
+		      norms[oiter->first] += feature.value;
 		  }
 		  ++ oiter;
 		  ++ kiter;
@@ -581,18 +617,20 @@ struct OptimizeLinear
 		feature.index = oiter->first.id() + 1;
 		feature.value = oiter->second;
 		features.push_back(feature);
-	      
-		norms[oiter->first] += feature.value * feature.value;
+
+		if (normalize_vector)
+		  norms[oiter->first] += oiter->second;
 	      }
 	    
 	      for (/**/; kiter != kiter_end; ++ kiter) {
 		feature.index = kiter->first.id() + 1;
 		feature.value = - kiter->second;
 		features.push_back(feature);
-	      
-		norms[kiter->first] += feature.value * feature.value;
+
+		if (normalize_vector)
+		  norms[kiter->first] += kiter->second;
 	      }
-	    
+	      
 	      // termination...
 	      // if we have no instances, simply erase the last offsets
 	      if (offsets.back() == features.size())
@@ -602,8 +640,21 @@ struct OptimizeLinear
 		feature.value = 0.0;
 		features.push_back(feature);
 	      }
-	      
 	    }
+	  
+	  if (normalize_vector) {
+	    const size_type instances_last = offsets.size();
+	    const double norm_sum = cicada::dot_product(norms, norms);
+
+	    if (norm_sum != 0.0) {
+	      const double size_scale = instances_last - instances_first;
+	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
+	      
+	      // quite easy to access feature-value... for index == -1, value is always zero...
+	      for (size_t i = offsets[instances_first]; i != features.size(); ++ i)
+		features[i].value *= factor;
+	    }
+	  }
 	}
       }
       
@@ -613,32 +664,6 @@ struct OptimizeLinear
   typedef Encoder encoder_type;
   typedef std::vector<encoder_type, std::allocator<encoder_type> > encoder_set_type;
 
-  struct Normalize
-  {
-    typedef utils::lockfree_list_queue<size_t, std::allocator<size_t> > queue_type;
-    
-    Normalize(queue_type& __queue,
-	      feature_node_map_type& __features,
-	      const weight_set_type& __norms)
-      : queue(__queue), features(__features), norms(__norms) {}
-
-    void operator()()
-    {
-      for (;;) {
-	size_t id = 0;
-	queue.pop(id);
-	if (id == size_t(-1)) break;
-	
-	for (feature_node_type* feat = features[id]; feat->index != -1; ++ feat)
-	  feat->value *= (norms[feat->index - 1] == 0.0 ? 1.0 : norms[feat->index - 1]);
-      }
-    }
-    
-    queue_type&    queue;
-    
-    feature_node_map_type& features;
-    const weight_set_type& norms;
-  };
   
   struct Gradient
   {
@@ -737,13 +762,9 @@ struct OptimizeLinear
     
     workers.join_all();
 
-    weight_set_type norms;
-    
     size_t data_size = 0;
-    for (int i = 0; i < threads; ++ i) {
+    for (int i = 0; i < threads; ++ i)
       data_size += encoders[i].offsets.size();
-      norms += encoders[i].norms;
-    }
 
     
     if (debug)
@@ -764,30 +785,6 @@ struct OptimizeLinear
       offset_set_type(encoders[i].offsets).swap(encoders[i].offsets);
     }
     
-    if (normalize_vector) {
-      typedef Normalize normalizer_type;
-
-      norms.allocate(0.0);
-      for (size_t i = 0; i != norms.size(); ++ i) {
-	if (norms[i] == 0.0)
-	  norms[i] = 1.0;
-	else
-	  norms[i] = 1.0 / std::sqrt(norms[i] / data_size);
-      }
-      
-      normalizer_type::queue_type queue;
-      
-      boost::thread_group workers;
-      for (int i = 0; i < threads; ++ i)
-	workers.add_thread(new boost::thread(normalizer_type(queue, features, norms)));
-      
-      for (size_t i = 0; i != features.size(); ++ i)
-	queue.push(i);
-      for (int i = 0; i < threads; ++ i)
-	queue.push(size_t(-1));
-      
-      workers.join_all();
-    }
     
     problem_type problem;
     
@@ -972,10 +969,6 @@ struct OptimizeLinear
 	}
       }
     }
-    
-    if (normalize_vector)
-      for (size_t i = 0; i != weights.size(); ++ i)
-	weights[i] *= (norms[i] == 0.0 ? 1.0 : 1.0 / norms[i]);
   }
   
 public:
