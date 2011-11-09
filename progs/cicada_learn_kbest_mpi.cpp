@@ -1969,17 +1969,19 @@ double optimize_cp(const scorer_document_type& scorers,
 	
 	line_search_type line_search;
 	
-	const optimum_type optimum = line_search(segments, 0.1, 100, scorers.error_metric());
+	const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
 
-	const double update = std::max((optimum.lower + optimum.upper) * 0.5, 0.1);
+	const double update = (optimum.lower + optimum.upper) * 0.5;
 	
-	direction *= update;
-	weights = origin;
-	weights += direction;
-    
-	if (debug >= 2)
-	  std::cerr << "mert update: " << update
-		    << " objective: " << optimum.objective << std::endl;
+	if (update != 0.0) {
+	  direction *= update;
+	  weights = origin;
+	  weights += direction;
+
+	  if (debug >= 2)
+	    std::cerr << "mert update: " << update
+		      << " objective: " << optimum.objective << std::endl;
+	}
 	
       } else {
 	EnvelopeKBest::line_set_type lines;
@@ -2375,11 +2377,13 @@ double optimize_mert(const scorer_document_type& scorers,
     
     const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
 
-    const double update = std::max((optimum.lower + optimum.upper) * 0.5, 0.1);
-    
-    direction *= update;
-    weights = origin;
-    weights += direction;
+    const double update = (optimum.lower + optimum.upper) * 0.5;
+
+    if (update != 0.0) {
+      direction *= update;
+      weights = origin;
+      weights += direction;
+    }
     
     if (debug >= 2)
       std::cerr << "mert update: " << update << std::endl;
