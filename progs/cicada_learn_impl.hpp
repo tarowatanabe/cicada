@@ -107,7 +107,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     
     objective += double(log(Z_correct) - log(Z)) * weight_scale;
     
-    if (weight_scale < 0.01 || 100 < weight_scale) {
+    if (weight_scale < 0.001 || 1000 < weight_scale) {
       weights *= weight_scale;
       weight_scale = 1.0;
       weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
