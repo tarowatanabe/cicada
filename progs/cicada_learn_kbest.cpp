@@ -75,6 +75,7 @@ bool line_search = false;
 bool mert_search = false;
 bool sample_vector = false;
 bool normalize_vector = false;
+bool normalize_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -1202,9 +1203,10 @@ struct OptimizeSVM
 		norms[fiter->first] += fiter->second;
 	    }
 	  }
+
+	  const size_type instances_last = losses.size();
 	  
 	  if (normalize_vector) {
-	    const size_type instances_last = losses.size();
 	    const double norm_sum = cicada::dot_product(norms, norms);
 	    
 	    if (norm_sum != 0.0) {
@@ -1217,6 +1219,15 @@ struct OptimizeSVM
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
 	      }
 	    }
+	  }
+	  
+	  if (normalize_loss) {
+	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
+	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
+	    
+	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
+	    if (loss_sum != 0.0)
+	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
 	  }
 	  
 	} else {
@@ -1267,9 +1278,10 @@ struct OptimizeSVM
 		}
 	      }
 	    }
+
+	  const size_type instances_last = losses.size();
 	  
 	  if (normalize_vector) {
-	    const size_type instances_last = losses.size();
 	    const double norm_sum = cicada::dot_product(norms, norms);
 	    
 	    if (norm_sum != 0.0) {
@@ -1282,6 +1294,15 @@ struct OptimizeSVM
 		  const_cast<feature_value_type&>(*fiter).second *= factor;
 	      }
 	    }
+	  }
+	  
+	  if (normalize_loss) {
+	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
+	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
+	    
+	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
+	    if (loss_sum != 0.0)
+	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
 	  }
 	}
       }
@@ -1676,13 +1697,27 @@ struct OptimizeLBFGS
       
       expectations.allocate();
       expectations.clear();
-
-      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
       
       while (1) {
 	int id = 0;
 	queue.pop(id);
 	if (id < 0) break;
+	
+	double cost_factor = (softmax_margin ? 1.0 : 0.0);
+	if (normalize_loss && softmax_margin) {
+	  double sum = 0.0;
+	  
+	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
+	    sum += oiter->loss;
+	  
+	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	    sum += kiter->loss;
+	  
+	  if (sum != 0.0)
+	    cost_factor = double(oracles[id].size() + kbests[id].size()) / sum;
+	}
 	
 	weight_type Z_oracle;
 	weight_type Z_kbest;
@@ -2455,6 +2490,7 @@ void options(int argc, char** argv)
     ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
     ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
+    ("normalize-loss",   po::bool_switch(&normalize_loss),   "normalize loss")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
