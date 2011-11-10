@@ -96,7 +96,7 @@ bool yield_dependency = false;
 
 // learning parameters
 int iteration = 10;
-int block_size = 64;
+int block_size = 8;
 int kbest_size = 1000;
 
 // solver parameters
