@@ -2373,16 +2373,8 @@ struct Oracle
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
 
-    score_ptr_type score_1best;
-        
-    score_ptr_type score_prev;
-    score_ptr_type score_best;
-    score_ptr_type score_curr;
+    score_ptr_type score_1best;    
     
-    oracle_map_type oracles_prev(kbests.size());
-    oracle_map_type oracles_best(kbests.size());
-    oracle_map_type oracles_curr(kbests.size());
-
     id_set_type ids;
     boost::random_number_generator<boost::mt19937> gen(generator);
     
@@ -2399,70 +2391,76 @@ struct Oracle
 	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
 	}
 	
-	if (! score_prev)
-	  score_prev = kbests[id].front().score->clone();
+	if (! score_1best)
+	  score_1best = kbests[id].front().score->clone();
 	else
-	  *score_prev += *(kbests[id].front().score);
-	
-	oracles_prev[id].push_back(&kbests[id].front());
+	  *score_1best += *(kbests[id].front().score);
       }
     
-    if (score_prev)
-      score_best = score_prev->clone();
-    else
-      throw std::runtime_error("no scores?");
+    if (! score_1best)
+      throw std::runtime_error("no evaluation score?");
     
-    score_1best = score_best->clone();
+    score_ptr_type score_best;
+    score_ptr_type score_curr;
+    score_ptr_type score_next;
     
-    oracles_best = oracles_prev;
+    oracle_map_type oracles_best(kbests.size());
+    oracle_map_type oracles_curr(kbests.size());
+    oracle_map_type oracles_next(kbests.size());
     
-    double objective_prev = score_prev->score() * score_factor;
-    double objective_best = objective_prev;
-    double objective_curr = objective_prev;
+    double objective_best = - std::numeric_limits<double>::infinity();
+    double objective_curr = - std::numeric_limits<double>::infinity();
+    double objective_next = - std::numeric_limits<double>::infinity();
     
     // 
     // 10 iteration will be fine
     //
     for (int i = 0; i < 10; ++ i) {
-      score_curr     = score_prev->clone();
-      objective_curr = objective_prev;
-      oracles_curr   = oracles_prev;
-
+      
       for (id_set_type::const_iterator iiter = ids.begin(); iiter != ids.end(); ++ iiter) {
 	const size_t id = *iiter;
 	
-	score_ptr_type score = score_curr->clone();
-	*score -= *(oracles_curr[id].front()->score);
-	  
+	score_ptr_type score_removed = (score_next ? score_next->clone() : score_ptr_type());
+	
+	if (score_removed && ! oracles_curr[id].empty())
+	  *score_removed -= *(oracles_curr[id].front()->score);
+	
+	oracles_next[id].clear();
+	
 	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
-	  score_ptr_type score_sample = score->clone();
-	  *score_sample += *(hiter->score);
-	    
+	  score_ptr_type score_sample;
+	  
+	  if (score_removed) {
+	    score_sample = score_removed->clone();
+	    *score_sample += *(hiter->score);
+	  } else
+	    score_sample = hiter->score->clone();
+	  
 	  const double objective_sample = score_sample->score() * score_factor;
+	  
+	  if (objective_sample > objective_next || oracles_next[id].empty()) {
+	    oracles_next[id].clear();
+	    oracles_next[id].push_back(&(*hiter));
 	    
-	  if (objective_sample > objective_curr) {
-	    oracles_curr[id].clear();
-	    oracles_curr[id].push_back(&(*hiter));
-	      
-	    objective_curr = objective_sample;
-	    score_curr     = score_sample;
-	  } else if (objective_sample == objective_curr)
-	    oracles_curr[id].push_back(&(*hiter));
+	    objective_next = objective_sample;
+	    score_next     = score_sample;
+	  } else if (objective_sample == objective_next)
+	    oracles_next[id].push_back(&(*hiter));
 	}
       }
       
-      if (objective_curr > objective_best) {
-	score_best     = score_curr->clone();
-	objective_best = objective_curr;
-	oracles_best   = oracles_curr;
+      if (objective_next > objective_best) {
+	score_best     = score_next->clone();
+	objective_best = objective_next;
+	oracles_best   = oracles_next;
       }
       
-      if (objective_curr <= objective_prev) break;
+      if (objective_next <= objective_curr) break;
       
-      score_prev     = score_curr->clone();
-      objective_prev = objective_curr;
-      oracles_prev   = oracles_curr;
+      score_curr     = score_next->clone();
+      objective_curr = objective_next;
+      oracles_curr   = oracles_next;
       
       std::random_shuffle(ids.begin(), ids.end(), gen);
     }
