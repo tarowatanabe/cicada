@@ -150,6 +150,9 @@ int main(int argc, char ** argv)
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
 
+    if (normalize_loss && ! softmax_margin && ! loss_margin)
+      throw std::runtime_error("loss normalization assume either softmax-margin or loss-margin");
+    
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 

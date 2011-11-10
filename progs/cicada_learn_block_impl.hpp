@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "cicada_kbest_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 #include "cicada/semiring.hpp"
 #include "cicada/eval.hpp"
@@ -22,6 +23,7 @@
 #include "cicada/operation/traversal.hpp"
 #include "cicada/operation/functional.hpp"
 #include "cicada/optimize_qp.hpp"
+#include "cicada/optimize.hpp"
 
 #include "utils/sgi_hash_set.hpp"
 #include "utils/base64.hpp"
@@ -408,6 +410,7 @@ struct LearnSVM : public LearnBase
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
+  
   void clear_history()
   {
   }
@@ -673,6 +676,7 @@ struct LearnPegasos : public LearnBase
     
     return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
   }
+
 
   void clear_history()
   {
@@ -1588,6 +1592,7 @@ struct LearnSGDL2 : public LearnLR
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
+
   void clear_history() {}
 
   double learn(weight_set_type& weights)
@@ -2151,6 +2156,7 @@ struct LearnLinear
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
+
 
   void clear_history() {}
 

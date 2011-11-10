@@ -118,6 +118,7 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool merge_vectors_mode  = false; // merge all the vectors from others
 bool line_search_mode = false;    // perform line-search
+bool mert_search_mode = false;    // perform MERT search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
 
@@ -189,7 +190,7 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos> 1)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos > 1)
       throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
     if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos == 0)
       learn_lbfgs = true;
@@ -356,6 +357,7 @@ enum {
   score_oracle_tag,
   notify_tag,
   point_tag,
+  envelope_tag,
 };
 
 inline
@@ -607,6 +609,8 @@ void cicada_learn(operation_set_type& operations,
   hypothesis_map_type  oracles_block;
   scorer_document_type scorers_block(scorers);
 
+  hypothesis_map_type kbests_all;
+
   const bool error_metric = scorers.error_metric();
   
   dumper_type::queue_type queue_dumper;
@@ -625,6 +629,8 @@ void cicada_learn(operation_set_type& operations,
 
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
+
+    kbests_all.clear();
     
     int updated = 0;
     score_ptr_type score_1best;
@@ -664,7 +670,10 @@ void cicada_learn(operation_set_type& operations,
       
       // oracle computation
       std::pair<score_ptr_type, score_ptr_type> scores = oracle_generator(kbests_block, scorers_block, oracles_block, generator);
-
+      
+      // insert into kbests-all
+      if (mert_search_mode)
+	kbests_all.insert(kbests_all.end(), kbests_block.begin(), kbests_block.end());
 
       if (! score_1best)
 	score_1best = scores.first;
@@ -814,10 +823,14 @@ void cicada_learn(operation_set_type& operations,
 	  }
 
 	  if (k > 0.0) {
-	    weights *= k;
-	    weights_prev *= (1.0 - k);
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	    
-	    weights += weights_prev;
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 - k) * weights_prev[i];
 	  }
 	  
 	} else if (grad_neg < 0.0) {
@@ -842,12 +855,132 @@ void cicada_learn(operation_set_type& operations,
 	  }
 	  
 	  if (k > 0.0) {
-	    weights *= - k;
-	    weights_prev *= (1.0 + k);
+	    const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	    
-	    weights += weights_prev;
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = - k * weights[i] + (1.0 + k) * weights_prev[i];
+	    for (size_t i = weights_size; i < weights.size(); ++ i)
+	      weights[i] = - k * weights[i];
+	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	      weights[i] = (1.0 + k) * weights_prev[i];
 	  }
 	}
+      }
+      
+      // receive new weights...
+      bcast_weights(weights);
+    }
+
+    if (mert_search_mode) {
+      typedef cicada::optimize::LineSearch line_search_type;
+      
+      typedef line_search_type::segment_type          segment_type;
+      typedef line_search_type::segment_set_type      segment_set_type;
+      typedef line_search_type::segment_document_type segment_document_type;
+      
+      typedef line_search_type::value_type optimum_type;
+      
+      const weight_set_type& origin = weights_prev;
+      weight_set_type direction = weights;
+      direction -= weights_prev;
+      
+      if (mpi_rank == 0) {
+	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+	
+	EnvelopeKBest::line_set_type lines;
+	EnvelopeKBest envelopes(origin, direction);
+	
+	segment_document_type segments;
+	
+	for (size_t id = 0; id != kbests_all.size(); ++ id) 
+	  if (! kbests_all[id].empty()) {
+	    segments.push_back(segment_set_type());
+	    
+	    envelopes(kbests_all[id], lines);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
+	      segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
+	  }
+	
+	for (int rank = 1; rank != mpi_size; ++ rank) {
+	  boost::iostreams::filtering_istream is;
+	  is.push(boost::iostreams::zlib_decompressor());
+	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
+
+	  std::string line;
+	  int id_prev = -1;
+      
+	  while (std::getline(is, line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
+	
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece id_str = *iter; 
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece x_str = *iter;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece score_str = *iter;
+	
+	    const int id = utils::lexical_cast<int>(id_str);
+	    if (id_prev != id)
+	      segments.push_back(segment_set_type());
+	
+	    segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
+						     scorer_type::score_type::decode(score_str)));
+	    
+	    id_prev = id;
+	  }
+	}
+	
+	if (! segments.empty()) {
+	  line_search_type line_search;
+	  
+	  const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+	  
+	  const double update = (optimum.lower + optimum.upper) * 0.5;
+	  
+	  if (update != 0.0) {
+	    direction *= update;
+	    weights = origin;
+	    weights += direction;
+	    
+	    if (debug)
+	      std::cerr << "mert update: " << update << " objective: " << optimum.objective << std::endl;
+	  }
+	}
+      } else {
+	EnvelopeKBest::line_set_type lines;
+	EnvelopeKBest envelopes(origin, direction);
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::zlib_compressor());
+	os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
+    
+	for (size_t id = 0; id != kbests_all.size(); ++ id) 
+	  if (! kbests_all[id].empty()) {
+	    envelopes(kbests_all[id], lines);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	      const EnvelopeKBest::line_type& line = *liter;
+	      
+	      os << id << " ||| ";
+	      utils::encode_base64(line.x, std::ostream_iterator<char>(os));
+	      os << " ||| " << line.hypothesis->score->encode() << '\n';
+	    }
+	  }
       }
       
       // receive new weights...
@@ -856,6 +989,9 @@ void cicada_learn(operation_set_type& operations,
     
     // clear history for line-search...
     learner.clear_history();
+    
+    // clear all the kbests
+    kbests_all.clear();
     
     // dump...
     if (dump_weights_mode && mpi_rank == 0)
@@ -1170,6 +1306,7 @@ void options(int argc, char** argv)
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
     ("merge-vector",   po::bool_switch(&merge_vectors_mode), "merge vectors from others")
     ("line-search",    po::bool_switch(&line_search_mode),   "perform line search")
+    ("mert-search",    po::bool_switch(&mert_search_mode),   "perform mert search")
     ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
