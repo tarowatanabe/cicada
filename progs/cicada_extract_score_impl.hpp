@@ -59,6 +59,8 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/double_base64_parser.hpp>
+#include <utils/double_base64_generator.hpp>
 
 #include <google/dense_hash_map>
 
@@ -652,11 +654,13 @@ struct RootCountParser
   RootCountParser() : grammar() {}
   RootCountParser(const RootCountParser& x) : grammar() {}
 
+#if 0
   class double_base64_type : public std::string
   {
   public:
     operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
   };
+#endif
 
   template <typename Iterator>
   struct root_count_parser : boost::spirit::qi::grammar<Iterator, root_count_type(), boost::spirit::standard::space_type>
@@ -668,8 +672,8 @@ struct RootCountParser
 
       label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
 
-      token %= qi::lexeme[+(standard::char_ - standard::space)];
-      count_base64 %= token;
+      //token %= qi::lexeme[+(standard::char_ - standard::space)];
+      //count_base64 %= token;
       count %= 'B' >> count_base64 | qi::double_;
 
       counts %= +count;
@@ -677,8 +681,9 @@ struct RootCountParser
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
-    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    utils::double_base64_parser<Iterator> count_base64;
     boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, root_count_type(), boost::spirit::standard::space_type> root_count;
@@ -746,11 +751,13 @@ struct PhrasePairParser
   PhrasePairParser() : grammar() {}
   PhrasePairParser(const PhrasePairParser& x) : grammar() {}
 
+#if 0
   class double_base64_type : public std::string
   {
   public:
     operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
   };
+#endif
 
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -764,20 +771,21 @@ struct PhrasePairParser
       point %= qi::int_ >> '-' >> qi::int_;
       alignment %= *point;
       
-      token %= qi::lexeme[+(standard::char_ - standard::space)];
-      count_base64 %= token;
+      //token %= qi::lexeme[+(standard::char_ - standard::space)];
+      //count_base64 %= token;
 
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> alignment >> "|||" >> counts;
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
-
+    
     boost::spirit::qi::rule<Iterator, alignment_type::point_type(), boost::spirit::standard::space_type> point;
     boost::spirit::qi::rule<Iterator, alignment_type(), boost::spirit::standard::space_type> alignment;
-
-    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    
+    utils::double_base64_parser<Iterator> count_base64;
+    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
@@ -849,11 +857,13 @@ struct PhrasePairModifiedParser
   PhrasePairModifiedParser() : grammar() {}
   PhrasePairModifiedParser(const PhrasePairModifiedParser& x) : grammar() {}
 
+#if 0
   class double_base64_type : public std::string
   {
   public:
     operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
   };
+#endif
 
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -864,17 +874,18 @@ struct PhrasePairModifiedParser
       namespace standard = boost::spirit::standard;
 
       phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
-
-      token %= qi::lexeme[+(standard::char_ - standard::space)];
-      count_base64 %= token;
+      
+      //token %= qi::lexeme[+(standard::char_ - standard::space)];
+      //count_base64 %= token;
 
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> counts;
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
-    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    utils::double_base64_parser<Iterator> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };

@@ -20,6 +20,8 @@
 
 #include <utils/simple_vector.hpp>
 #include <utils/base64.hpp>
+#include <utils/double_base64_parser.hpp>
+#include <utils/double_base64_generator.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/eval.hpp"
@@ -102,12 +104,6 @@ typedef std::vector<hypothesis_set_type, std::allocator<hypothesis_set_type> > h
 template <typename Iterator>
 struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature_type(), boost::spirit::standard::blank_type>
 {
-  class double_base64_type : public std::string
-  {
-  public:
-    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
-  };
-
   kbest_feature_parser() : kbest_feature_parser::base_type(kbest)
   {
     namespace qi = boost::spirit::qi;
