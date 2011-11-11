@@ -8,6 +8,7 @@
 #include <string>
 
 #include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
 
 #include <utils/base64.hpp>
 
@@ -25,12 +26,12 @@ namespace utils
     double_base64_parser() : double_base64_parser::base_type(double_base64)
     {
       namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
+      namespace ascii = boost::spirit::ascii;
       
-      double_token %= qi::repeat(11)[standar::char_ - standard::space];
+      double_token %= qi::repeat(11)[ascii::char_ - ascii::space];
       double_base64 %= double_token;
     }
-    
+
     boost::spirit::qi::rule<Iterator, double_base64_type()> double_token;
     boost::spirit::qi::rule<Iterator, double()> double_base64;
   };

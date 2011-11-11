@@ -60,6 +60,8 @@ config.h \
 dense_hashtable.hpp \
 dense_map.hpp \
 dense_set.hpp \
+double_base64_generator.hpp \
+double_base64_parser.hpp \
 filesystem.hpp \
 group_aligned_code.hpp \
 group_aligned_code_offsets.hpp \
@@ -135,6 +137,7 @@ sample_byte_aligned_vector \
 sample_chunk_vector \
 sample_compress_stream \
 sample_dense_map \
+sample_double_base64 \
 sample_filesystem \
 sample_group_aligned_code \
 sample_icu_filter \
@@ -246,6 +249,9 @@ sample_compress_stream_LDADD = $(LIBUTILS)
 
 sample_dense_map_SOURCES = sample_dense_map.cpp
 sample_dense_map_LDADD = $(LIBUTILS)
+
+sample_double_base64_SOURCES = sample_double_base64.cpp
+sample_double_base64_LDADD = $(LIBUTILS)
 
 sample_filesystem_SOURCES = sample_filesystem.cpp
 sample_filesystem_LDADD = $(LIBUTILS)
