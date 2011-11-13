@@ -22,6 +22,7 @@
 #include "cicada/dot_product.hpp"
 #include "cicada/parameter.hpp"
 
+#include <boost/spirit/include/qi.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
@@ -39,6 +40,9 @@ typedef cicada::WeightVector<double> weight_set_type;
 
 path_set_type input_files;
 path_type     output_file = "-";
+
+path_type bound_lower_file;
+path_type bound_upper_file;
 
 bool distance_mode = false;
 bool average_mode = false;
@@ -185,6 +189,71 @@ int main(int argc, char** argv)
 	weights *= 1.0 / std::sqrt(sum);
     }
     
+    if (! bound_lower_file.empty()) {
+      typedef boost::spirit::istream_iterator iter_type;
+
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
+	throw std::runtime_error("no file? " + bound_lower_file.string());
+      
+      utils::compress_istream is(bound_lower_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      std::string feature;
+      double      value;
+      
+      while (iter != iter_end) {
+	feature.clear();
+	value = 0.0;
+	
+	if (! qi::phrase_parse(iter, iter_end,
+			       qi::lexeme[+(standard::char_ - standard::space)] >> qi::double_ >> (qi::eol | qi::eoi),
+			       standard::blank, feature, value))
+	  if (iter != iter_end)
+	    throw std::runtime_error("weights file parsing failed");
+	
+	weights[feature] = std::max(weights[feature], value);
+      }
+    }
+
+    if (! bound_upper_file.empty()) {
+      typedef boost::spirit::istream_iterator iter_type;
+
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
+	throw std::runtime_error("no file? " + bound_upper_file.string());
+      
+      utils::compress_istream is(bound_upper_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      std::string feature;
+      double      value;
+      
+      while (iter != iter_end) {
+	feature.clear();
+	value = 0.0;
+	
+	if (! qi::phrase_parse(iter, iter_end,
+			       qi::lexeme[+(standard::char_ - standard::space)] >> qi::double_ >> (qi::eol | qi::eoi),
+			       standard::blank, feature, value))
+	  if (iter != iter_end)
+	    throw std::runtime_error("weights file parsing failed");
+	
+	weights[feature] = std::min(weights[feature], value);
+      }
+    }
+
+    
     if (sort_mode || sort_abs_mode) {
       typedef std::pair<weight_set_type::feature_type, double> value_type;
       typedef std::vector<value_type, std::allocator<value_type> > value_set_type;
@@ -232,6 +301,9 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",     po::value<path_set_type>(&input_files)->multitoken(),           "input files")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+
+    ("bound-lower", po::value<path_type>(&bound_lower_file), "lower bound file")
+    ("bound-upper", po::value<path_type>(&bound_upper_file), "upper bound file")
 
     ("distance",     po::bool_switch(&distance_mode), "compute distance")
     ("average",      po::bool_switch(&average_mode),  "average weights")
