@@ -280,8 +280,8 @@ case $learn in
       learner="cicada_learn_kbest"
     else
       echo "sructured-svm solver does not support forest translation" >&2
-      exit 1	
-    else
+      exit 1
+    fi
     learn_option=" --learn-svm"
     break ;;
   * )
