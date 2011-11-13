@@ -682,6 +682,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
                         --kbest  $tstset \
                         --oracle $learn_oracle \
                         --refset $refset \
+                        --scorer $scorer \
 	                $unite \
                         --output $weights_learn \
                         \

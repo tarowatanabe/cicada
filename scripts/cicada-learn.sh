@@ -641,6 +641,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
 	                --refset $refset \
+	                --scorer $scorer \
                         --oracle $learn_oracle \
 	                $unite \
 	                $weights_option \
