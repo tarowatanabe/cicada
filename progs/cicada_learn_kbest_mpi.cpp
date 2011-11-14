@@ -64,6 +64,7 @@ int iteration = 100;
 bool learn_lbfgs = false;
 bool learn_sgd = false;
 bool learn_mira = false;
+bool learn_nherd = false;
 bool learn_arow = false;
 bool learn_cw = false;
 bool learn_pegasos = false;
@@ -147,9 +148,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_nherd > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_nherd == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -263,6 +264,8 @@ int main(int argc, char ** argv)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_pegasos)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+    else if (learn_nherd)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cp)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, bounds_lower, bounds_upper, weights);
     else 
@@ -3220,6 +3223,7 @@ void options(int argc, char** argv)
     ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")
     ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
     ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
+    ("learn-nherd",   po::bool_switch(&learn_nherd),   "online NHERD algorithm")
     ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
     ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
