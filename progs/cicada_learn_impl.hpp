@@ -5,6 +5,11 @@
 #ifndef __CICADA_LEARN_IMPL__HPP__
 #define __CICADA_LEARN_IMPL__HPP__ 1
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
 #include "cicada/hypergraph.hpp"
@@ -584,5 +589,40 @@ struct OptimizerPegasos : public OptimizerBase
   double lambda;
 };
 
+void read_bounds(const path_type& path, weight_set_type& bounds, const double default_value)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  bounds.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iter_type iter(is);
+  iter_type iter_end;
+  
+  std::string feature;
+  double      value;
+  
+  while (iter != iter_end) {
+    feature.clear();
+    value = 0.0;
+    
+    if (! qi::phrase_parse(iter, iter_end,
+			   qi::lexeme[+(standard::char_ - standard::space)] >> qi::double_ >> (qi::eol | qi::eoi),
+			   standard::blank, feature, value))
+      if (iter != iter_end)
+	throw std::runtime_error("weights file parsing failed");
+    
+    const feature_type feat(feature);
+    
+    bounds.allocate(default_value);
+    
+    bounds[feat] = value;
+  }
+}
 
 #endif

@@ -52,6 +52,9 @@ path_type weights_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
+path_type bound_lower_file;
+path_type bound_upper_file;
+
 path_set_type refset_files;
 
 int iteration = 100;
@@ -142,7 +145,15 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no kbest?");
     if (oracle_path.empty())
       throw std::runtime_error("no oracke kbest?");
-
+    
+    if (! bound_lower_file.empty())
+      if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
+	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
+    
+    if (! bound_upper_file.empty())
+      if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
+	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
+    
     threads = utils::bithack::max(1, threads);
 
     scorer_document_type scorers(scorer_name);
@@ -185,6 +196,16 @@ int main(int argc, char ** argv)
     
     weights.allocate();
     
+    weight_set_type bounds_lower;
+    weight_set_type bounds_upper;
+    
+    if (! bound_lower_file.empty())
+      read_bounds(bound_lower_file, bounds_lower, - std::numeric_limits<double>::infinity());
+    
+    if (! bound_upper_file.empty())
+      read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
+    
+    
     double objective = 0.0;
     
     boost::mt19937 generator;
@@ -202,6 +223,20 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
     
+    if (! bounds_lower.empty()) {
+      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = std::max(weights[i], bounds_lower[i]);
+    }
+    
+    if (! bounds_upper.empty()) {
+      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = std::min(weights[i], bounds_upper[i]);
+    }
+
     if (mert_search) {
       const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
       
@@ -2468,6 +2503,9 @@ void options(int argc, char** argv)
     ("output",  po::value<path_type>(&output_path),                    "output parameter")
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
+
+    ("bound-lower", po::value<path_type>(&bound_lower_file),                     "lower bounds definition for feature weights")
+    ("bound-upper", po::value<path_type>(&bound_upper_file),                     "upper bounds definition for feature weights")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     

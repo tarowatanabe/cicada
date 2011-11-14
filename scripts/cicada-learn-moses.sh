@@ -51,6 +51,8 @@ bias_features=""
 bias_weight=-1
 merge="no"
 interpolate=0.0
+lower=""
+upper=""
 
 ### qsubs
 mem=8gb
@@ -97,6 +99,9 @@ $me [options]
   --bias-weight             bias weight
   --merge                   perform kbest merging
   --interpolate             weights interpolation
+
+  --lower                   lower-bound for features
+  --uppper                  upper-bound for features
 
   -d, --dev, --devset              tuning data (required)
   -r, --reference, --refset, --ref reference translations (required)
@@ -205,6 +210,15 @@ while test $# -gt 0 ; do
   --interpolate )
     test $# = 1 && eval "$exit_missing_arg"
     interpolate=$2
+    shift; shift ;;
+
+  --lower )
+    test $# = 1 && eval "$exit_missing_arg"
+    lower=$2
+    shift; shift ;;
+  --upper )
+    test $# = 1 && eval "$exit_missing_arg"
+    lower=$2
     shift; shift ;;
 
   --config | -c )
@@ -677,6 +691,15 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     regularize=" --regularize-l1"
   fi
 
+  lower_bound=""
+  if test "$lower" != ""; then
+    lower_bound=" --bound-lower $lower"
+  fi
+  upper_bound=""
+  if test "$upper" != ""; then
+    upper_bound=" --bound-upper $upper"
+  fi
+
   echo "learning ${root}weights.$iter" >&2
   qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
@@ -689,8 +712,10 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
                         $weights_option \
                         $learn_option \
                         $learn_options \
-                        --C $C \
                         $regularize \
+                        --C $C \
+                        $lower_bound \
+                        $upper_bound \
                         \
                         --debug=2 || exit 1
 
