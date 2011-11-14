@@ -502,10 +502,18 @@ struct OptimizeOnline
 	gradient_kbests[fiter->first] += weight_type(fiter->second) * weight;
     }
     
-    optimizer(gradient_oracles,
-	      gradient_kbests,
-	      Z_oracle,
-	      Z_kbest);
+    if (! bounds_lower.empty() || ! bounds_upper.empty())
+      optimizer(gradient_oracles,
+		gradient_kbests,
+		Z_oracle,
+		Z_kbest,
+		bounds_lower,
+		bounds_upper);
+    else
+      optimizer(gradient_oracles,
+		gradient_kbests,
+		Z_oracle,
+		Z_kbest);
   }
   
   Optimizer& optimizer;
