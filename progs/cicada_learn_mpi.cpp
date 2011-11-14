@@ -59,7 +59,7 @@ path_type bound_upper_file;
 int iteration = 100;
 bool learn_lbfgs = false;
 bool learn_sgd = false;
-bool learn_mira = false
+bool learn_mira = false;
 bool learn_nherd = false;
 bool learn_arow = false;
 bool learn_cw = false;
