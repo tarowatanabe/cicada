@@ -104,6 +104,8 @@ template <typename Optimize>
 double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
+		   const weight_set_type& bounds_lower,
+		   const weight_set_type& bounds_upper,
 		   weight_set_type& weights);
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
@@ -113,6 +115,8 @@ template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
+		       const weight_set_type& bounds_lower,
+		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
 		       Generator& generator);
 
@@ -248,19 +252,19 @@ int main(int argc, char ** argv)
     
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cp)
-      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, weights);
+      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, bounds_lower, bounds_upper, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
 
@@ -343,10 +347,14 @@ struct OptimizeOnline
   
   OptimizeOnline(Optimizer& __optimizer,
 		 const hypothesis_map_type& __kbests,
-		 const hypothesis_map_type& __oracles)
+		 const hypothesis_map_type& __oracles,
+		 const weight_set_type& __bounds_lower,
+		 const weight_set_type& __bounds_upper)
     : optimizer(__optimizer),
       kbests(__kbests),
-      oracles(__oracles)
+      oracles(__oracles),
+      bounds_lower(__bounds_lower),
+      bounds_upper(__bounds_upper)
   {
     ids.reserve(kbests.size());
     ids.resize(kbests.size());
@@ -501,6 +509,8 @@ struct OptimizeOnline
 
   const hypothesis_map_type& kbests;
   const hypothesis_map_type& oracles;
+  const weight_set_type& bounds_lower;
+  const weight_set_type& bounds_upper;
 
   id_set_type ids;
 };
@@ -639,8 +649,12 @@ struct OptimizeOnlineMargin
   
   OptimizeOnlineMargin(Optimizer& __optimizer,
 		       const hypothesis_map_type& kbests,
-		       const hypothesis_map_type& oracles)
-    : optimizer(__optimizer)
+		       const hypothesis_map_type& oracles,
+		       const weight_set_type& __bounds_lower,
+		       const weight_set_type& __bounds_upper)
+    : optimizer(__optimizer),
+      bounds_lower(__bounds_lower),
+      bounds_upper(__bounds_upper)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
@@ -974,6 +988,9 @@ struct OptimizeOnlineMargin
 
   Optimizer& optimizer;
   
+  const weight_set_type& bounds_lower;
+  const weight_set_type& bounds_upper;
+  
   sample_set_type features;
   loss_set_type   losses;
   id_set_type     ids;
@@ -1115,6 +1132,8 @@ template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
+		       const weight_set_type& bounds_lower,
+		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
 		       Generator& generator)
 {
@@ -1135,7 +1154,7 @@ double optimize_online(const scorer_document_type& scorers,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
 
   optimizer_type optimizer(instances, C);
-  Optimize opt(optimizer, kbests, oracles);
+  Optimize opt(optimizer, kbests, oracles, bounds_lower, bounds_upper);
 
   const double norm_local = opt.normalizer();
   double norm = 0.0;
@@ -1188,6 +1207,20 @@ double optimize_online(const scorer_document_type& scorers,
       optimizer.weights *= (1.0 / samples);
       
       // optimizer.weights is the new weights.
+      if (! bounds_lower.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::max(weights[i], bounds_lower[i]);
+      }
+      
+      if (! bounds_upper.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::min(weights[i], bounds_upper[i]);
+      }
+
 
       if (line_search) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
@@ -2017,6 +2050,8 @@ template <typename Optimize>
 double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
+		   const weight_set_type& bounds_lower,
+		   const weight_set_type& bounds_upper,
 		   weight_set_type& weights)
 {
   typedef std::deque<weight_set_type, std::allocator<weight_set_type> > weight_queue_type;
@@ -2096,13 +2131,28 @@ double optimize_cp(const scorer_document_type& scorers,
 	if (*aiter > 0.0) {
 	  for (size_t j = 0; j != a[id].size(); ++ j)
 	    weights[j] += (*aiter) * a[id][j];
-
+	  
 	  ++ active_size;
 	}
+      
+      if (! bounds_lower.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::max(weights[i], bounds_lower[i]);
+      }
+      
+      if (! bounds_upper.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::min(weights[i], bounds_upper[i]);
+      }
       
       if (debug >= 3)
 	std::cerr << "active size: " << active_size << std::endl;
     }
+
     
     if (line_search) {
       
