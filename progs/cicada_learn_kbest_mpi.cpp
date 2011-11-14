@@ -2129,28 +2129,10 @@ double optimize_cp(const scorer_document_type& scorers,
       alpha_set_type::iterator aiter = alpha.begin();
       for (size_t id = 0; id != a.size(); ++ id, ++ aiter)
 	if (*aiter > 0.0) {
+	  for (size_t j = 0; j != a[id].size(); ++ j)
+	    weights[j] += (*aiter) * a[id][j];
 	  
-	  if (! bounds_lower.empty() || ! bounds_upper.empty()) {
-	    for (size_t j = 0; j != a[id].size(); ++ j) 
-	      if (a[id][j] != 0.0) {
-		const double weight_new = weights[j] + (*aiter) * a[id][j];
-		
-		// weights[j] +  (*aiter) * a[j] >= bounds_lower[j]
-		if (j < bounds_lower.size() && weight_new < bounds_lower[j])
-		  (*aiter) = std::max((bounds_lower[j] - weights[j]) / a[id][j], 0.0);
-		
-		// weights[j] + (*aiter) * a[j] <= bounds_upper[j]
-		if (j < bounds_upper.size() && weight_new > bounds_upper[j])
-		  (*aiter) = std::max((bounds_upper[j] - weights[j]) / a[id][j], 0.0);
-	      }
-	  }
-	  
-	  if (*aiter > 0.0) {
-	    for (size_t j = 0; j != a[id].size(); ++ j)
-	      weights[j] += (*aiter) * a[id][j];
-	    
-	    ++ active_size;
-	  }
+	  ++ active_size;
 	}
       
       
