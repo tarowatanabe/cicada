@@ -260,6 +260,30 @@ struct OptimizerMIRA : public OptimizerBase
   {
     
   }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const weight_set_type& bounds_lower, const weight_set_type& bounds_upper, const double loss)
+  {
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, first, last, 0.0);
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+    
+    if (alpha > 1e-10) {
+      for (/**/; first != last; ++ first) {
+	weights[first->first] += alpha * first->second;
+	
+	if (first->first.id() < bounds_lower.size())
+	  weights[first->first] = std::max(weights[first->first], bounds_lower[first->first]);
+	if (first->first.id() < bounds_upper.size())
+	  weights[first->first] = std::min(weights[first->first], bounds_upper[first->first]);
+      }
+    
+      ++ samples;
+    }
+  }
   
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
@@ -325,6 +349,40 @@ struct OptimizerNHERD : public OptimizerBase
   {
     
   }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const weight_set_type& bounds_lower, const weight_set_type& bounds_upper, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      const double lambda = 1.0 / C;
+      
+      for (/**/; first != last; ++ first) {
+	const double var = covariances[first->first];
+	
+	weights[first->first]     += alpha * first->second * var;
+	//covariances[first->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
+	covariances[first->first]  = var / (1.0 + var * (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
+
+	if (first->first.id() < bounds_lower.size())
+	  weights[first->first] = std::max(weights[first->first], bounds_lower[first->first]);
+	if (first->first.id() < bounds_upper.size())
+	  weights[first->first] = std::min(weights[first->first], bounds_upper[first->first]);
+      }
+      
+      ++ samples;
+    }
+  }
+
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
@@ -414,6 +472,36 @@ struct OptimizerAROW : public OptimizerBase
   }
 
   template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const weight_set_type& bounds_lower, const weight_set_type& bounds_upper, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      for (/**/; first != last; ++ first) {
+	const double var = covariances[first->first];
+	
+	weights[first->first]     += alpha * first->second * var;
+	covariances[first->first] -= beta * (var * var) * (first->second * first->second);
+
+	if (first->first.id() < bounds_lower.size())
+	  weights[first->first] = std::max(weights[first->first], bounds_lower[first->first]);
+	if (first->first.id() < bounds_upper.size())
+	  weights[first->first] = std::min(weights[first->first], bounds_upper[first->first]);
+      }
+      
+      ++ samples;
+    }
+  }
+
+  template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
     covariances.allocate(1.0);
@@ -492,6 +580,39 @@ struct OptimizerCW : public OptimizerBase
   void finalize()
   {
     
+  }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const weight_set_type& bounds_lower, const weight_set_type& bounds_upper, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    if (loss - margin > 0.0) {
+      const double theta = 1.0 + 2.0 * C * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
+      const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+      
+      if (alpha > 1e-10 && beta > 0.0) {
+	for (/**/; first != last; ++ first) {
+	  const double var = covariances[first->first];
+	  
+	  weights[first->first]     += alpha * first->second * var;
+	  covariances[first->first] -= beta * (var * var) * (first->second * first->second);
+	  
+	  if (first->first.id() < bounds_lower.size())
+	    weights[first->first] = std::max(weights[first->first], bounds_lower[first->first]);
+	  if (first->first.id() < bounds_upper.size())
+	    weights[first->first] = std::min(weights[first->first], bounds_upper[first->first]);
+	}
+	
+	++ samples;
+      }
+    }
   }
 
   template <typename Iterator>
@@ -586,6 +707,41 @@ struct OptimizerPegasos : public OptimizerBase
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const weight_set_type& bounds_lower, const weight_set_type& bounds_upper, const double loss)
+  {
+    const double margin = cicada::dot_product(weights, first, last, 0.0) * weight_scale;
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    if (loss - margin > 0.0) {
+      //const double eta = 1.0 / (lambda * (epoch + 2));
+      // exponential decay...
+      const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+      ++ epoch;
+      
+      rescale(1.0 - eta * lambda);
+      
+      ++ samples;
+      
+      for (/**/; first != last; ++ first) {
+	update(weights[first->first], double(first->second) * eta);
+	
+	if (first->first.id() < bounds_lower.size())
+	  weights[first->first] = std::max(weights[first->first] * weight_scale, bounds_lower[first->first]) / weight_scale;
+	if (first->first.id() < bounds_upper.size())
+	  weights[first->first] = std::min(weights[first->first] * weight_scale, bounds_upper[first->first]) / weight_scale;
+      }
+      
+      // projection...
+      if (weight_norm > 1.0 / lambda)
+	rescale(std::sqrt(1.0 / (lambda * weight_norm)));
+      
+      if (weight_scale < 0.001 || 1000 < weight_scale)
+	finalize();
+    }
   }
 
   template <typename Iterator>

@@ -878,10 +878,18 @@ struct OptimizeOnlineMargin
     boost::random_number_generator<Generator> gen(generator);
     std::random_shuffle(ids.begin(), ids.end(), gen);
     
-    for (size_t i = 0; i != ids.size(); ++ i) {
-      const size_type id = ids[i];
-      
-      optimizer(features[id].begin(), features[id].end(), losses[id]);
+    if (! bounds_lower.empty() || ! bounds_upper.empty()) {
+      for (size_t i = 0; i != ids.size(); ++ i) {
+	const size_type id = ids[i];
+	
+	optimizer(features[id].begin(), features[id].end(), bounds_lower, bounds_upper, losses[id]);
+      }
+    } else {
+      for (size_t i = 0; i != ids.size(); ++ i) {
+	const size_type id = ids[i];
+	
+	optimizer(features[id].begin(), features[id].end(), losses[id]);
+      }
     }
   }
   
