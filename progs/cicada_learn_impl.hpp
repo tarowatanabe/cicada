@@ -309,6 +309,91 @@ struct OptimizerMIRA : public OptimizerBase
   double lambda;
 };
 
+struct OptimizerNHERD : public OptimizerBase
+{
+  OptimizerNHERD(const size_t& __instances,
+		 const double& C) : instances(__instances), samples(0), lambda(C) {}
+
+  void initialize()
+  {
+    samples = 0;
+    objective = 0.0;
+    weight_scale = 1.0;
+  }
+  
+  void finalize()
+  {
+    
+  }
+
+  template <typename Iterator>
+  void operator()(Iterator first, Iterator last, const double loss)
+  {
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      const double lambda = 1.0 / C;
+      
+      for (/**/; first != last; ++ first) {
+	const double var = covariances[first->first];
+	
+	weights[first->first]     += alpha * first->second * var;
+	covariances[first->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
+      }
+      
+      ++ samples;
+    }
+  }
+
+  void operator()(const feature_set_type& features_reward,
+		  const feature_set_type& features_penalty,
+		  const double loss=1.0)
+  {
+    feature_set_type features(features_reward - features_penalty);
+    
+    covariances.allocate(1.0);
+    
+    const double margin = cicada::dot_product(weights, features);
+    const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
+    
+    objective += (loss - margin) * (loss - margin > 0.0);
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      const double lambda = 1.0 / C;
+      
+      feature_set_type::const_iterator fiter_end = features.end();
+      for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+	const double var = covariances[fiter->first];
+	
+	weights[fiter->first]     += alpha * fiter->second * var;
+	covariances[fiter->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
+      }
+    }
+    ++ samples;
+  }
+  
+  size_t instances;
+  size_t samples;
+  
+  double objective;
+  weight_set_type weights;
+  double weight_scale;
+  double lambda;
+
+  weight_set_type covariances;
+};
+
 struct OptimizerAROW : public OptimizerBase
 {
   OptimizerAROW(const size_t& __instances,
