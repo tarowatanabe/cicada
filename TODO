@@ -129,3 +129,7 @@ Add softmax-margin... How? (assume duplicates as in mert code?)
 octavian support?
 
 ngram feature should use id-based encoding, not word based for efficient oov computation
+
+add NHERD to our set of learning algorithms and add online learner to block-learner
+
+add lower/upper bound for online learner as restrictions for updates...?

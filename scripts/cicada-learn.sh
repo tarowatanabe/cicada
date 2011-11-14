@@ -653,10 +653,12 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	                $weights_option \
                         --output $weights_learn \
                         \
-	                $regularize \
 	                $learn_option \
                         $learn_options \
+	                $regularize \
                         --C $C \
+                        $lower_bound \
+                        $upper_bound \
                         \
                         --debug=2 || exit 1
   else

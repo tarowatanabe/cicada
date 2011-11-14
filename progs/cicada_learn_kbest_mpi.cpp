@@ -3175,6 +3175,9 @@ void options(int argc, char** argv)
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
+    ("bound-lower", po::value<path_type>(&bound_lower_file),                     "lower bounds definition for feature weights")
+    ("bound-upper", po::value<path_type>(&bound_upper_file),                     "upper bounds definition for feature weights")
+
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")
