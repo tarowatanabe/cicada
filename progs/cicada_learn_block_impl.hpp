@@ -518,11 +518,9 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
-// Pegasos learner
-struct LearnPegasos : public LearnBase
+struct LearnOnlineMargin : public LearnBase
 {
   typedef std::vector<double, std::allocator<double> > loss_set_type;
-  
   
   //
   // typedef for unique sentences
@@ -542,14 +540,12 @@ struct LearnPegasos : public LearnBase
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
   
-  LearnPegasos(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
-  
   void clear()
   {
     features.clear();
     losses.clear();
   }
-
+  
   std::ostream& encode(std::ostream& os)
   {
     return os;
@@ -559,6 +555,7 @@ struct LearnPegasos : public LearnBase
   {
     return is;
   }
+  
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
@@ -625,20 +622,6 @@ struct LearnPegasos : public LearnBase
 	history_features.insert(feats.begin(), feats.end());
       }
   }
-  
-  void initialize(weight_set_type& weights)
-  {
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-  }
-  
-  void finalize(weight_set_type& weights)
-  {
-    weights *= weight_scale;
-    
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-  }
 
   template <typename Iterator>
   boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
@@ -683,6 +666,36 @@ struct LearnPegasos : public LearnBase
     history_features.clear();
     history_losses.clear();
   }
+  
+  sample_set_type features;
+  loss_set_type   losses;
+  
+  sample_set_type history_features;
+  loss_set_type   history_losses;
+  
+  sentence_unique_type sentences;
+};
+
+// Pegasos learner
+struct LearnPegasos : public LearnOnlineMargin
+{
+  
+  LearnPegasos(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
 
   double learn(weight_set_type& weights)
   {
@@ -745,39 +758,11 @@ struct LearnPegasos : public LearnBase
   double    lambda;
   double    weight_scale;
   double    weight_norm;
-  
-  sample_set_type features;
-  loss_set_type   losses;
-
-  sample_set_type history_features;
-  loss_set_type   history_losses;
-  
-  sentence_unique_type sentences;
 };
 
 // optimized-Pegasos learner
-struct LearnOPegasos : public LearnBase
+struct LearnOPegasos : public LearnOnlineMargin
 {
-  typedef std::vector<double, std::allocator<double> > loss_set_type;
-  
-  //
-  // typedef for unique sentences
-  //
-  struct hash_sentence : public utils::hashmurmur<size_t>
-  {
-    typedef utils::hashmurmur<size_t> hasher_type;
-
-    size_t operator()(const hypothesis_type::sentence_type& x) const
-    {
-      return hasher_type()(x.begin(), x.end(), 0);
-    }
-  };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
-
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
@@ -833,89 +818,7 @@ struct LearnOPegasos : public LearnBase
     const FeatureSet& features;
   };
   
-  LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
-  
-  void clear()
-  {
-    features.clear();
-    losses.clear();
-  }
-
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
-  {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-    
-    if (kbests.empty() || oracles.empty()) return;
-    
-    sentences.clear();
-    for (size_t o = 0; o != oracles.size(); ++ o)
-      sentences.insert(oracles[o].sentence);
-
-    const double error_factor = (error_metric ? - 1.0 : 1.0);
-
-    features_type feats;
-    
-    for (size_t o = 0; o != oracles.size(); ++ o)
-      for (size_t k = 0; k != kbests.size(); ++ k) {
-	const hypothesis_type& oracle = oracles[o];
-	const hypothesis_type& kbest  = kbests[k];
-	
-	if (sentences.find(kbest.sentence) != sentences.end()) continue;
-	
-	hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
-	hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
-	
-	hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
-	hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
-	
-	feats.clear();
-	
-	while (oiter != oiter_end && kiter != kiter_end) {
-	  if (oiter->first < kiter->first) {
-	    feats.push_back(*oiter);
-	    ++ oiter;
-	  } else if (kiter->first < oiter->first) {
-	    feats.push_back(feature_value_type(kiter->first, - kiter->second));
-	    ++ kiter;
-	  } else {
-	    const double value = oiter->second - kiter->second;
-	    if (value != 0.0)
-	      feats.push_back(feature_value_type(kiter->first, value));
-	    ++ oiter;
-	    ++ kiter;
-	  }
-	}
-	
-	for (/**/; oiter != oiter_end; ++ oiter)
-	  feats.push_back(*oiter);
-	
-	for (/**/; kiter != kiter_end; ++ kiter)
-	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
-	
-	if (feats.empty()) continue;
-	
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
-	
-	if (loss <= 0.0) continue;
-	
-	losses.push_back(loss_rank ? 1.0 : loss);
-	features.insert(feats.begin(), feats.end());
-	
-	// for history...
-	history_losses.push_back(loss_rank ? 1.0 : loss);
-	history_features.insert(feats.begin(), feats.end());
-      }
-  }
+  LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
   
   void initialize(weight_set_type& weights)
   {
@@ -929,49 +832,6 @@ struct LearnOPegasos : public LearnBase
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-  }
-
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    static const double inf = std::numeric_limits<double>::infinity();
-    
-    double grad_pos = 0.0;
-    double grad_neg = 0.0;
-    for (size_t i = 0; i != history_features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
-      const double loss = history_losses[i];
-      
-      const double bi_pos = margin_prev - margin;
-      const double ci_pos = loss - margin_prev;
-      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
-      
-      const double bi_neg = margin_prev + margin;
-      const double ci_neg = loss - margin_prev;
-      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
-      
-      if (ki_pos > 0) {
-	*iter = std::make_pair(ki_pos, bi_pos);
-	++ iter;
-      }
-      
-      if (ki_neg > 0) {
-	*iter = std::make_pair(- ki_neg, bi_neg);
-	++ iter;
-      }
-      
-      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
-      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
-    }
-    
-    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
-  }
-
-  void clear_history()
-  {
-    history_features.clear();
-    history_losses.clear();
   }
 
   double learn(weight_set_type& weights)
@@ -1061,43 +921,216 @@ struct LearnOPegasos : public LearnBase
   double    weight_scale;
   double    weight_norm;
   
-
-  sample_set_type features;
-  loss_set_type   losses;
-  
-  sample_set_type history_features;
-  loss_set_type   history_losses;
-  
-  sentence_unique_type sentences;
-  
   alpha_type    alpha;
   f_type        f;
 };
 
+struct LearnPA : public LearnOnlineMargin
+{
+  LearnPA(const size_type __instances) : lambda(C) {}
+
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    double objective = 0.0;
+
+    const double constant = 1.0 / lambda;
+    
+    for (size_t i = 0; i != losses.size(); ++ i) {
+      const double margin = cicada::dot_product(weights, features[i].begin(), features[i].end(), 0.0);
+      const double loss   = losses[i];
+      
+      const double suffered = loss - margin;
+
+      if (suffered <= 0.0) continue;
+      
+      const double variance = cicada::dot_product(features[i].begin(), features[i].end(), features[i].begin(), features[i].end(), 0.0);
+      const double alpha = std::min(suffered / variance, constant);
+      
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	weights[fiter->first] += alpha * fiter->second;
+      
+      objective += suffered;
+    }
+    
+    return objective / losses.size();
+  }
+  
+  double lambda;
+};
+
+struct LearnCW : public LearnOnlineMargin
+{
+  LearnCW(const size_type __instances) : lambda(C) {}
+
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    double objective = 0.0;
+
+    covariances.allocate(1.0);
+    
+    for (size_t i = 0; i != losses.size(); ++ i) {
+      const double margin = cicada::dot_product(weights, features[i].begin(), features[i].end(), 0.0);
+      const double loss   = losses[i];
+      
+      const double suffered = loss - margin;
+      
+      if (suffered <= 0.0) continue;
+
+      const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
+      
+      const double theta = 1.0 + 2.0 * lambda * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * lambda * (margin - loss - lambda * variance))) / (4.0 * lambda * variance));
+      const double beta  = (2.0 * alpha * lambda) / (1.0 + 2.0 * alpha * lambda * variance);
+
+      if (alpha > 1e-12 && beta > 0.0) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  const double var = covariances[fiter->first];
+	  
+	  weights[fiter->first]     += alpha * fiter->second * var;
+	  covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+	}
+      }
+      
+      objective += suffered;
+    }
+    
+    return objective / losses.size();
+  }
+  
+  weight_set_type covariances;
+  double lambda;
+};
+
+struct LearnAROW : public LearnOnlineMargin
+{
+  LearnAROW(const size_type __instances) : lambda(C) {}
+
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    double objective = 0.0;
+
+    covariances.allocate(1.0);
+    
+    for (size_t i = 0; i != losses.size(); ++ i) {
+      const double margin = cicada::dot_product(weights, features[i].begin(), features[i].end(), 0.0);
+      const double loss   = losses[i];
+      
+      const double suffered = loss - margin;
+
+      if (suffered <= 0.0) continue;
+
+      const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
+      
+      const double beta = 1.0 / (variance + lambda);
+      const double alpha = std::max(0.0, (loss - margin) * beta);
+      
+      if (alpha > 1e-12) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  const double var = covariances[fiter->first];
+	  
+	  weights[fiter->first]     += alpha * fiter->second * var;
+	  covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+	}
+      }
+      
+      objective += suffered;
+    }
+    
+    return objective / losses.size();
+  }
+  
+  weight_set_type covariances;
+  double lambda;
+};
+
+struct LearnNHERD : public LearnOnlineMargin
+{
+  LearnNHERD(const size_type __instances) : lambda(C) {}
+
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    double objective = 0.0;
+
+    covariances.allocate(1.0);
+    
+    for (size_t i = 0; i != losses.size(); ++ i) {
+      const double margin = cicada::dot_product(weights, features[i].begin(), features[i].end(), 0.0);
+      const double loss   = losses[i];
+      
+      const double suffered = loss - margin;
+
+      if (suffered <= 0.0) continue;
+      
+      const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
+      
+      const double beta = 1.0 / (variance + C);
+      const double alpha = std::max(0.0, (loss - margin) * beta);
+      
+      if (alpha > 1e-12) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  const double var = covariances[fiter->first];
+	
+	  weights[fiter->first]     += alpha * fiter->second * var;
+	  //covariances[fiter->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
+	  covariances[fiter->first]  = var / (1.0 + var * (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
+	}
+      }
+      
+      objective += suffered;
+    }
+    
+    return objective / losses.size();
+  }
+  
+  weight_set_type covariances;
+  double lambda;
+};
+
+
 // MIRA learner
 // We will run a qp solver and determine the alpha, then, translate this into w
-struct LearnMIRA : public LearnBase
+struct LearnMIRA : public LearnOnlineMargin
 {
-  typedef std::vector<double, std::allocator<double> > loss_set_type;
-  
-  //
-  // typedef for unique sentences
-  //
-  struct hash_sentence : public utils::hashmurmur<size_t>
-  {
-    typedef utils::hashmurmur<size_t> hasher_type;
-
-    size_t operator()(const hypothesis_type::sentence_type& x) const
-    {
-      return hasher_type()(x.begin(), x.end(), 0);
-    }
-  };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
-
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
@@ -1155,88 +1188,6 @@ struct LearnMIRA : public LearnBase
   
   LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
-  void clear()
-  {
-    features.clear();
-    losses.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
-  {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-    
-    if (kbests.empty() || oracles.empty()) return;
-    
-    sentences.clear();
-    for (size_t o = 0; o != oracles.size(); ++ o)
-      sentences.insert(oracles[o].sentence);
-
-    const double error_factor = (error_metric ? - 1.0 : 1.0);
-
-    features_type feats;
-    
-    for (size_t o = 0; o != oracles.size(); ++ o)
-      for (size_t k = 0; k != kbests.size(); ++ k) {
-	const hypothesis_type& oracle = oracles[o];
-	const hypothesis_type& kbest  = kbests[k];
-	
-	if (sentences.find(kbest.sentence) != sentences.end()) continue;
-	
-	hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
-	hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
-	
-	hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
-	hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
-	
-	feats.clear();
-	
-	while (oiter != oiter_end && kiter != kiter_end) {
-	  if (oiter->first < kiter->first) {
-	    feats.push_back(*oiter);
-	    ++ oiter;
-	  } else if (kiter->first < oiter->first) {
-	    feats.push_back(feature_value_type(kiter->first, - kiter->second));
-	    ++ kiter;
-	  } else {
-	    const double value = oiter->second - kiter->second;
-	    if (value != 0.0)
-	      feats.push_back(feature_value_type(kiter->first, value));
-	    ++ oiter;
-	    ++ kiter;
-	  }
-	}
-	
-	for (/**/; oiter != oiter_end; ++ oiter)
-	  feats.push_back(*oiter);
-	
-	for (/**/; kiter != kiter_end; ++ kiter)
-	  feats.push_back(feature_value_type(kiter->first, - kiter->second));
-	
-	if (feats.empty()) continue;
-	
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
-	
-	if (loss <= 0.0) continue;
-	
-	losses.push_back(loss_rank ? 1.0 : loss);
-	features.insert(feats.begin(), feats.end());
-
-	// for history...
-	history_losses.push_back(loss_rank ? 1.0 : loss);
-	history_features.insert(feats.begin(), feats.end());
-      }
-  }
-  
   void initialize(weight_set_type& weights)
   {
     
@@ -1246,49 +1197,6 @@ struct LearnMIRA : public LearnBase
   void finalize(weight_set_type& weights)
   {
     
-  }
-
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    static const double inf = std::numeric_limits<double>::infinity();
-    
-    double grad_pos = 0.0;
-    double grad_neg = 0.0;
-    for (size_t i = 0; i != history_features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
-      const double loss = history_losses[i];
-      
-      const double bi_pos = margin_prev - margin;
-      const double ci_pos = loss - margin_prev;
-      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
-      
-      const double bi_neg = margin_prev + margin;
-      const double ci_neg = loss - margin_prev;
-      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
-      
-      if (ki_pos > 0) {
-	*iter = std::make_pair(ki_pos, bi_pos);
-	++ iter;
-      }
-      
-      if (ki_neg > 0) {
-	*iter = std::make_pair(- ki_neg, bi_neg);
-	++ iter;
-      }
-      
-      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
-      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
-    }
-    
-    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
-  }
-
-  void clear_history()
-  {
-    history_features.clear();
-    history_losses.clear();
   }
   
   double learn(weight_set_type& weights)
@@ -1308,7 +1216,7 @@ struct LearnMIRA : public LearnBase
     double objective = 0.0;
     for (size_t i = 0; i != losses.size(); ++ i) {
       f[i] = - (losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
-      objective -= f[i];
+      objective -= f[i] * (f[i] < 0.0);
     }
     
     objective /= losses.size();
@@ -1338,14 +1246,6 @@ struct LearnMIRA : public LearnBase
   double tolerance;
   double lambda;
 
-  sample_set_type features;
-  loss_set_type   losses;
-
-  sample_set_type history_features;
-  loss_set_type   history_losses;
-  
-  sentence_unique_type sentences;
-  
   alpha_type    alpha;
   f_type        f;
 };

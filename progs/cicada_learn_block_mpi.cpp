@@ -103,6 +103,10 @@ int kbest_size = 1000;
 bool learn_lbfgs  = false;
 bool learn_pegasos = false;
 bool learn_opegasos = false;
+bool learn_pa = false;
+bool learn_cw = false;
+bool learn_arow = false;
+bool learn_nherd = false;
 bool learn_mira   = false;
 bool learn_sgd    = false;
 bool learn_svm    = false;
@@ -190,9 +194,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos > 1)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
       throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos == 0)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_lbfgs = true;
     
     if (int(regularize_l1) + regularize_l2 > 1)
@@ -287,6 +291,14 @@ int main(int argc, char ** argv)
     if (yield_sentence) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_pa)
+	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, samples, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, samples, scorers, weights);
       else if (learn_sgd && regularize_l1)
@@ -304,6 +316,14 @@ int main(int argc, char ** argv)
     } else if (yield_alignment) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_pa)
+	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
       else if (learn_sgd && regularize_l1)
@@ -321,6 +341,14 @@ int main(int argc, char ** argv)
     } else if (yield_dependency) {
       if (learn_lbfgs)
 	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_pa)
+	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, samples, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, samples, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, samples, scorers, weights);
       else if (learn_sgd && regularize_l1)
@@ -1286,6 +1314,10 @@ void options(int argc, char** argv)
     ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
     ("learn-pegasos",  po::bool_switch(&learn_pegasos),  "online Pegasos algorithm")
     ("learn-opegasos", po::bool_switch(&learn_opegasos), "online optimized-Pegasos algorithm")
+    ("learn-pa",       po::bool_switch(&learn_pa),       "online PA algorithm")
+    ("learn-cw",       po::bool_switch(&learn_cw),       "online CW algorithm")
+    ("learn-arow",     po::bool_switch(&learn_arow),     "online AROW algorithm")
+    ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
     ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
     ("learn-svm",      po::bool_switch(&learn_svm),      "SVM for structured output")
     ("learn-linear",   po::bool_switch(&learn_linear),   "liblinear algorithm")

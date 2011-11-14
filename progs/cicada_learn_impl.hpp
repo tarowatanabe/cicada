@@ -346,7 +346,8 @@ struct OptimizerNHERD : public OptimizerBase
 	const double var = covariances[first->first];
 	
 	weights[first->first]     += alpha * first->second * var;
-	covariances[first->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
+	//covariances[first->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
+	covariances[first->first]  = var / (1.0 + var * (2.0 * lambda + lambda * lambda * variance) * first->second * first->second);
       }
       
       ++ samples;
@@ -377,7 +378,8 @@ struct OptimizerNHERD : public OptimizerBase
 	const double var = covariances[fiter->first];
 	
 	weights[fiter->first]     += alpha * fiter->second * var;
-	covariances[fiter->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
+	//covariances[fiter->first]  = 1.0 / ((1.0 / var) + (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
+	covariances[fiter->first]  = var / (1.0 + var * (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
       }
     }
     ++ samples;
