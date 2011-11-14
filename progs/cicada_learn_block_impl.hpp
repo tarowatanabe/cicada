@@ -929,14 +929,9 @@ struct LearnPA : public LearnOnlineMargin
 {
   LearnPA(const size_type __instances) : lambda(C) {}
 
-  void initialize(weight_set_type& weights)
-  {
-  }
+  void initialize(weight_set_type& weights) {}
   
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
+  void finalize(weight_set_type& weights) {}
   
   double learn(weight_set_type& weights)
   {
@@ -952,6 +947,7 @@ struct LearnPA : public LearnOnlineMargin
 
       if (suffered <= 0.0) continue;
       
+      // PA-I
       const double variance = cicada::dot_product(features[i].begin(), features[i].end(), features[i].begin(), features[i].end(), 0.0);
       const double alpha = std::min(suffered / variance, constant);
       
@@ -972,14 +968,9 @@ struct LearnCW : public LearnOnlineMargin
 {
   LearnCW(const size_type __instances) : lambda(C) {}
 
-  void initialize(weight_set_type& weights)
-  {
-  }
+  void initialize(weight_set_type& weights) {}
   
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
+  void finalize(weight_set_type& weights) {}
   
   double learn(weight_set_type& weights)
   {
@@ -1025,14 +1016,9 @@ struct LearnAROW : public LearnOnlineMargin
 {
   LearnAROW(const size_type __instances) : lambda(C) {}
 
-  void initialize(weight_set_type& weights)
-  {
-  }
+  void initialize(weight_set_type& weights) {}
   
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
+  void finalize(weight_set_type& weights) {}
   
   double learn(weight_set_type& weights)
   {
@@ -1077,14 +1063,9 @@ struct LearnNHERD : public LearnOnlineMargin
 {
   LearnNHERD(const size_type __instances) : lambda(C) {}
 
-  void initialize(weight_set_type& weights)
-  {
-  }
+  void initialize(weight_set_type& weights) {}
   
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
+  void finalize(weight_set_type& weights) {}
   
   double learn(weight_set_type& weights)
   {
@@ -1101,9 +1082,7 @@ struct LearnNHERD : public LearnOnlineMargin
       if (suffered <= 0.0) continue;
       
       const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
-      
-      const double beta = 1.0 / (variance + C);
-      const double alpha = std::max(0.0, (loss - margin) * beta);
+      const double alpha = std::max(0.0, (loss - margin) / (variance + lambda));
       
       if (alpha > 1e-12) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -1188,16 +1167,9 @@ struct LearnMIRA : public LearnOnlineMargin
   
   LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
-  void initialize(weight_set_type& weights)
-  {
-    
-    
-  }
+  void initialize(weight_set_type& weights) {}
   
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
+  void finalize(weight_set_type& weights) {}
   
   double learn(weight_set_type& weights)
   {
