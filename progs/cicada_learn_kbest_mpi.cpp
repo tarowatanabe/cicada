@@ -2448,22 +2448,92 @@ struct OptimizeLBFGS
 
   double operator()()
   {
-    lbfgs_parameter_t param;
-    lbfgs_parameter_init(&param);
-    
-    if (regularize_l1) {
-      param.orthantwise_c = C;
-      param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
-    } else
-      param.orthantwise_c = 0.0;
-    
-    param.max_iterations = iteration;
-    
-    double objective = 0.0;
-    
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
-    
-    return objective;
+    if (regularize_l2 && (! bounds_lower.empty() || ! bounds_upper.empty())) {
+      typedef Task                  task_type;
+      
+      const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+      const int mpi_size = MPI::COMM_WORLD.Get_size();
+      
+      std::vector<double, std::allocator<double> > g(weights.size());
+      std::vector<double, std::allocator<double> > l(weights.size());
+      std::vector<double, std::allocator<double> > u(weights.size());
+      std::vector<int, std::allocator<int> >       nbd(weights.size());
+
+      const double inf = std::numeric_limits<double>::infinity();
+
+      for (size_t i = 0; i != weights.size(); ++ i) {
+	bool has_lower_bound = (i < bounds_lower.size() && bounds_lower[i] > - inf);
+	bool has_upper_bound = (i < bounds_upper.size() && bounds_upper[i] <   inf);
+	
+	if (i < bounds_lower.size())
+	  l[i] = bounds_lower[i];
+	
+	if (i < bounds_upper.size())
+	  u[i] = bounds_upper[i];
+	
+	nbd[i] = (has_lower_bound && has_upper_bound ? 2 : (has_lower_bound ? 1 : (has_upper_bound ? 3 : 0)));
+      }
+      
+      LBFGS lbfgs;
+      lbfgs.init(weights.size(), 7, &(*l.begin()), &(*u.begin()), &(*nbd.begin()));
+      
+      double objective = 0.0;
+      for (;;) {
+	// send notification!
+	for (int rank = 1; rank < mpi_size; ++ rank)
+	  MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+	
+	bcast_weights(0, weights);
+	
+	task_type task(weights, kbests, oracles, instances);
+	task();
+	
+	// collect all the objective and gradients...
+	reduce_weights(task.g);
+	
+	std::fill(g.begin(), g.end(), 0.0);
+	std::transform(task.g.begin(), task.g.end(), g.begin(), g.begin(), std::plus<double>());
+	
+	objective = 0.0;
+	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	const double objective_unregularized = objective;
+	
+	double norm = 0.0;
+	for (size_t i = 0; i < g.size(); ++ i) {
+	  g[i] += C * weights[i];
+	  norm += weights[i] * weights[i];
+	}
+	objective += 0.5 * C * norm;
+	
+	if (debug >= 2)
+	  std::cerr << "objective: " << objective << " non-regularized: " << objective_unregularized << std::endl;
+
+	const int ret = lbfgs.optimize(&(*weights.begin()), &objective, &(*g.begin()));
+
+	if (ret <= 0)
+	  break;
+      }
+      
+      return objective;
+    } else {
+      lbfgs_parameter_t param;
+      lbfgs_parameter_init(&param);
+      
+      if (regularize_l1) {
+	param.orthantwise_c = C;
+	param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+      } else
+	param.orthantwise_c = 0.0;
+      
+      param.max_iterations = iteration;
+      
+      double objective = 0.0;
+      
+      lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
+      
+      return objective;
+    }
   }
 
   
@@ -2583,22 +2653,6 @@ struct OptimizeLBFGS
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
-
-#if 0
-    if (! optimizer.bounds_lower.empty()) {
-      const size_t weights_size = utils::bithack::min(optimizer.weights.size(), optimizer.bounds_lower.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	optimizer.weights[i] = std::max(optimizer.weights[i], optimizer.bounds_lower[i]);
-    }
-
-    if (! optimizer.bounds_upper.empty()) {
-      const size_t weights_size = utils::bithack::min(optimizer.weights.size(), optimizer.bounds_upper.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	optimizer.weights[i] = std::min(optimizer.weights[i], optimizer.bounds_upper[i]);
-    }
-#endif
     
     bcast_weights(0, optimizer.weights);
     
