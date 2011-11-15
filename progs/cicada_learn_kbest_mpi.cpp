@@ -2583,6 +2583,7 @@ struct OptimizeLBFGS
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
 
+if 0
     if (! optimizer.bounds_lower.empty()) {
       const size_t weights_size = utils::bithack::min(optimizer.weights.size(), optimizer.bounds_lower.size());
       
@@ -2596,6 +2597,7 @@ struct OptimizeLBFGS
       for (size_t i = 0; i != weights_size; ++ i)
 	optimizer.weights[i] = std::min(optimizer.weights[i], optimizer.bounds_upper[i]);
     }
+#endif
     
     bcast_weights(0, optimizer.weights);
     
