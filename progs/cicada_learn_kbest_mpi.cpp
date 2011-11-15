@@ -2491,8 +2491,7 @@ struct OptimizeLBFGS
 	// collect all the objective and gradients...
 	reduce_weights(task.g);
 	
-	std::fill(g.begin(), g.end(), 0.0);
-	std::transform(task.g.begin(), task.g.end(), g.begin(), g.begin(), std::plus<double>());
+	std::fill(std::copy(task.g.begin(), task.g.end(), g.begin()), g.end(), 0.0);
 	
 	objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
@@ -2663,8 +2662,7 @@ struct OptimizeLBFGS
     
     reduce_weights(task.g);
     
-    std::fill(g, g + n, 0.0);
-    std::transform(task.g.begin(), task.g.end(), g, g, std::plus<double>());
+    std::fill(std::copy(task.g.begin(), task.g.end(), g), g + n, 0.0);
     
     double objective = 0.0;
     MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
