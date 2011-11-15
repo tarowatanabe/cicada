@@ -1061,7 +1061,7 @@ struct LearnAROW : public LearnOnlineMargin
 
 struct LearnNHERD : public LearnOnlineMargin
 {
-  LearnNHERD(const size_type __instances) : lambda(C) {}
+  LearnNHERD(const size_type __instances) : lambda(1.0 / C) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1078,11 +1078,11 @@ struct LearnNHERD : public LearnOnlineMargin
       const double loss   = losses[i];
       
       const double suffered = loss - margin;
-
+      
       if (suffered <= 0.0) continue;
       
       const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
-      const double alpha = std::max(0.0, (loss - margin) / (variance + lambda));
+      const double alpha = std::max(0.0, (loss - margin) / (variance + 1.0 / lambda));
       
       if (alpha > 1e-12) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
