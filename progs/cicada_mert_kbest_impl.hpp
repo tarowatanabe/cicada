@@ -95,6 +95,20 @@ struct EnvelopeKBest
     operator()(lines);
   }
 
+  template <typename Iterator, typename OutputIterator>
+  void operator()(Iterator first, Iterator last, OutputIterator result)
+  {
+    for (/**/; first != last; ++ first) {
+      const hypothesis_type& hyp = *first;
+      
+      const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
+      const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
+      
+      *result = line_type(m, y, hyp);
+      ++ result;
+    }
+  }
+
 
   inline
   void operator()(const hypothesis_set_type& kbests, line_set_type& lines)

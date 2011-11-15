@@ -45,6 +45,7 @@ typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+typedef std::vector<size_t, std::allocator<size_t> > kbest_map_type;
 
 path_set_type kbest_path;
 path_set_type oracle_path;
@@ -97,7 +98,8 @@ void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
-		hypothesis_map_type& oracles);
+		hypothesis_map_type& oracles,
+		kbest_map_type& kbest_map);
 
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
@@ -113,6 +115,7 @@ double optimize_svm(const hypothesis_map_type& kbests,
 
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
+		     const kbest_map_type& kbest_map,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights);
 
@@ -179,8 +182,9 @@ int main(int argc, char ** argv)
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
+    kbest_map_type      kbest_map;
     
-    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles);
+    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -238,7 +242,7 @@ int main(int argc, char ** argv)
     }
 
     if (mert_search) {
-      const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
+      const double objective = optimize_mert(scorers, kbests, kbest_map, weights_prev, weights);
       
       if (debug)
 	std::cerr << "mert objective: " << objective << std::endl;
@@ -1905,12 +1909,14 @@ struct EnvelopeTask
 	       segment_document_type&      __segments,
 	       const weight_set_type&      __origin,
 	       const weight_set_type&      __direction,
-	       const hypothesis_map_type&  __kbests)
+	       const hypothesis_map_type&  __kbests,
+	       const kbest_map_type&       __kbest_map)
     : queue(__queue),
       segments(__segments),
       origin(__origin),
       direction(__direction),
-      kbests(__kbests) {}
+      kbests(__kbests),
+      kbest_map(__kbest_map) {}
 
   void operator()()
   {
@@ -1923,7 +1929,11 @@ struct EnvelopeTask
       queue.pop(seg);
       if (seg < 0) break;
       
-      envelopes(kbests[seg], lines);
+      lines.clear();
+      
+      for (size_t i = 0; i != kbest_map.size(); ++ i)
+	if (kbest_map[i] == seg)
+	  envelopes(kbests[i].begin(), kbests[i].end(), std::back_inserter(lines));
       
       EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
       for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
@@ -1945,10 +1955,12 @@ struct EnvelopeTask
   const weight_set_type& direction;
   
   const hypothesis_map_type&  kbests;
+  const kbest_map_type&       kbest_map;
 };
 
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
+		     const kbest_map_type& kbest_map,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights)
 {
@@ -1958,21 +1970,24 @@ double optimize_mert(const scorer_document_type& scorers,
   typedef task_type::line_search_type line_search_type;
   
   typedef line_search_type::value_type optimum_type;
+
+  if (kbest_map.empty()) return 0.0;
   
   const weight_set_type& origin = weights_prev;
   weight_set_type direction = weights;
   direction -= weights_prev;
   
-  task_type::segment_document_type segments(kbests.size());
+  const size_t segment_max = *std::max_element(kbest_map.begin(), kbest_map.end());
+  
+  task_type::segment_document_type segments(segment_max);
   queue_type queue;
   
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, kbests)));
+    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, kbests, kbest_map)));
   
-  for (size_t seg = 0; seg != kbests.size(); ++ seg)
-    if (! kbests[seg].empty())
-      queue.push(seg);
+  for (size_t seg = 0; seg != segment_max; ++ seg)
+    queue.push(seg);
   
   for (int i = 0; i < threads; ++ i)
     queue.push(-1);
@@ -2169,7 +2184,7 @@ struct TaskReadUnite
 
 struct TaskReadSync
 {
-  typedef boost::fusion::tuple<path_type, path_type, size_t> path_pair_type;
+  typedef boost::fusion::tuple<path_type, path_type, size_t, size_t> path_pair_type;
   typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
   
   TaskReadSync(queue_type& __queue, const scorer_document_type& __scorers)
@@ -2198,10 +2213,13 @@ struct TaskReadSync
       oracles.resize(oracles.size() + 1);
 
       const size_t refpos = boost::fusion::get<2>(paths);
+      const size_t mappos = boost::fusion::get<3>(paths);
       
       if (! scorers.empty())
 	if (refpos >= scorers.size())
 	  throw std::runtime_error("reference positions outof index");
+      
+      kbest_map.push_back(mappos);
       
       {
 	utils::compress_istream is(boost::fusion::get<0>(paths), 1024 * 1024);
@@ -2264,14 +2282,18 @@ struct TaskReadSync
   
   hypothesis_map_type kbests;
   hypothesis_map_type oracles;
+  kbest_map_type      kbest_map;
 };
 
 void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
-		hypothesis_map_type& oracles)
+		hypothesis_map_type& oracles,
+		kbest_map_type& kbest_map)
 {
+  kbest_map.clear();
+
   if (unite_kbest) {
     typedef TaskReadUnite task_type;
     typedef task_type::queue_type queue_type;
@@ -2336,6 +2358,12 @@ void read_kbest(const scorer_document_type& scorers,
     oracles.reserve(oracles_size);
     oracles.resize(oracles_size);
     
+    // assign kbest-map
+    kbest_map.reserve(kbests_size);
+    kbest_map.resize(kbests_size);
+    for (size_t seg = 0; seg != kbests_size; ++ seg)
+      kbest_map[seg] = seg;
+
     for (int i = 0; i != threads; ++ i) {
       for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
 	kbests[id].insert(kbests[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
@@ -2411,12 +2439,12 @@ void read_kbest(const scorer_document_type& scorers,
 	if (! boost::filesystem::exists(path_kbest)) break;
 	if (! boost::filesystem::exists(path_oracle)) continue;
 	
-	queue.push(path_pair_type(path_kbest, path_oracle, refpos ++));
+	queue.push(path_pair_type(path_kbest, path_oracle, refpos ++, i));
       }
     }
     
     for (int i = 0; i != threads; ++ i)
-      queue.push(path_pair_type(path_type(), path_type(), size_t(-1)));
+      queue.push(path_pair_type(path_type(), path_type(), size_t(-1), size_t(-1)));
     
     workers.join_all();
 
@@ -2429,13 +2457,15 @@ void read_kbest(const scorer_document_type& scorers,
     
     if (kbests_size != oracles_size)
       throw std::runtime_error("kbest/oracle size do not match");
-
+    
     kbests.reserve(kbests_size);
     oracles.reserve(oracles_size);
+    kbest_map.reserve(kbests_size);
     
     for (int i = 0; i != threads; ++ i) {
       kbests.insert(kbests.end(), tasks[i].kbests.begin(), tasks[i].kbests.end());
       oracles.insert(oracles.end(), tasks[i].oracles.begin(), tasks[i].oracles.end());
+      kbest_map.insert(kbest_map.end(), tasks[i].kbest_map.begin(), tasks[i].kbest_map.end());
       
       tasks[i].kbests.clear();
       tasks[i].oracles.clear();
