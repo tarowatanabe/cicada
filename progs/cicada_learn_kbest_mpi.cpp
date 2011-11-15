@@ -43,6 +43,7 @@
 #include <boost/random.hpp>
 
 #include "lbfgs.h"
+#include "lbfgs_fortran.h"
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;

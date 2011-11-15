@@ -1,4 +1,10 @@
+// -*- mode: c++ -*-
+
+#ifndef __LBFGS_FORTRAN__H__
+#define __LBFGS_FORTRAN__H__ 1
+
 #include <vector>
+#include <cstring>
 #include <iostream>
 
 extern "C" {
@@ -10,8 +16,6 @@ extern "C" {
 			     double *f, double *g, double *factr, double *pgtol, double *wa, int *iwa, 
 			     char *task, int *iprint, char *csave, int *lsave, int *isave, double *dsave, short task_len, short csave_len); 
 }
-
-using namespace std;
 
 class LBFGS {
 
@@ -114,3 +118,5 @@ public:
     return -1;
   }
 };
+
+#endif
