@@ -49,6 +49,7 @@ typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+typedef std::vector<size_t, std::allocator<size_t> > kbest_map_type;
 
 path_set_type kbest_path;
 path_set_type oracle_path;
@@ -98,7 +99,8 @@ void read_kbest(const  scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
-		hypothesis_map_type& oracles);
+		hypothesis_map_type& oracles,
+		kbest_map_type& kbest_map);
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
 
@@ -126,6 +128,7 @@ double optimize_online(const scorer_document_type& scorers,
 
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
+		     const kbest_map_type& kbest_map,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights);
 
@@ -209,8 +212,9 @@ int main(int argc, char ** argv)
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
+    kbest_map_type      kbest_map;
     
-    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles);
+    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
     
     weight_set_type weights;
     if (mpi_rank == 0 && ! weights_path.empty()) {
@@ -292,7 +296,7 @@ int main(int argc, char ** argv)
     }
     
     if (mert_search) {
-      const double objective = optimize_mert(scorers, kbests, weights_prev, weights);
+      const double objective = optimize_mert(scorers, kbests, kbest_map, weights_prev, weights);
       
       if (debug && mpi_rank == 0)
 	std::cerr << "mert objective: " << objective << std::endl;
@@ -2767,6 +2771,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
 
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
+		     const kbest_map_type& kbest_map,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights)
 {
@@ -2777,9 +2782,14 @@ double optimize_mert(const scorer_document_type& scorers,
   typedef line_search_type::segment_document_type segment_document_type;
   
   typedef line_search_type::value_type optimum_type;
-
+  
+  typedef EnvelopeKBest::line_set_type line_set_type;
+  typedef std::deque<line_set_type, std::allocator<line_set_type> > line_map_type;
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  if (kbest_map.empty()) return 0.0;
   
   weight_set_type origin = weights_prev;
   weight_set_type direction = weights;
@@ -2787,25 +2797,36 @@ double optimize_mert(const scorer_document_type& scorers,
   
   bcast_weights(0, origin);
   bcast_weights(0, direction);
+
+  EnvelopeKBest envelopes(origin, direction);
+  line_map_type lines;
+  
+  for (size_t id = 0; id != kbests.size(); ++ id)
+    if (! kbests[id].empty()) {
+      
+      if (kbest_map[id] >= lines.size())
+	lines.resize(kbest_map[id] + 1);
+      
+      envelopes(kbests[id].begin(), kbests[id].end(), std::back_inserter(lines[kbest_map[id]]));
+    }
   
   // collect all the segments...
   if (mpi_rank == 0) {
     typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
-    EnvelopeKBest::line_set_type lines;
-    EnvelopeKBest envelopes(origin, direction);
-    
     segment_document_type segments;
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      if (! kbests[id].empty()) {
-	segments.push_back(segment_set_type());
+    for (size_t seg = 0; seg != lines.size(); ++ seg)
+      if (! lines[seg].empty()) {
 	
-	envelopes(kbests[id], lines);
+	if (seg >= segments.size())
+	  segments.resize(seg + 1);
 	
-	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
-	  segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
+	envelopes(lines[seg]);
+	
+	EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
+	for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter)
+	  segments[seg].push_back(std::make_pair(liter->x, liter->hypothesis->score));
       }
     
     for (int rank = 1; rank != mpi_size; ++ rank) {
@@ -2814,7 +2835,6 @@ double optimize_mert(const scorer_document_type& scorers,
       is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
 
       std::string line;
-      int id_prev = -1;
       
       while (std::getline(is, line)) {
 	const utils::piece line_piece(line);
@@ -2838,14 +2858,13 @@ double optimize_mert(const scorer_document_type& scorers,
 	if (iter == tokenizer.end()) continue;
 	const utils::piece score_str = *iter;
 	
-	const int id = utils::lexical_cast<int>(id_str);
-	if (id_prev != id)
-	  segments.push_back(segment_set_type());
+	const size_t id = utils::lexical_cast<size_t>(id_str);
 	
-	segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
-						 scorer_type::score_type::decode(score_str)));
+	if (id >= segments.size())
+	  segments.resize(id + 1);
 	
-	id_prev = id;
+	segments[id].push_back(std::make_pair(utils::decode_base64<double>(x_str),
+					      scorer_type::score_type::decode(score_str)));
       }
     }
     
@@ -2867,27 +2886,25 @@ double optimize_mert(const scorer_document_type& scorers,
     
     return optimum.objective;
   } else {
-    EnvelopeKBest::line_set_type lines;
-    EnvelopeKBest envelopes(origin, direction);
-    
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::zlib_compressor());
     os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
-    
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      if (! kbests[id].empty()) {
-	envelopes(kbests[id], lines);
+
+    for (size_t seg = 0; seg != lines.size(); ++ seg)
+      if (! lines[seg].empty()) {
 	
-	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	envelopes(lines[seg]);
+	
+	EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
+	for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter) {
 	  const EnvelopeKBest::line_type& line = *liter;
 	  
-	  os << id << " ||| ";
+	  os << seg << " ||| ";
 	  utils::encode_base64(line.x, std::ostream_iterator<char>(os));
 	  os << " ||| " << line.hypothesis->score->encode() << '\n';
 	}
       }
-
+    
     return 0.0;
   }
   
@@ -2922,7 +2939,8 @@ void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
-		hypothesis_map_type& oracles)
+		hypothesis_map_type& oracles,
+		kbest_map_type&      kbest_map)
 {  
   typedef boost::spirit::istream_iterator iter_type;
   typedef kbest_feature_parser<iter_type> parser_type;
@@ -2935,6 +2953,8 @@ void read_kbest(const scorer_document_type& scorers,
   
   parser_type parser;
   kbest_feature_type kbest;
+
+  kbest_map.clear();
   
   if (unite_kbest) {
     for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
@@ -2985,6 +3005,11 @@ void read_kbest(const scorer_document_type& scorers,
 	}
       }
     }
+    
+    kbest_map.reserve(kbests.size());
+    kbest_map.resize(kbests.size());
+    for (size_t seg = 0; seg != kbests.size(); ++ seg)
+      kbest_map[seg] = seg;
     
     oracles.resize(kbests.size());
     
@@ -3053,9 +3078,10 @@ void read_kbest(const scorer_document_type& scorers,
 	
 	if (! boost::filesystem::exists(path_kbest)) break;
 	if (! boost::filesystem::exists(path_oracle)) continue;
-
+	
 	kbests.resize(kbests.size() + 1);
 	oracles.resize(oracles.size() + 1);
+	kbest_map.push_back(i);
 
 	const size_type refset_pos = refset_offset + i;
 	
@@ -3125,6 +3151,8 @@ void read_kbest(const scorer_document_type& scorers,
   // uniques...
   unique_kbest(kbests);
   unique_kbest(oracles);  
+
+  kbest_map_type(kbest_map).swap(kbest_map);
 }
 
 
