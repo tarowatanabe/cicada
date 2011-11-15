@@ -1934,6 +1934,8 @@ struct EnvelopeTask
       for (size_t i = 0; i != kbest_map.size(); ++ i)
 	if (kbest_map[i] == seg)
 	  envelopes(kbests[i].begin(), kbests[i].end(), std::back_inserter(lines));
+
+      envelopes(lines);
       
       EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
       for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
