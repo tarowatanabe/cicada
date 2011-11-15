@@ -73,10 +73,11 @@ struct OptimizerSGDL2 : public OptimizerBase
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
+    const double factor = 1.0 / instances;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
-    rescale(1.0 - eta * lambda);
+    //rescale(1.0 - eta * lambda);
 
     gradient_type::const_iterator citer = correct.begin();
     gradient_type::const_iterator citer_end = correct.end();
@@ -86,25 +87,25 @@ struct OptimizerSGDL2 : public OptimizerBase
 
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
-	update(weights[citer->first], double(citer->second) * eta);
+	update(weights[citer->first], double(citer->second) * eta * factor);
 	++ citer;
       } else if (miter < citer) {
-	update(weights[miter->first], - double(miter->second) * eta);
+	update(weights[miter->first], - double(miter->second) * eta * factor);
 	++ miter;
       } else {
 	const double alpha = double(citer->second) - double(miter->second);
 	if (alpha != 0.0)
-	  update(weights[citer->first], alpha * eta);
+	  update(weights[citer->first], alpha * eta * factor);
 	++ citer;
 	++ miter;
       }
     }
     
     for (/**/; citer != citer_end; ++ citer)
-      update(weights[citer->first], double(citer->second) * eta);
+      update(weights[citer->first], double(citer->second) * eta * factor);
 
     for (/**/; miter != miter_end; ++ miter)
-      update(weights[miter->first], - double(miter->second) * eta);
+      update(weights[miter->first], - double(miter->second) * eta * factor);
     
     // projection...
     if (weight_norm > 1.0 / lambda)
@@ -130,10 +131,11 @@ struct OptimizerSGDL2 : public OptimizerBase
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
+    const double factor = 1.0 / instances;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
-    rescale(1.0 - eta * lambda);
+    //rescale(1.0 - eta * lambda);
     
     const double inf = std::numeric_limits<double>::infinity();
 
@@ -145,19 +147,19 @@ struct OptimizerSGDL2 : public OptimizerBase
 
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
-	update(weights[citer->first], double(citer->second) * eta,
+	update(weights[citer->first], double(citer->second) * eta * factor,
 	       citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 	       citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
 	++ citer;
       } else if (miter < citer) {
-	update(weights[miter->first], - double(miter->second) * eta,
+	update(weights[miter->first], - double(miter->second) * eta * factor,
 	       citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 	       citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
 	++ miter;
       } else {
 	const double alpha = double(citer->second) - double(miter->second);
 	if (alpha != 0.0)
-	  update(weights[citer->first], alpha * eta,
+	  update(weights[citer->first], alpha * eta * factor,
 		 citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 		 citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
 	++ citer;
@@ -166,12 +168,12 @@ struct OptimizerSGDL2 : public OptimizerBase
     }
     
     for (/**/; citer != citer_end; ++ citer)
-      update(weights[citer->first], double(citer->second) * eta,
+      update(weights[citer->first], double(citer->second) * eta * factor,
 	     citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 	     citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
 
     for (/**/; miter != miter_end; ++ miter)
-      update(weights[miter->first], - double(miter->second) * eta,
+      update(weights[miter->first], - double(miter->second) * eta * factor,
 	     citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 	     citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
     
