@@ -1480,7 +1480,8 @@ struct LearnSGDL2 : public LearnLR
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
+    // do we really need this...?
+    //rescale(weights, 1.0 - eta * lambda);
     
     expectation_type expectations;
     
