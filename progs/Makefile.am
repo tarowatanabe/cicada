@@ -117,6 +117,8 @@ noinst_DATA = .gitignore
 
 LBFGS_SOURCE = lbfgs.c arithmetic_ansi.h  arithmetic_sse_double.h  arithmetic_sse_float.h  lbfgs.h
 
+LBFGS_FORTRAN_SOURCE = lbfgs_fortran.h lbfgsb_fortran.c lbfgs_fortran.c
+
 cicada_SOURCES = cicada.cpp cicada_impl.hpp
 cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
@@ -276,7 +278,7 @@ cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDAD
 cicada_learn_kbest_SOURCES = cicada_learn_kbest.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
 cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
-cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
+cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp $(LBFGS_FORTRAN_SOURCE)
 cicada_learn_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
