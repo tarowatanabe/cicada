@@ -111,6 +111,8 @@ double optimize_cp(const scorer_document_type& scorers,
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
+		      const weight_set_type& bounds_lower,
+		      const weight_set_type& bounds_upper,
 		      weight_set_type& weights);
 template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
@@ -269,7 +271,7 @@ int main(int argc, char ** argv)
     else if (learn_cp)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, bounds_lower, bounds_upper, weights);
     else 
-      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
+      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
 
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
@@ -2432,10 +2434,14 @@ struct OptimizeLBFGS
 
   OptimizeLBFGS(const hypothesis_map_type& __kbests,
 		const hypothesis_map_type& __oracles,
+		const weight_set_type& __bounds_lower,
+		const weight_set_type& __bounds_upper,
 		weight_set_type& __weights,
 		const size_t& __instances)
     : kbests(__kbests),
       oracles(__oracles),
+      bounds_lower(__bounds_lower),
+      bounds_upper(__bounds_upper),
       weights(__weights),
       instances(__instances) {}
 
@@ -2486,8 +2492,6 @@ struct OptimizeLBFGS
       expectations.clear();
       
       const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
-
-      
       
       for (size_t id = 0; id != id_max; ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
@@ -2554,8 +2558,7 @@ struct OptimizeLBFGS
     const weight_set_type& weights;
 
     const hypothesis_map_type& kbests;
-    const hypothesis_map_type& oracles;
-    
+    const hypothesis_map_type& oracles;    
     size_t instances;
     
     double          objective;
@@ -2579,6 +2582,20 @@ struct OptimizeLBFGS
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+
+    if (! optimizer.bounds_lower.empty()) {
+      const size_t weights_size = utils::bithack::min(optimizer.weights.size(), optimizer.bounds_lower.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	optimizer.weights[i] = std::max(optimizer.weights[i], optimizer.bounds_lower[i]);
+    }
+
+    if (! optimizer.bounds_upper.empty()) {
+      const size_t weights_size = utils::bithack::min(optimizer.weights.size(), optimizer.bounds_upper.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	optimizer.weights[i] = std::min(optimizer.weights[i], optimizer.bounds_upper[i]);
+    }
     
     bcast_weights(0, optimizer.weights);
     
@@ -2615,6 +2632,9 @@ struct OptimizeLBFGS
     
   const hypothesis_map_type& kbests;
   const hypothesis_map_type& oracles;
+
+  const weight_set_type& bounds_lower;
+  const weight_set_type& bounds_upper;
   
   weight_set_type& weights;
   size_t instances;
@@ -2623,6 +2643,8 @@ struct OptimizeLBFGS
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
+		      const weight_set_type& bounds_lower,
+		      const weight_set_type& bounds_upper,
 		      weight_set_type& weights)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -2638,7 +2660,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(kbests, oracles, weights, instances)();
+    const double objective = Optimize(kbests, oracles, bounds_lower, bounds_upper, weights, instances)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
