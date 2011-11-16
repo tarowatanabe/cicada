@@ -159,7 +159,7 @@ namespace cicada
 	
 	double objective_primal = 0.5 * std::inner_product(w.begin(), w.end(), w.begin(), 0.0);
 	for (size_type i = 0; i != model_size; ++ i)
-	  objective_primal += f[i]* x[i];
+	  objective_primal += f[i] * x[i];
 	
 	return objective_primal;
       }
