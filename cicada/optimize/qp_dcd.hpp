@@ -146,7 +146,7 @@ namespace cicada
 	
 	// normalize x!
 	const double sum = std::accumulate(x.begin(), x.end(), 0.0);
-	if (sum != 0.0)
+	if (sum > C)
 	  std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
 	
 	std::vector<double, std::allocator<double> > d(f.begin(), f.end());
