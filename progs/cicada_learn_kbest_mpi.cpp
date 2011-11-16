@@ -2433,19 +2433,21 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (terminate) break;
     
-    if (mpi_rank == 0 && line_search && cut_ratio != 1.0) {
-      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+    if (line_search) {
+      if (mpi_rank == 0 && cut_ratio != 1.0) {
+	const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = cut_ratio * weights[i] + (1.0 - cut_ratio) * weights_prev[i];
+	for (size_t i = weights_size; i < weights.size(); ++ i)
+	  weights[i] = cut_ratio * weights[i];
+	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	  weights[i] = (1.0 - cut_ratio) * weights_prev[i];
+      }
       
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = cut_ratio * weights[i] + (1.0 - cut_ratio) * weights_prev[i];
-      for (size_t i = weights_size; i < weights.size(); ++ i)
-	weights[i] = cut_ratio * weights[i];
-      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	weights[i] = (1.0 - cut_ratio) * weights_prev[i];
+      // bcast again...
+      bcast_weights(0, weights);
     }
-    
-    // bcast again...
-    bcast_weights(0, weights);
   }
 
   weights = weights_min;
