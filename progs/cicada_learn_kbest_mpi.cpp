@@ -2106,6 +2106,7 @@ double optimize_cp(const scorer_document_type& scorers,
   alpha_set_type    alpha;
 
   weight_set_type weights_prev;
+  weight_set_type weights_best;
   point_set_type points;
   
   weight_set_type weights_min;
@@ -2435,10 +2436,10 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (terminate) break;
 
-    // keep previous "best" weights
-    weights_prev = weights;
     
     if (line_search) {
+      weights_best = weights;
+
       if (mpi_rank == 0 && cut_ratio != 1.0) {
 	const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	
@@ -2452,7 +2453,10 @@ double optimize_cp(const scorer_document_type& scorers,
       
       // bcast again...
       bcast_weights(0, weights);
-    }
+
+      weights_prev.swap(weights_best);
+    } else
+      weights_prev = weights;
   }
 
   weights = weights_min;
