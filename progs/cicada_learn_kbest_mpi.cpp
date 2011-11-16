@@ -2100,6 +2100,7 @@ double optimize_cp(const scorer_document_type& scorers,
   // synchronize weights...
   bcast_weights(0, weights);
   
+  
   weight_queue_type a;
   f_set_type        f;
   alpha_set_type    alpha;
@@ -2112,10 +2113,11 @@ double optimize_cp(const scorer_document_type& scorers,
 
   double objective_master = 0.0;
   double objective_reduced = 0.0;
+
+  // keep previous best...
+  weights_prev = weights;
   
   for (int iter = 0; iter != iteration; ++ iter) {
-    // keep previous best...
-    weights_prev = weights;
     
     if (mpi_rank == 0)
       a.push_back(weight_set_type());
@@ -2432,6 +2434,9 @@ double optimize_cp(const scorer_document_type& scorers,
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
+
+    // keep previous "best" weights
+    weights_prev = weights;
     
     if (line_search) {
       if (mpi_rank == 0 && cut_ratio != 1.0) {
