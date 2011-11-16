@@ -59,7 +59,8 @@ namespace cicada
 			const __H& H,
 			const __M& M,
 			const double C,
-			const double tolerance)
+			const double tolerance,
+			const bool no_normalize=false)
       {
 	typedef cicada::WeightVector<double> weights_type;
 	typedef std::vector<double, std::allocator<double> > q_type;
@@ -147,7 +148,7 @@ namespace cicada
 	// normalize x!
 	double sum = std::accumulate(x.begin(), x.end(), 0.0);
 	
-	if (sum > C) {
+	if (! no_normalize && sum > C) {
 	  std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
 	  
 	  w.clear();

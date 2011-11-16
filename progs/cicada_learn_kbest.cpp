@@ -111,6 +111,8 @@ double optimize_batch(const hypothesis_map_type& kbests,
 template <typename Optimizer>
 double optimize_svm(const hypothesis_map_type& kbests,
 		    const hypothesis_map_type& oracles,
+		    const weight_set_type& bounds_lower,
+		    const weight_set_type& bounds_upper,
 		    weight_set_type& weights);
 
 double optimize_mert(const scorer_document_type& scorers,
@@ -218,9 +220,9 @@ int main(int argc, char ** argv)
     const weight_set_type weights_prev = weights;
     
     if (learn_linear)
-      objective = optimize_svm<OptimizeLinear>(kbests, oracles, weights);
+      objective = optimize_svm<OptimizeLinear>(kbests, oracles, bounds_lower, bounds_upper, weights);
     else if (learn_svm)
-      objective = optimize_svm<OptimizeSVM>(kbests, oracles, weights);
+      objective = optimize_svm<OptimizeSVM>(kbests, oracles, bounds_lower, bounds_upper, weights);
     else
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
     
@@ -759,6 +761,8 @@ struct OptimizeLinear
   
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles,
+		 const weight_set_type& bounds_lower,
+		 const weight_set_type& bounds_upper,
 		 weight_set_type& weights_prev)
     : weights(), objective(0.0)
   {
@@ -993,9 +997,11 @@ public:
 template <typename Optimizer>
 double optimize_svm(const hypothesis_map_type& kbests,
 		    const hypothesis_map_type& oracles,
+		    const weight_set_type& bounds_lower,
+		    const weight_set_type& bounds_upper,
 		    weight_set_type& weights)
 {
-  Optimizer optimizer(kbests, oracles, weights);
+  Optimizer optimizer(kbests, oracles, bounds_lower, bounds_upper, weights);
   
   weights = optimizer.weights;
   
@@ -1369,8 +1375,13 @@ struct OptimizeSVM
   struct HMatrix
   {
     HMatrix(const pos_pair_set_type& __positions,
-	    const encoder_set_type&   __encoders)
-      : positions(__positions), encoders(__encoders) {}
+	    const encoder_set_type&  __encoders,
+	    const weight_set_type& __bounds_lower,
+	    const weight_set_type& __bounds_upper)
+      : positions(__positions),
+	encoders(__encoders),
+	bounds_lower(__bounds_lower),
+	bounds_upper(__bounds_upper) {}
 
     double operator()(int i, int j) const
     {
@@ -1383,14 +1394,21 @@ struct OptimizeSVM
     }
     
     const pos_pair_set_type& positions;
-    const encoder_set_type& encoders;
+    const encoder_set_type&  encoders;
+    const weight_set_type&   bounds_lower;
+    const weight_set_type&   bounds_upper;
   };
   
   struct MMatrix
   {
     MMatrix(const pos_pair_set_type& __positions,
-	    const encoder_set_type&   __encoders)
-      : positions(__positions), encoders(__encoders) {}
+	    const encoder_set_type&  __encoders,
+	    const weight_set_type& __bounds_lower,
+	    const weight_set_type& __bounds_upper)
+      : positions(__positions),
+	encoders(__encoders),
+	bounds_lower(__bounds_lower),
+	bounds_upper(__bounds_upper){}
     
     template <typename W>
     void operator()(W& w, const alpha_set_type& alpha) const
@@ -1407,6 +1425,20 @@ struct OptimizeSVM
 	    for (sample_set_type::value_type::const_iterator fiter = encoders[i].features[j].begin(); fiter != fiter_end; ++ fiter) 
 	      w[fiter->first] += (*aiter) * fiter->second;
 	  }
+      }
+      
+      if (! bounds_lower.empty()) {
+	const size_t weights_size = utils::bithack::min(w.size(), bounds_lower.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  w[i] = std::max(w[i], bounds_lower[i]);
+      }
+      
+      if (! bounds_upper.empty()) {
+	const size_t weights_size = utils::bithack::min(w.size(), bounds_upper.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  w[i] = std::min(w[i], bounds_upper[i]);
       }
     }
     
@@ -1426,14 +1458,30 @@ struct OptimizeSVM
     void operator()(W& w, const double& update, const size_t& i) const
     {
       const pos_pair_type& pos_i = positions[i];
-      
-      sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
-      for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter) 
-	w[fiter->first] += update * fiter->second;
+
+      if (! bounds_lower.empty() || ! bounds_upper.empty()) {
+	sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
+	for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter) {
+	  double& value = w[fiter->first];
+	  
+	  value += update * fiter->second;
+	  
+	  if (fiter->first.id() < bounds_lower.size())
+	    value = std::max(value, bounds_lower[fiter->first]);
+	  if (fiter->first.id() < bounds_upper.size())
+	    value = std::min(value, bounds_upper[fiter->first]);
+	}
+      } else {
+	sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
+	for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter)
+	  w[fiter->first] += update * fiter->second;
+      }
     }
     
     const pos_pair_set_type& positions;
     const encoder_set_type&  encoders;
+    const weight_set_type&   bounds_lower;
+    const weight_set_type&   bounds_upper;
   };
   
   struct Gradient
@@ -1488,6 +1536,8 @@ struct OptimizeSVM
 
   OptimizeSVM(const hypothesis_map_type& kbests,
 	      const hypothesis_map_type& oracles,
+	      const weight_set_type& bounds_lower,
+	      const weight_set_type& bounds_upper,
 	      weight_set_type& weights_prev)
     : weights(), objective(0.0), tolerance(0.1)
   {
@@ -1533,10 +1583,10 @@ struct OptimizeSVM
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix H(positions, encoders);
-    MMatrix M(positions, encoders);
+    HMatrix H(positions, encoders, bounds_lower, bounds_upper);
+    MMatrix M(positions, encoders, bounds_lower, bounds_upper);
     
-    objective = solver(alpha, f, H, M, 1.0 / (C * data_size), tolerance);
+    objective = solver(alpha, f, H, M, 1.0 / (C * data_size), tolerance, true); // we do not normalize alpha values for compatibility with liblinear
     objective *= C;
     
     size_type actives = 0;
@@ -1552,6 +1602,20 @@ struct OptimizeSVM
 	  
 	  ++ actives;
 	}
+    
+    if (! bounds_lower.empty()) {
+      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = std::max(weights[i], bounds_lower[i]);
+    }
+    
+    if (! bounds_upper.empty()) {
+      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = std::min(weights[i], bounds_upper[i]);
+    }
     
     if (debug)
       std::cerr << "# of active vectors: " << actives << std::endl;
