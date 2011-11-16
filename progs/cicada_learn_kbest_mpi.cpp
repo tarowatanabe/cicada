@@ -2161,26 +2161,11 @@ double optimize_cp(const scorer_document_type& scorers,
 	  ++ active_size;
 	}
       
-#if 0
-      if (! bounds_lower.empty()) {
-	const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-      
-	for (size_t i = 0; i != weights_size; ++ i)
-	  weights[i] = std::max(weights[i], bounds_lower[i]);
-      }
-    
-      if (! bounds_upper.empty()) {
-	const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-      
-	for (size_t i = 0; i != weights_size; ++ i)
-	  weights[i] = std::min(weights[i], bounds_upper[i]);
-      }
-#endif
-      
       if (debug >= 3)
 	std::cerr << "active size: " << active_size << std::endl;
     }
-
+    
+    double cut_ratio = 1.0;
     
     if (line_search) {
       
@@ -2256,6 +2241,8 @@ double optimize_cp(const scorer_document_type& scorers,
 	      weights[i] = k * weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	      weights[i] = (1.0 - k) * weights_prev[i];
+	    
+	    cut_ratio = k + (1.0 - k) * 0.1;
 	  }
 	} else if (grad_neg < 0.0) {
 	  double k = 0.0;
@@ -2290,19 +2277,11 @@ double optimize_cp(const scorer_document_type& scorers,
 	      weights[i] = - k * weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	      weights[i] = (1.0 + k) * weights_prev[i];
+
+	    cut_ratio = - k + (1.0 + k) * 0.1;
 	  }
-	} else {
-	  // anyway, set to 0.1...
-	  const double k = 0.1;
-	  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
-	    
-	  for (size_t i = 0; i != weights_size; ++ i)
-	    weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
-	  for (size_t i = weights_size; i < weights.size(); ++ i)
-	    weights[i] = k * weights[i];
-	  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	    weights[i] = (1.0 - k) * weights_prev[i];
-	}
+	} else
+	  cut_ratio = 0.1;
       }
       
       // finished line-search
@@ -2453,6 +2432,20 @@ double optimize_cp(const scorer_document_type& scorers,
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
+    
+    if (mpi_rank == 0 && line_search && cut_ratio != 1.0) {
+      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = cut_ratio * weights[i] + (1.0 - cut_ratio) * weights_prev[i];
+      for (size_t i = weights_size; i < weights.size(); ++ i)
+	weights[i] = cut_ratio * weights[i];
+      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	weights[i] = (1.0 - cut_ratio) * weights_prev[i];
+    }
+    
+    // bcast again...
+    bcast_weights(0, weights);
   }
 
   weights = weights_min;
