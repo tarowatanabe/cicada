@@ -2161,6 +2161,19 @@ double optimize_cp(const scorer_document_type& scorers,
 	  ++ active_size;
 	}
       
+      if (! bounds_lower.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
+      
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::max(weights[i], bounds_lower[i]);
+      }
+    
+      if (! bounds_upper.empty()) {
+	const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
+      
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = std::min(weights[i], bounds_upper[i]);
+      }
       
       if (debug >= 3)
 	std::cerr << "active size: " << active_size << std::endl;
