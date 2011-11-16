@@ -1426,20 +1426,6 @@ struct OptimizeSVM
 	      w[fiter->first] += (*aiter) * fiter->second;
 	  }
       }
-      
-      if (! bounds_lower.empty()) {
-	const size_t weights_size = utils::bithack::min(w.size(), bounds_lower.size());
-	
-	for (size_t i = 0; i != weights_size; ++ i)
-	  w[i] = std::max(w[i], bounds_lower[i]);
-      }
-      
-      if (! bounds_upper.empty()) {
-	const size_t weights_size = utils::bithack::min(w.size(), bounds_upper.size());
-	
-	for (size_t i = 0; i != weights_size; ++ i)
-	  w[i] = std::min(w[i], bounds_upper[i]);
-      }
     }
     
     template <typename W>
@@ -1459,23 +1445,9 @@ struct OptimizeSVM
     {
       const pos_pair_type& pos_i = positions[i];
 
-      if (! bounds_lower.empty() || ! bounds_upper.empty()) {
-	sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
-	for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter) {
-	  double& value = w[fiter->first];
-	  
-	  value += update * fiter->second;
-	  
-	  if (fiter->first.id() < bounds_lower.size())
-	    value = std::max(value, bounds_lower[fiter->first]);
-	  if (fiter->first.id() < bounds_upper.size())
-	    value = std::min(value, bounds_upper[fiter->first]);
-	}
-      } else {
-	sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
-	for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter)
-	  w[fiter->first] += update * fiter->second;
-      }
+      sample_set_type::value_type::const_iterator fiter_end = encoders[pos_i.first].features[pos_i.second].end();
+      for (sample_set_type::value_type::const_iterator fiter = encoders[pos_i.first].features[pos_i.second].begin(); fiter != fiter_end; ++ fiter)
+	w[fiter->first] += update * fiter->second;
     }
     
     const pos_pair_set_type& positions;
@@ -1602,20 +1574,6 @@ struct OptimizeSVM
 	  
 	  ++ actives;
 	}
-    
-    if (! bounds_lower.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::max(weights[i], bounds_lower[i]);
-    }
-    
-    if (! bounds_upper.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::min(weights[i], bounds_upper[i]);
-    }
     
     if (debug)
       std::cerr << "# of active vectors: " << actives << std::endl;
