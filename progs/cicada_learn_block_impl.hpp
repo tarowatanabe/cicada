@@ -462,7 +462,7 @@ struct LearnSVM : public LearnBase
       //std::transform(alpha.begin(), alpha.end(), alpha.begin(), multiplies_min(factor, clip));
     }
     
-    cicada::optimize::QPSMO solver;
+    cicada::optimize::QPDCD solver;
     
     HMatrix H(positions, features);
     MMatrix M(positions, features);
