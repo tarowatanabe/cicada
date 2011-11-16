@@ -127,7 +127,7 @@ namespace cicada
 	      M(w, x[i] - x_old, i);
 	    }
 	  }
-	  
+
 	  if ((PGmax_new - PGmin_new) <= tolerance || ! assigned) {
 	    if (active_size == model_size)
 	      break;
@@ -145,21 +145,18 @@ namespace cicada
 	}
 	
 	// normalize x!
-	const double sum = std::accumulate(x.begin(), x.end(), 0.0);
-	if (sum > C)
+	double sum = std::accumulate(x.begin(), x.end(), 0.0);
+	
+	if (sum > C) {
 	  std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
+	  
+	  w.clear();
+	  M(w, x);
+	  
+	  sum = C;
+	}
 	
-	std::vector<double, std::allocator<double> > d(f.begin(), f.end());
-	for (size_t i = 0; i != model_size; ++ i)
-	  if (x[i] > 0.0)
-	    for (size_t j = 0; j != model_size; ++ j)
-	      d[j] += H(j, i) * x[i];
-	
-	double objective_primal = 0.0;
-	for (size_t i = 0; i != model_size; ++ i)
-	  objective_primal += 0.5 * x[i] * (f[i] + d[i]);
-	
-	return objective_primal;
+	return 0.5 * std::inner_product(w.begin(), w.end(), w.begin(), - sum * 2);
       }
     };
   };
