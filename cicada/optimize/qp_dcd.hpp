@@ -146,18 +146,22 @@ namespace cicada
 	}
 	
 	// normalize x!
-	double sum = std::accumulate(x.begin(), x.end(), 0.0);
-	
-	if (! no_normalize && sum > C) {
-	  std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
+	if (! no_normalize) {
+	  const double sum = std::accumulate(x.begin(), x.end(), 0.0);
 	  
-	  w.clear();
-	  M(w, x);
-	  
-	  sum = C;
+	  if (sum > C) {
+	    std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
+	    
+	    w.clear();
+	    M(w, x);
+	  }
 	}
 	
-	return 0.5 * std::inner_product(w.begin(), w.end(), w.begin(), - sum * 2);
+	double objective_primal = 0.5 * std::inner_product(w.begin(), w.end(), w.begin(), 0.0);
+	for (size_type i = 0; i != model_size; ++ i)
+	  objective_primal += f[i]* x[i];
+	
+	return objective_primal;
       }
     };
   };
