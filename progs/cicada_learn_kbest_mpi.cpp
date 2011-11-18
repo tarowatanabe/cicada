@@ -2058,8 +2058,6 @@ double optimize_cp(const scorer_document_type& scorers,
 	std::cerr << "active size: " << active_size << std::endl;
     }
     
-    double cut_ratio = 1.0;
-    
     if (line_search) {
       
       if (debug >= 3 && mpi_rank == 0)
@@ -2134,8 +2132,6 @@ double optimize_cp(const scorer_document_type& scorers,
 	      weights[i] = k * weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	      weights[i] = (1.0 - k) * weights_prev[i];
-	    
-	    cut_ratio = k + (1.0 - k) * 0.1;
 	  }
 	} else if (grad_neg < 0.0) {
 	  double k = 0.0;
@@ -2170,11 +2166,8 @@ double optimize_cp(const scorer_document_type& scorers,
 	      weights[i] = - k * weights[i];
 	    for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	      weights[i] = (1.0 + k) * weights_prev[i];
-
-	    cut_ratio = - k + (1.0 + k) * 0.1;
 	  }
-	} else
-	  cut_ratio = 0.1;
+	}
       }
       
       // finished line-search
@@ -2215,10 +2208,11 @@ double optimize_cp(const scorer_document_type& scorers,
     if (terminate) break;
 
     
-    if (line_search) {
+    if (line_search || mert_search_local) {
       weights_best = weights;
-
-      if (mpi_rank == 0 && cut_ratio != 1.0) {
+      
+      if (mpi_rank == 0) {
+	const double cut_ratio = 0.1;
 	const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
 	
 	for (size_t i = 0; i != weights_size; ++ i)
