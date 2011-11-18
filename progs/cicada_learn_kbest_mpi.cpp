@@ -83,6 +83,7 @@ bool mert_search_local = false;
 bool sample_vector = false;
 bool normalize_vector = false;
 bool normalize_loss = false;
+bool oracle_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -108,6 +109,7 @@ template <typename Optimize>
 double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
+		   const kbest_map_type& kbest_map,
 		   const weight_set_type& bounds_lower,
 		   const weight_set_type& bounds_upper,
 		   weight_set_type& weights);
@@ -121,6 +123,7 @@ template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
+		       const kbest_map_type& kbest_map,
 		       const weight_set_type& bounds_lower,
 		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
@@ -260,21 +263,21 @@ int main(int argc, char ** argv)
     
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_nherd)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cp)
-      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, bounds_lower, bounds_upper, weights);
+      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
 
@@ -1158,6 +1161,7 @@ template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
+		       const kbest_map_type& kbest_map,
 		       const weight_set_type& bounds_lower,
 		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
@@ -1365,94 +1369,9 @@ double optimize_online(const scorer_document_type& scorers,
       }
 
       if (mert_search_local) {
-	typedef cicada::optimize::LineSearch line_search_type;
-	
-	typedef line_search_type::segment_type          segment_type;
-	typedef line_search_type::segment_set_type      segment_set_type;
-	typedef line_search_type::segment_document_type segment_document_type;
-	
-	typedef line_search_type::value_type optimum_type;
-
-	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-	
 	bcast_weights(0, optimizer.weights);
 	
-	const weight_set_type& origin = weights_prev;
-	weight_set_type direction = optimizer.weights;
-	direction -= weights_prev;
-	
-	EnvelopeKBest::line_set_type lines;
-	EnvelopeKBest envelopes(origin, direction);
-	
-	segment_document_type segments;
-	
-	for (size_t id = 0; id != kbests.size(); ++ id) 
-	  if (! kbests[id].empty()) {
-	    segments.push_back(segment_set_type());
-	    
-	    envelopes(kbests[id], lines);
-	    
-	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
-	      segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
-	  }
-	
-	for (int rank = 1; rank != mpi_size; ++ rank) {
-	  boost::iostreams::filtering_istream is;
-	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
-
-	  std::string line;
-	  int id_prev = -1;
-      
-	  while (std::getline(is, line)) {
-	    const utils::piece line_piece(line);
-	    tokenizer_type tokenizer(line_piece);
-	
-	    tokenizer_type::iterator iter = tokenizer.begin();
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece id_str = *iter; 
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece x_str = *iter;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece score_str = *iter;
-	
-	    const int id = utils::lexical_cast<int>(id_str);
-	    if (id_prev != id)
-	      segments.push_back(segment_set_type());
-	
-	    segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
-						     scorer_type::score_type::decode(score_str)));
-	    
-	    id_prev = id;
-	  }
-	}
-	
-	line_search_type line_search;
-	
-	const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
-
-	const double update = (optimum.lower + optimum.upper) * 0.5;
-
-	if (update != 0.0) {
-	  direction *= update;
-	  optimizer.weights = origin;
-	  optimizer.weights += direction;
-	  
-	  if (debug >= 2)
-	    std::cerr << "mert update: " << update
-		      << " objective: " << optimum.objective << std::endl;
-	}
+	optimize_mert(scorers, kbests, kbest_map, weights_prev, optimizer.weights);
       }
       
       // compute objective
@@ -1559,40 +1478,9 @@ double optimize_online(const scorer_document_type& scorers,
 	}
 
 	if (mert_search_local) {
-	  typedef cicada::optimize::LineSearch line_search_type;
-	  
-	  typedef line_search_type::segment_type          segment_type;
-	  typedef line_search_type::segment_set_type      segment_set_type;
-	  typedef line_search_type::segment_document_type segment_document_type;
-	  
-	  typedef line_search_type::value_type optimum_type;
-	  
 	  bcast_weights(0, optimizer.weights);
 	  
-	  const weight_set_type& origin = weights_prev;
-	  weight_set_type direction = optimizer.weights;
-	  direction -= weights_prev;
-	  
-	  EnvelopeKBest::line_set_type lines;
-	  EnvelopeKBest envelopes(origin, direction);
-	  
-	  boost::iostreams::filtering_ostream os;
-	  os.push(boost::iostreams::zlib_compressor());
-	  os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
-    
-	  for (size_t id = 0; id != kbests.size(); ++ id) 
-	    if (! kbests[id].empty()) {
-	      envelopes(kbests[id], lines);
-	      
-	      EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	      for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
-		const EnvelopeKBest::line_type& line = *liter;
-		
-		os << id << " ||| ";
-		utils::encode_base64(line.x, std::ostream_iterator<char>(os));
-		os << " ||| " << line.hypothesis->score->encode() << '\n';
-	      }
-	    }
+	  optimize_mert(scorers, kbests, kbest_map, weights_prev, optimizer.weights);
 	}
 	
 	// compute objective
@@ -2076,6 +1964,7 @@ template <typename Optimize>
 double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
+		   const kbest_map_type& kbest_map,
 		   const weight_set_type& bounds_lower,
 		   const weight_set_type& bounds_upper,
 		   weight_set_type& weights)
@@ -2291,121 +2180,9 @@ double optimize_cp(const scorer_document_type& scorers,
     }
     
     if (mert_search_local) {
-      typedef cicada::optimize::LineSearch line_search_type;
-      
-      typedef line_search_type::segment_type          segment_type;
-      typedef line_search_type::segment_set_type      segment_set_type;
-      typedef line_search_type::segment_document_type segment_document_type;
-      
-      typedef line_search_type::value_type optimum_type;
-
       bcast_weights(0, weights);
       
-      const weight_set_type& origin = weights_prev;
-      weight_set_type direction = weights;
-      direction -= weights_prev;
-      
-      if (mpi_rank == 0) {
-	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-	
-	EnvelopeKBest::line_set_type lines;
-	EnvelopeKBest envelopes(origin, direction);
-	
-	segment_document_type segments;
-	
-	for (size_t id = 0; id != kbests.size(); ++ id) 
-	  if (! kbests[id].empty()) {
-	    segments.push_back(segment_set_type());
-	    
-	    envelopes(kbests[id], lines);
-	    
-	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
-	      segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
-	  }
-	
-	
-	for (int rank = 1; rank != mpi_size; ++ rank) {
-	  boost::iostreams::filtering_istream is;
-	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
-
-	  std::string line;
-	  int id_prev = -1;
-      
-	  while (std::getline(is, line)) {
-	    const utils::piece line_piece(line);
-	    tokenizer_type tokenizer(line_piece);
-	
-	    tokenizer_type::iterator iter = tokenizer.begin();
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece id_str = *iter; 
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece x_str = *iter;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end()) continue;
-	    const utils::piece score_str = *iter;
-	
-	    const int id = utils::lexical_cast<int>(id_str);
-	    if (id_prev != id)
-	      segments.push_back(segment_set_type());
-	
-	    segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
-						     scorer_type::score_type::decode(score_str)));
-	    
-	    id_prev = id;
-	  }
-	}
-	
-	line_search_type line_search;
-	
-	const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
-
-	const double update = (optimum.lower + optimum.upper) * 0.5;
-	
-	if (update != 0.0) {
-	  direction *= update;
-	  weights = origin;
-	  weights += direction;
-
-	  if (debug >= 2)
-	    std::cerr << "mert update: " << update
-		      << " objective: " << optimum.objective << std::endl;
-	}
-	
-      } else {
-	EnvelopeKBest::line_set_type lines;
-	EnvelopeKBest envelopes(origin, direction);
-	
-	boost::iostreams::filtering_ostream os;
-	os.push(boost::iostreams::zlib_compressor());
-	os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
-    
-	for (size_t id = 0; id != kbests.size(); ++ id) 
-	  if (! kbests[id].empty()) {
-	    envelopes(kbests[id], lines);
-	    
-	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
-	      const EnvelopeKBest::line_type& line = *liter;
-	      
-	      os << id << " ||| ";
-	      utils::encode_base64(line.x, std::ostream_iterator<char>(os));
-	      os << " ||| " << line.hypothesis->score->encode() << '\n';
-	    }
-	  }
-      }
-      
-      // finished local mert
+      optimize_mert(scorers, kbests, kbest_map, weights_prev, weights);
     }
     
     // current weights is the master problems weights...
@@ -3392,6 +3169,7 @@ void options(int argc, char** argv)
     ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
     ("normalize-vector",  po::bool_switch(&normalize_vector),  "normalize feature vectors")
     ("normalize-loss",    po::bool_switch(&normalize_loss),    "normalize loss")
+    ("oracle-loss",       po::bool_switch(&oracle_loss),       "compute loss by treating zero loss for oracle")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

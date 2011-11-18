@@ -80,6 +80,7 @@ bool mert_search = false;
 bool sample_vector = false;
 bool normalize_vector = false;
 bool normalize_loss = false;
+bool oracle_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -2290,7 +2291,7 @@ struct TaskReadSync
 	  oracles.back().push_back(hypothesis_type(kbest));
 
 	  hypothesis_type& oracle = oracles.back().back();
-
+	  
 	  if (! scorers.empty()) {
 	    oracle.score = scorers[refpos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
 	    oracle.loss  = oracle.score->score() * loss_factor;
@@ -2586,6 +2587,7 @@ void options(int argc, char** argv)
     ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
     ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
     ("normalize-loss",   po::bool_switch(&normalize_loss),   "normalize loss")
+    ("oracle-loss",      po::bool_switch(&oracle_loss),      "compute loss by treating zero loss for oracle")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
