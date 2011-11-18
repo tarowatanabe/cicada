@@ -2068,11 +2068,11 @@ struct OptimizeMCP
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
-	  acc[kiter->first] -= kiter->second;
+	  acc[kiter->first] -= kiter->second * factor;
 	
 	hypothesis_type::feature_set_type::const_iterator oiter_end = oracles_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator oiter = oracles_hyp[seg]->features.begin(); oiter != oiter_end; ++ oiter)
-	  acc[oiter->first] += oiter->second;
+	  acc[oiter->first] += oiter->second * factor;
       }
     
     return (loss - margin) * factor;
