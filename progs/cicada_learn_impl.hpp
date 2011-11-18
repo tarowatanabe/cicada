@@ -73,11 +73,11 @@ struct OptimizerSGDL2 : public OptimizerBase
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
-    const double factor = 1.0 / instances;
+    const double factor = 1.0;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
-    //rescale(1.0 - eta * lambda);
+    rescale(1.0 - eta * lambda);
 
     gradient_type::const_iterator citer = correct.begin();
     gradient_type::const_iterator citer_end = correct.end();

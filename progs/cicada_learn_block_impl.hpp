@@ -1481,7 +1481,7 @@ struct LearnSGDL2 : public LearnLR
     ++ epoch;
     
     // do we really need this...?
-    //rescale(weights, 1.0 - eta * lambda);
+    rescale(weights, 1.0 - eta * lambda);
     
     expectation_type expectations;
     
