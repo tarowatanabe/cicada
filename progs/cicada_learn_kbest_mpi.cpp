@@ -2158,7 +2158,7 @@ struct OptimizeMCP
     return std::make_pair(0.0, 0.0);
   }
  
-  double instances() const
+  double instances()
   {
     kbests_hyp.clear();
     
