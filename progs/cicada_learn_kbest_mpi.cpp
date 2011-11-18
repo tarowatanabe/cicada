@@ -2689,7 +2689,7 @@ double optimize_mert(const scorer_document_type& scorers,
     }
     
     if (debug >= 2)
-      std::cerr << "mert update: " << update << std::endl;
+      std::cerr << "mert update: " << update << " objective: " <<  optimum.objective << std::endl;
     
     return optimum.objective;
   } else {
