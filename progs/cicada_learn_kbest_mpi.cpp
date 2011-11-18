@@ -71,6 +71,7 @@ bool learn_arow = false;
 bool learn_cw = false;
 bool learn_pegasos = false;
 bool learn_cp = false;
+bool learn_mcp = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -140,6 +141,7 @@ struct OptimizeOnline;
 template <typename Optimizer>
 struct OptimizeOnlineMargin;
 struct OptimizeCP;
+struct OptimizeMCP;
 struct OptimizeLBFGS;
 
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -157,9 +159,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_nherd > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_mcp + learn_nherd > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_nherd == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_mcp + learn_nherd == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -175,7 +177,9 @@ int main(int argc, char ** argv)
 
     if (line_search && (learn_lbfgs || learn_sgd))
       throw std::runtime_error("line-search is applicable only for non-maxent based loss");
-
+    if (line_search && learn_mcp)
+      throw std::runtime_error("no line-search for MCP");
+    
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
     if (oracle_path.empty())
@@ -212,6 +216,8 @@ int main(int argc, char ** argv)
       throw std::runtime_error("mert search requires evaluation scores");
     if (sample_vector && scorers.empty())
       throw std::runtime_error("sampling requires evaluation scores");
+    if (learn_mcp && scorers.empty())
+      throw std::runtime_error("MCP requires evaluation scores");
     
     hypothesis_map_type kbests;
     hypothesis_map_type oracles;
@@ -278,6 +284,8 @@ int main(int argc, char ** argv)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cp)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights);
+    else if (learn_mcp)
+      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
 
@@ -1630,8 +1638,10 @@ struct OptimizeCP
     const loss_set_type&   losses;
   };
 
-  OptimizeCP(const hypothesis_map_type& kbests,
-	     const hypothesis_map_type& oracles) 
+  OptimizeCP(const scorer_document_type& scorers,
+	     const hypothesis_map_type& kbests,
+	     const hypothesis_map_type& oracles,
+	     const kbest_map_type& kbest_map) 
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
@@ -1961,6 +1971,279 @@ struct OptimizeCP
   double samples;
 };
 
+struct OptimizeMCP
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+    
+  OptimizeMCP(const scorer_document_type& __scorers,
+	      const hypothesis_map_type&  __kbests,
+	      const hypothesis_map_type&  __oracles,
+	      const kbest_map_type&       __kbest_map) 
+    : scorers(__scorers),
+      kbests(__kbests),
+      oracles(__oracles),
+      kbest_map(__kbest_map)
+  {
+    
+  }
+  
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+  typedef std::vector<double, std::allocator<double> > margin_set_type;
+  typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > hypothesis_ptr_set_type;
+  
+  margin_set_type         kbests_margin;
+  margin_set_type         oracles_margin;
+  hypothesis_ptr_set_type kbests_hyp;
+  hypothesis_ptr_set_type oracles_hyp;
+  
+  double operator()(const weight_set_type& weights, weight_set_type& acc)
+  {
+    kbests_margin.clear();
+    kbests_hyp.clear();
+    
+    oracles_margin.clear();
+    oracles_hyp.clear();
+
+    const double inf = std::numeric_limits<double>::infinity();
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	
+	const size_type seg = kbest_map[id];
+	
+	if (seg >= kbests_hyp.size())
+	  kbests_hyp.resize(seg + 1, 0);
+	if (seg >= kbests_margin.size())
+	  kbests_margin.resize(seg + 1, - inf);
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& kbest = *kiter;
+
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  
+	  if (margin > kbests_margin[seg]) {
+	    kbests_margin[seg] = margin;
+	    kbests_hyp[seg] = &kbest;
+	  }
+	}
+      }
+    
+    for (size_t id = 0; id != oracles.size(); ++ id) 
+      if (! oracles[id].empty()) {
+	const size_type seg = kbest_map[id];
+	
+	if (seg >= oracles_hyp.size())
+	  oracles_hyp.resize(seg + 1, 0);
+	if (seg >= oracles_margin.size())
+	  oracles_margin.resize(seg + 1, - inf);
+	
+	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	  const hypothesis_type& oracle = *oiter;
+	  
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  
+	  if (margin > oracles_margin[seg]) {
+	    oracles_margin[seg] = margin;
+	    oracles_hyp[seg] = &oracle;
+	  }
+	}
+      }
+
+    if (oracles_margin.size() != kbests_margin.size())
+      throw std::runtime_error("margin size differ");
+    if (oracles_hyp.size() != kbests_hyp.size())
+      throw std::runtime_error("margin size differ");
+    
+    score_ptr_type score_kbest;
+    score_ptr_type score_oracle;
+    double margin = 0.0;
+    
+    for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
+      if (oracles_hyp[seg] && kbests_hyp[seg]) {
+	
+	if (score_kbest)
+	  *score_kbest += *(kbests_hyp[seg]->score);
+	else
+	  score_kbest = kbests_hyp[seg]->score->clone();
+
+	if (score_oracle)
+	  *score_oracle += *(oracles_hyp[seg]->score);
+	else
+	  score_oracle = oracles_hyp[seg]->score->clone();
+	
+	margin += oracles_margin[seg] - kbests_margin[seg];
+
+	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
+	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
+	  acc[kiter->first] -= kiter->second;
+	
+	hypothesis_type::feature_set_type::const_iterator oiter_end = oracles_hyp[seg]->features.end();
+	for (hypothesis_type::feature_set_type::const_iterator oiter = oracles_hyp[seg]->features.begin(); oiter != oiter_end; ++ oiter)
+	  acc[oiter->first] += oiter->second;
+      }
+    
+    if (! score_kbest || ! score_oracle)
+      throw std::runtime_error("no score?");
+    
+    const double loss = (score_oracle->score() - score_kbest->score()) * (scorers.error_metric() ? - 1.0 : 1.0);
+    
+    return loss - margin;
+  }
+
+  double objective(const weight_set_type& weights)
+  {
+    kbests_margin.clear();
+    kbests_hyp.clear();
+    
+    oracles_margin.clear();
+    oracles_hyp.clear();
+
+    const double inf = std::numeric_limits<double>::infinity();
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	
+	const size_type seg = kbest_map[id];
+	
+	if (seg >= kbests_hyp.size())
+	  kbests_hyp.resize(seg + 1, 0);
+	if (seg >= kbests_margin.size())
+	  kbests_margin.resize(seg + 1, - inf);
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& kbest = *kiter;
+
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  
+	  if (margin > kbests_margin[seg]) {
+	    kbests_margin[seg] = margin;
+	    kbests_hyp[seg] = &kbest;
+	  }
+	}
+      }
+    
+    for (size_t id = 0; id != oracles.size(); ++ id) 
+      if (! oracles[id].empty()) {
+	const size_type seg = kbest_map[id];
+	
+	if (seg >= oracles_hyp.size())
+	  oracles_hyp.resize(seg + 1, 0);
+	if (seg >= oracles_margin.size())
+	  oracles_margin.resize(seg + 1, - inf);
+	
+	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	  const hypothesis_type& oracle = *oiter;
+	  
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  
+	  if (margin > oracles_margin[seg]) {
+	    oracles_margin[seg] = margin;
+	    oracles_hyp[seg] = &oracle;
+	  }
+	}
+      }
+
+    if (oracles_margin.size() != kbests_margin.size())
+      throw std::runtime_error("margin size differ");
+    if (oracles_hyp.size() != kbests_hyp.size())
+      throw std::runtime_error("margin size differ");
+    
+    score_ptr_type score_kbest;
+    score_ptr_type score_oracle;
+    double margin = 0.0;
+    
+    for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
+      if (oracles_hyp[seg] && kbests_hyp[seg]) {
+	
+	if (score_kbest)
+	  *score_kbest += *(kbests_hyp[seg]->score);
+	else
+	  score_kbest = kbests_hyp[seg]->score->clone();
+
+	if (score_oracle)
+	  *score_oracle += *(oracles_hyp[seg]->score);
+	else
+	  score_oracle = oracles_hyp[seg]->score->clone();
+	
+	margin += oracles_margin[seg] - kbests_margin[seg];
+      }
+    
+    if (! score_kbest || ! score_oracle)
+      throw std::runtime_error("no score?");
+    
+    const double loss = (score_oracle->score() - score_kbest->score()) * (scorers.error_metric() ? - 1.0 : 1.0);
+    
+    return loss - margin;
+  }
+
+  template <typename Iterator>
+  std::pair<double, double> operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return std::make_pair(0.0, 0.0);
+  }
+ 
+  double instances() const
+  {
+    return kbests.size();
+  }
+  
+  template <typename Features>
+  struct HMatrix
+  {
+    HMatrix(const Features& __features) : features(__features) {}
+
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[i], features[j]);
+    }
+    
+    const Features& features;
+  };
+  
+  template <typename Features>
+  struct MMatrix
+  {
+    MMatrix(const Features& __features) : features(__features) {}
+    
+    template <typename W>
+    void operator()(W& w, const std::vector<double, std::allocator<double> >& alpha) const
+    {
+      std::vector<double, std::allocator<double> >::const_iterator aiter = alpha.begin();
+      
+      for (size_type id = 0; id != features.size(); ++ id, ++ aiter)
+	if (*aiter > 0.0)
+	  operator()(w, *aiter, id);
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      return cicada::dot_product(w, features[i]);
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      for (size_t j = 0; j != features[i].size(); ++ j)
+	w[j] += update * features[i][j];
+    }
+
+    const Features& features;
+  };
+  
+  const scorer_document_type& scorers;
+  const hypothesis_map_type&  kbests;
+  const hypothesis_map_type&  oracles;
+  const kbest_map_type&       kbest_map;
+  
+  double samples;
+};
+
 template <typename Optimize>
 double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
@@ -1980,7 +2263,7 @@ double optimize_cp(const scorer_document_type& scorers,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  Optimize opt(kbests, oracles);
+  Optimize opt(scorers, kbests, oracles, kbest_map);
   
   // setup norm...
   const double instances_local = opt.instances();
@@ -1989,7 +2272,6 @@ double optimize_cp(const scorer_document_type& scorers,
 
   // synchronize weights...
   bcast_weights(0, weights);
-  
   
   weight_queue_type a;
   f_set_type        f;
@@ -3146,6 +3428,7 @@ void options(int argc, char** argv)
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
     ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
     ("learn-cp",      po::bool_switch(&learn_cp),      "cutting place algorithm")
+    ("learn-mcp",     po::bool_switch(&learn_mcp),     "MERT by cutting place algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")

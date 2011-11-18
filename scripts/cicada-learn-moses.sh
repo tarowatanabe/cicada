@@ -90,7 +90,7 @@ $me [options]
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
-  --learn                   learner (lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp)
+  --learn                   learner (lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp, mcp)
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --learn-options           other learning options
   --zero-weights            learning from zero weights in each iteration
@@ -289,7 +289,7 @@ fi
 learner="cicada_learn_kbest_mpi"
 learn_option=""
 case $learn in
-  lbfgs | sgd | pegasos | mira | cw | arow | nherd | cp)
+  lbfgs | sgd | pegasos | mira | cw | arow | nherd | cp | mcp )
     learner="cicada_learn_kbest_mpi"
     learn_option=" --learn-$learn"
     break ;;
@@ -302,7 +302,7 @@ case $learn in
     learn_option=" --learn-svm"
     break ;;
   * )
-    echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos, mira, cw, arow, cp"
+    echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos, mira, cw, arow, cp, mcp"
     exit 1 ;;
 esac
 
