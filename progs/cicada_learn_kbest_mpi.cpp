@@ -1869,7 +1869,7 @@ struct OptimizeCP
   double objective(const weight_set_type& weights) const
   {
     const double factor = 1.0 / samples;
-
+    
     double obj = 0.0;
     for (size_t id = 0; id != losses.size(); ++ id) {
       const double margin = cicada::dot_product(weights, features[id].begin(), features[id].end(), 0.0);
@@ -2005,6 +2005,7 @@ struct OptimizeMCP
     oracles_margin.clear();
     oracles_hyp.clear();
 
+    const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
     
     for (size_t id = 0; id != kbests.size(); ++ id) 
@@ -2057,25 +2058,14 @@ struct OptimizeMCP
     if (oracles_hyp.size() != kbests_hyp.size())
       throw std::runtime_error("margin size differ");
     
-    score_ptr_type score_kbest;
-    score_ptr_type score_oracle;
+    double loss = 0.0;
     double margin = 0.0;
     
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
-	
-	if (score_kbest)
-	  *score_kbest += *(kbests_hyp[seg]->score);
-	else
-	  score_kbest = kbests_hyp[seg]->score->clone();
-
-	if (score_oracle)
-	  *score_oracle += *(oracles_hyp[seg]->score);
-	else
-	  score_oracle = oracles_hyp[seg]->score->clone();
-	
+	loss   += kbests_hyp[seg]->loss - oracles_hyp[seg]->loss;
 	margin += oracles_margin[seg] - kbests_margin[seg];
-
+	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
 	  acc[kiter->first] -= kiter->second;
@@ -2085,12 +2075,7 @@ struct OptimizeMCP
 	  acc[oiter->first] += oiter->second;
       }
     
-    if (! score_kbest || ! score_oracle)
-      throw std::runtime_error("no score?");
-    
-    const double loss = (score_oracle->score() - score_kbest->score()) * (scorers.error_metric() ? - 1.0 : 1.0);
-    
-    return loss - margin;
+    return (loss - margin) * factor;
   }
 
   double objective(const weight_set_type& weights)
@@ -2100,7 +2085,8 @@ struct OptimizeMCP
     
     oracles_margin.clear();
     oracles_hyp.clear();
-
+    
+    const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
     
     for (size_t id = 0; id != kbests.size(); ++ id) 
@@ -2153,32 +2139,17 @@ struct OptimizeMCP
     if (oracles_hyp.size() != kbests_hyp.size())
       throw std::runtime_error("margin size differ");
     
-    score_ptr_type score_kbest;
-    score_ptr_type score_oracle;
+    
+    double loss = 0.0;
     double margin = 0.0;
     
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
-	
-	if (score_kbest)
-	  *score_kbest += *(kbests_hyp[seg]->score);
-	else
-	  score_kbest = kbests_hyp[seg]->score->clone();
-
-	if (score_oracle)
-	  *score_oracle += *(oracles_hyp[seg]->score);
-	else
-	  score_oracle = oracles_hyp[seg]->score->clone();
-	
+	loss   += kbests_hyp[seg]->loss - oracles_hyp[seg]->loss;
 	margin += oracles_margin[seg] - kbests_margin[seg];
       }
     
-    if (! score_kbest || ! score_oracle)
-      throw std::runtime_error("no score?");
-    
-    const double loss = (score_oracle->score() - score_kbest->score()) * (scorers.error_metric() ? - 1.0 : 1.0);
-    
-    return loss - margin;
+    return (loss - margin) * factor;
   }
 
   template <typename Iterator>
@@ -2189,7 +2160,22 @@ struct OptimizeMCP
  
   double instances() const
   {
-    return kbests.size();
+    kbests_hyp.clear();
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	const size_type seg = kbest_map[id];
+	
+	if (seg >= kbests_hyp.size())
+	  kbests_hyp.resize(seg + 1, 0);
+	
+	kbests_hyp[seg] = &kbests[id].front();
+      }
+    
+    size_type samples = 0;
+    for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)    
+      samples += (kbests_hyp[seg] != 0);
+    return samples;
   }
   
   template <typename Features>
