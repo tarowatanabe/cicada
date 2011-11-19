@@ -47,6 +47,7 @@
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
+typedef std::pair<score_ptr_type, score_ptr_type> score_ptr_pair_type;
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<size_t, std::allocator<size_t> > kbest_map_type;
@@ -147,7 +148,7 @@ struct OptimizeLBFGS;
 void bcast_weights(const int rank, weight_set_type& weights);
 void send_weights(const weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
-
+void reduce_score(score_ptr_pair_type& score_pair);
 
 int main(int argc, char ** argv)
 {
@@ -177,8 +178,6 @@ int main(int argc, char ** argv)
 
     if (line_search && (learn_lbfgs || learn_sgd))
       throw std::runtime_error("line-search is applicable only for non-maxent based loss");
-    if (line_search && learn_mcp)
-      throw std::runtime_error("no line-search for MCP");
     
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
@@ -339,6 +338,7 @@ enum {
   termination_tag,
   point_tag,
   envelope_tag,
+  score_tag,
 };
 
 inline
@@ -1843,7 +1843,7 @@ struct OptimizeCP
   }
   
 
-  double operator()(const weight_set_type& weights, weight_set_type& acc) const
+  std::pair<double, score_ptr_pair_type> operator()(const weight_set_type& weights, weight_set_type& acc) const
   {
     const double factor = 1.0 / samples;
     
@@ -1863,10 +1863,10 @@ struct OptimizeCP
       }
     }
     
-    return objective;
+    return std::make_pair(objective, score_ptr_pair_type());
   }
 
-  double objective(const weight_set_type& weights) const
+  std::pair<double, score_ptr_pair_type> objective(const weight_set_type& weights) const
   {
     const double factor = 1.0 / samples;
     
@@ -1878,7 +1878,7 @@ struct OptimizeCP
       obj += (loss - margin) * (loss - margin > 0.0);
     }
     
-    return obj * factor;
+    return std::make_pair(obj * factor, score_ptr_pair_type());
   }
 
   template <typename Iterator>
@@ -1997,7 +1997,7 @@ struct OptimizeMCP
   hypothesis_ptr_set_type kbests_hyp;
   hypothesis_ptr_set_type oracles_hyp;
   
-  double operator()(const weight_set_type& weights, weight_set_type& acc)
+  std::pair<double, score_ptr_pair_type> operator()(const weight_set_type& weights, weight_set_type& acc)
   {
     kbests_margin.clear();
     kbests_hyp.clear();
@@ -2058,12 +2058,27 @@ struct OptimizeMCP
     if (oracles_hyp.size() != kbests_hyp.size())
       throw std::runtime_error("margin size differ");
     
+    score_ptr_pair_type score;
     double loss = 0.0;
     double margin = 0.0;
     
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
-	loss   += kbests_hyp[seg]->loss - oracles_hyp[seg]->loss;
+	
+	if (oracles_hyp[seg]->score) {
+	  if (score.first)
+	    score.first = oracles_hyp[seg]->score->clone();
+	  else
+	    *score.first += *(oracles_hyp[seg]->score);
+	}
+	
+	if (kbests_hyp[seg]->score) {
+	  if (score.second)
+	    score.second = kbests_hyp[seg]->score->clone();
+	  else
+	    *score.second += *(kbests_hyp[seg]->score);
+	}
+	
 	margin += oracles_margin[seg] - kbests_margin[seg];
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
@@ -2075,10 +2090,10 @@ struct OptimizeMCP
 	  acc[oiter->first] += oiter->second * factor;
       }
     
-    return (loss - margin) * factor;
+    return std::make_pair((loss - margin) * factor, score);
   }
 
-  double objective(const weight_set_type& weights)
+  std::pair<double, score_ptr_pair_type> objective(const weight_set_type& weights)
   {
     kbests_margin.clear();
     kbests_hyp.clear();
@@ -2139,22 +2154,38 @@ struct OptimizeMCP
     if (oracles_hyp.size() != kbests_hyp.size())
       throw std::runtime_error("margin size differ");
     
-    
+    score_ptr_pair_type score;
     double loss = 0.0;
     double margin = 0.0;
     
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
-	loss   += kbests_hyp[seg]->loss - oracles_hyp[seg]->loss;
+	
+	if (oracles_hyp[seg]->score) {
+	  if (score.first)
+	    score.first = oracles_hyp[seg]->score->clone();
+	  else
+	    *score.first += *(oracles_hyp[seg]->score);
+	}
+	
+	if (kbests_hyp[seg]->score) {
+	  if (score.second)
+	    score.second = kbests_hyp[seg]->score->clone();
+	  else
+	    *score.second += *(kbests_hyp[seg]->score);
+	}
+	
 	margin += oracles_margin[seg] - kbests_margin[seg];
       }
     
-    return (loss - margin) * factor;
+    return std::make_pair((loss - margin) * factor, score);
   }
 
   template <typename Iterator>
   std::pair<double, double> operator()(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
+    
+    
     return std::make_pair(0.0, 0.0);
   }
  
@@ -2273,6 +2304,8 @@ double optimize_cp(const scorer_document_type& scorers,
   double objective_master = 0.0;
   double objective_reduced = 0.0;
 
+  const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
+
   // keep previous best...
   weights_prev = weights;
   
@@ -2284,15 +2317,22 @@ double optimize_cp(const scorer_document_type& scorers,
       a.resize(1);
     a.back().clear();
 
-    const double risk_local = opt(weights, a.back());
+    std::pair<double, score_ptr_pair_type> risk_local = opt(weights, a.back());
     if (mpi_rank == 0)
       reduce_weights(a.back());
     else
       send_weights(a.back());
     
+    // reduce objective part
     double risk = 0.0;
-    MPI::COMM_WORLD.Reduce(&risk_local, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
-
+    MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    // reduce score part
+    reduce_score(risk_local.second);
+    
+    risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : 0.0);
+    risk += (risk_local.second.second ? risk_local.second.second->score() * loss_factor : 0.0);
+    
     size_t active_size = 0;
     
     if (mpi_rank == 0) {
@@ -2452,9 +2492,16 @@ double optimize_cp(const scorer_document_type& scorers,
     
     objective_master = 0.0;
     
-    const double objective_master_local = opt.objective(weights);
+    std::pair<double, score_ptr_pair_type> objective_master_local = opt.objective(weights);
     
-    MPI::COMM_WORLD.Reduce(&objective_master_local, &objective_master, 1, MPI::DOUBLE, MPI::SUM, 0);
+    // reduce objectice part
+    MPI::COMM_WORLD.Reduce(&objective_master_local.first, &objective_master, 1, MPI::DOUBLE, MPI::SUM, 0);
+    
+    // reduce score part
+    reduce_score(objective_master_local.second);
+    
+    objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->score() * loss_factor : 0.0);
+    objective_master += (objective_master_local.second.second ? objective_master_local.second.second->score() * loss_factor : 0.0);
     
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
 
@@ -3381,6 +3428,51 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       
       scorers[id]->insert(id_sentence.second);
     }
+  }
+}
+
+void reduce_score(score_ptr_pair_type& score)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(utils::mpi_device_source(rank, score_tag, 256));
+      
+      std::string score_str1;
+      std::string score_str2;
+      if (is >> score_str1 && is >> score_str2) {
+	
+	if (score_str1 != "{}") {
+	  if (! score.first)
+	    score.first = scorer_type::score_type::decode(score_str1);
+	  else
+	    *score.first += *scorer_type::score_type::decode(score_str1);
+	}
+	
+	if (score_str2 != "{}") {
+	  if (! score.second)
+	    score.second = scorer_type::score_type::decode(score_str2);
+	  else
+	    *score.second += *scorer_type::score_type::decode(score_str2);
+	}
+      }
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_sink(0, score_tag, 256));
+    
+    if (score.first)
+      os << score.first->encode();
+    else
+      os << "{}";
+    os << ' ';
+    if (score.second)
+      os << score.second->encode();
+    else
+      os << "{}";
   }
 }
 
