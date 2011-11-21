@@ -2066,14 +2066,14 @@ struct OptimizeMCP
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
 	if (oracles_hyp[seg]->score) {
-	  if (score.first)
+	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
 	
 	if (kbests_hyp[seg]->score) {
-	  if (score.second)
+	  if (! score.second)
 	    score.second = kbests_hyp[seg]->score->clone();
 	  else
 	    *score.second += *(kbests_hyp[seg]->score);
@@ -2162,14 +2162,14 @@ struct OptimizeMCP
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
 	if (oracles_hyp[seg]->score) {
-	  if (score.first)
+	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
 	
 	if (kbests_hyp[seg]->score) {
-	  if (score.second)
+	  if (! score.second)
 	    score.second = kbests_hyp[seg]->score->clone();
 	  else
 	    *score.second += *(kbests_hyp[seg]->score);
