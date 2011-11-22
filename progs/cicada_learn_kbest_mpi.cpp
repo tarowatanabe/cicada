@@ -1381,7 +1381,7 @@ double optimize_online(const scorer_document_type& scorers,
       if (mert_search_local) {
 	bcast_weights(0, optimizer.weights);
 	
-	optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, optimizer.weights);
+	optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, optimizer.weights);
       }
       
       // compute objective
@@ -1491,7 +1491,7 @@ double optimize_online(const scorer_document_type& scorers,
 	if (mert_search_local) {
 	  bcast_weights(0, optimizer.weights);
 	  
-	  optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, optimizer.weights);
+	  optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, optimizer.weights);
 	}
 	
 	// compute objective
@@ -2485,7 +2485,7 @@ double optimize_cp(const scorer_document_type& scorers,
     if (mert_search_local) {
       bcast_weights(0, weights);
       
-      optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, weights);
+      optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
     }
     
     // current weights is the master problems weights...
