@@ -2523,6 +2523,38 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (terminate) break;
     
+    if (iter && objective_master > objective_master_prev) {
+      // we will try find the best scaling between weights_prev and weights
+      weights_best = weights;
+      
+      const double suffered_loss = objective_master - objective_master_prev;
+      
+      double variance = 0.0;
+      
+      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	variance += (weights[i] - weights_prev[i]) * (weights[i] - weights_prev[i]);
+      for (size_t i = weights_size; i < weights.size(); ++ i)
+	variance += weights[i] * weights[i];
+      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	variance += weights_prev[i] * weights_prev[i];
+      
+      const double k = std::min(suffered_loss / variance, 1.0);
+      if (k != 1.0) {
+	for (size_t i = 0; i != weights_size; ++ i)
+	  weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+	for (size_t i = weights_size; i < weights.size(); ++ i)
+	  weights[i] = k * weights[i];
+	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	  weights[i] = (1.0 - k) * weights_prev[i];
+      }
+      
+      weights_prev.swap(weights_best);
+    } else
+      weights_prev = weights;
+    
+#if 0
     if (line_search || mert_search_local) {
       const double k = 0.1;
       const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
@@ -2539,6 +2571,7 @@ double optimize_cp(const scorer_document_type& scorers,
       weights_prev.swap(weights_best);
     } else
       weights_prev = weights;
+#endif
     
     objective_master_prev = objective_master;
   }
