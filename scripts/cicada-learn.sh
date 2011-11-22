@@ -32,6 +32,7 @@ config=""
 
 ### linear learning
 iteration=20
+iteration_first=1
 weights_init=""
 C=1e-3
 regularize_l1=no
@@ -75,6 +76,7 @@ $me [options]
   
   Training options
   -i, --iteration           PRO iterations                   (default: $iteration)
+  --iteration-first         The first iteration (default: $iteration_first)
   -w, --weights             initial weights
   -C, --C                   hyperparameter                   (default: $C)
   --regularize-l1           L1 regularization
@@ -143,6 +145,10 @@ while test $# -gt 0 ; do
   --iteration | -i )
     test $# = 1 && eval "$exit_missing_arg"
     iteration=$2
+    shift; shift ;;
+  --iteration-first )
+    test $# = 1 && eval "$exit_missing_arg"
+    iteration_first=$2
     shift; shift ;;
   --weights | -w )
     test $# = 1 && eval "$exit_missing_arg"
@@ -500,7 +506,7 @@ qsubwrapper() {
   fi
 }
 
-for ((iter=1;iter<=iteration; ++ iter)); do
+for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   echo "iteration: $iter" >&2
   iter_prev=`expr $iter - 1`
 
