@@ -134,6 +134,8 @@ double optimize_online(const scorer_document_type& scorers,
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
 		     const kbest_map_type& kbest_map,
+		     const double scale_min,
+		     const double scale_max,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights);
 
@@ -306,7 +308,7 @@ int main(int argc, char ** argv)
     }
     
     if (mert_search) {
-      const double objective = optimize_mert(scorers, kbests, kbest_map, weights_prev, weights);
+      const double objective = optimize_mert(scorers, kbests, kbest_map, 0.1, 1.1, weights_prev, weights);
       
       if (debug && mpi_rank == 0)
 	std::cerr << "mert objective: " << objective << std::endl;
@@ -1379,7 +1381,7 @@ double optimize_online(const scorer_document_type& scorers,
       if (mert_search_local) {
 	bcast_weights(0, optimizer.weights);
 	
-	optimize_mert(scorers, kbests, kbest_map, weights_prev, optimizer.weights);
+	optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, optimizer.weights);
       }
       
       // compute objective
@@ -1489,7 +1491,7 @@ double optimize_online(const scorer_document_type& scorers,
 	if (mert_search_local) {
 	  bcast_weights(0, optimizer.weights);
 	  
-	  optimize_mert(scorers, kbests, kbest_map, weights_prev, optimizer.weights);
+	  optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, optimizer.weights);
 	}
 	
 	// compute objective
@@ -2483,7 +2485,7 @@ double optimize_cp(const scorer_document_type& scorers,
     if (mert_search_local) {
       bcast_weights(0, weights);
       
-      optimize_mert(scorers, kbests, kbest_map, weights_prev, weights);
+      optimize_mert(scorers, kbests, kbest_map, -1.0, 1.0, weights_prev, weights);
     }
     
     // current weights is the master problems weights...
@@ -2882,6 +2884,8 @@ double optimize_batch(const hypothesis_map_type& kbests,
 double optimize_mert(const scorer_document_type& scorers,
 		     const hypothesis_map_type& kbests,
 		     const kbest_map_type& kbest_map,
+		     const double scale_min,
+		     const double scale_max,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights)
 {
@@ -2981,7 +2985,7 @@ double optimize_mert(const scorer_document_type& scorers,
 
     line_search_type line_search;
     
-    const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+    const optimum_type optimum = line_search(segments, scale_min, scale_max, scorers.error_metric());
 
     const double update = (optimum.lower + optimum.upper) * 0.5;
 
