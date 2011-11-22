@@ -2561,8 +2561,10 @@ double optimize_cp(const scorer_document_type& scorers,
 	std::cerr << "cutting plane ratio: " << k << std::endl;
       
       //weights_prev.swap(weights_best);
-    } else
+    } else {
       weights_prev = weights;
+      objective_master_prev = objective_master;
+    }
     
 #if 0
     if (line_search || mert_search_local) {
@@ -2582,8 +2584,6 @@ double optimize_cp(const scorer_document_type& scorers,
     } else
       weights_prev = weights;
 #endif
-    
-    objective_master_prev = objective_master;
   }
 
   weights = weights_min;
