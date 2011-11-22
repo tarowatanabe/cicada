@@ -2303,6 +2303,7 @@ double optimize_cp(const scorer_document_type& scorers,
   weight_set_type weights_min;
   double objective_master_min = std::numeric_limits<double>::infinity();
 
+  double objective_master_prev = std::numeric_limits<double>::infinity();
   double objective_master = 0.0;
   double objective_reduced = 0.0;
 
@@ -2517,28 +2518,20 @@ double optimize_cp(const scorer_document_type& scorers,
 		<< " actives: " << active_size << std::endl;
     
     // check termination condition...
-    
     int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 0.01);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
     
     if (line_search || mert_search_local) {
-      weights_best = weights;
+      MPI::COMM_WORLD.Bcast(&objective_master, 1, MPI::DOUBLE, 0);
       
-      const double cut_ratio = 0.1;
-      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = cut_ratio * weights[i] + (1.0 - cut_ratio) * weights_prev[i];
-      for (size_t i = weights_size; i < weights.size(); ++ i)
-	weights[i] = cut_ratio * weights[i];
-      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	weights[i] = (1.0 - cut_ratio) * weights_prev[i];
-
-      weights_prev.swap(weights_best);
+      if (iter && std::fabs(objective_master - objective_master_prev) > 0.01)
+	weights_prev = weights;
     } else
       weights_prev = weights;
+    
+    objective_master_prev = objective_master;
   }
 
   weights = weights_min;
