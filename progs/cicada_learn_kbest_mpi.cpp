@@ -2523,16 +2523,22 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (terminate) break;
     
-#if 0
     if (line_search || mert_search_local) {
-      MPI::COMM_WORLD.Bcast(&objective_master, 1, MPI::DOUBLE, 0);
+      const double k = 0.1;
+      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
       
-      if (iter && std::fabs(objective_master - objective_master_prev) > 0.01)
-	weights_prev = weights;
-    }
-#endif
-    
-    weights_prev = weights;
+      weights_best = weights;
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+      for (size_t i = weights_size; i < weights.size(); ++ i)
+	weights[i] = k * weights[i];
+      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	weights[i] = (1.0 - k) * weights_prev[i];
+
+      weights_prev.swap(weights_best);
+    } else
+      weights_prev = weights;
     
     objective_master_prev = objective_master;
   }
