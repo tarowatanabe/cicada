@@ -2307,11 +2307,9 @@ double optimize_cp(const scorer_document_type& scorers,
   const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
 
   // keep previous best...
-  // weights_prev = weights;
+  weights_prev = weights;
   
   for (int iter = 0; iter != iteration; ++ iter) {
-    weights_prev = weights;
-    
     if (mpi_rank == 0)
       a.push_back(weight_set_type());
     else
@@ -2523,19 +2521,6 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (terminate) break;
     
-    {
-      const double cut_ratio = 0.1;
-      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = cut_ratio * weights[i] + (1.0 - cut_ratio) * weights_prev[i];
-      for (size_t i = weights_size; i < weights.size(); ++ i)
-	weights[i] = cut_ratio * weights[i];
-      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
-	weights[i] = (1.0 - cut_ratio) * weights_prev[i];
-    }
-    
-#if 0
     if (line_search || mert_search_local) {
       weights_best = weights;
       
@@ -2552,7 +2537,6 @@ double optimize_cp(const scorer_document_type& scorers,
       weights_prev.swap(weights_best);
     } else
       weights_prev = weights;
-#endif
   }
 
   weights = weights_min;
