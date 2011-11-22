@@ -2022,7 +2022,7 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	  const hypothesis_type& kbest = *kiter;
 
-	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), kbest.loss);
 	  
 	  if (margin > kbests_margin[seg]) {
 	    kbests_margin[seg] = margin;
@@ -2044,7 +2044,7 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  const double margin = - cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 	  
 	  if (margin > oracles_margin[seg]) {
 	    oracles_margin[seg] = margin;
@@ -2118,7 +2118,7 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	  const hypothesis_type& kbest = *kiter;
 
-	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), kbest.loss);
 	  
 	  if (margin > kbests_margin[seg]) {
 	    kbests_margin[seg] = margin;
@@ -2140,7 +2140,7 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  const double margin = - cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 	  
 	  if (margin > oracles_margin[seg]) {
 	    oracles_margin[seg] = margin;
