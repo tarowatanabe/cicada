@@ -2544,7 +2544,8 @@ double optimize_cp(const scorer_document_type& scorers,
       for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	variance += weights_prev[i] * weights_prev[i];
       
-      const double k = std::min(suffered_loss / variance, 1.0);
+      //const double k = std::min(suffered_loss / variance, 1.0);
+      const double k = suffered_loss / variance;
 
       if (k != 1.0) {
 	for (size_t i = 0; i != weights_size; ++ i)
@@ -2559,7 +2560,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	std::cerr << "cutting plane ratio: " << k << std::endl;
       
       weights_prev.swap(weights_best);
-    } else if (iter == 0)
+    } else
       weights_prev = weights;
     
 #if 0
