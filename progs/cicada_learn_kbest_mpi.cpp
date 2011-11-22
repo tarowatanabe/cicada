@@ -2525,6 +2525,8 @@ double optimize_cp(const scorer_document_type& scorers,
 
     MPI::COMM_WORLD.Bcast(&objective_master, 1, MPI::DOUBLE, 0);
     
+    // we will update proximy when better solution found
+
     if (iter && objective_master > objective_master_prev) {
       // we will try find the best scaling between weights_prev and weights
       weights_best = weights;
@@ -2557,7 +2559,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	std::cerr << "cutting plane ratio: " << k << std::endl;
       
       weights_prev.swap(weights_best);
-    } else
+    } else if (iter == 0)
       weights_prev = weights;
     
 #if 0
