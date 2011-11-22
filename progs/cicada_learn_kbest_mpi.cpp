@@ -2522,6 +2522,8 @@ double optimize_cp(const scorer_document_type& scorers,
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
+
+    MPI::COMM_WORLD.Bcast(&objective_master, 1, MPI::DOUBLE, 0);
     
     if (iter && objective_master > objective_master_prev) {
       // we will try find the best scaling between weights_prev and weights
@@ -2541,6 +2543,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	variance += weights_prev[i] * weights_prev[i];
       
       const double k = std::min(suffered_loss / variance, 1.0);
+
       if (k != 1.0) {
 	for (size_t i = 0; i != weights_size; ++ i)
 	  weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
