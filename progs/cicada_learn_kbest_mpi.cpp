@@ -2046,7 +2046,7 @@ struct OptimizeMCP
 	  
 	  const double margin = - cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 	  
-	  if (margin > oracles_margin[seg] || || ! oracles_hyp[seg]) {
+	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	  }
