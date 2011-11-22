@@ -2552,6 +2552,9 @@ double optimize_cp(const scorer_document_type& scorers,
 	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	  weights[i] = (1.0 - k) * weights_prev[i];
       }
+
+      if (mpi_rank == 0 && debug >= 2) 
+	std::cerr << "cutting plane ratio: " << k << std::endl;
       
       weights_prev.swap(weights_best);
     } else
