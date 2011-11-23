@@ -55,12 +55,7 @@ namespace cicada
   };
   
   struct __feature_vector_data_codec
-  {
-    static const uint8_t mask_float    = 1 << (4 + 0);
-    static const uint8_t mask_unsigned = 1 << (4 + 1);
-    static const uint8_t mask_signed   = 1 << (4 + 2);
-    static const uint8_t mask_size     = 0x0f;
-    
+  {    
     typedef uint8_t byte_type;
 
     template <typename __Tp>
@@ -90,6 +85,11 @@ namespace cicada
 
     static size_t encode(byte_type* buffer, const double& value)
     {
+      static const uint8_t mask_float    = 1 << (4 + 0);
+      static const uint8_t mask_unsigned = 1 << (4 + 1);
+      static const uint8_t mask_signed   = 1 << (4 + 2);
+      static const uint8_t mask_size     = 0x0f;
+
       const int64_t val = value;
       
       if (double(val) == value) {
@@ -135,6 +135,11 @@ namespace cicada
     static
     size_t decode(const byte_type* buffer, double& value) 
     {
+      static const uint8_t mask_float    = 1 << (4 + 0);
+      static const uint8_t mask_unsigned = 1 << (4 + 1);
+      static const uint8_t mask_signed   = 1 << (4 + 2);
+      static const uint8_t mask_size     = 0x0f;
+
       if (*buffer & mask_float) {
 	if ((*buffer & mask_size) == sizeof(float)) {
 	  ++ buffer;
