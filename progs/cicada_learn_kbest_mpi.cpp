@@ -521,20 +521,19 @@ struct OptimizeOnlineMargin
   typedef ptrdiff_t difference_type;
   
   typedef hypothesis_type::feature_value_type feature_value_type;
-  
+
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, utils::map_file_allocator<feature_value_type,
-								      std::allocator<feature_value_type>,
-								      size_t(8) * 1024 * 1024 * 1024> > features_type;
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef utils::map_file<feature_value_type, std::allocator<feature_value_type> > features_mapped_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
     {
-      typedef features_type::const_iterator const_iterator;
-
+      typedef const feature_value_type* const_iterator;
+      
       Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
-
+      
       const_iterator begin() const { return first; }
       const_iterator end() const { return last; }
       size_type size() const { return last - first; }
@@ -547,44 +546,77 @@ struct OptimizeOnlineMargin
     typedef Sample sample_type;
     typedef sample_type value_type;
     
-    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    SampleSet() : features(), offsets(), mapped(), os(), path() { offsets.push_back(0); }
     
     void clear()
     {
       features.clear();
       offsets.clear();
       offsets.push_back(0);
+      
+      mapped.clear();
+      os.reset();
+      path = path_type();
     }
     
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
+      const size_type offset     = offsets.back();
+      const size_type size_first = features.size();
+      
       features.insert(features.end(), first, last);
-      offsets.push_back(features.size());
+      
+      offsets.push_back(offset + (features.size() - size_first));
     }
     
     sample_type operator[](size_type pos) const
     {
-      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+      if (! mapped.empty())
+	return sample_type(&(*mapped.begin()) + offsets[pos], &(*mapped.begin()) + offsets[pos + 1]);
+      else
+	return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
     }
     
     size_type size() const { return offsets.size() - 1; }
     bool empty() const { return offsets.size() == 1; }
-
-    void swap(SampleSet& x)
-    {
-      features.swap(x.features);
-      offsets.swap(x.offsets);
-    }
-
+    
     void shrink()
     {
-      //features_type(features).swap(features);
+      flush();
+      
+      if (os) {
+	os.reset();
+	mapped.open(path);
+      }
+      
+      features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
+    }
+    
+    void flush()
+    {
+      if (! os) {
+	path = utils::tempfile::file_name(utils::tempfile::tmp_dir() / "cicada.learn-kbest.features.XXXXXX");
+	
+	utils::tempfile::insert(path);
+	
+	os.reset(new utils::compress_ostream(path, 1024 * 1024));
+      }
+      
+      features_type::const_iterator fiter_end = features.end();
+      for (features_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	os->write((char*) &(*fiter), sizeof(feature_value_type));
+      
+      features.clear();
     }
     
     features_type features;
     offsets_type  offsets;
+    
+    features_mapped_type mapped;
+    boost::shared_ptr<std::ostream> os;
+    path_type                       path;
   };
   
   typedef SampleSet sample_set_type;
@@ -734,6 +766,8 @@ struct OptimizeOnlineMargin
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	  }
+
+	  features.flush();
 	}
       
     } else {
@@ -770,6 +804,8 @@ struct OptimizeOnlineMargin
 		losses.push_back(1.0);
 	      }
 	    }
+	  
+	  features.flush();
 	}
     }
     
@@ -1407,20 +1443,19 @@ struct OptimizeCP
   typedef ptrdiff_t difference_type;
   
   typedef hypothesis_type::feature_value_type feature_value_type;
-
+  
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, utils::map_file_allocator<feature_value_type,
-								      std::allocator<feature_value_type>,
-								      size_t(8) * 1024 * 1024 * 1024> > features_type;
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef utils::map_file<feature_value_type, std::allocator<feature_value_type> > features_mapped_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
     {
-      typedef features_type::const_iterator const_iterator;
-
+      typedef const feature_value_type* const_iterator;
+      
       Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
-
+      
       const_iterator begin() const { return first; }
       const_iterator end() const { return last; }
       size_type size() const { return last - first; }
@@ -1433,44 +1468,77 @@ struct OptimizeCP
     typedef Sample sample_type;
     typedef sample_type value_type;
     
-    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    SampleSet() : features(), offsets(), mapped(), os(), path() { offsets.push_back(0); }
     
     void clear()
     {
       features.clear();
       offsets.clear();
       offsets.push_back(0);
+      
+      mapped.clear();
+      os.reset();
+      path = path_type();
     }
     
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
+      const size_type offset     = offsets.back();
+      const size_type size_first = features.size();
+      
       features.insert(features.end(), first, last);
-      offsets.push_back(features.size());
+      
+      offsets.push_back(offset + (features.size() - size_first));
     }
     
     sample_type operator[](size_type pos) const
     {
-      return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+      if (! mapped.empty())
+	return sample_type(&(*mapped.begin()) + offsets[pos], &(*mapped.begin()) + offsets[pos + 1]);
+      else
+	return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
     }
     
     size_type size() const { return offsets.size() - 1; }
     bool empty() const { return offsets.size() == 1; }
-
-    void swap(SampleSet& x)
-    {
-      features.swap(x.features);
-      offsets.swap(x.offsets);
-    }
-
+    
     void shrink()
     {
-      //features_type(features).swap(features);
+      flush();
+      
+      if (os) {
+	os.reset();
+	mapped.open(path);
+      }
+      
+      features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
+    }
+    
+    void flush()
+    {
+      if (! os) {
+	path = utils::tempfile::file_name(utils::tempfile::tmp_dir() / "cicada.learn-kbest.features.XXXXXX");
+	
+	utils::tempfile::insert(path);
+	
+	os.reset(new utils::compress_ostream(path, 1024 * 1024));
+      }
+      
+      features_type::const_iterator fiter_end = features.end();
+      for (features_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	os->write((char*) &(*fiter), sizeof(feature_value_type));
+      
+      features.clear();
     }
     
     features_type features;
     offsets_type  offsets;
+    
+    features_mapped_type mapped;
+    boost::shared_ptr<std::ostream> os;
+    path_type                       path;
   };
   
   typedef SampleSet sample_set_type;
@@ -1614,6 +1682,8 @@ struct OptimizeCP
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	  }
+
+	  features.flush();
 	}
       
     } else {
@@ -1650,6 +1720,8 @@ struct OptimizeCP
 		losses.push_back(1.0);
 	      }
 	    }
+	  
+	  features.flush();
 	}
     }
     
