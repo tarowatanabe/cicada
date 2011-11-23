@@ -162,15 +162,27 @@ int main(int argc, char** argv)
   for (int iter = 0; iter != 64; ++ iter) {
 
     for (int i = 0; i != 32; ++ i) {
-      std::string feat = "good:" + utils::lexical_cast<std::string>(random());
+      std::string feat = "double:" + utils::lexical_cast<std::string>(random());
       
       features1[feat] = (1.0 * random()) / random();
     }
 
     for (int i = 0; i != 32; ++ i) {
-      std::string feat = "good:" + utils::lexical_cast<std::string>(random());
+      std::string feat = "double:" + utils::lexical_cast<std::string>(random());
       
       features1[feat] = (- 1.0 * random()) / random();
+    }
+
+    for (int i = 0; i != 32; ++ i) {
+      std::string feat = "int:" + utils::lexical_cast<std::string>(random());
+      
+      features1[feat] = random() % 16;
+    }
+
+    for (int i = 0; i != 32; ++ i) {
+      std::string feat = "int:" + utils::lexical_cast<std::string>(random());
+      
+      features1[feat] = - (int(random()) % 16);
     }
     
     check_compact(features1);

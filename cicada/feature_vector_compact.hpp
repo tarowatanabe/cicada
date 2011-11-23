@@ -308,6 +308,30 @@ namespace cicada
     template <typename Iterator>
     FeatureVectorCompact(Iterator first, Iterator last, const bool sorted=false)
     {
+      assign(first, last, sorted);
+    }
+    
+    template <typename T, typename A>
+    FeatureVectorCompact(const FeatureVector<T, A>& x)
+    {
+      assign(x);
+    }
+    
+    template <typename T, typename A>
+    FeatureVectorCompact& operator=(const FeatureVector<T, A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
+    void assign(const FeatureVectorCompact& x)
+    {
+      storage.assign(x.storage);
+    }
+    
+    template <typename Iterator>
+    void assign(Iterator first, Iterator last, const bool sorted=false)
+    {
       typedef std::pair<feature_type, double> pair_type;
       typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
       typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
@@ -356,7 +380,7 @@ namespace cicada
     }
     
     template <typename T, typename A>
-    FeatureVectorCompact(const FeatureVector<T, A>& x)
+    void assign(const FeatureVector<T, A>& x)
     {
       typedef typename FeatureVector<T, A>::const_iterator const_iterator;
       typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
@@ -380,6 +404,7 @@ namespace cicada
       
       storage.assign(compressed.begin(), citer);
     }
+
     
   public:
     const_iterator begin() const { return const_iterator(storage.begin(), storage.end()); }
@@ -391,6 +416,14 @@ namespace cicada
     {
       storage.swap(x.storage);
     }
+    
+  public:
+    friend bool operator==(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage == y.storage; }
+    friend bool operator!=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage != y.storage; }
+    friend bool operator<(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage < y.storage; }
+    friend bool operator>(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage > y.storage; }
+    friend bool operator<=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage <= y.storage; }
+    friend bool operator>=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage >= y.storage; }
     
   private:
     storage_type storage;
