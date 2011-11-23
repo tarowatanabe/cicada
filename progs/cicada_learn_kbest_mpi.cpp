@@ -666,8 +666,6 @@ struct OptimizeOnlineMargin
     sample_set_type features_sample;
     loss_set_type   losses_sample;
 
-    weight_set_type norms;
-
     if (sample_vector) {
       for (size_type id = 0; id != kbests.size(); ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
@@ -724,8 +722,6 @@ struct OptimizeOnlineMargin
 	  positions.clear();
 	  for (size_type i = 0; i != losses_sample.size(); ++ i)
 	    positions.push_back(i);
-	  
-	  norms.clear();
 
 	  const size_type instances_first = losses.size();
 	  
@@ -743,8 +739,6 @@ struct OptimizeOnlineMargin
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-	
-	  norms.clear();
 	  
 	  const size_type instances_first = losses.size();
 
@@ -1554,8 +1548,6 @@ struct OptimizeCP
     sample_set_type features_sample;
     loss_set_type   losses_sample;
     
-    weight_set_type norms;
-    
     if (sample_vector) {
       for (size_type id = 0; id != kbests.size(); ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
@@ -1613,10 +1605,6 @@ struct OptimizeCP
 	  for (size_type i = 0; i != losses_sample.size(); ++ i)
 	    positions.push_back(i);
 
-	  norms.clear();
-
-	  const size_type instances_first = losses.size();
-	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
@@ -1631,10 +1619,6 @@ struct OptimizeCP
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-
-	  norms.clear();
-	  
-	  const size_type instances_first = losses.size();
 	  
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
@@ -1657,11 +1641,6 @@ struct OptimizeCP
 		if (loss > 0.0) {
 		  features.insert(feats.begin(), feats.end());
 		  losses.push_back(loss);
-		  
-		  features_type::const_iterator fiter_end = feats.end();
-		  for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		    norms[fiter->first] += fiter->second;
-		  
 		}
 	      } else {
 		features.insert(feats.begin(), feats.end());
