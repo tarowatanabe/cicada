@@ -83,8 +83,6 @@ bool line_search = false;
 bool mert_search = false;
 bool mert_search_local = false;
 bool sample_vector = false;
-bool normalize_vector = false;
-bool normalize_loss = false;
 bool oracle_loss = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -172,9 +170,6 @@ int main(int argc, char ** argv)
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
 
-    if (normalize_loss && ! softmax_margin && ! loss_margin)
-      throw std::runtime_error("loss normalization assume either softmax-margin or loss-margin");
-    
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
@@ -409,22 +404,7 @@ struct OptimizeOnline
     for (size_t id = 0; id != kbests.size(); ++ id) 
       if (! oracles[id].empty() && ! kbests[id].empty()) {
 	
-	double cost_factor = (softmax_margin ? 1.0 : 0.0);
-	
-	if (normalize_loss && softmax_margin) {
-	  double sum = 0.0;
-	  
-	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	    sum += oiter->loss;
-	  
-	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	    sum += kiter->loss;
-	  
-	  if (sum != 0.0)
-	    cost_factor = double(oracles[id].size() + kbests[id].size()) / sum;
-	}
+	const double cost_factor = (softmax_margin ? 1.0 : 0.0);
 	
 	weight_type Z_oracle;
 	weight_type Z_kbest;
@@ -475,22 +455,7 @@ struct OptimizeOnline
   void operator()(const hypothesis_set_type& oracles,
 		  const hypothesis_set_type& kbests)
   {
-    double cost_factor = (softmax_margin ? 1.0 : 0.0);
-    
-    if (normalize_loss && softmax_margin) {
-      double sum = 0.0;
-      
-      hypothesis_set_type::const_iterator oiter_end = oracles.end();
-      for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-	sum += oiter->loss;
-      
-      hypothesis_set_type::const_iterator kiter_end = kbests.end();
-      for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-	sum += kiter->loss;
-      
-      if (sum != 0.0)
-	cost_factor = double(oracles.size() + kbests.size()) / sum;
-    }
+    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
     
     weight_type Z_oracle;
     weight_type Z_kbest;
@@ -769,38 +734,6 @@ struct OptimizeOnlineMargin
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
-
-	    if (normalize_vector) {
-	      typename sample_set_type::value_type::const_iterator fiter_end = features_sample[*piter].end();
-	      for (typename sample_set_type::value_type::const_iterator fiter = features_sample[*piter].begin(); fiter != fiter_end; ++ fiter) 
-		norms[fiter->first] += fiter->second;
-	    }
-	  }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_vector) {
-	    const double norm_sum = cicada::dot_product(norms, norms);
-	    
-	    if (norm_sum != 0.0) {
-	      const double size_scale = instances_last - instances_first;
-	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
-	      
-	      for (size_type id = instances_first; id != instances_last; ++ id) {
-		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
-		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
-		  const_cast<feature_value_type&>(*fiter).second *= factor;
-	      }
-	    }
-	  }
-	  
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
 	  }
 	}
       
@@ -836,50 +769,12 @@ struct OptimizeOnlineMargin
 		if (loss > 0.0) {
 		  features.insert(feats.begin(), feats.end());
 		  losses.push_back(loss);
-		  
-		  if (normalize_vector) {
-		    features_type::const_iterator fiter_end = feats.end();
-		    for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		      norms[fiter->first] += fiter->second;
-		  }
 		}
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
-		
-		if (normalize_vector) {
-		  features_type::const_iterator fiter_end = feats.end();
-		  for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		    norms[fiter->first] += fiter->second;
-		}
 	      }
 	    }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_vector) {
-	    const double norm_sum = cicada::dot_product(norms, norms);
-	    
-	    if (norm_sum != 0.0) {
-	      const double size_scale = instances_last - instances_first;
-	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
-	      
-	      for (size_type id = instances_first; id != instances_last; ++ id) {
-		typename sample_set_type::value_type::const_iterator fiter_end = features[id].end();
-		for (typename sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
-		  const_cast<feature_value_type&>(*fiter).second *= factor;
-	      }
-	    }
-	  }
-	  
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
-	  }
 	}
     }
     
@@ -1723,42 +1618,10 @@ struct OptimizeCP
 	  const size_type instances_first = losses.size();
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
-
+	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
-	    
-	    if (normalize_vector) {
-	      sample_set_type::value_type::const_iterator fiter_end = features_sample[*piter].end();
-	      for (sample_set_type::value_type::const_iterator fiter = features_sample[*piter].begin(); fiter != fiter_end; ++ fiter) 
-		norms[fiter->first] += fiter->second;
-	    }
-	  }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_vector) {
-	    const double norm_sum = cicada::dot_product(norms, norms);
-	    
-	    if (norm_sum != 0.0) {
-	      const double size_scale = instances_last - instances_first;
-	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
-	      
-	      for (size_type id = instances_first; id != instances_last; ++ id) {
-		sample_set_type::value_type::const_iterator fiter_end = features[id].end();
-		for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
-		  const_cast<feature_value_type&>(*fiter).second *= factor;
-	      }
-	    }
-	  }
-
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
 	  }
 	}
       
@@ -1803,40 +1666,8 @@ struct OptimizeCP
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
-		
-		if (normalize_vector) {
-		  features_type::const_iterator fiter_end = feats.end();
-		  for (features_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		    norms[fiter->first] += fiter->second;
-		}
 	      }
 	    }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_vector) {
-	    const double norm_sum = cicada::dot_product(norms, norms);
-	    
-	    if (norm_sum != 0.0) {
-	      const double size_scale = instances_last - instances_first;
-	      const double factor = 1.0 / std::sqrt(norm_sum / (size_scale * size_scale));
-	      
-	      for (size_type id = instances_first; id != instances_last; ++ id) {
-		sample_set_type::value_type::const_iterator fiter_end = features[id].end();
-		for (sample_set_type::value_type::const_iterator fiter = features[id].begin(); fiter != fiter_end; ++ fiter) 
-		  const_cast<feature_value_type&>(*fiter).second *= factor;
-	      }
-	    }
-	  }
-	  
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
-	  }
 	}
     }
     
@@ -2987,21 +2818,7 @@ struct OptimizeLBFGS
       for (size_t id = 0; id != id_max; ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
 
-	  double cost_factor = (softmax_margin ? 1.0 : 0.0);
-	  if (normalize_loss && softmax_margin) {
-	    double sum = 0.0;
-	    
-	    hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	    for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	      sum += oiter->loss;
-	    
-	    hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	    for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	      sum += kiter->loss;
-	    
-	    if (sum != 0.0)
-	      cost_factor = double(oracles[id].size() + kbests[id].size()) / sum;
-	  }
+	  const double cost_factor = (softmax_margin ? 1.0 : 0.0);
 	  
 	  weight_type Z_oracle;
 	  weight_type Z_kbest;
@@ -3825,8 +3642,6 @@ void options(int argc, char** argv)
     ("mert-search",       po::bool_switch(&mert_search),       "perform one-dimensional mert")
     ("mert-search-local", po::bool_switch(&mert_search_local), "perform local one-dimensional mert")
     ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
-    ("normalize-vector",  po::bool_switch(&normalize_vector),  "normalize feature vectors")
-    ("normalize-loss",    po::bool_switch(&normalize_loss),    "normalize loss")
     ("oracle-loss",       po::bool_switch(&oracle_loss),       "compute loss by treating zero loss for oracle")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")

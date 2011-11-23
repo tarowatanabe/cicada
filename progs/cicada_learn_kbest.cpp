@@ -82,8 +82,6 @@ bool softmax_margin = false;
 bool line_search = false;
 bool mert_search = false;
 bool sample_vector = false;
-bool normalize_vector = false;
-bool normalize_loss = false;
 bool oracle_loss = false;
 
 std::string scorer_name = "bleu:order=4";
@@ -144,9 +142,6 @@ int main(int argc, char ** argv)
       throw std::runtime_error("either L1 or L2 regularization");
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
-
-    if (normalize_loss && ! softmax_margin && ! loss_margin)
-      throw std::runtime_error("loss normalization assume either softmax-margin or loss-margin");
 
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
@@ -1150,24 +1145,11 @@ struct OptimizeSVM
 	  for (size_type i = 0; i != losses_sample.size(); ++ i)
 	    positions.push_back(i);
 	  
-	  const size_type instances_first = losses.size();
-	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
-	  }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
 	  }
 	  
 	} else {
@@ -1175,8 +1157,6 @@ struct OptimizeSVM
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-
-	  const size_type instances_first = losses.size();
 	
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
@@ -1204,17 +1184,6 @@ struct OptimizeSVM
 		losses.push_back(1.0);
 	      }
 	    }
-
-	  const size_type instances_last = losses.size();
-	  
-	  if (normalize_loss) {
-	    loss_set_type::iterator liter_first = losses.begin() + instances_first;
-	    loss_set_type::iterator liter_last  = losses.begin() + instances_last;
-	    
-	    const double loss_sum = std::accumulate(liter_first, liter_last, 0.0);
-	    if (loss_sum != 0.0)
-	      std::transform(liter_first, liter_last, liter_first, std::bind2nd(std::multiplies<double>(), double(liter_last - liter_first) / loss_sum));
-	  }
 	}
       }
     }
@@ -1630,21 +1599,7 @@ struct OptimizeLBFGS
 	queue.pop(id);
 	if (id < 0) break;
 	
-	double cost_factor = (softmax_margin ? 1.0 : 0.0);
-	if (normalize_loss && softmax_margin) {
-	  double sum = 0.0;
-	  
-	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	    sum += oiter->loss;
-	  
-	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	    sum += kiter->loss;
-	  
-	  if (sum != 0.0)
-	    cost_factor = double(oracles[id].size() + kbests[id].size()) / sum;
-	}
+	const double cost_factor = (softmax_margin ? 1.0 : 0.0);
 	
 	weight_type Z_oracle;
 	weight_type Z_kbest;
@@ -2447,8 +2402,6 @@ void options(int argc, char** argv)
     ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
     ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
     ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
-    ("normalize-vector", po::bool_switch(&normalize_vector), "normalize feature vectors")
-    ("normalize-loss",   po::bool_switch(&normalize_loss),   "normalize loss")
     ("oracle-loss",      po::bool_switch(&oracle_loss),      "compute loss by treating zero loss for oracle")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
