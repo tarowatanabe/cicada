@@ -316,15 +316,17 @@ namespace cicada
     FeatureVectorCompact() {}
     
     template <typename Iterator>
-    FeatureVectorCompact(Iterator first, Iterator last, const bool sorted=false)
-    {
-      assign(first, last, sorted);
-    }
+    FeatureVectorCompact(Iterator first, Iterator last, const bool sorted=false) { assign(first, last, sorted); }
     
     template <typename T, typename A>
-    FeatureVectorCompact(const FeatureVector<T, A>& x)
+    FeatureVectorCompact(const FeatureVector<T, A>& x) { assign(x); }
+    
+    FeatureVectorCompact(const FeatureVectorCompact& x) : storage(x.storage) {}
+
+    FeatureVectorCompact& operator=(const FeatureVectorCompact& x)
     {
-      assign(x);
+      storage = x.storage;
+      return *this;
     }
     
     template <typename T, typename A>
