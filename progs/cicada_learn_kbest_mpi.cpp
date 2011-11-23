@@ -583,6 +583,12 @@ struct OptimizeOnlineMargin
       offsets_type(offsets).swap(offsets);
     }
     
+    void flush()
+    {
+      
+      
+    }
+
     features_type features;
     offsets_type  offsets;
   };
@@ -734,6 +740,8 @@ struct OptimizeOnlineMargin
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	  }
+
+	  features.flush();
 	}
       
     } else {
@@ -770,6 +778,8 @@ struct OptimizeOnlineMargin
 		losses.push_back(1.0);
 	      }
 	    }
+	  
+	  features.flush();
 	}
     }
     
@@ -1469,6 +1479,12 @@ struct OptimizeCP
       offsets_type(offsets).swap(offsets);
     }
     
+    void flush()
+    {
+      
+      
+    }
+
     features_type features;
     offsets_type  offsets;
   };
@@ -1614,6 +1630,8 @@ struct OptimizeCP
 	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
 	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
 	  }
+
+	  features.flush();
 	}
       
     } else {
@@ -1650,6 +1668,8 @@ struct OptimizeCP
 		losses.push_back(1.0);
 	      }
 	    }
+	  
+	  features.flush();
 	}
     }
     
