@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include "feature_vector.hpp"
+#include "feature_vector_compact.hpp"
 #include "dot_product.hpp"
 
 #include "utils/lexical_cast.hpp"
