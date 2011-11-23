@@ -33,6 +33,9 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/map_file_allocator.hpp"
+#include "utils/map_file.hpp"
+#include "utils/tempfile.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -521,7 +524,9 @@ struct OptimizeOnlineMargin
   
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<feature_value_type, utils::map_file_allocator<feature_value_type,
+								      std::allocator<feature_value_type>,
+								      size_t(8) * 1024 * 1024 * 1024> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
@@ -574,7 +579,7 @@ struct OptimizeOnlineMargin
 
     void shrink()
     {
-      features_type(features).swap(features);
+      //features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
     }
     
@@ -1405,7 +1410,9 @@ struct OptimizeCP
 
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<feature_value_type, utils::map_file_allocator<feature_value_type,
+								      std::allocator<feature_value_type>,
+								      size_t(8) * 1024 * 1024 * 1024> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
@@ -1458,7 +1465,7 @@ struct OptimizeCP
 
     void shrink()
     {
-      features_type(features).swap(features);
+      //features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
     }
     
