@@ -287,7 +287,7 @@ namespace utils
     
   };
   
-  template <typename _Tp, typename _Alloc=std::allocator<_Tp> >
+  template <typename _Tp, typename _Alloc=std::allocator<_Tp>, size_t _Threshold=size_t(1) * 1024 * 1024 * 1024>
   struct map_file_allocator : public __map_file_allocator_base,
 			      public _Alloc
   {
@@ -301,17 +301,17 @@ namespace utils
     typedef const _Tp& const_reference;
     typedef _Tp        value_type;
     
-    template<typename _Tp1>
+    template<typename _Tp1, typename _Alloc1=std::allocator<_Tp1>, size_t _Threshold1=size_t(1) * 1024 * 1024 * 1024>
     struct rebind
-    { typedef map_file_allocator<_Tp1> other; };
+    { typedef map_file_allocator<_Tp1, _Alloc1, _Threshold1> other; };
     
   public:
     map_file_allocator() throw() { }
     
     map_file_allocator(const map_file_allocator&) throw() { }
     
-    template<typename _Tp1, typename _Alloc1>
-    map_file_allocator(const map_file_allocator<_Tp1, _Alloc1>&) throw() { }
+    template<typename _Tp1, typename _Alloc1, size_t _Threshold1>
+    map_file_allocator(const map_file_allocator<_Tp1, _Alloc1, _Threshold1>&) throw() { }
     
     ~map_file_allocator() throw() { }
     
@@ -339,7 +339,8 @@ namespace utils
     {
       if (__n == 0) return 0;
 
-      if (sizeof(_Tp) * __n < 1024 * 1024 * 256)
+      // 4GB
+      if (sizeof(_Tp) * __n < _Threshold)
 	return base_allocator().allocate(__n);
       else
 	return static_cast<pointer>(map_alloc().allocate(sizeof(_Tp) * __n));
@@ -349,7 +350,8 @@ namespace utils
     deallocate(pointer __p, size_type __n) {
       if (! __p) return;
       
-      if (sizeof(_Tp) * __n < 1024 * 1024 * 256)
+      // 4GB
+      if (sizeof(_Tp) * __n < _Threshold)
 	base_allocator().deallocate(__p, __n);
       else
 	map_alloc().deallocate(static_cast<void*>(__p), sizeof(_Tp) * __n);

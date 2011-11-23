@@ -28,6 +28,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/sgi_hash_set.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/map_file_allocator.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -275,7 +276,9 @@ struct OptimizeLinear
   typedef struct problem      problem_type;
   typedef struct feature_node feature_node_type;
 
-  typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
+  typedef std::vector<feature_node_type, utils::map_file_allocator<feature_node_type,
+								   std::allocator<feature_node_type>,
+								   size_t(4) * 1024 * 1024 * 1024> > feature_node_set_type;
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
   typedef std::vector<int, std::allocator<int> > label_set_type;
   
@@ -681,7 +684,7 @@ struct OptimizeLinear
 	}
       }
       
-      feature_node_set_type(features).swap(features);
+      //feature_node_set_type(features).swap(features);
     }
   };
   typedef Encoder encoder_type;
