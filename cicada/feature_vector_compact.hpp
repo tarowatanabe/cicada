@@ -208,6 +208,14 @@ namespace cicada
   public:
     struct iterator
     {
+    public:
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
+      typedef std::input_iterator_tag   iterator_category;
+      typedef std::pair<const feature_type, data_type> value_type;
+      typedef const value_type* pointer;
+      typedef const value_type& reference;
+
     private:
       typedef storage_type::const_iterator storage_ptr_type;
       
@@ -305,6 +313,8 @@ namespace cicada
     };
     
   public:
+    FeatureVectorCompact() {}
+    
     template <typename Iterator>
     FeatureVectorCompact(Iterator first, Iterator last, const bool sorted=false)
     {
@@ -342,7 +352,7 @@ namespace cicada
 	
 	feature_type::id_type id_prev = 0;
 	for (/**/; first != last; ++ first) {
-	  const feature_type::id_type id = first->first.id();
+	  const feature_type::id_type id = feature_type(first->first).id();
 	  
 	  const size_type feature_size = codec_feature_type::encode(&(*citer), id - id_prev);
 	  citer += feature_size;
@@ -411,6 +421,7 @@ namespace cicada
     const_iterator end() const { return const_iterator(); }
     
     bool empty() const { return storage.empty(); }
+    size_type size_compressed() const  { return storage.size(); }
 
     void swap(FeatureVectorCompact& x)
     {

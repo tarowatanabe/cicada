@@ -27,6 +27,7 @@
 #include "cicada/eval.hpp"
 #include "cicada/feature.hpp"
 #include "cicada/symbol.hpp"
+#include "cicada/feature_vector_compact.hpp"
 
 typedef cicada::Sentence sentence_type;
 
@@ -49,7 +50,8 @@ struct hypothesis_type
   typedef std::pair<feature_type, double> feature_value_type;
   
   typedef utils::simple_vector<word_type, std::allocator<word_type> >                   sentence_type;
-  typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
+  //typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
+  typedef cicada::FeatureVectorCompact feature_set_type;
   
   hypothesis_type() : sentence(), features(), score(), loss(0) {}
   hypothesis_type(const kbest_feature_type& x)
@@ -58,7 +60,7 @@ struct hypothesis_type
       score(),
       loss(0)
   {
-    std::sort(features.begin(), features.end());
+    
   }
   template <typename IteratorSentence, typename IteratorFeature>
   hypothesis_type(IteratorSentence sfirst, IteratorSentence slast,
@@ -68,7 +70,7 @@ struct hypothesis_type
       score(),
       loss(0)
   {
-    std::sort(features.begin(), features.end());
+    
   }
   
   sentence_type    sentence;

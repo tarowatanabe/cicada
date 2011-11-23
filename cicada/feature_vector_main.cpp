@@ -25,6 +25,10 @@ void check_compact(const feature_set_type& features, const feature_compact_type&
   feature_compact_type::const_iterator citer = feats.begin();
   feature_compact_type::const_iterator citer_end = feats.end();
 
+  std::cerr << "size: " << features.size() * sizeof(feature_set_type::value_type)
+	    << " compressed: " << feats.size_compressed()
+	    << std::endl;
+
   while (iter != iter_end && citer != citer_end) {
     if (iter->first < citer->first) {
       std::cerr << "differ for the original vector!" << std::endl;
