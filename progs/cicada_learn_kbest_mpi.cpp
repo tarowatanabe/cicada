@@ -723,8 +723,6 @@ struct OptimizeOnlineMargin
 	  for (size_type i = 0; i != losses_sample.size(); ++ i)
 	    positions.push_back(i);
 
-	  const size_type instances_first = losses.size();
-	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
@@ -739,8 +737,6 @@ struct OptimizeOnlineMargin
 	  sentences.clear();
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    sentences.insert(oracles[id][o].sentence);
-	  
-	  const size_type instances_first = losses.size();
 
 	  for (size_t o = 0; o != oracles[id].size(); ++ o)
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
