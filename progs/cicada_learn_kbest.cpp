@@ -929,7 +929,10 @@ struct OptimizeSVM
 
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<feature_value_type, utils::map_file_allocator<feature_value_type,
+								      std::allocator<feature_value_type>,
+								      size_t(8) * 1024 * 1024 * 1024> > features_type;
+
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
@@ -982,7 +985,7 @@ struct OptimizeSVM
 
     void shrink()
     {
-      features_type(features).swap(features);
+      //features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
     }
     
@@ -1186,6 +1189,9 @@ struct OptimizeSVM
 	    }
 	}
       }
+      
+      // shrinkt features...
+      features.shrink();
     }
     
     queue_type& queue;
