@@ -133,3 +133,10 @@ ngram feature should use id-based encoding, not word based for efficient oov com
 add NHERD to our set of learning algorithms and add online learner to block-learner
 
 add lower/upper bound for online learner as restrictions for updates...?
+
+
+Compressed feature vector representation
+   for liblinear training, we cannot use a compact form, thus, still use mmap based impelementation
+   for hypothesis storage, use a compact notation of features
+       use of delta encoded feature representation (assuming non random access iterators)
+       + value representation using either char/short/int/float/double
