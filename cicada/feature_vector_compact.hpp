@@ -89,46 +89,34 @@ namespace cicada
       static const uint8_t mask_unsigned = 1 << (4 + 1);
       static const uint8_t mask_signed   = 1 << (4 + 2);
       static const uint8_t mask_size     = 0x0f;
-
-      const int64_t val = value;
       
-      if (double(val) == value) {
+      if (::fmod(value, 1.0) == 0.0) {
+	const int64_t  val = value;
 	const uint64_t value_encode = utils::bithack::branch(val < 0, - val, val);
-	const size_t value_size = byte_size(value_encode);
+	const size_t   value_size = byte_size(value_encode);
 	
 	*buffer = utils::bithack::branch(val < 0, mask_signed, mask_unsigned) | (value_size & mask_size);
 	++ buffer;
 	
 	switch (value_size) {
-	case 8: buffer[7] = (value_encode >> 56);
-	case 7: buffer[6] = (value_encode >> 48);
-	case 6: buffer[5] = (value_encode >> 40);
-	case 5: buffer[4] = (value_encode >> 32);
-	case 4: buffer[3] = (value_encode >> 24);
-	case 3: buffer[2] = (value_encode >> 16);
-	case 2: buffer[1] = (value_encode >> 8);
-	case 1: buffer[0] = (value_encode);
+	case 8: buffer[value_size - 8] = (value_encode >> 56);
+	case 7: buffer[value_size - 7] = (value_encode >> 48);
+	case 6: buffer[value_size - 6] = (value_encode >> 40);
+	case 5: buffer[value_size - 5] = (value_encode >> 32);
+	case 4: buffer[value_size - 4] = (value_encode >> 24);
+	case 3: buffer[value_size - 3] = (value_encode >> 16);
+	case 2: buffer[value_size - 2] = (value_encode >> 8);
+	case 1: buffer[value_size - 1] = (value_encode);
 	}
 	
 	return value_size + 1;
       } else {
-	const float val = value;
+	*buffer = (mask_float | (sizeof(double) & mask_size));
+	++ buffer;
 	
-	if (double(val) == value) {
-	  *buffer = (mask_float | (sizeof(float) & mask_size));
-	  ++ buffer;
-	  
-	  std::copy(cast(val), cast(val) + sizeof(float), buffer);
-	  
-	  return sizeof(float) + 1;
-	} else {
-	  *buffer = (mask_float | (sizeof(double) & mask_size));
-	  ++ buffer;
-	  
-	  std::copy(cast(value), cast(value) + sizeof(double), buffer);
-	  
-	  return sizeof(double) + 1;
-	}
+	std::copy(cast(value), cast(value) + sizeof(double), buffer);
+	
+	return sizeof(double) + 1;
       }
     }
     
@@ -141,22 +129,9 @@ namespace cicada
       static const uint8_t mask_size     = 0x0f;
 
       if (*buffer & mask_float) {
-	if ((*buffer & mask_size) == sizeof(float)) {
-	  ++ buffer;
-	  
-	  float value_decode;
-	  std::copy(buffer, buffer + sizeof(float), cast(value_decode));
-	  value = value_decode;
-	  
-	  return sizeof(float) + 1;
-	} else if ((*buffer & mask_size) == sizeof(double)) {
-	  ++ buffer;
-	  
-	  std::copy(buffer, buffer + sizeof(double), cast(value));
-	  
-	  return sizeof(double) + 1;
-	} else
-	  throw std::runtime_error("invalid size for float");
+	++ buffer;
+	std::copy(buffer, buffer + sizeof(double), cast(value));
+	return sizeof(double) + 1;
       } else if ((*buffer & mask_signed) || (*buffer & mask_unsigned)) {
 	const bool value_signed = (*buffer & mask_signed);
 	const size_t value_size = (*buffer & mask_size);
@@ -166,14 +141,14 @@ namespace cicada
 	const uint64_t mask = 0xff;
 	uint64_t value_decode = 0;
 	switch (value_size) {
-	case 8: value_decode |= ((uint64_t(buffer[7]) & mask) << 56);
-	case 7: value_decode |= ((uint64_t(buffer[6]) & mask) << 48);
-	case 6: value_decode |= ((uint64_t(buffer[5]) & mask) << 40);
-	case 5: value_decode |= ((uint64_t(buffer[4]) & mask) << 32);
-	case 4: value_decode |= ((uint64_t(buffer[3]) & mask) << 24);
-	case 3: value_decode |= ((uint64_t(buffer[2]) & mask) << 16);
-	case 2: value_decode |= ((uint64_t(buffer[1]) & mask) << 8);
-	case 1: value_decode |= ((uint64_t(buffer[0]) & mask));
+	case 8: value_decode |= ((uint64_t(buffer[value_size - 8]) & mask) << 56);
+	case 7: value_decode |= ((uint64_t(buffer[value_size - 7]) & mask) << 48);
+	case 6: value_decode |= ((uint64_t(buffer[value_size - 6]) & mask) << 40);
+	case 5: value_decode |= ((uint64_t(buffer[value_size - 5]) & mask) << 32);
+	case 4: value_decode |= ((uint64_t(buffer[value_size - 4]) & mask) << 24);
+	case 3: value_decode |= ((uint64_t(buffer[value_size - 3]) & mask) << 16);
+	case 2: value_decode |= ((uint64_t(buffer[value_size - 2]) & mask) << 8);
+	case 1: value_decode |= ((uint64_t(buffer[value_size - 1]) & mask));
 	}
 	
 	value = utils::bithack::branch(value_signed, - int64_t(value_decode), int64_t(value_decode));
