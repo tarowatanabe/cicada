@@ -507,6 +507,9 @@ struct OptimizeOnline
     
     margin_set_type margins;
     
+    gradient_type gradient_oracles;
+    gradient_type gradient_kbests;
+    
     id_set_type::const_iterator iiter_end = ids.end();
     for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
       const size_type id = *iiter;
@@ -535,8 +538,8 @@ struct OptimizeOnline
 	Z_kbest += margins[i];
       }
       
-      gradient_type gradient_oracles;
-      gradient_type gradient_kbests;
+      gradient_oracles.clear();
+      gradient_kbests.clear();
       
       for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
 	const typename sample_set_type::value_type features = samples[id].features[i];
