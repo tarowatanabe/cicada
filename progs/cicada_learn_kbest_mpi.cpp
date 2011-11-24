@@ -2773,6 +2773,8 @@ struct OptimizeLBFGS
   
   struct Task
   {
+    typedef hypothesis_type::feature_value_type feature_value_type;
+    
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
     
@@ -2788,48 +2790,75 @@ struct OptimizeLBFGS
     
     void operator()()
     {
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+      typedef std::vector<features_type, std::allocator<features_type> > features_set_type;
+      typedef std::vector<double, std::allocator<double> > margin_set_type;
+      
       g.clear();
       objective = 0.0;
-
+      
       expectation_type  expectations;
       
       expectations.allocate();
       expectations.clear();
       
+      features_set_type features_kbest;
+      features_set_type features_oracle;
+      
+      margin_set_type margins_kbest;
+      margin_set_type margins_oracle;
+      
       const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
       
       for (size_t id = 0; id != id_max; ++ id)
 	if (! kbests[id].empty() && ! oracles[id].empty()) {
-
+	  
 	  const double cost_factor = (softmax_margin ? 1.0 : 0.0);
 	  
 	  weight_type Z_oracle;
 	  weight_type Z_kbest;
 	  
+	  features_kbest.clear();
+	  features_oracle.clear();
+	  
+	  features_kbest.reserve(kbests[id].size());
+	  features_oracle.reserve(oracles[id].size());
+	  
+	  margins_kbest.clear();
+	  margins_oracle.clear();
+	  
 	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	    Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss));
+	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	    features_oracle.push_back(features_type(oiter->features.begin(), oiter->features.end()));
+	    margins_oracle.push_back(cicada::dot_product(weights, features_oracle.back().begin(), features_oracle.back().end(), cost_factor * oiter->loss));
+	    
+	    Z_oracle += cicada::semiring::traits<weight_type>::exp(margins_oracle.back());
+	  }
 	
 	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	    Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss));
-	
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss)) / Z_oracle;
+	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	    features_kbest.push_back(features_type(kiter->features.begin(), kiter->features.end()));
+	    margins_kbest.push_back(cicada::dot_product(weights, features_kbest.back().begin(), features_kbest.back().end(), cost_factor * kiter->loss));
+	    
+	    Z_kbest += cicada::semiring::traits<weight_type>::exp(margins_kbest.back());
+	  }
 	  
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
+	  for (size_t i = 0; i != features_oracle.size(); ++ i) {
+	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_oracle[i]) / Z_oracle;
+	    
+	    features_type::const_iterator fiter_end = features_oracle[i].end();
+	    for (features_type::const_iterator fiter = features_oracle[i].begin(); fiter != fiter_end; ++ fiter)
 	      expectations[fiter->first] -= weight_type(fiter->second) * weight;
 	  }
-	
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss)) / Z_kbest;
-	  
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
+
+	  for (size_t j = 0; j != features_kbest.size(); ++ j) {
+	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_kbest[j]) / Z_kbest;
+	    
+	    features_type::const_iterator fiter_end = features_kbest[j].end();
+	    for (features_type::const_iterator fiter = features_kbest[j].begin(); fiter != fiter_end; ++ fiter)
 	      expectations[fiter->first] += weight_type(fiter->second) * weight;
 	  }
-	
+	  
 	  const double margin = log(Z_oracle) - log(Z_kbest);
 	  objective -= margin;
 	
