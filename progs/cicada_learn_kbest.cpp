@@ -1176,19 +1176,17 @@ struct OptimizeSVM
 	      // ignore oracle translations
 	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	      
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
+	      
 	      feats.clear();
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
 	      
 	      if (loss_margin) {
-		const double loss = kbest.loss - oracle.loss;
-		
-		// checking...
-		if (loss > 0.0) {
-		  features.insert(feats.begin(), feats.end());
-		  losses.push_back(loss);
-		}
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(loss);
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
