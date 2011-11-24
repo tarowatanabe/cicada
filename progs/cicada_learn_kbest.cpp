@@ -1599,13 +1599,127 @@ public:
 
 struct OptimizeLBFGS
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
   
-  OptimizeLBFGS(const hypothesis_map_type& __kbests,
-		const hypothesis_map_type& __oracles,
+  typedef hypothesis_type::feature_value_type feature_value_type;
+
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef const feature_value_type* const_iterator;
+      
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+  
+  struct sample_pair_type
+  {
+    typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+    sample_pair_type() : features(), loss(),  offset(0) {}
+    sample_pair_type(const hypothesis_set_type& kbests,
+		     const hypothesis_set_type& oracles)
+      : features(), loss(),  offset(0)
+    {
+      loss.reserve(kbests.size() + oracles.size());
+
+      hypothesis_set_type::const_iterator oiter_end = oracles.end();
+      for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+	features.insert(oiter->features.begin(), oiter->features.end());
+	loss.push_back(oiter->loss);
+      }
+      
+      offset = loss.size();
+      
+      hypothesis_set_type::const_iterator kiter_end = kbests.end();
+      for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+	features.insert(kiter->features.begin(), kiter->features.end());
+	loss.push_back(kiter->loss);
+      }
+      
+      features.shrink();
+    }
+    
+    size_type oracle_begin() const { return 0; }
+    size_type oracle_end() const { return offset; }
+    
+    size_type kbest_begin() const { return offset; }
+    size_type kbest_end() const { return loss.size(); }
+    
+    size_type size() const { return loss.size(); }
+    
+    sample_set_type features;
+    loss_set_type   loss;
+    size_type offset;
+  };
+  
+  typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
+  
+  OptimizeLBFGS(const hypothesis_map_type& kbests,
+		const hypothesis_map_type& oracles,
 		weight_set_type& __weights)
-    : kbests(__kbests),
-      oracles(__oracles),
-      weights(__weights) {}
+    : weights(__weights)
+  {
+    // transform into sample-pair-set-type
+    
+    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+    
+    samples.reserve(id_max);
+    for (size_t id = 0; id != id_max; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty())
+	samples.push_back(sample_pair_type(kbests[id], oracles[id]));
+  }
 
   double operator()()
   {
@@ -1639,21 +1753,17 @@ struct OptimizeLBFGS
     
     Task(queue_type&            __queue,
 	 const weight_set_type& __weights,
-	 const hypothesis_map_type& __kbests,
-	 const hypothesis_map_type& __oracles,
+	 const sample_pair_set_type& __samples,
 	 const size_t& __instances)
       : queue(__queue),
 	weights(__weights),
-	kbests(__kbests),
-	oracles(__oracles),
+	samples(__samples),
 	instances(__instances)
     {}
     
 
     void operator()()
     {
-      typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-      typedef std::vector<features_type, std::allocator<features_type> > features_set_type;
       typedef std::vector<double, std::allocator<double> > margin_set_type;
 
       g.clear();
@@ -1663,61 +1773,55 @@ struct OptimizeLBFGS
       
       expectations.allocate();
       expectations.clear();
-
-      features_set_type features_kbest;
-      features_set_type features_oracle;
       
-      margin_set_type margins_kbest;
-      margin_set_type margins_oracle;
+      margin_set_type margins;
+      
+      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
       
       while (1) {
 	int id = 0;
 	queue.pop(id);
 	if (id < 0) break;
 	
-	const double cost_factor = (softmax_margin ? 1.0 : 0.0);
-	
 	weight_type Z_oracle;
 	weight_type Z_kbest;
 	
-	features_kbest.clear();
-	features_oracle.clear();
+	margins.clear();
+	margins.resize(samples[id].size());
 	
-	features_kbest.reserve(kbests[id].size());
-	features_oracle.reserve(oracles[id].size());
-	
-	margins_kbest.clear();
-	margins_oracle.clear();
-
-	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	  features_oracle.push_back(features_type(oiter->features.begin(), oiter->features.end()));
-	  margins_oracle.push_back(cicada::dot_product(weights, features_oracle.back().begin(), features_oracle.back().end(), cost_factor * oiter->loss));
+	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const double loss = samples[id].loss[i];
 	  
-	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins_oracle.back());
-	}
-
-	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	  features_kbest.push_back(features_type(kiter->features.begin(), kiter->features.end()));
-	  margins_kbest.push_back(cicada::dot_product(weights, features_kbest.back().begin(), features_kbest.back().end(), cost_factor * kiter->loss));
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
 	  
-	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins_kbest.back());
+	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins[i]);
 	}
 	
-	for (size_t i = 0; i != features_oracle.size(); ++ i) {
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_oracle[i]) / Z_oracle;
+	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const double loss = samples[id].loss[i];
 	  
-	  features_type::const_iterator fiter_end = features_oracle[i].end();
-	  for (features_type::const_iterator fiter = features_oracle[i].begin(); fiter != fiter_end; ++ fiter)
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
+	  
+	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins[i]);
+	}
+	
+	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_oracle;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features.end();
+	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
 	    expectations[fiter->first] -= weight_type(fiter->second) * weight;
 	}
-
-	for (size_t j = 0; j != features_kbest.size(); ++ j) {
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_kbest[j]) / Z_kbest;
-	    
-	  features_type::const_iterator fiter_end = features_kbest[j].end();
-	  for (features_type::const_iterator fiter = features_kbest[j].begin(); fiter != fiter_end; ++ fiter)
+	
+	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_kbest;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features.end();
+	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
 	    expectations[fiter->first] += weight_type(fiter->second) * weight;
 	}
 	
@@ -1740,9 +1844,8 @@ struct OptimizeLBFGS
     queue_type&            queue;
     
     const weight_set_type& weights;
+    const sample_pair_set_type& samples;
     
-    const hypothesis_map_type& kbests;
-    const hypothesis_map_type& oracles;
     size_t instances;
     
     double          objective;
@@ -1763,23 +1866,18 @@ struct OptimizeLBFGS
 
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
 
-    const int id_max = utils::bithack::min(optimizer.kbests.size(), optimizer.oracles.size());
-    size_t instances = 0;
-    for (int id = 0; id != id_max; ++ id)
-      instances += (! optimizer.kbests[id].empty() && ! optimizer.oracles[id].empty());
+    const size_t instances = optimizer.samples.size();
         
     queue_type queue;
     
-    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.kbests, optimizer.oracles, instances));
+    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.samples, instances));
 
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    
-    for (int id = 0; id != id_max; ++ id)
-      if (! optimizer.kbests[id].empty() && ! optimizer.oracles[id].empty())
-	queue.push(id);
+    for (int id = 0; id != instances; ++ id)
+      queue.push(id);
     
     // collect all the objective and gradients...
     double objective = 0.0;
@@ -1811,8 +1909,7 @@ struct OptimizeLBFGS
     return objective;
   }
   
-  const hypothesis_map_type& kbests;
-  const hypothesis_map_type& oracles;
+  sample_pair_set_type samples;
   
   weight_set_type& weights;
 };
