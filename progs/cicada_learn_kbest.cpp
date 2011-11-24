@@ -554,9 +554,12 @@ struct OptimizeLinear
 	    for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	      const hypothesis_type& oracle = oracles[id][o];
 	      const hypothesis_type& kbest  = kbests[id][k];
-	    
+	      
 	      // ignore oracle translations
 	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	      
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
 
 	      feats.clear();
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
