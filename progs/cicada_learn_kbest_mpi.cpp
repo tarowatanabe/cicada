@@ -363,22 +363,134 @@ int loop_sleep(bool found, int non_found_iter)
 template <typename Optimizer>
 struct OptimizeOnline
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef const feature_value_type* const_iterator;
+      
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+  
+  struct sample_pair_type
+  {
+    typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+    sample_pair_type() : features(), loss(),  offset(0) {}
+    sample_pair_type(const hypothesis_set_type& kbests,
+		     const hypothesis_set_type& oracles)
+      : features(), loss(),  offset(0)
+    {
+      loss.reserve(kbests.size() + oracles.size());
+
+      hypothesis_set_type::const_iterator oiter_end = oracles.end();
+      for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+	features.insert(oiter->features.begin(), oiter->features.end());
+	loss.push_back(oiter->loss);
+      }
+      
+      offset = loss.size();
+      
+      hypothesis_set_type::const_iterator kiter_end = kbests.end();
+      for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+	features.insert(kiter->features.begin(), kiter->features.end());
+	loss.push_back(kiter->loss);
+      }
+      
+      features.shrink();
+    }
+    
+    size_type oracle_begin() const { return 0; }
+    size_type oracle_end() const { return offset; }
+    
+    size_type kbest_begin() const { return offset; }
+    size_type kbest_end() const { return loss.size(); }
+    
+    size_type size() const { return loss.size(); }
+    
+    sample_set_type features;
+    loss_set_type   loss;
+    size_type offset;
+  };
+  
+  typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
+
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
   OptimizeOnline(Optimizer& __optimizer,
-		 const hypothesis_map_type& __kbests,
-		 const hypothesis_map_type& __oracles,
+		 const hypothesis_map_type& kbests,
+		 const hypothesis_map_type& oracles,
 		 const weight_set_type& __bounds_lower,
 		 const weight_set_type& __bounds_upper)
     : optimizer(__optimizer),
-      kbests(__kbests),
-      oracles(__oracles),
       bounds_lower(__bounds_lower),
       bounds_upper(__bounds_upper)
   {
-    ids.reserve(kbests.size());
-    ids.resize(kbests.size());
+    samples.reserve(kbests.size());
     
+    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+    
+    for (size_t id = 0; id != id_max; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty())
+	samples.push_back(sample_pair_type(kbests[id], oracles[id]));
+    
+    ids.reserve(samples.size());
+    ids.resize(samples.size());
     for (size_t id = 0; id != ids.size(); ++ id)
       ids[id] = id;
   }
@@ -386,12 +498,81 @@ struct OptimizeOnline
   template <typename Generator>
   void operator()(Generator& generator)
   {
+    typedef std::vector<weight_type, std::allocator<weight_type> > margin_set_type;
+
     boost::random_number_generator<Generator> gen(generator);
     std::random_shuffle(ids.begin(), ids.end(), gen);
+
+    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
     
-    for (size_t id = 0; id != ids.size(); ++ id)
-      if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
-	operator()(oracles[ids[id]], kbests[ids[id]]);
+    margin_set_type margins;
+    
+    gradient_type gradient_oracles;
+    gradient_type gradient_kbests;
+    
+    id_set_type::const_iterator iiter_end = ids.end();
+    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+      const size_type id = *iiter;
+      
+      weight_type Z_oracle;
+      weight_type Z_kbest;
+      
+      margins.clear();
+      margins.resize(samples[id].size());
+      
+      for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const double loss = samples[id].loss[i];
+	
+	margins[i] = function(features.begin(), features.end(), cost_factor * loss);
+	
+	Z_oracle += margins[i];
+      }
+      
+      for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const double loss = samples[id].loss[i];
+	
+	margins[i] = function(features.begin(), features.end(), cost_factor * loss);
+	
+	Z_kbest += margins[i];
+      }
+      
+      gradient_oracles.clear();
+      gradient_kbests.clear();
+      
+      for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const weight_type weight = margins[i] / Z_oracle;
+	
+	typename sample_set_type::value_type::const_iterator fiter_end = features.end();
+	for (typename sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	  gradient_oracles[fiter->first] += weight_type(fiter->second) * weight;
+      }
+      
+      for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const weight_type weight = margins[i] / Z_kbest;
+	
+	typename sample_set_type::value_type::const_iterator fiter_end = features.end();
+	for (typename sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	  gradient_kbests[fiter->first] += weight_type(fiter->second) * weight;
+      }
+      
+      
+      if (! bounds_lower.empty() || ! bounds_upper.empty())
+	optimizer(gradient_oracles,
+		  gradient_kbests,
+		  Z_oracle,
+		  Z_kbest,
+		  bounds_lower,
+		  bounds_upper);
+      else
+	optimizer(gradient_oracles,
+		  gradient_kbests,
+		  Z_oracle,
+		  Z_kbest);
+    }
   }
 
   typedef Optimizer optimizer_type;
@@ -401,37 +582,37 @@ struct OptimizeOnline
   
   double objective(const weight_set_type& weights) const
   {
+    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
+    
     double obj = 0.0;
 
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      if (! oracles[id].empty() && ! kbests[id].empty()) {
+    for (size_t id = 0; id != samples.size(); ++ id) {
+      weight_type Z_oracle;
+      weight_type Z_kbest;
+      
+      for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const double loss = samples[id].loss[i];
 	
-	const double cost_factor = (softmax_margin ? 1.0 : 0.0);
-	
-	weight_type Z_oracle;
-	weight_type Z_kbest;
-	
-	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	  Z_oracle += function(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss);
-	
-	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	  Z_kbest += function(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss);
-	
-	obj -= log(Z_oracle) - log(Z_kbest);
+	Z_oracle += function(weights, features.begin(), features.end(), cost_factor * loss);
       }
+      
+      for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	const typename sample_set_type::value_type features = samples[id].features[i];
+	const double loss = samples[id].loss[i];
+	
+	Z_kbest += function(weights, features.begin(), features.end(), cost_factor * loss);
+      }
+      
+      obj -= log(Z_oracle) - log(Z_kbest);
+    }
     
     return obj;
   }
 
   double normalizer() const
   {
-    size_t num = 0;
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      num += (! oracles[id].empty() && ! kbests[id].empty());
-    
-    return num;
+    return samples.size();
   }
   
   template <typename Iterator>
@@ -454,59 +635,11 @@ struct OptimizeOnline
   }
   
   
-  void operator()(const hypothesis_set_type& oracles,
-		  const hypothesis_set_type& kbests)
-  {
-    const double cost_factor = (softmax_margin ? 1.0 : 0.0);
-    
-    weight_type Z_oracle;
-    weight_type Z_kbest;
-    
-    hypothesis_set_type::const_iterator oiter_end = oracles.end();
-    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
-      Z_oracle += function(oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss);
-    
-    hypothesis_set_type::const_iterator kiter_end = kbests.end();
-    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
-      Z_kbest += function(kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss);
-    
-    gradient_type gradient_oracles;
-    gradient_type gradient_kbests;
-    
-    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
-      const weight_type weight = function(oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss) / Z_oracle;
-      
-      hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
-      for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
-	gradient_oracles[fiter->first] += weight_type(fiter->second) * weight;
-    }
-    
-    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
-      const weight_type weight = function(kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss) / Z_kbest;
-      
-      hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
-      for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
-	gradient_kbests[fiter->first] += weight_type(fiter->second) * weight;
-    }
-    
-    if (! bounds_lower.empty() || ! bounds_upper.empty())
-      optimizer(gradient_oracles,
-		gradient_kbests,
-		Z_oracle,
-		Z_kbest,
-		bounds_lower,
-		bounds_upper);
-    else
-      optimizer(gradient_oracles,
-		gradient_kbests,
-		Z_oracle,
-		Z_kbest);
-  }
   
   Optimizer& optimizer;
 
-  const hypothesis_map_type& kbests;
-  const hypothesis_map_type& oracles;
+  sample_pair_set_type samples;
+
   const weight_set_type& bounds_lower;
   const weight_set_type& bounds_upper;
 
@@ -2667,15 +2800,119 @@ double optimize_cp(const scorer_document_type& scorers,
 
 struct OptimizeLBFGS
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
-  OptimizeLBFGS(const hypothesis_map_type& __kbests,
-		const hypothesis_map_type& __oracles,
+    struct Sample
+    {
+      typedef const feature_value_type* const_iterator;
+      
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+  
+  struct sample_pair_type
+  {
+    typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+    sample_pair_type() : features(), loss(),  offset(0) {}
+    sample_pair_type(const hypothesis_set_type& kbests,
+		     const hypothesis_set_type& oracles)
+      : features(), loss(),  offset(0)
+    {
+      loss.reserve(kbests.size() + oracles.size());
+
+      hypothesis_set_type::const_iterator oiter_end = oracles.end();
+      for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+	features.insert(oiter->features.begin(), oiter->features.end());
+	loss.push_back(oiter->loss);
+      }
+      
+      offset = loss.size();
+      
+      hypothesis_set_type::const_iterator kiter_end = kbests.end();
+      for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+	features.insert(kiter->features.begin(), kiter->features.end());
+	loss.push_back(kiter->loss);
+      }
+      
+      features.shrink();
+    }
+    
+    size_type oracle_begin() const { return 0; }
+    size_type oracle_end() const { return offset; }
+    
+    size_type kbest_begin() const { return offset; }
+    size_type kbest_end() const { return loss.size(); }
+    
+    size_type size() const { return loss.size(); }
+    
+    sample_set_type features;
+    loss_set_type   loss;
+    size_type offset;
+  };
+  
+  typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
+
+  OptimizeLBFGS(const sample_pair_set_type& __samples,
 		const weight_set_type& __bounds_lower,
 		const weight_set_type& __bounds_upper,
 		weight_set_type& __weights,
 		const size_t& __instances)
-    : kbests(__kbests),
-      oracles(__oracles),
+    : samples(__samples),
       bounds_lower(__bounds_lower),
       bounds_upper(__bounds_upper),
       weights(__weights),
@@ -2720,7 +2957,7 @@ struct OptimizeLBFGS
 	
 	bcast_weights(0, weights);
 	
-	task_type task(weights, kbests, oracles, instances);
+	task_type task(weights, samples, instances);
 	task();
 	
 	// collect all the objective and gradients...
@@ -2769,73 +3006,88 @@ struct OptimizeLBFGS
       return objective;
     }
   }
-
   
   struct Task
   {
+    typedef hypothesis_type::feature_value_type feature_value_type;
+    
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
     
     Task(const weight_set_type& __weights,
-	 const hypothesis_map_type& __kbests,
-	 const hypothesis_map_type& __oracles,
+	 const sample_pair_set_type& __samples,
 	 const size_t& __instances)
       : weights(__weights),
-	kbests(__kbests),
-	oracles(__oracles),
+	samples(__samples),
 	instances(__instances)
     {}
     
     void operator()()
     {
+      typedef std::vector<double, std::allocator<double> > margin_set_type;
+      
       g.clear();
       objective = 0.0;
-
+      
       expectation_type  expectations;
       
       expectations.allocate();
       expectations.clear();
       
-      const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
-      
-      for (size_t id = 0; id != id_max; ++ id)
-	if (! kbests[id].empty() && ! oracles[id].empty()) {
+      margin_set_type margins;
 
-	  const double cost_factor = (softmax_margin ? 1.0 : 0.0);
+      const double cost_factor = (softmax_margin ? 1.0 : 0.0);
+      
+      for (size_t id = 0; id != samples.size(); ++ id) {
+	
+	weight_type Z_oracle;
+	weight_type Z_kbest;
+	
+	margins.clear();
+	margins.resize(samples[id].size());
+	
+	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const double loss = samples[id].loss[i];
 	  
-	  weight_type Z_oracle;
-	  weight_type Z_kbest;
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
 	  
-	  hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter)
-	    Z_oracle += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss));
-	
-	  hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
-	    Z_kbest += cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss));
-	
-	  for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, oiter->features.begin(), oiter->features.end(), cost_factor * oiter->loss)) / Z_oracle;
-	  
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
-	      expectations[fiter->first] -= weight_type(fiter->second) * weight;
-	  }
-	
-	  for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	    const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(weights, kiter->features.begin(), kiter->features.end(), cost_factor * kiter->loss)) / Z_kbest;
-	  
-	    hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
-	    for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
-	      expectations[fiter->first] += weight_type(fiter->second) * weight;
-	  }
-	
-	  const double margin = log(Z_oracle) - log(Z_kbest);
-	  objective -= margin;
-	
-	  if (debug >= 3)
-	    std::cerr << " margin: " << margin << std::endl;
+	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins[i]);
 	}
+	
+	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const double loss = samples[id].loss[i];
+	  
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
+	  
+	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins[i]);
+	}
+	
+	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_oracle;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features.end();
+	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	    expectations[fiter->first] -= weight_type(fiter->second) * weight;
+	}
+	
+	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
+	  const sample_set_type::value_type features = samples[id].features[i];
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_kbest;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features.end();
+	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	    expectations[fiter->first] += weight_type(fiter->second) * weight;
+	}
+	
+	const double margin = log(Z_oracle) - log(Z_kbest);
+	objective -= margin;
+	
+	if (debug >= 3)
+	  std::cerr << " margin: " << margin << std::endl;
+      }
       
       // transform feature_expectations into g...
       g.allocate();
@@ -2847,9 +3099,8 @@ struct OptimizeLBFGS
     }
     
     const weight_set_type& weights;
-
-    const hypothesis_map_type& kbests;
-    const hypothesis_map_type& oracles;    
+    const sample_pair_set_type& samples;
+    
     size_t instances;
     
     double          objective;
@@ -2876,7 +3127,7 @@ struct OptimizeLBFGS
     
     bcast_weights(0, optimizer.weights);
     
-    task_type task(optimizer.weights, optimizer.kbests, optimizer.oracles, optimizer.instances);
+    task_type task(optimizer.weights, optimizer.samples, optimizer.instances);
     task();
     
     // collect all the objective and gradients...
@@ -2906,8 +3157,7 @@ struct OptimizeLBFGS
     return objective;
   }
     
-  const hypothesis_map_type& kbests;
-  const hypothesis_map_type& oracles;
+  const sample_pair_set_type& samples;
 
   const weight_set_type& bounds_lower;
   const weight_set_type& bounds_upper;
@@ -2928,15 +3178,22 @@ double optimize_batch(const hypothesis_map_type& kbests,
 
   const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
   
+  typename Optimize::sample_pair_set_type samples;
+  samples.reserve(id_max);
+  
   int instances_local = 0;
-  for (size_t id = 0; id != id_max; ++ id)
-    instances_local += (!kbests[id].empty()) && (!oracles[id].empty());
+  for (size_t id = 0; id != id_max; ++ id) 
+    if (! kbests[id].empty() && ! oracles[id].empty()) {
+      samples.push_back(typename Optimize::sample_pair_type(kbests[id], oracles[id]));
+      
+      ++ instances_local;
+    }
 
   int instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(kbests, oracles, bounds_lower, bounds_upper, weights, instances)();
+    const double objective = Optimize(samples, bounds_lower, bounds_upper, weights, instances)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -2968,7 +3225,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
 
 	bcast_weights(0, weights);
 	
-	task_type task(weights, kbests, oracles, instances);
+	task_type task(weights, samples, instances);
 	task();
 	
 	send_weights(task.g);
