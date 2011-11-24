@@ -72,9 +72,9 @@ struct OptimizerSGDL2 : public OptimizerBase
 		  const weight_type& Z)
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
-    const double eta = 1.0 / (lambda * (epoch + 2));
+    //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
-    //const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
@@ -130,9 +130,9 @@ struct OptimizerSGDL2 : public OptimizerBase
 		  const weight_set_type& bounds_upper)
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
-    const double eta = 1.0 / (lambda * (epoch + 2));
+    //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
-    //const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
