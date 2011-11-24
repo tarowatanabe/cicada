@@ -277,7 +277,7 @@ struct OptimizeLinear
   typedef struct problem      problem_type;
   typedef struct feature_node feature_node_type;
 
-  typedef utils::map_file<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
+  typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
   typedef std::vector<int, std::allocator<int> > label_set_type;
   
@@ -424,25 +424,23 @@ struct OptimizeLinear
     }
     
     template <typename Iterator>
-    void transform_pair(Iterator first, Iterator last, std::ostream& os, size_type& offset)
+    void transform_pair(Iterator first, Iterator last)
     {
       feature_node_type feature;
       
-      offsets.push_back(offset);
+      offsets.push_back(features.size());
       
       for (/**/; first != last; ++ first) {
 	feature.index = first->first.id() + 1;
 	feature.value = first->second;
-	
-	os.write((char*) &feature, sizeof(feature_node_type));
-	++ offset;
+
+	features.push_back(feature);
       }
       
       feature.index = -1;
       feature.value = 0.0;
       
-      os.write((char*) &feature, sizeof(feature_node_type));
-      ++ offset;
+      features.push_back(feature);
     }
 
     struct greater_loss
@@ -464,15 +462,7 @@ struct OptimizeLinear
       
       offsets.clear();
       features.clear();
-      
-      const path_type tmp_dir = utils::tempfile::tmp_dir();
-      const path_type tmp_path = utils::tempfile::file_name(tmp_dir / "cicada.learn-kbest.features.XXXXXX");
-      
-      utils::tempfile::insert(tmp_path);
-      
-      size_type offset = 0;
-      std::auto_ptr<std::ostream> os(new utils::compress_ostream(tmp_path, 1024 * 1024 * 8));
-      
+            
       sentence_unique_type  sentences;
       
       int id = 0;
@@ -553,7 +543,7 @@ struct OptimizeLinear
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
 	  
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter)
-	    transform_pair(features_sample[*piter].begin(), features_sample[*piter].end(), *os, offset);
+	    transform_pair(features_sample[*piter].begin(), features_sample[*piter].end());
 	  
 	} else {
 	  sentences.clear();
@@ -573,14 +563,12 @@ struct OptimizeLinear
 
 	      if (feats.empty()) continue;
 	      
-	      transform_pair(feats.begin(), feats.end(), *os, offset);
+	      transform_pair(feats.begin(), feats.end());
 	    }
 	}
       }
       
-      os.reset();
-      features.open(tmp_path);
-      //feature_node_set_type(features).swap(features);
+      feature_node_set_type(features).swap(features);
     }
   };
   typedef Encoder encoder_type;
@@ -690,7 +678,6 @@ struct OptimizeLinear
     for (int i = 0; i < threads; ++ i)
       data_size += encoders[i].offsets.size();
 
-    
     if (debug)
       std::cerr << "liblinear data size: " << data_size << std::endl;
     
@@ -918,7 +905,6 @@ struct OptimizeSVM
   struct SampleSet
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-    typedef utils::map_file<feature_value_type, std::allocator<feature_value_type> > features_mapped_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
@@ -939,36 +925,25 @@ struct OptimizeSVM
     typedef Sample sample_type;
     typedef sample_type value_type;
     
-    SampleSet() : features(), offsets(), mapped(), os(), path() { offsets.push_back(0); }
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
     
     void clear()
     {
       features.clear();
       offsets.clear();
       offsets.push_back(0);
-      
-      mapped.clear();
-      os.reset();
-      path = path_type();
     }
     
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
-      const size_type offset     = offsets.back();
-      const size_type size_first = features.size();
-      
       features.insert(features.end(), first, last);
-      
-      offsets.push_back(offset + (features.size() - size_first));
+      offsets.push_back(features.size());
     }
     
     sample_type operator[](size_type pos) const
     {
-      if (! mapped.empty())
-	return sample_type(&(*mapped.begin()) + offsets[pos], &(*mapped.begin()) + offsets[pos + 1]);
-      else
-	return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
     }
     
     size_type size() const { return offsets.size() - 1; }
@@ -976,40 +951,17 @@ struct OptimizeSVM
     
     void shrink()
     {
-      flush();
-      
-      if (os) {
-	os.reset();
-	mapped.open(path);
-      }
-      
       features_type(features).swap(features);
       offsets_type(offsets).swap(offsets);
     }
     
     void flush()
     {
-      if (! os) {
-	path = utils::tempfile::file_name(utils::tempfile::tmp_dir() / "cicada.learn-kbest.features.XXXXXX");
-	
-	utils::tempfile::insert(path);
-	
-	os.reset(new utils::compress_ostream(path, 1024 * 1024));
-      }
       
-      features_type::const_iterator fiter_end = features.end();
-      for (features_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
-	os->write((char*) &(*fiter), sizeof(feature_value_type));
-      
-      features.clear();
     }
     
     features_type features;
     offsets_type  offsets;
-    
-    features_mapped_type mapped;
-    boost::shared_ptr<std::ostream> os;
-    path_type                       path;
   };
   
   typedef SampleSet sample_set_type;

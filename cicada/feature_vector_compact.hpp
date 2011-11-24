@@ -202,8 +202,11 @@ namespace cicada
     typedef uint8_t byte_type;
     typedef utils::simple_vector<byte_type, std::allocator<byte_type> > storage_type;
     
+  public:
+    typedef __feature_vector_feature_codec codec_key_type;
     typedef __feature_vector_feature_codec codec_feature_type;
     typedef __feature_vector_data_codec    codec_data_type;
+    typedef __feature_vector_data_codec    codec_mapped_type;
     
   public:
     struct iterator
@@ -215,12 +218,11 @@ namespace cicada
       typedef std::pair<const feature_type, data_type> value_type;
       typedef const value_type* pointer;
       typedef const value_type& reference;
-
-    private:
-      typedef storage_type::const_iterator storage_ptr_type;
+      
+      typedef const byte_type* ptr_type;
       
     public:
-      iterator(storage_ptr_type iter, storage_ptr_type last) : __iter(iter), __last(last), __impl()
+      iterator(ptr_type iter, ptr_type last) : __iter(iter), __last(last), __impl()
       {
 	if (__iter != __last) {
 	  const size_type feature_size = codec_feature_type::decode(&(*__iter), const_cast<feature_type&>(__impl.first));
@@ -229,12 +231,12 @@ namespace cicada
 	  const size_type data_size = codec_data_type::decode(&(*__iter), const_cast<data_type&>(__impl.second));
 	  __iter += data_size;
 	} else {
-	  __iter = storage_ptr_type();
-	  __last = storage_ptr_type();
+	  __iter = 0;
+	  __last = 0;
 	}
       }
       
-      iterator() : __iter(), __last(), __impl() {}
+      iterator() : __iter(0), __last(0), __impl() {}
       iterator(const iterator& x) : __iter(x.__iter), __last(x.__last), __impl(x.__impl) {}
       iterator& operator=(const iterator& x)
       {
@@ -278,8 +280,8 @@ namespace cicada
       void increment()
       {
 	if (__iter == __last) {
-	  __iter = storage_ptr_type();
-	  __last = storage_ptr_type();
+	  __iter = 0;
+	  __last = 0;
 	} else {
 	  feature_type::id_type feature_inc = 0;
 	  const size_type feature_size = codec_feature_type::decode(&(*__iter), feature_inc);
@@ -292,9 +294,9 @@ namespace cicada
       }
 
     private:
-      storage_ptr_type __iter;
-      storage_ptr_type __last;
-      value_type       __impl;
+      ptr_type   __iter;
+      ptr_type   __last;
+      value_type __impl;
     };
     
     typedef iterator const_iterator;
@@ -419,7 +421,7 @@ namespace cicada
 
     
   public:
-    const_iterator begin() const { return const_iterator(storage.begin(), storage.end()); }
+    const_iterator begin() const { return const_iterator(&(*storage.begin()), &(*storage.end())); }
     const_iterator end() const { return const_iterator(); }
     
     bool empty() const { return storage.empty(); }
