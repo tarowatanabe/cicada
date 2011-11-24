@@ -911,6 +911,7 @@ struct OptimizeSVM
 
   typedef hypothesis_type::feature_value_type feature_value_type;
 
+#if 0
   struct SampleSet
   {
     typedef cicada::FeatureVectorCompact feature_vector_compact_type;
@@ -963,6 +964,68 @@ struct OptimizeSVM
       feature_vector_compact_type::encoder_type encoder;
       
       features.resize(std::distance(features.begin(), encoder(first, last, features.begin() + pos)));
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    void flush()
+    {
+      
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+#endif
+
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef const feature_value_type* const_iterator;
+      
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
       offsets.push_back(features.size());
     }
     
