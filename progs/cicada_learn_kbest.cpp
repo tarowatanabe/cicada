@@ -21,6 +21,7 @@
 #include "cicada/optimize_qp.hpp"
 #include "cicada/optimize.hpp"
 #include "cicada/semiring/envelope.hpp"
+#include "cicada/feature_vector_compact.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -326,10 +327,10 @@ struct OptimizeLinear
 
       struct Sample
       {
-	typedef features_type::const_iterator const_iterator;
-
+	typedef const feature_value_type* const_iterator;
+      
 	Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
-
+      
 	const_iterator begin() const { return first; }
 	const_iterator end() const { return last; }
 	size_type size() const { return last - first; }
@@ -360,16 +361,21 @@ struct OptimizeLinear
     
       sample_type operator[](size_type pos) const
       {
-	return sample_type(features.begin() + offsets[pos], features.begin() + offsets[pos + 1]);
+	return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
       }
     
       size_type size() const { return offsets.size() - 1; }
       bool empty() const { return offsets.size() == 1; }
-
+    
       void shrink()
       {
 	features_type(features).swap(features);
 	offsets_type(offsets).swap(offsets);
+      }
+    
+      void flush()
+      {
+      
       }
     
       features_type features;
@@ -907,22 +913,29 @@ struct OptimizeSVM
 
   struct SampleSet
   {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef cicada::FeatureVectorCompact feature_vector_compact_type;
+
+    typedef feature_vector_compact_type::byte_type byte_type;
+
+    typedef feature_vector_compact_type::codec_feature_type codec_feature_type;
+    typedef feature_vector_compact_type::codec_data_type    codec_data_type;
+
+    typedef std::vector<byte_type, std::allocator<byte_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
 
     struct Sample
     {
-      typedef const feature_value_type* const_iterator;
+      typedef feature_vector_compact_type::const_iterator const_iterator;
+      typedef const_iterator::ptr_type ptr_type;
       
-      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      Sample(ptr_type __first, ptr_type __last) : first(__first), last(__last) {}
       
-      const_iterator begin() const { return first; }
-      const_iterator end() const { return last; }
-      size_type size() const { return last - first; }
-      bool emtpy() const { return first == last; }
+      const_iterator begin() const { return const_iterator(first, last); }
+      const_iterator end() const { return const_iterator(); }
+      bool emtpy() const { return begin() == end(); }
       
-      const_iterator first;
-      const_iterator last;
+      ptr_type first;
+      ptr_type last;
     };
 
     typedef Sample sample_type;
@@ -940,7 +953,16 @@ struct OptimizeSVM
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
-      features.insert(features.end(), first, last);
+      //features.insert(features.end(), first, last);
+      
+      // we assume taht [first, last) is sorted
+      const size_type pos = features.size();
+      
+      features.resize(pos + std::distance(first, last) * 16);
+      
+      feature_vector_compact_type::encoder_type encoder;
+      
+      features.resize(std::distance(features.begin(), encoder(first, last, features.begin() + pos)));
       offsets.push_back(features.size());
     }
     
@@ -1142,19 +1164,17 @@ struct OptimizeSVM
 	      // ignore oracle translations
 	      if (sentences.find(kbest.sentence) != sentences.end()) continue;
 	      
+	      const double loss = kbest.loss - oracle.loss;
+	      if (loss <= 0.0) continue;
+	      
 	      feats.clear();
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
 	      
 	      if (loss_margin) {
-		const double loss = kbest.loss - oracle.loss;
-		
-		// checking...
-		if (loss > 0.0) {
-		  features.insert(feats.begin(), feats.end());
-		  losses.push_back(loss);
-		}
+		features.insert(feats.begin(), feats.end());
+		losses.push_back(loss);
 	      } else {
 		features.insert(feats.begin(), feats.end());
 		losses.push_back(1.0);
