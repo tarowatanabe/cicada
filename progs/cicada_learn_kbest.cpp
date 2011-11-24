@@ -915,7 +915,7 @@ struct OptimizeSVM
   {
     typedef cicada::FeatureVectorCompact feature_vector_compact_type;
 
-    typedef feature_vector_compact_type::byte_type byte_tyep;
+    typedef feature_vector_compact_type::byte_type byte_type;
 
     typedef feature_vector_compact_type::codec_feature_type codec_feature_type;
     typedef feature_vector_compact_type::codec_data_type    codec_data_type;
