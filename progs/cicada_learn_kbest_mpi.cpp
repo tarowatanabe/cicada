@@ -2794,6 +2794,7 @@ struct OptimizeLBFGS
     size_type kbest_begin() const { return offset; }
     size_type kbest_end() const { return loss.size(); }
     
+    size_type size() const { return loss.size(); }
     
     sample_set_type features;
     loss_set_type   loss;
@@ -2938,7 +2939,7 @@ struct OptimizeLBFGS
 	weight_type Z_kbest;
 	
 	margins.clear();
-	margins.resize(samples[id].loss.size());
+	margins.resize(samples[id].size());
 	
 	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
