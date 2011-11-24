@@ -962,7 +962,7 @@ struct OptimizeSVM
       
       feature_vector_compact_type::encoder_type encoder;
       
-      features.resize(std::distance(features.begin(), encoder(frist, last, features.begin() + pos)));
+      features.resize(std::distance(features.begin(), encoder(first, last, features.begin() + pos)));
       offsets.push_back(features.size());
     }
     
