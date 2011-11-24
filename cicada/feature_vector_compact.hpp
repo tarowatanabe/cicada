@@ -89,12 +89,11 @@ namespace cicada
       static const uint8_t mask_unsigned = 1 << (4 + 1);
       static const uint8_t mask_signed   = 1 << (4 + 2);
       static const uint8_t mask_size     = 0x0f;
-
-      const int64_t val = value;
       
-      if (double(val) == value) {
+      if (::fmod(value, 1.0) == 0.0) {
+	const int64_t  val = value;
 	const uint64_t value_encode = utils::bithack::branch(val < 0, - val, val);
-	const size_t value_size = byte_size(value_encode);
+	const size_t   value_size = byte_size(value_encode);
 	
 	*buffer = utils::bithack::branch(val < 0, mask_signed, mask_unsigned) | (value_size & mask_size);
 	++ buffer;
@@ -112,23 +111,12 @@ namespace cicada
 	
 	return value_size + 1;
       } else {
-	const float val = value;
+	*buffer = (mask_float | (sizeof(double) & mask_size));
+	++ buffer;
 	
-	if (double(val) == value) {
-	  *buffer = (mask_float | (sizeof(float) & mask_size));
-	  ++ buffer;
-	  
-	  std::copy(cast(val), cast(val) + sizeof(float), buffer);
-	  
-	  return sizeof(float) + 1;
-	} else {
-	  *buffer = (mask_float | (sizeof(double) & mask_size));
-	  ++ buffer;
-	  
-	  std::copy(cast(value), cast(value) + sizeof(double), buffer);
-	  
-	  return sizeof(double) + 1;
-	}
+	std::copy(cast(value), cast(value) + sizeof(double), buffer);
+	
+	return sizeof(double) + 1;
       }
     }
     
@@ -141,22 +129,9 @@ namespace cicada
       static const uint8_t mask_size     = 0x0f;
 
       if (*buffer & mask_float) {
-	if ((*buffer & mask_size) == sizeof(float)) {
-	  ++ buffer;
-	  
-	  float value_decode;
-	  std::copy(buffer, buffer + sizeof(float), cast(value_decode));
-	  value = value_decode;
-	  
-	  return sizeof(float) + 1;
-	} else if ((*buffer & mask_size) == sizeof(double)) {
-	  ++ buffer;
-	  
-	  std::copy(buffer, buffer + sizeof(double), cast(value));
-	  
-	  return sizeof(double) + 1;
-	} else
-	  throw std::runtime_error("invalid size for float");
+	++ buffer;
+	std::copy(buffer, buffer + sizeof(double), cast(value));
+	return sizeof(double) + 1;
       } else if ((*buffer & mask_signed) || (*buffer & mask_unsigned)) {
 	const bool value_signed = (*buffer & mask_signed);
 	const size_t value_size = (*buffer & mask_size);
