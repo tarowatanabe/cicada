@@ -2938,23 +2938,24 @@ struct OptimizeLBFGS
 	weight_type Z_kbest;
 	
 	margins.clear();
+	margins.resize(samples[id].loss.size());
 	
 	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
 	  const double loss = samples[id].loss[i];
 	  
-	  margins.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
 	  
-	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins.back());
+	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins[i]);
 	}
 	
 	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
 	  const double loss = samples[id].loss[i];
 	  
-	  margins.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
+	  margins[i] = cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss);
 	  
-	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins.back());
+	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins[i]);
 	}
 	
 	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
