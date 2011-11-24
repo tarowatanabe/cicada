@@ -2929,8 +2929,7 @@ struct OptimizeLBFGS
       expectations.allocate();
       expectations.clear();
       
-      margin_set_type margins_kbest;
-      margin_set_type margins_oracle;
+      margin_set_type margins;
       
       for (size_t id = 0; id != samples.size(); ++ id) {
 	const double cost_factor = (softmax_margin ? 1.0 : 0.0);
@@ -2938,30 +2937,29 @@ struct OptimizeLBFGS
 	weight_type Z_oracle;
 	weight_type Z_kbest;
 	
-	margins_kbest.clear();
-	margins_oracle.clear();
+	margins.clear();
 	
 	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
 	  const double loss = samples[id].loss[i];
 	  
-	  margins_oracle.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
+	  margins.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
 	  
-	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins_oracle.back());
+	  Z_oracle += cicada::semiring::traits<weight_type>::exp(margins.back());
 	}
 	
 	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
 	  const double loss = samples[id].loss[i];
 	  
-	  margins_kbest.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
+	  margins.push_back(cicada::dot_product(weights, features.begin(), features.end(), cost_factor * loss));
 	  
-	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins_kbest.back());
+	  Z_kbest += cicada::semiring::traits<weight_type>::exp(margins.back());
 	}
 	
 	for (size_type i = samples[id].oracle_begin(); i != samples[id].oracle_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_oracle[i]) / Z_oracle;
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_oracle;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features.end();
 	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
@@ -2970,7 +2968,7 @@ struct OptimizeLBFGS
 	
 	for (size_type i = samples[id].kbest_begin(); i != samples[id].kbest_end(); ++ i) {
 	  const sample_set_type::value_type features = samples[id].features[i];
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins_kbest[i]) / Z_kbest;
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margins[i]) / Z_kbest;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features.end();
 	  for (sample_set_type::value_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
