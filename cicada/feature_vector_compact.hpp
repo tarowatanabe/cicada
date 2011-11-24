@@ -99,14 +99,14 @@ namespace cicada
 	++ buffer;
 	
 	switch (value_size) {
-	case 8: buffer[7] = (value_encode >> 56);
-	case 7: buffer[6] = (value_encode >> 48);
-	case 6: buffer[5] = (value_encode >> 40);
-	case 5: buffer[4] = (value_encode >> 32);
-	case 4: buffer[3] = (value_encode >> 24);
-	case 3: buffer[2] = (value_encode >> 16);
-	case 2: buffer[1] = (value_encode >> 8);
-	case 1: buffer[0] = (value_encode);
+	case 8: buffer[value_size - 8] = (value_encode >> 56);
+	case 7: buffer[value_size - 7] = (value_encode >> 48);
+	case 6: buffer[value_size - 6] = (value_encode >> 40);
+	case 5: buffer[value_size - 5] = (value_encode >> 32);
+	case 4: buffer[value_size - 4] = (value_encode >> 24);
+	case 3: buffer[value_size - 3] = (value_encode >> 16);
+	case 2: buffer[value_size - 2] = (value_encode >> 8);
+	case 1: buffer[value_size - 1] = (value_encode);
 	}
 	
 	return value_size + 1;
@@ -141,14 +141,14 @@ namespace cicada
 	const uint64_t mask = 0xff;
 	uint64_t value_decode = 0;
 	switch (value_size) {
-	case 8: value_decode |= ((uint64_t(buffer[7]) & mask) << 56);
-	case 7: value_decode |= ((uint64_t(buffer[6]) & mask) << 48);
-	case 6: value_decode |= ((uint64_t(buffer[5]) & mask) << 40);
-	case 5: value_decode |= ((uint64_t(buffer[4]) & mask) << 32);
-	case 4: value_decode |= ((uint64_t(buffer[3]) & mask) << 24);
-	case 3: value_decode |= ((uint64_t(buffer[2]) & mask) << 16);
-	case 2: value_decode |= ((uint64_t(buffer[1]) & mask) << 8);
-	case 1: value_decode |= ((uint64_t(buffer[0]) & mask));
+	case 8: value_decode |= ((uint64_t(buffer[value_size - 8]) & mask) << 56);
+	case 7: value_decode |= ((uint64_t(buffer[value_size - 7]) & mask) << 48);
+	case 6: value_decode |= ((uint64_t(buffer[value_size - 6]) & mask) << 40);
+	case 5: value_decode |= ((uint64_t(buffer[value_size - 5]) & mask) << 32);
+	case 4: value_decode |= ((uint64_t(buffer[value_size - 4]) & mask) << 24);
+	case 3: value_decode |= ((uint64_t(buffer[value_size - 3]) & mask) << 16);
+	case 2: value_decode |= ((uint64_t(buffer[value_size - 2]) & mask) << 8);
+	case 1: value_decode |= ((uint64_t(buffer[value_size - 1]) & mask));
 	}
 	
 	value = utils::bithack::branch(value_signed, - int64_t(value_decode), int64_t(value_decode));
