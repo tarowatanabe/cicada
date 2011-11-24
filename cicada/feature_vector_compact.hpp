@@ -182,8 +182,8 @@ namespace cicada
       } else
 	throw std::runtime_error("invalid type for decoding");
     }
-
   };
+
   
   class FeatureVectorCompact
   {
@@ -197,9 +197,10 @@ namespace cicada
     typedef double data_type;
     
     typedef std::pair<const feature_type, data_type> value_type;
+
+    typedef uint8_t byte_type;
         
   private:
-    typedef uint8_t byte_type;
     typedef utils::simple_vector<byte_type, std::allocator<byte_type> > storage_type;
     
   public:
@@ -303,6 +304,25 @@ namespace cicada
     
     typedef const value_type& reference;
     typedef const value_type& const_reference;
+    
+    struct encoder_type
+    {
+      template <typename Iterator, typename Output>
+      Output operator()(Iterator first, Iterator last, Output iter) const
+      {
+	feature_type::id_type id_prev = 0;
+	for (/**/; first != last; ++ first) {
+	  const feature_type::id_type id = feature_type(first->first).id();
+	  
+	  std::advance(iter, codec_feature_type::encode(&(*iter), id - id_prev));
+	  std::advance(iter, codec_data_type::encode(&(*iter), first->second));
+	  
+	  id_prev = id;
+	}
+	
+	return iter;
+      }
+    };
 
   private:
     template <typename Tp>
@@ -350,73 +370,31 @@ namespace cicada
       typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
       typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
 
+      encoder_type encoder;
+
       if (sorted) {
 	compressed_type compressed(std::distance(first, last) * 16);
-	compressed_type::iterator citer = compressed.begin();
 	
-	feature_type::id_type id_prev = 0;
-	for (/**/; first != last; ++ first) {
-	  const feature_type::id_type id = feature_type(first->first).id();
-	  
-	  const size_type feature_size = codec_feature_type::encode(&(*citer), id - id_prev);
-	  citer += feature_size;
-	  
-	  const size_type data_size = codec_data_type::encode(&(*citer), first->second);
-	  citer += data_size;
-	  
-	  id_prev = id;
-	}
-	
-	storage.assign(compressed.begin(), citer);
+	storage.assign(compressed.begin(), encoder(first, last, compressed.begin()));
       } else {
 	raw_type raw(first, last);
 	std::sort(raw.begin(), raw.end(), less_first<pair_type>());
-      
+	
 	compressed_type compressed(raw.size() * 16);
-	compressed_type::iterator citer = compressed.begin();
-      
-	feature_type::id_type id_prev = 0;
-	raw_type::const_iterator iter_end = raw.end();
-	for (raw_type::const_iterator iter = raw.begin(); iter != iter_end; ++ iter) {
-	  const feature_type::id_type id = iter->first.id();
 	
-	  const size_type feature_size = codec_feature_type::encode(&(*citer), id - id_prev);
-	  citer += feature_size;
-	
-	  const size_type data_size = codec_data_type::encode(&(*citer), iter->second);
-	  citer += data_size;
-	  
-	  id_prev = id;
-	}
-	
-	storage.assign(compressed.begin(), citer);
+	storage.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
       }
     }
     
     template <typename T, typename A>
     void assign(const FeatureVector<T, A>& x)
     {
-      typedef typename FeatureVector<T, A>::const_iterator const_iterator;
       typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
 
+      encoder_type encoder;
       compressed_type compressed(x.size() * 16);
-      compressed_type::iterator citer = compressed.begin();
       
-      feature_type::id_type id_prev = 0;
-      const_iterator iter_end = x.end();
-      for (const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
-	const feature_type::id_type id = iter->first.id();
-	
-	const size_type feature_size = codec_feature_type::encode(&(*citer), id - id_prev);
-	citer += feature_size;
-	
-	const size_type data_size = codec_data_type::encode(&(*citer), iter->second);
-	citer += data_size;
-	
-	id_prev = id;
-      }
-      
-      storage.assign(compressed.begin(), citer);
+      storage.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
     }
 
     

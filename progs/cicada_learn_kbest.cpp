@@ -915,10 +915,10 @@ struct OptimizeSVM
   {
     typedef cicada::FeatureVectorCompact feature_vector_compact_type;
 
+    typedef feature_vector_compact_type::byte_type byte_tyep;
+
     typedef feature_vector_compact_type::codec_feature_type codec_feature_type;
     typedef feature_vector_compact_type::codec_data_type    codec_data_type;
-    
-    typedef uint8_t byte_type;
 
     typedef std::vector<byte_type, std::allocator<byte_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
@@ -926,7 +926,7 @@ struct OptimizeSVM
     struct Sample
     {
       typedef feature_vector_compact_type::const_iterator const_iterator;
-      typedef const byte_type* ptr_type;
+      typedef const_iterator::ptr_type ptr_type;
       
       Sample(ptr_type __first, ptr_type __last) : first(__first), last(__last) {}
       
@@ -960,21 +960,9 @@ struct OptimizeSVM
       
       features.resize(pos + std::distance(first, last) * 16);
       
-      features_type::iterator citer = features.begin() + pos;
-      feature_type::id_type id_prev = 0;
-      for (/**/; first != last; ++ first) {
-	const feature_type::id_type id = first->first.id();
-	
-	const size_type feature_size = codec_feature_type::encode(&(*citer), id - id_prev);
-	citer += feature_size;
-	
-	const size_type data_size = codec_data_type::encode(&(*citer), first->second);
-	citer += data_size;
-	
-	id_prev = id;
-      }
+      feature_vector_compact_type::encoder_type encoder;
       
-      features.resize(std::distance(features.begin(), citer));
+      features.resize(std::distance(features.begin(), encoder(frist, last, features.begin() + pos)));
       offsets.push_back(features.size());
     }
     
