@@ -1974,6 +1974,51 @@ struct OptimizeMCP
 	  }
 	}
 	
+	if (ptr_kbest->score) {
+	  if (! score.second)
+	    score.second = ptr_kbest->score->clone();
+	  else
+	    *score.second += *(ptr_kbest->score);
+	}
+	
+	margin += - margin_kbest;
+	
+	{
+	  hypothesis_type::feature_set_type::const_iterator kiter_end = ptr_kbest->features.end();
+	  for (hypothesis_type::feature_set_type::const_iterator kiter = ptr_kbest->features.begin(); kiter != kiter_end; ++ kiter)
+	    acc[kiter->first] -= kiter->second * factor;
+	}
+      }
+    
+    return std::make_pair((loss - margin) * factor, score);
+
+#if 0
+    const double factor = 1.0 / samples;
+    const double inf = std::numeric_limits<double>::infinity();
+    
+    score_ptr_pair_type score;
+    double loss = 0.0;
+    double margin = 0.0;
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	const hypothesis_type* ptr_kbest = 0;
+	const hypothesis_type* ptr_oracle = 0;
+	double margin_kbest  = - inf;
+	double margin_oracle =   inf;
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& kbest = *kiter;
+	  
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  
+	  if (! ptr_kbest || margin > margin_kbest) {
+	    margin_kbest = margin;
+	    ptr_kbest = &kbest;
+	  }
+	}
+	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
@@ -2014,6 +2059,7 @@ struct OptimizeMCP
       }
     
     return std::make_pair((loss - margin) * factor, score);
+#endif
     
 #if 0
     kbests_margin.clear();
@@ -2142,6 +2188,45 @@ struct OptimizeMCP
 	  }
 	}
 	
+	if (ptr_kbest->score) {
+	  if (! score.second)
+	    score.second = ptr_kbest->score->clone();
+	  else
+	    *score.second += *(ptr_kbest->score);
+	}
+	
+	margin += - margin_kbest;
+      }
+    
+    return std::make_pair((loss - margin) * factor, score);
+
+#if 0
+    const double factor = 1.0 / samples;
+    const double inf = std::numeric_limits<double>::infinity();
+    
+    score_ptr_pair_type score;
+    double loss = 0.0;
+    double margin = 0.0;
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	const hypothesis_type* ptr_kbest = 0;
+	const hypothesis_type* ptr_oracle = 0;
+	double margin_kbest  = - inf;
+	double margin_oracle =   inf;
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& kbest = *kiter;
+	  
+	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  
+	  if (! ptr_kbest || margin > margin_kbest) {
+	    margin_kbest = margin;
+	    ptr_kbest = &kbest;
+	  }
+	}
+	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
@@ -2172,6 +2257,7 @@ struct OptimizeMCP
       }
     
     return std::make_pair((loss - margin) * factor, score);
+#endif
 
 #if 0
     kbests_margin.clear();
