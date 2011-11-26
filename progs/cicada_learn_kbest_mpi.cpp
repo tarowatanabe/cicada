@@ -2721,7 +2721,7 @@ double optimize_cp(const scorer_document_type& scorers,
 		<< " actives: " << active_size << std::endl;
     
     // check termination condition...
-    int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 0.01);
+    int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 1e-4);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) break;
