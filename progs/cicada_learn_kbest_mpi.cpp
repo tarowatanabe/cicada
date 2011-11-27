@@ -2602,7 +2602,8 @@ double optimize_cp(const scorer_document_type& scorers,
           if (! kbests[id].empty()) {
             segments.push_back(segment_set_type());
             
-            envelopes(kbests[id], oracles[id], lines);
+            //envelopes(kbests[id], oracles[id], lines);
+	    envelopes(kbests[id], lines);
             
             EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
             for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
@@ -2676,7 +2677,8 @@ double optimize_cp(const scorer_document_type& scorers,
 	
         for (size_t id = 0; id != kbests.size(); ++ id) 
           if (! kbests[id].empty()) {
-            envelopes(kbests[id], oracles[id], lines);
+            //envelopes(kbests[id], oracles[id], lines);
+	    envelopes(kbests[id], lines);
             
             EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
             for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
