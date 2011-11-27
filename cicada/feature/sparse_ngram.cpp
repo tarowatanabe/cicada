@@ -376,14 +376,17 @@ namespace cicada
 	  
 	  if (forced_feature || feature_type::exists(name))
 	    cache_feature[id].push_back(name);
+
+	  const std::string& name_surface = name;
 	  
 	  for (size_t i = 0; i != normalizers.size(); ++ i) {
 	    std::string name = prefix + ":";
 	    for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
 	      name += "_" + static_cast<const std::string&>(normalizers[i](*fiter));
 	    
-	    if (forced_feature || feature_type::exists(name))
-	      cache_feature[id].push_back(name);
+	    if (name != name_surface)
+	      if (forced_feature || feature_type::exists(name))
+		cache_feature[id].push_back(name);
 	  }
 	  
 	  checked_feature[id] = true;
