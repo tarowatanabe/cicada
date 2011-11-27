@@ -143,7 +143,7 @@ void synchronize();
 
 void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
-void reduce_score(score_ptr_type& score, const int tag);
+void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle);
 
 int main(int argc, char ** argv)
 {
@@ -381,8 +381,7 @@ int main(int argc, char ** argv)
 
 enum {
   weights_tag = 1000,
-  score_1best_tag,
-  score_oracle_tag,
+  score_tag,
   notify_tag,
   point_tag,
   envelope_tag,
@@ -729,8 +728,7 @@ void cicada_learn(operation_set_type& operations,
     }
 
     if (debug) {
-      reduce_score(score_1best, score_1best_tag);
-      reduce_score(score_oracle, score_oracle_tag);
+      reduce_score_pair(score_1best, score_oracle);
       
       if (mpi_rank == 0)
 	std::cerr << "devset total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
@@ -975,14 +973,20 @@ void cicada_learn(operation_set_type& operations,
 	if (! segments.empty()) {
 	  line_search_type line_search;
 	  
-	  const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+	  const optimum_type optimum = line_search(segments, -1.0, 1.0, scorers.error_metric());
 	  
 	  const double update = (optimum.lower + optimum.upper) * 0.5;
 	  
 	  if (update != 0.0) {
-	    direction *= update;
-	    weights = origin;
-	    weights += direction;
+	    const size_t weights_size = utils::bithack::min(origin.size(), direction.size());
+	    
+	    weights.clear();
+	    for (size_t i = 0; i != weights_size; ++ i)
+	      weights[i] = origin[i] + direction[i] * update;
+	    for (size_t i = weights_size; i < origin.size(); ++ i)
+	      weights[i] = origin[i];
+	    for (size_t i = weights_size; i < direction.size(); ++ i)
+	      weights[i] = direction[i] * update;
 	    
 	    if (debug)
 	      std::cerr << "mert update: " << update << " objective: " << optimum.objective << std::endl;
@@ -1032,28 +1036,38 @@ void cicada_learn(operation_set_type& operations,
   }
 }
 
-void reduce_score(score_ptr_type& score, const int tag)
+void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   if (mpi_rank == 0) {
+    std::string score_str_1best;
+    std::string score_str_oracle;
+    
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
-      is.push(utils::mpi_device_source(rank, tag, 256));
+      is.push(utils::mpi_device_source(rank, score_tag, 256));
       
-      std::string score_str;
-      is >> score_str;
+      is >> score_str_1best;
+      is >> score_str_oracle;
       
-      if (! score)
-	score = scorer_type::score_type::decode(score_str);
+      if (! score_1best)
+	score_1best = scorer_type::score_type::decode(score_str_1best);
       else
-	*score += *scorer_type::score_type::decode(score_str);
+	*score_1best += *scorer_type::score_type::decode(score_str_1best);
+      
+      if (! score_oracle)
+	score_oracle = scorer_type::score_type::decode(score_str_oracle);
+      else
+	*score_oracle += *scorer_type::score_type::decode(score_str_oracle);      
     }
   } else {
     boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_sink(0, tag, 256));
-    os << score->encode();
+    os.push(utils::mpi_device_sink(0, score_tag, 256));
+    os << score_1best->encode();
+    os << ' ';
+    os << score_oracle->encode();
   }
 }
 
