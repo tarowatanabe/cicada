@@ -131,6 +131,8 @@ sparse-ngram: sparse ngram feature\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: sparse-ngram)\n\
+\tcluster=[word class file] word-class for ngram\n\
+\tstemmer=[stemmer spec] stemming for ngram\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\

@@ -4,6 +4,9 @@
 
 #include "sparse_ngram.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
+#include "cicada/cluster_stemmer.hpp"
 
 #include "utils/array_power2.hpp"
 #include "utils/piece.hpp"
@@ -24,6 +27,12 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       
+      typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
+      
+      typedef cicada::ClusterStemmer normalizer_type;
+      typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
+
       typedef cicada::FeatureFunction feature_function_type;
       
       typedef feature_function_type::feature_set_type   feature_set_type;
@@ -43,9 +52,11 @@ namespace cicada
       typedef symbol_type word_type;
 
       typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > trie_type;
+
+      typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
       
-      typedef std::vector<feature_type, std::allocator<feature_type> > cache_feature_type;
-      typedef std::vector<bool, std::allocator<bool> >                 checked_feature_type;
+      typedef std::vector<feature_list_type, std::allocator<feature_list_type> > cache_feature_type;
+      typedef std::vector<bool, std::allocator<bool> >                           checked_feature_type;
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
 
@@ -275,8 +286,13 @@ namespace cicada
 	      
 	      if (iter2 < iter) continue;
 	      
-	      if (! cache_feature[id].empty())
-		cache.features[cache_feature[id]] += 1.0;
+	      if (! cache_feature[id].empty()) {
+		const feature_list_type& feats = cache_feature[id];
+		
+		feature_list_type::const_iterator fiter_end = feats.end();
+		for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		  cache.features[*fiter] += 1.0;
+	      }
 	    }
 	  }
 	}
@@ -303,8 +319,13 @@ namespace cicada
 	    for (Iterator iter = first; iter != end; ++ iter) {
 	      id = traverse(id, first, iter);
 	      
-	      if (! cache_feature[id].empty())
-		cache.features[cache_feature[id]] += 1.0;
+	      if (! cache_feature[id].empty()) {
+		const feature_list_type& feats = cache_feature[id];
+		
+		feature_list_type::const_iterator fiter_end = feats.end();
+		for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		  cache.features[*fiter] += 1.0;
+	      }
 	    }
 	  }
 	}
@@ -342,7 +363,7 @@ namespace cicada
 	id = trie.push(id, *iter);
 	
 	if (id >= cache_feature.size())
-	  cache_feature.resize(id + 1, feature_type());
+	  cache_feature.resize(id + 1, feature_list_type());
 	if (id >= checked_feature.size())
 	  checked_feature.resize(id + 1, false);
 	
@@ -354,7 +375,16 @@ namespace cicada
 	    name += "_" + static_cast<const std::string&>(*fiter);
 	  
 	  if (forced_feature || feature_type::exists(name))
-	    cache_feature[id] = name;
+	    cache_feature[id].push_back(name);
+	  
+	  for (size_t i = 0; i != normalizers.size(); ++ i) {
+	    std::string name = prefix + ":";
+	    for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
+	      name += "_" + static_cast<const std::string&>(normalizers[i](*fiter));
+	    
+	    if (forced_feature || feature_type::exists(name))
+	      cache_feature[id].push_back(name);
+	  }
 	  
 	  checked_feature[id] = true;
 	}
@@ -381,6 +411,7 @@ namespace cicada
       cache_context_set_type cache_context;
       cache_ngram_set_type   cache_ngram;
 
+      normalizer_set_type normalizers;
       
       int order;
       bool no_bos_eos;
@@ -400,6 +431,8 @@ namespace cicada
       
       if (utils::ipiece(param.name()) != "sparse-ngram")
 	throw std::runtime_error("this is not sparse ngram feature: " + parameter);
+
+      impl_type::normalizer_set_type normalizers;
       
       int order = 3;
       bool skip_sgml_tag = false;
@@ -416,6 +449,13 @@ namespace cicada
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
+	else if (utils::ipiece(piter->first) == "cluster") {
+	  if (! boost::filesystem::exists(piter->second))
+	    throw std::runtime_error("no cluster file: " + piter->second);
+	  
+	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
+	}else if (utils::ipiece(piter->first) == "stemmer")
+	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse ngram: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -427,6 +467,8 @@ namespace cicada
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
       ngram_impl->prefix = (name.empty() ? std::string("sparse-ngram") : name);
       
+      ngram_impl->normalizers.swap(normalizers);
+    
       // two-side context + length + counts-id 
       base_type::__state_size = sizeof(impl_type::trie_type::id_type) * 2;
       base_type::__feature_name = (name.empty() ? std::string("sparse-ngram") : name);
