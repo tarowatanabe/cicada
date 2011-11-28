@@ -2297,12 +2297,14 @@ struct OptimizeMCP
  
   double instances()
   {
+#if 0
     size_type samples = 0;
     for (size_t id = 0; id != kbests.size(); ++ id) 
       samples += (! kbests[id].empty()) && (! oracles[id].empty());
     return samples;
+#endif
 
-#if 0
+#if 1
     kbests_hyp.clear();
     
     for (size_t id = 0; id != kbests.size(); ++ id) 
