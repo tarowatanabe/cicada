@@ -63,7 +63,7 @@ namespace cicada
       typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
+	: uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
       { uniques.set_empty_key(word_type());  }
 
       struct skipper_epsilon
@@ -145,45 +145,41 @@ namespace cicada
 	caches.clear();
 	words.clear();
 	
-	lattice_type::const_iterator liter_end = lattice.end();
-	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	    if (! skipper(aiter->label)) {
-	      words.push_back(aiter->label);
+	if (unique_source) {
+	  lattice_type::const_iterator liter_end = lattice.end();
+	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	      if (! skipper(aiter->label))
+		uniques.insert(aiter->label);
+	  }
 	  
-	      for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-		const word_type normalized = normalizers_source[i](aiter->label);
-		if (normalized != aiter->label)
-		  words.push_back(normalized);
-	      }
+	  word_set_type::const_iterator uiter_end = uniques.end();
+	  for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	    words.push_back(*uiter);
+	    
+	    for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+	      const word_type normalized = normalizers_source[i](*uiter);
+	      if (normalized != *uiter)
+		words.push_back(normalized);
 	    }
-	}
-	
-#if 0
-	uniques.clear();
-	caches.clear();
-	
-	lattice_type::const_iterator liter_end = lattice.end();
-	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	    if (! skipper(aiter->label))
-	      uniques.insert(aiter->label);
-	}
-	
-	words.clear();
-	word_set_type::const_iterator uiter_end = uniques.end();
-	for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
-	  words.push_back(*uiter);
-	  
-	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-	    const word_type normalized = normalizers_source[i](*uiter);
-	    if (normalized != *uiter)
-	      words.push_back(normalized);
+	  }
+	} else {
+	  lattice_type::const_iterator liter_end = lattice.end();
+	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	      if (! skipper(aiter->label)) {
+		words.push_back(aiter->label);
+		
+		for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+		  const word_type normalized = normalizers_source[i](aiter->label);
+		  if (normalized != aiter->label)
+		    words.push_back(normalized);
+		}
+	    }
 	  }
 	}
-#endif
       }
       
       void clear()
@@ -200,6 +196,7 @@ namespace cicada
       cache_set_type caches;
       
       bool skip_sgml_tag;
+      bool unique_source;
       
       std::string prefix;
       bool forced_feature;
@@ -220,6 +217,7 @@ namespace cicada
       impl_type::normalizer_set_type normalizers_target;
       
       bool skip_sgml_tag = false;
+      bool unique_source = false;
       
       std::string name;
       
@@ -240,6 +238,8 @@ namespace cicada
 	  normalizers_target.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "unique-source")
+	  unique_source = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -252,6 +252,7 @@ namespace cicada
       lexicon_impl->normalizers_target.swap(normalizers_target);
       
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
+      lexicon_impl->unique_source = unique_source;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
       
       // two-side context + length + counts-id 
@@ -296,7 +297,7 @@ namespace cicada
 				     feature_set_type& features,
 				     const bool final) const
     {
-      
+      apply(state, states, edge, features, final);
     }
     
     void SparseLexicon::apply_predict(state_ptr_type& state,
@@ -304,7 +305,11 @@ namespace cicada
 				      const edge_type& edge,
 				      feature_set_type& features,
 				      const bool final) const
-    {}
+    {
+      apply(state, states, edge, features, final);
+    }
+
+    
     void SparseLexicon::apply_scan(state_ptr_type& state,
 				   const state_ptr_set_type& states,
 				   const edge_type& edge,
@@ -317,10 +322,7 @@ namespace cicada
 				       const edge_type& edge,
 				       feature_set_type& features,
 				       const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-
+    {}
     
     
     void SparseLexicon::assign(const size_type& id,

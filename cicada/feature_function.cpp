@@ -125,6 +125,7 @@ sparse-lexicon: sparse lexicon feature\n\
 \tstemmer-source=[stemmer spec] stemming for source side\n\
 \tstemmer-target=[stemmer spec] stemming for target side\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tunique-source=[true|source] unique source labels\n\
 \tname=feature-name-prefix (default: sparse-lexicon)\n\
 sparse-ngram: sparse ngram feature\n\
 \torder=<order>\n\
