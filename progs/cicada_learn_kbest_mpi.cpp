@@ -1948,6 +1948,7 @@ struct OptimizeMCP
   
   std::pair<double, score_ptr_pair_type> operator()(const weight_set_type& weights, weight_set_type& acc)
   {
+#if 0
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
     
@@ -2014,8 +2015,9 @@ struct OptimizeMCP
       }
     
     return std::make_pair((loss - margin) * factor, score);
+#endif
     
-#if 0
+#if 1
     kbests_margin.clear();
     kbests_hyp.clear();
     
@@ -2116,6 +2118,7 @@ struct OptimizeMCP
 
   std::pair<double, score_ptr_pair_type> objective(const weight_set_type& weights)
   {
+#if 0
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
     
@@ -2172,8 +2175,8 @@ struct OptimizeMCP
       }
     
     return std::make_pair((loss - margin) * factor, score);
-
-#if 0
+#endif
+#if 1
     kbests_margin.clear();
     kbests_hyp.clear();
     
