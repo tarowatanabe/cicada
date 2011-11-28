@@ -1985,12 +1985,14 @@ struct OptimizeMCP
 	  }
 	}
 	
+#if 0
 	if (ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
+#endif
 	
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2088,13 +2090,15 @@ struct OptimizeMCP
     
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
-	
+
+#if 0	
 	if (oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
+#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
@@ -2164,12 +2168,14 @@ struct OptimizeMCP
 	  }
 	}
 
+#if 0
 	if (ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
+#endif
 
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2257,12 +2263,14 @@ struct OptimizeMCP
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
+#if 0
 	if (oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
+#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
@@ -2413,6 +2421,7 @@ double optimize_cp(const scorer_document_type& scorers,
   double objective_reduced = 0.0;
 
   const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
+  const double loss_oracle = (scorers.error_metric() ? 0.0 : - 1.0);
 
   // keep previous best...
   weights_prev = weights;
@@ -2437,7 +2446,7 @@ double optimize_cp(const scorer_document_type& scorers,
     // reduce score part
     reduce_score(risk_local.second);
     
-    risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : 0.0);
+    risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : loss_oracle);
     risk += (risk_local.second.second ? risk_local.second.second->score() * loss_factor : 0.0);
     
     size_t active_size = 0;
@@ -2725,7 +2734,7 @@ double optimize_cp(const scorer_document_type& scorers,
     // reduce score part
     reduce_score(objective_master_local.second);
     
-    objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->score() * loss_factor : 0.0);
+    objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->score() * loss_factor : loss_oracle);
     objective_master += (objective_master_local.second.second ? objective_master_local.second.second->score() * loss_factor : 0.0);
     
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
