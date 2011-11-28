@@ -55,7 +55,7 @@ namespace cicada
 
       typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
       
-      typedef std::vector<feature_list_type, std::allocator<feature_list_type> > cache_feature_type;
+      typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > cache_feature_type;
       typedef std::vector<bool, std::allocator<bool> >                           checked_feature_type;
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
@@ -235,7 +235,7 @@ namespace cicada
 	    
 	    context[0] = ngram_context(buffer.begin(), buffer.begin() + prefix_size);
 	    context[1] = ngram_context(buffer.end() - suffix_size, buffer.end());
-	  } else if (buffer.size() <= context_size) {
+	  } else if (static_cast<int>(buffer.size()) <= context_size) {
 	    context[0] = ngram_context(buffer.begin(), buffer.end());
 	    context[1] = trie.root();
 	  } else {
@@ -286,13 +286,11 @@ namespace cicada
 	      
 	      if (iter2 < iter) continue;
 	      
-	      if (! cache_feature[id].empty()) {
-		const feature_list_type& feats = cache_feature[id];
-		
-		feature_list_type::const_iterator fiter_end = feats.end();
-		for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		  cache.features[*fiter] += 1.0;
-	      }
+	      const feature_list_type& feats = cache_feature[id];
+	      
+	      feature_list_type::const_iterator fiter_end = feats.end();
+	      for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		cache.features[*fiter] += 1.0;
 	    }
 	  }
 	}
@@ -319,13 +317,11 @@ namespace cicada
 	    for (Iterator iter = first; iter != end; ++ iter) {
 	      id = traverse(id, first, iter);
 	      
-	      if (! cache_feature[id].empty()) {
-		const feature_list_type& feats = cache_feature[id];
-		
-		feature_list_type::const_iterator fiter_end = feats.end();
-		for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		  cache.features[*fiter] += 1.0;
-	      }
+	      const feature_list_type& feats = cache_feature[id];
+	      
+	      feature_list_type::const_iterator fiter_end = feats.end();
+	      for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+		cache.features[*fiter] += 1.0;
 	    }
 	  }
 	}
@@ -388,6 +384,8 @@ namespace cicada
 	      if (forced_feature || feature_type::exists(name))
 		cache_feature[id].push_back(name);
 	  }
+	  
+	  std::sort(cache_feature[id].begin(), cache_feature[id].end());
 	  
 	  checked_feature[id] = true;
 	}
