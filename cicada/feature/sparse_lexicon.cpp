@@ -56,7 +56,6 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef symbol_type word_type;
-      typedef std::pair<word_type, word_type> word_pair_type;
       
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
 
@@ -255,7 +254,6 @@ namespace cicada
       lexicon_impl->unique_source = unique_source;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
       
-      // two-side context + length + counts-id 
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("sparse-lexicon") : name);
       base_type::__sparse_feature = true;
@@ -338,6 +336,9 @@ namespace cicada
       //
       
       pimpl->clear();
+      
+      if (! lattice.empty())
+	pimpl->assign(lattice);
     }
     
   };
