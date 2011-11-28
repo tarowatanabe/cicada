@@ -140,9 +140,7 @@ namespace cicada
       template <typename Skipper>
       void assign(const lattice_type& lattice, Skipper skipper)
       {
-	uniques.clear();
-	caches.clear();
-	words.clear();
+	clear();
 	
 	if (unique_source) {
 	  lattice_type::const_iterator liter_end = lattice.end();
@@ -179,10 +177,13 @@ namespace cicada
 	    }
 	  }
 	}
+	
+	std::sort(words.begin(), words.end());
       }
       
       void clear()
       {
+	uniques.clear();
 	words.clear();
 	caches.clear();
       }
