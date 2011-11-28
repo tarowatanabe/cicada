@@ -2000,16 +2000,21 @@ struct OptimizeMCP
 	}
 	
 	//margin += (margin_oracle - ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += margin_oracle - margin_kbest;
+	if (! direct_loss)
+	  margin += margin_oracle - margin_kbest;
+	else
+	  margin += - margin_kbest;
 	
 	{
 	  hypothesis_type::feature_set_type::const_iterator kiter_end = ptr_kbest->features.end();
 	  for (hypothesis_type::feature_set_type::const_iterator kiter = ptr_kbest->features.begin(); kiter != kiter_end; ++ kiter)
 	    acc[kiter->first] -= kiter->second * factor;
 	  
-	  hypothesis_type::feature_set_type::const_iterator oiter_end = ptr_oracle->features.end();
-	  for (hypothesis_type::feature_set_type::const_iterator oiter = ptr_oracle->features.begin(); oiter != oiter_end; ++ oiter)
-	    acc[oiter->first] += oiter->second * factor;
+	  if (! direct_loss) {
+	    hypothesis_type::feature_set_type::const_iterator oiter_end = ptr_oracle->features.end();
+	    for (hypothesis_type::feature_set_type::const_iterator oiter = ptr_oracle->features.begin(); oiter != oiter_end; ++ oiter)
+	      acc[oiter->first] += oiter->second * factor;
+	  }
 	}
       }
     
@@ -2104,15 +2109,20 @@ struct OptimizeMCP
 	}
 	
 	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += oracles_margin[seg] - kbests_margin[seg];
+	if (! direct_loss)
+	  margin += oracles_margin[seg] - kbests_margin[seg];
+	else
+	  margin += - kbests_margin[seg];
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
 	  acc[kiter->first] -= kiter->second * factor;
 	
-	hypothesis_type::feature_set_type::const_iterator oiter_end = oracles_hyp[seg]->features.end();
-	for (hypothesis_type::feature_set_type::const_iterator oiter = oracles_hyp[seg]->features.begin(); oiter != oiter_end; ++ oiter)
-	  acc[oiter->first] += oiter->second * factor;
+	if (! direct_loss) {
+	  hypothesis_type::feature_set_type::const_iterator oiter_end = oracles_hyp[seg]->features.end();
+	  for (hypothesis_type::feature_set_type::const_iterator oiter = oracles_hyp[seg]->features.begin(); oiter != oiter_end; ++ oiter)
+	    acc[oiter->first] += oiter->second * factor;
+	}
       }
     
     return std::make_pair((loss - margin) * factor, score);
@@ -2179,7 +2189,11 @@ struct OptimizeMCP
 	}
 	
 	//margin += (margin_oracle - ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += margin_oracle - margin_kbest;
+
+	if (! direct_loss)
+	  margin += margin_oracle - margin_kbest;
+	else
+	  margin += - margin_kbest;
       }
     
     return std::make_pair((loss - margin) * factor, score);
@@ -2272,7 +2286,10 @@ struct OptimizeMCP
 	}
 	
 	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += oracles_margin[seg] - kbests_margin[seg];
+	if (! direct_loss)
+	  margin += oracles_margin[seg] - kbests_margin[seg];
+	else
+	  margin += - kbests_margin[seg];
       }
     
     return std::make_pair((loss - margin) * factor, score);
