@@ -1973,8 +1973,10 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
 	  
+	  if (oracle.loss > ptr_kbest->loss) continue;
+	  
 	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
-
+	  
 	  if (! ptr_oracle || margin < margin_oracle) {
 	    margin_oracle = margin;
 	    ptr_oracle = &oracle;
@@ -2054,9 +2056,13 @@ struct OptimizeMCP
 	if (seg >= oracles_margin.size())
 	  oracles_margin.resize(seg + 1, inf);
 	
+	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
+	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
+	  
+	  if (oracle.loss > kbest_loss) continue;
 	  
 	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
@@ -2143,6 +2149,8 @@ struct OptimizeMCP
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
 	  
+	  if (oracle.loss > ptr_kbest->loss) continue;
+	  
 	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 
 	  if (! ptr_oracle || margin < margin_oracle) {
@@ -2212,10 +2220,14 @@ struct OptimizeMCP
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
 	  oracles_margin.resize(seg + 1, inf);
+
+	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
 	  const hypothesis_type& oracle = *oiter;
+
+	  if (oracle.loss > kbest_loss) continue;
 	  
 	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
