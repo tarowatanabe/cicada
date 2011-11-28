@@ -106,6 +106,8 @@ struct EnvelopeKBest
       for (Iterator iter2 = first2; iter2 != last2; ++ iter2) {
 	const hypothesis_type& hyp2 = *iter2;
 	
+	if (hyp2.loss > hyp.loss) continue;
+	
 	const double m = (cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0)
 			  - cicada::dot_product(direction, hyp2.features.begin(), hyp2.features.end(), 0.0));
 	const double y = (cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0)
@@ -140,6 +142,8 @@ struct EnvelopeKBest
       
       for (Iterator iter2 = first2; iter2 != last2; ++ iter2) {
 	const hypothesis_type& hyp2 = *iter2;
+	
+	if (hyp2.loss > hyp.loss) continue;
 	
 	const double m = (cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0)
 			  - cicada::dot_product(direction, hyp2.features.begin(), hyp2.features.end(), 0.0));
