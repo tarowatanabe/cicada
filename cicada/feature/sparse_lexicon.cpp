@@ -138,18 +138,29 @@ namespace cicada
 	  assign(lattice, skipper_epsilon());
       }
       
-      void assign(const hypergraph_type& graph)
-      {
-	if (skip_sgml_tag)
-	  assign(graph, skipper_sgml());
-	else
-	  assign(graph, skipper_epsilon());
-      }
-      
       template <typename Skipper>
-      void assign(const lattice_type& lattice,
-		  Skipper skipper)
+      void assign(const lattice_type& lattice, Skipper skipper)
       {
+	uniques.clear();
+	caches.clear();
+	words.clear();
+	
+	lattice_type::const_iterator liter_end = lattice.end();
+	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	    if (! skipper(aiter->label)) {
+	      words.push_back(aiter->label);
+	  
+	      for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+		const word_type normalized = normalizers_source[i](aiter->label);
+		if (normalized != aiter->label)
+		  words.push_back(normalized);
+	      }
+	    }
+	}
+	
+#if 0
 	uniques.clear();
 	caches.clear();
 	
@@ -160,37 +171,6 @@ namespace cicada
 	    if (! skipper(aiter->label))
 	      uniques.insert(aiter->label);
 	}
-
-	words.clear();
-	word_set_type::const_iterator uiter_end = uniques.end();
-	for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
-	  words.push_back(*uiter);
-	  
-	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-	    const word_type normalized = normalizers_source[i](*uiter);
-	    if (normalized != *uiter)
-	      words.push_back(normalized);
-	  }
-	}
-      }
-      
-      template <typename Skipper>
-      void assign(const hypergraph_type& forest,
-		  Skipper skipper)
-      {
-	uniques.clear();
-	caches.clear();
-	
-	hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
-	for (hypergraph_type::edge_set_type::const_iterator eiter = forest.edges.begin(); eiter != eiter_end; ++ eiter)
-	  if (eiter->rule) {
-	    const rule_type& rule = *(eiter->rule);
-	    
-	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
-	      if (siter->is_terminal() && ! skipper(*siter))
-		uniques.insert(*siter);
-	  }
 	
 	words.clear();
 	word_set_type::const_iterator uiter_end = uniques.end();
@@ -203,6 +183,7 @@ namespace cicada
 	      words.push_back(normalized);
 	  }
 	}
+#endif
       }
       
       void clear()
@@ -355,9 +336,6 @@ namespace cicada
       //
       
       pimpl->clear();
-      
-      if (! lattice.empty())
-	pimpl->assign(lattice);
     }
     
   };
