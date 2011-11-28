@@ -1985,7 +1985,6 @@ struct OptimizeMCP
 	  }
 	}
 	
-	
 	if (! direct_loss && ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
