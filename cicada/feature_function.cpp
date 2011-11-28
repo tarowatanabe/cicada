@@ -17,6 +17,7 @@
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/lexicalized_reordering.hpp"
+#include "feature/lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
@@ -81,6 +82,11 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
 \tfeature=attribute name mapping\n\
+lexicon: lexicon model feature\n\
+\tfile=lexicon model file\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tunique-source=[true|source] unique source labels\n\
+\tname=feature-name-prefix (default: lexicon)\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -209,6 +215,8 @@ word-pair: word pair feature\n\
 	     || param_name == "lexical-reordering"
 	     || param_name == "lexical-reorder")
       return feature_function_ptr_type(new feature::LexicalizedReordering(parameter));
+    else if (param_name == "lexicon")
+      return feature_function_ptr_type(new feature::Lexicon(parameter));
     else if (param_name == "sgml-tag")
       return feature_function_ptr_type(new feature::SGMLTag(parameter));
     else if (param_name == "span")
