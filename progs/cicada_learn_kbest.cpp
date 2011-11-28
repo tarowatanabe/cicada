@@ -82,7 +82,7 @@ bool softmax_margin = false;
 bool line_search = false;
 bool mert_search = false;
 bool sample_vector = false;
-bool oracle_loss = false;
+bool direct_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -2512,7 +2512,7 @@ void options(int argc, char** argv)
     ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
     ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
     ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
-    ("oracle-loss",      po::bool_switch(&oracle_loss),      "compute loss by treating zero loss for oracle")
+    ("direct-loss",      po::bool_switch(&direct_loss),      "compute loss by directly treating hypothesis score")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

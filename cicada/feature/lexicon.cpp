@@ -254,6 +254,8 @@ namespace cicada
 		words.push_back(aiter->label);
 	  }
 	}
+	
+	std::sort(words.begin(), words.end());
       }
       
       void clear()
