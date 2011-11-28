@@ -1985,12 +1985,14 @@ struct OptimizeMCP
 	  }
 	}
 	
+#if 0
 	if (ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
+#endif
 	
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2089,12 +2091,14 @@ struct OptimizeMCP
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
+#if 0
 	if (oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
+#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
@@ -2163,13 +2167,15 @@ struct OptimizeMCP
 	    ptr_oracle = &oracle;
 	  }
 	}
-	
+
+#if 0	
 	if (ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
+#endif
 
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2257,12 +2263,14 @@ struct OptimizeMCP
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
+#if 0
 	if (oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
+#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
