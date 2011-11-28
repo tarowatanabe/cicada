@@ -85,7 +85,7 @@ bool line_search = false;
 bool mert_search = false;
 bool mert_search_local = false;
 bool sample_vector = false;
-bool oracle_loss = false;
+bool direct_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -1985,14 +1985,13 @@ struct OptimizeMCP
 	  }
 	}
 	
-#if 0
-	if (ptr_oracle->score) {
+	
+	if (! direct_loss && ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
-#endif
 	
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2091,14 +2090,12 @@ struct OptimizeMCP
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 
-#if 0	
-	if (oracles_hyp[seg]->score) {
+	if (! direct_loss && oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
-#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
@@ -2168,14 +2165,12 @@ struct OptimizeMCP
 	  }
 	}
 
-#if 0
-	if (ptr_oracle->score) {
+	if (! direct_loss && ptr_oracle->score) {
 	  if (! score.first)
 	    score.first = ptr_oracle->score->clone();
 	  else
 	    *score.first += *(ptr_oracle->score);
 	}
-#endif
 
 	if (ptr_kbest->score) {
 	  if (! score.second)
@@ -2263,14 +2258,12 @@ struct OptimizeMCP
     for (size_type seg = 0; seg != kbests_hyp.size(); ++ seg)
       if (oracles_hyp[seg] && kbests_hyp[seg]) {
 	
-#if 0
-	if (oracles_hyp[seg]->score) {
+	if (! direct_loss && oracles_hyp[seg]->score) {
 	  if (! score.first)
 	    score.first = oracles_hyp[seg]->score->clone();
 	  else
 	    *score.first += *(oracles_hyp[seg]->score);
 	}
-#endif
 	
 	if (kbests_hyp[seg]->score) {
 	  if (! score.second)
@@ -3911,7 +3904,7 @@ void options(int argc, char** argv)
     ("mert-search",       po::bool_switch(&mert_search),       "perform one-dimensional mert")
     ("mert-search-local", po::bool_switch(&mert_search_local), "perform local one-dimensional mert")
     ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
-    ("oracle-loss",       po::bool_switch(&oracle_loss),       "compute loss by treating zero loss for oracle")
+    ("direct-loss",       po::bool_switch(&direct_loss),       "compute loss by directly treating hypothesis score")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
