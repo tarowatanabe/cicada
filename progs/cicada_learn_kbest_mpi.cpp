@@ -1401,11 +1401,8 @@ double optimize_online(const scorer_document_type& scorers,
 	}
       }
 
-      if (mert_search_local) {
-	bcast_weights(0, optimizer.weights);
-	
+      if (mert_search_local)
 	optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, optimizer.weights);
-      }
       
       // compute objective
       bcast_weights(0, optimizer.weights);
@@ -1511,11 +1508,8 @@ double optimize_online(const scorer_document_type& scorers,
 	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
 	}
 
-	if (mert_search_local) {
-	  bcast_weights(0, optimizer.weights);
-	  
+	if (mert_search_local)
 	  optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, optimizer.weights);
-	}
 	
 	// compute objective
 	bcast_weights(0, optimizer.weights);
@@ -2576,9 +2570,9 @@ double optimize_cp(const scorer_document_type& scorers,
     
     if (mert_search_local) {
       // correct merting...
-      //bcast_weights(0, weights);
-      //optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
+      optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
       
+#if 0
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
@@ -2693,6 +2687,7 @@ double optimize_cp(const scorer_document_type& scorers,
             }
           }
       }
+#endif
       
       // finished mert-search-local
     }
