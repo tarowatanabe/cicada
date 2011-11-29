@@ -38,7 +38,24 @@ namespace cicada
 
       typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> >   score_set_type;
       
-      typedef std::pair<double, score_ptr_type>                               segment_type;
+      struct segment_type
+      {
+	double x;
+	double m;
+	double y;
+	
+	score_ptr_type score;
+	
+	segment_type(const std::pair<double, score_ptr_type>& point) : x(point.first), m(0.0), y(0.0), score(point.second) {}
+	segment_type(const double& __x,
+		     const score_ptr_type& __score) : x(__x), m(0.0), y(0.0), score(__score) {}
+	segment_type(const double& __x,
+		     const double& __m,
+		     const double& __y,
+		     const score_ptr_type& __score) : x(__x), m(__m), y(__y), score(__score) {}
+	segment_type() : x(0.0), m(0.0), y(0.0), score() {}
+      };
+      
       typedef std::vector<segment_type, std::allocator<segment_type> >        segment_set_type;
       typedef std::deque<segment_set_type, std::allocator<segment_set_type> > segment_document_type;
       
@@ -218,7 +235,7 @@ namespace cicada
       {
 	bool operator()(const item_type& x, const item_type& y) const
 	{
-	  return x.first->first > y.first->first;
+	  return x.first->x > y.first->x;
 	}
       };
       
@@ -262,10 +279,10 @@ namespace cicada
 	  if (! segments[seg].empty()) {
 	    
 	    if (! stat)
-	      stat = segments[seg].front().second->zero();
+	      stat = segments[seg].front().score->zero();
 	    
-	    scores[seg] = segments[seg].front().second;
-	    *stat += *segments[seg].front().second;
+	    scores[seg] = segments[seg].front().score;
+	    *stat += *segments[seg].front().score;
 	    
 	    if (segments[seg].size() > 1)
 	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
@@ -278,8 +295,8 @@ namespace cicada
 	
 	const double score = score_factor * stat->score();
 	
-	double lower = lower_bound(heap.front().first->first, range.first);
-	double upper = heap.front().first->first;
+	double lower = lower_bound(heap.front().first->x, range.first);
+	double upper = heap.front().first->x;
 	
 	double objective = score;
 	
@@ -299,14 +316,14 @@ namespace cicada
 	while (! heap.empty()) {
 	  // next at heap...
 	  
-	  const double segment_curr = heap.front().first->first;
+	  const double segment_curr = heap.front().first->x;
 	  
-	  while (! heap.empty() && heap.front().first->first == segment_curr) { 
+	  while (! heap.empty() && heap.front().first->x == segment_curr) { 
 	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	    
 	    *stat -= *scores[heap.back().seg];
-	    *stat += *heap.back().first->second;
-	    scores[heap.back().seg] = heap.back().first->second;
+	    *stat += *heap.back().first->score;
+	    scores[heap.back().seg] = heap.back().first->score;
 	    
 	    // pop and push heap...
 	    ++ heap.back().first;
@@ -316,7 +333,7 @@ namespace cicada
 	      heap.pop_back();
 	  }
 	  
-	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first);
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
 	  const double score = score_factor * stat->score();
@@ -369,10 +386,10 @@ namespace cicada
 	  if (! segments[seg].empty()) {
 	    
 	    if (! stat)
-	      stat = segments[seg].front().second->zero();
+	      stat = segments[seg].front().score->zero();
 	    
-	    scores[seg] = segments[seg].front().second;
-	    *stat += *segments[seg].front().second;
+	    scores[seg] = segments[seg].front().score;
+	    *stat += *segments[seg].front().score;
 	    
 	    if (segments[seg].size() > 1)
 	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
@@ -386,8 +403,8 @@ namespace cicada
 	
 	const double score = score_factor * stat->score();
 	
-	double optimum_lower = lower_bound(heap.front().first->first, range.first);
-	double optimum_upper = heap.front().first->first;
+	double optimum_lower = lower_bound(heap.front().first->x, range.first);
+	double optimum_upper = heap.front().first->x;
 	
 	double optimum_objective = score;
 	double optimum_score = score;
@@ -406,15 +423,15 @@ namespace cicada
 	while (! heap.empty()) {
 	  // next at heap...
 	  
-	  const double segment_curr = heap.front().first->first;
+	  const double segment_curr = heap.front().first->x;
 	  
-	  while (! heap.empty() && heap.front().first->first == segment_curr) { 
+	  while (! heap.empty() && heap.front().first->x == segment_curr) { 
 	    
 	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	    
 	    *stat -= *scores[heap.back().seg];
-	    *stat += *heap.back().first->second;
-	    scores[heap.back().seg] = heap.back().first->second;
+	    *stat += *heap.back().first->score;
+	    scores[heap.back().seg] = heap.back().first->score;
 	    
 	    // pop and push heap...
 	    ++ heap.back().first;
@@ -424,7 +441,134 @@ namespace cicada
 	      heap.pop_back();
 	  }
 	
-	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first);
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
+	  
+	  // we perform merging of ranges if error counts are equal...
+	  const double score = score_factor * stat->score();
+	  if (score != score_prev) {
+	    segment_prev = segment_curr;
+	    score_prev = score;
+	  }
+	  
+	  const double lower = segment_prev;
+	  const double upper = segment_next;
+	  const double point = (lower + upper) * 0.5;
+	  
+	  if (point > range.second) break;   // out of range for upper-bound, quit!
+	  if (point < range.first) continue; // out of range for lower-bound...
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
+	  
+	  const double objective = score;
+	  
+	  if (debug >= 4)
+	    std::cerr << "lower: " << lower
+		      << " upper: " << upper
+		      << " score: " << score
+		      << " objective: " << objective
+		      << std::endl;
+	  
+	  if (objective < optimum_objective) {
+	    optimum_objective = objective;
+	    optimum_score = score;
+	    optimum_lower = lower;
+	    optimum_upper = upper;
+	  }
+	}
+	
+	const double point = (optimum_lower + optimum_upper) * 0.5;
+	if (point < range.first || range.second < point)
+	  return value_type();
+	else {
+	  if (debug >= 2)
+	    std::cerr << "minimum objective: " << optimum_objective
+		      << " score: " << optimum_score
+		      << " lower: " << optimum_lower
+		      << " upper: " << optimum_upper << std::endl;
+	  return value_type(optimum_objective, optimum_score, optimum_lower, optimum_upper);
+	}
+      }
+
+      template <typename Regularizer>
+      value_type operator()(const segment_document_type& segments,
+			    const weight_set_type& origin,
+			    const weight_set_type& direction,
+			    Regularizer regularizer,
+			    const double value_min,
+			    const double value_max,
+			    const bool minimize)
+      {
+	// we assume a set of line_ptr and score_ptr pair...
+	
+	const double score_factor = (minimize ? 1.0 : - 1.0);
+	const std::pair<double, double> range(value_min, value_max);
+
+	heap_type heap;
+	
+	if (debug >= 4)
+	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	
+	score_ptr_type stat;
+	score_set_type scores(segments.size());
+	
+	for (size_t seg = 0; seg != segments.size(); ++ seg)
+	  if (! segments[seg].empty()) {
+	    
+	    if (! stat)
+	      stat = segments[seg].front().score->zero();
+	    
+	    scores[seg] = segments[seg].front().score;
+	    *stat += *segments[seg].front().score;
+	    
+	    if (segments[seg].size() > 1)
+	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
+	  }
+
+	if (heap.empty())
+	  return value_type();
+	
+	// priority queue...
+	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	
+	const double score = score_factor * stat->score();
+	
+	double optimum_lower = lower_bound(heap.front().first->x, range.first);
+	double optimum_upper = heap.front().first->x;
+	
+	double optimum_objective = score;
+	double optimum_score = score;
+	
+	double segment_prev = optimum_lower;
+	double score_prev   = score;
+
+	if (debug >= 4)
+	  std::cerr << "lower: " << optimum_lower
+		    << " upper: " << optimum_upper
+		    << " score: " << score
+		    << " objective: " << optimum_objective
+		    << std::endl;
+	
+	while (! heap.empty()) {
+	  // next at heap...
+	  
+	  const double segment_curr = heap.front().first->x;
+	  
+	  while (! heap.empty() && heap.front().first->x == segment_curr) { 
+	    
+	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	    
+	    *stat -= *scores[heap.back().seg];
+	    *stat += *heap.back().first->score;
+	    scores[heap.back().seg] = heap.back().first->score;
+	    
+	    // pop and push heap...
+	    ++ heap.back().first;
+	    if (heap.back().first != heap.back().last)
+	      std::push_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	    else
+	      heap.pop_back();
+	  }
+	
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
 	  const double score = score_factor * stat->score();
@@ -495,10 +639,10 @@ namespace cicada
 	  if (! segments[seg].empty()) {
 	    
 	    if (! stat)
-	      stat = segments[seg].front().second->zero();
+	      stat = segments[seg].front().score->zero();
 	    
-	    scores[seg] = segments[seg].front().second;
-	    *stat += *segments[seg].front().second;
+	    scores[seg] = segments[seg].front().score;
+	    *stat += *segments[seg].front().score;
 	    
 	    if (segments[seg].size() > 1)
 	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
@@ -512,8 +656,8 @@ namespace cicada
 	
 	const double score = score_factor * stat->score();
 	
-	double optimum_lower = lower_bound(heap.front().first->first, range.first);
-	double optimum_upper = heap.front().first->first;
+	double optimum_lower = lower_bound(heap.front().first->x, range.first);
+	double optimum_upper = heap.front().first->x;
 	
 	double optimum_objective = score + regularizer(origin, direction, optimum_lower, optimum_upper);
 	double optimum_score = score;
@@ -532,15 +676,15 @@ namespace cicada
 	while (! heap.empty()) {
 	  // next at heap...
 	  
-	  const double segment_curr = heap.front().first->first;
+	  const double segment_curr = heap.front().first->x;
 	  
-	  while (! heap.empty() && heap.front().first->first == segment_curr) { 
+	  while (! heap.empty() && heap.front().first->x == segment_curr) { 
 	    
 	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	    
 	    *stat -= *scores[heap.back().seg];
-	    *stat += *heap.back().first->second;
-	    scores[heap.back().seg] = heap.back().first->second;
+	    *stat += *heap.back().first->score;
+	    scores[heap.back().seg] = heap.back().first->score;
 	    
 	    // pop and push heap...
 	    ++ heap.back().first;
@@ -550,7 +694,7 @@ namespace cicada
 	      heap.pop_back();
 	  }
 	
-	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first);
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
 	  const double score = score_factor * stat->score();

@@ -138,14 +138,6 @@ double optimize_mert(const scorer_document_type& scorers,
 		     const double scale_max,
 		     const weight_set_type& weights_prev,
 		     weight_set_type& weights);
-double optimize_mert(const scorer_document_type& scorers,
-		     const hypothesis_map_type& kbests,
-		     const hypothesis_map_type& oracles,
-		     const kbest_map_type& kbest_map,
-		     const double scale_min,
-		     const double scale_max,
-		     const weight_set_type& weights_prev,
-		     weight_set_type& weights);
 
 template <typename Optimizer>
 struct OptimizeOnline;
@@ -2618,8 +2610,11 @@ double optimize_cp(const scorer_document_type& scorers,
   // keep previous best...
   weights_prev = weights;
   
+  // at most 1000 iterations
+  // at least two updates
+  
   int num_minimum = 0;
-  for (int iter = 0; (num_minimum <= 1 || iter < iteration); ++ iter) {
+  for (int iter = 0; (num_minimum <= 1 || iter < iteration) && (iter < 1000); ++ iter) {
     if (mpi_rank == 0)
       a.push_back(weight_set_type());
     else
@@ -2791,10 +2786,6 @@ double optimize_cp(const scorer_document_type& scorers,
     }
     
     if (mert_search_local) {
-      // correct merting...
-      optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
-      
-#if 0
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
@@ -2803,40 +2794,51 @@ double optimize_cp(const scorer_document_type& scorers,
       
       typedef line_search_type::value_type optimum_type;
 
+      typedef EnvelopeKBest::line_set_type line_set_type;
+      typedef std::deque<line_set_type, std::allocator<line_set_type> > line_map_type;
+      
       bcast_weights(0, weights);
       
       const weight_set_type& origin = weights_prev;
       weight_set_type direction = weights;
       direction -= weights_prev;
       
+      EnvelopeKBest envelopes(origin, direction);
+      line_map_type lines;
+      
+      for (size_t id = 0; id != kbests.size(); ++ id)
+	if (! kbests[id].empty()) {
+	  
+	  if (kbest_map[id] >= lines.size())
+	    lines.resize(kbest_map[id] + 1);
+	  
+	  envelopes(kbests[id].begin(), kbests[id].end(), std::back_inserter(lines[kbest_map[id]]));
+	}
+      
       if (mpi_rank == 0) {
         typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-        
-        EnvelopeKBest::line_set_type lines;
-        EnvelopeKBest envelopes(origin, direction);
-        
+	
         segment_document_type segments;
-        
-        for (size_t id = 0; id != kbests.size(); ++ id) 
-          if (! kbests[id].empty()) {
-            segments.push_back(segment_set_type());
-            
-            //envelopes(kbests[id], oracles[id], lines);
-	    envelopes(kbests[id], lines);
-            
-            EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-            for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
-              segments.back().push_back(std::make_pair(liter->x, liter->hypothesis->score));
-          }
-    
+	
+	for (size_t seg = 0; seg != lines.size(); ++ seg)
+	  if (! lines[seg].empty()) {
+	    
+	    if (seg >= segments.size())
+	      segments.resize(seg + 1);
+	    
+	    envelopes(lines[seg]);
+	    
+	    EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
+	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter)
+	      segments[seg].push_back(std::make_pair(liter->x, liter->hypothesis->score));
+	  }
+	
         for (int rank = 1; rank != mpi_size; ++ rank) {
           boost::iostreams::filtering_istream is;
           is.push(boost::iostreams::zlib_decompressor());
           is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
 
           std::string line;
-          int id_prev = -1;
-      
           while (std::getline(is, line)) {
             const utils::piece line_piece(line);
             tokenizer_type tokenizer(line_piece);
@@ -2858,15 +2860,14 @@ double optimize_cp(const scorer_document_type& scorers,
             ++ iter;
             if (iter == tokenizer.end()) continue;
             const utils::piece score_str = *iter;
-        
-            const int id = utils::lexical_cast<int>(id_str);
-            if (id_prev != id)
-              segments.push_back(segment_set_type());
 	    
-            segments.back().push_back(std::make_pair(utils::decode_base64<double>(x_str),
-                                                     scorer_type::score_type::decode(score_str)));
-            
-            id_prev = id;
+            const int id = utils::lexical_cast<int>(id_str);
+	    
+	    if (id >= segments.size())
+	      segments.resize(id + 1);
+	    
+            segments[id].push_back(std::make_pair(utils::decode_base64<double>(x_str),
+						  scorer_type::score_type::decode(score_str)));
           }
         }
 	
@@ -2887,29 +2888,25 @@ double optimize_cp(const scorer_document_type& scorers,
         }
 	
       } else {
-        EnvelopeKBest::line_set_type lines;
-        EnvelopeKBest envelopes(origin, direction);
-        
         boost::iostreams::filtering_ostream os;
         os.push(boost::iostreams::zlib_compressor());
         os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
 	
-        for (size_t id = 0; id != kbests.size(); ++ id) 
-          if (! kbests[id].empty()) {
-            //envelopes(kbests[id], oracles[id], lines);
-	    envelopes(kbests[id], lines);
+	for (size_t seg = 0; seg != lines.size(); ++ seg)
+	  if (! lines[seg].empty()) {
+	    
+	    envelopes(lines[seg]);
             
-            EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
-            for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+            EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
+            for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter) {
               const EnvelopeKBest::line_type& line = *liter;
               
-              os << id << " ||| ";
+              os << seg << " ||| ";
               utils::encode_base64(line.x, std::ostream_iterator<char>(os));
               os << " ||| " << line.hypothesis->score->encode() << '\n';
             }
           }
       }
-#endif
       
       // finished mert-search-local
     }
@@ -3490,150 +3487,6 @@ double optimize_mert(const scorer_document_type& scorers,
 	lines.resize(kbest_map[id] + 1);
       
       envelopes(kbests[id].begin(), kbests[id].end(), std::back_inserter(lines[kbest_map[id]]));
-    }
-  
-  // collect all the segments...
-  if (mpi_rank == 0) {
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-    
-    segment_document_type segments;
-    
-    for (size_t seg = 0; seg != lines.size(); ++ seg)
-      if (! lines[seg].empty()) {
-	
-	if (seg >= segments.size())
-	  segments.resize(seg + 1);
-	
-	envelopes(lines[seg]);
-	
-	EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
-	for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter)
-	  segments[seg].push_back(std::make_pair(liter->x, liter->hypothesis->score));
-      }
-    
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::zlib_decompressor());
-      is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
-
-      std::string line;
-      
-      while (std::getline(is, line)) {
-	const utils::piece line_piece(line);
-	tokenizer_type tokenizer(line_piece);
-	
-	tokenizer_type::iterator iter = tokenizer.begin();
-	if (iter == tokenizer.end()) continue;
-	const utils::piece id_str = *iter; 
-	
-	++ iter;
-	if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece x_str = *iter;
-	
-	++ iter;
-	if (iter == tokenizer.end() || *iter != "|||") continue;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece score_str = *iter;
-	
-	const size_t id = utils::lexical_cast<size_t>(id_str);
-	
-	if (id >= segments.size())
-	  segments.resize(id + 1);
-	
-	segments[id].push_back(std::make_pair(utils::decode_base64<double>(x_str),
-					      scorer_type::score_type::decode(score_str)));
-      }
-    }
-    
-
-    line_search_type line_search;
-    
-    const optimum_type optimum = line_search(segments, scale_min, scale_max, scorers.error_metric());
-
-    const double update = (optimum.lower + optimum.upper) * 0.5;
-
-    if (update != 0.0) {
-      direction *= update;
-      weights = origin;
-      weights += direction;
-    }
-    
-    if (debug >= 2)
-      std::cerr << "mert update: " << update << " objective: " <<  optimum.objective << std::endl;
-    
-    return optimum.objective;
-  } else {
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::zlib_compressor());
-    os.push(utils::mpi_device_sink(0, envelope_tag, 4096));
-
-    for (size_t seg = 0; seg != lines.size(); ++ seg)
-      if (! lines[seg].empty()) {
-	
-	envelopes(lines[seg]);
-	
-	EnvelopeKBest::line_set_type::const_iterator liter_end = lines[seg].end();
-	for (EnvelopeKBest::line_set_type::const_iterator liter = lines[seg].begin(); liter != liter_end; ++ liter) {
-	  const EnvelopeKBest::line_type& line = *liter;
-	  
-	  os << seg << " ||| ";
-	  utils::encode_base64(line.x, std::ostream_iterator<char>(os));
-	  os << " ||| " << line.hypothesis->score->encode() << '\n';
-	}
-      }
-    
-    return 0.0;
-  }
-  
-}
-
-double optimize_mert(const scorer_document_type& scorers,
-		     const hypothesis_map_type& kbests,
-		     const hypothesis_map_type& oracles,
-		     const kbest_map_type& kbest_map,
-		     const double scale_min,
-		     const double scale_max,
-		     const weight_set_type& weights_prev,
-		     weight_set_type& weights)
-{
-  typedef cicada::optimize::LineSearch line_search_type;
-  
-  typedef line_search_type::segment_type          segment_type;
-  typedef line_search_type::segment_set_type      segment_set_type;
-  typedef line_search_type::segment_document_type segment_document_type;
-  
-  typedef line_search_type::value_type optimum_type;
-  
-  typedef EnvelopeKBest::line_set_type line_set_type;
-  typedef std::deque<line_set_type, std::allocator<line_set_type> > line_map_type;
-  
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  if (kbest_map.empty()) return 0.0;
-  
-  weight_set_type origin = weights_prev;
-  weight_set_type direction = weights;
-  direction -= weights_prev;
-  
-  bcast_weights(0, origin);
-  bcast_weights(0, direction);
-
-  EnvelopeKBest envelopes(origin, direction);
-  line_map_type lines;
-  
-  for (size_t id = 0; id != kbests.size(); ++ id)
-    if (! kbests[id].empty()) {
-      
-      if (kbest_map[id] >= lines.size())
-	lines.resize(kbest_map[id] + 1);
-      
-      envelopes(kbests[id].begin(), kbests[id].end(), oracles[id].begin(), oracles[id].end(), std::back_inserter(lines[kbest_map[id]]));
     }
   
   // collect all the segments...
