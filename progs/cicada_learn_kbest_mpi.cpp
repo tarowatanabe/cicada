@@ -2618,7 +2618,8 @@ double optimize_cp(const scorer_document_type& scorers,
   // keep previous best...
   weights_prev = weights;
   
-  for (int iter = 0; iter != iteration; ++ iter) {
+  int num_minimum = 0;
+  for (int iter = 0; (num_minimum <= 1 || iter < iteration); ++ iter) {
     if (mpi_rank == 0)
       a.push_back(weight_set_type());
     else
@@ -2934,6 +2935,8 @@ double optimize_cp(const scorer_document_type& scorers,
     if (objective_master <= objective_master_min) {
       weights_min = weights;
       objective_master_min = objective_master;
+      
+      ++ num_minimum;
     }
 
     if (mpi_rank == 0 && debug >= 2)
