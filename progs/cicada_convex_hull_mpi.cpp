@@ -367,8 +367,8 @@ void compute_envelope(const scorer_document_type& scorers,
 	segment_set_type::const_iterator siter_end = segments[seg].end();
 	for (segment_set_type::const_iterator siter = segments[seg].begin(); siter != siter_end; ++ siter) {
 	  os << seg << " ||| ";
-	  utils::encode_base64(siter->first, std::ostream_iterator<char>(os));
-	  os << " ||| " << siter->second->encode()
+	  utils::encode_base64(siter->x, std::ostream_iterator<char>(os));
+	  os << " ||| " << siter->score->encode()
 	     << '\n';
 	}
       }
