@@ -12,6 +12,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/weight_vector.hpp>
+#include <cicada/dot_product.hpp>
 
 #include <cicada/semiring/envelope.hpp>
 #include <cicada/eval/score.hpp>
@@ -68,6 +69,8 @@ namespace cicada
     public:
       struct RegularizeNone
       {
+	RegularizeNone(const double& __scale, const weight_set_type& __origin, const weight_set_type& __direction)
+	{}
 	RegularizeNone(const double& __scale)
 	{}
 	RegularizeNone()
@@ -78,6 +81,11 @@ namespace cicada
 	  return 0.0;
 	}
 	
+	double operator()(const double& k) const
+	{
+	  return 0.0;
+	}
+
 	double operator()(const weight_set_type& origin,
 			  const weight_set_type& direction,
 			  const double& lower,
@@ -89,8 +97,10 @@ namespace cicada
       
       struct RegularizeL1
       {
-	const double scale;
+	double scale;
 	
+	RegularizeL1(const double& __scale, const weight_set_type& __origin, const weight_set_type& __direction)
+	  : scale(__scale) {}
 	RegularizeL1(const double& __scale)
 	  : scale(__scale) {}
 	
@@ -104,74 +114,97 @@ namespace cicada
 	  return total * scale;
 	}
   
-      double operator()(const weight_set_type& origin,
-			const weight_set_type& direction,
-			const double& lower,
-			const double& upper) const
-      {
-	double total = 0.0;
-	
-	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (! feature_type(id).empty()) {
-	    const feature_type feature(id);
-	    
-	    const double ori = origin[feature];
-	    const double dir = direction[feature];
-	    
-	    const double low = ori + lower * dir;
-	    const double upp = ori + upper * dir;
-	    
-	    const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
-	    
-	    total += std::fabs(weight);
-	  }
-	
-	return total * scale;
-      }
-    };
+	double operator()(const double& k) const
+	{
+	  return 0.0;
+	}
 
-    struct RegularizeL2
-    {
-      const double scale;
-  
-      RegularizeL2(const double& __scale)
-	: scale(__scale) {}
+	double operator()(const weight_set_type& origin,
+			  const weight_set_type& direction,
+			  const double& lower,
+			  const double& upper) const
+	{
+	  double total = 0.0;
+	
+	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	    if (! feature_type(id).empty()) {
+	      const feature_type feature(id);
+	    
+	      const double ori = origin[feature];
+	      const double dir = direction[feature];
+	    
+	      const double low = ori + lower * dir;
+	      const double upp = ori + upper * dir;
+	    
+	      const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
+	      
+	      total += std::fabs(weight);
+	    }
+	  
+	  return total * scale;
+	}
+      };
+      
+      struct RegularizeL2
+      {
+	double scale;
+	double o2;
+	double od;
+	double d2;
+      
+	RegularizeL2(const double& __scale, const weight_set_type& origin, const weight_set_type& direction)
+	  : scale(__scale)
+	{
+	  // 0.5 * \lambda * w^2 + k * \lambda * w * d + k^2 * 0.5 * \lambda * d * d
+	  
+	  o2 = scale * 0.5 * cicada::dot_product(origin, origin);
+	  od = scale * cicada::dot_product(origin, direction);
+	  d2 = scale * 0.5 * cicada::dot_product(direction, direction);
+	}
+	
+	RegularizeL2(const double& __scale)
+	  : scale(__scale), o2(0.0), od(0.0), d2(0.0) {}
+	
+	double operator()(const double& k) const
+	{
+	  return o2 + k * od + k * k * d2;
+	}
 
-      double operator()(const weight_set_type& weights) const
-      {
-	double total = 0.0;
-	weight_set_type::const_iterator witer_end = weights.end();
-	for (weight_set_type::const_iterator witer = weights.begin(); witer != witer_end; ++ witer)
-	  total += (*witer) * (*witer);
+	double operator()(const weight_set_type& weights) const
+	{
+	  double total = 0.0;
+	  weight_set_type::const_iterator witer_end = weights.end();
+	  for (weight_set_type::const_iterator witer = weights.begin(); witer != witer_end; ++ witer)
+	    total += (*witer) * (*witer);
 	
-	return total * scale;
-      }
+	  return total * scale;
+	}
   
-      double operator()(const weight_set_type& origin,
-			const weight_set_type& direction,
-			const double& lower,
-			const double& upper) const
-      {
-	double total = 0.0;
+	double operator()(const weight_set_type& origin,
+			  const weight_set_type& direction,
+			  const double& lower,
+			  const double& upper) const
+	{
+	  double total = 0.0;
 	
-	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (! feature_type(id).empty()) {
-	    const feature_type feature(id);
+	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	    if (! feature_type(id).empty()) {
+	      const feature_type feature(id);
 	    
-	    const double ori = origin[feature];
-	    const double dir = direction[feature];
+	      const double ori = origin[feature];
+	      const double dir = direction[feature];
 	    
-	    const double low = ori + lower * dir;
-	    const double upp = ori + upper * dir;
+	      const double low = ori + lower * dir;
+	      const double upp = ori + upper * dir;
 	    
-	    const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
+	      const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
 	    
-	    total += weight * weight;
-	  }
+	      total += weight * weight;
+	    }
 	
-	return total * 0.5 * scale;
-      }
-    };
+	  return total * 0.5 * scale;
+	}
+      };
 
       struct Result
       {
@@ -490,8 +523,6 @@ namespace cicada
 
       template <typename Regularizer>
       value_type operator()(const segment_document_type& segments,
-			    const weight_set_type& origin,
-			    const weight_set_type& direction,
 			    Regularizer regularizer,
 			    const double value_min,
 			    const double value_max,
@@ -534,7 +565,7 @@ namespace cicada
 	double optimum_lower = lower_bound(heap.front().first->x, range.first);
 	double optimum_upper = heap.front().first->x;
 	
-	double optimum_objective = score;
+	double optimum_objective = score + regularizer((optimum_lower + optimum_upper) * 0.5);
 	double optimum_score = score;
 	
 	double segment_prev = optimum_lower;
@@ -585,7 +616,7 @@ namespace cicada
 	  if (point < range.first) continue; // out of range for lower-bound...
 	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
-	  const double objective = score;
+	  const double objective = score + regularizer(point);
 	  
 	  if (debug >= 4)
 	    std::cerr << "lower: " << lower
