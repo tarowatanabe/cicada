@@ -1963,7 +1963,7 @@ struct OptimizeMCP
 	const hypothesis_type* ptr_kbest = 0;
 	const hypothesis_type* ptr_oracle = 0;
 	double margin_kbest  = - inf;
-	double margin_oracle = inf;
+	double margin_oracle = - inf;
 	
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
@@ -1984,10 +1984,10 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > ptr_kbest->loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
-	  if (! ptr_oracle || margin < margin_oracle) {
+	  if (! ptr_oracle || margin > margin_oracle) {
 	    margin_oracle = margin;
 	    ptr_oracle = &oracle;
 	  }
@@ -2007,8 +2007,8 @@ struct OptimizeMCP
 	    *score.second += *(ptr_kbest->score);
 	}
 	
-	//margin += (margin_oracle - ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += (margin_oracle - ptr_oracle->loss) - margin_kbest;
+	//margin += (margin_oracle + ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
+	margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
 	//margin += margin_oracle - margin_kbest;
 	
 	{
@@ -2047,7 +2047,7 @@ struct OptimizeMCP
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
-	  oracles_margin.resize(seg + 1, inf);
+	  oracles_margin.resize(seg + 1, - inf);
 
 	bool updated = false;
 	
@@ -2076,10 +2076,10 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
-	  if (margin < oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	  }
@@ -2107,8 +2107,8 @@ struct OptimizeMCP
 	    *score.second += *(kbests_hyp[seg]->score);
 	}
 	
-	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
+	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
 	//margin += oracles_margin[seg] - kbests_margin[seg];
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
@@ -2163,7 +2163,7 @@ struct OptimizeMCP
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
-	  oracles_margin.resize(seg + 1, inf);
+	  oracles_margin.resize(seg + 1, - inf);
 	
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
 	
@@ -2173,10 +2173,10 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
-	  if (margin < oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	  }
@@ -2210,8 +2210,8 @@ struct OptimizeMCP
 	}
 	
 	
-	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
+	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
 	//margin += oracles_margin[seg] - kbests_margin[seg];
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
@@ -2242,7 +2242,7 @@ struct OptimizeMCP
 	const hypothesis_type* ptr_kbest = 0;
 	const hypothesis_type* ptr_oracle = 0;
 	double margin_kbest  = - inf;
-	double margin_oracle = inf;
+	double margin_oracle = - inf;
 	
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
@@ -2263,10 +2263,10 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > ptr_kbest->loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 
-	  if (! ptr_oracle || margin < margin_oracle) {
+	  if (! ptr_oracle || margin > margin_oracle) {
 	    margin_oracle = margin;
 	    ptr_oracle = &oracle;
 	  }
@@ -2286,8 +2286,8 @@ struct OptimizeMCP
 	    *score.second += *(ptr_kbest->score);
 	}
 	
-	//margin += (margin_oracle - ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += (margin_oracle - ptr_oracle->loss) - margin_kbest;
+	//margin += (margin_oracle + ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
+	margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
 	//margin += margin_oracle - margin_kbest;
       }
     
@@ -2316,7 +2316,7 @@ struct OptimizeMCP
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
-	  oracles_margin.resize(seg + 1, inf);
+	  oracles_margin.resize(seg + 1, - inf);
 	
 	bool updated = false;
 	
@@ -2345,10 +2345,10 @@ struct OptimizeMCP
 
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
-	  if (margin < oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	  }
@@ -2376,8 +2376,8 @@ struct OptimizeMCP
 	    *score.second += *(kbests_hyp[seg]->score);
 	}
 	
-	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
+	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
 	//margin += oracles_margin[seg] - kbests_margin[seg];
       }
     
@@ -2424,7 +2424,7 @@ struct OptimizeMCP
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
-	  oracles_margin.resize(seg + 1, inf);
+	  oracles_margin.resize(seg + 1, - inf);
 
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
 	
@@ -2434,10 +2434,10 @@ struct OptimizeMCP
 
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
-	  if (margin < oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	  }
@@ -2470,8 +2470,8 @@ struct OptimizeMCP
 	    *score.second += *(kbests_hyp[seg]->score);
 	}
 	
-	//margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] - oracles_hyp[seg]->loss) - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
+	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
 	//margin += oracles_margin[seg] - kbests_margin[seg];
       }
     
@@ -2938,7 +2938,6 @@ double optimize_cp(const scorer_document_type& scorers,
       
       ++ num_minimum;
     }
-    // share num-minimum!
     MPI::COMM_WORLD.Bcast(&num_minimum, 1, MPI::INT, 0);
 
     if (mpi_rank == 0 && debug >= 2)
