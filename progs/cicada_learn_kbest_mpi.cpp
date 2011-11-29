@@ -3073,7 +3073,7 @@ double optimize_cp(const scorer_document_type& scorers,
     
     // we will update proximy when better solution found
 
-    if (iter && objective_master - objective_master_prev > 0.01) {
+    if (iter && objective_master - objective_master_prev > 0.001) {
       // we will try find the best scaling between weights_prev and weights
       // we do not update proximy!
       const double suffered_loss = objective_master - objective_master_prev;
