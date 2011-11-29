@@ -2786,6 +2786,9 @@ double optimize_cp(const scorer_document_type& scorers,
     }
     
     if (mert_search_local) {
+      optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
+      
+#if 0
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
@@ -2907,7 +2910,7 @@ double optimize_cp(const scorer_document_type& scorers,
             }
           }
       }
-      
+#endif
       // finished mert-search-local
     }
     
