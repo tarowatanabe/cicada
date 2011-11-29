@@ -2024,8 +2024,7 @@ struct OptimizeMCP
     
     return std::make_pair((loss - margin) * factor, score);
 #endif
-    
-#if 1
+#if 0
     kbests_margin.clear();
     kbests_hyp.clear();
     
@@ -2123,8 +2122,7 @@ struct OptimizeMCP
     
     return std::make_pair((loss - margin) * factor, score);
 #endif
-    
-#if 0
+#if 1
     kbests_margin.clear();
     kbests_hyp.clear();
     
@@ -2295,8 +2293,7 @@ struct OptimizeMCP
     
     return std::make_pair((loss - margin) * factor, score);
 #endif
-
-#if 1
+#if 0
     kbests_margin.clear();
     kbests_hyp.clear();
     
@@ -2386,7 +2383,7 @@ struct OptimizeMCP
     
     return std::make_pair((loss - margin) * factor, score);
 #endif
-#if 0
+#if 1
     kbests_margin.clear();
     kbests_hyp.clear();
     
