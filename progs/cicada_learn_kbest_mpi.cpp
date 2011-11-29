@@ -2938,6 +2938,8 @@ double optimize_cp(const scorer_document_type& scorers,
       
       ++ num_minimum;
     }
+    // share num-minimum!
+    MPI::COMM_WORLD.Bcast(&num_minimum, 1, MPI::INT, 0);
 
     if (mpi_rank == 0 && debug >= 2)
       std::cerr << "objective master: " << objective_master
