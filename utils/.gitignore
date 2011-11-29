@@ -53,6 +53,7 @@ sample_map_file_allocator
 sample_packed_vector
 sample_piece
 sample_program_options
+sample_random_seed
 sample_simple_vector
 sample_sparse_map
 sample_static_allocator

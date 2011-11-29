@@ -151,6 +151,7 @@ sample_map_file_allocator \
 sample_packed_vector \
 sample_piece \
 sample_program_options \
+sample_random_seed \
 sample_simple_vector \
 sample_sparse_map \
 sample_static_allocator \
@@ -305,6 +306,9 @@ sample_static_allocator_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_sparse_map_SOURCES = sample_sparse_map.cpp
 sample_sparse_map_LDADD = $(LIBUTILS)
+
+sample_random_seed_SOURCES = sample_random_seed.cpp
+sample_random_seed_LDADD = $(LIBUTILS)
 
 sample_subprocess_SOURCES = sample_subprocess.cpp
 sample_subprocess_LDFLAGS = $(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS)
