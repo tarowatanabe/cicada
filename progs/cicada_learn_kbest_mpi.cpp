@@ -3256,6 +3256,8 @@ double optimize_cp(const scorer_document_type& scorers,
 	std::cerr << "cutting plane ratio: " << k << std::endl;
 #endif
       
+      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+      
       const double k = 0.1;
       
       for (size_t i = 0; i != weights_size; ++ i)
