@@ -3224,7 +3224,7 @@ double optimize_cp(const scorer_document_type& scorers,
     // we will update proximy when better solution found
 
     if (iter && objective_master - objective_master_prev > 0.001) {
-#if 0
+#if 1
       // we will try find the best scaling between weights_prev and weights
       // we do not update proximy!
       const double suffered_loss = objective_master - objective_master_prev;
@@ -3255,7 +3255,7 @@ double optimize_cp(const scorer_document_type& scorers,
       if (mpi_rank == 0 && debug >= 2) 
 	std::cerr << "cutting plane ratio: " << k << std::endl;
 #endif
-      
+#if 0 
       const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
       
       const double k = 0.1;
@@ -3266,6 +3266,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	weights[i] = k * weights[i];
       for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	weights[i] = (1.0 - k) * weights_prev[i];
+#endif
       
     } else {
       weights_prev = weights;
