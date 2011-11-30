@@ -3750,8 +3750,15 @@ double optimize_mert(const scorer_document_type& scorers,
   if (kbest_map.empty()) return 0.0;
   
   weight_set_type origin = weights_prev;
-  weight_set_type direction = weights;
-  direction -= weights_prev;
+  weight_set_type direction;
+  
+  const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+  for (size_t i = 0; i != weights_size; ++ i)
+    direction[i] = weights[i] - weights_prev[i];
+  for (size_t i = weights_size; i < weights.size(); ++ i)
+    direction[i] = weights[i];
+  for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+    direction[i] = - weights_prev[i];
   
   bcast_weights(0, origin);
   bcast_weights(0, direction);
@@ -3834,9 +3841,15 @@ double optimize_mert(const scorer_document_type& scorers,
     const double update = (optimum.lower + optimum.upper) * 0.5;
 
     if (update != 0.0) {
-      direction *= update;
-      weights = origin;
-      weights += direction;
+      const size_t weights_size = utils::bithack::min(origin.size(), direction.size());
+      
+      weights.clear();
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = origin[i] + direction[i] * update;
+      for (size_t i = weights_size; i < origin.size(); ++ i)
+	weights[i] = origin[i];
+      for (size_t i = weights_size; i < direction.size(); ++ i)
+	weights[i] = direction[i] * update;
     }
     
     if (debug >= 2)
