@@ -2031,6 +2031,7 @@ struct OptimizeMCP
   hypothesis_ptr_set_type oracles_hyp;
   pos_set_type            kbests_pos;
   pos_set_type            oracles_pos;
+  loss_set_type           oracles_loss;
   
   std::pair<double, score_ptr_pair_type> operator()(const weight_set_type& weights, weight_set_type& acc)
   {
@@ -2217,6 +2218,7 @@ struct OptimizeMCP
     oracles_margin.clear();
     oracles_hyp.clear();
     oracles_pos.clear();
+    oracles_loss.clear();
 
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
@@ -2263,7 +2265,8 @@ struct OptimizeMCP
 	  oracles_margin.resize(seg + 1, - inf);
 	if (seg >= oracles_pos.size())
 	  oracles_pos.resize(seg + 1);
-	
+	if (seg >= oracles_loss.size())
+	  oracles_loss.resize(seg + 1, inf);
 	
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
 	const double kbest_margin = kbests_margin[seg];
@@ -2273,6 +2276,7 @@ struct OptimizeMCP
 	  const hypothesis_type& oracle = *oiter;
 	  
 	  if (oracle.loss > kbest_loss) continue;
+	  if (oracle.loss > oracles_loss[seg]) continue;
 	  
 	  //
 	  // we will find oracles which is very close to kbest...
@@ -2286,6 +2290,7 @@ struct OptimizeMCP
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
 	    oracles_pos[seg] = pos_oracle;
+	    oracles_loss[seg] = oracle.loss;
 	  }
 	}
       }
@@ -2510,6 +2515,7 @@ struct OptimizeMCP
     
     oracles_margin.clear();
     oracles_hyp.clear();
+    oracles_loss.clear();
     
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
@@ -2551,7 +2557,9 @@ struct OptimizeMCP
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
 	  oracles_margin.resize(seg + 1, - inf);
-
+	if (seg >= oracles_loss.size())
+	  oracles_loss.resize(seg + 1, inf);
+	  
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
 	const double kbest_margin = kbests_margin[seg];
 	
@@ -2560,6 +2568,8 @@ struct OptimizeMCP
 	  const hypothesis_type& oracle = *oiter;
 
 	  if (oracle.loss > kbest_loss) continue;
+	  if (oracle.loss > oracles_loss[seg]) continue;
+
 	  
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
@@ -2568,6 +2578,7 @@ struct OptimizeMCP
 	  if (! oracles_hyp[seg] || margin > oracles_margin[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
+	    oracles_loss[seg] = oracle.loss;
 	  }
 	}
       }
@@ -3866,6 +3877,7 @@ void unique_kbest(hypothesis_map_type& kbests)
     }
 }
 
+
 void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
@@ -4078,6 +4090,7 @@ void read_kbest(const scorer_document_type& scorers,
       }
     }
   }
+  
 
   // uniques...
   unique_kbest(kbests);
