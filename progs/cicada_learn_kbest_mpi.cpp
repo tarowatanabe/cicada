@@ -2519,7 +2519,7 @@ struct OptimizeMCP
     size_t pos_oracle = 0;
     
     for (size_t id = 0; id != id_size; ++ id) 
-      if (! kbests[id].empty() && ! oracles[id].size()) {
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
 	
 	const size_type seg = kbest_map[id];
 	
