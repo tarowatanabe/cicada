@@ -3224,6 +3224,7 @@ double optimize_cp(const scorer_document_type& scorers,
     // we will update proximy when better solution found
 
     if (iter && objective_master - objective_master_prev > 0.001) {
+#if 0
       // we will try find the best scaling between weights_prev and weights
       // we do not update proximy!
       const double suffered_loss = objective_master - objective_master_prev;
@@ -3241,7 +3242,7 @@ double optimize_cp(const scorer_document_type& scorers,
       
       //const double k = std::min(suffered_loss / variance, 1.0);
       const double k = suffered_loss / variance;
-
+      
       if (k != 1.0) {
 	for (size_t i = 0; i != weights_size; ++ i)
 	  weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
@@ -3250,9 +3251,20 @@ double optimize_cp(const scorer_document_type& scorers,
 	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	  weights[i] = (1.0 - k) * weights_prev[i];
       }
-      
+
       if (mpi_rank == 0 && debug >= 2) 
 	std::cerr << "cutting plane ratio: " << k << std::endl;
+#endif
+      
+      const double k = 0.1;
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+      for (size_t i = weights_size; i < weights.size(); ++ i)
+	weights[i] = k * weights[i];
+      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	weights[i] = (1.0 - k) * weights_prev[i];
+      
     } else {
       weights_prev = weights;
       objective_master_prev = objective_master;
