@@ -1918,6 +1918,73 @@ struct OptimizeMCP
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  struct SampleSet
+  {
+    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
+    typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
+
+    struct Sample
+    {
+      typedef const feature_value_type* const_iterator;
+      
+      Sample(const_iterator __first, const_iterator __last) : first(__first), last(__last) {}
+      
+      const_iterator begin() const { return first; }
+      const_iterator end() const { return last; }
+      size_type size() const { return last - first; }
+      bool emtpy() const { return first == last; }
+      
+      const_iterator first;
+      const_iterator last;
+    };
+
+    typedef Sample sample_type;
+    typedef sample_type value_type;
+    
+    SampleSet() : features(), offsets() { offsets.push_back(0); }
+    
+    void clear()
+    {
+      features.clear();
+      offsets.clear();
+      offsets.push_back(0);
+    }
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      features.insert(features.end(), first, last);
+      offsets.push_back(features.size());
+    }
+    
+    sample_type operator[](size_type pos) const
+    {
+      return sample_type(&(*features.begin()) + offsets[pos], &(*features.begin()) + offsets[pos + 1]);
+    }
+    
+    size_type size() const { return offsets.size() - 1; }
+    bool empty() const { return offsets.size() == 1; }
+    
+    void shrink()
+    {
+      features_type(features).swap(features);
+      offsets_type(offsets).swap(offsets);
+    }
+    
+    void flush()
+    {
+      
+    }
+    
+    features_type features;
+    offsets_type  offsets;
+  };
+  
+  typedef SampleSet sample_set_type;
+
     
   OptimizeMCP(const scorer_document_type& __scorers,
 	      const hypothesis_map_type&  __kbests,
@@ -1928,29 +1995,56 @@ struct OptimizeMCP
       oracles(__oracles),
       kbest_map(__kbest_map)
   {
+    // transform kbests/oracles as an expanded features for faster learning?
+
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
+    for (size_t id = 0; id != id_size; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& kbest = *kiter;
+	  
+	  features_kbest.insert(kbest.features.begin(), kbest.features.end());
+	}
+	
+	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	  const hypothesis_type& oracle = *oiter;
+	  
+	  features_oracle.insert(oracle.features.begin(), oracle.features.end());
+	}
+      }
+    
+    features_kbest.shrink();
+    features_oracle.shrink();
   }
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
   typedef std::vector<double, std::allocator<double> > margin_set_type;
+  typedef std::vector<size_t, std::allocator<size_t> > pos_set_type;
   typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > hypothesis_ptr_set_type;
   
   margin_set_type         kbests_margin;
   margin_set_type         oracles_margin;
   hypothesis_ptr_set_type kbests_hyp;
   hypothesis_ptr_set_type oracles_hyp;
+  pos_set_type            kbests_pos;
+  pos_set_type            oracles_pos;
+  loss_set_type           oracles_loss;
   
   std::pair<double, score_ptr_pair_type> operator()(const weight_set_type& weights, weight_set_type& acc)
   {
 #if 0
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
     score_ptr_pair_type score;
     double loss = 0.0;
     double margin = 0.0;
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
+    for (size_t id = 0; id != id_size; ++ id) 
       if (! kbests[id].empty() && ! oracles[id].empty()) {
 	const hypothesis_type* ptr_kbest = 0;
 	const hypothesis_type* ptr_oracle = 0;
@@ -1976,8 +2070,8 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > ptr_kbest->loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
-	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
 	  if (! ptr_oracle || margin > margin_oracle) {
 	    margin_oracle = margin;
@@ -2000,8 +2094,8 @@ struct OptimizeMCP
 	}
 	
 	//margin += (margin_oracle + ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
-	//margin += margin_oracle - margin_kbest;
+	//margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
+	margin += margin_oracle - margin_kbest;
 	
 	{
 	  hypothesis_type::feature_set_type::const_iterator kiter_end = ptr_kbest->features.end();
@@ -2025,8 +2119,9 @@ struct OptimizeMCP
 
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
+    for (size_t id = 0; id != id_size; ++ id) 
       if (! kbests[id].empty() && ! oracles[id].empty()) {
 	
 	const size_type seg = kbest_map[id];
@@ -2061,6 +2156,7 @@ struct OptimizeMCP
 	if (! updated) continue;
 	
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
+	const double kbest_margin = kbests_margin[seg];
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
@@ -2068,8 +2164,8 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
-	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
 	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
@@ -2100,8 +2196,8 @@ struct OptimizeMCP
 	}
 	
 	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
-	//margin += oracles_margin[seg] - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
+	margin += oracles_margin[seg] - kbests_margin[seg];
 	
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
@@ -2117,15 +2213,22 @@ struct OptimizeMCP
 #if 1
     kbests_margin.clear();
     kbests_hyp.clear();
+    kbests_pos.clear();
     
     oracles_margin.clear();
     oracles_hyp.clear();
+    oracles_pos.clear();
+    oracles_loss.clear();
 
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
+
+    size_t pos_kbest = 0;
+    size_t pos_oracle = 0;
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      if (! kbests[id].empty()) {
+    for (size_t id = 0; id != id_size; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
 	
 	const size_type seg = kbest_map[id];
 	
@@ -2133,44 +2236,62 @@ struct OptimizeMCP
 	  kbests_hyp.resize(seg + 1, 0);
 	if (seg >= kbests_margin.size())
 	  kbests_margin.resize(seg + 1, - inf);
+	if (seg >= kbests_pos.size())
+	  kbests_pos.resize(seg + 1);
 	
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter, ++ pos_kbest) {
 	  const hypothesis_type& kbest = *kiter;
 
 	  //const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), kbest.loss);
-	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  const double margin = cicada::dot_product(weights, features_kbest[pos_kbest].begin(), features_kbest[pos_kbest].end(), 0.0);
 	  
-	  if (margin > kbests_margin[seg] || ! kbests_hyp[seg]) {
+	  if (! kbests_hyp[seg] || margin > kbests_margin[seg]) {
 	    kbests_margin[seg] = margin;
 	    kbests_hyp[seg] = &kbest;
+	    kbests_pos[seg] = pos_kbest;
 	  }
 	}
       }
     
-    for (size_t id = 0; id != oracles.size(); ++ id) 
-      if (! oracles[id].empty()) {
+    for (size_t id = 0; id != id_size; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
 	const size_type seg = kbest_map[id];
 	
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
 	  oracles_margin.resize(seg + 1, - inf);
+	if (seg >= oracles_pos.size())
+	  oracles_pos.resize(seg + 1);
+	if (seg >= oracles_loss.size())
+	  oracles_loss.resize(seg + 1, inf);
 	
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
+	const double kbest_margin = kbests_margin[seg];
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter, ++ pos_oracle) {
 	  const hypothesis_type& oracle = *oiter;
 	  
 	  if (oracle.loss > kbest_loss) continue;
+	  //if (oracle.loss > oracles_loss[seg]) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  //
+	  // we will find oracles which is very close to kbest...
+	  //
+	  
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oraacle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, features_oracle[pos_oracle].begin(), features_oracle[pos_oracle].end(), 0.0);
+	  const double margin = cicada::dot_product(weights, features_oracle[pos_oracle].begin(), features_oracle[pos_oracle].end(), - oracle.loss);
 	  
-	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (! oracles_hyp[seg] || margin > oracles_margin[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
+	    oracles_pos[seg] = pos_oracle;
+	    oracles_loss[seg] = oracle.loss;
 	  }
 	}
       }
@@ -2178,6 +2299,8 @@ struct OptimizeMCP
     if (oracles_margin.size() != kbests_margin.size())
       throw std::runtime_error("margin size differ");
     if (oracles_hyp.size() != kbests_hyp.size())
+      throw std::runtime_error("margin size differ");
+    if (oracles_pos.size() != kbests_pos.size())
       throw std::runtime_error("margin size differ");
     
     score_ptr_pair_type score;
@@ -2201,11 +2324,19 @@ struct OptimizeMCP
 	    *score.second += *(kbests_hyp[seg]->score);
 	}
 	
-	
 	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
 	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
 	//margin += oracles_margin[seg] - kbests_margin[seg];
 	
+	sample_set_type::value_type::const_iterator kiter_end = features_kbest[kbests_pos[seg]].end();
+	for (sample_set_type::value_type::const_iterator kiter = features_kbest[kbests_pos[seg]].begin(); kiter != kiter_end; ++ kiter)
+	  acc[kiter->first] -= kiter->second * factor;
+
+	sample_set_type::value_type::const_iterator oiter_end = features_oracle[oracles_pos[seg]].end();
+	for (sample_set_type::value_type::const_iterator oiter = features_oracle[oracles_pos[seg]].begin(); oiter != oiter_end; ++ oiter)
+	  acc[oiter->first] += oiter->second * factor;
+	
+#if 0
 	hypothesis_type::feature_set_type::const_iterator kiter_end = kbests_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator kiter = kbests_hyp[seg]->features.begin(); kiter != kiter_end; ++ kiter)
 	  acc[kiter->first] -= kiter->second * factor;
@@ -2213,6 +2344,7 @@ struct OptimizeMCP
 	hypothesis_type::feature_set_type::const_iterator oiter_end = oracles_hyp[seg]->features.end();
 	for (hypothesis_type::feature_set_type::const_iterator oiter = oracles_hyp[seg]->features.begin(); oiter != oiter_end; ++ oiter)
 	  acc[oiter->first] += oiter->second * factor;
+#endif
       }
     
     return std::make_pair((loss - margin) * factor, score);
@@ -2224,12 +2356,13 @@ struct OptimizeMCP
 #if 0
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
     score_ptr_pair_type score;
     double loss = 0.0;
     double margin = 0.0;
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
+    for (size_t id = 0; id != id_size; ++ id) 
       if (! kbests[id].empty() && ! oracles[id].empty()) {
 	const hypothesis_type* ptr_kbest = 0;
 	const hypothesis_type* ptr_oracle = 0;
@@ -2255,8 +2388,8 @@ struct OptimizeMCP
 	  
 	  if (oracle.loss > ptr_kbest->loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
-	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 
 	  if (! ptr_oracle || margin > margin_oracle) {
 	    margin_oracle = margin;
@@ -2279,8 +2412,8 @@ struct OptimizeMCP
 	}
 	
 	//margin += (margin_oracle + ptr_oracle->loss) - (margin_kbest - ptr_kbest->loss);
-	margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
-	//margin += margin_oracle - margin_kbest;
+	//margin += (margin_oracle + ptr_oracle->loss) - margin_kbest;
+	margin += margin_oracle - margin_kbest;
       }
     
     return std::make_pair((loss - margin) * factor, score);
@@ -2294,8 +2427,9 @@ struct OptimizeMCP
     
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
+    for (size_t id = 0; id != id_size; ++ id) 
       if (! kbests[id].empty() && ! oracles[id].empty()) {
 	
 	const size_type seg = kbest_map[id];
@@ -2330,6 +2464,7 @@ struct OptimizeMCP
 	if (! updated) continue;
 	
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
+	const double kbest_margin = kbests_margin[seg];
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
 	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
@@ -2337,8 +2472,8 @@ struct OptimizeMCP
 
 	  if (oracle.loss > kbest_loss) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
-	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
 	  
 	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
 	    oracles_margin[seg] = margin;
@@ -2369,8 +2504,8 @@ struct OptimizeMCP
 	}
 	
 	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - (kbests_margin[seg] - kbests_hyp[seg]->loss);
-	margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
-	//margin += oracles_margin[seg] - kbests_margin[seg];
+	//margin += (oracles_margin[seg] + oracles_hyp[seg]->loss) - kbests_margin[seg];
+	margin += oracles_margin[seg] - kbests_margin[seg];
       }
     
     return std::make_pair((loss - margin) * factor, score);
@@ -2381,12 +2516,17 @@ struct OptimizeMCP
     
     oracles_margin.clear();
     oracles_hyp.clear();
+    oracles_loss.clear();
     
     const double factor = 1.0 / samples;
     const double inf = std::numeric_limits<double>::infinity();
+    const size_t id_size = utils::bithack::min(kbests.size(), oracles.size());
     
-    for (size_t id = 0; id != kbests.size(); ++ id) 
-      if (! kbests[id].empty()) {
+    size_t pos_kbest = 0;
+    size_t pos_oracle = 0;
+    
+    for (size_t id = 0; id != id_size; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
 	
 	const size_type seg = kbest_map[id];
 	
@@ -2396,42 +2536,50 @@ struct OptimizeMCP
 	  kbests_margin.resize(seg + 1, - inf);
 	
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter, ++ pos_kbest) {
 	  const hypothesis_type& kbest = *kiter;
 
 	  //const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), kbest.loss);
-	  const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0);
+	  const double margin = cicada::dot_product(weights, features_kbest[pos_kbest].begin(), features_kbest[pos_kbest].end(), 0.0);
 	  
-	  if (margin > kbests_margin[seg] || ! kbests_hyp[seg]) {
+	  if (! kbests_hyp[seg] || margin > kbests_margin[seg]) {
 	    kbests_margin[seg] = margin;
 	    kbests_hyp[seg] = &kbest;
 	  }
 	}
       }
     
-    for (size_t id = 0; id != oracles.size(); ++ id) 
-      if (! oracles[id].empty()) {
+    for (size_t id = 0; id != id_size; ++ id) 
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
 	const size_type seg = kbest_map[id];
 	
 	if (seg >= oracles_hyp.size())
 	  oracles_hyp.resize(seg + 1, 0);
 	if (seg >= oracles_margin.size())
 	  oracles_margin.resize(seg + 1, - inf);
-
+	if (seg >= oracles_loss.size())
+	  oracles_loss.resize(seg + 1, inf);
+	  
 	const double kbest_loss = (kbests_hyp[seg] ? kbests_hyp[seg]->loss : inf);
+	const double kbest_margin = kbests_margin[seg];
 	
 	hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
-	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter, ++ pos_oracle) {
 	  const hypothesis_type& oracle = *oiter;
 
 	  if (oracle.loss > kbest_loss) continue;
+	  //if (oracle.loss > oracles_loss[seg]) continue;
 	  
-	  const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
+	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), - oracle.loss);
 	  //const double margin = cicada::dot_product(weights, oracle.features.begin(), oracle.features.end(), 0.0);
+	  //const double margin = cicada::dot_product(weights, features_oracle[pos_oracle].begin(), features_oracle[pos_oracle].end(), 0.0);
+	  const double margin = cicada::dot_product(weights, features_oracle[pos_oracle].begin(), features_oracle[pos_oracle].end(), - oracle.loss);
 	  
-	  if (margin > oracles_margin[seg] || ! oracles_hyp[seg]) {
+	  if (! oracles_hyp[seg] || margin > oracles_margin[seg]) {
 	    oracles_margin[seg] = margin;
 	    oracles_hyp[seg] = &oracle;
+	    oracles_loss[seg] = oracle.loss;
 	  }
 	}
       }
@@ -2556,6 +2704,9 @@ struct OptimizeMCP
   const hypothesis_map_type&  kbests;
   const hypothesis_map_type&  oracles;
   const kbest_map_type&       kbest_map;
+
+  sample_set_type features_kbest;
+  sample_set_type features_oracle;
   
   double samples;
 };
@@ -2786,7 +2937,7 @@ double optimize_cp(const scorer_document_type& scorers,
     }
     
     if (mert_search_local) {
-      //optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
+      optimize_mert(scorers, kbests, kbest_map, 0.01, 2.0, weights_prev, weights);
 
 #if 0
       typedef cicada::optimize::LineSearch line_search_type;
@@ -2906,7 +3057,7 @@ double optimize_cp(const scorer_document_type& scorers,
 
 #endif
       
-#if 1
+#if 0
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
@@ -3073,11 +3224,10 @@ double optimize_cp(const scorer_document_type& scorers,
     
     // we will update proximy when better solution found
 
-    if (iter && objective_master > objective_master_prev) {
+    if (iter && (line_search || mert_search_local) && objective_master - objective_master_prev > 0.001) {
+#if 1
       // we will try find the best scaling between weights_prev and weights
       // we do not update proximy!
-      weights_best = weights;
-      
       const double suffered_loss = objective_master - objective_master_prev;
       
       double variance = 0.0;
@@ -3093,7 +3243,7 @@ double optimize_cp(const scorer_document_type& scorers,
       
       //const double k = std::min(suffered_loss / variance, 1.0);
       const double k = suffered_loss / variance;
-
+      
       if (k != 1.0) {
 	for (size_t i = 0; i != weights_size; ++ i)
 	  weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
@@ -3102,15 +3252,23 @@ double optimize_cp(const scorer_document_type& scorers,
 	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
 	  weights[i] = (1.0 - k) * weights_prev[i];
       }
-      
+
       if (mpi_rank == 0 && debug >= 2) 
 	std::cerr << "cutting plane ratio: " << k << std::endl;
+#endif
+#if 0 
+      const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
       
-      // if the difference of suffered loss is within a margin, update previous best
-      if (suffered_loss < 0.01) {
-	weights_prev.swap(weights_best);
-	objective_master_prev = objective_master;
-      }
+      const double k = 0.1;
+      
+      for (size_t i = 0; i != weights_size; ++ i)
+	weights[i] = k * weights[i] + (1.0 - k) * weights_prev[i];
+      for (size_t i = weights_size; i < weights.size(); ++ i)
+	weights[i] = k * weights[i];
+      for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	weights[i] = (1.0 - k) * weights_prev[i];
+#endif
+      
     } else {
       weights_prev = weights;
       objective_master_prev = objective_master;
@@ -3735,6 +3893,7 @@ void unique_kbest(hypothesis_map_type& kbests)
     }
 }
 
+
 void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
@@ -3947,6 +4106,7 @@ void read_kbest(const scorer_document_type& scorers,
       }
     }
   }
+  
 
   // uniques...
   unique_kbest(kbests);
