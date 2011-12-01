@@ -54,9 +54,12 @@ typedef std::pair<score_ptr_type, score_ptr_type> score_ptr_pair_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<size_t, std::allocator<size_t> > kbest_map_type;
 
+typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weights_history_type;
+
 path_set_type kbest_path;
 path_set_type oracle_path;
-path_type weights_path;
+path_type     weights_path;
+path_set_type weights_history_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
@@ -114,6 +117,7 @@ double optimize_cp(const scorer_document_type& scorers,
 		   const kbest_map_type& kbest_map,
 		   const weight_set_type& bounds_lower,
 		   const weight_set_type& bounds_upper,
+		   const weights_history_type& weights_history,
 		   weight_set_type& weights);
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
@@ -231,6 +235,26 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_path, 1024 * 1024);
       is >> weights;
     }
+
+    weights_history_type weights_history;
+    if (mpi_rank == 0 && ! weights_history_path.empty()) {
+      weights_history.reserve(weights_history_path.size());
+      
+      for (size_t i = 0; i != weights_history_path.size(); ++ i) {
+	const path_type& path = weights_history_path[i];
+	
+	if (! boost::filesystem::exists(path))
+	  throw std::runtime_error("no path? " + path.string());
+	
+	weights_history.push_back(weight_set_type());
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	is >> weights_history.back();
+	
+	if (weights_history.back().empty())
+	  weights_history.pop_back();
+      }
+    }
     
     // collect features...
     for (int rank = 0; rank < mpi_size; ++ rank) {
@@ -281,9 +305,9 @@ int main(int argc, char ** argv)
     else if (learn_nherd)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
     else if (learn_cp)
-      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights);
+      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
     else if (learn_mcp)
-      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights);
+      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
 
@@ -2698,6 +2722,7 @@ double optimize_cp(const scorer_document_type& scorers,
 		   const kbest_map_type& kbest_map,
 		   const weight_set_type& bounds_lower,
 		   const weight_set_type& bounds_upper,
+		   const weights_history_type& weights_history,
 		   weight_set_type& weights)
 {
   typedef std::deque<weight_set_type, std::allocator<weight_set_type> > weight_queue_type;
@@ -2709,6 +2734,9 @@ double optimize_cp(const scorer_document_type& scorers,
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
+  const double loss_oracle = (scorers.error_metric() ? 0.0 : - 1.0);
   
   Optimize opt(scorers, kbests, oracles, kbest_map);
   
@@ -2716,30 +2744,71 @@ double optimize_cp(const scorer_document_type& scorers,
   const double instances_local = opt.instances();
   opt.samples = 0.0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &opt.samples, 1, MPI::DOUBLE, MPI::SUM);
-
-  // synchronize weights...
-  bcast_weights(0, weights);
   
   weight_queue_type a;
   f_set_type        f;
   alpha_set_type    alpha;
 
-  weight_set_type weights_prev;
-  weight_set_type weights_best;
-  point_set_type points;
+  {
+    int history_size = weights_history.size();
+    MPI::COMM_WORLD.Bcast(&history_size, 1, MPI::INT, 0);
+    
+    if (history_size) {
+      weight_set_type weights;
+      
+      for (int i = 0; i != history_size; ++ i) {
+	if (mpi_rank == 0)
+	  a.push_back(weight_set_type());
+	else
+	  a.resize(1);
+	a.back().clear();
+
+	if (mpi_rank == 0)
+	  bcast_weights(0, const_cast<weight_set_type&>(weights_history[i]));
+	else
+	  bcast_weights(0, weights);
+	
+	std::pair<double, score_ptr_pair_type> risk_local = opt(mpi_rank == 0 ? weights_history[i] : weights, a.back());
+	if (mpi_rank == 0)
+	  reduce_weights(a.back());
+	else
+	  send_weights(a.back());
+	
+	// reduce objective part
+	double risk = 0.0;
+	MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	// reduce score part
+	reduce_score(risk_local.second);
+	
+	risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : loss_oracle);
+	risk += (risk_local.second.second ? risk_local.second.second->score() * loss_factor : 0.0);
+	
+	if (mpi_rank == 0) {
+	  // b = risk + a \cdot w
+	  f.push_back(- risk - cicada::dot_product(a.back(), weights_history[i]));
+	  alpha.push_back(0.0);
+	}
+      }
+    }
+  }
   
   weight_set_type weights_min;
   double objective_master_min = std::numeric_limits<double>::infinity();
-
+  
   double objective_master_prev = std::numeric_limits<double>::infinity();
   double objective_master = 0.0;
   double objective_reduced = 0.0;
-
-  const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
-  const double loss_oracle = (scorers.error_metric() ? 0.0 : - 1.0);
-
-  // keep previous best...
-  weights_prev = weights;
+    
+  // synchronize weights...
+  bcast_weights(0, weights);
+  
+  
+  // keep the previous bests
+  weight_set_type weights_prev = weights;
+  
+  // line-search points
+  point_set_type points;
   
   // at most 1000 iterations
   // at least two updates
@@ -4326,11 +4395,12 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("kbest",   po::value<path_set_type>(&kbest_path)->multitoken(),  "kbest path")
-    ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(), "oracle kbest path")
-    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
-    ("weights", po::value<path_type>(&weights_path),      "initial parameter")
-    ("output",  po::value<path_type>(&output_path),       "output parameter")
+    ("kbest",           po::value<path_set_type>(&kbest_path)->multitoken(),           "kbest path")
+    ("oracle",          po::value<path_set_type>(&oracle_path)->multitoken(),          "oracle kbest path")
+    ("refset",          po::value<path_set_type>(&refset_files)->multitoken(),         "reference set file(s)")
+    ("weights",         po::value<path_type>(&weights_path),                           "initial parameter")
+    ("weights-history", po::value<path_set_type>(&weights_history_path)->multitoken(), "parameter history")
+    ("output",          po::value<path_type>(&output_path),                            "output parameter")
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     

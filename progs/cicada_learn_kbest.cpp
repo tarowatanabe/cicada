@@ -54,6 +54,8 @@ typedef std::vector<size_t, std::allocator<size_t> > kbest_map_type;
 path_set_type kbest_path;
 path_set_type oracle_path;
 path_type weights_path;
+path_set_type weights_history_path;
+
 path_type output_path = "-";
 path_type output_objective_path;
 
@@ -2482,6 +2484,7 @@ void options(int argc, char** argv)
     ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(),  "oracle kbest path")
     ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     ("weights", po::value<path_type>(&weights_path),                   "initial parameter")
+    ("weights-history", po::value<path_set_type>(&weights_history_path)->multitoken(), "parameter history")
     ("output",  po::value<path_type>(&output_path),                    "output parameter")
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
