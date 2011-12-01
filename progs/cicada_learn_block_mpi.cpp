@@ -907,8 +907,18 @@ void cicada_learn(operation_set_type& operations,
       typedef line_search_type::value_type optimum_type;
       
       const weight_set_type& origin = weights_prev;
-      weight_set_type direction = weights;
-      direction -= weights_prev;
+      weight_set_type direction;
+      
+      {
+	const size_t weights_size = utils::bithack::min(weights.size(), weights_prev.size());
+	
+	for (size_t i = 0; i != weights_size; ++ i)
+	  direction[i] = weights[i] - weights_prev[i];
+	for (size_t i = weights_size; i < weights.size(); ++ i)
+	  direction[i] = weights[i];
+	for (size_t i = weights_size; i < weights_prev.size(); ++ i)
+	  direction[i] = - weights_prev[i];
+      }
       
       if (mpi_rank == 0) {
 	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;

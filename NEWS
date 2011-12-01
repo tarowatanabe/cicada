@@ -1,7 +1,10 @@
-2011-11-x
+2011-12-x
 Better ngram feature computation by pre-transforming into word-id
 New: added softmax-margin and loss-margin in cicaa_learn_kbest{,_mpi} (probably, we will deprecate cicada_maxlike{,mpi})
-New: added many more learning algorithms in cicda_learn_kbest_mpi: pegasos and cutting-plac w/ and w/o line-search optimization
+New: added many more learning algorithms in cicda_learn_kbest_mpi: pegasos and cutting-plane w/ and w/o line-search optimization
+New: added mert-search which performs line-search used in mert
+New: added direct-loss cutting plane algorithm (mcp)
+New: added pa,cw,arow,nherd for block-based optimization
 Deprecated cicada-learn-linear.sh which is now integrated in cicad-learn.sh
 
 2011-10-29
