@@ -46,6 +46,7 @@ scorer="bleu:order=4,exact=true"
 learn="lbfgs"
 learn_options=""
 zero_weights=no
+history_weights=no
 kbest=1000
 bias_features=""
 bias_weight=-1
@@ -94,6 +95,7 @@ $me [options]
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --learn-options           other learning options
   --zero-weights            learning from zero weights in each iteration
+  --history-weights         learning from multiple hisories (only for mcp learning)
   --kbest                   kbest size             (default: $kbest)
   --bias-features           bias features
   --bias-weight             bias weight
@@ -189,6 +191,9 @@ while test $# -gt 0 ; do
     shift; shift ;;
   --zero-weights )
     zero_weights=yes
+    shift ;;
+  --history-weights )
+    history_weights=yes
     shift ;;
 
   --kbest )
@@ -639,14 +644,6 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     fi
   done
 
-  ### last weights
-  weights_last=${weights_init}
-  for ((i=1;i<$iter;++i)); do
-    if test -e ${root}weights.$i; then
-      weights_last=${root}weights.$i
-    fi
-  done
-
   tstset_oracle=${root}kbest-$iter
   if test "$merge" = "yes"; then
     tstset_oracle=$tstset
@@ -663,6 +660,30 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
         \
         --debug || exit 1
 
+  ### previous weights...
+  weights_last=${weights_init}
+  weights_history=${weights_init}
+  for ((i=1;i<$iter;++i)); do
+    if test -e ${root}weights.$i; then
+      weights_last=${root}weights.$i
+      weights_history="${weights_history} ${weights_last}"
+    fi
+  done
+
+  ### option for previous weights
+  weights_option=""
+  if test "$weights_last" != ""; then
+    weights_option=" --weights $weights_last"
+  fi
+  if test "$zero_weights" = "yes"; then
+    weights_option=""
+  fi
+  if test "$history_weights" = "yes"; then
+    if test "$weights_history" != ""; then
+      weights_option="${weights_option} --weights-history ${weights_history}"
+    fi
+  fi
+
   learn_oracle=$orcset
   unite=""
   if test "$merge" = "yes"; then
@@ -673,17 +694,6 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   weights_learn=${root}weights.$iter
   if test $do_interpolate -eq 1; then
     weights_learn=${root}weights.${iter}.learn
-  fi
-    
-  ## liblinear learning
-  
-  ### option for previous weights
-  weights_option=""
-  if test "$weights_last" != ""; then
-    weights_option=" --weights $weights_last"
-  fi
-  if test "$zero_weights" = "yes"; then
-    weights_option=""
   fi
 
   regularize=" --regularize-l2"
