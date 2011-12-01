@@ -3222,7 +3222,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	variance += weights_prev[i] * weights_prev[i];
       
       //const double k = std::min(suffered_loss / variance, 1.0);
-      const double k = - suffered_loss / variance;
+      const double k = suffered_loss / variance;
       
       if (k != 1.0) {
 	for (size_t i = 0; i != weights_size; ++ i)
