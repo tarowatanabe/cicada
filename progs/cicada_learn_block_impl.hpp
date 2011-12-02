@@ -1546,6 +1546,229 @@ struct LearnSGDL2 : public LearnLR
   double weight_norm;
 };
 
+// SGDL2 learner
+struct LearnOSGDL2 : public LearnLR
+{
+  typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
+
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
+
+  template <typename FeatureSet>
+  struct HMatrix
+  {
+    HMatrix(const FeatureSet& __features) : features(__features) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
+    }
+    
+    const FeatureSet& features;
+  };
+  
+  template <typename FeatureSet>
+  struct MMatrix
+  {
+    MMatrix(const FeatureSet& __features) : features(__features) {}
+    
+    template <typename W>
+    void operator()(W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = features.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const FeatureSet& features;
+  };
+    
+  LearnOSGDL2(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  
+  void clear()
+  {
+    samples.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  {
+    if (kbests.empty() || oracles.empty()) return;
+    
+    samples.push_back(sample_pair_type());
+    samples.back().encode(kbests, oracles, error_metric);
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  template <typename Iterator>
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+
+  void clear_history() {}
+
+  sample_set_type::features_type feats;
+  sample_set_type features;
+  alpha_type      alpha;
+  f_type          f;
+  
+  double learn(weight_set_type& weights)
+  {
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
+    
+    if (samples.empty()) return 0.0;
+    
+    const size_type k = samples.size();
+    const double k_norm = 1.0 / k;
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    // do we really need this...?
+    rescale(weights, 1.0 - eta * lambda);
+    
+    expectation_type expectations;
+    
+    features.clear();
+    
+    // update... by eta / k
+    double objective = 0.0;
+    sample_pair_set_type::const_iterator siter_end = samples.end();
+    for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter) {
+      expectations.clear();
+      objective += siter->encode(weights, expectations, weight_scale);
+      
+      feats.clear();
+      expectation_type::const_iterator eiter_end = expectations.end();
+      for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter)
+	feats.push_back(std::make_pair(eiter->first, - double(eiter->second)));
+      
+      features.insert(feats.begin(), feats.end());
+    }
+    objective /= samples.size();
+    
+    f.clear();
+    alpha.clear();
+    
+    alpha.reserve(samples.size());
+    f.reserve(samples.size());
+    
+    alpha.resize(samples.size(), 0.0);
+    f.resize(samples.size(), 0.0);
+    for (size_t i = 0; i != samples.size(); ++ i)
+      f[i] = - (0.0 - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
+    
+    cicada::optimize::QPDCD solver;
+    
+    HMatrix<sample_set_type> H(features);
+    MMatrix<sample_set_type> M(features);
+    
+    solver(alpha, f, H, M, eta, tolerance);
+    
+    // update by expectations...
+    double a_norm = 0.0;
+    double pred = 0.0;
+    for (size_t i = 0; i != samples.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  double& x = weights[fiter->first];
+	  const double a = alpha[i] * fiter->second;
+	  
+	  a_norm += a * a;
+	  pred += 2.0 * x * a;
+	  
+	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
+	  x += a / weight_scale;
+	}
+      }
+    
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
+    
+    if (weight_norm > 1.0 / lambda)
+      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
+    
+    // clear current training events..
+    samples.clear();
+    
+    return objective;
+  }
+
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+  
+  sample_pair_set_type samples;
+
+  double tolerance;
+
+  size_type instances;
+  
+  size_type epoch;
+  double    lambda;
+  
+  double weight_scale;
+  double weight_norm;
+};
+
 // LBFGS learner
 struct LearnLBFGS : public LearnLR
 {
