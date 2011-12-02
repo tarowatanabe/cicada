@@ -1700,7 +1700,7 @@ struct LearnOSGDL2 : public LearnLR
     
     alpha.resize(samples.size(), 0.0);
     for (size_t i = 0; i != samples.size(); ++ i)
-      f[i] = - (f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
+      f[i] = - (- f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
     
     cicada::optimize::QPDCD solver;
     
