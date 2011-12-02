@@ -1260,7 +1260,7 @@ struct LearnLR : public LearnBase
 
     typedef std::vector<double, std::allocator<double> > margin_set_type;
 
-    margin_set_type margins;
+    margin_set_type __margins;
     
     template <typename Expectations>
     double encode(const weight_set_type& weights, Expectations& expectations, const double scale) const
@@ -1271,6 +1271,8 @@ struct LearnLR : public LearnBase
       weight_type Z_kbest;
       
       const double cost_factor = (softmax_margin ? 1.0 : 0.0);
+
+      margin_set_type& margins = const_cast<margin_set_type&>(__margins);
 
       margins.clear();
       
