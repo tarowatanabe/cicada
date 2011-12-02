@@ -1257,6 +1257,10 @@ struct LearnLR : public LearnBase
 	loss_oracles.push_back(oiter->score->score() * error_factor);
       }
     }
+
+    typedef std::vector<double, std::allocator<double> > margin_set_type;
+
+    margin_set_type margins;
     
     template <typename Expectations>
     double encode(const weight_set_type& weights, Expectations& expectations, const double scale) const
@@ -1267,23 +1271,31 @@ struct LearnLR : public LearnBase
       weight_type Z_kbest;
       
       const double cost_factor = (softmax_margin ? 1.0 : 0.0);
-      
-      for (size_type o = 0; o != oracles.size(); ++ o)
-	Z_oracle += traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]);
-      
-      for (size_type k = 0; k != kbests.size(); ++ k)
-	Z_kbest += traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]);
+
+      margins.clear();
       
       for (size_type o = 0; o != oracles.size(); ++ o) {
-	const weight_type weight = traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]) / Z_oracle;
+	margins.push_back(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]);
+	Z_oracle += traits_type::exp(margins.back());
+      }
+      
+      for (size_type k = 0; k != kbests.size(); ++ k) {
+	margins.push_back(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]);
+	Z_kbest += traits_type::exp(margins.back());
+      }
+
+      margin_set_type::const_iterator miter = margins.begin();
+      
+      for (size_type o = 0; o != oracles.size(); ++ o, ++ miter) {
+	const weight_type weight = traits_type::exp(*miter) / Z_oracle;
 	
 	sample_set_type::value_type::const_iterator fiter_end = oracles[o].end();
 	for (sample_set_type::value_type::const_iterator fiter = oracles[o].begin(); fiter != fiter_end; ++ fiter)
 	  expectations[fiter->first] -= weight_type(fiter->second) * weight;
       }
       
-      for (size_type k = 0; k != kbests.size(); ++ k) {
-	const weight_type weight = traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]) / Z_kbest;	
+      for (size_type k = 0; k != kbests.size(); ++ k, ++ miter) {
+	const weight_type weight = traits_type::exp(*miter) / Z_kbest;	
 	
 	sample_set_type::value_type::const_iterator fiter_end = kbests[k].end();
 	for (sample_set_type::value_type::const_iterator fiter = kbests[k].begin(); fiter != fiter_end; ++ fiter)
