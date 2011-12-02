@@ -1677,13 +1677,17 @@ struct LearnOSGDL2 : public LearnLR
     expectation_type expectations;
     
     features.clear();
+    f.clear();
+    alpha.clear();
     
     // update... by eta / k
     double objective = 0.0;
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter) {
       expectations.clear();
-      objective += siter->encode(weights, expectations, weight_scale);
+      f.push_back(siter->encode(weights, expectations, weight_scale));
+      
+      objective += f.back();
       
       feats.clear();
       expectation_type::const_iterator eiter_end = expectations.end();
@@ -1694,16 +1698,9 @@ struct LearnOSGDL2 : public LearnLR
     }
     objective /= samples.size();
     
-    f.clear();
-    alpha.clear();
-    
-    alpha.reserve(samples.size());
-    f.reserve(samples.size());
-    
     alpha.resize(samples.size(), 0.0);
-    f.resize(samples.size(), 0.0);
     for (size_t i = 0; i != samples.size(); ++ i)
-      f[i] = - (0.0 - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
+      f[i] = - (f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
     
     cicada::optimize::QPDCD solver;
     
