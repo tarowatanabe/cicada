@@ -20,14 +20,17 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <boost/thread.hpp>
+
 
 #include "cicada/lattice.hpp"
 #include "cicada/hypergraph.hpp"
 #include "cicada/query_tree.hpp"
 #include "cicada/grammar.hpp"
 #include "cicada/tree_grammar.hpp"
-#include "utils/json_string_generator.hpp"
 
+#include "utils/lockfree_list_queue.hpp"
+#include "utils/json_string_generator.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/filesystem.hpp"
 
@@ -195,52 +198,40 @@ bool grammar_list = false;
 grammar_file_set_type tree_grammar_files;
 bool tree_grammar_list = false;
 
+int threads = 1;
+
 int debug = 0;
 
-void options(int argc, char** argv);
 
-int main(int argc, char** argv)
+struct Task
 {
-  try {
-    options(argc, argv);
-    
-    if (grammar_list) {
-      std::cout << grammar_type::lists();
-      return 0;
-    }
-    
-    if (tree_grammar_list) {
-      std::cout << tree_grammar_type::lists();
-      return 0;
-    }
-    
-    // read grammars...
-    grammar_type grammar(grammar_files.begin(), grammar_files.end());
-    if (debug)
-      std::cerr << "grammar: " << grammar.size() << std::endl;
-    
-    tree_grammar_type tree_grammar(tree_grammar_files.begin(), tree_grammar_files.end());
-    if (debug)
-      std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
-    
-    utils::compress_istream is(input_file, 1024 * 1024);
-
-    tree_rule_pair_unique_type tree_rules_unique;
-    rule_pair_unique_type      rules_unique;
+  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  
+  Task(queue_type& __queue,
+       const tree_grammar_type& __tree_grammar,
+       const grammar_type& __grammar) : queue(__queue), tree_grammar(__tree_grammar), grammar(__grammar) {}
+  
+  void operator()()
+  {
+    cicada::QueryTree query(tree_grammar, grammar);
 
     tree_rule_pair_set_type tree_rules;
     rule_pair_set_type      rules;
-
+    
     tree_rule_pair_string_type tree_rule_string;
     rule_pair_string_type rule_string;
     
     boost::iostreams::filtering_ostream os_source;
     boost::iostreams::filtering_ostream os_target;
-
-    cicada::QueryTree query(tree_grammar, grammar);
     
     hypergraph_type graph;
-    while (is >> graph) {
+    std::string line;
+    for (;;) {
+      queue.pop_swap(line);
+      if (line.empty()) break;
+      
+      graph.assign(line);
+      
       tree_rules.clear();
       rules.clear();
       
@@ -293,6 +284,83 @@ int main(int argc, char** argv)
 	}
     }
     
+  }
+
+  queue_type&              queue;
+  const tree_grammar_type& tree_grammar;
+  const grammar_type&      grammar;
+  
+  tree_rule_pair_unique_type tree_rules_unique;
+  rule_pair_unique_type      rules_unique;
+};
+
+void options(int argc, char** argv);
+
+int main(int argc, char** argv)
+{
+  try {
+    options(argc, argv);
+    
+    if (grammar_list) {
+      std::cout << grammar_type::lists();
+      return 0;
+    }
+    
+    if (tree_grammar_list) {
+      std::cout << tree_grammar_type::lists();
+      return 0;
+    }
+    
+    threads = utils::bithack::max(1, threads);
+
+    // read grammars...
+    grammar_type grammar(grammar_files.begin(), grammar_files.end());
+    if (debug)
+      std::cerr << "grammar: " << grammar.size() << std::endl;
+    
+    tree_grammar_type tree_grammar(tree_grammar_files.begin(), tree_grammar_files.end());
+    if (debug)
+      std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
+
+    typedef Task task_type;
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
+    task_type::queue_type queue(threads);
+    task_set_type tasks(threads, task_type(queue, tree_grammar, grammar));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    utils::compress_istream is(input_file, 1024 * 1024);
+    
+    std::string line;
+    while (std::getline(is, line))
+      if (! line.empty())
+	queue.push_swap(line);
+    
+    for (int i = 0; i != threads; ++ i)
+      queue.push(std::string());
+    
+    workers.join_all();
+
+    tree_rule_pair_unique_type tree_rules_unique;
+    rule_pair_unique_type      rules_unique;
+    
+    for (int i = 0; i != threads; ++ i) {
+      if (tree_rules_unique.empty())
+	tree_rules_unique.swap(tasks[i].tree_rules_unique);
+      else
+	tree_rules_unique.insert(tasks[i].tree_rules_unique.begin(), tasks[i].tree_rules_unique.end());
+      
+      if (rules_unique.empty())
+	rules_unique.swap(tasks[i].rules_unique);
+      else
+	rules_unique.insert(tasks[i].rules_unique.begin(), tasks[i].rules_unique.end());      
+    }
+    tasks.clear();
+    
+
     typedef std::ostream_iterator<char> oiter_type;
 
     features_generator<oiter_type>   generate_features;
@@ -365,6 +433,7 @@ void options(int argc, char** argv)
   po::options_description opts_command("command line options");
   opts_command.add_options()
     ("config",  po::value<path_type>(),                    "configuration file")
+    ("threads", po::value<int>(&threads),                  "# of threads (highly experimental)")
     ("debug",   po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
