@@ -6,6 +6,7 @@ New: added mert-search which performs line-search used in mert
 New: added direct-loss cutting plane algorithm (mcp)
 New: added pa,cw,arow,nherd for block-based optimization
 New: added optimized-sgd (osgd) like optimized-pegasos (opegasos) in cicada_learn_block_mpi
+New: added cicada_query_{cky,tree,tree-cky} which query rules (or tree-rules) given sentence/lattice or hypergraph, and dump unique rules
 Deprecated cicada-learn-linear.sh which is now integrated in cicad-learn.sh
 
 2011-10-29
