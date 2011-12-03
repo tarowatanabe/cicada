@@ -215,6 +215,7 @@ struct Task
 	  rule_string.clear();
 	  
 	  rule_string.lhs = (riter->source ? riter->source->lhs : riter->target->lhs);
+	  
 	  if (riter->source)
 	    rule_string.source = riter->source->rhs;
 	  if (riter->target)
