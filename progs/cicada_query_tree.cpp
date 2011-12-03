@@ -22,13 +22,13 @@
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
 
-
 #include "cicada/lattice.hpp"
 #include "cicada/hypergraph.hpp"
 #include "cicada/query_tree.hpp"
 #include "cicada/grammar.hpp"
 #include "cicada/tree_grammar.hpp"
 #include "cicada/feature_vector_compact.hpp"
+#include "cicada/symbol_vector_compact.hpp"
 
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/json_string_generator.hpp"
@@ -55,6 +55,7 @@ typedef transducer_type::rule_pair_type      rule_pair_type;
 
 typedef rule_type::symbol_type     symbol_type;
 typedef rule_type::symbol_set_type symbol_set_type;
+typedef cicada::SymbolVectorCompact symbol_compact_type;
 
 typedef tree_transducer_type::rule_type      tree_rule_type;
 typedef tree_transducer_type::rule_ptr_type  tree_rule_ptr_type;
@@ -65,8 +66,8 @@ struct rule_pair_string_type
   typedef cicada::FeatureVectorCompact feature_set_type;
 
   symbol_type lhs;
-  symbol_set_type source;
-  symbol_set_type target;
+  symbol_compact_type source;
+  symbol_compact_type target;
   
   feature_set_type   features;
   attribute_set_type attributes;
@@ -409,7 +410,9 @@ int main(int argc, char** argv)
       for (rule_pair_unique_type::const_iterator iter = rules_unique.begin(); iter != iter_end; ++ iter) {
 	karma::generate(oiter_type(os),
 			standard::string << " ||| " << -(standard::string % ' ') << " ||| " << -(standard::string % ' '),
-			iter->lhs, iter->source, iter->target);
+			iter->lhs,
+			symbol_set_type(iter->source.begin(), iter->source.end()),
+			symbol_set_type(iter->target.begin(), iter->target.end()));
 	
 	if (! iter->features.empty()) {
 	  feature_set_type features(iter->features.begin(), iter->features.end());
