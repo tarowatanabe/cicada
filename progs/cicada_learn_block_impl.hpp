@@ -1693,6 +1693,10 @@ struct LearnOSGDL2 : public LearnLR
     features.clear();
     f.clear();
     alpha.clear();
+
+    // use LBFGS?
+    // we will minimize ||x - x'|| + loss...
+    //
     
     // update... by eta / k
     double objective = 0.0;
