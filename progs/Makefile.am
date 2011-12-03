@@ -95,6 +95,7 @@ bin_PROGRAMS = \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
+	cicada_query_tree \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
@@ -370,6 +371,9 @@ cicada_oracle_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 cicada_oracle_kbest_mpi_SOURCES  = cicada_oracle_kbest_mpi.cpp cicada_text_impl.hpp
 cicada_oracle_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_oracle_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_query_tree_SOURCES = cicada_query_tree.cpp
+cicada_query_tree_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 mpimap_SOURCES = mpimap.cpp
 mpimap_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
