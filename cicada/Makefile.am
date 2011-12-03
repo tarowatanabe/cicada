@@ -367,6 +367,7 @@ push_bos_eos.hpp \
 quantizer.hpp \
 query_cky.hpp \
 query_tree.hpp \
+query_tree_cky.hpp \
 remove_annotation.hpp \
 remove_bos_eos.hpp \
 remove_epsilon.hpp \

@@ -100,6 +100,7 @@ cicada_oracle_kbest
 cicada_oracle_kbest_mpi
 cicada_query_cky
 cicada_query_tree
+cicada_query_tree_cky
 cicada_unite_forest
 cicada_unite_lattice
 cicada_unite_sentence
