@@ -198,7 +198,7 @@ int main(int argc, char ** argv)
 struct TaskFile
 {
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
-
+  
   TaskFile(queue_type&   __queue_is,
 	   queue_type&   __queue_os,
 	   const model_type& __model,
@@ -345,7 +345,7 @@ struct TaskDirectory
       _model(__model),
       _grammar(__grammar),
       _tree_grammar(__tree_grammar) {}
-
+  
   void operator()()
   {
     // cloning should be performed in thread... otherwise, strangething may happen

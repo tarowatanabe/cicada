@@ -213,8 +213,8 @@ struct Task
   
   void operator()()
   {
-    tree_grammar_type tree_grammar_local(tree_grammar.clone());
-    grammar_type      grammar_local(grammar.clone());
+    const tree_grammar_type tree_grammar_local(tree_grammar.clone());
+    const grammar_type      grammar_local(grammar.clone());
 
     cicada::QueryTree query(tree_grammar_local, grammar_local);
 
