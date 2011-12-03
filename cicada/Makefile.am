@@ -365,6 +365,7 @@ prune_edge.hpp \
 prune_kbest.hpp \
 push_bos_eos.hpp \
 quantizer.hpp \
+query_cky.hpp \
 query_tree.hpp \
 remove_annotation.hpp \
 remove_bos_eos.hpp \

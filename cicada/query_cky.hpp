@@ -3,10 +3,6 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-//
-// query grammar table cky-style and extract rules. we do not construct a hypergraph
-//
-
 #ifndef __CICADA__QUERY_CKY__HPP__
 #define __CICADA__QUERY_CKY__HPP__ 1
 
@@ -37,10 +33,10 @@ namespace cicada
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
-    
+
     typedef Symbol symbol_type;
     typedef Vocab  vocab_type;
-    
+
     typedef Lattice    lattice_type;
     typedef Grammar    grammar_type;
     typedef Transducer transducer_type;
@@ -55,18 +51,11 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
-    QueryCKY(const symbol_type& __goal,
-	     const grammar_type& __grammar,
-	     const bool __yield_source=false,
+    QueryCKY(const grammar_type& __grammar,
 	     const bool __treebank=false,
-	     const bool __pos_mode=false,
-	     const bool __unique_goal=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), unique_goal(__unique_goal),
-	attr_span_first("span-first"),
-	attr_span_last("span-last")
+	     const bool __pos_mode=false)
+      : grammar(__grammar), treebank(__treebank), pos_mode(__pos_mode)
     {
-      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
-      
       node_map.set_empty_key(symbol_level_type());
       closure.set_empty_key(symbol_type());
       closure_head.set_empty_key(symbol_type());
@@ -76,30 +65,15 @@ namespace cicada
     struct Active
     {
       Active(const transducer_type::id_type& __node,
-	     const hypergraph_type::edge_type::node_set_type& __tails,
-	     const feature_set_type& __features,
-	     const attribute_set_type& __attributes)
+	     const hypergraph_type::edge_type::node_set_type& __tails)
 	: node(__node),
-	  tails(__tails),
-	  features(__features),
-	  attributes(__attributes) {}
-      Active(const transducer_type::id_type& __node,
-	     const feature_set_type& __features,
-	     const attribute_set_type& __attributes)
-	: node(__node),
-	  tails(),
-	  features(__features),
-	  attributes(__attributes) {}
+	  tails(__tails) {}
       Active(const transducer_type::id_type& __node)
 	: node(__node),
-	  tails(),
-	  features(),
-	  attributes() {}
+	  tails() {}
       
       transducer_type::id_type                  node;
       hypergraph_type::edge_type::node_set_type tails;
-      feature_set_type                          features;
-      attribute_set_type                        attributes;
     };
     
     typedef Active active_type;
@@ -143,29 +117,10 @@ namespace cicada
       const non_terminal_set_type& non_terminals;
     };
 
-    struct PruneNone
-    {
-      bool operator()(const int first, const int last) const
-      {
-	return false;
-      }
-      
-      bool operator()(const int first, const int last, const symbol_type& label) const
-      {
-	return false;
-      }
-    };
 
+    template <typename IteratorRule>
     void operator()(const lattice_type& lattice,
-		    hypergraph_type& graph)
-    {
-      operator()(lattice, graph, PruneNone());
-    }
-    
-    template <typename Pruner>
-    void operator()(const lattice_type& lattice,
-		    hypergraph_type& graph,
-		    const Pruner& pruner)
+		    IteratorRule rule_iter)
     {
       graph.clear();
       
@@ -196,8 +151,6 @@ namespace cicada
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
 
-	  if (pruner(first, last)) continue;
-	  
 	  node_map.clear();
 	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
@@ -237,13 +190,13 @@ namespace cicada
 		      // handling of EPSILON rule...
 		      if (terminal == vocab_type::EPSILON) {
 			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			  cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			  cell.push_back(active_type(aiter->node, aiter->tails));
 		      } else {
 			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			  if (node == transducer.root()) continue;
 			  
-			  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			  cell.push_back(active_type(node, aiter->tails));
 			}
 		      }
 		    }
@@ -257,13 +210,13 @@ namespace cicada
 		      // handling of EPSILON rule...
 		      if (terminal == vocab_type::EPSILON) {
 			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			  cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			  cell.push_back(active_type(aiter->node, aiter->tails));
 		      } else {
 			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			  if (node == transducer.root()) continue;
 			  
-			  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			  cell.push_back(active_type(node, aiter->tails));
 			}
 		      }
 		    }
@@ -289,13 +242,12 @@ namespace cicada
 	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
 	      
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
-		const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		const symbol_type& lhs = rule->lhs;
+		*rule_iter = *riter;
+		++ rule_iter;
+
+		const rule_ptr_type& rule = riter->source;
 		
-		if (pruner(first, last, lhs)) continue;
-		
-		apply_rule(rule, riter->features + citer->features, riter->attributes + citer->attributes,
-			   citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
+		apply_rule(rule, citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
 			   first, last);
 	      }
 	    }
@@ -342,18 +294,18 @@ namespace cicada
 		  
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		    const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+		    *rule_iter = *riter;
+		    ++ rule_iter;
+		    
+		    const rule_ptr_type& rule = riter->source;
 		    const symbol_type& lhs = rule->lhs;
 
-		    if (pruner(first, last, lhs)) continue;
-		    
 		    closure_level_type::const_iterator citer = closure.find(lhs);
 		    const int level = (citer != closure.end() ? citer->second : 0);
 		    
 		    closure_head.insert(lhs);
 		    
-		    apply_rule(rule, riter->features, riter->attributes,
-			       &passive_arcs[p], (&passive_arcs[p]) + 1, passive_arcs, graph,
+		    apply_rule(rule, &passive_arcs[p], (&passive_arcs[p]) + 1, passive_arcs, graph,
 			       first, last, level + 1);
 		  }
 		}
@@ -407,55 +359,18 @@ namespace cicada
 	    extend_actives(transducer, active_arcs, passive_arcs, cell);
 	  }
 	}
-      
-      // finally, collect all the parsed rules, and proceed to [goal] rule...
-      // passive arcs will not be updated!
-      
-      if (unique_goal) {
-	passive_set_type& passive_arcs = passives(0, lattice.size());
-	for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	  if (non_terminals[passive_arcs[p]] == goal) {
-	    if (graph.is_valid())
-	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(passive_arcs[p]));
-	    
-	    graph.goal = passive_arcs[p];
-	  }
-      } else {
-	passive_set_type& passive_arcs = passives(0, lattice.size());
-	for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	  if (non_terminals[passive_arcs[p]] == goal) {
-	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
-	    
-	    hypergraph_type::edge_type& edge = graph.add_edge(&(passive_arcs[p]), (&passive_arcs[p]) + 1);
-	    edge.rule = goal_rule;
-	    
-	    edge.attributes[attr_span_first] = attribute_set_type::int_type(0);
-	    edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice.size());
-	    
-	    if (! graph.is_valid()) {
-	      graph.goal = graph.add_node().id;
-	      non_terminals.push_back(goal_rule->lhs);
-	    }
-	    
-	    graph.connect_edge(edge.id, graph.goal);
-	  }
-      }
+
+      graph.clear();
       
       actives.clear();
       passives.clear();
       non_terminals.clear();
-      
-      // we will sort to remove unreachable nodes......
-      if (graph.is_valid())
-	graph.topologically_sort();
     }
-
+    
   private:
     
     template <typename Iterator>
     void apply_rule(const rule_ptr_type& rule,
-		    const feature_set_type& features,
-		    const attribute_set_type& attributes,
 		    Iterator first,
 		    Iterator last,
 		    passive_set_type& passives,
@@ -468,14 +383,8 @@ namespace cicada
 
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
-      edge.features = features;
-      edge.attributes = attributes;
-      
-      // assign metadata...
-      edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
-      edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
 
-      const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
+      const int cat_level = level;
       
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, cat_level), 0));
       if (result.second) {
@@ -529,7 +438,7 @@ namespace cicada
 	      if (node == transducer.root()) continue;
 	      
 	      tails.back() = *piter;
-	      cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
+	      cell.push_back(active_type(node, tails));
 	      
 	      found = true;
 	    }
@@ -539,20 +448,15 @@ namespace cicada
     }
     
   private:
-    const symbol_type goal;
     const grammar_type& grammar;
-    const bool yield_source;
     const bool treebank;
     const bool pos_mode;
-    const bool unique_goal;
-    const attribute_type attr_span_first;
-    const attribute_type attr_span_last;
-    
-    rule_ptr_type goal_rule;
 
+    hypergraph_type graph;
+    
     active_chart_set_type  actives;
     passive_chart_type     passives;
-
+    
     node_map_type         node_map;
     closure_level_type    closure;
     closure_type          closure_head;
@@ -560,10 +464,11 @@ namespace cicada
     non_terminal_set_type non_terminals;
   };
   
+  template <typename Iterator>
   inline
-  void query_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool unique_goal=false)
+  void query_cky(const Grammar& grammar, const Lattice& lattice, Iterator iter, const bool treebank=false, const bool pos_mode=false)
   {
-    QueryCKY(goal, grammar, yield_source, treebank, pos_mode, unique_goal)(lattice, graph);
+    QueryCKY(grammar, treebank, pos_mode)(lattice, iter);
   }
 };
 
