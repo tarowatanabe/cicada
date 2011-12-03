@@ -411,7 +411,7 @@ int main(int argc, char** argv)
 	karma::generate(oiter_type(os), standard::string << " ||| " << standard::string, iter->source, iter->target);
 	
 	if (! iter->features.empty()) {
-	  feature_set_type features(iter->features.begin(), iter->fetures.end());
+	  feature_set_type features(iter->features.begin(), iter->features.end());
 	  karma::generate(oiter_type(os), generate_features, features);
 	}
 	
@@ -434,7 +434,7 @@ int main(int argc, char** argv)
 			iter->lhs, iter->source, iter->target);
 	
 	if (! iter->features.empty()) {
-	  feature_set_type features(iter->features.begin(), iter->fetures.end());
+	  feature_set_type features(iter->features.begin(), iter->features.end());
 	  karma::generate(oiter_type(os), generate_features, iter->features);
 	}
 	
