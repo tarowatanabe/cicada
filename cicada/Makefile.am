@@ -395,6 +395,7 @@ tokenizer.hpp \
 treebank.hpp \
 symbol.hpp \
 symbol_vector.hpp \
+symbol_vector_compact.hpp \
 transducer.hpp \
 tree_grammar.hpp \
 tree_grammar_mutable.hpp \
@@ -502,6 +503,7 @@ signature_main \
 span_vector_main \
 stemmer_main \
 symbol_main \
+symbol_vector_main \
 tokenizer_main \
 transducer_main \
 tree_grammar_mutable_main \
@@ -582,6 +584,9 @@ stemmer_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la
+
+symbol_vector_main_SOURCES = symbol_vector_main.cpp
+symbol_vector_main_LDADD = libcicada.la
 
 tokenizer_main_SOURCES = tokenizer_main.cpp
 tokenizer_main_LDADD = libcicada.la

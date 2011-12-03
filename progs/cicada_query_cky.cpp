@@ -28,6 +28,7 @@
 #include "cicada/query_cky.hpp"
 #include "cicada/grammar.hpp"
 #include "cicada/feature_vector_compact.hpp"
+#include "cicada/symbol_vector_compact.hpp"
 
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/json_string_generator.hpp"
@@ -52,13 +53,17 @@ typedef transducer_type::rule_type           rule_type;
 typedef transducer_type::rule_ptr_type       rule_ptr_type;
 typedef transducer_type::rule_pair_type      rule_pair_type;
 
+typedef rule_type::symbol_type     symbol_type;
+typedef rule_type::symbol_set_type symbol_set_type;
+typedef cicada::SymbolVectorCompact symbol_compact_type;
+
 struct rule_pair_string_type
 {
   typedef cicada::FeatureVectorCompact feature_set_type;
   
-  std::string lhs;
-  std::string source;
-  std::string target;
+  symbol_type lhs;
+  symbol_compact_type source;
+  symbol_compact_type target;
   
   feature_set_type   features;
   attribute_set_type attributes;
@@ -67,7 +72,7 @@ struct rule_pair_string_type
 
   void clear()
   {
-    lhs.clear();
+    lhs = symbol_type();
     source.clear();
     target.clear();
     features.clear();
@@ -210,19 +215,13 @@ struct Task
       for (rule_pair_set_type::iterator riter = rules.begin(); riter != riter_end; ++ riter)
 	if (riter->source || riter->target) {
 	  rule_string.clear();
-	
-	  rule_string.lhs = (riter->source ? riter->source->lhs : riter->target->lhs);
-	
-	  os_source.push(boost::iostreams::back_inserter(rule_string.source));
-	  os_target.push(boost::iostreams::back_inserter(rule_string.target));
-	
-	  if (riter->source)
-	    os_source << riter->source->rhs;
-	  if (riter->target)
-	    os_target << riter->target->rhs;
 	  
-	  os_source.pop();
-	  os_target.pop();
+	  rule_string.lhs = (riter->source ? riter->source->lhs : riter->target->lhs);
+	  
+	  if (riter->source)
+	    rule_string.source = riter->source->rhs;
+	  if (riter->target)
+	    rule_string.target = riter->target->rhs;
 	  
 	  rule_string.features = riter->features;
 	  rule_string.attributes.swap(riter->attributes);
@@ -311,8 +310,10 @@ int main(int argc, char** argv)
       rule_pair_unique_type::const_iterator iter_end = rules_unique.end();
       for (rule_pair_unique_type::const_iterator iter = rules_unique.begin(); iter != iter_end; ++ iter) {
 	karma::generate(oiter_type(os),
-			standard::string << " ||| " << standard::string << " ||| " << standard::string,
-			iter->lhs, iter->source, iter->target);
+			standard::string << " ||| " << -(standard::string % ' ') << " ||| " << -(standard::string % ' '),
+			iter->lhs,
+			symbol_set_type(iter->source.begin(), iter->source.end()),
+			symbol_set_type(iter->target.begin(), iter->target.end()));
 	
 	if (! iter->features.empty()) {
 	  feature_set_type features(iter->features.begin(), iter->features.end());

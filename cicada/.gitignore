@@ -49,6 +49,7 @@ signature_main
 span_vector_main
 stemmer_main
 symbol_main
+symbol_vector_main
 tokenizer_main
 transducer_main
 tree_grammar_mutable_main
