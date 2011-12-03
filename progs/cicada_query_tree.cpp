@@ -359,7 +359,7 @@ int main(int argc, char** argv)
       if (rules_unique.empty())
 	rules_unique.swap(tasks[i].rules_unique);
       else
-	rules_unique.insert(tasks[i].rules_unique.begin(), tasks[i].rules_unique.end());      
+	rules_unique.insert(tasks[i].rules_unique.begin(), tasks[i].rules_unique.end());
     }
     tasks.clear();
     
