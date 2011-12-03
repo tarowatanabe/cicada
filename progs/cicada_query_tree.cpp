@@ -28,12 +28,12 @@
 #include "cicada/query_tree.hpp"
 #include "cicada/grammar.hpp"
 #include "cicada/tree_grammar.hpp"
+#include "cicada/feature_vector_compact.hpp"
 
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/json_string_generator.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/filesystem.hpp"
-
 
 typedef boost::filesystem::path path_type;
 
@@ -59,6 +59,8 @@ typedef tree_transducer_type::rule_pair_type tree_rule_pair_type;
 
 struct rule_pair_string_type
 {
+  typedef cicada::FeatureVectorCompact feature_set_type;
+
   std::string lhs;
   std::string source;
   std::string target;
@@ -80,6 +82,8 @@ struct rule_pair_string_type
 
 struct tree_rule_pair_string_type
 {
+  typedef cicada::FeatureVectorCompact feature_set_type;
+
   std::string source;
   std::string target;
   
@@ -261,7 +265,7 @@ struct Task
 	  os_source.pop();
 	  os_target.pop();
 	  
-	  tree_rule_string.features.swap(titer->features);
+	  tree_rule_string.features = titer->features;
 	  tree_rule_string.attributes.swap(titer->attributes);
 	  
 	  tree_rules_unique.insert(tree_rule_string);
@@ -285,7 +289,7 @@ struct Task
 	  os_source.pop();
 	  os_target.pop();
 	  
-	  rule_string.features.swap(riter->features);
+	  rule_string.features = riter->features;
 	  rule_string.attributes.swap(riter->attributes);
 	
 	  rules_unique.insert(rule_string);
@@ -371,7 +375,6 @@ int main(int argc, char** argv)
       tasks[i].rules_unique.clear();
     }
     tasks.clear();
-    
 
     typedef std::ostream_iterator<char> oiter_type;
 
@@ -388,8 +391,10 @@ int main(int argc, char** argv)
       for (tree_rule_pair_unique_type::const_iterator iter = tree_rules_unique.begin(); iter != iter_end; ++ iter) {
 	karma::generate(oiter_type(os), standard::string << " ||| " << standard::string, iter->source, iter->target);
 	
-	if (! iter->features.empty())
-	  karma::generate(oiter_type(os), generate_features, iter->features);
+	if (! iter->features.empty()) {
+	  feature_set_type features(iter->features.begin(), iter->fetures.end());
+	  karma::generate(oiter_type(os), generate_features, features);
+	}
 	
 	if (! iter->attributes.empty())
 	  karma::generate(oiter_type(os), generate_attributes, iter->attributes);
@@ -409,8 +414,10 @@ int main(int argc, char** argv)
 			standard::string << " ||| " << standard::string << " ||| " << standard::string,
 			iter->lhs, iter->source, iter->target);
 	
-	if (! iter->features.empty())
-	  karma::generate(oiter_type(os), generate_features, iter->features);
+	if (! iter->features.empty()) {
+	  feature_set_type features(iter->features.begin(), iter->fetures.end());
+	  karma::generate(oiter_type(os), generate_features, features);
+	}
 	
 	if (! iter->attributes.empty())
 	  karma::generate(oiter_type(os), generate_attributes, iter->attributes);
