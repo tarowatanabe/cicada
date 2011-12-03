@@ -1257,6 +1257,10 @@ struct LearnLR : public LearnBase
 	loss_oracles.push_back(oiter->score->score() * error_factor);
       }
     }
+
+    typedef std::vector<double, std::allocator<double> > margin_set_type;
+
+    margin_set_type __margins;
     
     template <typename Expectations>
     double encode(const weight_set_type& weights, Expectations& expectations, const double scale) const
@@ -1267,23 +1271,33 @@ struct LearnLR : public LearnBase
       weight_type Z_kbest;
       
       const double cost_factor = (softmax_margin ? 1.0 : 0.0);
-      
-      for (size_type o = 0; o != oracles.size(); ++ o)
-	Z_oracle += traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]);
-      
-      for (size_type k = 0; k != kbests.size(); ++ k)
-	Z_kbest += traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]);
+
+      margin_set_type& margins = const_cast<margin_set_type&>(__margins);
+
+      margins.clear();
       
       for (size_type o = 0; o != oracles.size(); ++ o) {
-	const weight_type weight = traits_type::exp(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]) / Z_oracle;
+	margins.push_back(cicada::dot_product(weights, oracles[o].begin(), oracles[o].end(), 0.0) * scale + cost_factor * loss_oracles[o]);
+	Z_oracle += traits_type::exp(margins.back());
+      }
+      
+      for (size_type k = 0; k != kbests.size(); ++ k) {
+	margins.push_back(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]);
+	Z_kbest += traits_type::exp(margins.back());
+      }
+
+      margin_set_type::const_iterator miter = margins.begin();
+      
+      for (size_type o = 0; o != oracles.size(); ++ o, ++ miter) {
+	const weight_type weight = traits_type::exp(*miter) / Z_oracle;
 	
 	sample_set_type::value_type::const_iterator fiter_end = oracles[o].end();
 	for (sample_set_type::value_type::const_iterator fiter = oracles[o].begin(); fiter != fiter_end; ++ fiter)
 	  expectations[fiter->first] -= weight_type(fiter->second) * weight;
       }
       
-      for (size_type k = 0; k != kbests.size(); ++ k) {
-	const weight_type weight = traits_type::exp(cicada::dot_product(weights, kbests[k].begin(), kbests[k].end(), 0.0) * scale + cost_factor * loss_kbests[k]) / Z_kbest;	
+      for (size_type k = 0; k != kbests.size(); ++ k, ++ miter) {
+	const weight_type weight = traits_type::exp(*miter) / Z_kbest;	
 	
 	sample_set_type::value_type::const_iterator fiter_end = kbests[k].end();
 	for (sample_set_type::value_type::const_iterator fiter = kbests[k].begin(); fiter != fiter_end; ++ fiter)
@@ -1677,13 +1691,21 @@ struct LearnOSGDL2 : public LearnLR
     expectation_type expectations;
     
     features.clear();
+    f.clear();
+    alpha.clear();
+
+    // use LBFGS?
+    // we will minimize ||x - x'|| + loss...
+    //
     
     // update... by eta / k
     double objective = 0.0;
     sample_pair_set_type::const_iterator siter_end = samples.end();
     for (sample_pair_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter) {
       expectations.clear();
-      objective += siter->encode(weights, expectations, weight_scale);
+      f.push_back(siter->encode(weights, expectations, weight_scale));
+      
+      objective += f.back();
       
       feats.clear();
       expectation_type::const_iterator eiter_end = expectations.end();
@@ -1694,16 +1716,9 @@ struct LearnOSGDL2 : public LearnLR
     }
     objective /= samples.size();
     
-    f.clear();
-    alpha.clear();
-    
-    alpha.reserve(samples.size());
-    f.reserve(samples.size());
-    
     alpha.resize(samples.size(), 0.0);
-    f.resize(samples.size(), 0.0);
     for (size_t i = 0; i != samples.size(); ++ i)
-      f[i] = - (0.0 - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
+      f[i] = - (- f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
     
     cicada::optimize::QPDCD solver;
     
