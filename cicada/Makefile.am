@@ -330,6 +330,7 @@ grammar_format.hpp \
 grammar_mutable.hpp \
 grammar_simple.hpp \
 grammar_static.hpp \
+grammar_shared.hpp \
 grammar_unknown.hpp \
 graphviz.hpp \
 head_finder.hpp \
@@ -396,6 +397,7 @@ transducer.hpp \
 tree_grammar.hpp \
 tree_grammar_mutable.hpp \
 tree_grammar_static.hpp \
+tree_grammar_shared.hpp \
 tree_grammar_simple.hpp \
 tree_rule.hpp \
 tree_transducer.hpp \

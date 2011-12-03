@@ -5,6 +5,7 @@
 #include <cicada/tree_transducer.hpp>
 #include <cicada/tree_grammar_mutable.hpp>
 #include <cicada/tree_grammar_static.hpp>
+#include <cicada/tree_grammar_shared.hpp>
 #include <cicada/tree_grammar_simple.hpp>
 
 #include <cicada/parameter.hpp>
@@ -60,7 +61,7 @@ fallback: fallback source-to-target transfer rule\n\
       if (path != "-" && boost::filesystem::is_directory(path))
 	return transducer_ptr_type(new TreeGrammarStatic(parameter));
       else
-	return transducer_ptr_type(new TreeGrammarMutable(parameter));
+	return transducer_ptr_type(new TreeGrammarShared(parameter));
     }
   }
   
