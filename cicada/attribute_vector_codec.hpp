@@ -75,12 +75,6 @@ namespace cicada
       typedef uint8_t byte_type;
       typedef AttributeVector attribute_set_type;
       
-      static const uint8_t mask_float    = 1 << (4 + 0);
-      static const uint8_t mask_unsigned = 1 << (4 + 1);
-      static const uint8_t mask_signed   = 1 << (4 + 2);
-      static const uint8_t mask_string   = 1 << (4 + 3);
-      static const uint8_t mask_size     = 0x0f;
-
       template <typename __Tp>
       static byte_type* cast(__Tp& x)
       {
@@ -108,6 +102,12 @@ namespace cicada
 
       struct __encoder_size : public boost::static_visitor<size_t>
       {
+	static const uint8_t mask_float    = 1 << (4 + 0);
+	static const uint8_t mask_unsigned = 1 << (4 + 1);
+	static const uint8_t mask_signed   = 1 << (4 + 2);
+	static const uint8_t mask_string   = 1 << (4 + 3);
+	static const uint8_t mask_size     = 0x0f;
+
 	size_t operator()(const attribute_set_type::int_type& x) const
 	{
 	  return byte_size(utils::bithack::branch(x < 0, - x, x)) + 1;
@@ -131,6 +131,12 @@ namespace cicada
 	
 	size_t operator()(const attribute_set_type::int_type& x) const
 	{
+	  static const uint8_t mask_float    = 1 << (4 + 0);
+	  static const uint8_t mask_unsigned = 1 << (4 + 1);
+	  static const uint8_t mask_signed   = 1 << (4 + 2);
+	  static const uint8_t mask_string   = 1 << (4 + 3);
+	  static const uint8_t mask_size     = 0x0f;
+
 	  const uint64_t value_encode = utils::bithack::branch(x < 0, - x, x);
 	  const size_t   value_size = byte_size(value_encode);
 	  
@@ -154,6 +160,12 @@ namespace cicada
 	
 	size_t operator()(const attribute_set_type::float_type& x) const
 	{
+	  static const uint8_t mask_float    = 1 << (4 + 0);
+	  static const uint8_t mask_unsigned = 1 << (4 + 1);
+	  static const uint8_t mask_signed   = 1 << (4 + 2);
+	  static const uint8_t mask_string   = 1 << (4 + 3);
+	  static const uint8_t mask_size     = 0x0f;
+
 	  *buffer = (mask_float | (sizeof(attribute_set_type::float_type) & mask_size));
 	  
 	  std::copy(cast(x), cast(x) + sizeof(attribute_set_type::float_type), buffer + 1);
@@ -163,6 +175,12 @@ namespace cicada
 	
 	size_t operator()(const attribute_set_type::string_type& x) const
 	{
+	  static const uint8_t mask_float    = 1 << (4 + 0);
+	  static const uint8_t mask_unsigned = 1 << (4 + 1);
+	  static const uint8_t mask_signed   = 1 << (4 + 2);
+	  static const uint8_t mask_string   = 1 << (4 + 3);
+	  static const uint8_t mask_size     = 0x0f;
+
 	  byte_type* biter = buffer;
 	  size_t copied = 0;
 	  attribute_set_type::string_type::const_iterator iter_end = x.end();
@@ -174,7 +192,9 @@ namespace cicada
 	    
 	    std::copy(iter, iter + block_size, biter);
 	    copied += block_size + 1;
+	    biter += block_size;
 	  }
+
 	  return copied;
 	}
 	
@@ -194,6 +214,12 @@ namespace cicada
       static
       size_t decode(const byte_type* buffer, attribute_set_type::data_type& value) 
       {
+	static const uint8_t mask_float    = 1 << (4 + 0);
+	static const uint8_t mask_unsigned = 1 << (4 + 1);
+	static const uint8_t mask_signed   = 1 << (4 + 2);
+	static const uint8_t mask_string   = 1 << (4 + 3);
+	static const uint8_t mask_size     = 0x0f;
+
 	if (*buffer & mask_float) {
 	  attribute_set_type::float_type value_decode;
 	  ++ buffer;
@@ -232,10 +258,11 @@ namespace cicada
 	    
 	    std::copy(buffer, buffer + value_size, std::back_inserter(value_decode));
 	    ret += value_size + 1;
+	    buffer += value_size;
 	    
-	    if (value_size != mask_size) break;
+	    if (value_size != size_t(mask_size)) break;
 	  }
-
+	  
 	  value = value_decode;
 	  
 	  return ret;
