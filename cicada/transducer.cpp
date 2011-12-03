@@ -9,6 +9,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/grammar_format.hpp>
 #include <cicada/grammar_mutable.hpp>
+#include <cicada/grammar_shared.hpp>
 #include <cicada/grammar_static.hpp>
 #include <cicada/grammar_simple.hpp>
 #include <cicada/grammar_unknown.hpp>
@@ -215,7 +216,7 @@ format: ICU's number/date format rules\n\
       if (path != "-" && boost::filesystem::is_directory(path))
 	return transducer_ptr_type(new GrammarStatic(parameter));
       else
-	return transducer_ptr_type(new GrammarMutable(parameter));
+	return transducer_ptr_type(new GrammarShared(parameter));
     }
   }
 };
