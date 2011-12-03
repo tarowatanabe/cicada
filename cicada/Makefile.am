@@ -288,6 +288,7 @@ apply_incremental.hpp \
 apply_state_less.hpp \
 attribute.hpp \
 attribute_vector.hpp \
+attribute_vector_codec.hpp \
 binarize.hpp \
 binarize_all.hpp \
 binarize_base.hpp \

@@ -26,7 +26,7 @@ namespace cicada
   // uses input-iterator, not bidirectional/random-access iterator
   // we use double as our underlying stroage..
   
-  struct FeatureVetorCODEC
+  struct FeatureVectorCODEC
   {
     struct __feature_vector_feature_codec
     {
@@ -161,6 +161,9 @@ namespace cicada
       }
     };
 
+    typedef __feature_vector_feature_codec codec_feature_type;
+    typedef __feature_vector_data_codec    codec_data_type;
+
     typedef cicada::Feature feature_type;
     typedef char byte_type;
     typedef std::vector<byte_type, std::allocator<byte_type> > buffer_type;
@@ -174,8 +177,8 @@ namespace cicada
 	for (/**/; first != last; ++ first) {
 	  const feature_type::id_type id = feature_type(first->first).id();
 	  
-	  std::advance(iter, codec_feature_type::encode((codec_feature_type::byte_type*) &(*iter), id - id_prev));
-	  std::advance(iter, codec_data_type::encode((codec_data_type::byte_type*) &(*iter), first->second));
+	  std::advance(iter, codec_feature_type::encode(reinterpret_cast<codec_feature_type::byte_type*>(&(*iter)), id - id_prev));
+	  std::advance(iter, codec_data_type::encode(reinterpret_cast<codec_data_type::byte_type*>(&(*iter)), first->second));
 	  
 	  id_prev = id;
 	}
@@ -187,10 +190,13 @@ namespace cicada
     template <typename Tp, typename Alloc, typename Iterator>
     void encode(const FeatureVector<Tp, Alloc>& x, Iterator result)
     {
+      __encoder encoder;
+
       buffer.clear();
+      buffer.reserve(x.size() * 16);
       buffer.resize(x.size() * 16);
       
-      std::copy(buffer.begin(), __encoder()(x.begin() x.end(), buffer.begin()), result);
+      std::copy(buffer.begin(), encoder(x.begin(), x.end(), buffer.begin()), result);
     }
     
     template <typename Iterator, typename Tp, typename Alloc>
@@ -202,10 +208,10 @@ namespace cicada
       feature_type::id_type inc = 0;
       double data;
       while (first != last) {
-	std::advance(first, codec_feature_type::decode((codec_feature_type::byte_type*) &(*first), inc));
-	std::advance(first, codec_data_type::decode((codec_data_type::byte_type*) &(*first), data));
+	std::advance(first, codec_feature_type::decode(reinterpret_cast<const codec_feature_type::byte_type*>(&(*first)), inc));
+	std::advance(first, codec_data_type::decode(reinterpret_cast<const codec_data_type::byte_type*>(&(*first)), data));
 	
-	id += feature_inc;
+	id += inc;
 	x[id] = data;
       }
     }
@@ -213,7 +219,21 @@ namespace cicada
     buffer_type buffer;
   };
   
-
+  
+  template <typename Tp, typename Alloc, typename Iterator>
+  inline
+  void feature_vector_encode(const FeatureVector<Tp, Alloc>& x, Iterator result)
+  {
+    FeatureVectorCODEC codec;
+    codec.encode(x, result);
+  }
+  
+  template <typename Iterator, typename Tp, typename Alloc>
+  void feature_vector_decode(Iterator first, Iterator last, FeatureVector<Tp, Alloc>& x)
+  {
+    FeatureVectorCODEC codec;
+    codec.decode(first, last, x);
+  }
   
 };
 

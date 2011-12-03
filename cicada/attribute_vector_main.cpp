@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "attribute_vector.hpp"
+#include "attribute_vector_codec.hpp"
 
 void find_attrs(const cicada::AttributeVector& attrs, const std::string& attr)
 {
