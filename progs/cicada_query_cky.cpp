@@ -171,7 +171,7 @@ struct Task
   
   void operator()()
   {
-    grammar_type      grammar_local(grammar.clone());
+    const grammar_type grammar_local(grammar.clone());
 
     cicada::QueryCKY query(grammar_local, treebank_mode, pos_mode);
     
