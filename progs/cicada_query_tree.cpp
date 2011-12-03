@@ -255,9 +255,9 @@ int main(int argc, char** argv)
 	  os_target.push(boost::iostreams::back_inserter(tree_rule_string.target));
 	  
 	  if (titer->source)
-	    os_source << titer->source;
+	    os_source << *(titer->source);
 	  if (titer->target)
-	    os_target << titer->target;
+	    os_target << *(titer->target);
 	  
 	  os_source.pop();
 	  os_target.pop();
