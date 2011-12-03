@@ -435,7 +435,7 @@ int main(int argc, char** argv)
 	
 	if (! iter->features.empty()) {
 	  feature_set_type features(iter->features.begin(), iter->features.end());
-	  karma::generate(oiter_type(os), generate_features, iter->features);
+	  karma::generate(oiter_type(os), generate_features, features);
 	}
 	
 	if (! iter->attributes.empty())
