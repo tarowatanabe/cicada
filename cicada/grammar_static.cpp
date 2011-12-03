@@ -24,6 +24,8 @@
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/bithack.hpp"
+#include "utils/byte_aligned_code.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -50,6 +52,8 @@ namespace cicada
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
+
+    typedef uint64_t off_type;
     
     typedef cicada::Symbol    symbol_type;
     typedef cicada::Symbol    word_type;
@@ -84,9 +88,287 @@ namespace cicada
     
     typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_db_type;
     typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > phrase_db_type;
+    
+    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > feature_db_type;
+    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > attribute_db_type;
 
     typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
+    
+    struct codec_feature_data_type
+    {
+      typedef uint8_t byte_type;
+
+      static const uint8_t mask_float    = 1 << (4 + 0);
+      static const uint8_t mask_unsigned = 1 << (4 + 1);
+      static const uint8_t mask_signed   = 1 << (4 + 2);
+      static const uint8_t mask_size     = 0x0f;
+      
+      template <typename __Tp>
+      static byte_type* cast(__Tp& x)
+      {
+	return (byte_type*) &x;
+      }
+      
+      template <typename __Tp>
+      static const byte_type* cast(const __Tp& x)
+      {
+	return (const byte_type*) &x;
+      }
+      
+      static 
+      size_t byte_size(const uint64_t& x)
+      {
+	return (1 
+		+ bool(x & 0xffffffffffffff00ull)
+		+ bool(x & 0xffffffffffff0000ull)
+		+ bool(x & 0xffffffffff000000ull)
+		+ bool(x & 0xffffffff00000000ull)
+		+ bool(x & 0xffffff0000000000ull)
+		+ bool(x & 0xffff000000000000ull)
+		+ bool(x & 0xff00000000000000ull));
+      }
+
+      static size_t encode(byte_type* buffer, const double& value)
+      {      
+	if (::fmod(value, 1.0) == 0.0) {
+	  const int64_t  val = value;
+	  const uint64_t value_encode = utils::bithack::branch(val < 0, - val, val);
+	  const size_t   value_size = byte_size(value_encode);
+	
+	  *buffer = utils::bithack::branch(val < 0, mask_signed, mask_unsigned) | (value_size & mask_size);
+	  ++ buffer;
+	
+	  switch (value_size) {
+	  case 8: buffer[value_size - 8] = (value_encode >> 56);
+	  case 7: buffer[value_size - 7] = (value_encode >> 48);
+	  case 6: buffer[value_size - 6] = (value_encode >> 40);
+	  case 5: buffer[value_size - 5] = (value_encode >> 32);
+	  case 4: buffer[value_size - 4] = (value_encode >> 24);
+	  case 3: buffer[value_size - 3] = (value_encode >> 16);
+	  case 2: buffer[value_size - 2] = (value_encode >> 8);
+	  case 1: buffer[value_size - 1] = (value_encode);
+	  }
+	
+	  return value_size + 1;
+	} else {
+	  *buffer = (mask_float | (sizeof(double) & mask_size));
+	  ++ buffer;
+	
+	  std::copy(cast(value), cast(value) + sizeof(double), buffer);
+	
+	  return sizeof(double) + 1;
+	}
+      }
+    
+      static
+      size_t decode(const byte_type* buffer, double& value) 
+      {
+	if (*buffer & mask_float) {
+	  ++ buffer;
+	  std::copy(buffer, buffer + sizeof(double), cast(value));
+	  return sizeof(double) + 1;
+	} else if ((*buffer & mask_signed) || (*buffer & mask_unsigned)) {
+	  const bool value_signed = (*buffer & mask_signed);
+	  const size_t value_size = (*buffer & mask_size);
+
+	  ++ buffer;
+	
+	  const uint64_t mask = 0xff;
+	  uint64_t value_decode = 0;
+	  switch (value_size) {
+	  case 8: value_decode |= ((uint64_t(buffer[value_size - 8]) & mask) << 56);
+	  case 7: value_decode |= ((uint64_t(buffer[value_size - 7]) & mask) << 48);
+	  case 6: value_decode |= ((uint64_t(buffer[value_size - 6]) & mask) << 40);
+	  case 5: value_decode |= ((uint64_t(buffer[value_size - 5]) & mask) << 32);
+	  case 4: value_decode |= ((uint64_t(buffer[value_size - 4]) & mask) << 24);
+	  case 3: value_decode |= ((uint64_t(buffer[value_size - 3]) & mask) << 16);
+	  case 2: value_decode |= ((uint64_t(buffer[value_size - 2]) & mask) << 8);
+	  case 1: value_decode |= ((uint64_t(buffer[value_size - 1]) & mask));
+	  }
+	
+	  value = utils::bithack::branch(value_signed, - int64_t(value_decode), int64_t(value_decode));
+	
+	  return value_size + 1;
+	} else
+	  throw std::runtime_error("invalid type for decoding");
+      }
+
+    };
+    
+    struct codec_attribute_data_type
+    {
+      typedef uint8_t byte_type;
+      typedef AttributeVector attribute_set_type;
+     
+      static const uint8_t mask_float    = 1 << (4 + 0);
+      static const uint8_t mask_unsigned = 1 << (4 + 1);
+      static const uint8_t mask_signed   = 1 << (4 + 2);
+      static const uint8_t mask_string   = 1 << (4 + 3);
+      static const uint8_t mask_size     = 0x0f;
+ 
+      template <typename __Tp>
+      static byte_type* cast(__Tp& x)
+      {
+	return (byte_type*) &x;
+      }
+      
+      template <typename __Tp>
+      static const byte_type* cast(const __Tp& x)
+      {
+	return (const byte_type*) &x;
+      }
+      
+      static size_t byte_size(const uint64_t& x)
+      {
+	return (1 
+		+ bool(x & 0xffffffffffffff00ull)
+		+ bool(x & 0xffffffffffff0000ull)
+		+ bool(x & 0xffffffffff000000ull)
+		+ bool(x & 0xffffffff00000000ull)
+		+ bool(x & 0xffffff0000000000ull)
+		+ bool(x & 0xffff000000000000ull)
+		+ bool(x & 0xff00000000000000ull));
+      }
+
+      struct __encoder_size : public boost::static_visitor<size_t>
+      {
+	size_t operator()(const attribute_set_type::int_type& x) const
+	{
+	  return byte_size(utils::bithack::branch(x < 0, - x, x)) + 1;
+	}
+	
+	size_t operator()(const attribute_set_type::float_type& x) const
+	{
+	  return sizeof(attribute_set_type::float_type) + 1;
+	}
+	
+	size_t operator()(const attribute_set_type::string_type& x) const
+	{
+	  return x.size() + 1;
+	}
+      };
+
+      struct __encoder : public boost::static_visitor<size_t>
+      {
+	
+	__encoder(byte_type* __buffer) : buffer(__buffer) {}
+	
+	size_t operator()(const attribute_set_type::int_type& x) const
+	{
+	  const uint64_t value_encode = utils::bithack::branch(x < 0, - x, x);
+	  const size_t   value_size = byte_size(value_encode);
+	  
+	  *buffer = utils::bithack::branch(x < 0, mask_signed, mask_unsigned) | (value_size & mask_size);
+	  
+	  byte_type* data = buffer + 1;
+	  
+	  switch (value_size) {
+	  case 8: data[value_size - 8] = (value_encode >> 56);
+	  case 7: data[value_size - 7] = (value_encode >> 48);
+	  case 6: data[value_size - 6] = (value_encode >> 40);
+	  case 5: data[value_size - 5] = (value_encode >> 32);
+	  case 4: data[value_size - 4] = (value_encode >> 24);
+	  case 3: data[value_size - 3] = (value_encode >> 16);
+	  case 2: data[value_size - 2] = (value_encode >> 8);
+	  case 1: data[value_size - 1] = (value_encode);
+	  }
+	  
+	  return value_size + 1;
+	}
+	
+	size_t operator()(const attribute_set_type::float_type& x) const
+	{
+	  *buffer = (mask_float | (sizeof(attribute_set_type::float_type) & mask_size));
+	  
+	  std::copy(cast(x), cast(x) + sizeof(attribute_set_type::float_type), buffer + 1);
+	  
+	  return sizeof(attribute_set_type::float_type) + 1;
+	}
+	
+	size_t operator()(const attribute_set_type::string_type& x) const
+	{
+	  *buffer = mask_string;
+	  
+	  std::copy(x.begin(), x.end(), buffer + 1);
+	  
+	  return x.size() + 1;
+	}
+	
+	byte_type* buffer;
+      };
+
+      static size_t encode_size(const attribute_set_type::data_type& value)
+      {
+	return boost::apply_visitor(__encoder_size(), value);
+      }
+      
+      static size_t encode(byte_type* buffer, const attribute_set_type::data_type& value)
+      {
+	return boost::apply_visitor(__encoder(buffer), value);
+      }
+      
+      static size_t is_string(const byte_type* buffer)
+      {
+	return *buffer & mask_string;
+      }
+      
+      static size_t decode_type(const byte_type* buffer, attribute_set_type::data_type& value)
+      {
+	if (*buffer & mask_float) {
+	  double x;
+	  ++ buffer;
+	  std::copy(buffer, buffer + sizeof(double), cast(x));
+	  value = x;
+	  return sizeof(double) + 1;
+	} else if ((*buffer & mask_signed) || (*buffer & mask_unsigned)) {
+	  const bool value_signed = (*buffer & mask_signed);
+	  const size_t value_size = (*buffer & mask_size);
+	  
+	  ++ buffer;
+	  
+	  const uint64_t mask = 0xff;
+	  uint64_t value_decode = 0;
+	  switch (value_size) {
+	  case 8: value_decode |= ((uint64_t(buffer[value_size - 8]) & mask) << 56);
+	  case 7: value_decode |= ((uint64_t(buffer[value_size - 7]) & mask) << 48);
+	  case 6: value_decode |= ((uint64_t(buffer[value_size - 6]) & mask) << 40);
+	  case 5: value_decode |= ((uint64_t(buffer[value_size - 5]) & mask) << 32);
+	  case 4: value_decode |= ((uint64_t(buffer[value_size - 4]) & mask) << 24);
+	  case 3: value_decode |= ((uint64_t(buffer[value_size - 3]) & mask) << 16);
+	  case 2: value_decode |= ((uint64_t(buffer[value_size - 2]) & mask) << 8);
+	  case 1: value_decode |= ((uint64_t(buffer[value_size - 1]) & mask));
+	  }
+	  
+	  value = utils::bithack::branch(value_signed, - int64_t(value_decode), int64_t(value_decode));
+	  
+	  return value_size + 1;
+	} else
+	  throw std::runtime_error("invalid type");
+	
+	return 0;
+      }
+    };
+
+
+    struct packer_feature_set_type : public hasher_type
+    {
+      typedef char byte_type;
+      typedef char mapped_type;
+      
+      typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > feature_map_type;
+      
+      packer_feature_set_type() : features() {}
+      
+      size_type insert(const feature_set_type& x)
+      {
+	
+      }
+      
+      feature_map_type                    features;
+      path_type                           path;
+      boost::iostreams::filtering_ostream os;
+    };
 
     class ScoreSet
     {
@@ -171,6 +453,8 @@ namespace cicada
 	target_db(x.target_db),
 	score_db(x.score_db),
 	attr_db(x.attr_db),
+	feature_db(x.feature_db),
+	attribute_db(x.attribute_db),
 	vocab(x.vocab),
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
@@ -189,6 +473,8 @@ namespace cicada
       target_db       = x.target_db;
       score_db        = x.score_db;
       attr_db         = x.attr_db;
+      feature_db      = x.feature_db;
+      attribute_db    = x.attribute_db;
       vocab           = x.vocab;
       feature_names   = x.feature_names;
       attribute_names = x.attribute_names;
@@ -207,6 +493,8 @@ namespace cicada
       target_db.clear();
       score_db.clear();
       attr_db.clear();
+      feature_db.clear();
+      attribute_db.clear();
       vocab.clear();
       feature_names.clear();
       attribute_names.clear();
@@ -419,9 +707,13 @@ namespace cicada
     
     score_db_type   score_db;
     score_db_type   attr_db;
+
+    feature_db_type   feature_db;
+    attribute_db_type attribute_db;
     
     vocab_type      vocab;
-
+    
+    
     feature_name_set_type   feature_names;
     attribute_name_set_type attribute_names;
     
@@ -846,6 +1138,11 @@ namespace cicada
     const parameter_type param(parameter);
     const path_type path = param.name();
 
+    // packing...
+    bool packing = false;
+    if (param.find("packing") != param.end())
+      packing = utils::lexical_cast<bool>(param.find("packing")->second);
+    
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_map_type;
     
     typedef ScoreSetStream score_stream_type;

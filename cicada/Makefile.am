@@ -320,6 +320,7 @@ expected_ngram.hpp \
 feature.hpp \
 feature_function.hpp \
 feature_vector.hpp \
+feature_vector_codec.hpp \
 feature_vector_compact.hpp \
 format.hpp \
 generate.hpp \
