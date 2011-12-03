@@ -288,6 +288,7 @@ apply_incremental.hpp \
 apply_state_less.hpp \
 attribute.hpp \
 attribute_vector.hpp \
+attribute_vector_codec.hpp \
 binarize.hpp \
 binarize_all.hpp \
 binarize_base.hpp \
@@ -320,6 +321,7 @@ expected_ngram.hpp \
 feature.hpp \
 feature_function.hpp \
 feature_vector.hpp \
+feature_vector_codec.hpp \
 feature_vector_compact.hpp \
 format.hpp \
 generate.hpp \

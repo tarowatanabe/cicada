@@ -380,6 +380,8 @@ namespace cicada
     bool empty() const { return storage.empty(); }
     size_type size_compressed() const  { return storage.size(); }
 
+    void clear() { storage.clear(); }
+
     void swap(FeatureVectorCompact& x)
     {
       storage.swap(x.storage);

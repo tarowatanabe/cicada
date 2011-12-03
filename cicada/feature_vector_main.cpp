@@ -6,9 +6,11 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <iterator>
 
 #include "feature_vector.hpp"
 #include "feature_vector_compact.hpp"
+#include "feature_vector_codec.hpp"
 #include "dot_product.hpp"
 
 #include "utils/lexical_cast.hpp"
@@ -61,6 +63,16 @@ void check_compact(const feature_set_type& features)
   check_compact(features, feats);
   check_compact(features, feats1);
   check_compact(features, feats2);
+  
+  std::vector<char> buffer;
+  
+  cicada::feature_vector_encode(features, std::back_inserter(buffer));
+  
+  feature_set_type decoded;
+  cicada::feature_vector_decode(buffer.begin(), buffer.end(), decoded);
+
+  if (decoded != features)
+    std::cerr << "differ?" << std::endl;
 }
 
 int main(int argc, char** argv)

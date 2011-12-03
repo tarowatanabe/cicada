@@ -5,6 +5,12 @@
 #include <iostream>
 
 #include "attribute_vector.hpp"
+#include "attribute_vector_codec.hpp"
+
+#include "utils/lexical_cast.hpp"
+#include "utils/random_seed.hpp"
+
+typedef cicada::AttributeVector attribute_set_type;
 
 void find_attrs(const cicada::AttributeVector& attrs, const std::string& attr)
 {
@@ -33,10 +39,25 @@ void find_attrs(const cicada::AttributeVector& attrs, const std::string& attr)
   }
 }
 
+void check_codec(const attribute_set_type& attributes)
+{
+  std::vector<char> buffer;
+  
+  cicada::attribute_vector_encode(attributes, std::back_inserter(buffer));
+  
+  attribute_set_type decoded;
+  cicada::attribute_vector_decode(buffer.begin(), buffer.end(), decoded);
+
+  if (attributes != decoded)
+    std::cerr << "differ: " << attributes << " codec: "  << decoded << std::endl;
+}
+
 int main(int argc, char** argv)
 {
   typedef cicada::AttributeVector attribute_set_type;
 
+  srandom(utils::random_seed());
+  
   std::cout << "size: " << sizeof(attribute_set_type) << " value: " << sizeof(attribute_set_type::value_type) << std::endl;
   
   attribute_set_type attr1("{\"good\":1,\"bad\":4.5,\"bad2\":1e-5, \"neutral\":\"bi\\u0020g\"}");
@@ -58,4 +79,32 @@ int main(int argc, char** argv)
   std::cout << "attr1: " << attr1 << std::endl;
   attr1["bad"] = 4.5;
   std::cout << "attr1: " << attr1 << std::endl;
+
+  attribute_set_type attributes;
+  
+  for (int iter = 0; iter != 32; ++ iter) {
+    for (int i = 0; i != 16; ++ i) {
+      std::string attr = "double:" + utils::lexical_cast<std::string>(random());
+      attributes[attr] = (1.0 * random()) / random();
+    }
+
+    check_codec(attributes);
+
+    for (int i = 0; i != 16; ++ i) {
+      std::string attr = "int:" + utils::lexical_cast<std::string>(random());
+      attributes[attr] = attribute_set_type::int_type(random());
+    }
+
+    check_codec(attributes);
+    
+    for (int i = 0; i != 16; ++ i) {
+      std::string attr = "string:" + utils::lexical_cast<std::string>(random());
+      attributes[attr] = (utils::lexical_cast<std::string>(random())
+			  + utils::lexical_cast<std::string>(random())
+			  + utils::lexical_cast<std::string>(random())
+			  + utils::lexical_cast<std::string>(random()));
+    }
+
+    check_codec(attributes);
+  }
 }
