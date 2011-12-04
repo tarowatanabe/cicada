@@ -989,8 +989,8 @@ namespace cicada
       void clear()
       {
 	offset = 0;
-	os_data.clear();
-	os_offset.clear();
+	os_data.pop();
+	os_offset.pop();
       }
 
       bool empty() const { return offset; }

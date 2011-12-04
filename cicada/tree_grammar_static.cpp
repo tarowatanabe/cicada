@@ -1314,7 +1314,6 @@ namespace cicada
     if (has_features) {
       TreeGrammarParser::feature_vocab_type   __feature_vocab(path_feature_vocab);
     }
-    
     if (has_attributes) {
       TreeGrammarParser::attribute_vocab_type __attribute_vocab(path_attribute_vocab);
     }
