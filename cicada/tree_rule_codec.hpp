@@ -72,13 +72,23 @@ namespace cicada
 	
 	for (;;) {
 	  const size_type bit_pos = size & size_type(7);
-	  ++ size;
 	  if (bit_pos == 0) {
 	    buffer = *iter;
 	    ++ iter;
+	    
+	    // optimize...!
+	    while (! buffer) {
+	      buffer = *iter;
+	      ++ iter;
+	      size += 8;
+	      value += 8;
+	    }
 	  }
 	  
-	  if (buffer & (1 << bit_pos))
+	  const bool test = buffer & (1 << bit_pos);
+	  ++ size;
+	  
+	  if (test)
 	    return value;
 	  else
 	    ++ value;
