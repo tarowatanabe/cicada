@@ -403,6 +403,7 @@ tree_grammar_static.hpp \
 tree_grammar_shared.hpp \
 tree_grammar_simple.hpp \
 tree_rule.hpp \
+tree_rule_compact.hpp \
 tree_transducer.hpp \
 unite.hpp \
 viterbi.hpp \
@@ -449,6 +450,7 @@ transducer.cpp \
 tree_grammar_mutable.cpp \
 tree_grammar_static.cpp \
 tree_rule.cpp \
+tree_rule_compact.cpp \
 tree_transducer.cpp \
 vocab.cpp
 
