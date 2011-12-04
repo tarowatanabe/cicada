@@ -15,6 +15,9 @@ namespace cicada
 {
   struct TreeRuleCODEC
   {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
     typedef cicada::Symbol       symbol_type;
     typedef cicada::Symbol       label_type;
     
@@ -22,6 +25,70 @@ namespace cicada
     
     typedef uint8_t  byte_type;
     typedef uint64_t off_type;
+    
+    struct bit_ostream_type
+    {
+      typedef std::vector<byte_type, std::allocator<byte_type> > buffer_type;
+      
+      bit_ostream_type() : size(0), buffer() {}
+
+      void clear()
+      {
+	size = 0;
+	buffer.clear();
+      }
+
+      void push(size_type value)
+      {
+	const size_type pos = size + value;
+	const size_type buf_pos  = pos >> 3;
+	const size_type mask_pos = pos & size_type(7);
+	
+	if (buf_pos >= buffer.size())
+	  buffer.resize(buf_pos + 1, 0);
+	
+	buffer[buf_pos] |= (1 << mask_pos);
+	size = pos + 1;
+      }
+      
+      size_type   size;
+      buffer_type buffer;
+    };
+
+    struct bit_istream_type
+    {
+      bit_istream_type() : size(0), buffer(0) {}
+
+      void clear()
+      {
+	size = 0;
+	buffer = 0;
+      }
+
+      template <typename Iterator>
+      size_type pop(Iterator& iter)
+      {
+	size_type value = 0;
+	
+	for (;;) {
+	  const size_type bit_pos = size & size_type(7);
+	  ++ size;
+	  if (bit_pos == 0) {
+	    buffer = *iter;
+	    ++ iter;
+	  }
+	  
+	  if (buffer & (1 << bit_pos))
+	    return value;
+	  else
+	    ++ value;
+	}
+      }
+
+      size_type   size;
+      byte_type   buffer;
+    };
+    
 
     static size_t encode(byte_type* buffer, const off_type& value)
     {
@@ -55,51 +122,97 @@ namespace cicada
       value = symbol_type(value_id);
       return ret;
     }
+
+    inline
+    void encode_tree(const rule_type& rule, bit_ostream_type& os)
+    {
+      os.push(rule.antecedents.size());
+      
+      for (size_t i = 0; i != rule.antecedents.size(); ++ i)
+	encode_tree(rule.antecedents[i], os);
+    }
     
     template <typename Iterator>
-    static inline
-    void encode(const rule_type& rule, Iterator result)
+    inline
+    void decode_tree(Iterator& iter, bit_istream_type& is, rule_type& rule)
     {
-      byte_type buf[32];
+      const size_type size = is.pop(iter);
+      
+      rule.antecedents.resize(size);
+      for (off_type i = 0; i != size; ++ i)
+	decode_tree(iter, is, rule.antecedents[i]);
+    }
+
+    template <typename Iterator>
+    inline
+    void decode_label(Iterator& iter, TreeRule& rule)
+    {
+      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), rule.label));
+      
+      for (off_type i = 0; i != rule.antecedents.size(); ++ i)
+	decode_label(iter, rule.antecedents[i]);
+    }
+
+    template <typename Iterator, typename _Vocab>
+    inline
+    void decode_label(Iterator& iter, const _Vocab& vocab, TreeRule& rule)
+    {
+      symbol_type::id_type id = 0;
+      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), id));
+      rule.label = vocab[id];
+      
+      for (off_type i = 0; i != rule.antecedents.size(); ++ i)
+	decode_label(iter, rule.antecedents[i]);
+    }
+    
+    
+    template <typename Iterator>
+    inline
+    void encode_label(const rule_type& rule, Iterator result)
+    {
+      byte_type buf[8];
       byte_type* begin = buf;
       byte_type* iter  = buf;
       
       std::advance(iter, encode(&(*iter), rule.label));
-      std::advance(iter, encode(&(*iter), off_type(rule.antecedents.size())));
-      
       std::copy(reinterpret_cast<char*>(begin), reinterpret_cast<char*>(iter), result);
       
       for (size_t i = 0; i != rule.antecedents.size(); ++ i)
-	encode(rule.antecedents[i], result);
+	encode_label(rule.antecedents[i], result);
     }
     
     template <typename Iterator>
-    static inline
+    inline
+    void encode(const rule_type& rule, Iterator result)
+    {
+      os.clear();
+      
+      encode_tree(rule, os);
+      std::copy(os.buffer.begin(), os.buffer.end(), result);
+      
+      encode_label(rule, result);
+    }
+    
+    template <typename Iterator>
+    inline
     void decode(Iterator& iter, TreeRule& rule)
     {
-      off_type size = 0;
-      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), rule.label));
-      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), size));
-      
-      rule.antecedents.resize(size);
-      for (off_type i = 0; i != size; ++ i)
-	decode(iter, rule.antecedents[i]);
+      is.clear();
+      decode_tree(iter, is, rule);
+      decode_label(iter, rule);
     }
 
     template <typename Iterator, typename _Vocab>
-    static inline
+    inline
     void decode(Iterator& iter, const _Vocab& vocab, TreeRule& rule)
     {
-      symbol_type::id_type id = 0;
-      off_type size = 0;
-      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), id));
-      std::advance(iter, decode(reinterpret_cast<const byte_type*>(&(*iter)), size));
-      
-      rule.label = vocab[id];
-      rule.antecedents.resize(size);
-      for (off_type i = 0; i != size; ++ i)
-	decode(iter, vocab, rule.antecedents[i]);
+      is.clear();
+      decode_tree(iter, is, rule);
+      decode_label(iter, vocab, rule);
     }
+
+    bit_ostream_type os;
+    bit_istream_type is;
   };
   
   template <typename Iterator>

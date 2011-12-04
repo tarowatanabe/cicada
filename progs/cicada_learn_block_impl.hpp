@@ -9,6 +9,10 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
+#include <boost/iostreams/device/array.hpp>
 
 #include <sstream>
 #include <vector>
@@ -2627,13 +2631,86 @@ void read_refset(const path_type& refset_path,
   }
 }
 
+class Event
+{
+public:
+  Event() {}
+  Event(const Event& x) : buffer(x.buffer) {}
+  Event(const std::string& data) { encode(data); }
+  Event& operator=(const std::string& data)
+  {
+    encode(data);
+    return *this;
+  }
+  
+  Event& operator=(const Event& x)
+  {
+    buffer = x.buffer;
+    return *this;
+  }
+
+  operator std::string() const { return decode(); }
+
+  bool empty() const { return buffer.empty(); }
+  void swap(Event& x) { buffer.swap(x.buffer); }
+  
+  void encode(const std::string& data)
+  {
+    buffer.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+    os.write(data.c_str(), data.size());
+    os.pop();
+  }
+  
+  std::string decode() const
+  {
+    std::string output;
+    
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::zlib_decompressor());
+    is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
+
+    char buf[1024];
+    
+    do {
+      is.read(buf, 1024);
+      std::copy(buf, buf + is.gcount(), std::back_inserter(output));
+    } while (is);
+    
+    is.pop();
+
+    return output;
+  }
+  
+private:
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+private:
+  buffer_type buffer;
+};
+
+namespace std
+{
+  inline
+  void swap(Event& x, Event& y)
+  {
+    x.swap(y);
+  }
+};
+
+typedef Event event_type;
+typedef std::vector<event_type, std::allocator<event_type> > event_set_type;
+
 inline
-void read_samples(const path_type& input_path,
-		  sample_set_type& samples,
-		  const bool directory_mode,
-		  const bool id_mode,
-		  const size_t shard_rank,
-		  const size_t shard_size)
+void read_events(const path_type& input_path,
+		 event_set_type& events,
+		 const bool directory_mode,
+		 const bool id_mode,
+		 const size_t shard_rank,
+		 const size_t shard_size)
 {
   namespace qi = boost::spirit::qi;
   namespace standard = boost::spirit::standard;
@@ -2668,10 +2745,10 @@ void read_samples(const path_type& input_path,
 	
 	const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
 	
-	if (id_rank >= samples.size())
-	  samples.resize(id_rank + 1);
+	if (id_rank >= events.size())
+	  events.resize(id_rank + 1);
 	
-	samples[id_rank] = line;
+	events[id_rank] = line;
       }
   } else if (id_mode) {
     utils::compress_istream is(input_path, 1024 * 1024);
@@ -2691,10 +2768,10 @@ void read_samples(const path_type& input_path,
 	if (shard_size == 0 || id % shard_size == shard_rank) {
 	  const size_t id_rank = (shard_size == 0 ? id : id / shard_size);
 	  
-	  if (id_rank >= samples.size())
-	    samples.resize(id_rank + 1);
+	  if (id_rank >= events.size())
+	    events.resize(id_rank + 1);
 	  
-	  samples[id_rank] = line;
+	  events[id_rank] = line;
 	}
       }
   } else {
@@ -2704,9 +2781,9 @@ void read_samples(const path_type& input_path,
     for (size_t id = 0; std::getline(is, line); ++ id) 
       if (shard_size == 0 || id % shard_size == shard_rank) {
 	if (! line.empty())
-	  samples.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);
+	  events.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	else
-	  samples.push_back(std::string());
+	  events.push_back(std::string());
       }
   }
 }

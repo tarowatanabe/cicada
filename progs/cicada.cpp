@@ -238,7 +238,14 @@ struct TaskFile
       queue_is.pop_swap(line);
       if (line.empty()) break;
       
-      operations(line);
+      if (input_directory_mode) {
+	utils::compress_istream is(line, 1024 * 1024);
+	
+	if (std::getline(is, line) && ! line.empty())
+	  operations(line);
+	
+      } else
+	operations(line);
       
       queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
@@ -374,8 +381,14 @@ struct TaskDirectory
     while (1) {
       queue.pop_swap(line);
       if (line.empty()) break;
-      
-      operations(line);
+
+      if (input_directory_mode) {
+	utils::compress_istream is(line, 1024 * 1024);
+	
+	if (std::getline(is, line) && ! line.empty())
+	  operations(line);
+      } else 
+	operations(line);
     }
     
     operations.clear();
@@ -423,10 +436,7 @@ void cicada_file(const operation_set_type& operations,
       
       if (! boost::filesystem::exists(path_input)) break;
       
-      utils::compress_istream is(path_input, 1024 * 1024);
-      
-      if (std::getline(is, line) && ! line.empty())
-	queue_is.push_swap(line);
+      queue_is.push(path_input.string());
     }
     
   } else {
@@ -478,14 +488,12 @@ void cicada_directory(const operation_set_type& operations,
     mapper.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   if (input_directory_mode) {
-    std::string line;
-    
     boost::filesystem::directory_iterator iter_end;
     for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
-      utils::compress_istream is(*iter, 1024 * 1024);
+      const std::string file = path_type(*iter).string();
       
-      if (std::getline(is, line) && ! line.empty())
-	queue.push_swap(line);
+      if (! file.empty())
+	queue.push(file);
     }
   } else {
     utils::compress_istream is(input_file, 1024 * 1024);

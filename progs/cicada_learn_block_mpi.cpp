@@ -55,8 +55,6 @@
 typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
-typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
-
 path_type input_file;
 
 bool input_id_mode = false;
@@ -137,7 +135,7 @@ void options(int argc, char** argv);
 
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
-		  const sample_set_type& samples,
+		  const event_set_type& events,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights);
 void synchronize();
@@ -270,14 +268,14 @@ int main(int argc, char ** argv)
     ::sync();
     
     // read input data
-    sample_set_type samples;
-    read_samples(input_file, samples, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+    event_set_type events;
+    read_events(input_file, events, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
     
     // read reference data
     scorer_document_type scorers(scorer_name);
     read_refset(refset_file, scorers, mpi_rank, mpi_size);
     
-    if (scorers.size() != samples.size())
+    if (scorers.size() != events.size())
       throw std::runtime_error("training sample size and reference translation size does not match");
     
     // weights
@@ -295,85 +293,85 @@ int main(int argc, char ** argv)
     // perform learning...
     if (yield_sentence) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, scorers, weights);
     } else if (yield_alignment) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, scorers, weights);
     } else if (yield_dependency) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, samples, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, samples, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, events, scorers, weights);
     } else
       throw std::runtime_error("invalid yield");
     
@@ -613,7 +611,7 @@ void reduce_points(Points& points)
 
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
-		  const sample_set_type& samples,
+		  const event_set_type& events,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights)
 {
@@ -627,11 +625,11 @@ void cicada_learn(operation_set_type& operations,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  Learner         learner(samples.size());
+  Learner         learner(events.size());
   KBestGenerator  kbest_generator;
   OracleGenerator oracle_generator;
   
-  segment_set_type segments(samples.size());
+  segment_set_type segments(events.size());
   for (size_t seg = 0; seg != segments.size(); ++ seg)
     segments[seg] = seg;
   
@@ -691,9 +689,9 @@ void cicada_learn(operation_set_type& operations,
       for (/**/; siter != siter_last; ++ siter) {
 	const size_t id = *siter;
 	
-	if (samples[id].empty() || ! scorers[id]) continue;
+	if (events[id].empty() || ! scorers[id]) continue;
 	
-	kbest_generator(operations, samples[id], weights, kbests);
+	kbest_generator(operations, events[id], weights, kbests);
 	
 	// no translations?
 	if (kbests.empty()) continue;
