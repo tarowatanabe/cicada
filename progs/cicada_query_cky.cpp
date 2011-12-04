@@ -202,6 +202,8 @@ struct Task
       }
       
       rules.clear();
+
+      grammar_local.assign(lattice);
       
       query(lattice, std::back_inserter(rules));
 

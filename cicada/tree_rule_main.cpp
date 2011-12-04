@@ -42,8 +42,8 @@ void compact(const rule_type& rule)
   if (decoded != rule)
     std::cerr << "rule differ?" << std::endl;
 
-  std::cerr << "raw: " << rule_bytes(rule) << std::endl;
-  std::cerr << "compressed: " << compact.size_compressed() << std::endl;
+  std::cout << "raw: " << rule_bytes(rule) << std::endl;
+  std::cout << "compressed: " << compact.size_compressed() << std::endl;
 }
 
 void process(const utils::piece& rule_str)
