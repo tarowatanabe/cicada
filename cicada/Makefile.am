@@ -403,6 +403,7 @@ tree_grammar_static.hpp \
 tree_grammar_shared.hpp \
 tree_grammar_simple.hpp \
 tree_rule.hpp \
+tree_rule_codec.hpp \
 tree_rule_compact.hpp \
 tree_transducer.hpp \
 unite.hpp \
