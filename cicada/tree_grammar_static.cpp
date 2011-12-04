@@ -33,6 +33,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/json_string_parser.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
@@ -866,6 +867,122 @@ namespace cicada
     }
   }
 
+  struct TreeGrammarParser
+  {
+    typedef boost::filesystem::path path_type;
+
+    typedef std::pair<std::string, double> score_parsed_type;
+    typedef std::vector<score_parsed_type, std::allocator<score_parsed_type> > scores_parsed_type;
+    
+    typedef std::pair<std::string, AttributeVector::data_type> attr_parsed_type;
+    typedef std::vector<attr_parsed_type, std::allocator<attr_parsed_type> > attrs_parsed_type;
+    
+    typedef boost::fusion::tuple<scores_parsed_type, attrs_parsed_type> scores_attrs_parsed_type;
+    
+    template <typename Iterator>
+    struct parser : boost::spirit::qi::grammar<Iterator, scores_attrs_parsed_type(), boost::spirit::standard::space_type>
+    {
+      parser() : parser::base_type(scores_attrs)
+      {
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+      
+	score  %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
+	scores %= -(score % (+standard::space));
+      
+	data %= data_string | double_dot | int64_;
+      
+	attribute %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> data;
+	attributes %= *attribute;
+      
+	scores_attrs %= -("|||" >> scores) >> -("|||" >> attribute);
+      }
+
+      typedef boost::spirit::standard::space_type space_type;
+
+      boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
+      boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    
+      boost::spirit::qi::rule<Iterator, score_parsed_type()>  score;
+      boost::spirit::qi::rule<Iterator, scores_parsed_type()> scores;
+
+      utils::json_string_parser<Iterator> data_string;
+      boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
+      boost::spirit::qi::rule<Iterator, attr_parsed_type(), space_type>           attribute;
+      boost::spirit::qi::rule<Iterator, attrs_parsed_type(), space_type>          attributes;
+
+      boost::spirit::qi::rule<Iterator, scores_attrs_parsed_type(), space_type>   scores_attrs;
+    };
+
+    template <typename Data, typename Codec>
+    struct DataStream
+    {
+      typedef uint64_t off_type;
+      typedef std::vector<char, std::allocator<char> > buffer_type;
+      
+      DataStream(const path_type& path)
+	: offset(0)
+      {
+	typedef utils::repository repository_type;
+	
+	repository_type rep(path, repository_type::write);
+	
+	os_data.push(boost::iostreams::file_sink(rep.path("data").string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+	os_offset.push(utils::packed_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
+      }
+      
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last)
+      {
+	buffer.clear();
+	codec.encode(Data(first, last), std::back_inserter(buffer));
+	offset += buffer.size();
+	
+	os_data.write((char*)&(*buffer.begin()), buffer.size());
+	os_offset.write((char*)&offset, sizeof(off_type));
+      }
+      
+      void clear()
+      {
+	os_data.clear();
+	os_offset.clear();
+      }
+      
+      Codec codec;
+      buffer_type buffer;
+      
+      off_type offset;
+      boost::iostreams::filtering_ostream os_data;
+      boost::iostreams::filtering_ostream os_offset;
+    };
+    
+    typedef DataStream<TreeTransducer::feature_set_type, FeatureVectorCODEC>     feature_stream_type;
+    typedef DataStream<TreeTransducer::attribute_set_type, AttributeVectorCODEC> attribute_stream_type;
+    
+    template <typename Data>
+    struct VocabStream : public utils::hashmurmur<uint64_t>
+    {
+      typedef utils::hashmurmur<uint64_t> hasher_type;
+
+      VocabStream(const path_type& path)
+      {
+	typedef succinctdb::succinct_hash_stream<char, std::allocator<char> > succinct_hash_stream_type;
+	
+	const size_t size = Data::allocated();
+	const size_t bin_size = utils::bithack::max(size, size_t(32));
+	
+	succinct_hash_stream_type data(path, bin_size);
+	for (size_t i = 0; i != size; ++ i) {
+	  const Data key(i);
+	  data.insert(&(*key.begin()), key.size(), hasher_type::operator()(key.begin(), key.end(), 0));
+	}
+      }
+    };
+
+    typedef VocabStream<TreeTransducer::feature_set_type::feature_type>     feature_vocab_type;
+    typedef VocabStream<TreeTransducer::attribute_set_type::attribute_type> attribute_vocab_type;
+  };
+
   struct TreeScoreSetStream
   {
     typedef boost::filesystem::path path_type;
@@ -978,7 +1095,249 @@ namespace cicada
   
   void TreeGrammarStaticImpl::read_keyed_text(const std::string& parameter)
   {
+    typedef std::vector<char, std::allocator<char> > buffer_type;
+
+    typedef cicada::Parameter parameter_type;
     
+    const parameter_type param(parameter);
+    const path_type path = param.name();
+    
+    {
+      parameter_type::const_iterator citer = param.find("cky");
+      if (citer != param.end())
+	cky = utils::lexical_cast<bool>(citer->second);
+    }
+    
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
+    
+    // feature-id, lhs-id, target-id
+    typedef std::pair<id_type, id_type > rule_pair_option_type;
+    typedef std::vector<rule_pair_option_type, std::allocator<rule_pair_option_type> > rule_pair_option_set_type;
+    
+    typedef std::vector<byte_type, std::allocator<byte_type> >  codes_type;
+    typedef std::vector<id_type, std::allocator<id_type> > index_type;
+    typedef std::vector<word_type, std::allocator<word_type> > node_type;
+    typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
+    
+    if (path != "-" && ! boost::filesystem::exists(path))
+      throw std::runtime_error(std::string("no file? ") + path.string());
+    
+    
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    const path_type path_edge   = utils::tempfile::directory_name(tmp_dir / "cicada.edge.XXXXXX");
+    const path_type path_rule   = utils::tempfile::directory_name(tmp_dir / "cicada.rule.XXXXXX");
+    const path_type path_source = utils::tempfile::directory_name(tmp_dir / "cicada.source.XXXXXX");
+    const path_type path_target = utils::tempfile::directory_name(tmp_dir / "cicada.target.XXXXXX");
+    const path_type path_vocab  = utils::tempfile::directory_name(tmp_dir / "cicada.vocab.XXXXXX");
+
+    const path_type path_feature_data  = utils::tempfile::directory_name(tmp_dir / "cicada.feature-data.XXXXXX");
+    const path_type path_feature_vocab = utils::tempfile::directory_name(tmp_dir / "cicada.feature-vocab.XXXXXX");
+    const path_type path_attribute_data  = utils::tempfile::directory_name(tmp_dir / "cicada.attribute-data.XXXXXX");
+    const path_type path_attribute_vocab = utils::tempfile::directory_name(tmp_dir / "cicada.attribute-vocab.XXXXXX");
+    
+    utils::tempfile::insert(path_edge);
+    utils::tempfile::insert(path_rule);
+    utils::tempfile::insert(path_source);
+    utils::tempfile::insert(path_target);
+    utils::tempfile::insert(path_vocab);
+    utils::tempfile::insert(path_feature_data);
+    utils::tempfile::insert(path_feature_vocab);
+    utils::tempfile::insert(path_attribute_data);
+    utils::tempfile::insert(path_attribute_vocab);
+    
+    rule_db.open(path_rule, rule_pair_db_type::WRITE);
+    
+    std::auto_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
+    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
+    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
+   
+    TreeGrammarParser::feature_stream_type   feature_stream(path_feature_data);
+    TreeGrammarParser::attribute_stream_type attribute_stream(path_attribute_data);
+    
+    id_type id_rule = 0;
+    
+    rule_type   source_prev;
+    rule_type   source;
+    rule_type   target;
+    TreeGrammarParser::scores_attrs_parsed_type feats_attrs;
+
+    buffer_type buffer_source;
+    buffer_type buffer_target;
+    codes_type  buffer_options;
+    index_type  buffer_index;
+    hyperpath_type hyperpath;
+    
+    rule_pair_option_set_type rule_options;
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    std::string line;
+
+    TreeGrammarParser::parser<std::string::const_iterator> features_parser;
+    
+    while (std::getline(is, line)) {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      if (line.empty()) continue;
+      
+      source.clear();
+      target.clear();
+      boost::fusion::get<0>(feats_attrs).clear();
+      boost::fusion::get<1>(feats_attrs).clear();
+      
+      std::string::const_iterator iter_end = line.end();
+      std::string::const_iterator iter = line.begin();
+      
+      if (! source.assign(iter, iter_end)) continue;
+      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
+      if (! target.assign(iter, iter_end)) continue;
+      if (! qi::phrase_parse(iter, iter_end, features_parser, standard::space, feats_attrs)) continue;
+      if (iter != iter_end) continue;
+      
+      if (source != source_prev) {
+	
+	if (! rule_options.empty()) {
+	  buffer_source.clear();
+	  tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  
+	  const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
+						       hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
+	  
+	  encode_tree_options(rule_options, buffer_options, id_source);
+
+	  if (cky) {
+	    buffer_index.clear();
+	    source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+	    
+	    //std::cerr << "buffer: ";
+	    //std::copy(buffer_index.begin(), buffer_index.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	    //std::cerr << std::endl;
+	  } else {
+	    source_prev.hyperpath(hyperpath);
+	    encode_path(hyperpath, buffer_index, *edge_map);
+	  }
+	  
+	  rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
+	}
+	
+	rule_options.clear();
+	source_prev = source;
+      }
+      
+      // encode features, attributes
+      feature_stream.insert(boost::fusion::get<0>(feats_attrs).begin(), boost::fusion::get<0>(feats_attrs).end());
+      attribute_stream.insert(boost::fusion::get<1>(feats_attrs).begin(), boost::fusion::get<1>(feats_attrs).end());
+    
+      // encode target
+      buffer_target.clear();
+      tree_rule_encode(target, std::back_inserter(buffer_target));
+      
+      const id_type id_target = target_map->insert(&(*buffer_target.begin()), buffer_target.size(),
+						   hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
+      
+      rule_options.push_back(std::make_pair(id_rule ++, id_target));
+    }
+    
+    if (! rule_options.empty()) {
+      buffer_source.clear();
+      tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  
+      const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
+						   hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
+	  
+      encode_tree_options(rule_options, buffer_options, id_source);
+
+      if (cky) {
+	buffer_index.clear();
+	source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+	    
+	//std::cerr << "buffer: ";
+	//std::copy(buffer_index.begin(), buffer_index.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	//std::cerr << std::endl;
+      } else {
+	source_prev.hyperpath(hyperpath);
+	encode_path(hyperpath, buffer_index, *edge_map);
+      }
+	  
+      rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
+    }
+    
+    
+    source_map->write(path_source);
+    source_map.reset();
+    
+    target_map->write(path_target);
+    target_map.reset();
+
+    // uncover edge_db from edge_map...
+    edge_db.open(path_edge, edge_db_type::WRITE);
+    
+    {
+      typedef std::vector<char, std::allocator<char> > codes_type;
+      typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > buffer_type;
+      
+      codes_type codes;
+      buffer_type buffer;
+      for (id_type id = 0; id != edge_map->size(); ++ id) {
+	codes.clear();
+	codes.insert(codes.end(), edge_map->operator[](id).begin(), edge_map->operator[](id).end());
+	
+	word_type::id_type word_id;
+	
+	buffer.clear();
+	codes_type::const_iterator citer = codes.begin();
+	codes_type::const_iterator citer_end = codes.end();
+	
+	while (citer != citer_end) {
+	  citer += utils::byte_aligned_decode(word_id, &(*citer));
+	  buffer.push_back(word_id);
+	}
+	
+	edge_db.insert(&(*buffer.begin()), buffer.size(), id);
+      }
+    }
+    
+    edge_map.reset();
+    edge_db.close();
+
+    feature_stream.clear();
+    attribute_stream.clear();
+    
+    TreeGrammarParser::feature_vocab_type   __feature_vocab(path_feature_vocab);
+    TreeGrammarParser::attribute_vocab_type __attribute_vocab(path_attribute_vocab);
+    
+    rule_db.close();
+    
+    ::sync();
+
+    while (! rule_db_type::exists(path_source))
+      boost::thread::yield();
+    while (! rule_db_type::exists(path_target))
+      boost::thread::yield();
+    while (! edge_db_type::exists(path_edge))
+      boost::thread::yield();
+    while (! rule_pair_db_type::exists(path_rule))
+      boost::thread::yield();
+    
+    source_db.open(path_source);
+    target_db.open(path_target);
+    edge_db.open(path_edge);
+    rule_db.open(path_rule);
+    
+    // vocabulary...
+    word_type::write(path_vocab);
+    ::sync();
+    while (! vocab_type::exists(path_vocab))
+      boost::thread::yield();
+    
+    vocab.open(path_vocab);
+
+    feature_data.open(path_feature_data);
+    attribute_data.open(path_attribute_data);
+    feature_vocab.open(path_feature_vocab);
+    attribute_vocab.open(path_attribute_vocab);
   }
 
   void TreeGrammarStaticImpl::read_text(const std::string& parameter)
@@ -995,7 +1354,6 @@ namespace cicada
       if (citer != param.end())
 	cky = utils::lexical_cast<bool>(citer->second);
     }
-
     
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
@@ -1020,7 +1378,6 @@ namespace cicada
     
     const path_type path_edge   = utils::tempfile::directory_name(tmp_dir / "cicada.edge.XXXXXX");
     const path_type path_rule   = utils::tempfile::directory_name(tmp_dir / "cicada.rule.XXXXXX");
-    //const path_type path_symbol = utils::tempfile::directory_name(tmp_dir / "cicada.symbol.XXXXXX");
     const path_type path_source = utils::tempfile::directory_name(tmp_dir / "cicada.source.XXXXXX");
     const path_type path_target = utils::tempfile::directory_name(tmp_dir / "cicada.target.XXXXXX");
     const path_type path_vocab  = utils::tempfile::directory_name(tmp_dir / "cicada.vocab.XXXXXX");
