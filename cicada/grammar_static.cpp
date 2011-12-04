@@ -993,7 +993,7 @@ namespace cicada
 	os_offset.pop();
       }
 
-      bool empty() const { return offset; }
+      bool empty() const { return ! offset; }
       
       Codec codec;
       buffer_type buffer;
