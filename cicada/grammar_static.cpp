@@ -988,9 +988,12 @@ namespace cicada
       
       void clear()
       {
+	offset = 0;
 	os_data.clear();
 	os_offset.clear();
       }
+
+      bool empty() const { return offset; }
       
       Codec codec;
       buffer_type buffer;
@@ -1020,6 +1023,7 @@ namespace cicada
 	  const Data key(i);
 	  data.insert(&(*key.begin()), key.size(), hasher_type::operator()(key.begin(), key.end(), 0));
 	}
+
       }
     };
 
@@ -1291,19 +1295,27 @@ namespace cicada
     
     target_map->write(path_target);
     target_map.reset();
+
+    const bool has_features   = ! feature_stream.empty();
+    const bool has_attributes = ! attribute_stream.empty();
     
     feature_stream.clear();
     attribute_stream.clear();
     
-    GrammarParser::feature_vocab_type   __feature_vocab(path_feature_vocab);
-    GrammarParser::attribute_vocab_type __attribute_vocab(path_attribute_vocab);
+    if (has_features) {
+      GrammarParser::feature_vocab_type   __feature_vocab(path_feature_vocab);
+    }
+    
+    if (has_attributes) {
+      GrammarParser::attribute_vocab_type __attribute_vocab(path_attribute_vocab);
+    }
     
     rule_db.close();
     
     word_type::write(path_vocab);
     
     ::sync();
-    
+
     while (! phrase_db_type::exists(path_source))
       boost::thread::yield();
     while (! phrase_db_type::exists(path_target))
@@ -1318,10 +1330,15 @@ namespace cicada
     rule_db.open(path_rule);
     vocab.open(path_vocab);
     
-    feature_data.open(path_feature_data);
-    attribute_data.open(path_attribute_data);
-    feature_vocab.open(path_feature_vocab);
-    attribute_vocab.open(path_attribute_vocab);
+    if (has_features) {
+      feature_data.open(path_feature_data);
+      feature_vocab.open(path_feature_vocab);
+    }
+    
+    if (has_attributes) {
+      attribute_data.open(path_attribute_data);
+      attribute_vocab.open(path_attribute_vocab);
+    }
   }
 
   void GrammarStaticImpl::read_text(const std::string& parameter)
