@@ -20,6 +20,7 @@ namespace cicada
     static const char* desc ="\
 file-name: indexed tree grammar or plain text tree grammar\n\
 \tcky|cyk=[true|false] indexing for CKY|CYK parsing/composition\n\
+\tkey-value=[true|false] store key-value format of features/attributes\n\
 \tfeature0=[feature-name]\n\
 \tfeature1=[feature-name]\n\
 \t...\n\
