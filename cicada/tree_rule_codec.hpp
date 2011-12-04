@@ -195,7 +195,7 @@ namespace cicada
     
     template <typename Iterator>
     inline
-    void decode(Iterator& iter, TreeRule& rule)
+    void decode(Iterator iter, TreeRule& rule)
     {
       is.clear();
       decode_tree(iter, is, rule);
@@ -204,7 +204,7 @@ namespace cicada
 
     template <typename Iterator, typename _Vocab>
     inline
-    void decode(Iterator& iter, const _Vocab& vocab, TreeRule& rule)
+    void decode(Iterator iter, const _Vocab& vocab, TreeRule& rule)
     {
       is.clear();
       decode_tree(iter, is, rule);

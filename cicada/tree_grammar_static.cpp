@@ -472,8 +472,7 @@ namespace cicada
 	if (symbol_db.empty()) {
 	  rule_type rule;
 	  //tree_rule_decode(db[pos].begin(), db[pos].end(), vocab, rule);
-	  utils::piece::const_iterator iter = db[pos].begin();
-	  codec.decode(iter, vocab, rule);
+	  codec.decode(db[pos].begin(), vocab, rule);
 	  
 	  cache.pos = pos;
 	  cache.rule = rule_type::create(rule);
