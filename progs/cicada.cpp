@@ -243,7 +243,6 @@ struct TaskFile
 	
 	if (std::getline(is, line) && ! line.empty())
 	  operations(line);
-	
       } else
 	operations(line);
       

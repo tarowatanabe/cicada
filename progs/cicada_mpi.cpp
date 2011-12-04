@@ -371,22 +371,8 @@ struct MapStdout
 	
 	if (! boost::filesystem::exists(path_input)) break;
 	
-	utils::compress_istream is(path_input, 1024 * 1024);
-	
-	if (std::getline(is, line))
-	  queue.push(std::make_pair(line, false));
+	queue.push(std::make_pair(path_input.string(), false));
       }
-      
-#if 0
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter) {
-	utils::compress_istream is(*iter, 1024 * 1024);
-	
-	if (std::getline(is, line))
-	  queue.push(std::make_pair(line, false));
-      }
-#endif
-      
     } else {
       size_t id = 0;
       utils::compress_istream is(path, 1024 * 1024);
@@ -426,7 +412,13 @@ struct TaskStdout
       queue_is.pop_swap(line);
       if (line.empty()) break;
       
-      operations(line);
+      if (input_directory_mode) {
+	utils::compress_istream is(line, 1024 * 1024);
+	
+	if (std::getline(is, line) && ! line.empty())
+	  operations(line);
+      } else
+	operations(line);
       
       queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
@@ -694,8 +686,14 @@ struct Task
     while (1) {
       queue.pop_swap(line);
       if (line.empty()) break;
-      
-      operations(line);
+
+      if (input_directory_mode) {
+	utils::compress_istream is(line, 1024 * 1024);
+	
+	if (std::getline(is, line) && ! line.empty())
+	  operations(line);
+      } else
+	operations(line);
     }
     
     operations.clear();
@@ -739,21 +737,19 @@ void cicada_process(operation_set_type& operations)
 	
 	for (int rank = 1; rank < mpi_size && iter != iter_end; ++ rank)
 	  if (stream[rank]->test()) {
-	    utils::compress_istream is(*iter, 1024 * 1024);
+	    const path_type path(*iter);
 	    ++ iter;
 	    
-	    if (std::getline(is, line))
-	      stream[rank]->write(line);
+	    stream[rank]->write(path.string());
 	    
 	    found = true;
 	  }
 	
 	if (queue.empty() && iter != iter_end) {
-	  utils::compress_istream is(*iter, 1024 * 1024);
+	  const path_type path(*iter);
 	  ++ iter;
 	  
-	  if (std::getline(is, line))
-	    queue.push(line);
+	  queue.push(path.string());
 	  
 	  found = true;
 	}
