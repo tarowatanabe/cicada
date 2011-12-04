@@ -730,47 +730,6 @@ namespace cicada
     ostream_ptr_type ostream;
     path_type        path;
   };
-
-  template <typename SymbolDB, typename Buffer, typename Hasher>
-  inline
-  void encode_rule(const TreeRule& rule, SymbolDB& symbol_map, Buffer& buffer, const Hasher& hasher)
-  {
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-
-    buffer.clear();
-    
-    {
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::back_inserter(buffer));
-      
-      os << rule;
-    }
-    
-    Buffer encoded(buffer.size() * 8, 0);
-
-    typename Buffer::iterator hiter = encoded.begin();
-    typename Buffer::iterator citer = encoded.end();
-    size_t pos = 0;
-    
-    utils::piece buffer_piece(buffer.begin(), buffer.end());
-    tokenizer_type tokenizer(buffer_piece);
-    
-    tokenizer_type::iterator titer_end = tokenizer.end();
-    for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-      utils::piece piece(*titer);
-      
-      typename SymbolDB::pos_type id = symbol_map.insert(piece.begin(), piece.size(), hasher(piece.begin(), piece.end(), 0));
-      
-      const size_t offset = utils::group_aligned_encode(id, &(*hiter), pos);
-      citer = hiter + offset;
-      hiter += offset & (- size_t((pos & 0x03) == 0x03));
-      ++ pos;
-    }
-    
-    encoded.resize(citer - encoded.begin());
-    
-    buffer.swap(encoded);
-  }
   
   template <typename Options, typename Codes, typename Id>
   inline
@@ -887,7 +846,6 @@ namespace cicada
     }
 
     
-    //typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > symbol_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
     
@@ -925,7 +883,6 @@ namespace cicada
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
     
     std::auto_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
-    //std::auto_ptr<symbol_map_type> symbol_map(new symbol_map_type(1024 * 1024 * 4));
     std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
     std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
     
@@ -984,7 +941,6 @@ namespace cicada
       if (source != source_prev) {
 	
 	if (! rule_options.empty()) {
-	  //encode_rule(source_prev, *symbol_map, buffer_source, *this);
 	  buffer_source.clear();
 	  tree_rule_encode(source_prev, std::back_inserter(buffer_source));
 	  
@@ -1050,7 +1006,6 @@ namespace cicada
       for (int attribute = 0; attribute < attribute_size; ++ attribute)
 	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
       
-      //encode_rule(target, *symbol_map, buffer_target, *this);
       buffer_target.clear();
       tree_rule_encode(target, std::back_inserter(buffer_target));
       
@@ -1061,7 +1016,6 @@ namespace cicada
     }
     
     if (! rule_options.empty()) {
-      //encode_rule(source_prev, *symbol_map, buffer_source, *this);
       buffer_source.clear();
       tree_rule_encode(source_prev, std::back_inserter(buffer_source));
 	  
@@ -1085,8 +1039,6 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
 
-    //symbol_map->write(path_symbol);
-    //symbol_map.reset();
     
     source_map->write(path_source);
     source_map.reset();
@@ -1129,8 +1081,6 @@ namespace cicada
     
     ::sync();
     
-    //while (! symbol_db_type::exists(path_symbol))
-    // boost::thread::yield();
     while (! rule_db_type::exists(path_source))
       boost::thread::yield();
     while (! rule_db_type::exists(path_target))
@@ -1140,7 +1090,6 @@ namespace cicada
     while (! rule_pair_db_type::exists(path_rule))
       boost::thread::yield();
     
-    //symbol_db.open(path_symbol);
     source_db.open(path_source);
     target_db.open(path_target);
     edge_db.open(path_edge);
