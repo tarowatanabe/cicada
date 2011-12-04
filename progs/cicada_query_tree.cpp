@@ -27,6 +27,7 @@
 #include "cicada/query_tree.hpp"
 #include "cicada/grammar.hpp"
 #include "cicada/tree_grammar.hpp"
+#include "cicada/tree_rule_compact.hpp"
 #include "cicada/feature_vector_compact.hpp"
 #include "cicada/symbol_vector_compact.hpp"
 
@@ -61,6 +62,8 @@ typedef tree_transducer_type::rule_type      tree_rule_type;
 typedef tree_transducer_type::rule_ptr_type  tree_rule_ptr_type;
 typedef tree_transducer_type::rule_pair_type tree_rule_pair_type;
 
+typedef cicada::TreeRuleCompact tree_rule_compact_type;
+
 struct rule_pair_string_type
 {
   typedef cicada::FeatureVectorCompact feature_set_type;
@@ -88,8 +91,8 @@ struct tree_rule_pair_string_type
 {
   typedef cicada::FeatureVectorCompact feature_set_type;
 
-  std::string source;
-  std::string target;
+  tree_rule_compact_type source;
+  tree_rule_compact_type target;
   
   feature_set_type   features;
   attribute_set_type attributes;
@@ -232,9 +235,6 @@ struct Task
     tree_rule_pair_string_type tree_rule_string;
     rule_pair_string_type rule_string;
     
-    boost::iostreams::filtering_ostream os_source;
-    boost::iostreams::filtering_ostream os_target;
-    
     hypergraph_type graph;
     std::string line;
     for (;;) {
@@ -258,16 +258,10 @@ struct Task
 	if (titer->source || titer->target) {
 	  tree_rule_string.clear();
 	  
-	  os_source.push(boost::iostreams::back_inserter(tree_rule_string.source));
-	  os_target.push(boost::iostreams::back_inserter(tree_rule_string.target));
-	  
 	  if (titer->source)
-	    os_source << *(titer->source);
+	    tree_rule_string.source = *(titer->source);
 	  if (titer->target)
-	    os_target << *(titer->target);
-	  
-	  os_source.pop();
-	  os_target.pop();
+	    tree_rule_string.target = *(titer->target);
 	  
 	  tree_rule_string.features = titer->features;
 	  tree_rule_string.attributes.swap(titer->attributes);
@@ -387,7 +381,7 @@ int main(int argc, char** argv)
       
       tree_rule_pair_unique_type::const_iterator iter_end = tree_rules_unique.end();
       for (tree_rule_pair_unique_type::const_iterator iter = tree_rules_unique.begin(); iter != iter_end; ++ iter) {
-	karma::generate(oiter_type(os), standard::string << " ||| " << standard::string, iter->source, iter->target);
+	os << iter->source.decode() << " ||| " << iter->target.decode();
 	
 	if (! iter->features.empty()) {
 	  feature_set_type features(iter->features.begin(), iter->features.end());
