@@ -172,7 +172,7 @@ namespace cicada
       rule.label = vocab[id];
       
       for (off_type i = 0; i != rule.antecedents.size(); ++ i)
-	decode_label(iter, rule.antecedents[i]);
+	decode_label(iter, vocab, rule.antecedents[i]);
     }
     
     
