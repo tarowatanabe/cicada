@@ -186,9 +186,6 @@ struct Task
     rule_pair_set_type    rules;
     rule_pair_string_type rule_string;
     
-    boost::iostreams::filtering_ostream os_source;
-    boost::iostreams::filtering_ostream os_target;
-
     lattice_type lattice;
     sentence_type sentence;
     
