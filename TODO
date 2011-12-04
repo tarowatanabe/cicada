@@ -140,3 +140,8 @@ Compressed feature vector representation
    for hypothesis storage, use a compact notation of features
        use of delta encoded feature representation (assuming non random access iterators)
        + value representation using either char/short/int/float/double
+
+Implement succinct-rtrie:
+  this is a trie-like structure, but it's purpose is a reverse index: given id, query data of string.
+  strings are stored in a trie, with an index refering to the leaf position of trie of id.
+  string is uncovered by leaf-to-parent traversal (thus, indexing requires reversing, first)

@@ -258,6 +258,9 @@ struct Task
       
       tree_rules.clear();
       rules.clear();
+
+      grammar_local.assign(lattice);
+      tree_grammar_local.assign(lattice);
       
       query(lattice, std::back_inserter(tree_rules), std::back_inserter(rules));
 

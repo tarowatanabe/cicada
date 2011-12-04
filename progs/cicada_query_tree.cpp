@@ -246,6 +246,9 @@ struct Task
       tree_rules.clear();
       rules.clear();
       
+      grammar_local.assign(graph);
+      tree_grammar_local.assign(graph);
+      
       query(graph, std::back_inserter(tree_rules), std::back_inserter(rules));
 
       if (debug)
