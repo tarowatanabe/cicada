@@ -11,6 +11,7 @@
 #include <cicada/tree_rule.hpp>
 
 #include <utils/simple_vector.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {
@@ -72,6 +73,7 @@ namespace cicada
     }
     
   public:
+    friend size_t hash_value(TreeRuleCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
     friend bool operator==(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl == y.impl; }
     friend bool operator!=(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl != y.impl; }
     friend bool operator<(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl < y.impl; }

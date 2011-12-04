@@ -9,6 +9,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/symbol_vector.hpp>
 
+#include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
 #include <utils/byte_aligned_code.hpp>
 #include <utils/simple_vector.hpp>
@@ -187,6 +188,7 @@ namespace cicada
     }
 
   public:
+    friend size_t hash_value(SymbolVectorCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
     friend bool operator==(const SymbolVectorCompact& x, const SymbolVectorCompact& y) { return x.impl == y.impl; }
     friend bool operator!=(const SymbolVectorCompact& x, const SymbolVectorCompact& y) { return x.impl != y.impl; }
     friend bool operator<(const SymbolVectorCompact& x, const SymbolVectorCompact& y) { return x.impl < y.impl; }

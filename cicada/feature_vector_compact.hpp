@@ -13,6 +13,7 @@
 
 #include <cicada/feature.hpp>
 
+#include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
 #include <utils/byte_aligned_code.hpp>
 #include <utils/simple_vector.hpp>
@@ -176,7 +177,7 @@ namespace cicada
     typedef uint8_t byte_type;
         
   private:
-    typedef utils::simple_vector<byte_type, std::allocator<byte_type> > storage_type;
+    typedef utils::simple_vector<byte_type, std::allocator<byte_type> > impl_type;
     
   public:
     typedef __feature_vector_feature_codec codec_key_type;
@@ -318,11 +319,11 @@ namespace cicada
     template <typename T, typename A>
     FeatureVectorCompact(const FeatureVector<T, A>& x) { assign(x); }
     
-    FeatureVectorCompact(const FeatureVectorCompact& x) : storage(x.storage) {}
+    FeatureVectorCompact(const FeatureVectorCompact& x) : impl(x.impl) {}
 
     FeatureVectorCompact& operator=(const FeatureVectorCompact& x)
     {
-      storage = x.storage;
+      impl = x.impl;
       return *this;
     }
     
@@ -335,7 +336,7 @@ namespace cicada
 
     void assign(const FeatureVectorCompact& x)
     {
-      storage.assign(x.storage);
+      impl.assign(x.impl);
     }
     
     template <typename Iterator>
@@ -350,14 +351,14 @@ namespace cicada
       if (sorted) {
 	compressed_type compressed(std::distance(first, last) * 16);
 	
-	storage.assign(compressed.begin(), encoder(first, last, compressed.begin()));
+	impl.assign(compressed.begin(), encoder(first, last, compressed.begin()));
       } else {
 	raw_type raw(first, last);
 	std::sort(raw.begin(), raw.end(), less_first<pair_type>());
 	
 	compressed_type compressed(raw.size() * 16);
 	
-	storage.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
+	impl.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
       }
     }
     
@@ -369,34 +370,35 @@ namespace cicada
       encoder_type encoder;
       compressed_type compressed(x.size() * 16);
       
-      storage.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
+      impl.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
     }
 
     
   public:
-    const_iterator begin() const { return const_iterator(&(*storage.begin()), &(*storage.end())); }
+    const_iterator begin() const { return const_iterator(&(*impl.begin()), &(*impl.end())); }
     const_iterator end() const { return const_iterator(); }
     
-    bool empty() const { return storage.empty(); }
-    size_type size_compressed() const  { return storage.size(); }
+    bool empty() const { return impl.empty(); }
+    size_type size_compressed() const  { return impl.size(); }
 
-    void clear() { storage.clear(); }
+    void clear() { impl.clear(); }
 
     void swap(FeatureVectorCompact& x)
     {
-      storage.swap(x.storage);
+      impl.swap(x.impl);
     }
     
   public:
-    friend bool operator==(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage == y.storage; }
-    friend bool operator!=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage != y.storage; }
-    friend bool operator<(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage < y.storage; }
-    friend bool operator>(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage > y.storage; }
-    friend bool operator<=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage <= y.storage; }
-    friend bool operator>=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.storage >= y.storage; }
+    friend size_t hash_value(FeatureVectorCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
+    friend bool operator==(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl == y.impl; }
+    friend bool operator!=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl != y.impl; }
+    friend bool operator<(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl < y.impl; }
+    friend bool operator>(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl > y.impl; }
+    friend bool operator<=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl <= y.impl; }
+    friend bool operator>=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl >= y.impl; }
     
   private:
-    storage_type storage;
+    impl_type impl;
   }; 
 };
 
