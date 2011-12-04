@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__FEATURE_VECTOR_CODEC__HPP__
@@ -215,6 +215,23 @@ namespace cicada
 	x[id] = data;
       }
     }
+
+    template <typename Iterator, typename _Vocab, typename Tp, typename Alloc>
+    void decode(Iterator first, Iterator last, const _Vocab& vocab, FeatureVector<Tp, Alloc>& x)
+    {
+      x.clear();
+      
+      feature_type::id_type id = 0;
+      feature_type::id_type inc = 0;
+      double data;
+      while (first != last) {
+	std::advance(first, codec_feature_type::decode(reinterpret_cast<const codec_feature_type::byte_type*>(&(*first)), inc));
+	std::advance(first, codec_data_type::decode(reinterpret_cast<const codec_data_type::byte_type*>(&(*first)), data));
+	
+	id += inc;
+	x[vocab[id]] = data;
+      }
+    }
     
     buffer_type buffer;
   };
@@ -229,10 +246,19 @@ namespace cicada
   }
   
   template <typename Iterator, typename Tp, typename Alloc>
+  inline
   void feature_vector_decode(Iterator first, Iterator last, FeatureVector<Tp, Alloc>& x)
   {
     FeatureVectorCODEC codec;
     codec.decode(first, last, x);
+  }
+
+  template <typename Iterator, typename _Vocab, typename Tp, typename Alloc>
+  inline
+  void feature_vector_decode(Iterator first, Iterator last, const _Vocab& vocab, FeatureVector<Tp, Alloc>& x)
+  {
+    FeatureVectorCODEC codec;
+    codec.decode(first, last, vocab, x);
   }
   
 };

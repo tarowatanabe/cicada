@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__ATTRIBUTE_VECTOR_CODEC__HPP__
@@ -332,6 +332,23 @@ namespace cicada
 	x[id] = data;
       }
     }
+
+    template <typename Iterator, typename _Vocab>
+    void decode(Iterator first, Iterator last, const _Vocab& vocab, attribute_set_type& x)
+    {
+      x.clear();
+      
+      attribute_type::id_type id = 0;
+      attribute_type::id_type inc = 0;
+      attribute_set_type::data_type data;
+      while (first != last) {
+	std::advance(first, codec_attribute_type::decode(reinterpret_cast<const codec_attribute_type::byte_type*>(&(*first)), inc));
+	std::advance(first, codec_data_type::decode(reinterpret_cast<const codec_data_type::byte_type*>(&(*first)), data));
+	
+	id += inc;
+	x[vocab[id]] = data;
+      }
+    }
     
     buffer_type buffer;
   };
@@ -345,10 +362,19 @@ namespace cicada
   }
   
   template <typename Iterator>
+  inline
   void attribute_vector_decode(Iterator first, Iterator last, AttributeVector& x)
   {
     AttributeVectorCODEC codec;
     codec.decode(first, last, x);
+  }
+
+  template <typename Iterator, typename _Vocab>
+  inline
+  void attribute_vector_decode(Iterator first, Iterator last, const _Vocab& vocab, AttributeVector& x)
+  {
+    AttributeVectorCODEC codec;
+    codec.decode(first, last, vocab, x);
   }
   
 };
