@@ -12,6 +12,9 @@
 #include "quantizer.hpp"
 #include "tree_rule_codec.hpp"
 
+#include "feature_vector_codec.hpp"
+#include "attribute_vector_codec.hpp"
+
 #include "succinct_db/succinct_trie_database.hpp"
 #include "succinct_db/succinct_trie_db.hpp"
 #include "succinct_db/succinct_hash.hpp"
@@ -95,6 +98,90 @@ namespace cicada
     
     typedef succinctdb::succinct_trie_db<word_type::id_type, id_type, std::allocator<std::pair<word_type::id_type, id_type> > > edge_db_type;
     typedef succinctdb::succinct_trie_database<id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
+
+    template <typename Key>
+    struct KeyVocab
+    {
+      typedef typename Key::id_type id_type;
+      typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > data_type;
+      
+      KeyVocab() : data() {}
+      KeyVocab(const path_type& path) : data(path) {}
+      
+      void write(const path_type& path) const { data.write(path); }
+      void read(const path_type& path) { data.open(path); }
+      void open(const path_type& path) { data.open(path); }
+      void clear() { data.clear(); }
+      
+      bool empty() const { return data.empty(); }
+      path_type path() const { return data.path(); }
+      
+      Key operator[](const id_type& id) const
+      {
+	return Key(data[id].begin(), data[id].end());
+      }
+      
+      data_type data;
+    };
+    
+    struct PackedData
+    {
+      typedef uint64_t off_type;
+      typedef utils::map_file<byte_type, std::allocator<byte_type> >           data_type;
+      typedef utils::packed_vector_mapped<off_type, std::allocator<off_type> > offset_type;
+      
+      PackedData() : data(), offset() {}
+      PackedData(const path_type& path) : data(), offset() { open(path); }
+      
+      bool empty() const { return data.empty(); }
+      path_type path() const { return data.path().parent_path(); }
+      void clear()
+      {
+	data.clear();
+	offset.clear();
+      }
+      
+      utils::piece operator[](size_t i) const
+      {
+	if (i == 0)
+	  return utils::piece(data.begin(), data.begin() + offset[i]);
+	else
+	  return utils::piece(data.begin() + offset[i - 1], data.begin() + offset[i]);
+      }
+
+      void open(const path_type& path) { read(path); }
+      
+      void read(const path_type& path)
+      {
+	typedef utils::repository repository_type;
+	
+	repository_type rep(path, repository_type::read);
+
+	data.open(rep.path("data"));
+	offset.open(rep.path("offset"));
+      }
+
+      void write(const path_type& file) const
+      {
+	typedef utils::repository repository_type;
+	
+	if (path() == file) return;
+	
+	repository_type rep(file, repository_type::write);
+	
+	data.write(rep.path("data"));
+	offset.write(rep.path("offset"));
+      }
+      
+    private:
+      data_type   data;
+      offset_type offset;
+    };
+
+    typedef KeyVocab<feature_type>   feature_vocab_type;
+    typedef KeyVocab<attribute_type> attribute_vocab_type;    
+    typedef PackedData               feature_data_type;
+    typedef PackedData               attribute_data_type;
     
     typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
@@ -174,6 +261,10 @@ namespace cicada
 	target_db(x.target_db),
 	score_db(x.score_db),
 	attr_db(x.attr_db),
+	feature_data(x.feature_data),
+	attribute_data(x.attribute_data),
+	feature_vocab(x.feature_vocab),
+	attribute_vocab(x.attribute_vocab),
 	vocab(x.vocab),
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
@@ -190,6 +281,10 @@ namespace cicada
       target_db     = x.target_db;
       score_db      = x.score_db;
       attr_db      = x.attr_db;
+      feature_data   = x.feature_data;
+      attribute_data = x.attribute_data;
+      feature_vocab   = x.feature_vocab;
+      attribute_vocab = x.attribute_vocab;
       vocab         = x.vocab;
       feature_names = x.feature_names;
       attribute_names = x.attribute_names;
@@ -207,6 +302,10 @@ namespace cicada
       target_db.clear();
       score_db.clear();
       attr_db.clear();
+      feature_data.clear();
+      attribute_data.clear();
+      feature_vocab.clear();
+      attribute_vocab.clear();
       vocab.clear();
       feature_names.clear();
       attribute_names.clear();
@@ -257,6 +356,9 @@ namespace cicada
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
+      FeatureVectorCODEC   feature_codec;
+      AttributeVectorCODEC attribute_codec;
+
       const size_type cache_pos = hasher_type::operator()(node) & (cache_rule.size() - 1);
       
       cache_rule_pair_set_type& cache = const_cast<cache_rule_pair_set_type&>(cache_rule[cache_pos]);
@@ -304,6 +406,18 @@ namespace cicada
 	    const rule_ptr_type rule_target = read_rule(pos_target, cache_target, target_db);
 	     
 	    options.push_back(rule_pair_type(rule_source, rule_target));
+
+	    if (! feature_data.empty())
+	      feature_codec.decode(feature_data[pos_feature].begin(),
+				   feature_data[pos_feature].end(),
+				   feature_vocab,
+				   options.back().features);
+	    
+	    if (! attribute_data.empty())
+	      attribute_codec.decode(attribute_data[pos_feature].begin(),
+				     attribute_data[pos_feature].end(),
+				     attribute_vocab,
+				     options.back().attributes);
 	     
 	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
@@ -414,6 +528,13 @@ namespace cicada
     rule_db_type          target_db;
     score_db_type         score_db;
     score_db_type         attr_db;
+
+    feature_data_type   feature_data;
+    attribute_data_type attribute_data;
+    
+    feature_vocab_type   feature_vocab;
+    attribute_vocab_type attribute_vocab;
+
     vocab_type            vocab;
     
     feature_name_set_type   feature_names;
@@ -602,6 +723,16 @@ namespace cicada
     
     vocab.write(rep.path("vocab"));
     
+    if (! feature_data.empty())
+      feature_data.write(rep.path("feature-data"));
+    if (! feature_vocab.empty())
+      feature_vocab.write(rep.path("feature-vocab"));
+    
+    if (! attribute_data.empty())
+      attribute_data.write(rep.path("attribute-data"));
+    if (! attribute_vocab.empty())
+      attribute_vocab.write(rep.path("attribute-vocab"));
+
     const size_type feature_size = score_db.size();
     const size_type attribute_size = attr_db.size();
     
@@ -650,6 +781,16 @@ namespace cicada
     target_db.open(rep.path("target"));
     
     vocab.open(rep.path("vocab"));
+
+    if (boost::filesystem::exists(rep.path("feature-data")))
+      feature_data.open(rep.path("feature-data"));
+    if (boost::filesystem::exists(rep.path("feature-vocab")))
+      feature_vocab.open(rep.path("feature-vocab"));
+
+    if (boost::filesystem::exists(rep.path("attribute-data")))
+      attribute_data.open(rep.path("attribute-data"));
+    if (boost::filesystem::exists(rep.path("attribute-vocab")))
+      attribute_vocab.open(rep.path("attribute-vocab"));
 
     repository_type::const_iterator citer = rep.find("cky");
     if (citer != rep.end())
