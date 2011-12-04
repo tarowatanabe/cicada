@@ -515,6 +515,7 @@ namespace cicada
     void read(const std::string& parameter);
     void write(const path_type& path) const;
 
+    void read_keyed_text(const std::string& path);
     void read_text(const std::string& path);
     void read_binary(const std::string& path);
 
@@ -699,8 +700,15 @@ namespace cicada
     if (path != "-" && ! boost::filesystem::exists(path))
       throw std::runtime_error(std::string("no grammar file") + param.name());
     
+    bool key_value = false;
+    parameter_type::const_iterator kiter = param.find("key-value");
+    if (kiter != param.end())
+      key_value = utils::lexical_cast<bool>(kiter->second);
+    
     if (boost::filesystem::is_directory(path))
       read_binary(parameter);
+    else if (key_value)
+      read_keyed_text(parameter);
     else
       read_text(parameter);
   }
@@ -967,10 +975,12 @@ namespace cicada
     
     buffer_type& buffer;
   };
+  
+  void TreeGrammarStaticImpl::read_keyed_text(const std::string& parameter)
+  {
+    
+  }
 
-  
-  // how do we store single-tree...? use raw string? perform compression? (quicklz etc. ... currently NO...)
-  
   void TreeGrammarStaticImpl::read_text(const std::string& parameter)
   {
     typedef std::vector<char, std::allocator<char> > buffer_type;

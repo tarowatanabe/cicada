@@ -29,6 +29,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
 #include "utils/byte_aligned_code.hpp"
+#include "utils/json_string_parser.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -526,6 +527,7 @@ namespace cicada
     void read(const std::string& parameter);
     void write(const path_type& path) const;
 
+    void read_keyed_text(const std::string& path);
     void read_text(const std::string& path);
     void read_binary(const std::string& path);
 
@@ -715,8 +717,15 @@ namespace cicada
     if (path != "-" && ! boost::filesystem::exists(path))
       throw std::runtime_error(std::string("no grammar file") + param.name());
     
+    bool key_value = false;
+    parameter_type::const_iterator kiter = param.find("key-value");
+    if (kiter != param.end())
+      key_value = utils::lexical_cast<bool>(kiter->second);
+
     if (boost::filesystem::is_directory(path))
       read_binary(parameter);
+    else if (key_value)
+      read_keyed_text(parameter);
     else
       read_text(parameter);
     
@@ -893,6 +902,131 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };
 
+  struct GrammarParser
+  {
+    typedef boost::filesystem::path path_type;
+
+    typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
+    typedef std::pair<std::string, double> score_parsed_type;
+    typedef std::vector<score_parsed_type, std::allocator<score_parsed_type> > scores_parsed_type;
+    
+    typedef std::pair<std::string, AttributeVector::data_type> attr_parsed_type;
+    typedef std::vector<attr_parsed_type, std::allocator<attr_parsed_type> > attrs_parsed_type;
+    
+    typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type, attrs_parsed_type> rule_parsed_type;
+    
+    template <typename Iterator>
+    struct parser : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
+    {
+    
+      parser() : parser::base_type(rule_grammar)
+      {
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	
+	lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
+	phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
+	
+	score %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
+	scores %= -(score % (+standard::space));
+	
+	data %= data_string | double_dot | int64_;
+	
+	attribute %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> data;
+	attributes %= *attribute;
+      
+	rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores) >> -("|||" >> attributes);
+      }
+  
+      typedef boost::spirit::standard::space_type space_type;
+
+      boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
+      boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    
+      boost::spirit::qi::rule<Iterator, std::string(), space_type> lhs;
+      boost::spirit::qi::rule<Iterator, phrase_parsed_type(), space_type> phrase;
+      
+      boost::spirit::qi::rule<Iterator, score_parsed_type()>  score;
+      boost::spirit::qi::rule<Iterator, scores_parsed_type()> scores;
+      
+      utils::json_string_parser<Iterator> data_string;
+      
+      boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
+      boost::spirit::qi::rule<Iterator, attr_parsed_type(), space_type>           attribute;
+      boost::spirit::qi::rule<Iterator, attrs_parsed_type(), space_type>          attributes;
+      
+      boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type> rule_grammar;
+    };
+
+    template <typename Data, typename Codec>
+    struct DataStream
+    {
+      typedef uint64_t off_type;
+      typedef std::vector<char, std::allocator<char> > buffer_type;
+      
+      DataStream(const path_type& path)
+	: offset(0)
+      {
+	typedef utils::repository repository_type;
+	
+	repository_type rep(path, repository_type::write);
+	
+	os_data.push(boost::iostreams::file_sink(rep.path("data").string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+	os_offset.push(utils::packed_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
+      }
+      
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last)
+      {
+	buffer.clear();
+	codec.encode(Data(first, last), std::back_inserter(buffer));
+	offset += buffer.size();
+	
+	os_data.write((char*)&(*buffer.begin()), buffer.size());
+	os_offset.write((char*)&offset, sizeof(off_type));
+      }
+      
+      void clear()
+      {
+	os_data.clear();
+	os_offset.clear();
+      }
+      
+      Codec codec;
+      buffer_type buffer;
+      
+      off_type offset;
+      boost::iostreams::filtering_ostream os_data;
+      boost::iostreams::filtering_ostream os_offset;
+    };
+    
+    typedef DataStream<Transducer::feature_set_type, FeatureVectorCODEC>     feature_stream_type;
+    typedef DataStream<Transducer::attribute_set_type, AttributeVectorCODEC> attribute_stream_type;
+    
+    template <typename Data>
+    struct VocabStream : public utils::hashmurmur<uint64_t>
+    {
+      typedef utils::hashmurmur<uint64_t> hasher_type;
+
+      VocabStream(const path_type& path)
+      {
+	typedef succinctdb::succinct_hash_stream<char, std::allocator<char> > succinct_hash_stream_type;
+	
+	const size_t size = Data::allocated();
+	const size_t bin_size = utils::bithack::max(size, size_t(32));
+	
+	succinct_hash_stream_type data(path, bin_size);
+	for (size_t i = 0; i != size; ++ i) {
+	  const Data key(i);
+	  data.insert(&(*key.begin()), key.size(), hasher_type::operator()(key.begin(), key.end(), 0));
+	}
+      }
+    };
+
+    typedef VocabStream<Transducer::feature_set_type::feature_type>     feature_vocab_type;
+    typedef VocabStream<Transducer::attribute_set_type::attribute_type> attribute_vocab_type;
+  };
+  
   struct ScoreSetStream
   {
     typedef boost::filesystem::path path_type;
@@ -985,17 +1119,217 @@ namespace cicada
     codes.resize(citer - codes.begin());
   }
   
+  void GrammarStaticImpl::read_keyed_text(const std::string& parameter)
+  {
+    typedef cicada::Parameter parameter_type;
+    
+    const parameter_type param(parameter);
+    const path_type path = param.name();
+    
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_map_type;
+    
+    typedef boost::tuple<id_type, symbol_type::id_type, id_type> rule_option_type;
+    typedef std::vector<rule_option_type, std::allocator<rule_option_type> > rule_option_set_type;
+    
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
+
+    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
+    typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+    
+    if (path != "-" && ! boost::filesystem::exists(path))
+      throw std::runtime_error(std::string("no file? ") + path.string());
+    
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    const path_type path_rule   = utils::tempfile::directory_name(tmp_dir / "cicada.rule.XXXXXX");
+    const path_type path_source = utils::tempfile::directory_name(tmp_dir / "cicada.source.XXXXXX");
+    const path_type path_target = utils::tempfile::directory_name(tmp_dir / "cicada.target.XXXXXX");
+    const path_type path_vocab  = utils::tempfile::directory_name(tmp_dir / "cicada.vocab.XXXXXX");
+    
+    const path_type path_feature_data  = utils::tempfile::directory_name(tmp_dir / "cicada.feature-data.XXXXXX");
+    const path_type path_feature_vocab = utils::tempfile::directory_name(tmp_dir / "cicada.feature-vocab.XXXXXX");
+    const path_type path_attribute_data  = utils::tempfile::directory_name(tmp_dir / "cicada.attribute-data.XXXXXX");
+    const path_type path_attribute_vocab = utils::tempfile::directory_name(tmp_dir / "cicada.attribute-vocab.XXXXXX");
+    
+    utils::tempfile::insert(path_rule);
+    utils::tempfile::insert(path_source);
+    utils::tempfile::insert(path_target);
+    utils::tempfile::insert(path_vocab);
+    utils::tempfile::insert(path_feature_data);
+    utils::tempfile::insert(path_feature_vocab);
+    utils::tempfile::insert(path_attribute_data);
+    utils::tempfile::insert(path_attribute_vocab);
+    
+    rule_db.open(path_rule, rule_db_type::WRITE);
+    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 128));
+    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 128));
+
+    GrammarParser::feature_stream_type   feature_stream(path_feature_data);
+    GrammarParser::attribute_stream_type attribute_stream(path_attribute_data);
+    
+    id_type id_rule = 0;
+    sequence_type source_prev;
+    sequence_type source;
+    sequence_type target;
+
+    GrammarParser::rule_parsed_type rule;
+    
+    id_set_type source_index;
+    
+    code_set_type codes_source;
+    code_set_type codes_target;
+    code_set_type codes_option;
+
+    rule_option_set_type rule_options;
+
+    utils::compress_istream is(path, 1024 * 1024);
+    
+    std::string line;
+    
+    GrammarParser::parser<std::string::const_iterator> rule_parser;
+    
+    size_type arity_source = 0;
+    
+    while (std::getline(is, line)) {
+      if (line.empty()) continue;
+
+      boost::fusion::get<0>(rule).clear();
+      boost::fusion::get<1>(rule).clear();
+      boost::fusion::get<2>(rule).clear();
+      boost::fusion::get<3>(rule).clear();
+      boost::fusion::get<4>(rule).clear();
+      
+      std::string::const_iterator iter_end = line.end();
+      std::string::const_iterator iter = line.begin();
+      
+      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
+      
+      if (! result || iter != iter_end) continue;
+
+      // skip empty source...
+      if (boost::fusion::get<1>(rule).empty()) continue;
+      
+      // lhs...
+      const std::string& lhs = boost::fusion::get<0>(rule);
+      const word_type::id_type id_lhs = word_type(lhs.empty() ? vocab_type::X : word_type(lhs)).id();
+      
+      // source
+      source.clear();
+      source.insert(source.end(), boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
+      
+      // target
+      target.clear();
+      target.insert(target.end(), boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
+
+      if (source != source_prev) {
+	if (! rule_options.empty()) {
+	  encode_phrase(source_prev, codes_source);
+	     
+	  const id_type id_source = source_map->insert(&(*codes_source.begin()), codes_source.size(),
+						       hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+	  
+	  // encode options
+	  encode_options(rule_options, codes_option, id_source);
+	  
+	  // encode source.. we will use index-stripped indexing!
+	  encode_index(source_prev.begin(), source_prev.end(), source_index);
+	  
+	  // insert...
+	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
+	}
+	
+	rule_options.clear();
+	
+	source_prev = source;
+	
+	arity_source = 0;
+	for (sequence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
+	  arity_source += siter->is_non_terminal();
+      }
+      
+      if (! target.empty()) {
+	size_type arity_target = 0;
+	for (sequence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer)
+	  arity_target += titer->is_non_terminal();
+	
+	if (arity_source != arity_target)
+	  throw std::runtime_error("# of non-terminals do not match...");
+      }
+
+      // encode features/attributes
+      feature_stream.insert(boost::fusion::get<3>(rule).begin(), boost::fusion::get<3>(rule).end());
+      attribute_stream.insert(boost::fusion::get<4>(rule).begin(), boost::fusion::get<4>(rule).end());
+      
+      // encode target...
+      encode_phrase(target, codes_target);
+      
+      const id_type id_target = target_map->insert(&(*codes_target.begin()), codes_target.size(),
+						   hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
+      
+      // put into rule_options...
+      rule_options.push_back(boost::make_tuple(id_rule ++, id_lhs, id_target));
+    }
+    
+    if (! rule_options.empty()) {
+      encode_phrase(source_prev, codes_source);
+      
+      const id_type id_source = source_map->insert(&(*codes_source.begin()), codes_source.size(),
+						   hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+      
+      // encode options
+      encode_options(rule_options, codes_option, id_source);
+      
+      // encode source.. we will use index-stripped indexing!
+      encode_index(source_prev.begin(), source_prev.end(), source_index);
+      
+      // insert...
+      rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size()); 
+    }
+    
+    source_map->write(path_source);
+    source_map.reset();
+    
+    target_map->write(path_target);
+    target_map.reset();
+    
+    feature_stream.clear();
+    attribute_stream.clear();
+    
+    GrammarParser::feature_vocab_type   __feature_vocab(path_feature_vocab);
+    GrammarParser::attribute_vocab_type __attribute_vocab(path_attribute_vocab);
+    
+    rule_db.close();
+    
+    word_type::write(path_vocab);
+    
+    ::sync();
+    
+    while (! phrase_db_type::exists(path_source))
+      boost::thread::yield();
+    while (! phrase_db_type::exists(path_target))
+      boost::thread::yield();
+    while (! vocab_type::exists(path_vocab))
+      boost::thread::yield();
+    while (! rule_db_type::exists(path_rule))
+      boost::thread::yield();
+    
+    source_db.open(path_source);
+    target_db.open(path_target);
+    rule_db.open(path_rule);
+    vocab.open(path_vocab);
+    
+    feature_data.open(path_feature_data);
+    attribute_data.open(path_attribute_data);
+    feature_vocab.open(path_feature_vocab);
+    attribute_vocab.open(path_attribute_vocab);
+  }
+
   void GrammarStaticImpl::read_text(const std::string& parameter)
   {
     typedef cicada::Parameter parameter_type;
     
     const parameter_type param(parameter);
     const path_type path = param.name();
-
-    // packing...
-    bool packing = false;
-    if (param.find("packing") != param.end())
-      packing = utils::lexical_cast<bool>(param.find("packing")->second);
     
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_map_type;
     
@@ -1043,7 +1377,6 @@ namespace cicada
     sequence_type source;
     sequence_type target;
     
-    
     rule_parsed_type rule;
     
     id_set_type source_index;
@@ -1053,8 +1386,6 @@ namespace cicada
     code_set_type codes_option;
     
     rule_option_set_type rule_options;
-    
-    const std::string sep("|||");
     
     utils::compress_istream is(path, 1024 * 1024);
     
