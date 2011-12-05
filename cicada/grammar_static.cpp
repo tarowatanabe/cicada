@@ -26,6 +26,8 @@
 #include "utils/arc_list.hpp"
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
+#include "utils/vertical_coded_device.hpp"
+#include "utils/vertical_coded_vector.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
 #include "utils/byte_aligned_code.hpp"
@@ -122,7 +124,7 @@ namespace cicada
     {
       typedef uint64_t off_type;
       typedef utils::map_file<byte_type, std::allocator<byte_type> >           data_type;
-      typedef utils::packed_vector_mapped<off_type, std::allocator<off_type> > offset_type;
+      typedef utils::vertical_coded_vector_mapped<off_type, std::allocator<off_type> > offset_type;
       
       PackedData() : data(), offset() {}
       PackedData(const path_type& path) : data(), offset() { open(path); }
@@ -651,7 +653,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  score_db[feature].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))
@@ -693,7 +695,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  attr_db[attr].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))
@@ -972,7 +974,7 @@ namespace cicada
 	repository_type rep(path, repository_type::write);
 	
 	os_data.push(boost::iostreams::file_sink(rep.path("data").string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
-	os_offset.push(utils::packed_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
+	os_offset.push(utils::vertical_coded_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
       }
       
       template <typename Iterator>
@@ -989,11 +991,11 @@ namespace cicada
       void clear()
       {
 	offset = 0;
-	os_data.pop();
-	os_offset.pop();
+	os_data.reset();
+	os_offset.reset();
       }
 
-      bool empty() const { return offset; }
+      bool empty() const { return ! offset; }
       
       Codec codec;
       buffer_type buffer;
@@ -1194,7 +1196,7 @@ namespace cicada
     
     size_type arity_source = 0;
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1208,7 +1210,10 @@ namespace cicada
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
-      if (! result || iter != iter_end) continue;
+      if (! result || iter != iter_end) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
 
       // skip empty source...
       if (boost::fusion::get<1>(rule).empty()) continue;
@@ -1413,7 +1418,7 @@ namespace cicada
 
     size_type arity_source = 0;
 
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1427,7 +1432,10 @@ namespace cicada
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
-      if (! result || iter != iter_end) continue;
+      if (! result || iter != iter_end) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
 
       // skip empty source...
       if (boost::fusion::get<1>(rule).empty()) continue;

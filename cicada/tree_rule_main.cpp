@@ -78,4 +78,8 @@ int main(int argc, char** argv)
   process("a(b(e) \\)(f g) \\()");
   process(" ");
   //process(" ||| ");
+
+  std::string line;
+  while (std::getline(std::cin, line))
+    process(line);
 }

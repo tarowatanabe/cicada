@@ -30,6 +30,8 @@
 #include "utils/arc_list.hpp"
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
+#include "utils/vertical_coded_device.hpp"
+#include "utils/vertical_coded_vector.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/space_separator.hpp"
@@ -129,7 +131,7 @@ namespace cicada
     {
       typedef uint64_t off_type;
       typedef utils::map_file<byte_type, std::allocator<byte_type> >           data_type;
-      typedef utils::packed_vector_mapped<off_type, std::allocator<off_type> > offset_type;
+      typedef utils::vertical_coded_vector_mapped<off_type, std::allocator<off_type> > offset_type;
       
       PackedData() : data(), offset() {}
       PackedData(const path_type& path) : data(), offset() { open(path); }
@@ -462,6 +464,8 @@ namespace cicada
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
     {
+      TreeRuleCODEC codec;
+
       const size_type cache_pos = hasher_type::operator()(pos) & (caches.size() - 1);
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
@@ -469,7 +473,8 @@ namespace cicada
 	
 	if (symbol_db.empty()) {
 	  rule_type rule;
-	  tree_rule_decode(db[pos].begin(), db[pos].end(), vocab, rule);
+	  //tree_rule_decode(db[pos].begin(), db[pos].end(), vocab, rule);
+	  codec.decode(db[pos].begin(), vocab, rule);
 	  
 	  cache.pos = pos;
 	  cache.rule = rule_type::create(rule);
@@ -634,7 +639,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  score_db[feature].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))
@@ -676,7 +681,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  attr_db[attr].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))
@@ -928,7 +933,7 @@ namespace cicada
 	repository_type rep(path, repository_type::write);
 	
 	os_data.push(boost::iostreams::file_sink(rep.path("data").string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
-	os_offset.push(utils::packed_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
+	os_offset.push(utils::vertical_coded_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
       }
       
       template <typename Iterator>
@@ -945,11 +950,11 @@ namespace cicada
       void clear()
       {
 	offset = 0;
-	os_data.clear();
-	os_offset.clear();
+	os_data.reset();
+	os_offset.reset();
       }
       
-      bool empty() const { return offset; }
+      bool empty() const { return ! offset; }
       
       Codec codec;
       buffer_type buffer;
@@ -1178,8 +1183,9 @@ namespace cicada
     std::string line;
 
     TreeGrammarParser::parser<std::string::const_iterator> features_parser;
+    TreeRuleCODEC codec;
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
@@ -1193,17 +1199,21 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
       
-      if (! source.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, features_parser, standard::space, feats_attrs)) continue;
-      if (iter != iter_end) continue;
+      if ((! source.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	  || (! target.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, features_parser, standard::space, feats_attrs))
+	  || (iter != iter_end)) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
       
       if (source != source_prev) {
 	
 	if (! rule_options.empty()) {
 	  buffer_source.clear();
-	  tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  //tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  codec.encode(source_prev, std::back_inserter(buffer_source));
 	  
 	  const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
 						       hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
@@ -1235,7 +1245,8 @@ namespace cicada
     
       // encode target
       buffer_target.clear();
-      tree_rule_encode(target, std::back_inserter(buffer_target));
+      //tree_rule_encode(target, std::back_inserter(buffer_target));
+      codec.encode(target, std::back_inserter(buffer_target));
       
       const id_type id_target = target_map->insert(&(*buffer_target.begin()), buffer_target.size(),
 						   hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
@@ -1245,7 +1256,8 @@ namespace cicada
     
     if (! rule_options.empty()) {
       buffer_source.clear();
-      tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+      //tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+      codec.encode(source_prev, std::back_inserter(buffer_source));
 	  
       const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
 						   hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
@@ -1440,10 +1452,12 @@ namespace cicada
     qi::rule<std::string::const_iterator, scores_type(), standard::space_type> scores_parser;
     qi::rule<std::string::const_iterator, scores_type(), standard::space_type> attrs_parser;
     
+    TreeRuleCODEC codec;
+
     scores_parser %= "|||" >> +qi::float_;
     attrs_parser  %= -("|||" >> *qi::float_);
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();
@@ -1454,18 +1468,22 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
       
-      if (! source.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) continue;
-      if (! qi::phrase_parse(iter, iter_end, attrs_parser, standard::space, attrs)) continue;
-      if (iter != iter_end) continue;
+      if ((! source.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	  || (! target.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores))
+	  || (! qi::phrase_parse(iter, iter_end, attrs_parser, standard::space, attrs))
+	  || (iter != iter_end)) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
       
       if (source != source_prev) {
 	
 	if (! rule_options.empty()) {
 	  buffer_source.clear();
-	  tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  //tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+	  codec.encode(source_prev, std::back_inserter(buffer_source));
 	  
 	  const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
 						       hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
@@ -1530,7 +1548,8 @@ namespace cicada
 	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
       
       buffer_target.clear();
-      tree_rule_encode(target, std::back_inserter(buffer_target));
+      //tree_rule_encode(target, std::back_inserter(buffer_target));
+      codec.encode(target, std::back_inserter(buffer_target));
       
       const id_type id_target = target_map->insert(&(*buffer_target.begin()), buffer_target.size(),
 						   hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
@@ -1540,7 +1559,8 @@ namespace cicada
     
     if (! rule_options.empty()) {
       buffer_source.clear();
-      tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+      //tree_rule_encode(source_prev, std::back_inserter(buffer_source));
+      codec.encode(source_prev, std::back_inserter(buffer_source));
 	  
       const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
 						   hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
