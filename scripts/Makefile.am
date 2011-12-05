@@ -13,4 +13,5 @@ dist_bin_SCRIPTS = \
 	cicada-mert.sh \
 	cicada-mert-moses.sh \
 	cicada-moses.sh \
-	cicada-qsub.sh
+	cicada-qsub.sh \
+	cicada-sh.py
