@@ -1194,7 +1194,7 @@ namespace cicada
     
     size_type arity_source = 0;
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1208,7 +1208,10 @@ namespace cicada
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
-      if (! result || iter != iter_end) continue;
+      if (! result || iter != iter_end) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
 
       // skip empty source...
       if (boost::fusion::get<1>(rule).empty()) continue;
@@ -1413,7 +1416,7 @@ namespace cicada
 
     size_type arity_source = 0;
 
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1427,7 +1430,10 @@ namespace cicada
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
-      if (! result || iter != iter_end) continue;
+      if (! result || iter != iter_end) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
 
       // skip empty source...
       if (boost::fusion::get<1>(rule).empty()) continue;

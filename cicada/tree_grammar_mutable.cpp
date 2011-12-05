@@ -257,7 +257,7 @@ namespace cicada
     feature_set_type         features;
     attribute_set_type       attributes;
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();
@@ -271,12 +271,14 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      if (! source.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores_attrs)) continue;
-      
-      if (iter != iter_end) continue;
+      if ((! source.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	  || (! target.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores_attrs))
+	  || (iter != iter_end)) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
       
       features.clear();
       int feature = 0;

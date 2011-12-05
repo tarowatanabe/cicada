@@ -1183,7 +1183,7 @@ namespace cicada
     TreeGrammarParser::parser<std::string::const_iterator> features_parser;
     TreeRuleCODEC codec;
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
@@ -1197,11 +1197,14 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
       
-      if (! source.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, features_parser, standard::space, feats_attrs)) continue;
-      if (iter != iter_end) continue;
+      if ((! source.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	  || (! target.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, features_parser, standard::space, feats_attrs))
+	  || (iter != iter_end)) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
       
       if (source != source_prev) {
 	
@@ -1452,7 +1455,7 @@ namespace cicada
     scores_parser %= "|||" >> +qi::float_;
     attrs_parser  %= -("|||" >> *qi::float_);
     
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();
@@ -1463,12 +1466,15 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
       
-      if (! source.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) continue;
-      if (! qi::phrase_parse(iter, iter_end, attrs_parser, standard::space, attrs)) continue;
-      if (iter != iter_end) continue;
+      if ((! source.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	  || (! target.assign(iter, iter_end))
+	  || (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores))
+	  || (! qi::phrase_parse(iter, iter_end, attrs_parser, standard::space, attrs))
+	  || (iter != iter_end)) {
+	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
+	continue;
+      }
       
       if (source != source_prev) {
 	

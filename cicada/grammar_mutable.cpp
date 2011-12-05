@@ -336,7 +336,7 @@ namespace cicada
     
     sequence_type source_index;
 
-    while (std::getline(is, line)) {
+    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       boost::fusion::get<0>(rule_parsed).clear();
@@ -351,7 +351,7 @@ namespace cicada
       const bool result = qi::phrase_parse(iter, iter_end, grammar_mutable_impl::instance(), standard::space, rule_parsed);
       
       if (! result || iter != iter_end)
-	throw std::runtime_error("rule parsing failed: " + line);
+	throw std::runtime_error("rule parsing failed: " + utils::lexical_cast<std::string>(num_line) + ": " + line);
       
       const symbol_type lhs(boost::fusion::get<0>(rule_parsed).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule_parsed)));
 
