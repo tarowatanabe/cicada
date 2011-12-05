@@ -30,6 +30,8 @@
 #include "utils/arc_list.hpp"
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
+#include "utils/vertical_coded_device.hpp"
+#include "utils/vertical_coded_vector.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/space_separator.hpp"
@@ -129,7 +131,7 @@ namespace cicada
     {
       typedef uint64_t off_type;
       typedef utils::map_file<byte_type, std::allocator<byte_type> >           data_type;
-      typedef utils::packed_vector_mapped<off_type, std::allocator<off_type> > offset_type;
+      typedef utils::vertical_coded_vector_mapped<off_type, std::allocator<off_type> > offset_type;
       
       PackedData() : data(), offset() {}
       PackedData(const path_type& path) : data(), offset() { open(path); }
@@ -931,7 +933,7 @@ namespace cicada
 	repository_type rep(path, repository_type::write);
 	
 	os_data.push(boost::iostreams::file_sink(rep.path("data").string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
-	os_offset.push(utils::packed_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
+	os_offset.push(utils::vertical_coded_sink<off_type, std::allocator<off_type> >(rep.path("offset")));
       }
       
       template <typename Iterator>
