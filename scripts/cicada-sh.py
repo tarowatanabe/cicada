@@ -255,7 +255,7 @@ if options.pbs:
     for line in sys.stdin:
         line = line.strip()
         if line:
-            pbs.run(command=line, threads=index.threads, memory=options.max_malloc)
+            pbs.run(command=line, threads=options.threads, memory=options.max_malloc)
 
 elif options.mpi:
     mpi = MPI(cicada=cicada,
@@ -274,4 +274,4 @@ else:
     for line in sys.stdin:
         line = line.strip()
         if line:
-            threads.run(command=index)
+            threads.run(command=line)
