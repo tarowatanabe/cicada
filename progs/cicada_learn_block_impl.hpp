@@ -33,11 +33,16 @@
 #include "utils/base64.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
+#include "utils/config.hpp"
 
 #include <boost/tokenizer.hpp>
 
 #include "lbfgs.h"
 #include "liblinear/linear.h"
+
+#ifdef HAVE_SNAPPY
+#include <snappy.h>
+#endif
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -2656,6 +2661,15 @@ public:
   
   void encode(const std::string& data)
   {
+#ifdef HAVE_SNAPPY
+    const size_t max_length = snappy::MaxCompressedLength(data.size());
+    buffer.reserve(max_length);
+    buffer.resize(max_length);
+    size_t length = 0;
+    snappy::RawCompress(data.c_str(), data.size(), &(*buffer.begin()), &length);
+    buffer.resize(length);
+    buffer_type(buffer).swap(buffer);
+#else
     buffer.clear();
     
     boost::iostreams::filtering_ostream os;
@@ -2663,10 +2677,16 @@ public:
     os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
     os.write(data.c_str(), data.size());
     os.reset();
+#endif
   }
   
   std::string decode() const
   {
+#ifdef HAVE_SNAPPY
+    std::string output;
+    snappy::Uncompress(&(*buffer.begin()), buffer.size(), &output);
+    return output;
+#else
     std::string output;
     
     boost::iostreams::filtering_istream is;
@@ -2683,6 +2703,7 @@ public:
     is.reset();
 
     return output;
+#endif
   }
   
 private:
