@@ -639,7 +639,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  score_db[feature].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))
@@ -681,7 +681,7 @@ namespace cicada
 	for (int i = 0; i < 256; ++ i)
 	  attr_db[attr].maps[i] = codebook[i];
 	
-	os.pop();
+	os.reset();
 	::sync();
 	
 	while (! score_set_type::quantized_set_type::exists(path))

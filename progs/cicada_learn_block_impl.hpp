@@ -2662,7 +2662,7 @@ public:
     os.push(boost::iostreams::zlib_compressor());
     os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
     os.write(data.c_str(), data.size());
-    os.pop();
+    os.reset();
   }
   
   std::string decode() const
@@ -2680,7 +2680,7 @@ public:
       std::copy(buf, buf + is.gcount(), std::back_inserter(output));
     } while (is);
     
-    is.pop();
+    is.reset();
 
     return output;
   }
