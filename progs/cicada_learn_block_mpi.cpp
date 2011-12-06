@@ -177,8 +177,11 @@ int main(int argc, char ** argv)
 	std::cout << tree_grammar_type::lists();
       return 0;
     }
-
-
+    
+    // fallback to input-directory mode... do we check this automatically?... yes...
+    if (boost::filesystem::exists(input_file) && boost::filesystem::is_directory(input_file))
+      input_directory_mode = true;
+    
     // check parameters for learning...
     // 
     //
