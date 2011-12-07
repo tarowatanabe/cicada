@@ -14,7 +14,7 @@
 
 #include <utils/config.hpp>
 
-#if 0
+#if defined HAVE_CLOCK_GETTIME
 
 #include <pthread.h>
 
@@ -26,6 +26,7 @@ namespace utils
     resource()
     {
       gettimeofday(&utime, NULL);
+      getrusage(RUSAGE_SELF, &ruse);
 #if defined CLOCK_THREAD_CPUTIME_ID
       ::clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tspec);
 #else
@@ -40,16 +41,54 @@ namespace utils
     }
     
   public:
-    double cpu_time() const { return double(tspec.tv_sec) + 1e-9 * tspec.tv_nsec; }
+    double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
     double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
+    double thread_time() const { return double(tspec.tv_sec) + 1e-9 * tspec.tv_nsec; }
     
   private:
-    struct timeval utime;
+    struct rusage   ruse;
+    struct timeval  utime;
     struct timespec tspec;
   };
-  
 };
 
+#elif defined HAVE_TASK_INFO
+#include <mach/mach_init.h>
+#include <mach/mach_traps.h>
+#include <math/task_info.h>
+
+namespace utils
+{
+  class resource
+  {
+  public:
+    resource()
+    {
+      gettimeofday(&utime, NULL);
+      getrusage(RUSAGE_SELF, &ruse);
+
+      task_t task = MACH_PORT_NULL;
+      struct task_basic_info t_info;
+      mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
+      
+      if (KERN_SUCCESS == task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count)) {
+	
+	
+      }
+    }
+    
+  public:
+    double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
+    double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
+    double thread_time() const { return cpu_time(); }
+    
+  private:
+    struct rusage  ruse;
+    struct timeval utime;
+  };
+};
 #else
 namespace utils
 {
@@ -64,14 +103,14 @@ namespace utils
     
   public:
     double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
-				+ 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
+				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
     double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
+    double thread_time() const { return cpu_time(); }
     
   private:
     struct rusage  ruse;
     struct timeval utime;
   };
-  
 };
 #endif
 
