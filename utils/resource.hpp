@@ -12,6 +12,45 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <utils/config.hpp>
+
+#if 0
+
+#include <pthread.h>
+
+namespace utils
+{
+  class resource
+  {
+  public:
+    resource()
+    {
+      gettimeofday(&utime, NULL);
+#if defined CLOCK_THREAD_CPUTIME_ID
+      ::clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tspec);
+#else
+      // get the current thread
+      pthread_t pth=pthread_self();
+      // get the clock_id associated to the current thread
+      clockid_t clock_id;
+      pthread_getcpuclockid(pth, &clock_id);
+      // get the timespec associated to the thread clock
+      ::clock_gettime(clock_id, &tspec);
+#endif
+    }
+    
+  public:
+    double cpu_time() const { return double(tspec.tv_sec) + 1e-9 * tspec.tv_nsec; }
+    double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
+    
+  private:
+    struct timeval utime;
+    struct timespec tspec;
+  };
+  
+};
+
+#else
 namespace utils
 {
   class resource
@@ -34,5 +73,6 @@ namespace utils
   };
   
 };
+#endif
 
 #endif
