@@ -10,7 +10,8 @@ namespace cicada
        << " node: " << stat.node
        << " edge: " << stat.edge
        << " user-time: " << stat.user_time
-       << " cpu-time: "  << stat.cpu_time;
+       << " cpu-time: "  << stat.cpu_time
+       << " thread-time: " << stat.thread_time;
     
     return os;
   }

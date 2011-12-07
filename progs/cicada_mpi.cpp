@@ -253,12 +253,17 @@ void merge_statistics(const operation_set_type& operations,
 	++ iter;
 	if (iter == tokenizer.end()) continue;
 	const utils::piece cpu_time = *iter;
+
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece thread_time = *iter;
 	
 	statistics[name] += statistics_type::statistic_type(utils::lexical_cast<statistics_type::count_type>(count),
 							    utils::lexical_cast<statistics_type::count_type>(node),
 							    utils::lexical_cast<statistics_type::count_type>(edge),
 							    utils::decode_base64<statistics_type::second_type>(user_time),
-							    utils::decode_base64<statistics_type::second_type>(cpu_time));
+							    utils::decode_base64<statistics_type::second_type>(cpu_time),
+							    utils::decode_base64<statistics_type::second_type>(thread_time));
       }
     }
     
@@ -277,6 +282,8 @@ void merge_statistics(const operation_set_type& operations,
       utils::encode_base64(siter->second.user_time, std::ostream_iterator<char>(os));
       os << ' ';
       utils::encode_base64(siter->second.cpu_time, std::ostream_iterator<char>(os));
+      os << ' ';
+      utils::encode_base64(siter->second.thread_time, std::ostream_iterator<char>(os));
       os << '\n';
     }
     os << '\n';

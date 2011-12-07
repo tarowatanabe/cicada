@@ -104,6 +104,7 @@ namespace cicada
       stat.edge += binarized.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
       
       data.hypergraph.swap(binarized);
     }

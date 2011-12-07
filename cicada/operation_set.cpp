@@ -456,6 +456,7 @@ viterbi: compute viterbi tree\n\
 	stat.edge += data.lattice.edge_size();
 	stat.user_time += (end.user_time() - start.user_time());
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+	stat.thread_time  += (end.thread_time() - start.thread_time());
       }
 
       if (! qi::phrase_parse(iter, end, "|||", standard::space))
@@ -474,6 +475,7 @@ viterbi: compute viterbi tree\n\
 	stat.edge += data.hypergraph.edges.size();
 	stat.user_time += (end.user_time() - start.user_time());
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+	stat.thread_time  += (end.thread_time() - start.thread_time());
       }
     } else if (input_lattice) {
       utils::resource start;
@@ -496,6 +498,7 @@ viterbi: compute viterbi tree\n\
       stat.edge += data.lattice.edge_size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     } else if (input_forest) {
       utils::resource start;
       if (! data.hypergraph.assign(iter, end))
@@ -509,6 +512,7 @@ viterbi: compute viterbi tree\n\
       stat.edge += data.hypergraph.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     }
     
     if (input_span) {

@@ -111,6 +111,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
       
       hypergraph.swap(composed);
     }
@@ -201,6 +202,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
 	
       hypergraph.swap(composed);
     }
@@ -284,6 +286,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     
       hypergraph.swap(composed);
     }
@@ -380,6 +383,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     
       hypergraph.swap(composed);
     }
@@ -464,6 +468,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     
       hypergraph.swap(composed);
     }
@@ -555,6 +560,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     
       hypergraph.swap(composed);
     }
@@ -658,6 +664,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     
       hypergraph.swap(composed);
     }
@@ -753,6 +760,7 @@ namespace cicada
       stat.edge += composed.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
       
       hypergraph.swap(composed);
     }
