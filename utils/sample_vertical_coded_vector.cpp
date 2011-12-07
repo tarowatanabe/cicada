@@ -5,6 +5,8 @@
 #include <iostream>
 #include <vector>
 
+#include "resource.hpp"
+
 #include "vertical_coded_vector.hpp"
 #include "vertical_coded_device.hpp"
 
@@ -25,6 +27,8 @@ struct Task
 
   void operator()()
   {
+    utils::resource start;
+
     for (int j = 0; j < coded.size(); ++ j) {
       const int __coded = coded[j];
       const int __mapped = coded_mapped[j];
@@ -35,6 +39,12 @@ struct Task
       if (__mapped != __stream)
 	std::cerr << "DIFFER... mapped: " << __mapped << " stream: " << __stream << std::endl;
     }
+
+    utils::resource end;
+
+    std::cerr << "user time: " << (end.user_time() - start.user_time())
+	      << " cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << std::endl;
   }
   
 };
@@ -92,6 +102,8 @@ int main(int argc, char** argv)
     
     std::cout << "START THREAD" << std::endl;
 
+    utils::resource start;
+
     std::vector<boost::thread*> threads(6);
   
     for (int i = 0; i < threads.size(); ++ i) {
@@ -101,6 +113,12 @@ int main(int argc, char** argv)
       threads[i]->join();
       delete threads[i];
     }
+
+    utils::resource end;
+
+    std::cerr << "user time: " << (end.user_time() - start.user_time())
+	      << " cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << std::endl;
   }
 
   

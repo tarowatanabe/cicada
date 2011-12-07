@@ -99,7 +99,10 @@ int main(int argc, char ** argv)
       return 0;
     }
 
-
+    // fallback to input-directory mode... do we check this automatically?... yes...
+    if (boost::filesystem::exists(input_file) && boost::filesystem::is_directory(input_file))
+      input_directory_mode = true;
+    
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
     if (debug && mpi_rank == 0)
