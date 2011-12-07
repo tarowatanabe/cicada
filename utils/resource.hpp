@@ -53,10 +53,11 @@ namespace utils
   };
 };
 
-#elif defined HAVE_TASK_INFO
+#elif defined HAVE_THREAD_INFO
+
 #include <mach/mach_init.h>
-#include <mach/mach_traps.h>
-#include <math/task_info.h>
+#include <mach/thread_info.h>
+#include <mach/thread_act.h>
 
 namespace utils
 {
@@ -68,25 +69,26 @@ namespace utils
       gettimeofday(&utime, NULL);
       getrusage(RUSAGE_SELF, &ruse);
 
-      task_t task = MACH_PORT_NULL;
-      struct task_basic_info t_info;
-      mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
+      struct thread_basic_info th_info;
+      mach_msg_type_number_t th_info_count = THREAD_BASIC_INFO_COUNT;
       
-      if (KERN_SUCCESS == task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count)) {
-	
-	
-      }
+      if (thread_info(mach_thread_self(), THREAD_BASIC_INFO, (thread_info_t)&th_info, &th_info_count) == KERN_SUCCESS)
+	__thread_time = (double(th_info.user_time.seconds + th_info.system_time.seconds)
+			 + 1e-6 * (th_info.user_time.microseconds + th_info.system_time.microseconds));
+      else
+	__thread_time = 0.0;
     }
     
   public:
     double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
 				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
     double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
-    double thread_time() const { return cpu_time(); }
+    double thread_time() const { return __thread_time; }
     
   private:
     struct rusage  ruse;
     struct timeval utime;
+    double         __thread_time;
   };
 };
 #else

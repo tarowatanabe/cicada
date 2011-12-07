@@ -72,24 +72,33 @@ namespace cicada
       if (debug)
 	std::cerr << name << ": " << data.id << std::endl;
           
-      utils::resource ngram_start;
+      utils::resource start;
     
       if (weights_one)
 	cicada::expected_ngram(hypergraph, weight_scaled_function_one<weight_type>(scale), ngram_counts, order, bos_eos);
       else
 	cicada::expected_ngram(hypergraph, weight_scaled_function<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos);
 
-      utils::resource ngram_end;
+      utils::resource end;
     
       if (debug)
 	std::cerr << name << ": " << data.id
-		  << " cpu time: " << (ngram_end.cpu_time() - ngram_start.cpu_time())
-		  << " user time: " << (ngram_end.user_time() - ngram_start.user_time())
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
       
       if (debug)
 	std::cerr << name << ": " << data.id
 		  << " counts: size: " << ngram_counts.size() << std::endl;
+
+      
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += ngram_counts.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      stat.thread_time  += (end.thread_time() - start.thread_time());
     }
 
     void ExpectedNGram::assign(const weight_set_type& __weights)

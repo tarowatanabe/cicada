@@ -435,26 +435,23 @@ AC_MSG_RESULT([no])
 AC_CHECK_LIB([rt], [clock_gettime])
 
 ### task_info
-AC_MSG_CHECKING([for task_info])
+AC_MSG_CHECKING([for thread_info])
 AC_TRY_COMPILE(
 [
 #include <mach/mach_init.h>
-#include <mach/mach_traps.h>
-#include <math/task_info.h>
+#include <mach/thread_info.h>
+#include <mach/thread_act.h>
 ], [
-   task_t task = MACH_PORT_NULL;
-   struct task_basic_info t_info;
-   mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
+   kern_return_t error;
+   struct thread_basic_info th_info;
+   mach_msg_type_number_t th_info_count = THREAD_BASIC_INFO_COUNT;
 
-   if (KERN_SUCCESS != task_info(mach_task_self(),
-      TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count))
-   {
-       return -1;
-   }
+   error = thread_info(mach_thread_self(), THREAD_BASIC_INFO, (thread_info_t)&th_info, &th_info_count);
+   return 0;
 ],
 [
 AC_MSG_RESULT([yes])
-AC_DEFINE([HAVE_TASK_INFO], 1, [Define to 1 if you have the task_info.])
+AC_DEFINE([HAVE_THREAD_INFO], 1, [Define to 1 if you have the thread_info.])
 ], [
 AC_MSG_RESULT([no])
 ])

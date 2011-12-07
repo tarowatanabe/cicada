@@ -39,23 +39,33 @@ namespace cicada
       
       second_type user_time;
       second_type cpu_time;
+      second_type thread_time;
       
-      Stat() : count(0), node(0), edge(0), user_time(0), cpu_time(0) {}
+      Stat() : count(0), node(0), edge(0), user_time(0), cpu_time(0), thread_time(0) {}
       Stat(const count_type& __count,
 	   const count_type& __node,
 	   const count_type& __edge,
 	   const second_type& __user_time,
 	   const second_type& __cpu_time)
 	: count(__count), node(__node), edge(__edge),
-	  user_time(__user_time), cpu_time(__cpu_time) {}
+	  user_time(__user_time), cpu_time(__cpu_time), thread_time(0.0) {}
+      Stat(const count_type& __count,
+	   const count_type& __node,
+	   const count_type& __edge,
+	   const second_type& __user_time,
+	   const second_type& __cpu_time,
+	   const second_type& __thread_time)
+	: count(__count), node(__node), edge(__edge),
+	  user_time(__user_time), cpu_time(__cpu_time), thread_time(__thread_time) {}
       
       void clear()
       {
 	count = 0;
 	node = 0;
 	edge = 0;
-	user_time = 0;
-	cpu_time  = 0;
+	user_time   = 0;
+	cpu_time    = 0;
+	thread_time = 0;
       }
       
       Stat operator+() const
@@ -75,8 +85,9 @@ namespace cicada
 	count += x.count;
 	node += x.node;
 	edge += x.edge;
-	user_time += x.user_time;
-	cpu_time  += x.cpu_time;
+	user_time   += x.user_time;
+	cpu_time    += x.cpu_time;
+	thread_time += x.thread_time;
 	return *this;
       }
       
@@ -85,8 +96,9 @@ namespace cicada
 	count -= x.count;
 	node -= x.node;
 	edge -= x.edge;
-	user_time -= x.user_time;
-	cpu_time  -= x.cpu_time;
+	user_time   -= x.user_time;
+	cpu_time    -= x.cpu_time;
+	thread_time -= x.thread_time;
 	return *this;
       }
 

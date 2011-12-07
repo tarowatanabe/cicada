@@ -44,6 +44,7 @@ struct Task
 
     std::cerr << "user time: " << (end.user_time() - start.user_time())
 	      << " cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << " thread time: " << (end.thread_time() - start.thread_time())
 	      << std::endl;
   }
   
@@ -118,6 +119,7 @@ int main(int argc, char** argv)
 
     std::cerr << "user time: " << (end.user_time() - start.user_time())
 	      << " cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << " thread time: " << (end.thread_time() - start.thread_time())
 	      << std::endl;
   }
 
