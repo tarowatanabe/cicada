@@ -414,6 +414,8 @@ fi
 #    AS_ERROR("no malloc statistics...")
 #fi
 
+
+### clock_gettime
 AC_MSG_CHECKING([for clock_gettime])
 
 AC_TRY_COMPILE(
@@ -426,12 +428,37 @@ AC_TRY_COMPILE(
 ],
 [
 AC_MSG_RESULT([yes])
-AC_DEFINE([HAVE_CLOCK_GETTIME], 1,
-          [Define to 1 if you have the clock_gettime.])
+AC_DEFINE([HAVE_CLOCK_GETTIME], 1, [Define to 1 if you have the clock_gettime.])
 ], [
 AC_MSG_RESULT([no])
 ])
 AC_CHECK_LIB([rt], [clock_gettime])
+
+### task_info
+AC_MSG_CHECKING([for task_info])
+AC_TRY_COMPILE(
+[
+#include <mach/mach_init.h>
+#include <mach/mach_traps.h>
+#include <math/task_info.h>
+], [
+   task_t task = MACH_PORT_NULL;
+   struct task_basic_info t_info;
+   mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
+
+   if (KERN_SUCCESS != task_info(mach_task_self(),
+      TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count))
+   {
+       return -1;
+   }
+],
+[
+AC_MSG_RESULT([yes])
+AC_DEFINE([HAVE_TASK_INFO], 1, [Define to 1 if you have the task_info.])
+], [
+AC_MSG_RESULT([no])
+])
+
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h time.h sys/time.h unistd.h])
