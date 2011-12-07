@@ -414,6 +414,25 @@ fi
 #    AS_ERROR("no malloc statistics...")
 #fi
 
+AC_MSG_CHECKING([for clock_gettime])
+
+AC_TRY_COMPILE(
+[
+#include <time.h>
+], [
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME, &t);
+  return 0;
+],
+[
+AC_MSG_RESULT([yes])
+AC_DEFINE([HAVE_CLOCK_GETTIME], 1,
+          [Define to 1 if you have the clock_gettime.])
+], [
+AC_MSG_RESULT([no])
+])
+AC_CHECK_LIB([rt], [clock_gettime])
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h time.h sys/time.h unistd.h])
 
