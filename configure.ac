@@ -415,7 +415,7 @@ fi
 #fi
 
 # Checks for header files.
-AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h time.h sys/time.h unistd.h])
 
 # hasn_{map,set}
 AC_CHECK_HEADERS([tr1/unordered_map tr1/unordered_set ext/hash_map ext/hash_set hash_map hash_set])
