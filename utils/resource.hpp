@@ -53,10 +53,7 @@ namespace utils
   };
 };
 
-#elif defined HAVE_TASK_INFO
-#include <mach/mach_init.h>
-#include <mach/mach_traps.h>
-#include <math/task_info.h>
+#elif defined HAVE_THREAD_INFO
 
 namespace utils
 {
@@ -67,15 +64,6 @@ namespace utils
     {
       gettimeofday(&utime, NULL);
       getrusage(RUSAGE_SELF, &ruse);
-
-      task_t task = MACH_PORT_NULL;
-      struct task_basic_info t_info;
-      mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
-      
-      if (KERN_SUCCESS == task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count)) {
-	
-	
-      }
     }
     
   public:
