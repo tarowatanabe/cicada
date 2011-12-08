@@ -178,9 +178,12 @@ int main(int argc, char ** argv)
       return 0;
     }
     
-    // fallback to input-directory mode... do we check this automatically?... yes...
-    if (boost::filesystem::exists(input_file) && boost::filesystem::is_directory(input_file))
-      input_directory_mode = true;
+    if (boost::filesystem::exists(input_file)) {
+      if (boost::filesystem::is_directory(input_file))
+	input_directory_mode = true;
+      else if (input_directory_mode)
+	throw std::runtime_error("non directory input: " + input_file.string());
+    }
     
     // check parameters for learning...
     // 
