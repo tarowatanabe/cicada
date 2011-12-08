@@ -704,13 +704,25 @@ struct LearnPegasos : public LearnOnlineMargin
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
-
+  
+  typedef std::vector<bool, std::allocator<bool> > suffered_set_type;
+  suffered_set_type suffered;
 
   double learn(weight_set_type& weights)
   {
     if (features.empty()) return 0.0;
     
-    const size_type k = features.size();
+    size_type k = 0;
+    suffered.clear();
+    suffered.resize(features.size(), false);
+    
+    for (size_t i = 0; i != features.size(); ++ i) {
+      const double loss = losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale;
+      const bool suffer_loss = loss > 0.0;
+      suffered[i] = suffer_loss;
+      k += suffer_loss;
+    }
+    
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
@@ -722,19 +734,20 @@ struct LearnPegasos : public LearnOnlineMargin
     
     double a_norm = 0.0;
     double pred = 0.0;
-    for (size_t i = 0; i != features.size(); ++ i) {
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
-	double& x = weights[fiter->first];
-	const double alpha = eta * k_norm * fiter->second;
-	
-	a_norm += alpha * alpha;
-	pred += 2.0 * x * alpha;
-	
-	//weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-	x += alpha / weight_scale;
+    for (size_t i = 0; i != features.size(); ++ i) 
+      if (suffered[i]) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  double& x = weights[fiter->first];
+	  const double alpha = eta * k_norm * fiter->second;
+	  
+	  a_norm += alpha * alpha;
+	  pred += 2.0 * x * alpha;
+	  
+	  //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+	  x += alpha / weight_scale;
+	}
       }
-    }
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
