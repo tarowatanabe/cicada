@@ -14,17 +14,42 @@
 
 #include <utils/config.hpp>
 
-#if defined HAVE_CLOCK_GETTIME
-
+#ifdef HAVE_CLOCK_GETTIME
 #include <pthread.h>
+#endif
+
+#ifdef HAVE_THREAD_INFO
+#include <mach/mach_init.h>
+#include <mach/thread_info.h>
+#include <mach/thread_act.h>
+#endif
 
 namespace utils
 {
-  class resource
+  struct resource
   {
   public:
     resource()
     {
+#if defined RUSAGE_THREAD
+      struct rusage  ruse;
+      struct rusage  ruse_thread;
+      struct timeval utime;
+    
+      gettimeofday(&utime, NULL);
+      getrusage(RUSAGE_SELF, &ruse);
+      getrusage(RUSAGE_THREAD, &ruse_thread);
+      
+      __cpu_time = (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+		    + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec));
+      __user_time = double(utime.tv_sec) + 1e-6 * utime.tv_usec;
+      __thread_time = (double(ruse_thread.ru_utime.tv_sec + ruse_thread.ru_stime.tv_sec)
+		       + 1e-6 * (ruse_thread.ru_utime.tv_usec + ruse_thread.ru_stime.tv_usec));
+#elif defined HAVE_CLOCK_GETTIME
+      struct rusage   ruse;
+      struct timeval  utime;
+      struct timespec tspec;
+      
       gettimeofday(&utime, NULL);
       getrusage(RUSAGE_SELF, &ruse);
 #if defined CLOCK_THREAD_CPUTIME_ID
@@ -38,82 +63,83 @@ namespace utils
       // get the timespec associated to the thread clock
       ::clock_gettime(clock_id, &tspec);
 #endif
-    }
-    
-  public:
-    double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
-				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
-    double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
-    double thread_time() const { return double(tspec.tv_sec) + 1e-9 * tspec.tv_nsec; }
-    
-  private:
-    struct rusage   ruse;
-    struct timeval  utime;
-    struct timespec tspec;
-  };
-};
-
+      
+      __cpu_time = (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+		    + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec));
+      __user_time = double(utime.tv_sec) + 1e-6 * utime.tv_usec;
+      __thread_time = double(tspec.tv_sec) + 1e-9 * tspec.tv_nsec;
 #elif defined HAVE_THREAD_INFO
-
-#include <mach/mach_init.h>
-#include <mach/thread_info.h>
-#include <mach/thread_act.h>
-
-namespace utils
-{
-  class resource
-  {
-  public:
-    resource()
-    {
-      gettimeofday(&utime, NULL);
-      getrusage(RUSAGE_SELF, &ruse);
-
+      struct timeval utime;
+      struct rusage  ruse;
       struct thread_basic_info th_info;
       mach_msg_type_number_t th_info_count = THREAD_BASIC_INFO_COUNT;
       
-      if (thread_info(mach_thread_self(), THREAD_BASIC_INFO, (thread_info_t)&th_info, &th_info_count) == KERN_SUCCESS)
-	__thread_time = (double(th_info.user_time.seconds + th_info.system_time.seconds)
-			 + 1e-6 * (th_info.user_time.microseconds + th_info.system_time.microseconds));
-      else
-	__thread_time = 0.0;
-    }
-    
-  public:
-    double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
-				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
-    double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
-    double thread_time() const { return __thread_time; }
-    
-  private:
-    struct rusage  ruse;
-    struct timeval utime;
-    double         __thread_time;
-  };
-};
-#else
-namespace utils
-{
-  class resource
-  {
-  public:
-    resource()
-    {
       gettimeofday(&utime, NULL);
       getrusage(RUSAGE_SELF, &ruse);
+      thread_info(mach_thread_self(), THREAD_BASIC_INFO, (thread_info_t)&th_info, &th_info_count);
+      
+      __cpu_time = (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+		    + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec));
+      __user_time = double(utime.tv_sec) + 1e-6 * utime.tv_usec;;
+      __thread_time = (double(th_info.user_time.seconds + th_info.system_time.seconds)
+		       + 1e-6 * (th_info.user_time.microseconds + th_info.system_time.microseconds));
+#else
+      struct rusage  ruse;
+      struct timeval utime;
+      
+      gettimeofday(&utime, NULL);
+      getrusage(RUSAGE_SELF, &ruse);
+      
+      __cpu_time = (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
+		    + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec));
+      __user_time = double(utime.tv_sec) + 1e-6 * utime.tv_usec;
+      __thread_time = __cpu_time;
+#endif
     }
     
   public:
-    double cpu_time() const { return (double(ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec)
-				      + 1e-6 * (ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec)); }
-    double user_time() const { return double(utime.tv_sec) + 1e-6 * utime.tv_usec; }
-    double thread_time() const { return cpu_time(); }
+    double cpu_time() const { return __cpu_time; }
+    double user_time() const { return __user_time; }
+    double thread_time() const { return __thread_time; }
+    
+  public:
+    resource& operator+=(const resource& x)
+    {
+      __cpu_time    += x.__cpu_time;
+      __user_time   += x.__user_time;
+      __thread_time += x.__thread_time;
+      return *this;
+    }
+    
+    resource& operator-=(const resource& x)
+    {
+      __cpu_time    -= x.__cpu_time;
+      __user_time   -= x.__user_time;
+      __thread_time -= x.__thread_time;
+      return *this;
+    }
     
   private:
-    struct rusage  ruse;
-    struct timeval utime;
+    double __cpu_time;
+    double __user_time;
+    double __thread_time;
   };
+  
+  inline
+  resource operator+(const resource& x, const resource& y)
+  {
+    resource ret = x;
+    ret += y;
+    return ret;
+  }
+  
+  inline
+  resource operator-(const resource& x, const resource& y)
+  {
+    resource ret = x;
+    ret -= y;
+    return ret;
+  }
 };
-#endif
 
 #endif
