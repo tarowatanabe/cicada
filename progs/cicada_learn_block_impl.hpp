@@ -723,6 +723,8 @@ struct LearnPegasos : public LearnOnlineMargin
       k += suffer_loss;
     }
     
+    if (! k) return 0.0;
+    
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
