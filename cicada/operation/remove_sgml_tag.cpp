@@ -65,6 +65,7 @@ namespace cicada
 	  std::cerr << name << ": " << data.id
 		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		    << " user time: " << (end.user_time() - start.user_time())
+		    << " thread time: " << (end.thread_time() - start.thread_time())
 		    << std::endl;
 	
 	if (debug)
@@ -102,6 +103,7 @@ namespace cicada
 	  std::cerr << name << ": " << data.id
 		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		    << " user time: " << (end.user_time() - start.user_time())
+		    << " thread time: " << (end.thread_time() - start.thread_time())
 		    << std::endl;
 	
 	if (debug)
