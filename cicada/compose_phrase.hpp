@@ -24,6 +24,8 @@
 #include <utils/sgi_hash_set.hpp>
 #include <utils/sgi_hash_map.hpp>
 
+#include <google/dense_hash_map>
+
 namespace cicada
 {
   // implementation of 
@@ -105,7 +107,27 @@ namespace cicada
     typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
 			  std::allocator<coverage_type > > coverage_set_type;
 #endif
+
+    struct span_node_type
+    {
+      transducer_type::id_type node;
+      int id;
+      int first;
+      int last;
+      
+      span_node_type() : node(0), id(-1), first(-1), last(-1) {}
+      span_node_type(const int& __id, const transducer_type::id_type& __node, const int& __first, const int& __last)
+	: node(__node), id(__id), first(__first), last(__last) {}
+      
+      friend
+      bool operator==(const span_node_type& x, const span_node_type& y)
+      {
+	return x.node == y.node && x.id == y.id && x.first == y.first && x.last == y.last;
+      }
+    };
     
+    typedef google::dense_hash_map<span_node_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<span_node_type> > span_node_map_type;
+
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
 		  const int& __max_distortion,
@@ -117,20 +139,24 @@ namespace cicada
 	attr_phrase_span_last("phrase-span-last")
     {
       rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
-
+      
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
       sequence.front() = non_terminal.non_terminal(1);
       sequence.back()  = non_terminal.non_terminal(2);
       
       rule_x1_x2 = rule_type::create(rule_type(non_terminal.non_terminal(), sequence.begin(), sequence.end()));
+      rule_x1    = rule_type::create(rule_type(non_terminal.non_terminal(), sequence.begin(), sequence.begin() + 1));
+      
+      span_nodes.set_empty_key(span_node_type());
     }
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)
     {
-       graph.clear();
-
+      graph.clear();
+       
       if (lattice.empty()) return;
-
+      
+      span_nodes.clear();
       nodes.clear();
       coverages.clear();
       
@@ -238,45 +264,61 @@ namespace cicada
 	  
 	  // construct graph...
 	  
-	  hypergraph_type::node_type& node = graph.add_node();
-
-	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	    hypergraph_type::edge_type& edge = graph.add_edge();
-	    edge.rule = (yield_source ? riter->source : riter->target);
-	    edge.features = riter->features;
-	    if (! state.features.empty())
-	      edge.features += state.features;
-	    edge.attributes = riter->attributes;
+	  
+	  std::pair<span_node_map_type::iterator, bool> result_node = span_nodes.insert(std::make_pair(span_node_type(state.grammar_id,
+														      state.node,
+														      state.first,
+														      state.last),
+												       0));
+	  if (result_node.second) {
+	    hypergraph_type::node_type& node = graph.add_node();
+	    result_node.first->second = node.id;
 	    
-	    // assign metadata...
-	    edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(state.first);
-	    edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(state.last);
-	    
-	    graph.connect_edge(edge.id, node.id);
+	    transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	    for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	      hypergraph_type::edge_type& edge = graph.add_edge();
+	      edge.rule = (yield_source ? riter->source : riter->target);
+	      edge.features = riter->features;
+	      edge.attributes = riter->attributes;
+	      
+	      // assign metadata...
+	      edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(state.first);
+	      edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(state.last);
+	      
+	      graph.connect_edge(edge.id, node.id);
+	    }
 	  }
+	  
+	  const hypergraph_type::id_type node_id = result_node.first->second;
 	  
 	  node_map_type::const_iterator titer = nodes.find(state.coverage);
 	  if (titer == nodes.end())
 	    throw std::runtime_error("no precedent nodes?");
 	  
+	  std::pair<node_map_type::iterator, bool> result_parent = nodes.insert(std::make_pair(coverage_new, 0));
+	  if (result_parent.second)
+	    result_parent.first->second = graph.add_node().id;
+
+	  const hypergraph_type::id_type parent_id = result_parent.first->second;
+	  
 	  if (titer->second == hypergraph_type::invalid) {
 	    // no precedent nodes... meaning that this is the node created by combining epsilon (or start-coverage)
 	    
-	    nodes[coverage_new] = node.id;
-	  } else {
-	    std::pair<node_map_type::iterator, bool> result = nodes.insert(std::make_pair(coverage_new, 0));
-	    if (result.second)
-	      result.first->second = graph.add_node().id;
+	    hypergraph_type::edge_type& edge = graph.add_edge(&node_id, (&node_id) + 1);
+	    edge.rule = rule_x1;
+	    edge.features = state.features;
 	    
-	    hypergraph_type::id_type tails[2] = {titer->second, node.id};
+	    graph.connect_edge(edge.id, parent_id);
+	  } else {
+	    hypergraph_type::id_type tails[2] = {titer->second, node_id};
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails, tails + 2);
 	    edge.rule = rule_x1_x2;
+	    edge.features = state.features;
 	    
-	    graph.connect_edge(edge.id, result.first->second);
+	    graph.connect_edge(edge.id, parent_id);
 	  }
 	}
-
+	
 	if (state.last != static_cast<int>(lattice.size())) {
 	  const lattice_type::arc_set_type& arcs = lattice[state.last];
 	  
@@ -344,11 +386,13 @@ namespace cicada
     const attribute_type attr_phrase_span_first;
     const attribute_type attr_phrase_span_last;
 
-    node_map_type     nodes;
-    coverage_set_type coverages;
+    span_node_map_type span_nodes;
+    node_map_type      nodes;
+    coverage_set_type  coverages;
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
+    rule_ptr_type rule_x1;
   };
   
   inline
