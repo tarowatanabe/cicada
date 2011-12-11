@@ -1,6 +1,7 @@
 2011-12-x
 INCOMPATIBLE CHANGE: revised internal indexing for tree-grammars. (You do not have to re-index, but the size is slightly smaller)
 Better ngram feature computation by pre-transforming into word-id
+Faster compose-phrase for phrase-based SMT :-)
 New: added softmax-margin and loss-margin in cicaa_learn_kbest{,_mpi} (probably, we will deprecate cicada_maxlike{,mpi})
 New: added many more learning algorithms in cicda_learn_kbest_mpi: pegasos and cutting-plane w/ and w/o line-search optimization
 New: added mert-search which performs line-search used in mert
