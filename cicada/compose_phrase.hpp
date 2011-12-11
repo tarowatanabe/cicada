@@ -128,6 +128,8 @@ namespace cicada
     
     typedef google::dense_hash_map<span_node_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<span_node_type> > span_node_map_type;
 
+    typedef std::vector<int, std::allocator<int> > node_set_type;
+
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
 		  const int& __max_distortion,
@@ -179,11 +181,12 @@ namespace cicada
       
       // breadth first search to compute jump positions...
       {
-	typedef std::vector<int, std::allocator<int> > node_set_type;
-	
-	node_set_type nodes;
-	node_set_type nodes_next;
 	coverage_type visited;
+	node_set_type& nodes = nodes_local;
+	node_set_type& nodes_next = nodes_local_next;
+	
+	nodes.clear();
+	nodes_next.clear();
 	
 	nodes.push_back(0);
 	visited.set(0);
@@ -226,11 +229,12 @@ namespace cicada
 	  const coverage_type* coverage_new = result.first;
 	  
 	  if (result.second) {
-	    typedef std::vector<int, std::allocator<int> > node_set_type;
-	
-	    node_set_type nodes;
-	    node_set_type nodes_next;
 	    coverage_type visited;
+	    node_set_type& nodes = nodes_local;
+	    node_set_type& nodes_next = nodes_local_next;
+	    
+	    nodes.clear();
+	    nodes_next.clear();
 	    
 	    const int first = coverage_new->select(1, false);
 	    const int last  = utils::bithack::min(static_cast<int>(lattice.size()), first + max_distortion + 1);
@@ -389,6 +393,9 @@ namespace cicada
     span_node_map_type span_nodes;
     node_map_type      nodes;
     coverage_set_type  coverages;
+
+    node_set_type nodes_local;
+    node_set_type nodes_local_next;
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
