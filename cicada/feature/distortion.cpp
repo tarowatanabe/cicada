@@ -80,7 +80,7 @@ namespace cicada
 	  
 	  return (lattice ? - lattice->shortest_distance(0, span[0]) : - span[0]);
 	} else if (states.size() == 1) {
-	  // it is only for the goal state...
+	  // it is only for the goal state if edge->rule->lhs == vocab_type::GOAL
 	  const int* span_antecedent = reinterpret_cast<const int*>(states[0]);
 
 	  span[0] = span_antecedent[0];

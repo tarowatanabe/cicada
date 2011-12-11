@@ -31,8 +31,6 @@
 #include <utils/chart.hpp>
 #include <utils/sgi_hash_set.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/compact_trie.hpp>
-#include <utils/indexed_trie.hpp>
 #include <utils/bithack.hpp>
 
 namespace cicada

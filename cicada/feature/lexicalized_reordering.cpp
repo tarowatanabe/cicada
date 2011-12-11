@@ -255,7 +255,7 @@ namespace cicada
 	  
 	  reordering_score(0, 0, span_first, span_last, cache, features);
 	} else if (states.size() == 1) {
-	  // it is only for the goal state...
+	  // it is only for the goal state if edge.rule->lhs == vocab_type::GOAL
 	  const int*        span_antecedent = reinterpret_cast<const int*>(states[0]);
 	  const state_type* node_antecedent = reinterpret_cast<const state_type*>(span_antecedent + 2);
 
