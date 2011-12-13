@@ -723,7 +723,13 @@ struct LearnPegasos : public LearnOnlineMargin
       k += suffer_loss;
     }
     
-    if (! k) return 0.0;
+    if (! k) {
+      // anyway, clear features!
+      features.clear();
+      losses.clear();
+      
+      return 0.0;
+    }
     
     const double k_norm = 1.0 / (features.size());
     //const double k_norm = 1.0 / k;
