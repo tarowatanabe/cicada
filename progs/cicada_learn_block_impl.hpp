@@ -695,6 +695,8 @@ struct LearnPegasos : public LearnOnlineMargin
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    
+    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -789,6 +791,8 @@ struct LearnPegasos : public LearnOnlineMargin
   double    lambda;
   double    weight_scale;
   double    weight_norm;
+  
+  weight_set_type weights_peg;
 };
 
 // optimized-Pegasos learner
@@ -855,6 +859,8 @@ struct LearnOPegasos : public LearnOnlineMargin
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    
+    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -954,6 +960,8 @@ struct LearnOPegasos : public LearnOnlineMargin
   
   alpha_type    alpha;
   f_type        f;
+
+  weight_set_type weights_peg;
 };
 
 struct LearnPA : public LearnOnlineMargin
