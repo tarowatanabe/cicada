@@ -671,7 +671,7 @@ struct LearnExpectedLoss : public LearnBase
       // we will update "minus" value...
       
       double& x = weights[eiter->first];
-      const double alpha = - static_cast<double>(eiter->second) * eta * k_norm;
+      const double alpha = static_cast<double>(eiter->second) * eta * k_norm;
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
