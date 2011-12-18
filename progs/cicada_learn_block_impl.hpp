@@ -647,7 +647,7 @@ struct LearnExpectedLoss : public LearnBase
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos_local) {
 	  const weight_type loss = losses[j];
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scale = (loss - loss_sum * weight);
+	  const weight_type scale = loss * (1.0 - weight);
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[pos_local].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[pos_local].begin(); fiter != fiter_end; ++ fiter)
