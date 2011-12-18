@@ -963,8 +963,8 @@ struct LearnOExpectedLoss : public LearnBase
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix<sample_set_type> H(features);
-    MMatrix<sample_set_type> M(features);
+    HMatrix<sample_set_type> H(features_optimize);
+    MMatrix<sample_set_type> M(features_optimize);
     
     solver(alpha, f, H, M, eta, tolerance);
     
