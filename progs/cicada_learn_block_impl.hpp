@@ -626,13 +626,14 @@ struct LearnExpectedLoss : public LearnBase
     for (size_t i = 0; i != scores.size(); ++ i) 
       if (! scores[i].empty()) {
 	weight_type Z;
+	expectations_Z.clear();
 	margins.clear();
 	losses.clear();
 	
 	score_ptr_type score_local = score->clone();
 	*score_local -= *scores[i].front();
 	
-	size_t pos_local = pos;
+	const size_t pos_local = pos;
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
 	  score_ptr_type score_segment = score_local->clone();
 	  *score_segment += *scores[i][j];
@@ -642,17 +643,30 @@ struct LearnExpectedLoss : public LearnBase
 	  Z += traits_type::exp(margins.back());
 	}
 	
-	const weight_type loss_sum = std::accumulate(losses.begin(), losses.end(), 0.0);
-	
-	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos_local) {
-	  const weight_type loss = losses[j];
+	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scaling = loss * weight * (1.0 - weight) * scale;
 	  
-	  sample_set_type::value_type::const_iterator fiter_end = features[pos_local].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[pos_local].begin(); fiter != fiter_end; ++ fiter)
+	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter)
+	    expectations_Z[fiter->first] += weight_type(fiter->second) * weight;
+	}
+	
+	weight_type scaling_sum;
+
+	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
+	  const weight_type weight = traits_type::exp(margins[j]) / Z;
+	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
+
+	  scaling_sum += scaling;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter)
 	    expectations[fiter->first] += weight_type(fiter->second) * scaling;
 	}
+
+	expectation_type::const_iterator eiter_end = expectations_Z.end();
+	for (expectation_type::const_iterator eiter = expectations_Z.begin(); eiter != eiter_end; ++ eiter)
+	  expectations[eiter->first] -= weight_type(eiter->second) * scaling_sum;
       }
     
     const size_type k = scores.size();
@@ -710,6 +724,7 @@ struct LearnExpectedLoss : public LearnBase
   loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
+  expectation_type   expectations_Z;
   
   score_ptr_map_type scores;
   bool error_metric;
@@ -956,6 +971,7 @@ struct LearnOExpectedLoss : public LearnBase
   loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
+  expectation_type   expectations_Z;
   
   score_ptr_map_type scores;
   bool error_metric;
