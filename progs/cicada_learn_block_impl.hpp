@@ -921,7 +921,7 @@ struct LearnOExpectedLoss : public LearnBase
 	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
 	  
 	  scaling_sum += scaling;
-	  objective += weight_type(losses[j]) * weight;
+	  objective_local += weight_type(losses[j]) * weight;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
