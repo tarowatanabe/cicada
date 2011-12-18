@@ -620,7 +620,8 @@ struct LearnExpectedLoss : public LearnBase
     
     expectations.clear();
 
-    const double error_factor = (error_metric ? 1.0 : - 1.0);
+    const double error_factor = (error_metric ? - 1.0 : 1.0);
+    const double error_constant = (error_metric ? 0.0 : 1.0);
     
     size_t pos = 0;
     for (size_t i = 0; i != scores.size(); ++ i) 
@@ -638,7 +639,7 @@ struct LearnExpectedLoss : public LearnBase
 	  score_ptr_type score_segment = score_local->clone();
 	  *score_segment += *scores[i][j];
 	  
-	  losses.push_back(error_factor * score_segment->score());
+	  losses.push_back(error_constant - error_factor * score_segment->score());
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -888,7 +889,8 @@ struct LearnOExpectedLoss : public LearnBase
     f.clear();
     alpha.clear();
     
-    const double error_factor = (error_metric ? 1.0 : - 1.0);
+    const double error_factor = (error_metric ? - 1.0 : 1.0);
+    const double error_constant = (error_metric ? 0.0 : 1.0);
     weight_type objective;
     
     size_t pos = 0;
@@ -908,7 +910,7 @@ struct LearnOExpectedLoss : public LearnBase
 	  score_ptr_type score_segment = score_local->clone();
 	  *score_segment += *scores[i][j];
 	  
-	  losses.push_back(error_factor * score_segment->score());
+	  losses.push_back(error_constant - error_factor * score_segment->score());
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
