@@ -642,26 +642,20 @@ struct LearnExpectedLoss : public LearnBase
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
-	
-	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
-	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  
-	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter)
-	    expectations_Z[fiter->first] += weight_type(fiter->second) * weight;
-	}
-	
-	weight_type scaling_sum;
 
+	weight_type scaling_sum;
+	
 	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
 	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
-
+	  
 	  scaling_sum += scaling;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter)
+	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
 	    expectations[fiter->first] += weight_type(fiter->second) * scaling;
+	    expectations_Z[fiter->first] += weight_type(fiter->second) * weight;
+	  }
 	}
 
 	expectation_type::const_iterator eiter_end = expectations_Z.end();
