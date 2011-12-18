@@ -802,7 +802,7 @@ struct LearnOExpectedLoss : public LearnBase
     const FeatureSet& features;
   };
 
-  LearnOExpectedLoss(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
 
   void clear()
   {
@@ -887,21 +887,23 @@ struct LearnOExpectedLoss : public LearnBase
     features_optimize.clear();
     f.clear();
     alpha.clear();
-
+    
     const double error_factor = (error_metric ? 1.0 : - 1.0);
+    weight_type objective;
     
     size_t pos = 0;
     for (size_t i = 0; i != scores.size(); ++ i) 
       if (! scores[i].empty()) {
 	weight_type Z;
 	expectations.clear();
+	expectations_Z.clear();
 	margins.clear();
 	losses.clear();
 	
 	score_ptr_type score_local = score->clone();
 	*score_local -= *scores[i].front();
 	
-	size_t pos_local = pos;
+	const size_t pos_local = pos;
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
 	  score_ptr_type score_segment = score_local->clone();
 	  *score_segment += *scores[i][j];
@@ -911,18 +913,41 @@ struct LearnOExpectedLoss : public LearnBase
 	  Z += traits_type::exp(margins.back());
 	}
 	
-	const weight_type loss_sum = std::accumulate(losses.begin(), losses.end(), 0.0);
+	weight_type scaling_sum;
+	weight_type objective_local;
 	
-	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos_local) {
-	  const weight_type loss = losses[j];
+	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scaling = loss * weight * (1.0 - weight) * scale;
+	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
 	  
-	  sample_set_type::value_type::const_iterator fiter_end = features[pos_local].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[pos_local].begin(); fiter != fiter_end; ++ fiter)
+	  scaling_sum += scaling;
+	  objective += weight_type(losses[j]) * weight;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
 	    expectations[fiter->first] += weight_type(fiter->second) * scaling;
+	    expectations_Z[fiter->first] += weight_type(fiter->second) * weight;
+	  }
 	}
+	
+	{
+	  expectation_type::const_iterator eiter_end = expectations_Z.end();
+	  for (expectation_type::const_iterator eiter = expectations_Z.begin(); eiter != eiter_end; ++ eiter)
+	    expectations[eiter->first] -= weight_type(eiter->second) * scaling_sum;
+	}
+	
+	// finaly, encode into features_optimize
+	feats.clear();
+	expectation_type::const_iterator eiter_end = expectations.end();
+	for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter)
+	  feats.push_back(std::make_pair(eiter->first, - double(eiter->second)));
+	
+	f.push_back(objective_local);
+	features_optimize.insert(feats.begin(), feats.end());
+	objective += objective_local;
       }
+
+    // perform optimizatin
     
     const size_type k = scores.size();
     const double k_norm = 1.0 / k;
@@ -932,11 +957,37 @@ struct LearnOExpectedLoss : public LearnBase
     
     rescale(weights, 1.0 - eta * lambda);
     
+    alpha.resize(f.size(), 0.0);
+    for (size_t i = 0; i != f.size(); ++ i)
+      f[i] = - (f[i] - cicada::dot_product(features_optimize[i].begin(), features_optimize[i].end(), weights, 0.0) * weight_scale);
     
-    // perform optimizatin
-
+    cicada::optimize::QPDCD solver;
     
+    HMatrix<sample_set_type> H(features);
+    MMatrix<sample_set_type> M(features);
     
+    solver(alpha, f, H, M, eta, tolerance);
+    
+    // update by expectations...
+    double a_norm = 0.0;
+    double pred = 0.0;
+    for (size_t i = 0; i != alpha.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	sample_set_type::value_type::const_iterator fiter_end = features_optimize[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features_optimize[i].begin(); fiter != fiter_end; ++ fiter) {
+	  double& x = weights[fiter->first];
+	  const double a = alpha[i] * fiter->second;
+	  
+	  a_norm += a * a;
+	  pred += 2.0 * x * a;
+	  
+	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
+	  x += a / weight_scale;
+	}
+      }
+    
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
@@ -947,7 +998,7 @@ struct LearnOExpectedLoss : public LearnBase
     features.clear();
     scores.clear();
     
-    return 0.0;
+    return objective * k_norm;
   }
   
   void rescale(weight_set_type& weights, const double scaling)
@@ -969,6 +1020,8 @@ struct LearnOExpectedLoss : public LearnBase
   
   score_ptr_map_type scores;
   bool error_metric;
+
+  double tolerance;
   
   size_type instances;
   
