@@ -127,7 +127,7 @@ struct LearnBase
 
 struct LearnSVM : public LearnBase
 {
-  typedef std::vector<double, std::allocator<double> > loss_set_type;
+   typedef std::vector<double, std::allocator<double> > loss_set_type;
   typedef std::vector<double, std::allocator<double> > alpha_set_type;
   typedef std::vector<double, std::allocator<double> > bound_map_type;
   typedef std::vector<double, std::allocator<double> > f_set_type;
@@ -527,6 +527,203 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
+struct LearnExpectedLoss : public LearnBase
+{
+  // lossfunction based on expected loss
+
+  typedef std::vector<double, std::allocator<double> > margin_set_type;
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+  typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
+  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+
+  typedef cicada::semiring::Log<double> weight_type;
+  typedef cicada::semiring::traits<weight_type> traits_type;
+  typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
+
+  LearnExpectedLoss(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+
+  void clear()
+  {
+    features.clear();
+    scores.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  template <typename Iterator>
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+  
+  void clear_history() {}
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
+  {
+    if (kbests.empty()) return;
+    
+    error_metric = __error_metric;
+    
+    scores.resize(scores.size() + 1);
+    scores.back().reserve(kbests.size());
+    
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+      features.insert(kiter->features.begin(), kiter->features.end());
+      scores.back().push_back(kiter->score);
+    }
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    if (scores.empty() || features.empty()) {
+      features.clear();
+      scores.clear();
+      
+      return 0.0;
+    }
+    
+    // first, compute loss based on the 1-best in the block
+    score_ptr_type score;
+    for (size_t i = 0; i != scores.size(); ++ i) 
+      if (! scores[i].empty()) {
+	if (! score)
+	  score = scores[i].front()->clone();
+	else
+	  *score += *scores[i].front();
+      }
+    
+    // second, compute expected loss
+    
+    expectations.clear();
+
+    const double error_factor = (error_metric ? 1.0 : - 1.0);
+    
+    size_t pos = 0;
+    for (size_t i = 0; i != scores.size(); ++ i) 
+      if (! scores[i].empty()) {
+	weight_type Z;
+	margins.clear();
+	losses.clear();
+	
+	score_ptr_type score_local = score->clone();
+	*score_local -= *scores[i].front();
+	
+	size_t pos_local = pos;
+	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
+	  score_ptr_type score_segment = score_local->clone();
+	  *score_segment += *scores[i][j];
+	  
+	  losses.push_back(error_factor * score_segment->score());
+	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale);
+	  Z += traits_type::exp(margins.back());
+	}
+	
+	const weight_type loss_sum = std::accumulate(losses.begin(), losses.end(), 0.0);
+	
+	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos_local) {
+	  const weight_type loss = losses[j];
+	  const weight_type weight = traits_type::exp(margins[j]) / Z;
+	  const weight_type scale = (loss - loss_sum * weight);
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features[pos_local].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[pos_local].begin(); fiter != fiter_end; ++ fiter)
+	    expectations[fiter->first] += weight_type(fiter->second) * scale;
+	}
+      }
+    
+    const size_type k = scores.size();
+    const double k_norm = 1.0 / k;
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    rescale(weights, 1.0 - eta * lambda);
+    
+    // update by expectations...
+    double a_norm = 0.0;
+    double pred = 0.0;
+    expectation_type::const_iterator eiter_end = expectations.end();
+    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
+      // we will update "minus" value...
+      
+      double& x = weights[eiter->first];
+      const double alpha = static_cast<double>(eiter->second) * eta * k_norm;
+      
+      a_norm += alpha * alpha;
+      pred += 2.0 * x * alpha;
+      
+      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+      x += alpha / weight_scale;
+    }
+    
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
+    
+    if (weight_norm > 1.0 / lambda)
+      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
+    
+    features.clear();
+    scores.clear();
+    
+    return 0.0;
+  }
+  
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+
+  margin_set_type    margins;
+  loss_set_type      losses;
+  sample_set_type    features;
+  expectation_type   expectations;
+  
+  score_ptr_map_type scores;
+  bool error_metric;
+  
+  size_type instances;
+  
+  size_type epoch;
+  double    lambda;
+  
+  double weight_scale;
+  double weight_norm;
+
+};
+
 struct LearnOnlineMargin : public LearnBase
 {
   typedef std::vector<double, std::allocator<double> > loss_set_type;
@@ -695,6 +892,8 @@ struct LearnPegasos : public LearnOnlineMargin
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    
+    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -789,6 +988,8 @@ struct LearnPegasos : public LearnOnlineMargin
   double    lambda;
   double    weight_scale;
   double    weight_norm;
+  
+  weight_set_type weights_peg;
 };
 
 // optimized-Pegasos learner
@@ -855,6 +1056,8 @@ struct LearnOPegasos : public LearnOnlineMargin
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    
+    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -954,6 +1157,8 @@ struct LearnOPegasos : public LearnOnlineMargin
   
   alpha_type    alpha;
   f_type        f;
+
+  weight_set_type weights_peg;
 };
 
 struct LearnPA : public LearnOnlineMargin

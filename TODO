@@ -151,3 +151,4 @@ remote grammar and tree-grammar:
   performs composition/parse/generation at the server side with larger memory (meaning with larger grammar)
   
   
+Allow expected loss-function (but uses block-wise loss)

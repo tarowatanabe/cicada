@@ -108,6 +108,7 @@ bool learn_nherd = false;
 bool learn_mira   = false;
 bool learn_sgd    = false;
 bool learn_osgd   = false;
+bool learn_el     = false;
 bool learn_svm    = false;
 bool learn_linear = false;
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
@@ -199,9 +200,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
       throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_lbfgs = true;
 
     
@@ -316,6 +317,8 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
+      else if (learn_el)
+	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
@@ -343,6 +346,8 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
+      else if (learn_el)
+	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
@@ -370,6 +375,8 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
+      else if (learn_el)
+	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
@@ -1359,6 +1366,7 @@ void options(int argc, char** argv)
     ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
     ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
     ("learn-osgd",     po::bool_switch(&learn_osgd),     "online optimized-SGD algorithm")
+    ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
     ("learn-svm",      po::bool_switch(&learn_svm),      "SVM for structured output")
     ("learn-linear",   po::bool_switch(&learn_linear),   "liblinear algorithm")
     ("solver",         po::value<int>(&linear_solver),   "liblinear solver type (default: 1)\n"
