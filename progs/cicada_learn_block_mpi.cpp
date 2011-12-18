@@ -117,6 +117,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
+double scale = 1.0;
 
 // additional misc parameters...
 bool loss_rank = false; // loss by rank
@@ -217,6 +218,8 @@ int main(int argc, char ** argv)
 
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
+    if (scale <= 0.0)
+      throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
 
     if (block_size <= 0)
       throw std::runtime_error("block size must be possitive: " + utils::lexical_cast<std::string>(block_size));
@@ -1389,6 +1392,7 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
+    ("scale",       po::value<double>(&scale),                 "scaling for weight")
     
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
