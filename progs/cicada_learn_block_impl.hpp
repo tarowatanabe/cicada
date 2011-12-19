@@ -1166,12 +1166,12 @@ struct LearnOExpectedLoss : public LearnBase
     for (size_t i = 0; i != f.size(); ++ i)
       f[i] = - (f[i] - cicada::dot_product(features_optimize[i].begin(), features_optimize[i].end(), weights, 0.0) * weight_scale);
     
-    cicada::optimize::QPDCD solver;
-    
-    HMatrix H(features_optimize);
-    MMatrix M(features_optimize);
-    
-    solver(alpha, f, H, M, eta, tolerance);
+    {
+      HMatrix H(features_optimize);
+      MMatrix M(features_optimize);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
+    }
     
     // update by expectations...
     double a_norm = 0.0;
