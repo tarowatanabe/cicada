@@ -960,6 +960,7 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
     
     HMatrix(const sample_set_type& __features) : features(__features) {}
     
+    inline
     double operator()(int i, int j) const
     {
       return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
@@ -974,8 +975,9 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
     
     MMatrix(const sample_set_type& __features) : features(__features) {}
     
-    template <typename __W>
-    void operator()(__W& w, const alpha_type& alpha) const
+    template <typename ___W>
+    inline
+    void operator()(___W& w, const alpha_type& alpha) const
     {
       const size_type model_size = features.size();
       
@@ -987,8 +989,9 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
 	}
     }
     
-    template <typename __W>
-    double operator()(const __W& w, const size_t& i) const
+    template <typename ___W>
+    inline
+    double operator()(const ___W& w, const size_t& i) const
     {
       double dot = 0.0;
       sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -997,8 +1000,9 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
       return dot;
     }
     
-    template <typename __W>
-    void operator()(__W& w, const double& update, const size_t& i) const
+    template <typename ___W>
+    inline
+    void operator()(___W& w, const double& update, const size_t& i) const
     {
       sample_set_type::value_type::const_iterator fiter_end = features[i].end();
       for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 

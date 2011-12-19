@@ -327,8 +327,8 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, scorers, weights);
-      //else if (learn_oel && regularize_l2)
-	//cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
