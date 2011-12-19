@@ -627,6 +627,7 @@ struct LearnExpectedLoss : public LearnBase
 
     const double error_factor   = (error_metric ? - 1.0 : 1.0);
     const double error_constant = (error_metric ? 0.0 : 1.0);
+    weight_type objective;
     
     size_t pos = 0;
     for (size_t i = 0; i != scores.size(); ++ i) 
@@ -650,12 +651,14 @@ struct LearnExpectedLoss : public LearnBase
 	}
 
 	weight_type scaling_sum;
+	weight_type objective_local;
 	
 	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
 	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
 	  
 	  scaling_sum += scaling;
+	  objective_local += weight_type(losses[j]) * weight;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
@@ -667,6 +670,8 @@ struct LearnExpectedLoss : public LearnBase
 	expectation_type::const_iterator eiter_end = expectations_Z.end();
 	for (expectation_type::const_iterator eiter = expectations_Z.begin(); eiter != eiter_end; ++ eiter)
 	  expectations[eiter->first] -= weight_type(eiter->second) * scaling_sum;
+	
+	objective += objective_local;
       }
     
     const size_type k = scores.size();
@@ -707,7 +712,7 @@ struct LearnExpectedLoss : public LearnBase
     features.clear();
     scores.clear();
     
-    return 0.0;
+    return objective * k_norm;
   }
   
   void rescale(weight_set_type& weights, const double scaling)
@@ -831,6 +836,7 @@ struct LearnExpectedLossL1 : public LearnBase
 
     const double error_factor   = (error_metric ? - 1.0 : 1.0);
     const double error_constant = (error_metric ? 0.0 : 1.0);
+    weight_type objective;
     
     size_t pos = 0;
     for (size_t i = 0; i != scores.size(); ++ i) 
@@ -854,6 +860,7 @@ struct LearnExpectedLossL1 : public LearnBase
 	}
 
 	weight_type scaling_sum;
+	weight_type objective_local;
 	
 	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
@@ -871,6 +878,8 @@ struct LearnExpectedLossL1 : public LearnBase
 	expectation_type::const_iterator eiter_end = expectations_Z.end();
 	for (expectation_type::const_iterator eiter = expectations_Z.begin(); eiter != eiter_end; ++ eiter)
 	  expectations[eiter->first] -= weight_type(eiter->second) * scaling_sum;
+
+	objective += objective_local;
       }
     
     const size_type k = scores.size();
@@ -897,7 +906,7 @@ struct LearnExpectedLossL1 : public LearnBase
     features.clear();
     scores.clear();
     
-    return 0.0;
+    return objective * k_norm;
   }
 
   void apply(double& x, double& penalty, const double& cummulative)
