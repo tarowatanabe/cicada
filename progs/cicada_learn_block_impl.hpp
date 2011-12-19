@@ -1231,7 +1231,7 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
 
 };
 
-struct LearnOnlineMargin : public LearnBase, public LearnMargin
+struct LearnOnlineMargin : public LearnBase
 {
   typedef std::vector<double, std::allocator<double> > loss_set_type;
   
@@ -1500,7 +1500,7 @@ struct LearnPegasos : public LearnOnlineMargin
 };
 
 // optimized-Pegasos learner
-struct LearnOPegasos : public LearnOnlineMargin
+struct LearnOPegasos : public LearnOnlineMargin, public LearnMargin
 {
   
   LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
@@ -1797,7 +1797,7 @@ struct LearnNHERD : public LearnOnlineMargin
 
 // MIRA learner
 // We will run a qp solver and determine the alpha, then, translate this into w
-struct LearnMIRA : public LearnOnlineMargin
+struct LearnMIRA : public LearnOnlineMargin, public LearnMargin
 {
   LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
