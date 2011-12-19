@@ -666,6 +666,7 @@ struct LearnExpectedLoss : public LearnBase
     
     const size_type k = scores.size();
     const double k_norm = 1.0 / k;
+    //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
@@ -732,6 +733,194 @@ struct LearnExpectedLoss : public LearnBase
   double weight_scale;
   double weight_norm;
 
+};
+
+struct LearnExpectedLossL1 : public LearnBase
+{
+  // lossfunction based on expected loss
+
+  typedef std::vector<double, std::allocator<double> > margin_set_type;
+  typedef std::vector<double, std::allocator<double> > loss_set_type;
+
+  typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
+  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+
+  typedef cicada::semiring::Log<double> weight_type;
+  typedef cicada::semiring::traits<weight_type> traits_type;
+  typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
+
+  typedef cicada::WeightVector<double> penalty_set_type;
+
+  LearnExpectedLossL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
+
+  void clear()
+  {
+    features.clear();
+    scores.clear();
+  }
+  
+  std::ostream& encode(std::ostream& os)
+  {
+    return os;
+  }
+  
+  std::istream& decode(std::istream& is)
+  {
+    return is;
+  }
+  
+  template <typename Iterator>
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+  
+  void clear_history() {}
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
+  {
+    if (kbests.empty()) return;
+    
+    error_metric = __error_metric;
+    
+    scores.resize(scores.size() + 1);
+    scores.back().reserve(kbests.size());
+    
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+      features.insert(kiter->features.begin(), kiter->features.end());
+      scores.back().push_back(kiter->score);
+    }
+  }
+  
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    if (scores.empty() || features.empty()) {
+      features.clear();
+      scores.clear();
+      
+      return 0.0;
+    }
+    
+    // first, compute loss based on the 1-best in the block
+    score_ptr_type score;
+    for (size_t i = 0; i != scores.size(); ++ i) 
+      if (! scores[i].empty()) {
+	if (! score)
+	  score = scores[i].front()->clone();
+	else
+	  *score += *scores[i].front();
+      }
+    
+    // second, compute expected loss
+    
+    expectations.clear();
+
+    const double error_factor   = (error_metric ? - 1.0 : 1.0);
+    const double error_constant = (error_metric ? 0.0 : 1.0);
+    
+    size_t pos = 0;
+    for (size_t i = 0; i != scores.size(); ++ i) 
+      if (! scores[i].empty()) {
+	weight_type Z;
+	expectations_Z.clear();
+	margins.clear();
+	losses.clear();
+	
+	score_ptr_type score_local = score->clone();
+	*score_local -= *scores[i].front();
+	
+	const size_t pos_local = pos;
+	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
+	  score_ptr_type score_segment = score_local->clone();
+	  *score_segment += *scores[i][j];
+	  
+	  losses.push_back(error_constant - error_factor * score_segment->score());
+	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * scale);
+	  Z += traits_type::exp(margins.back());
+	}
+
+	weight_type scaling_sum;
+	
+	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
+	  const weight_type weight = traits_type::exp(margins[j]) / Z;
+	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
+	  
+	  scaling_sum += scaling;
+	  
+	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
+	    expectations[fiter->first] += weight_type(fiter->second) * scaling;
+	    expectations_Z[fiter->first] += weight_type(fiter->second) * weight;
+	  }
+	}
+
+	expectation_type::const_iterator eiter_end = expectations_Z.end();
+	for (expectation_type::const_iterator eiter = expectations_Z.begin(); eiter != eiter_end; ++ eiter)
+	  expectations[eiter->first] -= weight_type(eiter->second) * scaling_sum;
+      }
+    
+    const size_type k = scores.size();
+    const double k_norm = 1.0 / k;
+    //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    penalty += eta * lambda * k_norm;
+
+    // update by expectations...
+    expectation_type::const_iterator eiter_end = expectations.end();
+    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
+      double& x = weights[eiter->first];
+      
+      // update weight ... we will update "minus" value
+      x += - static_cast<double>(eiter->second) * eta * k_norm;
+      
+      // apply penalty
+      apply(x, penalties[eiter->first], penalty);
+    }
+    
+    features.clear();
+    scores.clear();
+    
+    return 0.0;
+  }
+
+  void apply(double& x, double& penalty, const double& cummulative)
+  {
+    const double x_half = x;
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - cummulative);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + cummulative);
+    penalty += x - x_half;
+  }
+
+  margin_set_type    margins;
+  loss_set_type      losses;
+  sample_set_type    features;
+  expectation_type   expectations;
+  expectation_type   expectations_Z;
+  
+  score_ptr_map_type scores;
+  bool error_metric;
+  
+  size_type instances;
+  
+  size_type epoch;
+  double    lambda;
+
+  penalty_set_type penalties;
+  double penalty;
 };
 
 struct LearnOExpectedLoss : public LearnBase
