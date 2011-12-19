@@ -588,9 +588,9 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
-class LearnExpectedLoss : public LearnBase
+#if 0
+struct LearnExpectedLoss : public LearnBase
 {
-public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
@@ -797,9 +797,8 @@ public:
 
 };
 
-class LearnExpectedLossL1 : public LearnBase
+struct LearnExpectedLossL1 : public LearnBase
 {
-public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
@@ -986,9 +985,8 @@ public:
   double penalty;
 };
 
-class LearnOExpectedLoss : public LearnBase, public LearnMargin
+struct LearnOExpectedLoss : public LearnBase, public LearnMargin
 {
-public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
@@ -1232,6 +1230,7 @@ public:
   double weight_norm;
 
 };
+#endif
 
 struct LearnOnlineMargin : public LearnBase
 {
