@@ -1496,23 +1496,21 @@ struct LearnOPegasos : public LearnOnlineMargin
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
-  template <typename FeatureSet>
   struct HMatrix
   {
-    HMatrix(const FeatureSet& __features) : features(__features) {}
+    HMatrix(const sample_set_type& __features) : features(__features) {}
     
     double operator()(int i, int j) const
     {
       return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
     }
     
-    const FeatureSet& features;
+    const sample_set_type& features;
   };
   
-  template <typename FeatureSet>
   struct MMatrix
   {
-    MMatrix(const FeatureSet& __features) : features(__features) {}
+    MMatrix(const sample_set_type& __features) : features(__features) {}
     
     template <typename W>
     void operator()(W& w, const alpha_type& alpha) const
@@ -1545,7 +1543,7 @@ struct LearnOPegasos : public LearnOnlineMargin
 	w[fiter->first] += update * fiter->second;
     }
     
-    const FeatureSet& features;
+    const sample_set_type& features;
   };
   
   LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
@@ -1598,8 +1596,8 @@ struct LearnOPegasos : public LearnOnlineMargin
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix<sample_set_type> H(features);
-    MMatrix<sample_set_type> M(features);
+    HMatrix H(features);
+    MMatrix M(features);
     
     solver(alpha, f, H, M, eta, tolerance);
     
