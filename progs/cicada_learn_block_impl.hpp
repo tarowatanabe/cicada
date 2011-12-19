@@ -120,12 +120,6 @@ struct LearnBase
   typedef SampleSet sample_set_type;
 };
 
-struct LearnMargin
-{  
-
-  
-};
-
 //
 // SVM for structured output learning  
 //
@@ -937,7 +931,7 @@ struct LearnExpectedLossL1 : public LearnBase
   double penalty;
 };
 
-struct LearnOExpectedLoss : public LearnBase, public LearnMargin
+struct LearnOExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
 
@@ -1513,7 +1507,7 @@ struct LearnPegasos : public LearnOnlineMargin
 };
 
 // optimized-Pegasos learner
-struct LearnOPegasos : public LearnOnlineMargin, public LearnMargin
+struct LearnOPegasos : public LearnOnlineMargin
 {
   
   typedef std::vector<double, std::allocator<double> >    alpha_type;
@@ -1621,12 +1615,12 @@ struct LearnOPegasos : public LearnOnlineMargin, public LearnMargin
     }
     objective /= losses.size();
     
-    cicada::optimize::QPDCD solver;
-    
-    HMatrix H(features);
-    MMatrix M(features);
-    
-    solver(alpha, f, H, M, eta, tolerance);
+    {
+      HMatrix H(features);
+      MMatrix M(features);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
+    }
     
     double a_norm = 0.0;
     double pred = 0.0;
@@ -1867,7 +1861,7 @@ struct LearnNHERD : public LearnOnlineMargin
 
 // MIRA learner
 // We will run a qp solver and determine the alpha, then, translate this into w
-struct LearnMIRA : public LearnOnlineMargin, public LearnMargin
+struct LearnMIRA : public LearnOnlineMargin
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
@@ -2322,7 +2316,7 @@ struct LearnSGDL2 : public LearnLR
 };
 
 // SGDL2 learner
-struct LearnOSGDL2 : public LearnLR, public LearnMargin
+struct LearnOSGDL2 : public LearnLR
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
