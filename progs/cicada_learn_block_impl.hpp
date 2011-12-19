@@ -1244,6 +1244,9 @@ struct LearnOnlineMargin : public LearnBase
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
 
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
+
   struct HMatrix
   {
     HMatrix(const sample_set_type& __features) : features(__features) {}
@@ -1543,8 +1546,6 @@ struct LearnPegasos : public LearnOnlineMargin
 // optimized-Pegasos learner
 struct LearnOPegasos : public LearnOnlineMargin
 {
-  typedef std::vector<double, std::allocator<double> >    alpha_type;
-  typedef std::vector<double, std::allocator<double> >    f_type;
   
   LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
   
@@ -1842,10 +1843,6 @@ struct LearnNHERD : public LearnOnlineMargin
 // We will run a qp solver and determine the alpha, then, translate this into w
 struct LearnMIRA : public LearnOnlineMargin
 {
-  typedef std::vector<double, std::allocator<double> >    alpha_type;
-  typedef std::vector<double, std::allocator<double> >    f_type;
-
-  
   LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
   void initialize(weight_set_type& weights) {}
