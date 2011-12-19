@@ -532,7 +532,6 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
-#if 0
 struct LearnExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
@@ -1231,7 +1230,6 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
   double weight_norm;
 
 };
-#endif
 
 struct LearnOnlineMargin : public LearnBase
 {
