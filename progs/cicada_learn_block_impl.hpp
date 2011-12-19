@@ -940,23 +940,23 @@ struct LearnOExpectedLoss : public LearnBase
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
-  template <typename FeatureSet>
+  template <typename __FeatureSet>
   struct HMatrix
   {
-    HMatrix(const FeatureSet& __features) : features(__features) {}
+    HMatrix(const __FeatureSet& __features) : features(__features) {}
     
     double operator()(int i, int j) const
     {
       return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
     }
     
-    const FeatureSet& features;
+    const __FeatureSet& features;
   };
   
-  template <typename FeatureSet>
+  template <typename __FeatureSet>
   struct MMatrix
   {
-    MMatrix(const FeatureSet& __features) : features(__features) {}
+    MMatrix(const __FeatureSet& __features) : features(__features) {}
     
     template <typename W>
     void operator()(W& w, const alpha_type& alpha) const
@@ -989,7 +989,7 @@ struct LearnOExpectedLoss : public LearnBase
 	w[fiter->first] += update * fiter->second;
     }
     
-    const FeatureSet& features;
+    const __FeatureSet& features;
   };
 
   LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
