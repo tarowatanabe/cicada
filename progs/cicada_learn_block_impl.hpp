@@ -1243,6 +1243,56 @@ struct LearnOnlineMargin : public LearnBase
 #else
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
+
+  struct HMatrix
+  {
+    HMatrix(const sample_set_type& __features) : features(__features) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
+    }
+    
+    const sample_set_type& features;
+  };
+  
+  struct MMatrix
+  {
+    MMatrix(const sample_set_type& __features) : features(__features) {}
+    
+    template <typename W>
+    void operator()(W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = features.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename W>
+    double operator()(const W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename W>
+    void operator()(W& w, const double& update, const size_t& i) const
+    {
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const sample_set_type& features;
+  };
   
   void clear()
   {
@@ -1495,56 +1545,6 @@ struct LearnOPegasos : public LearnOnlineMargin
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
-
-  struct HMatrix
-  {
-    HMatrix(const sample_set_type& __features) : features(__features) {}
-    
-    double operator()(int i, int j) const
-    {
-      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
-    }
-    
-    const sample_set_type& features;
-  };
-  
-  struct MMatrix
-  {
-    MMatrix(const sample_set_type& __features) : features(__features) {}
-    
-    template <typename W>
-    void operator()(W& w, const alpha_type& alpha) const
-    {
-      const size_type model_size = features.size();
-      
-      for (size_type i = 0; i != model_size; ++ i)
-	if (alpha[i] > 0.0) {
-	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	    w[fiter->first] += alpha[i] * fiter->second;
-	}
-    }
-    
-    template <typename W>
-    double operator()(const W& w, const size_t& i) const
-    {
-      double dot = 0.0;
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	dot += w[fiter->first] * fiter->second;
-      return dot;
-    }
-    
-    template <typename W>
-    void operator()(W& w, const double& update, const size_t& i) const
-    {
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	w[fiter->first] += update * fiter->second;
-    }
-    
-    const sample_set_type& features;
-  };
   
   LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
   
@@ -1845,57 +1845,6 @@ struct LearnMIRA : public LearnOnlineMargin
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
-  template <typename FeatureSet>
-  struct HMatrix
-  {
-    HMatrix(const FeatureSet& __features) : features(__features) {}
-    
-    double operator()(int i, int j) const
-    {
-      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
-    }
-    
-    const FeatureSet& features;
-  };
-  
-  template <typename FeatureSet>
-  struct MMatrix
-  {
-    MMatrix(const FeatureSet& __features) : features(__features) {}
-    
-    template <typename W>
-    void operator()(W& w, const alpha_type& alpha) const
-    {
-      const size_type model_size = features.size();
-      
-      for (size_type i = 0; i != model_size; ++ i)
-	if (alpha[i] > 0.0) {
-	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	    w[fiter->first] += alpha[i] * fiter->second;
-	}
-    }
-    
-    template <typename W>
-    double operator()(const W& w, const size_t& i) const
-    {
-      double dot = 0.0;
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	dot += w[fiter->first] * fiter->second;
-      return dot;
-    }
-    
-    template <typename W>
-    void operator()(W& w, const double& update, const size_t& i) const
-    {
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
-	w[fiter->first] += update * fiter->second;
-    }
-    
-    const FeatureSet& features;
-  };
   
   LearnMIRA(const size_type __instances) : tolerance(0.1), lambda(C) {}
   
@@ -1927,8 +1876,8 @@ struct LearnMIRA : public LearnOnlineMargin
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix<sample_set_type> H(features);
-    MMatrix<sample_set_type> M(features);
+    HMatrix H(features);
+    MMatrix M(features);
     
     solver(alpha, f, H, M, 1.0 / (lambda * losses.size()), tolerance);
     
@@ -2452,8 +2401,8 @@ struct LearnOSGDL2 : public LearnLR
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix<sample_set_type> H(features);
-    MMatrix<sample_set_type> M(features);
+    HMatrix H(features);
+    MMatrix M(features);
     
     solver(alpha, f, H, M, eta, tolerance);
     
