@@ -940,23 +940,21 @@ struct LearnOExpectedLoss : public LearnBase
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
 
-  template <typename __FeatureSet>
   struct HMatrix
   {
-    HMatrix(const __FeatureSet& __features) : features(__features) {}
+    HMatrix(const sample_set_type& __features) : features(__features) {}
     
     double operator()(int i, int j) const
     {
       return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
     }
     
-    const __FeatureSet& features;
+    const sample_set_type& features;
   };
   
-  template <typename __FeatureSet>
   struct MMatrix
   {
-    MMatrix(const __FeatureSet& __features) : features(__features) {}
+    MMatrix(const sample_set_type& __features) : features(__features) {}
     
     template <typename W>
     void operator()(W& w, const alpha_type& alpha) const
@@ -989,7 +987,7 @@ struct LearnOExpectedLoss : public LearnBase
 	w[fiter->first] += update * fiter->second;
     }
     
-    const __FeatureSet& features;
+    const sample_set_type& features;
   };
 
   LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
@@ -1154,8 +1152,8 @@ struct LearnOExpectedLoss : public LearnBase
     
     cicada::optimize::QPDCD solver;
     
-    HMatrix<sample_set_type> H(features_optimize);
-    MMatrix<sample_set_type> M(features_optimize);
+    HMatrix H(features_optimize);
+    MMatrix M(features_optimize);
     
     solver(alpha, f, H, M, eta, tolerance);
     
