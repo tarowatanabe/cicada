@@ -215,6 +215,8 @@ int main(int argc, char ** argv)
 
     if (learn_osgd && regularize_l1)
       throw std::runtime_error("no optimized-SGD with L1");
+    if (learn_oel && regularize_l1)
+      throw std::runtime_error("no optimized-ExpectedLoss with L1");
 
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
@@ -321,8 +323,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
-      else if (learn_el)
+      else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_oel)
 	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
@@ -352,8 +356,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
-      else if (learn_el)
+      else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_oel)
 	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
@@ -383,8 +389,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
-      else if (learn_el)
+      else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_oel)
 	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
