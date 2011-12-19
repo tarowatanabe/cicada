@@ -588,8 +588,9 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
-struct LearnExpectedLoss : public LearnBase
+class LearnExpectedLoss : public LearnBase
 {
+public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
@@ -796,8 +797,9 @@ struct LearnExpectedLoss : public LearnBase
 
 };
 
-struct LearnExpectedLossL1 : public LearnBase
+class LearnExpectedLossL1 : public LearnBase
 {
+public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
@@ -809,11 +811,11 @@ struct LearnExpectedLossL1 : public LearnBase
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::semiring::traits<weight_type> traits_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
-
+  
   typedef cicada::WeightVector<double> penalty_set_type;
-
+  
   LearnExpectedLossL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
-
+  
   void clear()
   {
     features.clear();
@@ -984,20 +986,20 @@ struct LearnExpectedLossL1 : public LearnBase
   double penalty;
 };
 
-struct LearnOExpectedLoss : public LearnBase, public LearnMargin
+class LearnOExpectedLoss : public LearnBase, public LearnMargin
 {
+public:
   // lossfunction based on expected loss
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
   typedef std::vector<double, std::allocator<double> > loss_set_type;
-
+  
   typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
   typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
-
+  
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::semiring::traits<weight_type> traits_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
-
 
   LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
 
@@ -1059,7 +1061,7 @@ struct LearnOExpectedLoss : public LearnBase, public LearnMargin
   sample_set_type features_optimize;
   alpha_type      alpha;
   f_type          f;
-
+  
   double learn(weight_set_type& weights)
   {
     if (scores.empty() || features.empty()) {
