@@ -327,8 +327,6 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, scorers, weights);
-      else if (learn_oel)
-	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
@@ -360,8 +358,6 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, scorers, weights);
-      else if (learn_oel)
-	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
@@ -393,8 +389,6 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, scorers, weights);
-      else if (learn_oel)
-	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_linear)
 	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, scorers, weights);
       else if (learn_svm)
