@@ -2839,16 +2839,18 @@ struct Oracle
     // assign loss
     for (size_t id = 0; id != kbests.size(); ++ id) 
       if (! kbests[id].empty()) {
-	score_ptr_type score_local = score_1best->clone();
-	*score_local -= *kbests[id].front().score;
+	score_ptr_type score_segment = score_1best->clone();
+	*score_segment -= *kbests[id].front().score;
 	
 	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
 	  hypothesis_type& hyp = const_cast<hypothesis_type&>(*hiter);
-	  score_ptr_type score_segment = score_local->clone();
+	  
 	  *score_segment += *hyp.score;
 	  
 	  hyp.loss = loss_constant - loss_factor * score_segment->score();
+
+	  *score_segment -= *hyp.score;
 	}
       }
     
