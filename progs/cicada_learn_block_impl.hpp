@@ -810,9 +810,8 @@ struct LearnOExpectedLoss : public LearnBase
     
     MMatrix(const sample_set_type& __features) : features(__features) {}
     
-    template <typename ___W>
     inline
-    void operator()(___W& w, const alpha_type& alpha) const
+    void operator()(cicada::WeightVector<double>& w, const alpha_type& alpha) const
     {
       const size_type model_size = features.size();
       
@@ -824,9 +823,8 @@ struct LearnOExpectedLoss : public LearnBase
 	}
     }
     
-    template <typename ___W>
     inline
-    double operator()(const ___W& w, const size_t& i) const
+    double operator()(const cicada::WeightVector<double>& w, const size_t& i) const
     {
       double dot = 0.0;
       sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -835,9 +833,8 @@ struct LearnOExpectedLoss : public LearnBase
       return dot;
     }
     
-    template <typename ___W>
     inline
-    void operator()(___W& w, const double& update, const size_t& i) const
+    void operator()(cicada::WeightVector<double>& w, const double& update, const size_t& i) const
     {
       sample_set_type::value_type::const_iterator fiter_end = features[i].end();
       for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
