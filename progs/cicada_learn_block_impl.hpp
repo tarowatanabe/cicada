@@ -384,12 +384,12 @@ struct LearnSVM : public LearnBase
       //std::transform(alpha.begin(), alpha.end(), alpha.begin(), multiplies_min(factor, clip));
     }
     
-    cicada::optimize::QPDCD solver;
-    
-    HMatrix H(positions, features);
-    MMatrix M(positions, features);
-    
-    solver(alpha, f, H, M, 1.0 / (lambda * positions.size()), tolerance);
+    {
+      HMatrix H(positions, features);
+      MMatrix M(positions, features);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, 1.0 / (lambda * positions.size()), tolerance);
+    }
     
     weights.clear();
     alpha_set_type::const_iterator aiter = alpha.begin();
@@ -1739,12 +1739,12 @@ struct LearnMIRA : public LearnOnlineMargin
     
     objective /= losses.size();
     
-    cicada::optimize::QPDCD solver;
-    
-    HMatrix H(features);
-    MMatrix M(features);
-    
-    solver(alpha, f, H, M, 1.0 / (lambda * losses.size()), tolerance);
+    {
+      HMatrix H(features);
+      MMatrix M(features);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, 1.0 / (lambda * losses.size()), tolerance);
+    }
     
     for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
@@ -2224,12 +2224,12 @@ struct LearnOSGDL2 : public LearnLR
     for (size_t i = 0; i != samples.size(); ++ i)
       f[i] = - (- f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
     
-    cicada::optimize::QPDCD solver;
-    
-    HMatrix H(features);
-    MMatrix M(features);
-    
-    solver(alpha, f, H, M, eta, tolerance);
+    {
+      HMatrix H(features);
+      MMatrix M(features);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
+    }
     
     // update by expectations...
     double a_norm = 0.0;

@@ -108,7 +108,6 @@ namespace cicada
       return os;
     }
     
-
     class Scorer
     {
     public:
