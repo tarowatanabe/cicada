@@ -17,6 +17,7 @@
 #include <cicada/eval/score.hpp>
 
 #include <utils/compact_trie_dense.hpp>
+#include <utils/simple_vector.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>
 
@@ -29,7 +30,7 @@ namespace cicada
     public:
       typedef double count_type;
       
-      typedef std::vector<count_type, std::allocator<count_type> > ngram_counts_type;
+      typedef utils::simple_vector<count_type, std::allocator<count_type> > ngram_counts_type;
 
     public:      
       Bleu(const int order)
