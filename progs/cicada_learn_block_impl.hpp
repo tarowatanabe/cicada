@@ -458,7 +458,7 @@ struct LearnExpectedLoss : public LearnBase
   void clear()
   {
     features.clear();
-    scores.clear();
+    losses.clear();
   }
   
   template <typename Iterator>
@@ -471,13 +471,13 @@ struct LearnExpectedLoss : public LearnBase
   {
     if (kbests.empty()) return;
     
-    scores.resize(scores.size() + 1);
-    scores.back().reserve(kbests.size());
+    losses.resize(losses.size() + 1);
+    losses.back().reserve(kbests.size());
     
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->loss);
+      losses.back().push_back(kiter->loss);
     }
   }
   
@@ -497,9 +497,9 @@ struct LearnExpectedLoss : public LearnBase
 
   double learn(weight_set_type& weights)
   {
-    if (scores.empty() || features.empty()) {
+    if (losses.empty() || features.empty()) {
       features.clear();
-      scores.clear();
+      losses.clear();
       
       return 0.0;
     }
@@ -509,16 +509,14 @@ struct LearnExpectedLoss : public LearnBase
     weight_type objective;
     
     size_t pos = 0;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
+    for (size_t i = 0; i != losses.size(); ++ i) 
+      if (! losses[i].empty()) {
 	weight_type Z;
 	expectations_Z.clear();
 	margins.clear();
-	losses.clear();
 	
 	const size_t pos_local = pos;
-	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  losses.push_back(scores[i][j]);
+	for (size_t j = 0; j != losses[i].size(); ++ j, ++ pos) {
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -526,12 +524,12 @@ struct LearnExpectedLoss : public LearnBase
 	weight_type scaling_sum;
 	weight_type objective_local;
 	
-	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
+	for (size_t j = 0, p = pos_local; j != losses[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
+	  const weight_type scaling = weight_type(scale * losses[i][j]) * weight;
 	  
 	  scaling_sum += scaling;
-	  objective_local += weight_type(losses[j]) * weight;
+	  objective_local += weight_type(losses[i][j]) * weight;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
@@ -547,7 +545,7 @@ struct LearnExpectedLoss : public LearnBase
 	objective += objective_local;
       }
     
-    const size_type k = scores.size();
+    const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
@@ -583,7 +581,7 @@ struct LearnExpectedLoss : public LearnBase
       finalize(weights);
     
     features.clear();
-    scores.clear();
+    losses.clear();
     
     return objective * k_norm;
   }
@@ -600,12 +598,11 @@ struct LearnExpectedLoss : public LearnBase
   }
 
   margin_set_type    margins;
-  loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
   expectation_type   expectations_Z;
 
-  loss_map_type scores;
+  loss_map_type losses;
   
   size_type instances;
   
@@ -637,7 +634,7 @@ struct LearnExpectedLossL1 : public LearnBase
   void clear()
   {
     features.clear();
-    scores.clear();
+    losses.clear();
   }
   
   template <typename Iterator>
@@ -650,13 +647,13 @@ struct LearnExpectedLossL1 : public LearnBase
   {
     if (kbests.empty()) return;
     
-    scores.resize(scores.size() + 1);
-    scores.back().reserve(kbests.size());
+    losses.resize(losses.size() + 1);
+    losses.back().reserve(kbests.size());
     
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->loss);
+      losses.back().push_back(kiter->loss);
     }
   }
   
@@ -670,9 +667,9 @@ struct LearnExpectedLossL1 : public LearnBase
 
   double learn(weight_set_type& weights)
   {
-    if (scores.empty() || features.empty()) {
+    if (losses.empty() || features.empty()) {
       features.clear();
-      scores.clear();
+      losses.clear();
       
       return 0.0;
     }
@@ -682,16 +679,14 @@ struct LearnExpectedLossL1 : public LearnBase
     weight_type objective;
     
     size_t pos = 0;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
+    for (size_t i = 0; i != losses.size(); ++ i) 
+      if (! losses[i].empty()) {
 	weight_type Z;
 	expectations_Z.clear();
 	margins.clear();
-	losses.clear();
 	
 	const size_t pos_local = pos;
-	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  losses.push_back(scores[i][j]);
+	for (size_t j = 0; j != losses[i].size(); ++ j, ++ pos) {
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -699,11 +694,12 @@ struct LearnExpectedLossL1 : public LearnBase
 	weight_type scaling_sum;
 	weight_type objective_local;
 	
-	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
+	for (size_t j = 0, p = pos_local; j != losses[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
+	  const weight_type scaling = weight_type(scale * losses[i][j]) * weight;
 	  
 	  scaling_sum += scaling;
+	  objective_local += weight_type(losses[i][j]) * weight;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
@@ -719,7 +715,7 @@ struct LearnExpectedLossL1 : public LearnBase
 	objective += objective_local;
       }
     
-    const size_type k = scores.size();
+    const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
@@ -741,7 +737,7 @@ struct LearnExpectedLossL1 : public LearnBase
     }
     
     features.clear();
-    scores.clear();
+    losses.clear();
     
     return objective * k_norm;
   }
@@ -757,12 +753,11 @@ struct LearnExpectedLossL1 : public LearnBase
   }
   
   margin_set_type    margins;
-  loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
   expectation_type   expectations_Z;
 
-  loss_map_type scores;
+  loss_map_type losses;
   
   size_type instances;
   
@@ -852,7 +847,7 @@ struct LearnOExpectedLoss : public LearnBase
   void clear()
   {
     features.clear();
-    scores.clear();
+    losses.clear();
   }
   
   template <typename Iterator>
@@ -866,13 +861,13 @@ struct LearnOExpectedLoss : public LearnBase
   {
     if (kbests.empty()) return;
     
-    scores.resize(scores.size() + 1);
-    scores.back().reserve(kbests.size());
+    losses.resize(losses.size() + 1);
+    losses.back().reserve(kbests.size());
     
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->loss);
+      losses.back().push_back(kiter->loss);
     }
   }
   
@@ -897,9 +892,9 @@ struct LearnOExpectedLoss : public LearnBase
   
   double learn(weight_set_type& weights)
   {
-    if (scores.empty() || features.empty()) {
+    if (losses.empty() || features.empty()) {
       features.clear();
-      scores.clear();
+      losses.clear();
       
       return 0.0;
     }
@@ -911,17 +906,15 @@ struct LearnOExpectedLoss : public LearnBase
     weight_type objective;
     
     size_t pos = 0;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
+    for (size_t i = 0; i != losses.size(); ++ i) 
+      if (! losses[i].empty()) {
 	weight_type Z;
 	expectations.clear();
 	expectations_Z.clear();
 	margins.clear();
-	losses.clear();
 	
 	const size_t pos_local = pos;
-	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  losses.push_back(scores[i][j]);
+	for (size_t j = 0; j != losses[i].size(); ++ j, ++ pos) {
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -929,12 +922,12 @@ struct LearnOExpectedLoss : public LearnBase
 	weight_type scaling_sum;
 	weight_type objective_local;
 	
-	for (size_t j = 0, p = pos_local; j != scores[i].size(); ++ j, ++ p) {
+	for (size_t j = 0, p = pos_local; j != losses[i].size(); ++ j, ++ p) {
 	  const weight_type weight = traits_type::exp(margins[j]) / Z;
-	  const weight_type scaling = weight_type(scale * losses[j]) * weight;
+	  const weight_type scaling = weight_type(scale * losses[i][j]) * weight;
 	  
 	  scaling_sum += scaling;
-	  objective_local += weight_type(losses[j]) * weight;
+	  objective_local += weight_type(losses[i][j]) * weight;
 	  
 	  sample_set_type::value_type::const_iterator fiter_end = features[p].end();
 	  for (sample_set_type::value_type::const_iterator fiter = features[p].begin(); fiter != fiter_end; ++ fiter) {
@@ -962,7 +955,7 @@ struct LearnOExpectedLoss : public LearnBase
 
     // perform optimizatin
     
-    const size_type k = scores.size();
+    const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     const size_type num_samples = (instances + block_size - 1) / block_size;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
@@ -1009,7 +1002,7 @@ struct LearnOExpectedLoss : public LearnBase
       finalize(weights);
     
     features.clear();
-    scores.clear();
+    losses.clear();
     
     return objective * k_norm;
   }
@@ -1026,12 +1019,11 @@ struct LearnOExpectedLoss : public LearnBase
   }
 
   margin_set_type    margins;
-  loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
   expectation_type   expectations_Z;
   
-  loss_map_type scores;
+  loss_map_type losses;
 
   double tolerance;
   
