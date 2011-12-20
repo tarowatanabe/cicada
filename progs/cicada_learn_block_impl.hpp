@@ -247,7 +247,7 @@ struct LearnSVM : public LearnBase
   }
   
 
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     
@@ -467,7 +467,7 @@ struct LearnExpectedLoss : public LearnBase
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty()) return;
     
@@ -646,7 +646,7 @@ struct LearnExpectedLossL1 : public LearnBase
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty()) return;
     
@@ -862,7 +862,7 @@ struct LearnOExpectedLoss : public LearnBase
   }
   
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty()) return;
     
@@ -1076,7 +1076,7 @@ struct LearnOnlineMargin : public LearnBase
     history_losses.clear();
   }
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     
@@ -1867,7 +1867,7 @@ struct LearnSGDL1 : public LearnLR
   LearnSGDL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -1966,7 +1966,7 @@ struct LearnSGDL2 : public LearnLR
   LearnSGDL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -2141,7 +2141,7 @@ struct LearnOSGDL2 : public LearnLR
   LearnOSGDL2(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -2298,7 +2298,7 @@ struct LearnLBFGS : public LearnLR
 
   LearnLBFGS(const size_type __instances) {}
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty() || oracles.empty()) return;
     
@@ -2569,7 +2569,7 @@ struct LearnLinear
 
   LearnLinear(const size_type __instances) {}
   
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (id >= encoders.size())
       encoders.resize(id + 1);

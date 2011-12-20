@@ -677,8 +677,6 @@ void cicada_learn(operation_set_type& operations,
 
   hypothesis_map_type kbests_all;
 
-  const bool error_metric = scorers.error_metric();
-  
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> thread_dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
   
@@ -757,7 +755,7 @@ void cicada_learn(operation_set_type& operations,
       
       // encode into learner...
       for (size_t i = 0; i != kbests_block.size(); ++ i)
-	learner.encode(segments_block[i], kbests_block[i], oracles_block[i], error_metric);
+	learner.encode(segments_block[i], kbests_block[i], oracles_block[i]);
       
       // perform learning...
       learner.learn(weights);
