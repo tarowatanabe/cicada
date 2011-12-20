@@ -122,7 +122,6 @@ double scale = 1.0;
 // additional misc parameters...
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
-bool merge_vectors_mode  = false; // merge all the vectors from others
 bool line_search_mode = false;    // perform line-search
 bool mert_search_mode = false;    // perform MERT search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
@@ -776,35 +775,6 @@ void cicada_learn(operation_set_type& operations,
     
     // randomize..
     std::random_shuffle(segments.begin(), segments.end(), gen);
-    
-    // merge vectors...
-    if (merge_vectors_mode) {
-      if (debug && mpi_rank == 0)
-	std::cerr << "merge vectors" << std::endl;
-      
-      learner.clear();
-      
-      for (int rank = 0; rank != mpi_size; ++ rank)
-	if (rank == mpi_rank) {
-	  boost::iostreams::filtering_ostream os;
-	  os.push(boost::iostreams::zlib_compressor());
-	  os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
-	  
-	  learner.encode(os);
-	} else {
-	  boost::iostreams::filtering_istream is;
-	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
-	  
-	  learner.decode(is);
-	}
-      
-      if (debug && mpi_rank == 0)
-	std::cerr << "learning by merged vectors" << std::endl;
-      
-      // perform learning...
-      learner.learn(weights);
-    }
 
     learner.finalize(weights);
     
@@ -812,14 +782,7 @@ void cicada_learn(operation_set_type& operations,
     if (debug && mpi_rank == 0)
       std::cerr << "mix weights" << std::endl;
 
-    if (merge_vectors_mode) {
-      // simply averaging, since we have distributed vectors
-      reduce_weights(weights);
-      
-      bcast_weights(weights);
-      
-      weights *= 1.0 / mpi_size;
-    } else {
+    {
       ++ updated; // avoid zero...
       weights *= updated;
       
@@ -1070,7 +1033,7 @@ void cicada_learn(operation_set_type& operations,
     }
     
     // clear history for line-search...
-    learner.clear_history();
+    learner.clear();
     
     // clear all the kbests
     kbests_all.clear();
@@ -1404,7 +1367,6 @@ void options(int argc, char** argv)
     
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
-    ("merge-vector",   po::bool_switch(&merge_vectors_mode), "merge vectors from others")
     ("line-search",    po::bool_switch(&line_search_mode),   "perform line search")
     ("mert-search",    po::bool_switch(&mert_search_mode),   "perform mert search")
     ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")

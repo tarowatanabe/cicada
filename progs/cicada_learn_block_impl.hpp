@@ -246,86 +246,6 @@ struct LearnSVM : public LearnBase
     bounds.front() = - std::numeric_limits<double>::infinity();
   }
   
-  std::ostream& encode(std::ostream& os)
-  {
-    if (features.empty()) return os;
-    
-    for (size_type id = 1; id != features.size(); ++ id)
-      if (! features[id].empty()) {
-	
-	if (features[id].size() != losses[id].size())
-	  throw std::runtime_error("losses size differ");
-	
-	for (size_type i = 0; i != features[id].size(); ++ i) {
-	  utils::encode_base64(losses[id][i], std::ostream_iterator<char>(os));
-	  
-	  sample_set_type::value_type::const_iterator fiter_end = features[id][i].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[id][i].begin(); fiter != fiter_end; ++ fiter) {
-	    os << ' ' << fiter->first << ' ';
-	    utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
-	  }
-	  
-	  os << '\n';
-	}
-      }
-    
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-
-    if (features.empty())
-      features.resize(1);
-    if (losses.empty())
-      losses.resize(1);
-    if (alphas.empty())
-      alphas.resize(1);
-    
-    std::string line;
-    features_type feats;
-    
-    while (std::getline(is, line)) {
-      feats.clear();
-      
-      const utils::piece line_piece(line);
-      tokenizer_type tokenizer(line_piece);
-      
-      tokenizer_type::iterator iter     = tokenizer.begin();
-      tokenizer_type::iterator iter_end = tokenizer.end();
-      
-      if (iter == iter_end) continue;
-      
-      const utils::piece loss_str = *iter;
-      ++ iter;
-      
-      if (iter == iter_end) continue;
-      
-      while (iter != iter_end) {
-	const utils::piece feature = *iter;
-	++ iter;
-	
-	if (iter == iter_end) break;
-	
-	const utils::piece value = *iter;
-	++ iter;
-	
-	feats.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
-      }
-      
-      if (feats.empty()) continue;
-
-      std::sort(feats.begin(), feats.end());
-      
-      features.front().insert(feats.begin(), feats.end());
-      alphas.front().push_back(0.0);
-      losses.front().push_back(utils::decode_base64<double>(loss_str));
-    }
-    
-    return is;
-  }
 
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
@@ -347,8 +267,6 @@ struct LearnSVM : public LearnBase
     sentences.clear();
     for (size_t o = 0; o != oracles.size(); ++ o)
       sentences.insert(oracles[o].sentence);
-    
-    const double error_factor = (error_metric ? - 1.0 : 1.0);
     
     features_type feats;
     
@@ -391,7 +309,7 @@ struct LearnSVM : public LearnBase
 	
 	if (feats.empty()) continue;
 
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
+	const double loss = kbest.loss - oracle.loss;
 	
 	if (loss <= 0.0) continue;
 	
@@ -418,10 +336,6 @@ struct LearnSVM : public LearnBase
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  
-  void clear_history()
-  {
-  }
 
   struct multiplies_min
   {
@@ -533,8 +447,7 @@ struct LearnExpectedLoss : public LearnBase
   typedef std::vector<double, std::allocator<double> > margin_set_type;
   typedef std::vector<double, std::allocator<double> > loss_set_type;
 
-  typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
-  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+  typedef std::deque<loss_set_type, std::allocator<loss_set_type> > loss_map_type;
 
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::semiring::traits<weight_type> traits_type;
@@ -548,29 +461,15 @@ struct LearnExpectedLoss : public LearnBase
     scores.clear();
   }
   
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
   template <typename Iterator>
   boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  void clear_history() {}
-  
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
   {
     if (kbests.empty()) return;
-    
-    error_metric = __error_metric;
     
     scores.resize(scores.size() + 1);
     scores.back().reserve(kbests.size());
@@ -578,7 +477,7 @@ struct LearnExpectedLoss : public LearnBase
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->score);
+      scores.back().push_back(kiter->loss);
     }
   }
   
@@ -605,22 +504,8 @@ struct LearnExpectedLoss : public LearnBase
       return 0.0;
     }
     
-    // first, compute loss based on the 1-best in the block
-    score_ptr_type score;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
-	if (! score)
-	  score = scores[i].front()->clone();
-	else
-	  *score += *scores[i].front();
-      }
-    
-    // second, compute expected loss
-    
     expectations.clear();
 
-    const double error_factor   = (error_metric ? - 1.0 : 1.0);
-    const double error_constant = (error_metric ? 0.0 : 1.0);
     weight_type objective;
     
     size_t pos = 0;
@@ -631,19 +516,13 @@ struct LearnExpectedLoss : public LearnBase
 	margins.clear();
 	losses.clear();
 	
-	score_ptr_type score_local = score->clone();
-	*score_local -= *scores[i].front();
-	
 	const size_t pos_local = pos;
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  score_ptr_type score_segment = score_local->clone();
-	  *score_segment += *scores[i][j];
-	  
-	  losses.push_back(error_constant - error_factor * score_segment->score());
+	  losses.push_back(scores[i][j]);
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
-
+	
 	weight_type scaling_sum;
 	weight_type objective_local;
 	
@@ -725,9 +604,8 @@ struct LearnExpectedLoss : public LearnBase
   sample_set_type    features;
   expectation_type   expectations;
   expectation_type   expectations_Z;
-  
-  score_ptr_map_type scores;
-  bool error_metric;
+
+  loss_map_type scores;
   
   size_type instances;
   
@@ -745,9 +623,8 @@ struct LearnExpectedLossL1 : public LearnBase
 
   typedef std::vector<double, std::allocator<double> > margin_set_type;
   typedef std::vector<double, std::allocator<double> > loss_set_type;
-
-  typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
-  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+  
+  typedef std::deque<loss_set_type, std::allocator<loss_set_type> > loss_map_type;
 
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::semiring::traits<weight_type> traits_type;
@@ -763,29 +640,15 @@ struct LearnExpectedLossL1 : public LearnBase
     scores.clear();
   }
   
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
   template <typename Iterator>
   boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  void clear_history() {}
-  
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
   {
     if (kbests.empty()) return;
-    
-    error_metric = __error_metric;
     
     scores.resize(scores.size() + 1);
     scores.back().reserve(kbests.size());
@@ -793,7 +656,7 @@ struct LearnExpectedLossL1 : public LearnBase
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->score);
+      scores.back().push_back(kiter->loss);
     }
   }
   
@@ -814,22 +677,8 @@ struct LearnExpectedLossL1 : public LearnBase
       return 0.0;
     }
     
-    // first, compute loss based on the 1-best in the block
-    score_ptr_type score;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
-	if (! score)
-	  score = scores[i].front()->clone();
-	else
-	  *score += *scores[i].front();
-      }
-    
-    // second, compute expected loss
-    
     expectations.clear();
 
-    const double error_factor   = (error_metric ? - 1.0 : 1.0);
-    const double error_constant = (error_metric ? 0.0 : 1.0);
     weight_type objective;
     
     size_t pos = 0;
@@ -840,15 +689,9 @@ struct LearnExpectedLossL1 : public LearnBase
 	margins.clear();
 	losses.clear();
 	
-	score_ptr_type score_local = score->clone();
-	*score_local -= *scores[i].front();
-	
 	const size_t pos_local = pos;
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  score_ptr_type score_segment = score_local->clone();
-	  *score_segment += *scores[i][j];
-	  
-	  losses.push_back(error_constant - error_factor * score_segment->score());
+	  losses.push_back(scores[i][j]);
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -912,15 +755,14 @@ struct LearnExpectedLossL1 : public LearnBase
       x = std::min(0.0, x - penalty + cummulative);
     penalty += x - x_half;
   }
-
+  
   margin_set_type    margins;
   loss_set_type      losses;
   sample_set_type    features;
   expectation_type   expectations;
   expectation_type   expectations_Z;
-  
-  score_ptr_map_type scores;
-  bool error_metric;
+
+  loss_map_type scores;
   
   size_type instances;
   
@@ -938,8 +780,7 @@ struct LearnOExpectedLoss : public LearnBase
   typedef std::vector<double, std::allocator<double> > margin_set_type;
   typedef std::vector<double, std::allocator<double> > loss_set_type;
   
-  typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
-  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+  typedef std::deque<loss_set_type, std::allocator<loss_set_type> > loss_map_type;
   
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::semiring::traits<weight_type> traits_type;
@@ -1014,29 +855,16 @@ struct LearnOExpectedLoss : public LearnBase
     scores.clear();
   }
   
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
   template <typename Iterator>
   boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
-  void clear_history() {}
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool __error_metric=false)
   {
     if (kbests.empty()) return;
-    
-    error_metric = __error_metric;
     
     scores.resize(scores.size() + 1);
     scores.back().reserve(kbests.size());
@@ -1044,7 +872,7 @@ struct LearnOExpectedLoss : public LearnBase
     hypothesis_set_type::const_iterator kiter_end = kbests.end();
     for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
       features.insert(kiter->features.begin(), kiter->features.end());
-      scores.back().push_back(kiter->score);
+      scores.back().push_back(kiter->loss);
     }
   }
   
@@ -1076,24 +904,10 @@ struct LearnOExpectedLoss : public LearnBase
       return 0.0;
     }
     
-    // first, compute loss based on the 1-best in the block
-    score_ptr_type score;
-    for (size_t i = 0; i != scores.size(); ++ i) 
-      if (! scores[i].empty()) {
-	if (! score)
-	  score = scores[i].front()->clone();
-	else
-	  *score += *scores[i].front();
-      }
-    
-    // second, compute expected loss
-    
     features_optimize.clear();
     f.clear();
     alpha.clear();
     
-    const double error_factor   = (error_metric ? - 1.0 : 1.0);
-    const double error_constant = (error_metric ? 0.0 : 1.0);
     weight_type objective;
     
     size_t pos = 0;
@@ -1105,15 +919,9 @@ struct LearnOExpectedLoss : public LearnBase
 	margins.clear();
 	losses.clear();
 	
-	score_ptr_type score_local = score->clone();
-	*score_local -= *scores[i].front();
-	
 	const size_t pos_local = pos;
 	for (size_t j = 0; j != scores[i].size(); ++ j, ++ pos) {
-	  score_ptr_type score_segment = score_local->clone();
-	  *score_segment += *scores[i][j];
-	  
-	  losses.push_back(error_constant - error_factor * score_segment->score());
+	  losses.push_back(scores[i][j]);
 	  margins.push_back(cicada::dot_product(weights, features[pos].begin(), features[pos].end(), 0.0) * weight_scale * scale);
 	  Z += traits_type::exp(margins.back());
 	}
@@ -1223,8 +1031,7 @@ struct LearnOExpectedLoss : public LearnBase
   expectation_type   expectations;
   expectation_type   expectations_Z;
   
-  score_ptr_map_type scores;
-  bool error_metric;
+  loss_map_type scores;
 
   double tolerance;
   
@@ -1264,18 +1071,10 @@ struct LearnOnlineMargin : public LearnBase
   {
     features.clear();
     losses.clear();
+
+    history_features.clear();
+    history_losses.clear();
   }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
-  
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
@@ -1286,8 +1085,6 @@ struct LearnOnlineMargin : public LearnBase
     sentences.clear();
     for (size_t o = 0; o != oracles.size(); ++ o)
       sentences.insert(oracles[o].sentence);
-
-    const double error_factor = (error_metric ? - 1.0 : 1.0);
 
     features_type feats;
     
@@ -1330,7 +1127,7 @@ struct LearnOnlineMargin : public LearnBase
 	
 	if (feats.empty()) continue;
 	
-	const double loss = (oracle.score->score() - kbest.score->score()) * error_factor;
+	const double loss = kbest.loss - oracle.loss;
 	
 	if (loss <= 0.0) continue;
 	
@@ -1381,12 +1178,6 @@ struct LearnOnlineMargin : public LearnBase
   }
 
 
-  void clear_history()
-  {
-    history_features.clear();
-    history_losses.clear();
-  }
-  
   sample_set_type features;
   loss_set_type   losses;
   
@@ -1994,27 +1785,25 @@ struct LearnLR : public LearnBase
     loss_set_type loss_kbests;
     loss_set_type loss_oracles;
 
-    void encode(const hypothesis_set_type& __kbests, const hypothesis_set_type& __oracles, const bool error_metric)
+    void encode(const hypothesis_set_type& __kbests, const hypothesis_set_type& __oracles)
     {
       if (__kbests.empty() || __oracles.empty()) return;
-      
-      const double error_factor = (error_metric ? 1.0 : - 1.0);
       
       hypothesis_set_type::const_iterator kiter_end = __kbests.end();
       for (hypothesis_set_type::const_iterator kiter = __kbests.begin(); kiter != kiter_end; ++ kiter) {
 	kbests.insert(kiter->features.begin(), kiter->features.end());
-	loss_kbests.push_back(kiter->score->score() * error_factor);
+	loss_kbests.push_back(kiter->loss);
       }
       
       hypothesis_set_type::const_iterator oiter_end = __oracles.end();
       for (hypothesis_set_type::const_iterator oiter = __oracles.begin(); oiter != oiter_end; ++ oiter) {
 	oracles.insert(oiter->features.begin(), oiter->features.end());
-	loss_oracles.push_back(oiter->score->score() * error_factor);
+	loss_oracles.push_back(oiter->loss);
       }
     }
 
     typedef std::vector<double, std::allocator<double> > margin_set_type;
-
+    
     margin_set_type __margins;
     
     template <typename Expectations>
@@ -2077,27 +1866,13 @@ struct LearnSGDL1 : public LearnLR
   
   LearnSGDL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
-  void clear()
-  {
-    samples.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    samples.back().encode(kbests, oracles, error_metric);
+    samples.back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -2116,7 +1891,7 @@ struct LearnSGDL1 : public LearnLR
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
-  void clear_history() {}
+  void clear() { samples.clear(); }
 
   double learn(weight_set_type& weights)
   {
@@ -2190,27 +1965,13 @@ struct LearnSGDL2 : public LearnLR
     
   LearnSGDL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
-  void clear()
-  {
-    samples.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    samples.back().encode(kbests, oracles, error_metric);
+    samples.back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -2234,7 +1995,7 @@ struct LearnSGDL2 : public LearnLR
   }
 
 
-  void clear_history() {}
+  void clear() { samples.clear(); }
 
   double learn(weight_set_type& weights)
   {
@@ -2379,27 +2140,13 @@ struct LearnOSGDL2 : public LearnLR
     
   LearnOSGDL2(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
-  void clear()
-  {
-    samples.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    return is;
-  }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
     
     samples.push_back(sample_pair_type());
-    samples.back().encode(kbests, oracles, error_metric);
+    samples.back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -2422,7 +2169,7 @@ struct LearnOSGDL2 : public LearnLR
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
-  void clear_history() {}
+  void clear() { samples.clear(); }
 
   sample_set_type::features_type feats;
   sample_set_type features;
@@ -2551,115 +2298,6 @@ struct LearnLBFGS : public LearnLR
 
   LearnLBFGS(const size_type __instances) {}
   
-  void clear()
-  {
-    samples_other.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    for (size_t id = 0; id != samples.size(); ++ id) 
-      if (! samples[id].empty()) {
-	sample_pair_set_type::const_iterator siter_end = samples[id].end();
-	for (sample_pair_set_type::const_iterator siter = samples[id].begin(); siter != siter_end; ++ siter) {
-	  const sample_pair_type& sample = *siter;
-	  
-	  if (sample.oracles.empty() || sample.kbests.empty()) continue;
-	  
-	  for (size_type o = 0; o != sample.oracles.size(); ++ o) {
-	    os << "oracle: ";
-	    utils::encode_base64(sample.loss_oracles[o], std::ostream_iterator<char>(os));
-	    
-	    sample_set_type::value_type::const_iterator fiter_end = sample.oracles[o].end();
-	    for (sample_set_type::value_type::const_iterator fiter = sample.oracles[o].begin(); fiter != fiter_end; ++ fiter) {
-	      os << ' ' << fiter->first << ' ';
-	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
-	    }
-	    os << '\n';
-	  }
-	  
-	  for (size_type k = 0; k != sample.kbests.size(); ++ k) {
-	    os << "kbest: ";
-	    utils::encode_base64(sample.loss_kbests[k], std::ostream_iterator<char>(os));
-	    
-	    sample_set_type::value_type::const_iterator fiter_end = sample.kbests[k].end();
-	    for (sample_set_type::value_type::const_iterator fiter = sample.kbests[k].begin(); fiter != fiter_end; ++ fiter) {
-	      os << ' ' << fiter->first << ' ';
-	      utils::encode_base64(fiter->second, std::ostream_iterator<char>(os));
-	    }
-	    os << '\n';
-	  }
-	}
-      }
-    
-    return os;
-  }
-
-  std::istream& decode(std::istream& is)
-  {
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-    
-    std::string mode = "kbest:";
-
-    sample_set_type* psample;
-    loss_set_type*   ploss;
-    
-    std::string line;
-    feature_set_type features;
-    while (std::getline(is, line)) {
-      features.clear();
-      
-      const utils::piece line_piece(line);
-      tokenizer_type tokenizer(line_piece);
-      
-      tokenizer_type::iterator iter     = tokenizer.begin();
-      tokenizer_type::iterator iter_end = tokenizer.end();
-      
-      if (iter == iter_end) continue;
-      
-      const utils::piece mode_curr = *iter;
-      ++ iter;
-      
-      if (iter == iter_end) continue;
-      
-      if (mode_curr != mode) {
-	if (mode_curr == "oracle:") {
-	  samples_other.push_back(sample_pair_type());
-	  psample = &(samples_other.back().oracles);
-	  ploss = &(samples_other.back().loss_oracles);
-	} else {
-	  psample = &(samples_other.back().kbests);
-	  ploss = &(samples_other.back().loss_kbests);
-	}
-	
-	mode = mode_curr;
-      }
-
-      const utils::piece loss_str = *iter;
-      ++ iter;
-      
-      while (iter != iter_end) {
-	const utils::piece feature = *iter;
-	++ iter;
-	
-	if (iter == iter_end) break;
-	
-	const utils::piece value = *iter;
-	++ iter;
-	
-	features.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
-      }
-      
-      if (features.empty()) continue;
-      
-      psample->insert(features.begin(), features.end());
-      ploss->push_back(utils::decode_base64<double>(loss_str));
-    }
-    
-    return is;
-  }
-  
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles, const bool error_metric=false)
   {
     if (kbests.empty() || oracles.empty()) return;
@@ -2669,7 +2307,7 @@ struct LearnLBFGS : public LearnLR
     
     samples[id].push_back(sample_pair_type());
     
-    samples[id].back().encode(kbests, oracles, error_metric);
+    samples[id].back().encode(kbests, oracles);
   }
   
   void initialize(weight_set_type& weights)
@@ -2688,7 +2326,7 @@ struct LearnLBFGS : public LearnLR
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
-  void clear_history() {}
+  void clear() { }
 
   double learn(weight_set_type& __weights)
   {
@@ -2724,7 +2362,6 @@ struct LearnLBFGS : public LearnLR
     expectation_type& expectations            = optimizer.expectations;
     weight_set_type& weights                  = optimizer.weights;
     const sample_pair_map_type& samples       = optimizer.samples;
-    const sample_pair_set_type& samples_other = optimizer.samples_other;
     
     expectations.clear();
     expectations.allocate();
@@ -2732,14 +2369,6 @@ struct LearnLBFGS : public LearnLR
     double objective = 0.0;
     size_t instances = 0;
 
-    for (size_t i = 0; i != samples_other.size(); ++ i) {
-      const sample_pair_type& sample = samples_other[i];
-      
-      const double margin = sample.encode(weights, expectations, 1.0);
-      objective -= margin;
-      ++ instances;
-    }
-    
     for (size_t id = 0; id != samples.size(); ++ id) 
       if (! samples[id].empty()) {
 	sample_pair_set_type::const_iterator siter_end = samples[id].end();
@@ -2773,7 +2402,6 @@ struct LearnLBFGS : public LearnLR
   expectation_type     expectations;
   weight_set_type      weights;
   sample_pair_map_type samples;
-  sample_pair_set_type samples_other;
 };
 
 // linear learner
@@ -2949,65 +2577,6 @@ struct LearnLinear
     encoders[id].encode(kbests, oracles);
   }
   
-  void clear()
-  {
-    encoder_other.clear();
-  }
-  
-  std::ostream& encode(std::ostream& os)
-  {
-    for (size_type id = 0; id != encoders.size(); ++ id)
-      for (size_type pos = 0; pos != encoders[id].offsets.size(); ++ pos) {
-	encoder_type::feature_node_set_type::const_iterator fiter     = encoders[id].features.begin() + encoders[id].offsets[pos];
-	encoder_type::feature_node_set_type::const_iterator fiter_end = (pos + 1 < encoders[id].offsets.size()
-									 ? encoders[id].features.begin() + encoders[id].offsets[pos + 1] - 1
-									 : encoders[id].features.end() - 1);
-	for (/**/; fiter != fiter_end; ++ fiter) {
-	  os << weight_set_type::feature_type(fiter->index - 1) << ' ';
-	  utils::encode_base64(fiter->value, std::ostream_iterator<char>(os));
-	  os << ' ';
-	}
-	os << '\n';
-      }
-    return os;
-  }
-  
-  std::istream& decode(std::istream& is)
-  {
-    typedef hypothesis_type::feature_value_type feature_value_type;
-    typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-
-    std::string line;
-    feature_set_type features;
-    while (std::getline(is, line)) {
-      features.clear();
-      
-      const utils::piece line_piece(line);
-      tokenizer_type tokenizer(line_piece);
-      
-      tokenizer_type::iterator iter     = tokenizer.begin();
-      tokenizer_type::iterator iter_end = tokenizer.end();
-      
-      while (iter != iter_end) {
-	const utils::piece feature = *iter;
-	++ iter;
-	
-	if (iter == iter_end) break;
-	
-	const utils::piece value = *iter;
-	++ iter;
-	
-	features.push_back(feature_value_type(feature, utils::decode_base64<double>(value)));
-      }
-
-      if (features.empty()) continue;
-      
-      std::sort(features.begin(), features.end());
-      encoder_other.encode(features.begin(), features.end());
-    }
-    return is;
-  }
   
   void initialize(weight_set_type& weights)
   {
@@ -3026,11 +2595,11 @@ struct LearnLinear
   }
 
 
-  void clear_history() {}
+  void clear() {}
 
   double learn(weight_set_type& weights)
   {
-    size_type data_size = encoder_other.offsets.size();
+    size_type data_size = 0;
     for (size_type id = 0; id != encoders.size(); ++ id)
       data_size += encoders[id].offsets.size();
     
@@ -3038,9 +2607,6 @@ struct LearnLinear
     feature_node_map_type features;
     features.reserve(data_size);
 
-    for (size_type pos = 0; pos != encoder_other.offsets.size(); ++ pos)
-      features.push_back(const_cast<feature_node_type*>(&(*encoder_other.features.begin())) + encoder_other.offsets[pos]);
-    
     for (size_type id = 0; id != encoders.size(); ++ id)
       for (size_type pos = 0; pos != encoders[id].offsets.size(); ++ pos)
 	features.push_back(const_cast<feature_node_type*>(&(*encoders[id].features.begin())) + encoders[id].offsets[pos]);
@@ -3099,7 +2665,6 @@ struct LearnLinear
   }
   
   encoder_set_type encoders;
-  encoder_type     encoder_other;
 };
 
 
@@ -3240,6 +2805,9 @@ struct Oracle
 
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
+    
+    const double loss_factor   = (error_metric ? - 1.0 : 1.0);
+    const double loss_constant = (error_metric ? 0.0 : 1.0);
 
     score_ptr_type score_1best;    
     
@@ -3267,6 +2835,22 @@ struct Oracle
     
     if (! score_1best)
       throw std::runtime_error("no evaluation score?");
+    
+    // assign loss
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	score_ptr_type score_local = score_1best->clone();
+	*score_local -= *kbests[id].front().score;
+	
+	hypothesis_set_type::const_iterator hiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	  hypothesis_type& hyp = const_cast<hypothesis_type&>(*hiter);
+	  score_ptr_type score_segment = score_local->clone();
+	  *score_segment += *hyp.score;
+	  
+	  hyp.loss = loss_constant - loss_factor * score_segment->score();
+	}
+      }
     
     score_ptr_type score_best;
     score_ptr_type score_curr;
