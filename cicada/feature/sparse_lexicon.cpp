@@ -2,6 +2,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <set>
+
 #include "sparse_lexicon.hpp"
 
 #include "cicada/parameter.hpp"
@@ -61,6 +63,7 @@ namespace cicada
 
       typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
       typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
+      typedef std::set<size_type, std::less<size_type>, std::allocator<size_type> > pos_set_type;
       
       typedef google::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > word_pair_unique_type;
       
@@ -190,8 +193,11 @@ namespace cicada
 	  
 	} else {
 	  word_set_type words;
+	  pos_set_type  positions;
 	  
 	  for (size_t pos = 0; pos != lattice.size(); ++ pos) {
+	    positions.clear();
+	    
 	    lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
 	    for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter)
 	      if (! skipper(aiter->label)) {
@@ -222,7 +228,13 @@ namespace cicada
 		      sources_prev.push_back(std::make_pair(*piter, *niter));
 		  }
 		}
-	      }
+	      } else
+		positions.insert(pos + aiter->distance);
+	    
+	    // copy lattice_prev[pos] into  positons.
+	    pos_set_type::const_iterator piter_end = positions.end();
+	    for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	      sources_prev[*piter].insert(sources_prev[*piter].end(), sources_prev[pos].begin(), sources_prev[pos].end());
 	  }
 	  
 	  // we will compute pair of lattice_prev[lattice.size()] and EOS
