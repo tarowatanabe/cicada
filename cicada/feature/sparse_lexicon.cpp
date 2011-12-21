@@ -56,14 +56,19 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef symbol_type word_type;
-      
-      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
+      typedef std::pair<word_type, word_type> word_pair_type;
+      typedef std::vector<word_pair_type, std::allocator<word_pair_type> > word_pair_set_type;
 
+      typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
+      typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
+      
+      typedef google::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > word_pair_unique_type;
+      
       typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
-      { uniques.set_empty_key(word_type());  }
+	: uniques(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
+      { uniques.set_empty_key(word_pair_type());  }
 
       struct skipper_epsilon
       {
@@ -106,20 +111,54 @@ namespace cicada
 	      feature_set_type& features = caches[piter->id()];
 	      features.clear();
 	      
-	      sentence_type::const_iterator witer_end = words.end();
-	      for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
-		
-		if (forced_feature || feature_type::exists(name))
-		  features[name] += 1.0;
-		
-		for (size_t i = 0; i != normalizers_target.size(); ++ i) {
-		  const word_type normalized = normalizers_target[i](*piter);
-		  if (normalized != *piter) {
-		    const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(normalized);
-		    
-		    if (forced_feature || feature_type::exists(name))
-		      features[name] += 1.0;
+	      {
+		word_pair_set_type::const_iterator witer_end = sources_prev.end();
+		for (word_pair_set_type::const_iterator witer = sources_prev.begin(); witer != witer_end; ++ witer) {
+		  const std::string name = (prefix + ":prev:"
+					    + static_cast<const std::string&>(witer->first)
+					    + '_' + static_cast<const std::string&>(witer->second)
+					    + '_' + static_cast<const std::string&>(*piter));
+		  
+		  if (forced_feature || feature_type::exists(name))
+		    features[name] += 1.0;
+		  
+		  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
+		    const word_type normalized = normalizers_target[i](*piter);
+		    if (normalized != *piter) {
+		      const std::string name = (prefix + ":prev:"
+						+ static_cast<const std::string&>(witer->first)
+						+ ':' + static_cast<const std::string&>(witer->second)
+						+ '_' + static_cast<const std::string&>(normalized));
+		      
+		      if (forced_feature || feature_type::exists(name))
+			features[name] += 1.0;
+		    }
+		  }
+		}
+	      }
+	      
+	      {
+		word_pair_set_type::const_iterator witer_end = sources_next.end();
+		for (word_pair_set_type::const_iterator witer = sources_next.begin(); witer != witer_end; ++ witer) {
+		  const std::string name = (prefix + ":next:"
+					    + static_cast<const std::string&>(witer->first)
+					    + '_' + static_cast<const std::string&>(witer->second)
+					    + '_' + static_cast<const std::string&>(*piter));
+		  
+		  if (forced_feature || feature_type::exists(name))
+		    features[name] += 1.0;
+		  
+		  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
+		    const word_type normalized = normalizers_target[i](*piter);
+		    if (normalized != *piter) {
+		      const std::string name = (prefix + ":next:"
+						+ static_cast<const std::string&>(witer->first)
+						+ ':' + static_cast<const std::string&>(witer->second)
+						+ '_' + static_cast<const std::string&>(normalized));
+		      
+		      if (forced_feature || feature_type::exists(name))
+			features[name] += 1.0;
+		    }
 		  }
 		}
 	      }
@@ -142,57 +181,76 @@ namespace cicada
       {
 	clear();
 	
+	lattice_prev.clear();
+	lattice_prev.resize(lattice.size() + 1);
+	lattice_prev.front().push_back(vocab_type::BOS);
+	
 	if (unique_source) {
-	  lattice_type::const_iterator liter_end = lattice.end();
-	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label))
-		uniques.insert(aiter->label);
-	  }
+	  // not implemented yet...
 	  
-	  word_set_type::const_iterator uiter_end = uniques.end();
-	  for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
-	    words.push_back(*uiter);
-	    
-	    for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-	      const word_type normalized = normalizers_source[i](*uiter);
-	      if (normalized != *uiter)
-		words.push_back(normalized);
-	    }
-	  }
 	} else {
-	  lattice_type::const_iterator liter_end = lattice.end();
-	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	  word_set_type words;
+	  
+	  for (size_t pos = 0; pos != lattice.size(); ++ pos) {
+	    lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
+	    for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter)
 	      if (! skipper(aiter->label)) {
-		words.push_back(aiter->label);
+		words.clear();
 		
+		words.push_back(aiter->label);
 		for (size_t i = 0; i != normalizers_source.size(); ++ i) {
 		  const word_type normalized = normalizers_source[i](aiter->label);
 		  if (normalized != aiter->label)
 		    words.push_back(normalized);
 		}
-	    }
+		
+		lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
+		
+		// we will compute pair of lattice_prev[pos] and words
+		word_set_type::const_iterator piter_end = lattice_prev[pos].end();
+		for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
+		  
+		  if (pos) {
+		    word_set_type::const_iterator niter_end = words.end();
+		    for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
+		      sources_prev.push_back(std::make_pair(*piter, *niter));
+		      sources_next.push_back(std::make_pair(*piter, *niter));
+		    }
+		  } else {
+		    word_set_type::const_iterator niter_end = words.end();
+		    for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter)
+		      sources_prev.push_back(std::make_pair(*piter, *niter));
+		  }
+		}
+	      }
 	  }
+	  
+	  // we will compute pair of lattice_prev[lattice.size()] and EOS
+	  word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
+	  for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
+	    sources_next.push_back(std::make_pair(*piter, vocab_type::EOS));
 	}
 	
-	std::sort(words.begin(), words.end());
+	std::sort(sources_prev.begin(), sources_prev.end());
+	std::sort(sources_next.begin(), sources_next.end());
       }
       
       void clear()
       {
 	uniques.clear();
-	words.clear();
+	sources_prev.clear();
+	sources_next.clear();
 	caches.clear();
       }
-
+      
       normalizer_set_type normalizers_source;
       normalizer_set_type normalizers_target;
       
-      word_set_type  uniques;
-      sentence_type  words;
+      word_pair_unique_type  uniques;
+      word_map_type          lattice_prev;
+      
+      word_pair_set_type sources_prev;
+      word_pair_set_type sources_next;
       cache_set_type caches;
       
       bool skip_sgml_tag;
