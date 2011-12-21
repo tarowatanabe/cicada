@@ -234,7 +234,7 @@ namespace cicada
 	    // copy lattice_prev[pos] into  positons.
 	    pos_set_type::const_iterator piter_end = positions.end();
 	    for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	      sources_prev[*piter].insert(sources_prev[*piter].end(), sources_prev[pos].begin(), sources_prev[pos].end());
+	      lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
 	  }
 	  
 	  // we will compute pair of lattice_prev[lattice.size()] and EOS
