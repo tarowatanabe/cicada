@@ -70,8 +70,11 @@ namespace cicada
       typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
       SparseLexiconImpl()
-	: uniques(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
-      { uniques.set_empty_key(word_pair_type());  }
+	: uniques_prev(), uniques_next(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
+      {
+	uniques_prev.set_empty_key(word_pair_type()); 
+	uniques_next.set_empty_key(word_pair_type()); 
+      }
 
       struct skipper_epsilon
       {
@@ -182,65 +185,70 @@ namespace cicada
       template <typename Skipper>
       void assign(const lattice_type& lattice, Skipper skipper)
       {
+	word_set_type words;
+	pos_set_type  positions;
+	
 	clear();
 	
 	lattice_prev.clear();
 	lattice_prev.resize(lattice.size() + 1);
 	lattice_prev.front().push_back(vocab_type::BOS);
 	
-	if (unique_source) {
-	  // not implemented yet...
-	  
-	} else {
-	  word_set_type words;
-	  pos_set_type  positions;
-	  
-	  for (size_t pos = 0; pos != lattice.size(); ++ pos) {
-	    positions.clear();
+	for (size_t pos = 0; pos != lattice.size(); ++ pos) {
+	  positions.clear();
 	    
-	    lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label)) {
-		words.clear();
+	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
+	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
+	    if (! skipper(aiter->label)) {
+	      words.clear();
 		
-		words.push_back(aiter->label);
-		for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-		  const word_type normalized = normalizers_source[i](aiter->label);
-		  if (normalized != aiter->label)
-		    words.push_back(normalized);
+	      words.push_back(aiter->label);
+	      for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+		const word_type normalized = normalizers_source[i](aiter->label);
+		if (normalized != aiter->label)
+		  words.push_back(normalized);
+	      }
+		
+	      lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
+		
+	      // we will compute pair of lattice_prev[pos] and words
+	      word_set_type::const_iterator piter_end = lattice_prev[pos].end();
+	      for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
+		
+		word_set_type::const_iterator niter_end = words.end();
+		for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
+		  sources_prev.push_back(std::make_pair(*piter, *niter));
+		  if (*piter != vocab_type::BOS)
+		    sources_next.push_back(std::make_pair(*piter, *niter));
 		}
-		
-		lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
-		
-		// we will compute pair of lattice_prev[pos] and words
-		word_set_type::const_iterator piter_end = lattice_prev[pos].end();
-		for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
-		  
-		  if (pos) {
-		    word_set_type::const_iterator niter_end = words.end();
-		    for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
-		      sources_prev.push_back(std::make_pair(*piter, *niter));
-		      sources_next.push_back(std::make_pair(*piter, *niter));
-		    }
-		  } else {
-		    word_set_type::const_iterator niter_end = words.end();
-		    for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter)
-		      sources_prev.push_back(std::make_pair(*piter, *niter));
-		  }
-		}
-	      } else
-		positions.insert(pos + aiter->distance);
-	    
-	    // copy lattice_prev[pos] into  positons.
-	    pos_set_type::const_iterator piter_end = positions.end();
-	    for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	      lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
+	      }
+	    } else
+	      positions.insert(pos + aiter->distance);
 	  }
+	    
+	  // copy lattice_prev[pos] into  positons.
+	  pos_set_type::const_iterator piter_end = positions.end();
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	    lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
+	}
+	
+	// we will compute pair of lattice_prev[lattice.size()] and EOS
+	word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
+	for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
+	  sources_next.push_back(std::make_pair(*piter, vocab_type::EOS));
+	
+	if (unique_source) {
+	  uniques_prev.clear();
+	  uniques_next.clear();
 	  
-	  // we will compute pair of lattice_prev[lattice.size()] and EOS
-	  word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
-	  for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
-	    sources_next.push_back(std::make_pair(*piter, vocab_type::EOS));
+	  uniques_prev.insert(sources_prev.begin(), sources_prev.end());
+	  uniques_next.insert(sources_next.begin(), sources_next.end());
+	  
+	  sources_prev.clear();
+	  sources_next.clear();
+	  
+	  sources_prev.insert(sources_prev.end(), uniques_prev.begin(), uniques_prev.end());
+	  sources_next.insert(sources_next.end(), uniques_next.begin(), uniques_next.end());
 	}
 	
 	std::sort(sources_prev.begin(), sources_prev.end());
@@ -249,7 +257,6 @@ namespace cicada
       
       void clear()
       {
-	uniques.clear();
 	sources_prev.clear();
 	sources_next.clear();
 	caches.clear();
@@ -258,7 +265,8 @@ namespace cicada
       normalizer_set_type normalizers_source;
       normalizer_set_type normalizers_target;
       
-      word_pair_unique_type  uniques;
+      word_pair_unique_type  uniques_prev;
+      word_pair_unique_type  uniques_next;
       word_map_type          lattice_prev;
       
       word_pair_set_type sources_prev;
