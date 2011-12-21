@@ -122,7 +122,7 @@ namespace cicada
 		for (word_pair_set_type::const_iterator witer = sources_prev.begin(); witer != witer_end; ++ witer) {
 		  const std::string name = (prefix + ":prev:"
 					    + static_cast<const std::string&>(witer->first)
-					    + '_' + static_cast<const std::string&>(witer->second)
+					    + ':' + static_cast<const std::string&>(witer->second)
 					    + '_' + static_cast<const std::string&>(*piter));
 		  
 		  if (forced_feature || feature_type::exists(name))
@@ -148,7 +148,7 @@ namespace cicada
 		for (word_pair_set_type::const_iterator witer = sources_next.begin(); witer != witer_end; ++ witer) {
 		  const std::string name = (prefix + ":next:"
 					    + static_cast<const std::string&>(witer->first)
-					    + '_' + static_cast<const std::string&>(witer->second)
+					    + ':' + static_cast<const std::string&>(witer->second)
 					    + '_' + static_cast<const std::string&>(*piter));
 		  
 		  if (forced_feature || feature_type::exists(name))
