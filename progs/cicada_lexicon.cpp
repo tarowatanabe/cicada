@@ -147,7 +147,6 @@ int debug = 0;
 struct Maximize;
 struct MaximizeBayes;
 
-
 void dump(const path_type& path, const ttable_type& lexicon);
 
 template <typename Maximizer>
@@ -165,28 +164,26 @@ int main(int argc, char ** argv)
     
     ttable_type ttable_source_target;
     ttable_type ttable_target_source;
-
+      
     if (variational_bayes_mode)
       learn<MaximizeBayes>(ttable_source_target, ttable_target_source);
     else
       learn<Maximize>(ttable_source_target, ttable_target_source);
-    
-    
+      
     // final dumping...
     boost::thread_group workers_dump;
-
+      
     if (! output_source_target_file.empty())
       workers_dump.add_thread(new boost::thread(boost::bind(dump,
 							    boost::cref(output_source_target_file),
 							    boost::cref(ttable_source_target))));
-    
+      
     if (! output_target_source_file.empty())
       workers_dump.add_thread(new boost::thread(boost::bind(dump,
 							    boost::cref(output_target_source_file),
 							    boost::cref(ttable_target_source))));
-    
+      
     workers_dump.join_all();
-    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

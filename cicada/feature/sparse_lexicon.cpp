@@ -81,7 +81,7 @@ namespace cicada
 	uniques_prev.set_empty_key(word_pair_type()); 
 	uniques_next.set_empty_key(word_pair_type()); 
       }
-
+      
       struct skipper_epsilon
       {
 	bool operator()(const symbol_type& word) const
@@ -118,66 +118,89 @@ namespace cicada
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
-
 	    if (! caches.exists(piter->id())) {
 	      feature_set_type& features = caches[piter->id()];
 	      features.clear();
 	      
 	      {
 		word_pair_set_type::const_iterator witer_end = sources_prev.end();
-		for (word_pair_set_type::const_iterator witer = sources_prev.begin(); witer != witer_end; ++ witer) {
-		  const std::string name = (prefix + ":prev:"
-					    + static_cast<const std::string&>(witer->first)
-					    + ':' + static_cast<const std::string&>(witer->second)
-					    + '_' + static_cast<const std::string&>(*piter));
-		  
-		  if (forced_feature || feature_type::exists(name))
-		    features[name] += 1.0;
-		  
-		  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
-		    const word_type normalized = normalizers_target[i](*piter);
-		    if (normalized != *piter) {
-		      const std::string name = (prefix + ":prev:"
-						+ static_cast<const std::string&>(witer->first)
-						+ ':' + static_cast<const std::string&>(witer->second)
-						+ '_' + static_cast<const std::string&>(normalized));
-		      
-		      if (forced_feature || feature_type::exists(name))
-			features[name] += 1.0;
-		    }
-		  }
-		}
+		for (word_pair_set_type::const_iterator witer = sources_prev.begin(); witer != witer_end; ++ witer) 
+		  if (! lexicon_prev || exists(*lexicon_prev, *witer, *piter))
+		    assign("prev", *witer, *piter, features);
 	      }
 	      
 	      {
 		word_pair_set_type::const_iterator witer_end = sources_next.end();
-		for (word_pair_set_type::const_iterator witer = sources_next.begin(); witer != witer_end; ++ witer) {
-		  const std::string name = (prefix + ":next:"
-					    + static_cast<const std::string&>(witer->first)
-					    + ':' + static_cast<const std::string&>(witer->second)
-					    + '_' + static_cast<const std::string&>(*piter));
-		  
-		  if (forced_feature || feature_type::exists(name))
-		    features[name] += 1.0;
-		  
-		  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
-		    const word_type normalized = normalizers_target[i](*piter);
-		    if (normalized != *piter) {
-		      const std::string name = (prefix + ":next:"
-						+ static_cast<const std::string&>(witer->first)
-						+ ':' + static_cast<const std::string&>(witer->second)
-						+ '_' + static_cast<const std::string&>(normalized));
-		      
-		      if (forced_feature || feature_type::exists(name))
-			features[name] += 1.0;
-		    }
-		  }
-		}
+		for (word_pair_set_type::const_iterator witer = sources_next.begin(); witer != witer_end; ++ witer)
+		  if (! lexicon_next || exists(*lexicon_next, *witer, *piter))
+		    assign("next", *witer, *piter, features);
 	      }
 	    }
 	    
 	    features += caches[piter->id()];
 	  }
+      }
+
+      word_set_type words_source_prev;
+      word_set_type words_source_next;
+      word_set_type words_target;
+  
+      void assign(const char* id, const word_pair_type& prev, const word_type& next, feature_set_type& features)
+      {
+	if (normalizers_source.empty() && normalizers_target.empty()) {
+	  const std::string name = (prefix + ':' + id + ':'
+				    + static_cast<const std::string&>(prev.first)
+				    + ':' + static_cast<const std::string&>(prev.second)
+				    + '_' + static_cast<const std::string&>(next));
+	  
+	  if (forced_feature || feature_type::exists(name))
+	    features[name] += 1.0;
+	} else {
+	  words_source_prev.clear();
+	  words_source_next.clear();
+	  words_target.clear();
+	  
+	  words_source_prev.push_back(prev.first);
+	  words_source_next.push_back(prev.second);
+	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+	    {
+	      const word_type normalized = normalizers_source[i](prev.first);
+	      if (normalized != prev.first)
+		words_source_prev.push_back(normalized);
+	    }
+	    {
+	      const word_type normalized = normalizers_source[i](prev.second);
+	      if (normalized != prev.second)
+		words_source_next.push_back(normalized);
+	    }
+	  }
+	  
+	  words_target.push_back(next);
+	  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
+	    const word_type normalized = normalizers_target[i](next);
+	    if (normalized != next)
+	      words_target.push_back(normalized);
+	  }
+	  
+	  word_set_type::const_iterator piter_begin = words_source_prev.begin();
+	  word_set_type::const_iterator piter_end   = words_source_prev.end();
+	  word_set_type::const_iterator niter_begin = words_source_next.begin();
+	  word_set_type::const_iterator niter_end   = words_source_next.end();
+	  word_set_type::const_iterator titer_begin = words_target.begin();
+	  word_set_type::const_iterator titer_end   = words_target.end();
+	  
+	  for (word_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter)
+	    for (word_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter)
+	      for (word_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+		const std::string name = (prefix + ':' + id + ':'
+					  + static_cast<const std::string&>(*piter)
+					  + ':' + static_cast<const std::string&>(*niter)
+					  + '_' + static_cast<const std::string&>(*titer));
+		
+		if (forced_feature || feature_type::exists(name))
+		  features[name] += 1.0;
+	      }
+	}
       }
 
       void assign(const lattice_type& lattice)
@@ -202,36 +225,33 @@ namespace cicada
 	
 	for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	  positions.clear();
-	    
+	  
 	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
 	    if (! skipper(aiter->label)) {
 	      words.clear();
-		
 	      words.push_back(aiter->label);
-	      for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-		const word_type normalized = normalizers_source[i](aiter->label);
-		if (normalized != aiter->label)
-		  words.push_back(normalized);
-	      }
-		
+	      
 	      lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
-		
+	      
 	      // we will compute pair of lattice_prev[pos] and words
 	      word_set_type::const_iterator piter_end = lattice_prev[pos].end();
 	      for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
 		
 		word_set_type::const_iterator niter_end = words.end();
 		for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
-		  sources_prev.push_back(std::make_pair(*piter, *niter));
-		  if (*piter != vocab_type::BOS)
+		  
+		  if (! lexicon_prev || exists(*lexicon_prev, *piter, *niter))
+		    sources_prev.push_back(std::make_pair(*piter, *niter));
+		  
+		  if (*piter != vocab_type::BOS && (! lexicon_next || exists(*lexicon_next, *piter, *niter)))
 		    sources_next.push_back(std::make_pair(*piter, *niter));
 		}
 	      }
 	    } else
 	      positions.insert(pos + aiter->distance);
 	  }
-	    
+	  
 	  // copy lattice_prev[pos] into  positons.
 	  pos_set_type::const_iterator piter_end = positions.end();
 	  for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
@@ -241,7 +261,8 @@ namespace cicada
 	// we will compute pair of lattice_prev[lattice.size()] and EOS
 	word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
 	for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
-	  sources_next.push_back(std::make_pair(*piter, vocab_type::EOS));
+	  if (! lexicon_next || exists(*lexicon_next, *piter, vocab_type::EOS))
+	    sources_next.push_back(std::make_pair(*piter, vocab_type::EOS));
 	
 	if (unique_source) {
 	  uniques_prev.clear();
@@ -266,6 +287,22 @@ namespace cicada
 	sources_prev.clear();
 	sources_next.clear();
 	caches.clear();
+      }
+
+      bool exists(const lexicon_type& lexicon, const word_pair_type& prev, const word_type& next)
+      {
+	word_type codes[2];
+	codes[0] = prev.first;
+	codes[1] = prev.second;
+	return lexicon.exists(codes, codes + 2, next);
+      }
+
+      bool exists(const lexicon_type& lexicon, const word_type& prev, const word_type& next)
+      {
+	word_type codes[2];
+	codes[0] = prev;
+	codes[1] = next;
+	return lexicon.exists(codes, codes + 2);
       }
       
       normalizer_set_type normalizers_source;
