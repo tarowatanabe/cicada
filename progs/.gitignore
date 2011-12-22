@@ -84,6 +84,7 @@ cicada_learn_block_mpi
 cicada_learn_online
 cicada_learn_online_mpi
 cicada_lexicon
+cicada_lexicon_pair
 cicada_lexicon_dice
 cicada_lexicon_global
 cicada_lexicon_global_mpi

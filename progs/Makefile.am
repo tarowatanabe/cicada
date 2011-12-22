@@ -81,6 +81,7 @@ bin_PROGRAMS = \
 	cicada_learn_online \
 	cicada_learn_online_mpi \
 	cicada_lexicon \
+	cicada_lexicon_pair \
 	cicada_lexicon_dice \
 	cicada_lexicon_global \
 	cicada_lexicon_global_mpi \
@@ -300,8 +301,11 @@ cicada_learn_online_mpi_SOURCES  = cicada_learn_online_mpi.cpp cicada_learn_onli
 cicada_learn_online_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_lexicon_SOURCES = cicada_lexicon.cpp cicada_lexicon_impl.hpp
+cicada_lexicon_SOURCES = cicada_lexicon.cpp
 cicada_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_pair_SOURCES = cicada_lexicon_pair.cpp
+cicada_lexicon_pair_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_lexicon_dice_SOURCES = cicada_lexicon_dice.cpp
 cicada_lexicon_dice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
