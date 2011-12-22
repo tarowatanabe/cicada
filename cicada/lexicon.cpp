@@ -18,9 +18,9 @@
 #include "utils/repository.hpp"
 #include "utils/tempfile.hpp"
 #include "utils/lexical_cast.hpp"
-
-#include <utils/sgi_hash_map.hpp>
-#include <utils/thread_specific_ptr.hpp>
+#include "utils/spinlock.hpp"
+#include "utils/sgi_hash_map.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 #include <boost/thread.hpp>
 
@@ -201,7 +201,16 @@ namespace cicada
   typedef sgi::hash_map<std::string, Lexicon, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, Lexicon> > > lexicon_map_type;
 #endif
-  
+
+  namespace impl
+  {
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    
+    static mutex_type       __lexicon_mutex;
+    static lexicon_map_type __lexicon_map;
+  };
+
 #ifdef HAVE_TLS
   static __thread lexicon_map_type* __lexicons_tls = 0;
   static boost::thread_specific_ptr<lexicon_map_type> __lexicons;
@@ -211,6 +220,8 @@ namespace cicada
 
   Lexicon& Lexicon::create(const std::string& parameter)
   {
+    
+    
 #ifdef HAVE_TLS
     if (! __lexicons_tls) {
       __lexicons.reset(new lexicon_map_type());
@@ -225,8 +236,15 @@ namespace cicada
 #endif
     
     lexicon_map_type::iterator iter = lexicons_map.find(parameter);
-    if (iter == lexicons_map.end())
-      iter = lexicons_map.insert(std::make_pair(parameter, Lexicon(parameter))).first;
+    if (iter == lexicons_map.end()) {
+      impl::lock_type lock(impl::__lexicon_mutex);
+      
+      lexicon_map_type::iterator iter_global = impl::__lexicon_map.find(parameter);
+      if (iter_global == impl::__lexicon_map.end())
+	iter_global = impl::__lexicon_map.insert(std::make_pair(parameter, Lexicon(parameter))).first;
+      
+      iter = lexicons_map.insert(*iter_global).first;
+    }
     
     return iter->second;
   }
