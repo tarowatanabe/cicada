@@ -341,6 +341,7 @@ inside_outside.hpp \
 intersect.hpp \
 kbest.hpp \
 lattice.hpp \
+lexicon.hpp \
 matcher.hpp \
 model.hpp \
 ngram.hpp \
@@ -429,6 +430,7 @@ graphviz.cpp \
 head_finder.cpp \
 hypergraph.cpp \
 lattice.cpp \
+lexicon.cpp \
 matcher.cpp \
 model.cpp \
 ngram.cpp \
@@ -496,6 +498,7 @@ grammar_static_main \
 grammar_unknown_main \
 hypergraph_main \
 lattice_main \
+lexicon_main \
 matcher_main \
 optimize_qp_main \
 parameter_main \
@@ -557,6 +560,9 @@ hypergraph_main_LDADD = libcicada.la
 
 lattice_main_SOURCES = lattice_main.cpp
 lattice_main_LDADD = libcicada.la
+
+lexicon_main_SOURCES = lexicon_main.cpp
+lexicon_main_LDADD = libcicada.la
 
 matcher_main_SOURCES = matcher_main.cpp
 matcher_main_LDADD = libcicada.la

@@ -74,6 +74,7 @@ cicada_grammar_learn
 cicada_index_cluster
 cicada_index_grammar
 cicada_index_global_lexicon
+cicada_index_lexicon
 cicada_index_tree_grammar
 cicada_learn
 cicada_learn_mpi

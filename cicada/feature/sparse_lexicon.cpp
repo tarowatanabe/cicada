@@ -6,6 +6,7 @@
 
 #include "sparse_lexicon.hpp"
 
+#include "cicada/lexicon.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -69,8 +70,13 @@ namespace cicada
       
       typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
+      
+      typedef cicada::Lexicon lexicon_type;
+      
       SparseLexiconImpl()
-	: uniques_prev(), uniques_next(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
+	: uniques_prev(), uniques_next(), caches(),
+	  lexicon_prev(0), lexicon_next(0),
+	  skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
       {
 	uniques_prev.set_empty_key(word_pair_type()); 
 	uniques_next.set_empty_key(word_pair_type()); 
@@ -272,6 +278,9 @@ namespace cicada
       word_pair_set_type sources_prev;
       word_pair_set_type sources_next;
       cache_set_type caches;
+
+      lexicon_type* lexicon_prev;
+      lexicon_type* lexicon_next;
       
       bool skip_sgml_tag;
       bool unique_source;
@@ -298,7 +307,10 @@ namespace cicada
       bool unique_source = false;
       
       std::string name;
-      
+
+      std::string lexicon_prev;
+      std::string lexicon_next;
+
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "cluster-source") {
 	  if (! boost::filesystem::exists(piter->second))
@@ -320,6 +332,10 @@ namespace cicada
 	  unique_source = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
+	else if (utils::ipiece(piter->first) == "lexicon-next")
+	  lexicon_next = piter->second;
+	else if (utils::ipiece(piter->first) == "lexicon-prev")
+	  lexicon_prev = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -333,6 +349,12 @@ namespace cicada
       lexicon_impl->unique_source = unique_source;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
       
+      if (! lexicon_prev.empty())
+	lexicon_impl->lexicon_prev = &cicada::Lexicon::create(lexicon_prev);
+      if (! lexicon_next.empty())
+	lexicon_impl->lexicon_next = &cicada::Lexicon::create(lexicon_next);
+
+      
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("sparse-lexicon") : name);
       base_type::__sparse_feature = true;
@@ -345,12 +367,26 @@ namespace cicada
     SparseLexicon::SparseLexicon(const SparseLexicon& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
-    {}
+    {
+      pimpl->lexicon_prev = 0;
+      pimpl->lexicon_next = 0;
+      if (x.pimpl->lexicon_prev)
+	pimpl->lexicon_prev = &cicada::Lexicon::create(x.pimpl->lexicon_prev->path().string());
+      if (x.pimpl->lexicon_next)
+	pimpl->lexicon_next = &cicada::Lexicon::create(x.pimpl->lexicon_next->path().string());
+    }
 
     SparseLexicon& SparseLexicon::operator=(const SparseLexicon& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
+      
+      pimpl->lexicon_prev = 0;
+      pimpl->lexicon_next = 0;
+      if (x.pimpl->lexicon_prev)
+	pimpl->lexicon_prev = &cicada::Lexicon::create(x.pimpl->lexicon_prev->path().string());
+      if (x.pimpl->lexicon_next)
+	pimpl->lexicon_next = &cicada::Lexicon::create(x.pimpl->lexicon_next->path().string());
       
       return *this;
     }
