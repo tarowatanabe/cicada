@@ -15,6 +15,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/alloc_vector.hpp"
+#include "utils/array_power2.hpp"
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -24,7 +25,7 @@ namespace cicada
   namespace feature
   {
 
-    class SparseLexiconImpl
+    class SparseLexiconImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -38,6 +39,8 @@ namespace cicada
 
       typedef cicada::Cluster  cluster_type;
       typedef cicada::Stemmer  stemmer_type;
+
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       typedef cicada::ClusterStemmer normalizer_type;
       typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
@@ -70,6 +73,17 @@ namespace cicada
       
       typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
+      struct CacheNormalize
+      {
+	typedef utils::simple_vector<word_type, std::allocator<word_type> > word_set_type;
+	
+	word_type::id_type word;
+	word_set_type      normalized;
+	
+	CacheNormalize() : word(word_type::id_type(-1)), normalized() {}
+      };
+      typedef CacheNormalize cache_normalize_type;
+      typedef utils::array_power2<cache_normalize_type, 1024 * 4, std::allocator<cache_normalize_type> > cache_normalize_set_type;
       
       typedef cicada::Lexicon lexicon_type;
       
@@ -141,10 +155,6 @@ namespace cicada
 	  }
       }
 
-      word_set_type words_source_prev;
-      word_set_type words_source_next;
-      word_set_type words_target;
-  
       void assign(const char* id, const word_pair_type& prev, const word_type& next, feature_set_type& features)
       {
 	if (normalizers_source.empty() && normalizers_target.empty()) {
@@ -156,40 +166,20 @@ namespace cicada
 	  if (forced_feature || feature_type::exists(name))
 	    features[name] += 1.0;
 	} else {
-	  words_source_prev.clear();
-	  words_source_next.clear();
-	  words_target.clear();
+	  const cache_normalize_type::word_set_type  words_source_prev = normalize(prev.first,  normalizers_source, cache_source);
+	  const cache_normalize_type::word_set_type& words_source_next = normalize(prev.second, normalizers_source, cache_source);
+	  const cache_normalize_type::word_set_type& words_target      = normalize(next,        normalizers_target, cache_target);
 	  
-	  words_source_prev.push_back(prev.first);
-	  words_source_next.push_back(prev.second);
-	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-	    const word_type normalized_prev = normalizers_source[i](prev.first);
-	    const word_type normalized_next = normalizers_source[i](prev.second);
-	    
-	    if (normalized_prev != prev.first)
-	      words_source_prev.push_back(normalized_prev);
-	    
-	    if (normalized_next != prev.second)
-	      words_source_next.push_back(normalized_next);
-	  }
+	  cache_normalize_type::word_set_type::const_iterator piter_begin = words_source_prev.begin();
+	  cache_normalize_type::word_set_type::const_iterator piter_end   = words_source_prev.end();
+	  cache_normalize_type::word_set_type::const_iterator niter_begin = words_source_next.begin();
+	  cache_normalize_type::word_set_type::const_iterator niter_end   = words_source_next.end();
+	  cache_normalize_type::word_set_type::const_iterator titer_begin = words_target.begin();
+	  cache_normalize_type::word_set_type::const_iterator titer_end   = words_target.end();
 	  
-	  words_target.push_back(next);
-	  for (size_t i = 0; i != normalizers_target.size(); ++ i) {
-	    const word_type normalized = normalizers_target[i](next);
-	    if (normalized != next)
-	      words_target.push_back(normalized);
-	  }
-	  
-	  word_set_type::const_iterator piter_begin = words_source_prev.begin();
-	  word_set_type::const_iterator piter_end   = words_source_prev.end();
-	  word_set_type::const_iterator niter_begin = words_source_next.begin();
-	  word_set_type::const_iterator niter_end   = words_source_next.end();
-	  word_set_type::const_iterator titer_begin = words_target.begin();
-	  word_set_type::const_iterator titer_end   = words_target.end();
-	  
-	  for (word_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter)
-	    for (word_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter)
-	      for (word_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	  for (cache_normalize_type::word_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter)
+	    for (cache_normalize_type::word_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter)
+	      for (cache_normalize_type::word_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 		const std::string name = (prefix + ':' + id + ':'
 					  + static_cast<const std::string&>(*piter)
 					  + ':' + static_cast<const std::string&>(*niter)
@@ -200,6 +190,27 @@ namespace cicada
 	      }
 	}
       }
+      
+      const cache_normalize_type::word_set_type& normalize(const word_type& word,
+							   normalizer_set_type& normalizers,
+							   cache_normalize_set_type& caches)
+      {
+	cache_normalize_type& cache = caches[hasher_type::operator()(word.id()) & (caches.size() - 1)];
+	if (cache.word != word.id()) {
+	  cache.word = word.id();
+	  cache.normalized.clear();
+	  
+	  cache.normalized.push_back(word);
+	  for (size_t i = 0; i != normalizers.size(); ++ i) {
+	    const word_type normalized = normalizers[i](word);
+	    if (word != normalized)
+	      cache.normalized.push_back(normalized);
+	  }
+	}
+	
+	return cache.normalized;
+      }
+
 
       void assign(const lattice_type& lattice)
       {
@@ -302,9 +313,18 @@ namespace cicada
 	codes[1] = next;
 	return lexicon.exists(codes, codes + 2);
       }
+
+      void clear_cache()
+      {
+	cache_source.clear();
+	cache_target.clear();
+      }
       
       normalizer_set_type normalizers_source;
       normalizer_set_type normalizers_target;
+
+      cache_normalize_set_type cache_source;
+      cache_normalize_set_type cache_target;
       
       word_pair_unique_type  uniques_prev;
       word_pair_unique_type  uniques_next;
@@ -409,6 +429,8 @@ namespace cicada
 	pimpl->lexicon_prev = &cicada::Lexicon::create(x.pimpl->lexicon_prev->path().string());
       if (x.pimpl->lexicon_next)
 	pimpl->lexicon_next = &cicada::Lexicon::create(x.pimpl->lexicon_next->path().string());
+
+      pimpl->clear_cache();
     }
 
     SparseLexicon& SparseLexicon::operator=(const SparseLexicon& x)
@@ -422,6 +444,8 @@ namespace cicada
 	pimpl->lexicon_prev = &cicada::Lexicon::create(x.pimpl->lexicon_prev->path().string());
       if (x.pimpl->lexicon_next)
 	pimpl->lexicon_next = &cicada::Lexicon::create(x.pimpl->lexicon_next->path().string());
+
+      pimpl->clear_cache();
       
       return *this;
     }
