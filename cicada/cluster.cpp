@@ -95,6 +95,11 @@ namespace cicada
       
       word_type::write(rep.path("vocab"));
       
+      ::sync();
+      
+      while (! vocab_type::exists(rep.path("vocab")))
+	boost::thread::yield();
+      
       vocab.open(rep.path("vocab"));
       clusters.open(rep.path("clusters"));
     }
