@@ -149,7 +149,7 @@ namespace cicada
       } else {
 	// we are root!
 	const size_type cache_pos = hasher_type::operator()(word.id()) & (caches_root.size() - 1);
-	cache_root_type& cache = const_cast<cache_type&>(caches_root[cache_pos]);
+	cache_root_type& cache = const_cast<cache_root_type&>(caches_root[cache_pos]);
 	
 	if (cache.word != word.id())  {
 	  const word_id_type word_id = vocab[word];
