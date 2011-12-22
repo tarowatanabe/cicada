@@ -17,6 +17,9 @@
 
 #include <succinct_db/succinct_trie_db.hpp>
 
+#include <utils/array_power2.hpp>
+#include <utils/hashmurmur.hpp>
+
 #include <boost/filesystem/path.hpp>
 
 namespace cicada
@@ -45,10 +48,32 @@ namespace cicada
     typedef std::allocator<std::pair<key_type, mapped_type> >  lexicon_alloc_type;
     typedef succinctdb::succinct_trie_db<key_type, mapped_type, lexicon_alloc_type > lexicon_type;
     typedef lexicon_type::size_type node_type;
+
+    struct Cache
+    {
+      word_id_type word;
+      node_type prev;
+      node_type next;
+      
+      Cache()
+	: word(word_id_type(-1)), prev(node_type(-1)), next(node_type(-1)) {}
+    };
+    
+    typedef Cache cache_type;
+    typedef utils::array_power2<cache_type, 1024 * 16, std::allocator<cache_type> > cache_set_type;
     
   public:
     Lexicon() : lexicon(), vocab(), smooth(1e-40) {}
     Lexicon(const std::string& path) { open(path); }
+    Lexicon(const Lexicon& x) : lexicon(x.lexicon), vocab(x.vocab), smooth(x.smooth) {}
+    Lexicon& operator=(const Lexicon& x)
+    {
+      clear();
+      lexicon = x.lexicon;
+      vocab   = x.vocab;
+      smooth  = x.smooth;
+      return *this;
+    }
     
   public:
     
@@ -98,26 +123,32 @@ namespace cicada
     {
       if (! lexicon.is_valid(node)) return node;
       
-      const word_id_type word_id = vocab[word];
-      
-      return lexicon.find(&word_id, 1, node);
-    }
+      const size_type cache_pos = hasher_type::operator()(word.id(), node) & (caches.size() - 1);
+      cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
 
+      if (cache.word != word.id() || cache.prev != node)  {
+	const word_id_type word_id = vocab[word];
+	
+	cache.word = word.id();
+	cache.prev = node;
+	cache.next = lexicon.find(&word_id, 1, node);
+      }
+      
+      return cache.next;
+    }
+    
     template <typename Iterator>
     node_type traverse(Iterator first, Iterator last) const
     {
       node_type node = 0;
       for (/**/; first != last; ++ first) {
-	const word_id_type word_id = vocab[*first];
-	
-	node = lexicon.find(&word_id, 1, node);
+	node = traverse(node, *first);
 	
 	if (! lexicon.is_valid(node))
 	  return node;
       }
       return node;
     }
-
     
   public:
     void open(const std::string& path);
@@ -129,6 +160,8 @@ namespace cicada
       lexicon.clear();
       vocab.clear();
       smooth = 1e-40;
+
+      caches.clear();
     }
 
     path_type path() const { return lexicon.path().parent_path(); }
@@ -141,6 +174,8 @@ namespace cicada
     lexicon_type lexicon;
     vocab_type   vocab;
     weight_type  smooth;
+
+    cache_set_type caches;
   };
 };
 
