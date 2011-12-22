@@ -163,16 +163,14 @@ namespace cicada
 	  words_source_prev.push_back(prev.first);
 	  words_source_next.push_back(prev.second);
 	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
-	    {
-	      const word_type normalized = normalizers_source[i](prev.first);
-	      if (normalized != prev.first)
-		words_source_prev.push_back(normalized);
-	    }
-	    {
-	      const word_type normalized = normalizers_source[i](prev.second);
-	      if (normalized != prev.second)
-		words_source_next.push_back(normalized);
-	    }
+	    const word_type normalized_prev = normalizers_source[i](prev.first);
+	    const word_type normalized_next = normalizers_source[i](prev.second);
+	    
+	    if (normalized_prev != prev.first)
+	      words_source_prev.push_back(normalized_prev);
+	    
+	    if (normalized_next != prev.second)
+	      words_source_next.push_back(normalized_next);
 	  }
 	  
 	  words_target.push_back(next);
