@@ -62,6 +62,17 @@ namespace cicada
     typedef Cache cache_type;
     typedef utils::array_power2<cache_type, 1024 * 16, std::allocator<cache_type> > cache_set_type;
     
+    struct CacheRoot
+    {
+      word_id_type word;
+      node_type node;
+      
+      CacheRoot() : word(word_id_type(-1)), node(node_type(-1)) {}
+    };
+    
+    typedef CacheRoot cache_root_type;
+    typedef utils::array_power2<cache_root_type, 1024 * 2, std::allocator<cache_root_type> > cache_root_set_type;
+    
   public:
     Lexicon() : lexicon(), vocab(), smooth(1e-40) {}
     Lexicon(const std::string& path) { open(path); }
@@ -123,18 +134,31 @@ namespace cicada
     {
       if (! lexicon.is_valid(node)) return node;
       
-      const size_type cache_pos = hasher_type::operator()(word.id(), node) & (caches.size() - 1);
-      cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
-
-      if (cache.word != word.id() || cache.prev != node)  {
-	const word_id_type word_id = vocab[word];
+      if (node) {
+	const size_type cache_pos = hasher_type::operator()(word.id(), node) & (caches.size() - 1);
+	cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
 	
-	cache.word = word.id();
-	cache.prev = node;
-	cache.next = lexicon.find(&word_id, 1, node);
+	if (cache.word != word.id() || cache.prev != node)  {
+	  const word_id_type word_id = vocab[word];
+	  
+	  cache.word = word.id();
+	  cache.prev = node;
+	  cache.next = lexicon.find(&word_id, 1, node);
+	}
+	return cache.next;
+      } else {
+	// we are root!
+	const size_type cache_pos = hasher_type::operator()(word.id()) & (caches_root.size() - 1);
+	cache_root_type& cache = const_cast<cache_type&>(caches_root[cache_pos]);
+	
+	if (cache.word != word.id())  {
+	  const word_id_type word_id = vocab[word];
+	  
+	  cache.word = word.id();
+	  cache.node = lexicon.find(&word_id, 1);
+	}
+	return cache.node;
       }
-      
-      return cache.next;
     }
     
     template <typename Iterator>
@@ -162,6 +186,7 @@ namespace cicada
       smooth = 1e-40;
 
       caches.clear();
+      caches_root.clear();
     }
 
     path_type path() const { return lexicon.path().parent_path(); }
@@ -175,7 +200,8 @@ namespace cicada
     vocab_type   vocab;
     weight_type  smooth;
 
-    cache_set_type caches;
+    cache_set_type      caches;
+    cache_root_set_type caches_root;
   };
 };
 
