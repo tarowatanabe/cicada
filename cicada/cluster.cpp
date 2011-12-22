@@ -17,6 +17,8 @@
 #include <utils/compress_stream.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
+#include <utils/spinlock.hpp>
+
 
 #include <boost/thread.hpp>
 
@@ -138,6 +140,15 @@ namespace cicada
   typedef sgi::hash_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
 #endif
+
+  namespace impl
+  {
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    
+    static mutex_type       __cluster_mutex;
+    static cluster_map_type __cluster_map;
+  };
   
 
 #ifdef HAVE_TLS
@@ -163,8 +174,15 @@ namespace cicada
 #endif
     
     cluster_map_type::iterator iter = clusters_map.find(path.string());
-    if (iter == clusters_map.end())
-      iter = clusters_map.insert(std::make_pair(path.string(), Cluster(path))).first;
+    if (iter == clusters_map.end()) {
+      impl::lock_type lock(impl::__cluster_mutex);
+      
+      cluster_map_type::iterator iter_global = impl::__cluster_map.find(path.string());
+      if (iter_global == impl::__cluster_map.end())
+	iter_global = impl::__cluster_map.insert(std::make_pair(path.string(), Cluster(path))).first;
+      
+      iter = clusters_map.insert(*iter_global).first;
+    }
     
     return iter->second;
   }
