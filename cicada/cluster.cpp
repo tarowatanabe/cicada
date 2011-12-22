@@ -30,8 +30,6 @@ namespace cicada
     typedef utils::repository repository_type;
 
     clear();
-
-    file = path;
     
     if (boost::filesystem::is_directory(path)) {
       repository_type rep(path, repository_type::read);
