@@ -103,8 +103,9 @@ class PBS:
         self.workers = []
 
     def __del__(self):
-        for worker in self.workers:
-            worker.join()
+        pass
+        #for worker in self.workers:
+        #    worker.join()
             
     def run(self, command="", threads=1, memory=0.0, name="cicada-sh", logfile=None):
         pipe = cStringIO.StringIO()
@@ -143,7 +144,8 @@ class PBS:
             pipe.write("%s\n" %(command))
 
         self.workers.append(QSUB(pipe.getvalue()))
-        self.workers[-1].start();
+        self.workers[-1].start()
+        self.workers[-1].join()
 
 class Threads:
     
