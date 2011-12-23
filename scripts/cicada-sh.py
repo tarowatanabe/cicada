@@ -9,7 +9,7 @@
 ###
 
 import threading
-#import multiprocessing
+import multiprocessing
 
 import time
 import sys
@@ -78,9 +78,9 @@ def compressed_file(file):
 	    return base
     return file
 
-class QSUB(threading.Thread):
+class QSUB(multiprocessing.Process):
     def __init__(self, command=""):
-        threading.Thread.__init__(self)
+        multiprocessing.Process.__init__(self)
         self.command = command
         
     def run(self):
