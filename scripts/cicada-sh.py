@@ -116,8 +116,10 @@ class PBS:
         pipe.write("#PBS -o /dev/null\n")
         #pipe.write("#PBS -W block=true\n")
         
-        if self.workers and self.workers[-1].qsub:
-            pipe.write("#PBS -W depend=after:%s\n" %(self.workers[-1].qsub))
+        if self.workers:
+            if self.workers[-1].qsub:
+                print self.workers[-1].qsub
+                pipe.write("#PBS -W depend=after:%s\n" %(self.workers[-1].qsub))
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
