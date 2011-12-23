@@ -9,7 +9,7 @@
 ###
 
 import threading
-#import multiprocessing
+import multiprocessing
 
 import time
 import sys
@@ -76,16 +76,14 @@ def compressed_file(file):
 	    return base
     return file
 
-class QSUB(threading.Thread):
+class QSUB(multiprocessing.Process):
     def __init__(self, command=""):
-        threading.Thread.__init__(self)
+        multiprocessing.Process.__init__(self)
         self.command = command
-        self.qsub = None
         
     def run(self):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        data = popen.communicate(self.command)
-        self.qsub = data[0].strip()
+        popen.communicate(self.command)
         
 class PBS:
     def __init__(self, queue="", workingdir=os.getcwd()):
@@ -103,7 +101,6 @@ class PBS:
         self.workers = []
 
     def __del__(self):
-        pass
         for worker in self.workers:
             worker.join()
             
@@ -141,7 +138,7 @@ class PBS:
             pipe.write("%s\n" %(command))
 
         self.workers.append(QSUB(pipe.getvalue()))
-        self.workers[-1].start()
+        self.workers[-1].start();
 
 class Threads:
     
