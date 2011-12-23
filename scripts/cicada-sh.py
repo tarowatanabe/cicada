@@ -9,7 +9,7 @@
 ###
 
 import threading
-import multiprocessing
+#import multiprocessing
 
 import time
 import sys
@@ -76,9 +76,9 @@ def compressed_file(file):
 	    return base
     return file
 
-class QSUB(multiprocessing.Process):
+class QSUB(threading.Process):
     def __init__(self, command=""):
-        multiprocessing.Process.__init__(self)
+        threading.Process.__init__(self)
         self.command = command
         self.qsub = None
         
@@ -116,7 +116,7 @@ class PBS:
         pipe.write("#PBS -o /dev/null\n")
         #pipe.write("#PBS -W block=true\n")
         
-        if self.workers:
+        if self.workers and self.workers[-1].qsub:
             pipe.write("#PBS -W depend=after:%s\n" %(self.workers[-1].qsub))
         
         if self.queue:
