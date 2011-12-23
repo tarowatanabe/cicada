@@ -138,7 +138,7 @@ class PBS:
             pipe.write("%s\n" %(command))
 
         self.workers.append(QSUB(pipe.getvalue()))
-        self.workers[-1].start();
+        self.workers[-1].start()
 
 class Threads:
     
