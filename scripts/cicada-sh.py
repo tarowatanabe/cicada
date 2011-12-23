@@ -80,10 +80,12 @@ class QSUB(multiprocessing.Process):
     def __init__(self, command=""):
         multiprocessing.Process.__init__(self)
         self.command = command
+        self.qsub = None
         
     def run(self):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        popen.communicate(self.command)
+        data = popen.communicate(self.command)
+        self.qsub = data[0].strip()
         
 class PBS:
     def __init__(self, queue="", workingdir=os.getcwd()):
@@ -111,7 +113,10 @@ class PBS:
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -e /dev/null\n")
         pipe.write("#PBS -o /dev/null\n")
-        pipe.write("#PBS -W block=true\n")
+        #pipe.write("#PBS -W block=true\n")
+        
+        if self.workers:
+            pipe.write("#PBS -W depend=after:%s\n" %(self.workers[-1].qsub))
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
