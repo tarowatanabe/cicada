@@ -116,7 +116,7 @@ class PBS:
         pipe.write("#PBS -W block=true\n")
 
         if hold:
-            pipe.write("#PBS -W depend=before:%s\n" %(hold))
+            pipe.write("#PBS -W depend=after:%s\n" %(hold))
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
