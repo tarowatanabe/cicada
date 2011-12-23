@@ -51,6 +51,8 @@ opt_parser = OptionParser(
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
                 help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+    make_option("--pbs-hold", default="", action="store", type="string",
+                help="PBS for launching processes after this process id", metavar="ID"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
@@ -104,7 +106,7 @@ class PBS:
         for worker in self.workers:
             worker.join()
             
-    def run(self, command="", threads=1, memory=0.0, name="cicada-sh", logfile=None):
+    def run(self, command="", threads=1, memory=0.0, name="cicada-sh", logfile=None, hold=""):
         pipe = cStringIO.StringIO()
         
         pipe.write("#!/bin/sh\n")
@@ -112,6 +114,9 @@ class PBS:
         pipe.write("#PBS -e /dev/null\n")
         pipe.write("#PBS -o /dev/null\n")
         pipe.write("#PBS -W block=true\n")
+
+        if hold:
+            pipe.write("#PBS -W depend=after:%s\n" %(hold))
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
@@ -255,7 +260,7 @@ if options.pbs:
     for line in sys.stdin:
         line = line.strip()
         if line:
-            pbs.run(command=line, threads=options.threads, memory=options.max_malloc)
+            pbs.run(command=line, threads=options.threads, memory=options.max_malloc, hold=options.pbs_hold)
 
 elif options.mpi:
     mpi = MPI(cicada=cicada,
