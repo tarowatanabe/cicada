@@ -76,9 +76,9 @@ def compressed_file(file):
 	    return base
     return file
 
-class QSUB(threading.Process):
+class QSUB(threading.Thread):
     def __init__(self, command=""):
-        threading.Process.__init__(self)
+        threading.Thread.__init__(self)
         self.command = command
         self.qsub = None
         
