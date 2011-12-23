@@ -263,6 +263,7 @@ if options.pbs:
             pbs.run(command=line, threads=options.threads, memory=options.max_malloc, hold=options.pbs_hold)
 
 elif options.mpi:
+    cicada = CICADA(options.cicada_dir)
     mpi = MPI(cicada=cicada,
               dir=options.mpi_dir,
               hosts=options.mpi_host,
@@ -274,6 +275,7 @@ elif options.mpi:
         if line:
             mpi.run(command=line)
 else:
+    cicada = CICADA(options.cicada_dir)
     threads = Threads(cicada=cicada, threads=options.threads)
     
     for line in sys.stdin:
