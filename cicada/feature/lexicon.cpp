@@ -17,11 +17,9 @@
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/alloc_vector.hpp"
 #include "utils/mathop.hpp"
 
 #include <google/dense_hash_set>
-#include <google/dense_hash_map>
 
 namespace cicada
 {
