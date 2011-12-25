@@ -929,6 +929,57 @@ namespace cicada
       
       return *this;
     }
+
+    template <typename T, typename A>
+    self_type& operator+=(const FeatureVectorUnordered<T,A>& x)
+    {
+      typedef FeatureVectorUnordered<T,A> another_type;
+      
+      if (x.empty())
+	return *this;
+      else if (empty()) {
+	assign(x);
+	return *this;
+      }
+      
+      if (__sparse || x.size() > __dense_size) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+	
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(*iter2);
+	  
+	  if (! result.second) {
+	    result.first->second += iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
+	  }
+	}
+      } else {
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  std::pair<typename dense_vector_type::iterator, bool> result = __dense.insert(*iter2);
+	  
+	  if (! result.second) {
+	    result.first->second += iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
+	  }
+	}
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+      }
+      
+      return *this;
+    }
     
     template <typename T, typename A>
     self_type& operator-=(const FeatureVector<T,A>& x)
@@ -1093,6 +1144,51 @@ namespace cicada
 	  dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
 	
 	__dense.swap(dense_new);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+      }
+      
+      return *this;
+    }
+
+    template <typename T, typename A>
+    self_type& operator-=(const FeatureVectorUnordered<T,A>& x)
+    {
+      typedef FeatureVectorUnordered<T,A> another_type;
+      
+      if (x.empty()) return *this;
+      
+      if (__sparse || x.size() > __dense_size) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+	
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(std::make_pair(iter2->first, -Tp(iter2->second)));
+	  if (! result.second) {
+	    result.first->second -= iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
+	  }
+	}
+      } else {
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  std::pair<typename dense_vector_type::iterator, bool> result = __dense.insert(std::make_pair(iter2->first, -Tp(iter2->second)));
+	  
+	  if (! result.second) {
+	    result.first->second -= iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
+	  }
+	}
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
