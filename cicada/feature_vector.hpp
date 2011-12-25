@@ -771,32 +771,7 @@ namespace cicada
       } else {
 	dense_vector_type dense_new;
 
-	typename dense_vector_type::const_iterator iter1     = __dense.begin();
-	typename dense_vector_type::const_iterator iter1_end = __dense.end();
-	
-	typename another_type::dense_vector_type::const_iterator iter2     = x.__dense.begin();
-	typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
-
-	while (iter1 != iter1_end && iter2 != iter2_end) {
-	  if (iter1->first < iter2->first) {
-	    dense_new.insert(dense_new.end(), *iter1);
-	    ++ iter1;
-	  } else if (iter2->first < iter1->first) {
-	    dense_new.insert(dense_new.end(), *iter2);
-	    ++ iter2;
-	  } else {
-	    const Tp value = iter1->second + iter2->second;
-	    if (value != Tp())
-	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
-	    ++ iter1;
-	    ++ iter2;
-	  }
-	}
-	
-	if (iter1 != iter1_end)
-	  dense_new.insert(iter1, iter1_end);
-	if (iter2 != iter2_end)
-	  dense_new.insert(iter2, iter2_end);
+	plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
 	
 	__dense.swap(dense_new);
 	
@@ -830,33 +805,8 @@ namespace cicada
 	plus_equal_ordered(*__sparse, x.begin(), x.end());
       } else {
 	dense_vector_type dense_new;
-	
-	typename dense_vector_type::const_iterator iter1     = __dense.begin();
-	typename dense_vector_type::const_iterator iter1_end = __dense.end();
-	
-	typename another_type::const_iterator iter2     = x.begin();
-	typename another_type::const_iterator iter2_end = x.end();
 
-	while (iter1 != iter1_end && iter2 != iter2_end) {
-	  if (iter1->first < iter2->first) {
-	    dense_new.insert(dense_new.end(), *iter1);
-	    ++ iter1;
-	  } else if (iter2->first < iter1->first) {
-	    dense_new.insert(dense_new.end(), *iter2);
-	    ++ iter2;
-	  } else {
-	    const Tp value = iter1->second + iter2->second;
-	    if (value != Tp())
-	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
-	    ++ iter1;
-	    ++ iter2;
-	  }
-	}
-	
-	if (iter1 != iter1_end)
-	  dense_new.insert(iter1, iter1_end);
-	if (iter2 != iter2_end)
-	  dense_new.insert(iter2, iter2_end);
+	plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
 	
 	__dense.swap(dense_new);
 	
@@ -919,33 +869,8 @@ namespace cicada
 	  minus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
       } else {
 	dense_vector_type dense_new;
-
-	typename dense_vector_type::const_iterator iter1     = __dense.begin();
-	typename dense_vector_type::const_iterator iter1_end = __dense.end();
 	
-	typename another_type::dense_vector_type::const_iterator iter2     = x.__dense.begin();
-	typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
-
-	while (iter1 != iter1_end && iter2 != iter2_end) {
-	  if (iter1->first < iter2->first) {
-	    dense_new.insert(dense_new.end(), *iter1);
-	    ++ iter1;
-	  } else if (iter2->first < iter1->first) {
-	    dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
-	    ++ iter2;
-	  } else {
-	    const Tp value = iter1->second - iter2->second;
-	    if (value != Tp())
-	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
-	    ++ iter1;
-	    ++ iter2;
-	  }
-	}
-	
-	if (iter1 != iter1_end)
-	  dense_new.insert(iter1, iter1_end);
-	for (/**/; iter2 != iter2_end; ++ iter2)
-	  dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
+	minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
 	
 	__dense.swap(dense_new);
 	
@@ -974,33 +899,8 @@ namespace cicada
 	minus_equal_ordered(*__sparse, x.begin(), x.end());
       } else {
 	dense_vector_type dense_new;
-
-	typename dense_vector_type::const_iterator iter1     = __dense.begin();
-	typename dense_vector_type::const_iterator iter1_end = __dense.end();
 	
-	typename another_type::const_iterator iter2     = x.begin();
-	typename another_type::const_iterator iter2_end = x.end();
-	
-	while (iter1 != iter1_end && iter2 != iter2_end) {
-	  if (iter1->first < iter2->first) {
-	    dense_new.insert(dense_new.end(), *iter1);
-	    ++ iter1;
-	  } else if (iter2->first < iter1->first) {
-	    dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
-	    ++ iter2;
-	  } else {
-	    const Tp value = iter1->second - iter2->second;
-	    if (value != Tp())
-	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
-	    ++ iter1;
-	    ++ iter2;
-	  }
-	}
-	
-	if (iter1 != iter1_end)
-	  dense_new.insert(iter1, iter1_end);
-	for (/**/; iter2 != iter2_end; ++ iter2)
-	  dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
+	minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
 	
 	__dense.swap(dense_new);
 	
@@ -1096,10 +996,28 @@ namespace cicada
 
   private:
     template <typename Container, typename Iterator1, typename Iterator2>
-    void plus_equal_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Itertor2 last2)
+    void plus_equal_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
     {
-      
-      
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first) {
+	  container.insert(container.end(), *first1);
+	  ++ first1;
+	} else if (first2->first < first1->first) {
+	  container.insert(container.end(), *first2);
+	  ++ first2;
+	} else {
+	  const Tp value = first1->second + first2->second;
+	  if (value != Tp())
+	    container.insert(container.end(), std::make_pair(first1->first, value));
+	  ++ first1;
+	  ++ first2;
+	}
+      }
+	
+      if (first1 != last1)
+	container.insert(first1, last1);
+      if (first2 != last2)
+	container.insert(first2, last2);
     }
 
     template <typename Container, typename Iterator>
@@ -1118,7 +1036,7 @@ namespace cicada
 	  
 	  if (result.first->second == Tp()) {
 	    container.erase(result.first);
-	    hint = container.begin();
+	    hint = container.upper_bound(first->first);
 	  }
 	}
       }
@@ -1142,6 +1060,31 @@ namespace cicada
       }
     }
 
+    template <typename Container, typename Iterator1, typename Iterator2>
+    void minus_equal_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
+    {
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first) {
+	  container.insert(container.end(), *first1);
+	  ++ first1;
+	} else if (first2->first < first1->first) {
+	  container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
+	  ++ first2;
+	} else {
+	  const Tp value = first1->second - first2->second;
+	  if (value != Tp())
+	    container.insert(container.end(), std::make_pair(first1->first, value));
+	  ++ first1;
+	  ++ first2;
+	}
+      }
+      
+      if (first1 != last1)
+	container.insert(first1, last1);
+      for (/**/; first2 != last2; ++ first2)
+	container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
+    }
+
     template <typename Container, typename Iterator>
     void minus_equal_ordered(Container& container, Iterator first, Iterator last)
     {
@@ -1149,7 +1092,7 @@ namespace cicada
       
       for (/**/; first != last && hint != container.end(); ++ first) {
 	std::pair<typename Container::iterator, bool> result = container.insert(std::make_pair(first->first, -Tp(first->second)));
-
+	
 	hint = result.first;
 	++ hint;
 	
@@ -1158,7 +1101,7 @@ namespace cicada
 	  
 	  if (result.first->second == Tp()) {
 	    container.erase(result.first);
-	    hint = container.begin();
+	    hint = container.upper_bound(first->first);
 	  }
 	}
       }
