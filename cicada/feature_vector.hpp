@@ -25,7 +25,7 @@ namespace cicada
   class WeightVector;
 
   template <typename Tp, typename Alloc >
-  class FeatureVectorSparse;
+  class FeatureVectorUnordered;
 
   class FeatureVectorCompact;
 
@@ -180,6 +180,9 @@ namespace cicada
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last)
       : __dense(), __sparse(0) { assign(first, last); }
+    template <typename T, typename A>
+    FeatureVector(const FeatureVectorUnordered<T,A>& x)
+      : __dense(), __sparse(0) { assign(x.begin(), x.end()); }
     
     FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
     {
@@ -189,6 +192,13 @@ namespace cicada
     
     template <typename T, typename A>
     FeatureVector& operator=(const FeatureVector<T, A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
+    template <typename T, typename A>
+    FeatureVector& operator=(const FeatureVectorUnordered<T, A>& x)
     {
       assign(x);
       return *this;
@@ -234,6 +244,28 @@ namespace cicada
       }
     }
 
+    template <typename T, typename A>
+    void assign(const FeatureVectorUnordered<T,A>& x)
+    {
+      const size_type __n = x.size();
+      
+      if (__n > __dense_size) {
+	__dense.clear();
+	if (__sparse) {
+	  __sparse->clear();
+	  __sparse->insert(x.begin(), x.end());
+	} else
+	  __sparse = new sparse_vector_type(x.begin(), x.end());
+      } else {
+	if (__sparse) {
+	  delete __sparse;
+	  __sparse = 0;
+	}
+	__dense.clear();
+	__dense.insert(x.begin(), x.end());
+      }
+    }
+    
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
@@ -1011,7 +1043,7 @@ namespace std
 
 #include <cicada/weight_vector.hpp>
 #include <cicada/feature_vector_compact.hpp>
-#include <cicada/feature_vector_sparse.hpp>
+#include <cicada/feature_vector_unordered.hpp>
 
 #endif
 

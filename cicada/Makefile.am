@@ -323,7 +323,7 @@ feature_function.hpp \
 feature_vector.hpp \
 feature_vector_codec.hpp \
 feature_vector_compact.hpp \
-feature_vector_sparse.hpp \
+feature_vector_unordered.hpp \
 format.hpp \
 generate.hpp \
 generate_earley.hpp \
