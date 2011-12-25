@@ -13,6 +13,7 @@
 #include "lexicon.hpp"
 
 #include "cicada/parameter.hpp"
+#include "cicada/lexicon.hpp"
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -61,77 +62,10 @@ namespace cicada
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
       typedef std::vector<double, std::allocator<double> > cache_set_type;
       
-      struct ttable_type
-      {
-	struct table_type
-	{
-	  typedef google::dense_hash_map<word_type, double, boost::hash<word_type> , std::equal_to<word_type> > __table_type;
-	  
-	  table_type() : table() { table.set_empty_key(word_type()); }
-	  
-	  __table_type table;
-	};
-	
-	typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
-	
-	ttable_type() : smooth(1e-30), tables() {}
-	ttable_type(const path_type& path) : smooth(), tables() { open(path); }
-	
-	void open(const path_type& path)
-	{
-	  namespace qi = boost::spirit::qi;
-	  namespace standard = boost::spirit::standard;
-	  
-	  typedef boost::fusion::tuple<std::string, std::string, double> parsed_type;
-	  
-	  qi::rule<std::string::const_iterator, std::string(), standard::space_type> word;
-	  qi::rule<std::string::const_iterator, parsed_type(), standard::space_type> lexicon;
-	  
-	  word %= qi::lexeme[+(standard::char_ - standard::space)];
-	  lexicon %= word >> word >> qi::double_;
-	  
-	  smooth = std::numeric_limits<double>::infinity();
-	  tables.clear();
-	  
-	  utils::compress_istream is(path, 1024 * 1024);
-	  std::string line;
-	  parsed_type parsed;
-	  
-	  while (std::getline(is, line)) {
-	    std::string::const_iterator iter = line.begin();
-	    std::string::const_iterator end = line.end();
-	    
-	    boost::fusion::get<0>(parsed).clear();
-	    boost::fusion::get<1>(parsed).clear();
-	    
-	    const bool result = qi::phrase_parse(iter, end, lexicon, standard::space, parsed);
-	    if (! result || iter != end) continue;
-	    
-	    tables[word_type(boost::fusion::get<1>(parsed)).id()].table[boost::fusion::get<0>(parsed)] = boost::fusion::get<2>(parsed);
-	    
-	    smooth = std::min(smooth, boost::fusion::get<2>(parsed));
-	  }
-	}
-	
-	double operator()(const word_type& source, const word_type& target) const
-	{
-	  if (tables.exists(source.id())) {
-	    const table_type& table = tables[source.id()];
-	    
-	    table_type::__table_type::const_iterator iter = table.table.find(target);
-	    return (iter != table.table.end() ? iter->second : smooth);
-	  } else 
-	    return smooth;
-	}
-	
-	
-	double smooth;
-	table_set_type tables;
-      };
-
+      typedef cicada::Lexicon lexicon_type;
       
       LexiconImpl()
-	: uniques(), words(), caches_model1(), caches_noisy_or(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_noisy_or()
+	: lexicon(0), uniques(), words(), caches_model1(), caches_noisy_or(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_noisy_or()
       { uniques.set_empty_key(word_type());  }
 
       struct skipper_epsilon
@@ -182,11 +116,11 @@ namespace cicada
 	      caches_noisy_or.resize(target.id() + 1, - inf);
 	    
 	    if (caches_model1[target.id()] == - inf) {
-	      double score = ttable(vocab_type::EPSILON, target);
+	      double score = lexicon->operator()(vocab_type::EPSILON, target);
 	      
 	      sentence_type::const_iterator siter_end = words.end();
 	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score += ttable(*siter, target);
+		score += lexicon->operator()(*siter, target);
 	      
 	      caches_model1[target.id()] = utils::mathop::log(score);
 	    }
@@ -199,7 +133,7 @@ namespace cicada
 	      double score = 0.0;
 	      sentence_type::const_iterator siter_end = words.end();
 	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score += utils::mathop::log(1.0 - ttable(*siter, target));
+		score += utils::mathop::log(1.0 - lexicon->operator()(*siter, target));
 	      
 	      caches_noisy_or[target.id()] = utils::mathop::log(- boost::math::expm1(score));
 	    }
@@ -265,8 +199,8 @@ namespace cicada
 	caches_model1.clear();
 	caches_noisy_or.clear();
       }
-
-      ttable_type ttable;
+      
+      lexicon_type* lexicon;
       
       word_set_type  uniques;
       sentence_type  words;
@@ -291,7 +225,7 @@ namespace cicada
       if (utils::ipiece(param.name()) != "lexicon")
 	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
 
-      path_type path;
+      std::string path;
       
       bool skip_sgml_tag = false;
       bool unique_source = false;
@@ -311,8 +245,8 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (path.empty() || ! boost::filesystem::exists(path))
-	throw std::runtime_error("no lexicon file? " + path.string());
+      if (path.empty())
+	throw std::runtime_error("no lexicon file? " + path);
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
       
@@ -322,7 +256,10 @@ namespace cicada
       lexicon_impl->feature_noisy_or = (name.empty() ? std::string("lexicon") : name) + ":noisy-or";
       
       // open!
-      lexicon_impl->ttable.open(path);
+      lexicon_impl->lexicon = &cicada::Lexicon::create(path);
+
+      if (! lexicon_impl->lexicon)
+	throw std::runtime_error("no lexicon")?
       
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("lexicon") : name);
@@ -335,12 +272,20 @@ namespace cicada
     Lexicon::Lexicon(const Lexicon& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
-    {}
+    {
+      pimpl->lexicon = 0;
+      if (x.pimpl->lexicon)
+	pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
+    }
 
     Lexicon& Lexicon::operator=(const Lexicon& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
+      
+      pimpl->lexicon = 0;
+      if (x.pimpl->lexicon)
+	pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
       
       return *this;
     }
