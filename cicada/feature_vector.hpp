@@ -1034,10 +1034,8 @@ namespace cicada
 	if (! result.second) {
 	  result.first->second += first->second;
 	  
-	  if (result.first->second == Tp()) {
+	  if (result.first->second == Tp())
 	    container.erase(result.first);
-	    hint = container.upper_bound(first->first);
-	  }
 	}
       }
       
@@ -1099,10 +1097,8 @@ namespace cicada
 	if (! result.second) {
 	  result.first->second -= first->second;
 	  
-	  if (result.first->second == Tp()) {
+	  if (result.first->second == Tp())
 	    container.erase(result.first);
-	    hint = container.upper_bound(first->first);
-	  }
 	}
       }
       
