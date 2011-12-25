@@ -27,6 +27,11 @@ namespace cicada
   // forward declaration...
   template <typename Tp, typename Alloc >
   class FeatureVector;
+
+  class FeatureVectorCompact;
+  
+  template <typename Tp, typename Alloc >
+  class FeatureVectorLinear;
   
   template <typename Tp, typename Alloc >
   class WeightVector;
@@ -62,7 +67,12 @@ namespace cicada
     FeatureVectorUnordered() : __map() { initialize(); }
     FeatureVectorUnordered(const self_type& x) : __map(x.__map) { }
     template <typename T, typename A>
-    FeatureVectorUnordered(const FeatureVectorUnordered<T,A>& x) : __map() { initialize(); __map.insert(x.begin(), x.end()); }
+    FeatureVectorUnordered(const FeatureVector<T,A>& x) : __map() { initialize(); assign(x); }
+    FeatureVectorUnordered(const FeatureVectorCompact& x) : __map() { initialize(); assign(x); }
+    template <typename T, typename A>
+    FeatureVectorUnordered(const FeatureVectorLinear<T,A>& x) : __map() { initialize(); assign(x); }
+    template <typename T, typename A>
+    FeatureVectorUnordered(const FeatureVectorUnordered<T,A>& x) : __map() { initialize(); assign(x); }
     template <typename Iterator>
     FeatureVectorUnordered(Iterator first, Iterator last) : __map() { initialize(); __map.insert(first, last); } 
      
@@ -71,12 +81,31 @@ namespace cicada
       __map = x.__map;
       return *this;
     }
-     
+
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator=(const FeatureVector<T,A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
+    FeatureVectorUnordered& operator=(const FeatureVectorCompact& x)
+    {
+      assign(x);
+      return *this;
+    }
+    
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator=(const FeatureVectorLinear<T,A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
     template <typename T, typename A>
     FeatureVectorUnordered& operator=(const FeatureVectorUnordered<T,A>& x)
     {
-      __map.clear();
-      __map.insert(x.begin(), x.end());
+      assign(x);
       return *this;
     }
 
@@ -87,6 +116,26 @@ namespace cicada
     void assign(const self_type& x)
     {
       __map = x.__map;
+    }
+
+    template <typename T, typename A>
+    void assign(const FeatureVector<T,A>& x)
+    {
+      __map.clear();
+      
+      if (x.sparse())
+	__map.insert(x.sparse_begin(), x.sparse_end());
+      else
+	__map.insert(x.dense_begin(), x.dense_end());
+    }
+
+    void assign(const FeatureVectorCompact& x);
+    
+    template <typename T, typename A>
+    void assign(const FeatureVectorLinear<T,A>& x)
+    {
+      __map.clear();
+      __map.insert(x.begin(), x.end());
     }
      
     template <typename T, typename A>
@@ -177,45 +226,89 @@ namespace cicada
       std::for_each(begin(), end(), __apply_unary<std::divides<Tp>, T>(x));
       return *this;
     }
+    
+
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator+=(const FeatureVector<T,A>& x)
+    {
+      if (x.sparse())
+	plus_equal(x.sparse_begin(), x.sparse_end());
+      else
+	plus_equal(x.dense_begin(), x.dense_end());
+      return *this;
+    }
+    
+    FeatureVectorUnordered& operator+=(const FeatureVectorCompact& x);
+
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator+=(const FeatureVectorLinear<T,A>& x)
+    {
+      plus_equal(x.begin(), x.end());
+      return *this;
+    }
      
     template <typename T, typename A>
     FeatureVectorUnordered& operator+=(const FeatureVectorUnordered<T,A>& x)
     {
-      typedef FeatureVectorUnordered<T,A> another_type;
-       
-      typename another_type::const_iterator iter_end = x.end();
-      for (typename another_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
-	std::pair<iterator, bool> result = __map.insert(*iter);
-	if (! result.second) {
-	  result.first->second += iter->second;
-	   
-	  if (result.first->second == Tp())
-	    __map.erase(result.first);
-	}
-      }
-       
+      plus_equal(x.begin(), x.end());
+      return *this;
+    }
+
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator-=(const FeatureVector<T,A>& x)
+    {
+      if (x.sparse())
+	minus_equal(x.sparse_begin(), x.sparse_end());
+      else
+	minus_equal(x.dense_begin(), x.dense_end());
+      return *this;
+    }
+
+    FeatureVectorUnordered& operator-=(const FeatureVectorCompact& x);
+
+    template <typename T, typename A>
+    FeatureVectorUnordered& operator-=(const FeatureVectorLinear<T,A>& x)
+    {
+      minus_equal(x.begin(), x.end());
       return *this;
     }
 
     template <typename T, typename A>
     FeatureVectorUnordered& operator-=(const FeatureVectorUnordered<T,A>& x)
     {
-      typedef FeatureVectorUnordered<T,A> another_type;
-       
-      typename another_type::const_iterator iter_end = x.end();
-      for (typename another_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
-	std::pair<iterator, bool> result = __map.insert(std::make_pair(iter->first, - iter->second));
+      minus_equal(x.begin(), x.end());
+      return *this;
+    }
+
+  private:
+    template <typename Iterator>
+    void plus_equal(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	std::pair<iterator, bool> result = __map.insert(*first);
 	if (! result.second) {
-	  result.first->second -= iter->second;
-	   
+	  result.first->second += first->second;
+	  
 	  if (result.first->second == Tp())
 	    __map.erase(result.first);
 	}
       }
-       
-      return *this;
     }
-     
+    
+    template <typename Iterator>
+    void minus_equal(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	std::pair<iterator, bool> result = __map.insert(std::make_pair(first->first, - first->second));
+	if (! result.second) {
+	  result.first->second -= first->second;
+	  
+	  if (result.first->second == Tp())
+	    __map.erase(result.first);
+	}
+      }
+    }
+
   private:
     void initialize()
     {
@@ -240,6 +333,35 @@ namespace std
 
 #include <cicada/weight_vector.hpp>
 #include <cicada/feature_vector.hpp>
+#include <cicada/feature_vector_compact.hpp>
+#include <cicada/feature_vector_linear.hpp>
 
+namespace cicada
+{
+  template <typename T, typename A>
+  inline
+  void FeatureVectorUnordered<T,A>::assign(const FeatureVectorCompact& x)
+  {
+    __map.clear();
+    __map.insert(x.begin(), x.end());
+  }
+  
+  template <typename T, typename A>
+  inline
+  FeatureVectorUnordered<T,A>& FeatureVectorUnordered<T,A>::operator+=(const FeatureVectorCompact& x)
+  {
+    plus_equal(x.begin(), x.end());
+    return *this;
+  }
+
+  template <typename T, typename A>
+  inline
+  FeatureVectorUnordered<T,A>& FeatureVectorUnordered<T,A>::operator-=(const FeatureVectorCompact& x)
+  {
+    minus_equal(x.begin(), x.end());
+    return *this;
+  }
+
+};
 
 #endif
