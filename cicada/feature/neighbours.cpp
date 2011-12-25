@@ -473,14 +473,15 @@ namespace cicada
 			   feature_set_type& features,
 			   const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
-      
-      pimpl->neighbours_score(state, states, edge, features);
 
+      feature_set_type feats;
+      
+      pimpl->neighbours_score(state, states, edge, feats);
       if (final)
-	pimpl->neighbours_final_score(state, features);
+	pimpl->neighbours_final_score(state, feats);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void Neighbours::apply_coarse(state_ptr_type& state,

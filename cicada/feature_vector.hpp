@@ -300,6 +300,52 @@ namespace cicada
       }
     }
 
+    template <typename T, typename A, typename Prefix>
+    void update(const FeatureVector<T,A>& x, const Prefix& prefix)
+    {
+      // update this by x
+      // logically, we erase-prefix, then *this += x;
+      
+      if (x.empty())
+	erase_prefix(prefix);
+      else {
+	typedef FeatureVector<T,A> another_type;
+	typedef std::pair<feature_type, data_type> feat_type;
+	typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
+	
+	feat_set_type feats;
+	
+	const_iterator iter1     = begin();
+	const_iterator iter1_end = end();
+	
+	typename another_type::const_iterator iter2 = x.begin();
+	typename another_type::const_iterator iter2_end = x.end();
+	
+	while (iter1 != iter1_end && iter2 != iter2_end) {
+	  if (iter1->first < iter2->first) {
+	    if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
+	      feats.push_back(*iter1);
+	    ++ iter1;
+	  } else if (iter2->first < iter1->first) {
+	    feats.push_back(*iter2);
+	    ++ iter2;
+	  } else {
+	    feats.push_back(*iter2);
+	    ++ iter1;
+	    ++ iter2;
+	  }
+	}
+	
+	for (/**/; iter1 != iter1_end; ++ iter1) 
+	  if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
+	    feats.push_back(*iter1);
+	
+	feats.insert(feats.end(), iter2, iter2_end);
+	
+	assign(feats.begin(), feats.end());
+      }
+    }
+
     size_type size() const { return (__sparse ? __sparse->size() : __dense.size()); }
     bool empty() const { return (__sparse ? __sparse->empty() : __dense.empty()); }
     bool sparse() const { return __sparse; }
@@ -718,13 +764,15 @@ namespace cicada
     self_type& operator*=(const FeatureVector<T,A>& x)
     {
       typedef FeatureVector<T,A> another_type;
+      typedef std::pair<feature_type, data_type> feat_type;
+      typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
       
       if (empty() || x.empty()) {
 	clear();
 	return *this;
       }
-
-      self_type features;
+      
+      feat_set_type feats;
       
       const_iterator iter1     = lower_bound(x.begin()->first);
       const_iterator iter1_end = end();
@@ -740,14 +788,14 @@ namespace cicada
 	else {
 	  const Tp value = iter1->second * iter2->second;
 	  if (value != Tp())
-	    features.insert(features.end(), std::make_pair(iter1->first, value));
+	    feats.push_back(std::make_pair(iter1->first, value));
 	  
 	  ++ iter1;
 	  ++ iter2;
 	}
       }
       
-      features.swap(*this);
+      assign(feats.begin(), feats.end());
       
       return *this;
     }

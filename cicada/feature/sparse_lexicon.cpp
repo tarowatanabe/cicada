@@ -336,11 +336,13 @@ namespace cicada
 			      feature_set_type& features,
 			      const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      pimpl->lexicon_score(edge, features);
+      feature_set_type feats;
+      
+      pimpl->lexicon_score(edge, feats);
+
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void SparseLexicon::apply_coarse(state_ptr_type& state,
@@ -491,7 +493,6 @@ namespace cicada
 	else
 	  lexicon_score(edge, features, skipper_epsilon());
       }
-      
       
       template <typename Skipper>
       void lexicon_score(const edge_type& edge,
@@ -827,11 +828,13 @@ namespace cicada
 			      feature_set_type& features,
 			      const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+ 
+      feature_set_type feats;
       
-      pimpl->lexicon_score(edge, features);
+      pimpl->lexicon_score(edge, feats);
+
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void SparseLexicon::apply_coarse(state_ptr_type& state,

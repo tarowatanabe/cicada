@@ -292,11 +292,13 @@ namespace cicada
 		     feature_set_type& features,
 		     const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+
+      feature_set_type feats;
       
-      pimpl->span_score(state, states, edge, features);
+      pimpl->span_score(state, states, edge, feats);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
     
     void Span::apply_coarse(state_ptr_type& state,

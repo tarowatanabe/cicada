@@ -325,12 +325,13 @@ namespace cicada
 			    feature_set_type& features,
 			    const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      feature_set_type feats;
 
-      pimpl->ngram_score(state, states, edge, features);
-
+      pimpl->ngram_score(state, states, edge, feats);
       if (final)
-	pimpl->ngram_score(state, features);
+	pimpl->ngram_score(state, feats);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void Variational::apply_coarse(state_ptr_type& state,

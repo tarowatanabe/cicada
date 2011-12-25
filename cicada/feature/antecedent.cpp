@@ -373,14 +373,16 @@ namespace cicada
 			   feature_set_type& features,
 			   const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
 
-      pimpl->antecedent_score(state, states, edge, features);
+      feature_set_type feats;
+      
+      pimpl->antecedent_score(state, states, edge, feats);
       
       if (final)
-	pimpl->antecedent_final_score(state, features);
+	pimpl->antecedent_final_score(state, feats);
+
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void Antecedent::apply_coarse(state_ptr_type& state,

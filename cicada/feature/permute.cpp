@@ -146,9 +146,11 @@ namespace cicada
 			feature_set_type& features,
 			const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      feature_set_type feats;
+
+      pimpl->permute_score(state, states, edge, feats);
       
-      pimpl->permute_score(state, states, edge, features);
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
     
     void Permute::apply_coarse(state_ptr_type& state,

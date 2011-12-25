@@ -128,8 +128,8 @@ namespace cicada
 	      // 1.0 - exp(score) == - expm1(score)
 	      //
 	      
-	      double score_model1 = lexicon->operator()(vocab_type::EPSILON, target);
-	      double score_viterbi = score_model1;
+	      double score_model1   = lexicon->operator()(vocab_type::EPSILON, target);
+	      double score_viterbi  = score_model1;
 	      double score_noisy_or = 0.0;
 	      
 	      sentence_type::const_iterator siter_end = words.end();

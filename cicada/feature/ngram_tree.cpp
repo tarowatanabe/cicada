@@ -130,7 +130,7 @@ namespace cicada
 	} else
 	  return edge.rule->lhs;
       }
-      
+
       void ngram_tree_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
@@ -239,8 +239,8 @@ namespace cicada
       }
 
       void ngram_tree_final_score(const state_ptr_type& state,
-				  const edge_type& edge,
-				  feature_set_type& features) const
+				    const edge_type& edge,
+				    feature_set_type& features) const
       {
 	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
 	
@@ -405,14 +405,16 @@ namespace cicada
 			  feature_set_type& features,
 			  const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
-
-      pimpl->ngram_tree_score(state, states, edge, features);
-
+ 
+      feature_set_type feats;
+      
+      pimpl->ngram_tree_score(state, states, edge, feats);
+      
       if (final)
-	pimpl->ngram_tree_final_score(state, edge, features);
+	pimpl->ngram_tree_final_score(state, edge, feats);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
     void NGramTree::apply_coarse(state_ptr_type& state,

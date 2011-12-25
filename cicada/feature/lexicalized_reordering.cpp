@@ -343,12 +343,13 @@ namespace cicada
 				      feature_set_type& features,
 				      const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      feature_set_type feats;
       
-      pimpl->lexicalized_reordering_score(state, states, edge, features);
-      
+      pimpl->lexicalized_reordering_score(state, states, edge, feats);
       if (final)
-	pimpl->lexicalized_reordering_final_score(state, features);
+	pimpl->lexicalized_reordering_final_score(state, feats);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
     
     void LexicalizedReordering::apply_coarse(state_ptr_type& state,

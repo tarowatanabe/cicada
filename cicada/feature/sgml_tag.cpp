@@ -200,9 +200,11 @@ namespace cicada
 			feature_set_type& features,
 			const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      feature_set_type feats;
       
-      pimpl->sgml_tag_score(state, states, edge, features, final);
+      pimpl->sgml_tag_score(state, states, edge, feats, final);
+      
+      features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
     
     void SGMLTag::apply_coarse(state_ptr_type& state,
