@@ -1057,10 +1057,10 @@ namespace cicada
 	      if (result.first->second == Tp())
 		__sparse->erase(result.first);
 	    }
+	    
+	    hint = result.first;
+	    ++ hint;
 	  }
-	  
-	  hint = result.first;
-	  ++ hint;
 	}
       } else {
 	dense_vector_type dense_new;
