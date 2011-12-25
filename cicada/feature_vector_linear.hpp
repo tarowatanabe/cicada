@@ -228,6 +228,14 @@ namespace cicada
       return *this;
     }
     
+  public:
+    friend size_t hash_value(FeatureVectorLinear const& x) { return utils::hashmurmur<size_t>()(x.__map.begin(), x.__map.end(), 0); }
+    friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
+    friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }
+    friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }
+    friend bool operator>(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map > y.__map; }
+    friend bool operator<=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map <= y.__map; }
+    friend bool operator>=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map >= y.__map; }
      
   private:
     map_type __map;
