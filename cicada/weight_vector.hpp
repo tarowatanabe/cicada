@@ -25,7 +25,7 @@ namespace cicada
   class FeatureVector;
 
   template <typename Tp, typename Alloc >
-  class FeatureSparseVector;
+  class FeatureVectorSparse;
 
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class WeightVector
@@ -356,6 +356,6 @@ namespace std
 };
 
 #include <cicada/feature_vector.hpp>
-#include <cicada/feature_sparse_vector.hpp>
+#include <cicada/feature_vector_sparse.hpp>
 
 #endif

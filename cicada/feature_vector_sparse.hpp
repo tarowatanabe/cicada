@@ -3,8 +3,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__FEATURE_SPARSE_VECTOR__HPP__
-#define __CICADA__FEATURE_SPARSE_VECTOR__HPP__ 1
+#ifndef __CICADA__FEATURE_VECTOR_SPARSE__HPP__
+#define __CICADA__FEATURE_VECTOR_SPARSE__HPP__ 1
 
 #include <map>
 #include <memory>
@@ -32,7 +32,7 @@ namespace cicada
   class WeightVector;
   
   template <typename Tp, typename Alloc=std::allocator<Tp> >
-  class FeatureSparseVector
+  class FeatureVectorSparse
   {
   public:
     typedef cicada::Feature feature_type;
@@ -56,24 +56,24 @@ namespace cicada
     typedef typename map_type::reference        reference;
      
   public:
-    typedef FeatureSparseVector<Tp, Alloc> self_type;
+    typedef FeatureVectorSparse<Tp, Alloc> self_type;
      
   public:
-    FeatureSparseVector() : __map() { initialize(); }
-    FeatureSparseVector(const self_type& x) : __map(x.__map) { }
+    FeatureVectorSparse() : __map() { initialize(); }
+    FeatureVectorSparse(const self_type& x) : __map(x.__map) { }
     template <typename T, typename A>
-    FeatureSparseVector(const FeatureSparseVector<T,A>& x) : __map() { initialize(); __map.insert(x.begin(), x.end()); }
+    FeatureVectorSparse(const FeatureVectorSparse<T,A>& x) : __map() { initialize(); __map.insert(x.begin(), x.end()); }
     template <typename Iterator>
-    FeatureSparseVector(Iterator first, Iterator last) : __map() { initialize(); __map.insert(first, last); } 
+    FeatureVectorSparse(Iterator first, Iterator last) : __map() { initialize(); __map.insert(first, last); } 
      
-    FeatureSparseVector& operator=(const self_type& x)
+    FeatureVectorSparse& operator=(const self_type& x)
     {
       __map = x.__map;
       return *this;
     }
      
     template <typename T, typename A>
-    FeatureSparseVector& operator=(const FeatureSparseVector<T,A>& x)
+    FeatureVectorSparse& operator=(const FeatureVectorSparse<T,A>& x)
     {
       __map.clear();
       __map.insert(x.begin(), x.end());
@@ -90,7 +90,7 @@ namespace cicada
     }
      
     template <typename T, typename A>
-    void assign(const FeatureSparseVector<T,A>& x)
+    void assign(const FeatureVectorSparse<T,A>& x)
     {
       __map.clear();
       __map.insert(x.begin(), x.end());
@@ -125,7 +125,7 @@ namespace cicada
 
     void erase(const key_type& x) { __map.erase(x); }
      
-    void swap(FeatureSparseVector& x) { __map.swap(x.__map); }
+    void swap(FeatureVectorSparse& x) { __map.swap(x.__map); }
      
     void clear() { __map.clear(); }
 
@@ -148,21 +148,21 @@ namespace cicada
     //operators...
      
     template <typename T>
-    FeatureSparseVector& operator+=(const T& x)
+    FeatureVectorSparse& operator+=(const T& x)
     {
       std::for_each(begin(), end(), __apply_unary<std::plus<Tp>, T>(x));
       return *this;
     }
 
     template <typename T>
-    FeatureSparseVector& operator-=(const T& x)
+    FeatureVectorSparse& operator-=(const T& x)
     {
       std::for_each(begin(), end(), __apply_unary<std::minus<Tp>, T>(x));
       return *this;
     }
      
     template <typename T>
-    FeatureSparseVector& operator*=(const T& x)
+    FeatureVectorSparse& operator*=(const T& x)
     {
       if (x == T())
 	clear();
@@ -172,16 +172,16 @@ namespace cicada
     }
      
     template <typename T>
-    FeatureSparseVector& operator/=(const T& x)
+    FeatureVectorSparse& operator/=(const T& x)
     {
       std::for_each(begin(), end(), __apply_unary<std::divides<Tp>, T>(x));
       return *this;
     }
      
     template <typename T, typename A>
-    FeatureSparseVector& operator+=(const FeatureSparseVector<T,A>& x)
+    FeatureVectorSparse& operator+=(const FeatureVectorSparse<T,A>& x)
     {
-      typedef FeatureSparseVector<T,A> another_type;
+      typedef FeatureVectorSparse<T,A> another_type;
        
       typename another_type::const_iterator iter_end = x.end();
       for (typename another_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
@@ -198,9 +198,9 @@ namespace cicada
     }
 
     template <typename T, typename A>
-    FeatureSparseVector& operator-=(const FeatureSparseVector<T,A>& x)
+    FeatureVectorSparse& operator-=(const FeatureVectorSparse<T,A>& x)
     {
-      typedef FeatureSparseVector<T,A> another_type;
+      typedef FeatureVectorSparse<T,A> another_type;
        
       typename another_type::const_iterator iter_end = x.end();
       for (typename another_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
@@ -232,7 +232,7 @@ namespace std
 {
   template <typename T, typename A>
   inline
-  void swap(cicada::FeatureSparseVector<T,A>& x, cicada::FeatureSparseVector<T, A>& y)
+  void swap(cicada::FeatureVectorSparse<T,A>& x, cicada::FeatureVectorSparse<T, A>& y)
   {
     x.swap(y);
   }
