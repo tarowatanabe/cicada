@@ -58,12 +58,23 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
-      typedef std::vector<double, std::allocator<double> > cache_set_type;
+      struct score_set_type
+      {
+	double model1;
+	double viterbi;
+	double noisy_or;
+	
+	score_set_type() 
+	  : model1(- std::numeric_limits<double>::infinity()),
+	    viterbi(- std::numeric_limits<double>::infinity()),
+	    noisy_or(- std::numeric_limits<double>::infinity()) {}
+      };
+      typedef std::vector<score_set_type, std::allocator<score_set_type> > cache_set_type;
       
       typedef cicada::Lexicon lexicon_type;
       
       LexiconImpl()
-	: lexicon(0), uniques(), words(), caches_model1(), caches_noisy_or(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_noisy_or()
+	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_viterbi(), feature_noisy_or()
       { uniques.set_empty_key(word_type());  }
 
       struct skipper_epsilon
@@ -101,6 +112,7 @@ namespace cicada
 	const double inf = std::numeric_limits<double>::infinity();
 
 	double score_model1 = 0.0;
+	double score_viterbi = 0.0;
 	double score_noisy_or = 0.0;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
@@ -108,42 +120,46 @@ namespace cicada
 	  if (piter->is_terminal() && ! skipper(*piter)) {
 	    const symbol_type& target = *piter;
 
-	    if (target.id() >= caches_model1.size())
-	      caches_model1.resize(target.id() + 1, - inf);
-	    if (target.id() >= caches_noisy_or.size())
-	      caches_noisy_or.resize(target.id() + 1, - inf);
+	    if (target.id() >= caches.size())
+	      caches.resize(target.id() + 1);
 	    
-	    if (caches_model1[target.id()] == - inf) {
-	      double score = lexicon->operator()(vocab_type::EPSILON, target);
-	      
-	      sentence_type::const_iterator siter_end = words.end();
-	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score += lexicon->operator()(*siter, target);
-	      
-	      caches_model1[target.id()] = utils::mathop::log(score);
-	    }
-	    
-	    if (caches_noisy_or[target.id()] == - inf) {
+	    if (caches[target.id()].model1 == - inf) {
 	      //
 	      // 1.0 - exp(score) == - expm1(score)
 	      //
 	      
-	      double score = 0.0;
-	      sentence_type::const_iterator siter_end = words.end();
-	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score += utils::mathop::log(1.0 - lexicon->operator()(*siter, target));
+	      double score_model1 = lexicon->operator()(vocab_type::EPSILON, target);
+	      double score_viterbi = score_model1;
+	      double score_noisy_or = 0.0;
 	      
-	      caches_noisy_or[target.id()] = utils::mathop::log(- boost::math::expm1(score));
+	      sentence_type::const_iterator siter_end = words.end();
+	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter) {
+		const double score = lexicon->operator()(*siter, target);
+		
+		score_model1   += score;
+		score_viterbi   = std::max(score_viterbi, score);
+		score_noisy_or += utils::mathop::log(1.0 - score);
+	      }
+	      
+	      caches[target.id()].model1   = utils::mathop::log(score_model1);
+	      caches[target.id()].viterbi  = utils::mathop::log(score_viterbi);
+	      caches[target.id()].noisy_or = utils::mathop::log(- boost::math::expm1(score_noisy_or));
 	    }
 	    
-	    score_model1   += caches_model1[target.id()];
-	    score_noisy_or += caches_noisy_or[target.id()];
+	    score_model1   += caches[target.id()].model1;
+	    score_viterbi  += caches[target.id()].viterbi;
+	    score_noisy_or += caches[target.id()].noisy_or;
 	  }
 	
 	if (score_model1 != 0.0)
 	  features[feature_model1] = score_model1;
 	else
 	  features.erase(feature_model1);
+
+	if (score_viterbi != 0.0)
+	  features[feature_viterbi] = score_viterbi;
+	else
+	  features.erase(feature_viterbi);
 	
 	if (score_noisy_or != 0.0)
 	  features[feature_noisy_or] = score_noisy_or;
@@ -194,21 +210,20 @@ namespace cicada
       {
 	uniques.clear();
 	words.clear();
-	caches_model1.clear();
-	caches_noisy_or.clear();
+	caches.clear();
       }
       
       lexicon_type* lexicon;
       
       word_set_type  uniques;
       sentence_type  words;
-      cache_set_type caches_model1;
-      cache_set_type caches_noisy_or;
+      cache_set_type caches;
       
       bool skip_sgml_tag;
       bool unique_source;
       
       feature_type feature_model1;
+      feature_type feature_viterbi;
       feature_type feature_noisy_or;
     };
     
@@ -251,6 +266,7 @@ namespace cicada
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->unique_source = unique_source;
       lexicon_impl->feature_model1   = (name.empty() ? std::string("lexicon") : name) + ":model1";
+      lexicon_impl->feature_viterbi  = (name.empty() ? std::string("lexicon") : name) + ":viterbi";
       lexicon_impl->feature_noisy_or = (name.empty() ? std::string("lexicon") : name) + ":noisy-or";
       
       // open!
