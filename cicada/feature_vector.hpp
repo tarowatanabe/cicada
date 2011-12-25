@@ -386,7 +386,7 @@ namespace cicada
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
       if (x.sparse())
-	update_ordered(x.saprse_begin(), x.sparse_end(), prefix);
+	update_ordered(x.sparse_begin(), x.sparse_end(), prefix);
       else
 	update_ordered(x.dense_begin(), x.dense_end(), prefix);
     }
@@ -407,50 +407,50 @@ namespace cicada
     template <typename Iterator, typename Prefix>
     void update_ordered(Iterator iter2, Iterator iter2_end, const Prefix& prefix)
     {
-      if (sparse())
-	update_ordered(sparse_begin(), sparse_end(), iter2, iter2_end, prefix);
-      else
-	update_ordered(dense_begin(), dense_end(), iter2, iter2_end, prefix);
+      if (iter2 == iter2_end)
+	erase_prefix(prefix);
+      else {
+	if (sparse())
+	  update_ordered(sparse_begin(), sparse_end(), iter2, iter2_end, prefix);
+	else
+	  update_ordered(dense_begin(), dense_end(), iter2, iter2_end, prefix);
+      }
     }
-
+    
     template <typename Iterator1, typename Iterator2, typename Prefix>
     void update_ordered(Iterator1 iter1, Iterator1 iter1_end, Iterator2 iter2, Iterator2 iter2_end, const Prefix& prefix)
     {
       typedef std::pair<feature_type, data_type> feat_type;
       typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
-    
+      
       // update this by x
       // logically, we erase-prefix, then *this += x;
       
-      if (iter2 == iter2_end)
-	erase_prefix(prefix);
-      else {
-	feat_set_type feats;
-	feats.reserve(size());
+      feat_set_type feats;
+      feats.reserve(size());
 	
-	while (iter1 != iter1_end && iter2 != iter2_end) {
-	  if (iter1->first < iter2->first) {
-	    if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
-	      feats.push_back(*iter1);
-	    ++ iter1;
-	  } else if (iter2->first < iter1->first) {
-	    feats.push_back(*iter2);
-	    ++ iter2;
-	  } else {
-	    feats.push_back(*iter2);
-	    ++ iter1;
-	    ++ iter2;
-	  }
-	}
-	
-	for (/**/; iter1 != iter1_end; ++ iter1) 
+      while (iter1 != iter1_end && iter2 != iter2_end) {
+	if (iter1->first < iter2->first) {
 	  if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
 	    feats.push_back(*iter1);
-	
-	feats.insert(feats.end(), iter2, iter2_end);
-	
-	assign(feats.begin(), feats.end());
+	  ++ iter1;
+	} else if (iter2->first < iter1->first) {
+	  feats.push_back(*iter2);
+	  ++ iter2;
+	} else {
+	  feats.push_back(*iter2);
+	  ++ iter1;
+	  ++ iter2;
+	}
       }
+	
+      for (/**/; iter1 != iter1_end; ++ iter1) 
+	if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
+	  feats.push_back(*iter1);
+	
+      feats.insert(feats.end(), iter2, iter2_end);
+	
+      assign(feats.begin(), feats.end());
     }
 
     template <typename Iterator, typename Prefix>
