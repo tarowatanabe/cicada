@@ -765,11 +765,9 @@ namespace cicada
 	}
 	
 	if (x.sparse()) {
-	  typename sparse_vector_type::iterator hint = __sparse->begin();
-	  
 	  typename another_type::sparse_vector_type::const_iterator iter2_end = x.__sparse->end();
 	  for (typename another_type::sparse_vector_type::const_iterator iter2 = x.__sparse->begin(); iter2 != iter2_end; ++ iter2) {
-	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, *iter2);
+	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(*iter2);
 	    
 	    if (! result.second) {
 	      result.first->second += iter2->second;
@@ -777,16 +775,11 @@ namespace cicada
 	      if (result.first->second == Tp())
 		__sparse->erase(result.first);
 	    }
-	    
-	    hint = result.first;
-	    ++ hint;
 	  }
 	} else {
-	  typename sparse_vector_type::iterator hint = __sparse->begin();
-	  
 	  typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
 	  for (typename another_type::dense_vector_type::const_iterator iter2 = x.__dense.begin(); iter2 != iter2_end; ++ iter2) {
-	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, *iter2);
+	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(*iter2);
 	    
 	    if (! result.second) {
 	      result.first->second += iter2->second;
@@ -794,9 +787,6 @@ namespace cicada
 	      if (result.first->second == Tp())
 		__sparse->erase(result.first);
 	    }
-	    
-	    hint = result.first;
-	    ++ hint;
 	  }
 	}
       } else {
@@ -858,11 +848,9 @@ namespace cicada
 	  __dense.clear();
 	}
 	
-	typename sparse_vector_type::iterator hint = __sparse->begin();
-	
 	typename another_type::const_iterator iter2_end = x.end();
 	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, *iter2);
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(*iter2);
 	  
 	  if (! result.second) {
 	    result.first->second += iter2->second;
@@ -870,9 +858,6 @@ namespace cicada
 	    if (result.first->second == Tp())
 	      __sparse->erase(result.first);
 	  }
-	  
-	  hint = result.first;
-	  ++ hint;
 	}
       } else {
 	dense_vector_type dense_new;
@@ -929,36 +914,26 @@ namespace cicada
 	}
 
 	if (x.sparse()) {
-	  typename sparse_vector_type::iterator hint = __sparse->begin();
-	
 	  typename another_type::sparse_vector_type::const_iterator iter2_end = x.__sparse->end();
 	  for (typename another_type::sparse_vector_type::const_iterator iter2 = x.__sparse->begin(); iter2 != iter2_end; ++ iter2) {
-	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, std::make_pair(iter2->first, -Tp(iter2->second)));
+	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(std::make_pair(iter2->first, -Tp(iter2->second)));
 	    if (! result.second) {
 	      result.first->second -= iter2->second;
 	    
 	      if (result.first->second == Tp())
 		__sparse->erase(result.first);
 	    }
-
-	    hint = result.first;
-	    ++ hint;
 	  }
 	} else {
-	  typename sparse_vector_type::iterator hint = __sparse->begin();
-	
 	  typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
 	  for (typename another_type::dense_vector_type::const_iterator iter2 = x.__dense.begin(); iter2 != iter2_end; ++ iter2) {
-	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, std::make_pair(iter2->first, -Tp(iter2->second)));
+	    std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(std::make_pair(iter2->first, -Tp(iter2->second)));
 	    if (! result.second) {
 	      result.first->second -= iter2->second;
 	    
 	      if (result.first->second == Tp())
 		__sparse->erase(result.first);
 	    }
-
-	    hint = result.first;
-	    ++ hint;
 	  }
 	}
       } else {
@@ -1015,20 +990,15 @@ namespace cicada
 	  __dense.clear();
 	}
 
-	typename sparse_vector_type::iterator hint = __sparse->begin();
-	
 	typename another_type::const_iterator iter2_end = x.end();
 	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(hint, std::make_pair(iter2->first, -Tp(iter2->second)));
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(std::make_pair(iter2->first, -Tp(iter2->second)));
 	  if (! result.second) {
 	    result.first->second -= iter2->second;
 	    
 	    if (result.first->second == Tp())
 	      __sparse->erase(result.first);
 	  }
-
-	  hint = result.first;
-	  ++ hint;
 	}
       } else {
 	dense_vector_type dense_new;
