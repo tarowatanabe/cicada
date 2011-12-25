@@ -169,9 +169,15 @@ namespace cicada
      
     inline const_iterator end() const { return __map.end(); }
     inline       iterator end()       { return __map.end(); }
-     
+    
     inline const_iterator find(const key_type& x) const { return __map.find(x); }
     inline       iterator find(const key_type& x)       { return __map.find(x); }
+    
+    inline const_iterator lower_bound(const key_type& x) const { return __map.lower_bound(x); }
+    inline       iterator lower_bound(const key_type& x)       { return __map.lower_bound(x); }
+    
+    inline const_iterator upper_bound(const key_type& x) const { return __map.upper_bound(x); }
+    inline       iterator upper_bound(const key_type& x)       { return __map.upper_bound(x); }
 
     void erase(const key_type& x) { __map.erase(x); }
      
@@ -229,7 +235,6 @@ namespace cicada
     }
     
   public:
-    friend size_t hash_value(FeatureVectorLinear const& x) { return utils::hashmurmur<size_t>()(x.__map.begin(), x.__map.end(), 0); }
     friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
     friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }
     friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }
