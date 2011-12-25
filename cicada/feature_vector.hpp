@@ -314,6 +314,7 @@ namespace cicada
 	typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
 	
 	feat_set_type feats;
+	feats.reserve(size() + x.size());
 	
 	const_iterator iter1     = begin();
 	const_iterator iter1_end = end();
@@ -773,6 +774,7 @@ namespace cicada
       }
       
       feat_set_type feats;
+      feats.reserve(size());
       
       const_iterator iter1     = lower_bound(x.begin()->first);
       const_iterator iter1_end = end();
