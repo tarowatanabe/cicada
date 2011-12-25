@@ -259,7 +259,7 @@ namespace cicada
       lexicon_impl->lexicon = &cicada::Lexicon::create(path);
 
       if (! lexicon_impl->lexicon)
-	throw std::runtime_error("no lexicon")?
+	throw std::runtime_error("no lexicon");
       
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("lexicon") : name);
