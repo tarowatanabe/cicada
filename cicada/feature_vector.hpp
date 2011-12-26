@@ -664,16 +664,14 @@ namespace cicada
     friend
     bool operator==(const FeatureVector& x, const FeatureVector& y)
     {
-      if (x.__sparse)
-	return ((y.__sparse && *x.__sparse == *y.__sparse)
-		|| (! y.__sparse
-		    && x.__sparse->size() == y.__dense.size()
-		    && std::equal(x.__sparse->begin(), x.__sparse->end(), y.__dense.begin(), __equal_value())));
-      else
-	return ((! y.__sparse && x.__dense == y.__dense)
-		|| (y.__sparse 
-		    && x.__dense.size() == y.__sparse->size()
-		    && std::equal(x.__dense.begin(), x.__dense.end(), y.__sparse->begin(), __equal_value())));
+      return ((x.__sparse && y.__sparse && *x.__sparse == *y.__sparse)
+	      || (! x.__sparse && ! y.__sparse && x.__dense == y.__dense)
+	      || (x.__sparse && ! y.__sparse
+		  && x.__sparse->size() == y.__dense.size()
+		  && std::equal(x.__sparse->begin(), x.__sparse->end(), y.__dense.begin(), __equal_value()))
+	      || (! x.__sparse && y.__sparse
+		  && x.__dense.size() == y.__sparse->size()
+		  && std::equal(x.__dense.begin(), x.__dense.end(), y.__sparse->begin(), __equal_value())));
     }
     
     friend
@@ -685,16 +683,14 @@ namespace cicada
     friend
     bool operator<(const FeatureVector& x, const FeatureVector& y)
     {
-      if (x.__sparse)
-	return ((y.__sparse && *x.__sparse < *y.__sparse)
-		|| (! y.__sparse && std::lexicographical_compare(x.__sparse->begin(), x.__sparse->end(),
-								 y.__dense.begin(), y.__dense.end(),
-								 __less_value())));
-      else
-	return ((! y.__sparse && x.__dense < y.__dense)
-		|| (y.__sparse && std::lexicographical_compare(x.__dense.begin(), x.__dense.end(),
-							       y.__sparse->begin(), y.__sparse->end(),
-							       __less_value())));
+      return ((x.__sparse && y.__sparse && *x.__sparse < *y.__sparse)
+	      || (! x.__sparse && ! y.__sparse && x.__dense < y.__dense)
+	      || (x.__sparse && ! y.__sparse && std::lexicographical_compare(x.__sparse->begin(), x.__sparse->end(),
+									     y.__dense.begin(), y.__dense.end(),
+									     __less_value()))
+	      || (! x.__sparse && y.__sparse && std::lexicographical_compare(x.__dense.begin(), x.__dense.end(),
+									     y.__sparse->begin(), y.__sparse->end(),
+									     __less_value())));
     }
 
     friend
