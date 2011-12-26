@@ -11,6 +11,8 @@
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
+#include "cicada/feature_vector_linear.hpp"
+#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -54,6 +56,9 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
 
+      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
+      typedef FeatureVectorLinear<feature_set_type::mapped_type>    feature_linear_set_type;
+
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
       
@@ -66,7 +71,7 @@ namespace cicada
       
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
 
-      typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
+      typedef utils::alloc_vector<feature_linear_set_type, std::allocator<feature_linear_set_type> > cache_set_type;
 
       struct CacheNormalize
       {
@@ -122,8 +127,7 @@ namespace cicada
 	  if (piter->is_terminal() && ! skipper(*piter)) {
 
 	    if (! caches.exists(piter->id())) {
-	      feature_set_type& features = caches[piter->id()];
-	      features.clear();
+	      feature_unordered_set_type features;
 	      
 	      sentence_type::const_iterator witer_end = words.end();
 	      for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
@@ -144,6 +148,8 @@ namespace cicada
 		  }
 		}
 	      }
+	      
+	      caches[piter->id()] = features;
 	    }
 	    
 	    features += caches[piter->id()];

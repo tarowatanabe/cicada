@@ -386,15 +386,15 @@ namespace cicada
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
       if (x.sparse())
-	update_ordered(x.sparse_begin(), x.sparse_end(), prefix);
+	update_ordered(x.sparse_begin(), x.sparse_end(), prefix, true);
       else
-	update_ordered(x.dense_begin(), x.dense_end(), prefix);
+	update_ordered(x.dense_begin(), x.dense_end(), prefix, false);
     }
-
+    
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVectorLinear<T,A>& x, const Prefix& prefix)
     {
-      update_ordered(x.begin(), x.end(), prefix);
+      update_ordered(x.begin(), x.end(), prefix, x.size() > __dense_size);
     }
 
     template <typename T, typename A, typename Prefix>
@@ -405,52 +405,67 @@ namespace cicada
 
   private:
     template <typename Iterator, typename Prefix>
-    void update_ordered(Iterator iter2, Iterator iter2_end, const Prefix& prefix)
+    void update_ordered(Iterator iter2, Iterator iter2_end, const Prefix& prefix, const bool large=false)
     {
       if (iter2 == iter2_end)
 	erase_prefix(prefix);
       else {
-	if (sparse())
-	  update_ordered(sparse_begin(), sparse_end(), iter2, iter2_end, prefix);
-	else
-	  update_ordered(dense_begin(), dense_end(), iter2, iter2_end, prefix);
+	if (__sparse || large) {
+	  if (! __sparse) {
+	    __sparse = new sparse_vector_type();
+	    
+	    update_ordered(*__sparse, __dense.begin(), __dense.end(), iter2, iter2_end, prefix);
+	    
+	    __dense.clear();
+	  } else {
+	    sparse_vector_type sparse_new;
+	    
+	    update_ordered(sparse_new, __sparse->begin(), __sparse->end(), iter2, iter2_end, prefix);
+	    
+	    __sparse->swap(sparse_new);
+	  }
+	} else {
+	  dense_vector_type dense_new;
+	  
+	  update_ordered(dense_new, __dense.begin(), __dense.end(), iter2, iter2_end, prefix);
+	  
+	  __dense.swap(dense_new);
+	  
+	  if (__dense.size() > __dense_size) {
+	    __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	    __dense.clear();
+	  }
+	}
       }
     }
     
-    template <typename Iterator1, typename Iterator2, typename Prefix>
-    void update_ordered(Iterator1 iter1, Iterator1 iter1_end, Iterator2 iter2, Iterator2 iter2_end, const Prefix& prefix)
+    template <typename Container, typename Iterator1, typename Iterator2, typename Prefix>
+    void update_ordered(Container& container, Iterator1 iter1, Iterator1 iter1_end, Iterator2 iter2, Iterator2 iter2_end, const Prefix& prefix)
     {
-      typedef std::pair<feature_type, data_type> feat_type;
-      typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
-      
       // update this by x
       // logically, we erase-prefix, then *this += x;
       
-      feat_set_type feats;
-      feats.reserve(size());
-	
       while (iter1 != iter1_end && iter2 != iter2_end) {
 	if (iter1->first < iter2->first) {
 	  if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
-	    feats.push_back(*iter1);
+	    container.insert(container.end(), *iter1);
 	  ++ iter1;
 	} else if (iter2->first < iter1->first) {
-	  feats.push_back(*iter2);
+	  container.insert(container.end(), *iter2);
 	  ++ iter2;
 	} else {
-	  feats.push_back(*iter2);
+	  container.insert(container.end(), *iter2);
 	  ++ iter1;
 	  ++ iter2;
 	}
       }
-	
+      
       for (/**/; iter1 != iter1_end; ++ iter1) 
 	if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
-	  feats.push_back(*iter1);
-	
-      feats.insert(feats.end(), iter2, iter2_end);
-	
-      assign(feats.begin(), feats.end());
+	  container.insert(container.end(), *iter1);
+      
+      for (/**/; iter2 != iter2_end; ++ iter2)
+	container.insert(container.end(), *iter2);
     }
 
     template <typename Iterator, typename Prefix>
@@ -749,8 +764,6 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator+=(const FeatureVector<T,A>& x)
     {
-      typedef FeatureVector<T,A> another_type;
-      
       if (x.empty())
 	return *this;
       else if (empty()) {
@@ -760,14 +773,20 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = new sparse_vector_type();
+	  
+	  if (x.sparse())
+	    plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__sparse->begin(), x.__sparse->end());
+	  else
+	    plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
+	  
 	  __dense.clear();
+	} else {
+	  if (x.sparse())
+	    plus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
+	  else
+	    plus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
 	}
-	
-	if (x.sparse())
-	  plus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
-	else
-	  plus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
       } else {
 	dense_vector_type dense_new;
 
@@ -784,11 +803,11 @@ namespace cicada
       return *this;
     }
 
+    self_type& operator+=(const FeatureVectorCompact& x);
+
     template <typename T, typename A>
     self_type& operator+=(const FeatureVectorLinear<T,A>& x)
     {
-      typedef FeatureVectorLinear<T,A> another_type;
-      
       if (x.empty())
 	return *this;
       else if (empty()) {
@@ -798,14 +817,16 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = new sparse_vector_type();
+	  
+	  plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.begin(), x.end());
+	  
 	  __dense.clear();
-	}
-	
-	plus_equal_ordered(*__sparse, x.begin(), x.end());
+	} else
+	  plus_equal_ordered(*__sparse, x.begin(), x.end());
       } else {
 	dense_vector_type dense_new;
-
+	
 	plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
 	
 	__dense.swap(dense_new);
@@ -822,8 +843,6 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator+=(const FeatureVectorUnordered<T,A>& x)
     {
-      typedef FeatureVectorUnordered<T,A> another_type;
-      
       if (x.empty())
 	return *this;
       else if (empty()) {
@@ -853,20 +872,24 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator-=(const FeatureVector<T,A>& x)
     {
-      typedef FeatureVector<T,A> another_type;
-      
       if (x.empty()) return *this;
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = new sparse_vector_type();
+	  
+	  if (x.sparse())
+	    minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__sparse->begin(), x.__sparse->end());
+	  else
+	    minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
+	  
 	  __dense.clear();
+	} else {
+	  if (x.sparse())
+	    minus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
+	  else
+	    minus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
 	}
-
-	if (x.sparse())
-	  minus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
-	else
-	  minus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
       } else {
 	dense_vector_type dense_new;
 	
@@ -883,20 +906,22 @@ namespace cicada
       return *this;
     }
 
+    self_type& operator-=(const FeatureVectorCompact& x);
+
     template <typename T, typename A>
     self_type& operator-=(const FeatureVectorLinear<T,A>& x)
     {
-      typedef FeatureVectorLinear<T,A> another_type;
-      
       if (x.empty()) return *this;
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = new sparse_vector_type();
+	  
+	  minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.begin(), x.end());
+	  
 	  __dense.clear();
-	}
-	
-	minus_equal_ordered(*__sparse, x.begin(), x.end());
+	} else
+	  minus_equal_ordered(*__sparse, x.begin(), x.end());
       } else {
 	dense_vector_type dense_new;
 	
@@ -916,8 +941,6 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator-=(const FeatureVectorUnordered<T,A>& x)
     {
-      typedef FeatureVectorUnordered<T,A> another_type;
-      
       if (x.empty()) return *this;
       
       if (__sparse || x.size() > __dense_size) {
@@ -1013,11 +1036,11 @@ namespace cicada
 	  ++ first2;
 	}
       }
-	
-      if (first1 != last1)
-	container.insert(first1, last1);
-      if (first2 != last2)
-	container.insert(first2, last2);
+      
+      for (/**/; first1 != last1; ++ first1)
+	container.insert(container.end(), *first1);
+      for (/**/; first2 != last2; ++ first2)
+	container.insert(container.end(), *first2);
     }
 
     template <typename Container, typename Iterator>
@@ -1077,8 +1100,8 @@ namespace cicada
 	}
       }
       
-      if (first1 != last1)
-	container.insert(first1, last1);
+      for (/**/; first1 != last1; ++ first1)
+	container.insert(container.end(), *first1);
       for (/**/; first2 != last2; ++ first2)
 	container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
     }
@@ -1326,6 +1349,60 @@ namespace cicada
     
     assign(feats.begin(), feats.end());
   }
+
+  template <typename T, typename A>
+  inline
+  FeatureVector<T,A>& FeatureVector<T,A>::operator+=(const FeatureVectorCompact& x)
+  {
+    if (x.empty())
+      return *this;
+    else if (empty()) {
+      assign(x);
+      return *this;
+    }
+      
+    if (__sparse)
+      plus_equal_ordered(*__sparse, x.begin(), x.end());
+    else {
+      dense_vector_type dense_new;
+      
+      plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
+      
+      __dense.swap(dense_new);
+      
+      if (__dense.size() > __dense_size) {
+	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__dense.clear();
+      }
+    }
+    
+    return *this;
+  }
+
+  template <typename T, typename A>
+  inline
+  FeatureVector<T,A>& FeatureVector<T,A>::operator-=(const FeatureVectorCompact& x)
+  {
+    if (x.empty()) return *this;
+    
+    if (__sparse)
+      minus_equal_ordered(*__sparse, x.begin(), x.end());
+    else {
+      dense_vector_type dense_new;
+	
+      minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
+	
+      __dense.swap(dense_new);
+	
+      if (__dense.size() > __dense_size) {
+	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__dense.clear();
+      }
+    }
+    
+    return *this;
+  }
+  
 };  
 
 #endif
