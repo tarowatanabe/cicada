@@ -247,22 +247,21 @@ namespace cicada
 	__sparse = 0;
       }
     }
-
+    
     template <typename T, typename A>
     void assign(const FeatureVector<T,A>& x)
     {
+      __dense.clear();
+      __dense.insert(x.__dense.begin(), x.__dense.end());
       if (x.__sparse) {
-	__dense.clear();
-	if (__sparse)
-	  *__sparse = *(x.__sparse);
-	else
-	  __sparse = new sparse_vector_type(*(x.__sparse));
-      } else {
 	if (__sparse) {
-	  delete __sparse;
-	  __sparse = 0;
-	}
-	__dense = x.__dense;
+	  __sparse->clear();
+	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
+	} else
+	  __sparse = new sparse_vector_type(x.__sparse->begin(), x.__sparse->end());
+      } else if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
       }
     }
 
