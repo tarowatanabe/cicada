@@ -125,7 +125,7 @@ namespace cicada
     {
       __map.clear();
       if (x.sparse())
-	__map.insert(x.sparse_begin(), x.saprse_end());
+	__map.insert(x.sparse_begin(), x.sparse_end());
       else
 	__map.insert(x.dense_begin(), x.dense_end());
     }
