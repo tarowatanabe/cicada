@@ -130,8 +130,14 @@ int main(int argc, char** argv)
   std::cout << "feature1 == feature2" << std::endl;
   std::cout << (features1 == features2) << std::endl;
 
+  std::cout << "feature1 != feature2" << std::endl;
+  std::cout << (features1 != features2) << std::endl;
+
   std::cout << "feature1 == feature1(copied)" << std::endl;
   std::cout << (features1 == feature_set_type(features1)) << std::endl;
+
+  std::cout << "feature1 != feature1(copied)" << std::endl;
+  std::cout << (features1 != feature_set_type(features1)) << std::endl;
 
   std::cout << "feature1 > feature2" << std::endl;
   std::cout << (features1 > features2) << std::endl;
