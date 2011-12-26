@@ -280,6 +280,10 @@ namespace cicada
       return *this;
     }
 
+  public:
+    friend bool operator==(const FeatureVectorUnordered& x, const FeatureVectorUnordered& y) { return x.__map == y.__map; }
+    friend bool operator!=(const FeatureVectorUnordered& x, const FeatureVectorUnordered& y) { return x.__map != y.__map; }
+
   private:
     template <typename Iterator>
     void plus_equal(Iterator first, Iterator last)
@@ -299,7 +303,7 @@ namespace cicada
     void minus_equal(Iterator first, Iterator last)
     {
       for (/**/; first != last; ++ first) {
-	std::pair<iterator, bool> result = __map.insert(std::make_pair(first->first, - first->second));
+	std::pair<iterator, bool> result = __map.insert(std::make_pair(first->first, - Tp(first->second)));
 	if (! result.second) {
 	  result.first->second -= first->second;
 	  
