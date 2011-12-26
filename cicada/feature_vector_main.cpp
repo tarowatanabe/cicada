@@ -124,6 +124,18 @@ int main(int argc, char** argv)
   std::cout << "dot_product(feature1, feature2)" << std::endl;
   std::cout << dot_product(features1, features2) << std::endl;
 
+  std::cout << "feature1 < feature2" << std::endl;
+  std::cout << (features1 < features2) << std::endl;
+
+  std::cout << "feature1 == feature2" << std::endl;
+  std::cout << (features1 == features2) << std::endl;
+
+  std::cout << "feature1 == feature1(copied)" << std::endl;
+  std::cout << (features1 == feature_set_type(features1)) << std::endl;
+
+  std::cout << "feature1 > feature2" << std::endl;
+  std::cout << (features1 > features2) << std::endl;
+
   check_compact(features1);
   check_compact(features2);
   check_compact(features3);
