@@ -7,6 +7,8 @@
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
+#include "cicada/feature_vector_linear.hpp"
+#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/array_power2.hpp"
 #include "utils/piece.hpp"
@@ -41,6 +43,9 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
+      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
+      typedef FeatureVectorLinear<feature_set_type::mapped_type>    feature_linear_set_type;
+      
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
       
@@ -68,7 +73,7 @@ namespace cicada
 	
 	phrase_type      context;
 	phrase_type      ngram;
-	feature_set_type features;
+	feature_linear_set_type features;
 	
 	CacheContext() : context(), ngram(), features() {}
       };
@@ -78,7 +83,7 @@ namespace cicada
 	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
 	
 	phrase_type      ngram;
-	feature_set_type features;
+	feature_linear_set_type features;
 	
 	CacheNGram() : ngram(), features() {}
       };
@@ -277,6 +282,8 @@ namespace cicada
 	  cache.ngram.assign(iter, last);
 	  cache.features.clear();
 	  
+	  feature_unordered_set_type features;
+	  
 	  for (/**/; first != iter; ++ first) {
 	    trie_type::id_type id = trie.root();
 	    
@@ -290,9 +297,11 @@ namespace cicada
 	      
 	      feature_list_type::const_iterator fiter_end = feats.end();
 	      for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		cache.features[*fiter] += 1.0;
+		features[*fiter] += 1.0;
 	    }
 	  }
+	  
+	  cache.features = features;
 	}
 	
 	features += cache.features;
@@ -309,6 +318,8 @@ namespace cicada
 	if (! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
 	  cache.features.clear();
+
+	  feature_unordered_set_type features;
 	  
 	  for (/**/; first != last; ++ first) {
 	    trie_type::id_type id = trie.root();
@@ -321,9 +332,11 @@ namespace cicada
 	      
 	      feature_list_type::const_iterator fiter_end = feats.end();
 	      for (feature_list_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
-		cache.features[*fiter] += 1.0;
+		features[*fiter] += 1.0;
 	    }
 	  }
+	  
+	  cache.features = features;
 	}
 	
 	features += cache.features;
