@@ -23,6 +23,12 @@ namespace cicada
   template <typename __Tp, typename __Alloc >
   class FeatureVector;
 
+  template <typename __Tp, typename __Alloc >
+  class FeatureVectorLinear;
+
+  template <typename __Tp, typename __Alloc >
+  class FeatureVectorUnordered;
+
   // a compact feature vector representation which do not allow any modification, and
   // uses input-iterator, not bidirectional/random-access iterator
   // we use double as our underlying stroage..
@@ -319,6 +325,12 @@ namespace cicada
     template <typename T, typename A>
     FeatureVectorCompact(const FeatureVector<T, A>& x) { assign(x); }
     
+    template <typename T, typename A>
+    FeatureVectorCompact(const FeatureVectorLinear<T, A>& x) { assign(x); }
+
+    template <typename T, typename A>
+    FeatureVectorCompact(const FeatureVectorUnordered<T, A>& x) { assign(x); }
+    
     FeatureVectorCompact(const FeatureVectorCompact& x) : impl(x.impl) {}
 
     FeatureVectorCompact& operator=(const FeatureVectorCompact& x)
@@ -329,6 +341,20 @@ namespace cicada
     
     template <typename T, typename A>
     FeatureVectorCompact& operator=(const FeatureVector<T, A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
+    template <typename T, typename A>
+    FeatureVectorCompact& operator=(const FeatureVectorLinear<T, A>& x)
+    {
+      assign(x);
+      return *this;
+    }
+
+    template <typename T, typename A>
+    FeatureVectorCompact& operator=(const FeatureVectorUnordered<T, A>& x)
     {
       assign(x);
       return *this;
@@ -373,6 +399,33 @@ namespace cicada
       impl.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
     }
 
+    template <typename T, typename A>
+    void assign(const FeatureVectorLinear<T, A>& x)
+    {
+      typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
+
+      encoder_type encoder;
+      compressed_type compressed(x.size() * 16);
+      
+      impl.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
+    }
+
+    template <typename T, typename A>
+    void assign(const FeatureVectorUnordered<T, A>& x)
+    {
+      typedef std::pair<feature_type, double> pair_type;
+      typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
+      typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
+      
+      raw_type raw(x.begin(), x.end());
+      std::sort(raw.begin(), raw.end(), less_first<pair_type>());
+      
+      encoder_type encoder;
+      compressed_type compressed(raw.size() * 16);
+      
+      impl.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
+    }
+    
     
   public:
     const_iterator begin() const { return const_iterator(&(*impl.begin()), &(*impl.end())); }
@@ -413,5 +466,7 @@ namespace std
 
 
 #include <cicada/feature_vector.hpp>
+#include <cicada/feature_vector_linear.hpp>
+#include <cicada/feature_vector_unordered.hpp>
 
 #endif
