@@ -637,7 +637,9 @@ namespace cicada
     friend
     bool operator==(const FeatureVector& x, const FeatureVector& y)
     {
-      return (x.__sparse && y.__sparse && *x.__sparse == *y.__sparse) || (x.__sparse == 0 && y.__sparse == 0 && x.__dense == y.__dense);
+      return ((x.__sparse && y.__sparse && *x.__sparse == *y.__sparse)
+	      || (x.__sparse == 0 && y.__sparse == 0 && x.__dense == y.__dense)
+	      || (x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin())));
     }
 
     friend
