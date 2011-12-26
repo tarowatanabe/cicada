@@ -122,6 +122,7 @@ double scale = 1.0;
 // additional misc parameters...
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
+bool project_weight = false;
 bool line_search_mode = false;    // perform line-search
 bool mert_search_mode = false;    // perform MERT search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
@@ -1365,6 +1366,7 @@ void options(int argc, char** argv)
     
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
+    ("project-weight", po::bool_switch(&project_weight),     "project L2 weight")
     ("line-search",    po::bool_switch(&line_search_mode),   "perform line search")
     ("mert-search",    po::bool_switch(&mert_search_mode),   "perform mert search")
     ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")

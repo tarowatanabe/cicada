@@ -574,7 +574,7 @@ struct LearnExpectedLoss : public LearnBase
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
@@ -995,7 +995,7 @@ struct LearnOExpectedLoss : public LearnBase
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
@@ -1257,7 +1257,7 @@ struct LearnPegasos : public LearnOnlineMargin
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
@@ -1425,7 +1425,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
@@ -2034,7 +2034,7 @@ struct LearnSGDL2 : public LearnLR
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
@@ -2244,7 +2244,7 @@ struct LearnOSGDL2 : public LearnLR
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
     
-    if (weight_norm > 1.0 / lambda)
+    if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
