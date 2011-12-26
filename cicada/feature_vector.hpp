@@ -465,7 +465,7 @@ namespace cicada
 	  container.insert(container.end(), *iter1);
       
       for (/**/; iter2 != iter2_end; ++ iter2)
-	container.insert(container.end(), *iter2);
+	container.insert(iter2, iter2_end);
     }
 
     template <typename Iterator, typename Prefix>
@@ -1037,10 +1037,10 @@ namespace cicada
 	}
       }
       
-      for (/**/; first1 != last1; ++ first1)
-	container.insert(container.end(), *first1);
-      for (/**/; first2 != last2; ++ first2)
-	container.insert(container.end(), *first2);
+      if (first1 != last1)
+	container.insert(first1, last1);
+      if (first2 != last2)
+	container.insert(first2, last2);
     }
 
     template <typename Container, typename Iterator>
@@ -1062,8 +1062,8 @@ namespace cicada
 	}
       }
       
-      for (/**/; first != last; ++ first)
-	container.insert(container.end(), *first);
+      if (first != last)
+	container.insert(first, last);
     }
     
     template <typename Container, typename Iterator>
@@ -1100,8 +1100,8 @@ namespace cicada
 	}
       }
       
-      for (/**/; first1 != last1; ++ first1)
-	container.insert(container.end(), *first1);
+      if (first1 != last1)
+	container.insert(first1, last1);
       for (/**/; first2 != last2; ++ first2)
 	container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
     }
