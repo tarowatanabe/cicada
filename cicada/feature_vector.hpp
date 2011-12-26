@@ -405,29 +405,29 @@ namespace cicada
 
   private:
     template <typename Iterator, typename Prefix>
-    void update_ordered(Iterator iter2, Iterator iter2_end, const Prefix& prefix, const bool large=false)
+    void update_ordered(Iterator first, Iterator last, const Prefix& prefix, const bool large=false)
     {
-      if (iter2 == iter2_end)
+      if (first == last)
 	erase_prefix(prefix);
       else {
 	if (__sparse || large) {
 	  if (! __sparse) {
 	    __sparse = new sparse_vector_type();
 	    
-	    update_ordered(*__sparse, __dense.begin(), __dense.end(), iter2, iter2_end, prefix);
+	    update_ordered(*__sparse, __dense.begin(), __dense.end(), first, last, prefix);
 	    
 	    __dense.clear();
 	  } else {
 	    sparse_vector_type sparse_new;
 	    
-	    update_ordered(sparse_new, __sparse->begin(), __sparse->end(), iter2, iter2_end, prefix);
+	    update_ordered(sparse_new, __sparse->begin(), __sparse->end(), first, last, prefix);
 	    
 	    __sparse->swap(sparse_new);
 	  }
 	} else {
 	  dense_vector_type dense_new;
 	  
-	  update_ordered(dense_new, __dense.begin(), __dense.end(), iter2, iter2_end, prefix);
+	  update_ordered(dense_new, __dense.begin(), __dense.end(), first, last, prefix);
 	  
 	  __dense.swap(dense_new);
 	  
@@ -440,32 +440,32 @@ namespace cicada
     }
     
     template <typename Container, typename Iterator1, typename Iterator2, typename Prefix>
-    void update_ordered(Container& container, Iterator1 iter1, Iterator1 iter1_end, Iterator2 iter2, Iterator2 iter2_end, const Prefix& prefix)
+    void update_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, const Prefix& prefix)
     {
       // update this by x
       // logically, we erase-prefix, then *this += x;
       
-      while (iter1 != iter1_end && iter2 != iter2_end) {
-	if (iter1->first < iter2->first) {
-	  if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
-	    container.insert(container.end(), *iter1);
-	  ++ iter1;
-	} else if (iter2->first < iter1->first) {
-	  container.insert(container.end(), *iter2);
-	  ++ iter2;
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first) {
+	  if (first1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), first1->first.begin()))
+	    container.insert(container.end(), *first1);
+	  ++ first1;
+	} else if (first2->first < first1->first) {
+	  container.insert(container.end(), *first2);
+	  ++ first2;
 	} else {
-	  container.insert(container.end(), *iter2);
-	  ++ iter1;
-	  ++ iter2;
+	  container.insert(container.end(), *first2);
+	  ++ first1;
+	  ++ first2;
 	}
       }
       
-      for (/**/; iter1 != iter1_end; ++ iter1) 
-	if (iter1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), iter1->first.begin()))
-	  container.insert(container.end(), *iter1);
+      for (/**/; first1 != last1; ++ first1) 
+	if (first1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), first1->first.begin()))
+	  container.insert(container.end(), *first1);
       
-      for (/**/; iter2 != iter2_end; ++ iter2)
-	container.insert(iter2, iter2_end);
+      if (first2 != last2)
+	container.insert(first2, last2);
     }
 
     template <typename Iterator, typename Prefix>
