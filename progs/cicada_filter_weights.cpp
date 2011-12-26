@@ -130,6 +130,8 @@ int main(int argc, char** argv)
 	utils::compress_ostream os(output_file);
 	os << norm << '\n';
       }
+
+      return 0;
       
     } else if (distance_mode) {
       if (input_files.size() != 2)
