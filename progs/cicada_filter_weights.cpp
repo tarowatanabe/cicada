@@ -44,6 +44,7 @@ path_type     output_file = "-";
 path_type bound_lower_file;
 path_type bound_upper_file;
 
+bool norm_mode = false;
 bool distance_mode = false;
 bool average_mode = false;
 bool sum_mode = false;
@@ -53,6 +54,8 @@ bool normalize_l1 = false;
 bool normalize_l2 = false;
 bool distance_l1 = false;
 bool distance_l2 = false;
+bool norm_l1 = false;
+bool norm_l2 = false;
 
 int debug = 0;
 
@@ -81,14 +84,14 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (int(sum_mode) + average_mode + distance_mode > 1)
+    if (int(sum_mode) + average_mode + distance_mode + norm_mode > 1)
       throw std::runtime_error("You cannnot perform both sum, average and dist");
     if (normalize_l1 && normalize_l2)
       throw std::runtime_error("You cannnot perform both normalize-l1 and normalize-l2");
     if (sort_mode && sort_abs_mode)
       throw std::runtime_error("You cannnot perform both sort and sort-abs");
 
-    if (int(sum_mode) + average_mode + distance_mode == 0)
+    if (int(sum_mode) + average_mode + distance_mode + norm_mode == 0)
       sum_mode = true;
     
     weight_set_type weights;
@@ -97,7 +100,38 @@ int main(int argc, char** argv)
     if (input_files.empty())
       input_files.push_back("-");
     
-    if (distance_mode) {
+    if (norm_mode) {
+      if (input_files.size() > 2)
+	throw std::runtime_error("we need a single weights");
+    
+      if (int(norm_l1) + norm_l2 > 1)
+	throw std::runtime_error("you cannot compute both l1 and l2 norm");
+      if (int(norm_l1) + norm_l2 == 0)
+	norm_l2 = true;
+
+      weight_set_type weights;
+      
+      utils::compress_istream is(input_files.front(), 1024 * 1024);
+      
+      is >> weights;
+      
+      if (norm_l1) {
+	double norm = 0.0;
+	for (size_t i = 0; i != weights.size(); ++ i)
+	  norm += std::fabs(weights[i]);
+	
+	utils::compress_ostream os(output_file);
+	os << norm << '\n';
+      } else {
+	double norm = 0.0;
+	for (size_t i = 0; i != weights.size(); ++ i)
+	  norm += weights[i] * weights[i];
+	
+	utils::compress_ostream os(output_file);
+	os << norm << '\n';
+      }
+      
+    } else if (distance_mode) {
       if (input_files.size() != 2)
 	throw std::runtime_error("we need at least two weights for comparison");
 
@@ -306,6 +340,7 @@ void options(int argc, char** argv)
     ("bound-upper", po::value<path_type>(&bound_upper_file), "upper bound file")
 
     ("distance",     po::bool_switch(&distance_mode), "compute distance")
+    ("norm",         po::bool_switch(&norm_mode),     "compute norm")
     ("average",      po::bool_switch(&average_mode),  "average weights")
     ("sum",          po::bool_switch(&sum_mode),      "sum weights")
     
@@ -315,6 +350,8 @@ void options(int argc, char** argv)
     ("normalize-l2", po::bool_switch(&normalize_l2),  "weight normalization by L2")
     ("distance-l1",  po::bool_switch(&distance_l1),  "weight distance by L1")
     ("distance-l2",  po::bool_switch(&distance_l2),  "weight distance by L2")
+    ("norm-l1",      po::bool_switch(&norm_l1),      "weight norm by L1")
+    ("norm-l2",      po::bool_switch(&norm_l2),      "weight norm by L2")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     
