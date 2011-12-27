@@ -978,6 +978,7 @@ struct LearnOExpectedLoss : public LearnBase
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
+    size_t invalids = 0;
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features_optimize[i].end();
@@ -992,11 +993,12 @@ struct LearnOExpectedLoss : public LearnBase
 	  x += a / weight_scale;
 
 	  ++ actives;
+	  invalids += f[i] > 0.0;
 	}
       }
     
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " vectors: " << alpha.size() << std::endl;
+      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -1414,6 +1416,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
+    size_t invalids = 0;
     for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -1428,11 +1431,12 @@ struct LearnOPegasos : public LearnOnlineMargin
 	  x += a / weight_scale;
 	  
 	  ++ actives;
+	  invalids += f[i] > 0.0;
 	}
       }
     
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " vectors: " << losses.size() << std::endl;
+      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -2239,6 +2243,7 @@ struct LearnOSGDL2 : public LearnLR
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
+    size_t invalids = 0;
     for (size_t i = 0; i != samples.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -2253,11 +2258,12 @@ struct LearnOSGDL2 : public LearnLR
 	  x += a / weight_scale;
 
 	  ++ actives;
+	  invalids += f[i] > 0.0;
 	}
       }
 
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " vectors: " << samples.size() << std::endl;
+      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
