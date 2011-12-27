@@ -991,10 +991,10 @@ struct LearnOExpectedLoss : public LearnBase
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
-
-	  ++ actives;
-	  invalids += f[i] > 0.0;
 	}
+	
+	++ actives;
+	invalids += f[i] > 0.0;
       }
     
     if (debug >= 2)
@@ -1429,10 +1429,10 @@ struct LearnOPegasos : public LearnOnlineMargin
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
-	  
-	  ++ actives;
-	  invalids += f[i] > 0.0;
 	}
+	
+	++ actives;
+	invalids += f[i] > 0.0;
       }
     
     if (debug >= 2)
@@ -2256,10 +2256,10 @@ struct LearnOSGDL2 : public LearnLR
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
-
-	  ++ actives;
-	  invalids += f[i] > 0.0;
 	}
+	
+	++ actives;
+	invalids += f[i] > 0.0;
       }
 
     if (debug >= 2)
