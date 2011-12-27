@@ -977,6 +977,7 @@ struct LearnOExpectedLoss : public LearnBase
     // update by expectations...
     double a_norm = 0.0;
     double pred = 0.0;
+    size_t actives = 0;
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features_optimize[i].end();
@@ -989,8 +990,13 @@ struct LearnOExpectedLoss : public LearnBase
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
+
+	  ++ actives;
 	}
       }
+    
+    if (debug >= 2)
+      std::cerr << "actives: " << actives << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -1407,6 +1413,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     
     double a_norm = 0.0;
     double pred = 0.0;
+    size_t actives = 0;
     for (size_t i = 0; i != losses.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -1419,8 +1426,13 @@ struct LearnOPegasos : public LearnOnlineMargin
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
+	  
+	  ++ actives;
 	}
       }
+    
+    if (debug >= 2)
+      std::cerr << "actives: " << actives << " vectors: " << losses.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -2226,6 +2238,7 @@ struct LearnOSGDL2 : public LearnLR
     // update by expectations...
     double a_norm = 0.0;
     double pred = 0.0;
+    size_t actives = 0;
     for (size_t i = 0; i != samples.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
@@ -2238,8 +2251,13 @@ struct LearnOSGDL2 : public LearnLR
 	  
 	  //weight_norm += 2.0 * x * a * weight_scale + a * a;
 	  x += a / weight_scale;
+
+	  ++ actives;
 	}
       }
+
+    if (debug >= 2)
+      std::cerr << "actives: " << actives << " vectors: " << samples.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
