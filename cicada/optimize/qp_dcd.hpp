@@ -149,7 +149,7 @@ namespace cicada
 	if (! no_normalize) {
 	  const double sum = std::accumulate(x.begin(), x.end(), 0.0);
 	  
-	  if (sum > C) {
+	  if (sum != 0.0) {
 	    std::transform(x.begin(), x.end(), x.begin(), std::bind2nd(std::multiplies<double>(), C / sum));
 	    
 	    w.clear();
