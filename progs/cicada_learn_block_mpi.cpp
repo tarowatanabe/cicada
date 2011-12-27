@@ -118,6 +118,7 @@ bool regularize_l2 = false;
 double C = 1e-3;
 double eps = std::numeric_limits<double>::infinity();
 double scale = 1.0;
+double eta0 = 0.2;
 
 // additional misc parameters...
 bool loss_rank = false; // loss by rank
@@ -1362,7 +1363,8 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
-    ("scale",       po::value<double>(&scale),                 "scaling for weight")
+    ("scale",         po::value<double>(&scale),                "scaling for weight")
+    ("eta0",          po::value<double>(&eta0),                 "\\eta_0 for decay")
     
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")

@@ -549,7 +549,7 @@ struct LearnExpectedLoss : public LearnBase
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
@@ -719,7 +719,7 @@ struct LearnExpectedLossL1 : public LearnBase
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     penalty += eta * lambda * k_norm;
@@ -783,38 +783,36 @@ struct LearnOExpectedLoss : public LearnBase
 
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
-  typedef std::vector<int, std::allocator<int> >          index_type;
-
+  
   struct HMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    HMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    HMatrix(const sample_set_type& __features) : features(__features) {}
     
     double operator()(int i, int j) const
     {
-      return cicada::dot_product(features[index[i]].begin(), features[index[i]].end(), features[index[j]].begin(), features[index[j]].end(), 0.0);
+      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
     }
     
     const sample_set_type& features;
-    const index_type& index;
   };
   
   struct MMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    MMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    MMatrix(const sample_set_type& __features) : features(__features) {}
     
     template <typename __W>
     void operator()(__W& w, const alpha_type& alpha) const
     {
-      const size_type model_size = index.size();
+      const size_type model_size = features.size();
       
       for (size_type i = 0; i != model_size; ++ i)
 	if (alpha[i] > 0.0) {
-	  sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	    w[fiter->first] += alpha[i] * fiter->second;
 	}
     }
@@ -823,8 +821,8 @@ struct LearnOExpectedLoss : public LearnBase
     double operator()(const __W& w, const size_t& i) const
     {
       double dot = 0.0;
-      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	dot += w[fiter->first] * fiter->second;
       return dot;
     }
@@ -832,13 +830,12 @@ struct LearnOExpectedLoss : public LearnBase
     template <typename __W>
     void operator()(__W& w, const double& update, const size_t& i) const
     {
-      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	w[fiter->first] += update * fiter->second;
     }
     
     const sample_set_type& features;
-    const index_type& index;
   };
 
   LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
@@ -888,7 +885,6 @@ struct LearnOExpectedLoss : public LearnBase
   sample_set_type features_optimize;
   alpha_type      alpha;
   f_type          f;
-  index_type      index;
   
   double learn(weight_set_type& weights)
   {
@@ -902,7 +898,6 @@ struct LearnOExpectedLoss : public LearnBase
     features_optimize.clear();
     f.clear();
     alpha.clear();
-    index.clear();
     
     weight_type objective;
     
@@ -959,26 +954,20 @@ struct LearnOExpectedLoss : public LearnBase
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
+    // rescaling here
     rescale(weights, 1.0 - eta * lambda);
     
-    for (size_t i = 0; i != f.size(); ++ i) {
-      const double loss = f[i] - cicada::dot_product(features_optimize[i].begin(), features_optimize[i].end(), weights, 0.0) * weight_scale;
-      
-      if (loss <= 0.0) continue;
-      
-      f[index.size()] = - loss;
-      index.push_back(i);
-    }
+    for (size_t i = 0; i != f.size(); ++ i)
+      f[i] = - (f[i] - cicada::dot_product(features_optimize[i].begin(), features_optimize[i].end(), weights, 0.0) * weight_scale);
     
-    f.resize(index.size());
-    alpha.resize(index.size(), 0.0);
+    alpha.resize(f.size(), 0.0);
     
     {
-      HMatrix H(features_optimize, index);
-      MMatrix M(features_optimize, index);
+      HMatrix H(features_optimize);
+      MMatrix M(features_optimize);
       
       cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
     }
@@ -987,11 +976,11 @@ struct LearnOExpectedLoss : public LearnBase
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
-    size_t invalids = 0;
+    size_t negatives = 0;
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
-	sample_set_type::value_type::const_iterator fiter_end = features_optimize[index[i]].end();
-	for (sample_set_type::value_type::const_iterator fiter = features_optimize[index[i]].begin(); fiter != fiter_end; ++ fiter) {
+	sample_set_type::value_type::const_iterator fiter_end = features_optimize[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features_optimize[i].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
 	  const double a = alpha[i] * fiter->second;
 	  
@@ -1003,11 +992,11 @@ struct LearnOExpectedLoss : public LearnBase
 	}
 	
 	++ actives;
-	invalids += f[i] > 0.0;
+	negatives += f[i] > 0.0;
       }
     
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
+      std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -1248,7 +1237,7 @@ struct LearnPegasos : public LearnOnlineMargin
     const double k_norm = 1.0 / k; // it is wrong, but works quite well in practice
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
@@ -1309,7 +1298,6 @@ struct LearnPegasos : public LearnOnlineMargin
 // optimized-Pegasos learner
 struct LearnOPegasos : public LearnOnlineMargin
 {
-  
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
   typedef std::vector<int, std::allocator<int> >          index_type;
@@ -1396,28 +1384,35 @@ struct LearnOPegasos : public LearnOnlineMargin
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
     // udpate...
     
     alpha.clear();
     f.clear();
     index.clear();
     
+    for (size_t i = 0; i != losses.size(); ++ i)
+      f.push_back(cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+    
+    const double weight_scale_curr = weight_scale;
+    
+    rescale(weights, 1.0 - eta * lambda);
+    
     double objective = 0.0;
-    for (size_t i = 0; i != losses.size(); ++ i) {
-      const double loss = losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale;
+    for (size_t i = 0; i != f.size(); ++ i) {
+      const double loss = losses[i] - f[i] * weight_scale_curr;
       
       if (loss <= 0.0) continue;
       
-      f.push_back(-loss);
+      f[index.size()] = - (losses[i] - f[i] * weight_scale);
       index.push_back(i);
       objective += loss;
     }
     objective /= losses.size();
     
+    f.resize(index.size());
     alpha.resize(index.size(), 0.0);
     
     {
@@ -1430,7 +1425,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
-    size_t invalids = 0;
+    size_t negatives = 0;
     for (size_t i = 0; i != index.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
@@ -1446,11 +1441,11 @@ struct LearnOPegasos : public LearnOnlineMargin
 	}
 	
 	++ actives;
-	invalids += f[i] > 0.0;
+	negatives += f[i] > 0.0;
       }
     
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
+      std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -1930,7 +1925,7 @@ struct LearnSGDL1 : public LearnLR
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     penalty += eta * lambda * k_norm;
@@ -2030,7 +2025,7 @@ struct LearnSGDL2 : public LearnLR
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     // do we really need this...?
@@ -2104,38 +2099,36 @@ struct LearnOSGDL2 : public LearnLR
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
-  typedef std::vector<int, std::allocator<int> >          index_type;
   
   struct HMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    HMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    HMatrix(const sample_set_type& __features) : features(__features) {}
     
     double operator()(int i, int j) const
     {
-      return cicada::dot_product(features[index[i]].begin(), features[index[i]].end(), features[index[j]].begin(), features[index[j]].end(), 0.0);
+      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
     }
     
     const sample_set_type& features;
-    const index_type& index;
   };
   
   struct MMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    MMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    MMatrix(const sample_set_type& __features) : features(__features) {}
     
     template <typename __W>
     void operator()(__W& w, const alpha_type& alpha) const
     {
-      const size_type model_size = index.size();
+      const size_type model_size = features.size();
       
       for (size_type i = 0; i != model_size; ++ i)
 	if (alpha[i] > 0.0) {
-	  sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	    w[fiter->first] += alpha[i] * fiter->second;
 	}
     }
@@ -2144,8 +2137,8 @@ struct LearnOSGDL2 : public LearnLR
     double operator()(const __W& w, const size_t& i) const
     {
       double dot = 0.0;
-      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	dot += w[fiter->first] * fiter->second;
       return dot;
     }
@@ -2153,13 +2146,12 @@ struct LearnOSGDL2 : public LearnLR
     template <typename __W>
     void operator()(__W& w, const double& update, const size_t& i) const
     {
-      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
 	w[fiter->first] += update * fiter->second;
     }
     
     const sample_set_type& features;
-    const index_type& index;
   };
 
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
@@ -2201,7 +2193,6 @@ struct LearnOSGDL2 : public LearnLR
   sample_set_type features;
   alpha_type      alpha;
   f_type          f;
-  index_type      index;
   
   double learn(weight_set_type& weights)
   {
@@ -2213,7 +2204,7 @@ struct LearnOSGDL2 : public LearnLR
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
         
     expectation_type expectations;
@@ -2221,7 +2212,6 @@ struct LearnOSGDL2 : public LearnLR
     features.clear();
     f.clear();
     alpha.clear();
-    index.clear();
 
     // use LBFGS?
     // we will minimize ||x - x'|| + loss...
@@ -2248,21 +2238,14 @@ struct LearnOSGDL2 : public LearnLR
     // perform rescaling here!
     rescale(weights, 1.0 - eta * lambda);
     
-    for (size_t i = 0; i != samples.size(); ++ i) {
-      const double loss = - f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale;
-      
-      if (loss <= 0.0) continue;
-      
-      f[index.size()] = - loss;
-      index.push_back(i);
-    }
+    for (size_t i = 0; i != samples.size(); ++ i)
+      f[i] = -(- f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
     
-    f.resize(index.size());
-    alpha.resize(index.size(), 0.0);
+    alpha.resize(f.size(), 0.0);
     
     {
-      HMatrix H(features, index);
-      MMatrix M(features, index);
+      HMatrix H(features);
+      MMatrix M(features);
       
       cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
     }
@@ -2271,11 +2254,11 @@ struct LearnOSGDL2 : public LearnLR
     double a_norm = 0.0;
     double pred = 0.0;
     size_t actives = 0;
-    size_t invalids = 0;
+    size_t negatives = 0;
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
-	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
 	  const double a = alpha[i] * fiter->second;
 	  
@@ -2287,11 +2270,11 @@ struct LearnOSGDL2 : public LearnLR
 	}
 	
 	++ actives;
-	invalids += f[i] > 0.0;
+	negatives += f[i] > 0.0;
       }
-
+    
     if (debug >= 2)
-      std::cerr << "actives: " << actives << " invalids: " << invalids << " vectors: " << alpha.size() << std::endl;
+      std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
