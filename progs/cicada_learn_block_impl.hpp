@@ -1329,7 +1329,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     template <typename __W>
     void operator()(__W& w, const alpha_type& alpha) const
     {
-      const size_type model_size = features.size();
+      const size_type model_size = index.size();
       
       for (size_type i = 0; i != model_size; ++ i)
 	if (alpha[i] > 0.0) {
@@ -2095,36 +2095,38 @@ struct LearnOSGDL2 : public LearnLR
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
-
+  typedef std::vector<int, std::allocator<int> >          index_type;
+  
   struct HMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    HMatrix(const sample_set_type& __features) : features(__features) {}
+    HMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
     
     double operator()(int i, int j) const
     {
-      return cicada::dot_product(features[i].begin(), features[i].end(), features[j].begin(), features[j].end(), 0.0);
+      return cicada::dot_product(features[index[i]].begin(), features[index[i]].end(), features[index[j]].begin(), features[index[j]].end(), 0.0);
     }
     
     const sample_set_type& features;
+    const index_type& index;
   };
   
   struct MMatrix
   {
     typedef LearnBase::sample_set_type sample_set_type;
     
-    MMatrix(const sample_set_type& __features) : features(__features) {}
+    MMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
     
     template <typename __W>
     void operator()(__W& w, const alpha_type& alpha) const
     {
-      const size_type model_size = features.size();
+      const size_type model_size = index.size();
       
       for (size_type i = 0; i != model_size; ++ i)
 	if (alpha[i] > 0.0) {
-	  sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	  for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+	  sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
 	    w[fiter->first] += alpha[i] * fiter->second;
 	}
     }
@@ -2133,8 +2135,8 @@ struct LearnOSGDL2 : public LearnLR
     double operator()(const __W& w, const size_t& i) const
     {
       double dot = 0.0;
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
 	dot += w[fiter->first] * fiter->second;
       return dot;
     }
@@ -2142,12 +2144,13 @@ struct LearnOSGDL2 : public LearnLR
     template <typename __W>
     void operator()(__W& w, const double& update, const size_t& i) const
     {
-      sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-      for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) 
+      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
 	w[fiter->first] += update * fiter->second;
     }
     
     const sample_set_type& features;
+    const index_type& index;
   };
 
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
@@ -2189,6 +2192,7 @@ struct LearnOSGDL2 : public LearnLR
   sample_set_type features;
   alpha_type      alpha;
   f_type          f;
+  index_type      index;
   
   double learn(weight_set_type& weights)
   {
@@ -2202,15 +2206,13 @@ struct LearnOSGDL2 : public LearnLR
     const size_type num_samples = (instances + block_size - 1) / block_size;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
-    
-    // do we really need this...?
-    rescale(weights, 1.0 - eta * lambda);
-    
+        
     expectation_type expectations;
     
     features.clear();
     f.clear();
     alpha.clear();
+    index.clear();
 
     // use LBFGS?
     // we will minimize ||x - x'|| + loss...
@@ -2234,13 +2236,24 @@ struct LearnOSGDL2 : public LearnLR
     }
     objective /= samples.size();
     
-    alpha.resize(samples.size(), 0.0);
-    for (size_t i = 0; i != samples.size(); ++ i)
-      f[i] = - (- f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale);
+    // perform rescaling here!
+    rescale(weights, 1.0 - eta * lambda);
+    
+    for (size_t i = 0; i != samples.size(); ++ i) {
+      const double loss = - f[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0) * weight_scale;
+      
+      if (loss <= 0.0) continue;
+      
+      f[index.size()] = - loss;
+      index.push_back(i);
+    }
+    
+    f.resize(index.size());
+    alpha.resize(index.size(), 0.0);
     
     {
-      HMatrix H(features);
-      MMatrix M(features);
+      HMatrix H(features, index);
+      MMatrix M(features, index);
       
       cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
     }
@@ -2252,8 +2265,8 @@ struct LearnOSGDL2 : public LearnLR
     size_t invalids = 0;
     for (size_t i = 0; i != samples.size(); ++ i)
       if (alpha[i] > 0.0) {
-	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
 	  const double a = alpha[i] * fiter->second;
 	  
