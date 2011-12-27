@@ -2263,7 +2263,7 @@ struct LearnOSGDL2 : public LearnLR
     double pred = 0.0;
     size_t actives = 0;
     size_t invalids = 0;
-    for (size_t i = 0; i != samples.size(); ++ i)
+    for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
