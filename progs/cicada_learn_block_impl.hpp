@@ -1768,7 +1768,7 @@ struct LearnMIRA : public LearnOnlineMargin
       HMatrix H(features, index);
       MMatrix M(features, index);
       
-      cicada::optimize::QPDCD()(alpha, f, H, M, 1.0 / (lambda * num_samples), tolerance);
+      cicada::optimize::QPDCD()(alpha, f, H, M, 1.0 / lambda, tolerance);
     }
     
     for (size_t i = 0; i != alpha.size(); ++ i)
