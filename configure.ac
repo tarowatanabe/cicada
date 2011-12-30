@@ -315,9 +315,14 @@ AC_MSG_RESULT($MPI_LDFLAGS)
 AC_SUBST(MPI_LDFLAGS)
 
 AC_MSG_CHECKING([for __thread])
-AC_LINK_IFELSE([AC_LANG_PROGRAM([#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && ((__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 1) || (__GNUC__ == 4 && __GNUC_MINOR__ == 1 && __GNUC_PATCHLEVEL__ < 2))
+AC_LINK_IFELSE([AC_LANG_PROGRAM([
+#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && ((__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 1) || (__GNUC__ == 4 && __GNUC_MINOR__ == 1 && __GNUC_PATCHLEVEL__ < 2))
 #error gcc has this bug: http://gcc.gnu.org/ml/gcc-bugs/2006-09/msg02275.html
-#endif], [static __thread int p = 0])],
+#endif
+#if defined(__APPLE__)
+#error no __thread in mac os x
+#endif
+], [static __thread int p = 0])],
                [AC_DEFINE(HAVE_TLS, 1, Define to 1 if compiler supports __thread)
                 AC_MSG_RESULT([yes])],
                [AC_MSG_RESULT([no])])
