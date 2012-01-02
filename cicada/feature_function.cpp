@@ -133,6 +133,7 @@ sparse-lexicon: sparse lexicon feature\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tunique-source=[true|source] unique source labels\n\
 \tname=feature-name-prefix (default: sparse-lexicon)\n\
+\tlexicon=lexicon file\n\
 sparse-ngram: sparse ngram feature\n\
 \torder=<order>\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\

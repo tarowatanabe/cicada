@@ -150,5 +150,3 @@ remote grammar and tree-grammar:
   set up server for grammar(s) and query from clients
   performs composition/parse/generation at the server side with larger memory (meaning with larger grammar)
   
-  
-Allow expected loss-function (but uses block-wise loss)

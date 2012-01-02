@@ -84,9 +84,11 @@ namespace cicada
       };
       typedef CacheNormalize cache_normalize_type;
       typedef utils::array_power2<cache_normalize_type, 1024 * 4, std::allocator<cache_normalize_type> > cache_normalize_set_type;
+
+      typedef cicada::Lexicon lexicon_type;
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
+	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false)
       { uniques.set_empty_key(word_type());  }
 
       struct skipper_epsilon
@@ -125,35 +127,61 @@ namespace cicada
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
-
+	    const word_type& target = *piter;
+	    
 	    if (! caches.exists(piter->id())) {
 	      feature_unordered_set_type features;
 	      
 	      sentence_type::const_iterator witer_end = words.end();
-	      for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
-		
-		if (forced_feature || feature_type::exists(name))
-		  features[name] += 1.0;
-
-		if (! normalizers_target.empty()) {
-		  const cache_normalize_type::word_set_type& normalized = normalize(*piter,  normalizers_target, cache_target);
+	      for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) 
+		if (exists(*witer, target)) {
+		  const word_type& source = *witer;
 		  
-		  cache_normalize_type::word_set_type::const_iterator niter_end = normalized.end();
-		  for (cache_normalize_type::word_set_type::const_iterator niter = normalized.begin(); niter != niter_end; ++ niter) {
-		    const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*niter);
+		  apply(source, target, features);
+		  
+		  if (! normalizers_source.empty()) {
+		    const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
 		    
-		    if (forced_feature || feature_type::exists(name))
-		      features[name] += 1.0;
+		    cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
+		    for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter)
+		      apply(*siter, target, features);
+		  }
+		  
+		  if (! normalizers_target.empty()) {
+		    const cache_normalize_type::word_set_type& normalized_target = normalize(target,  normalizers_target, cache_target);
+		    
+		    cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+		    for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer)
+		      apply(source, *titer, features);
+		  }
+		  
+		  if (! normalizers_source.empty() && ! normalizers_target.empty()) {
+		    const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
+		    const cache_normalize_type::word_set_type& normalized_target = normalize(target,  normalizers_target, cache_target);
+		    
+		    cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
+		    for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter) {
+		      cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+		      for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer)
+			apply(*siter, *titer, features);
+		    }
 		  }
 		}
-	      }
 	      
 	      caches[piter->id()] = features;
 	    }
 	    
 	    features += caches[piter->id()];
 	  }
+      }
+
+      template <typename Features>
+      void apply(const word_type& source, const word_type& target, Features& features)
+      {
+	const std::string name = prefix + ":" + static_cast<const std::string&>(source) + "_" + static_cast<const std::string&>(target);
+	
+	if (forced_feature || feature_type::exists(name))
+	  features[name] += 1.0;
       }
 
       void assign(const lattice_type& lattice)
@@ -174,34 +202,21 @@ namespace cicada
 	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
 	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
 	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label))
+	      if (! skipper(aiter->label) && exists(aiter->label))
 		uniques.insert(aiter->label);
 	  }
 	  
 	  word_set_type::const_iterator uiter_end = uniques.end();
-	  for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	  for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
 	    words.push_back(*uiter);
-	    
-	    if (! normalizers_source.empty()) {
-	      const cache_normalize_type::word_set_type& normalized = normalize(*uiter,  normalizers_source, cache_source);
-	      
-	      words.insert(words.end(), normalized.begin(), normalized.end());
-	    }
-	  }
+	  
 	} else {
 	  lattice_type::const_iterator liter_end = lattice.end();
 	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
 	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
 	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label)) {
+	      if (! skipper(aiter->label) && exists(aiter->label))
 		words.push_back(aiter->label);
-		
-		if (! normalizers_source.empty()) {
-		  const cache_normalize_type::word_set_type& normalized = normalize(aiter->label,  normalizers_source, cache_source);
-		  
-		  words.insert(words.end(), normalized.begin(), normalized.end());
-		}
-	      }
 	  }
 	}
 	
@@ -239,6 +254,18 @@ namespace cicada
 	cache_source.clear();
 	cache_target.clear();
       }
+
+      bool exists(const word_type& source, const word_type& target)
+      {
+	return (! lexicon) || (lexicon->exists(&source, (&source) + 1, target));
+      }
+      
+      bool exists(const word_type& source)
+      {
+	return (! lexicon) || (lexicon->exists(&source, (&source) + 1));
+      }
+
+      lexicon_type* lexicon;
       
       normalizer_set_type normalizers_source;
       normalizer_set_type normalizers_target;
@@ -267,7 +294,7 @@ namespace cicada
       
       if (utils::ipiece(param.name()) != "sparse-lexicon")
 	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
-      
+
       impl_type::normalizer_set_type normalizers_source;
       impl_type::normalizer_set_type normalizers_target;
       
@@ -275,6 +302,8 @@ namespace cicada
       bool unique_source = false;
       
       std::string name;
+
+      std::string lexicon;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "cluster-source") {
@@ -297,6 +326,8 @@ namespace cicada
 	  unique_source = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
+	else if (utils::ipiece(piter->first) == "lexicon")
+          lexicon = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -309,6 +340,9 @@ namespace cicada
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->unique_source = unique_source;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
+
+      if (! lexicon.empty())
+	lexicon_impl->lexicon = &cicada::Lexicon::create(lexicon);
       
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("sparse-lexicon") : name);
@@ -324,6 +358,10 @@ namespace cicada
 	pimpl(new impl_type(*x.pimpl))
     {
       pimpl->clear_cache();
+
+      pimpl->lexicon = 0;
+      if (x.pimpl->lexicon)
+        pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
     }
 
     SparseLexicon& SparseLexicon::operator=(const SparseLexicon& x)
@@ -332,6 +370,10 @@ namespace cicada
       *pimpl = *x.pimpl;
       
       pimpl->clear_cache();
+      
+      pimpl->lexicon = 0;
+      if (x.pimpl->lexicon)
+        pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
       
       return *this;
     }
