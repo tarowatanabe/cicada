@@ -108,6 +108,8 @@ path_type output_file = "-";
 int num_cluster = 50;
 int max_iteration = 20;
 
+bool bigram_mode = false;
+
 int num_thread = 2;
 
 int debug = 0;
@@ -116,6 +118,8 @@ int getoptions(int argc, char** argv);
 
 double likelihood_cluster(const cluster_set_type& clusters);
 void read_corpus(const path_type& file,
+		 word_class_count_set_type& words);
+void read_bigram(const path_type& file,
 		 word_class_count_set_type& words);
 void initial_cluster(const word_class_count_set_type& words,
 		     cluster_set_type& clusters);
@@ -140,7 +144,10 @@ int main(int argc, char** argv)
     
     word_class_count_set_type words;
     
-    read_corpus(input_file, words);
+    if (bigram_mode)
+      read_bigram(input_file, words);
+    else
+      read_corpus(input_file, words);
     
     cluster_set_type clusters(num_cluster);
     
@@ -582,6 +589,68 @@ struct WordCount
   WordCount() : words(), count(0) { words.set_empty_key(word_type()); }
 };
 
+void read_bigram(const path_type& file,
+		 word_class_count_set_type& words)
+{
+  // we don't care EOS! since it is one-sided word-class...
+  
+  typedef WordCount word_count_type;
+  typedef utils::alloc_vector<word_count_type, std::allocator<word_count_type> > word_count_set_type;
+  typedef std::multimap<const word_count_type*, word_type, greater_countp<word_count_type>, std::allocator<std::pair<const word_count_type* const, word_type> > > sorted_type;
+
+  
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  
+  utils::compress_istream is(file, 1024 * 1024);
+  
+  std::string line;
+  sentence_type sent;
+  
+  word_count_set_type word_counts;
+    
+  while (std::getline(is, line)) {
+    utils::piece line_piece(line);
+    tokenizer_type tokenizer(line_piece);
+
+    tokenizer_type::iterator titer = tokenizer.begin();
+
+    if (titer == tokenizer.end()) continue;
+    const utils::piece prev = *titer;
+    ++ titer;
+    
+    if (titer == tokenizer.end()) continue;
+    const utils::piece next = *titer;
+    ++ titer;
+    
+    if (titer == tokenizer.end()) continue;
+    const count_type count = utils::lexical_cast<count_type>(*titer);
+    
+    word_count_type& word_class = word_counts[word_type(prev).id()];
+    word_class.count += count;
+    word_class.words[word_type(next).id()] += count;
+  }
+  
+  sorted_type sorted;
+  word_count_set_type::const_iterator citer_begin = word_counts.begin();
+  word_count_set_type::const_iterator citer_end = word_counts.end();
+  for (word_count_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) 
+    if (*citer)
+      sorted.insert(std::make_pair(&(*(*citer)), word_type(word_type::id_type(citer - citer_begin))));
+
+  words.clear();
+  words.reserve(sorted.size());
+  words.resize(sorted.size());
+  
+  word_class_count_set_type::iterator witer = words.begin();
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter, ++ witer) {
+    witer->word = siter->second;
+    witer->count = siter->first->count;
+    witer->words = word_class_count_type::word_count_type(siter->first->words.begin(), siter->first->words.end());
+    const_cast<word_count_type*>(siter->first)->words.clear();
+  }
+}
+
 void read_corpus(const path_type& file,
 		 word_class_count_set_type& words)
 {
@@ -652,6 +721,8 @@ int getoptions(int argc, char** argv)
     
     ("cluster",   po::value<int>(&num_cluster),   "# of clusters")
     ("iteration", po::value<int>(&max_iteration), "# of iterations")
+
+    ("bigram", po::bool_switch(&bigram_mode), "raad bigram counts")
     
     ("threads", po::value<int>(&num_thread), "# of threads")
     
