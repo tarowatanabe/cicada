@@ -22,7 +22,7 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), dense(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -47,6 +47,10 @@ namespace cicada
 	  sparse = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "dense")
 	  dense = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "state-full")
+	  state_full = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "state-less")
+	  state_less = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -66,7 +70,13 @@ namespace cicada
       }
 
       if (sparse && dense)
-	throw std::runtime_error("either sparse|dense|all");
+	throw std::runtime_error("either sparse|dense");
+      
+      if (state_full && state_less)
+	throw std::runtime_error("either state-full| state-less");
+
+      if ((state_full || state_less) && (sparse || dense))
+	throw std::runtime_error("currently, we do not allow mixing sparse|dense and state-full|state-less");
       
       if (sparse) {
 	model_type model_sparse;
@@ -94,6 +104,32 @@ namespace cicada
 	  throw std::runtime_error("we have no dense features");
 	
 	model_local.swap(model_dense);
+      } else if (state_less) {
+	model_type model_less;
+
+	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
+
+	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
+	  if (! (*iter)->state_size())
+	    model_less.push_back(*iter);
+	
+	if (model_less.empty())
+	  throw std::runtime_error("we have no state-less features");
+	
+	model_local.swap(model_less);
+      } else if (state_full) {
+	model_type model_full;
+
+	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
+
+	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
+	  if ((*iter)->state_size())
+	    model_full.push_back(*iter);
+	
+	if (model_full.empty())
+	  throw std::runtime_error("we have no state-full features");
+	
+	model_local.swap(model_full);
       }
 
       if (const_cast<model_type&>(! model_local.empty() ? model_local : model).empty())
@@ -109,6 +145,7 @@ namespace cicada
 	weights = &base_type::weights();
       
       name = (std::string("apply-")
+	      + std::string(state_full ? "full-" : (state_less ? "less-" : ""))
 	      + std::string(sparse ? "sparse-" : (dense ? "dense-" : ""))
 	      + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))));
     }

@@ -63,6 +63,8 @@ apply: feature application\n\
 \tforced=[true|false] forced feature application\n\
 \tsparse=[true|false] apply sparse features only\n\
 \tdense=[true|false]  apply non-sparse features only\n\
+\tstate-full=[true|false] apply state-full features only\n\
+\tstate-less=[true|false] apply state-less features only\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\

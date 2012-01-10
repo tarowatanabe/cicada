@@ -407,25 +407,40 @@ namespace cicada
 	    const int length_shortest = - log(lengths_shortest.back());
 	    const int length_longest  =   log(lengths_longest.back());
 	    
+	    // # of unaries
+	    int unaries = 0;
+	    {
+	      hypergraph_type::edge_set_type::const_iterator eiter_end = data.hypergraph.edges.end();
+	      for (hypergraph_type::edge_set_type::const_iterator eiter = data.hypergraph.edges.begin(); eiter != eiter_end; ++ eiter) {
+		const hypergraph_type::edge_type& edge = *eiter;
+		
+		unaries += (edge.tails.size() == 1 && edge.rule->rhs.size() == 1);
+	      }
+	    }
+	    
 	    if (no_id)
 	      os << "hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
 		 << "hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+		 << "hypergraph-num-unary: " << unaries << '\n'
 		 << "hypergraph-shortest-leaf: " << length_shortest << '\n'
 		 << "hypergraph-longest-leaf: "  << length_longest << '\n';
 	    else
 	      os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
 		 << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+		 << id << " ||| hypergraph-num-unary: " << unaries << '\n'
 		 << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
 		 << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
 	  } else {
 	    if (no_id)
 	      os << "hypergraph-num-node: " << 0 << '\n'
 		 << "hypergraph-num-edge: " << 0 << '\n'
+		 << "hypergraph-num-unary: " << 0 << '\n'
 		 << "hypergraph-shortest-leaf: " << 0 << '\n'
 		 << "hypergraph-longest-leaf: "  << 0 << '\n';
 	    else
 	      os << id << " ||| hypergraph-num-node: " << 0 << '\n'
 		 << id << " ||| hypergraph-num-edge: " << 0 << '\n'
+		 << id << " ||| hypergraph-num-unary: " << 0 << '\n'
 		 << id << " ||| hypergraph-shortest-leaf: " << 0 << '\n'
 		 << id << " ||| hypergraph-longest-leaf: "  << 0 << '\n';
 	  }
