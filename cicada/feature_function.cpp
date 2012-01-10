@@ -104,6 +104,7 @@ ngram: ngram language model\n\
 \tcoarse-order=<order> ngram order for coarse heuristic\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
+\tcoarse-approximate=[true|false] approximated upper-bound estimates\n\
 ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
