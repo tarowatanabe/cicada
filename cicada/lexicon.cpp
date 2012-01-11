@@ -95,7 +95,6 @@ namespace cicada
 	
 	lexicon_parsed_type lexicon_parsed;
 	code_set_type codes;
-	weight_type dummy = 1.0;
 	
 	while (iter != iter_end) {
 	  lexicon_parsed.clear();
@@ -104,14 +103,16 @@ namespace cicada
 	    if (iter != iter_end)
 	      throw std::runtime_error("global lexicon parsing failed");
 	  
-	  if (lexicon_parsed.empty()) continue;
+	  if (lexicon_parsed.size() < 2) continue;
+	  
+	  const weight_type weight(utils::lexical_cast<weight_type>(lexicon_parsed.back()));
 	  
 	  codes.clear();
-	  lexicon_parsed_type::const_iterator liter_end = lexicon_parsed.end();
+	  lexicon_parsed_type::const_iterator liter_end = lexicon_parsed.end() - 1;
 	  for (lexicon_parsed_type::const_iterator liter = lexicon_parsed.begin(); liter != liter_end; ++ liter)
 	    codes.push_back(word_type(*liter).id());
 	  
-	  lexicon.insert(&(*codes.begin()), codes.size(), dummy);
+	  lexicon.insert(&(*codes.begin()), codes.size(), weight);
 	}
       } else {
 	typedef boost::fusion::tuple<std::string, std::string, weight_type > lexicon_parsed_type;
