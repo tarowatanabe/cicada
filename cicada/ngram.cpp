@@ -143,7 +143,7 @@ namespace cicada
   static utils::thread_specific_ptr<ngram_map_type> __ngrams;
 #endif
 
-  NGram& NGram::create(const std::string& parameter)
+  NGram& NGram::create(const path_type& path)
   {
 #ifdef HAVE_TLS
     if (! __ngrams_tls) {
@@ -157,6 +157,8 @@ namespace cicada
     
     ngram_map_type& ngrams_map = *__ngrams;
 #endif
+
+    const std::string parameter = path.string();
     
     ngram_map_type::iterator iter = ngrams_map.find(parameter);
     if (iter == ngrams_map.end()) {

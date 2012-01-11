@@ -105,19 +105,20 @@ namespace cicada
       
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
+	: ngram(&ngram_type::create(__path)),
+	  order(__order), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
       {
-	order = utils::bithack::min(order, ngram.index.order());
+	order = utils::bithack::min(order, ngram->index.order());
 	
 	initialize_cache();
 	
-	id_oov = ngram.index.vocab()[vocab_type::UNK];
-	id_bos = ngram.index.vocab()[vocab_type::BOS];
-	id_eos = ngram.index.vocab()[vocab_type::EOS];
+	id_oov = ngram->index.vocab()[vocab_type::UNK];
+	id_bos = ngram->index.vocab()[vocab_type::BOS];
+	id_eos = ngram->index.vocab()[vocab_type::EOS];
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram),
+	: ngram(&ngram_type::create(x.ngram->path())),
 	  order(x.order),
 	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
 	  coarse(x.coarse),
@@ -136,7 +137,7 @@ namespace cicada
 
       NGramImpl& operator=(const NGramImpl& x)
       {
-	ngram = x.ngram;
+	ngram = &ngram_type::create(x.ngram->path());
 	order = x.order;
 	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
 	coarse = x.coarse;
@@ -158,7 +159,7 @@ namespace cicada
       void initialize_cache()
       {
 	cache_logprob.clear();
-	cache_estimate = ngram_cache_type(ngram.index.order());
+	cache_estimate = ngram_cache_type(ngram->index.order());
       }
       
       template <typename Iterator>
@@ -205,9 +206,9 @@ namespace cicada
 	typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
 	if (coarse)
-	  return ngram_score(state, first, last, __ngram_score_logbound(ngram), value_type());
+	  return ngram_score(state, first, last, __ngram_score_logbound(*ngram), value_type());
 	else
-	  return ngram_score(state, first, last, __ngram_score_logprob(ngram), value_type());
+	  return ngram_score(state, first, last, __ngram_score_logprob(*ngram), value_type());
       }
       
       template <typename Iterator, typename Scorer>
@@ -218,7 +219,7 @@ namespace cicada
 	if (length == 0)
 	  return state_score_type(state, 0.0);
 	else if (length == 1)
-	  return scorer(state, *first, ngram.index.order(state) + 1 < order, order);
+	  return scorer(state, *first, ngram->index.order(state) + 1 < order, order);
 	
 	const size_t cache_pos = hash_phrase(first, last, state.value()) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
@@ -229,7 +230,7 @@ namespace cicada
 	  
 	  ngram_type::logprob_type score = 0.0;
 	  for (/**/; first != last; ++ first) {
-	    const state_score_type result = scorer(state, *first, ngram.index.order(state) + 1 < order, order);
+	    const state_score_type result = scorer(state, *first, ngram->index.order(state) + 1 < order, order);
 	    
 	    state = result.first;
 	    score += result.second;
@@ -247,9 +248,9 @@ namespace cicada
 	typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
 	if (approximate)
-	  return ngram_estimate(first, last, __ngram_score_logprob(ngram), value_type());
+	  return ngram_estimate(first, last, __ngram_score_logprob(*ngram), value_type());
 	else
-	  return ngram_estimate(first, last, __ngram_score_logbound(ngram), value_type());
+	  return ngram_estimate(first, last, __ngram_score_logbound(*ngram), value_type());
       }
       
       template <typename Iterator, typename Scorer>
@@ -264,13 +265,13 @@ namespace cicada
 	  state_score_type state_score(ngram_state_type(), 0.0);
 	  
 	  if (*first == id_bos) {
-	    state_score.first = ngram.index.next(state_score.first, id_bos);
+	    state_score.first = ngram->index.next(state_score.first, id_bos);
 	    ++ first;
 	    ++ bound_order;
 	  }
 	  
 	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) < bound_order, order);
+	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
 	    
 	    state_score.first   = result.first;
 	    state_score.second += result.second;
@@ -289,13 +290,13 @@ namespace cicada
 	  state_score_type state_score(ngram_state_type(), 0.0);
 	  
 	  if (*first == id_bos) {
-	    state_score.first = ngram.index.next(state_score.first, id_bos);
+	    state_score.first = ngram->index.next(state_score.first, id_bos);
 	    ++ first;
 	    ++ bound_order;
 	  }
 	  
 	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram.index.order(state_score.first) < bound_order, order);
+	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
 	    
 	    state_score.first   = result.first;
 	    state_score.second += result.second;
@@ -407,7 +408,7 @@ namespace cicada
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	    if (! skipper(*titer)) {
-	      buffer.push_back(ngram.index.vocab()[extract(*titer)]);
+	      buffer.push_back(ngram->index.vocab()[extract(*titer)]);
 	      oov += (buffer.back() == id_oov);
 	    }
 	  
@@ -415,7 +416,7 @@ namespace cicada
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
 	  
 	  if (prefix.second == biter_end) {
 	    *ngram_state = state_invalid;
@@ -468,7 +469,7 @@ namespace cicada
 		buffer_type::const_iterator biter_end   = buffer.end();
 		buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 		
-		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter);
+		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
 		
 		if (prefix.second == biter_end) {
 		  // implicitly, invalid state, but we do not have to make an assignment, since state_rule will be assinged from antecedent.
@@ -494,7 +495,7 @@ namespace cicada
 	      state_rule = *ngram_state_antecedent;
 	    
 	  } else if (! skipper(*titer)) {
-	    buffer.push_back(ngram.index.vocab()[extract(*titer)]);
+	    buffer.push_back(ngram->index.vocab()[extract(*titer)]);
 	    oov += (buffer.back() == id_oov);
 	  }
 	}
@@ -515,7 +516,7 @@ namespace cicada
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.prefix(biter_begin, biter);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
 	  
 	  if (prefix.second == biter_end) {
 	    *ngram_state = state_invalid;
@@ -566,7 +567,7 @@ namespace cicada
 	    
 	    buffer.clear();
 	  } else if (! skipper(*titer)) {
-	    buffer.push_back(ngram.index.vocab()[extract(*titer)]);
+	    buffer.push_back(ngram->index.vocab()[extract(*titer)]);
 	    oov += (buffer.back() == id_oov);
 	  }
 	}
@@ -601,14 +602,14 @@ namespace cicada
 	  else {
 	    const state_score_type state_bound = ngram_estimate(context, context_end);
 	    const state_score_type state_score = (*context == id_bos
-						  ? ngram_score(ngram.index.next(ngram_state_type(), *context), context + 1, context_end)
+						  ? ngram_score(ngram->index.next(ngram_state_type(), *context), context + 1, context_end)
 						  : ngram_score(ngram_state_type(), context, context_end));
 	    
 	    return state_score.second - state_bound.second;
 	  }
 	} else {
 	  const state_score_type state_bound = ngram_estimate(context, context_end);
-	  const state_score_type state_score = ngram_score(ngram.index.next(ngram_state_type(), id_bos), context, context_end);
+	  const state_score_type state_score = ngram_score(ngram->index.next(ngram_state_type(), id_bos), context, context_end);
 	  
 	  return (state_score.second - state_bound.second
 		  + ngram_score(*ngram_state != state_invalid ? *ngram_state : state_score.first, &id_eos, (&id_eos) + 1).second);
@@ -621,7 +622,7 @@ namespace cicada
 	
 	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
 	
-	*ngram_state = (no_bos_eos ? ngram_state_type() : ngram.index.next(ngram_state_type(), id_bos));
+	*ngram_state = (no_bos_eos ? ngram_state_type() : ngram->index.next(ngram_state_type(), id_bos));
 	
 	return 0.0;
       }
@@ -663,7 +664,7 @@ namespace cicada
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
 	  if (! skipper(*piter)) {
-	    buffer.push_back(ngram.index.vocab()[extract(*piter)]);
+	    buffer.push_back(ngram->index.vocab()[extract(*piter)]);
 	    oov += (buffer.back() == id_oov);
 	  }
 	
@@ -698,8 +699,8 @@ namespace cicada
       buffer_type    buffer_impl;
       
       // ngrams
-      ngram_type     ngram;
-      int            order;
+      ngram_type*     ngram;
+      int             order;
 
       // cluster...
       cluster_type* cluster;

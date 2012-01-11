@@ -423,7 +423,7 @@ namespace cicada
     bool has_bounds() const { return ! logbounds.empty(); }
 
   public:
-    static NGram& create(const std::string& path);
+    static NGram& create(const path_type& path);
     
   public:
     shard_index_type    index;
