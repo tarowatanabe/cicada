@@ -828,7 +828,7 @@ namespace cicada
 	  pimpl_coarse = ngram_impl.release();
 	} else {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
-	  ngram_impl->approximate = coarse_approximate;
+	  ngram_impl->approximate = false;
 	  ngram_impl->order = coarse_order;
 	  ngram_impl->coarse = true;
 	  
