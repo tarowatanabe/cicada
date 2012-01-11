@@ -4,12 +4,15 @@
 
 #include "ngram.hpp"
 
+#include "utils/spinlock.hpp"
+#include "utils/sgi_hash_map.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/thread_specific_ptr.hpp"
+
+#include <boost/thread.hpp>
 
 namespace cicada
 {
-  
-
   void NGram::ShardData::open(const path_type& path)
   {
     typedef utils::repository repository_type;
@@ -105,4 +108,68 @@ namespace cicada
 		<< " smooth: " << smooth
 		<< std::endl;
   }
+
+
+  template <typename Tp>
+  struct hash_string : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const Tp& x) const
+    {
+      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+    }
+  };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<std::string, NGram, hash_string<std::string>, std::equal_to<std::string>,
+				  std::allocator<std::pair<const std::string, NGram> > > ngram_map_type;
+#else
+  typedef sgi::hash_map<std::string, NGram, hash_string<std::string>, std::equal_to<std::string>,
+			std::allocator<std::pair<const std::string, NGram> > > ngram_map_type;
+#endif
+
+  namespace impl
+  {
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    
+    static mutex_type     __ngram_mutex;
+    static ngram_map_type __ngram_map;
+  };
+
+#ifdef HAVE_TLS
+  static __thread ngram_map_type* __ngrams_tls = 0;
+  static boost::thread_specific_ptr<ngram_map_type> __ngrams;
+#else
+  static utils::thread_specific_ptr<ngram_map_type> __ngrams;
+#endif
+
+  NGram& NGram::create(const std::string& parameter)
+  {
+#ifdef HAVE_TLS
+    if (! __ngrams_tls) {
+      __ngrams.reset(new ngram_map_type());
+      __ngrams_tls = __ngrams.get();
+    }
+    ngram_map_type& ngrams_map = *__ngrams_tls;
+#else
+    if (! __ngrams.get())
+      __ngrams.reset(new ngram_map_type());
+    
+    ngram_map_type& ngrams_map = *__ngrams;
+#endif
+    
+    ngram_map_type::iterator iter = ngrams_map.find(parameter);
+    if (iter == ngrams_map.end()) {
+      impl::lock_type lock(impl::__ngram_mutex);
+      
+      ngram_map_type::iterator iter_global = impl::__ngram_map.find(parameter);
+      if (iter_global == impl::__ngram_map.end())
+	iter_global = impl::__ngram_map.insert(std::make_pair(parameter, NGram(parameter))).first;
+      
+      iter = ngrams_map.insert(*iter_global).first;
+    }
+    
+    return iter->second;
+  }
+  
 };
