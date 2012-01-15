@@ -625,9 +625,9 @@ void read_bigram(const path_type& file,
     if (titer == tokenizer.end()) continue;
     const count_type count = utils::lexical_cast<count_type>(*titer);
     
-    word_count_type& word_class = word_counts[word_type(prev).id()];
+    word_count_type& word_class = word_counts[word_type(next).id()];
     word_class.count += count;
-    word_class.words[word_type(next).id()] += count;
+    word_class.words[word_type(prev).id()] += count;
   }
   
   sorted_type sorted;
