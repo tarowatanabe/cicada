@@ -300,29 +300,38 @@ void dump(const path_type& path, const ttable_type& lexicon)
   
   sorted_type sorted;
   
-  {
-    ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
-    ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
-    for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
-      if (*siter) {
-	const word_type source(word_type::id_type(siter - siter_begin));
-	const ttable_type::count_map_type& dict = *(*siter);
-	
-	if (dict.empty()) continue;
-	
-	ttable_type::count_map_type::const_iterator titer_end = dict.end();
-	for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
-	  sorted.push_back(std::make_pair(&(*titer), source));
-      }
-  }
+  ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
+  ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
+  for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
+    if (*siter) {
+      const word_type source(word_type::id_type(siter - siter_begin));
+      const ttable_type::count_map_type& dict = *(*siter);
+      
+      if (dict.empty()) continue;
+      
+      ttable_type::count_map_type::const_iterator titer_end = dict.end();
+      for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
+	sorted.push_back(std::make_pair(&(*titer), source));
+    }
   
   std::sort(sorted.begin(), sorted.end(), compare_pvalue<pvalue_type>());
   
   utils::compress_ostream os(path, 1024 * 1024);
   
-  sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-    os << siter->first->first << ' ' << siter->second << ' ' << siter->first->second << '\n';
+  if (kbest <= 0 || sorted.size() <= static_cast<size_t>(kbest)) {
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      os << siter->first->first << ' ' << siter->second << ' ' << siter->first->second << '\n';
+  } else {
+    sorted_type::const_iterator siter_end  = sorted.end();
+    sorted_type::const_iterator siter_last = sorted.begin() + kbest;
+    
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_last; ++ siter)
+      os << siter->first->first << ' ' << siter->second << ' ' << siter->first->second << '\n';
+    for (sorted_type::const_iterator siter = siter_last; siter != siter_end && siter->first->second == siter_last->first->second; ++ siter)
+      os << siter->first->first << ' ' << siter->second << ' ' << siter->first->second << '\n';
+    
+  }
 }
 
 void dump_pair(const path_type& path, const ttable_pair_type& lexicon)
@@ -333,29 +342,38 @@ void dump_pair(const path_type& path, const ttable_pair_type& lexicon)
 
   sorted_type sorted;
   
-  {
-    ttable_pair_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
-    ttable_pair_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
-    for (ttable_pair_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
-      if (*siter) {
-	const word_type source(word_type::id_type(siter - siter_begin));
-	const ttable_pair_type::count_map_type& dict = *(*siter);
-	
-	if (dict.empty()) continue;
-	
-	ttable_pair_type::count_map_type::const_iterator titer_end = dict.end();
-	for (ttable_pair_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
-	  sorted.push_back(std::make_pair(&(*titer), source));
-      }
-  }
+  ttable_pair_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
+  ttable_pair_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
+  for (ttable_pair_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
+    if (*siter) {
+      const word_type source(word_type::id_type(siter - siter_begin));
+      const ttable_pair_type::count_map_type& dict = *(*siter);
+      
+      if (dict.empty()) continue;
+      
+      ttable_pair_type::count_map_type::const_iterator titer_end = dict.end();
+      for (ttable_pair_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
+	sorted.push_back(std::make_pair(&(*titer), source));
+    }
   
   std::sort(sorted.begin(), sorted.end(), compare_pvalue<pvalue_type>());
     
   utils::compress_ostream os(path, 1024 * 1024);
 
-  sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-    os << siter->first->first.first << ' ' << siter->first->first.second << ' ' << siter->second << ' ' << siter->first->second << '\n';
+  if (kbest <= 0 || sorted.size() <= static_cast<size_t>(kbest)) {
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      os << siter->first->first.first << ' ' << siter->first->first.second << ' ' << siter->second << ' ' << siter->first->second << '\n';
+  } else {
+    sorted_type::const_iterator siter_end = sorted.end();
+    sorted_type::const_iterator siter_last = sorted.begin() + kbest;
+    
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_last; ++ siter)
+      os << siter->first->first.first << ' ' << siter->first->first.second << ' ' << siter->second << ' ' << siter->first->second << '\n';
+    
+    for (sorted_type::const_iterator siter = siter_last; siter != siter_end && siter->first->second == siter_last->first->second; ++ siter)
+      os << siter->first->first.first << ' ' << siter->first->first.second << ' ' << siter->second << ' ' << siter->first->second << '\n';
+  }
 }
 
 struct TaskLearn
