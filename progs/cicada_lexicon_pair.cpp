@@ -26,6 +26,7 @@
 #include <boost/thread.hpp>
 
 #include <google/dense_hash_set>
+#include <google/dense_hash_map>
 
 typedef cicada::Symbol    word_type;
 typedef cicada::Sentence  sentence_type;
@@ -33,24 +34,23 @@ typedef cicada::Alignment alignment_type;
 typedef cicada::Vocab     vocab_type;
 typedef boost::filesystem::path path_type;
 
-typedef double count_type;
+typedef uint64_t count_type;
 
 struct ttable_type
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
-  typedef std::pair<word_type, word_type> word_pair_type;
-  
   struct count_map_type
   {
-    typedef google::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > counts_type;
+    typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > counts_type;
 
     typedef counts_type::value_type      value_type;
     typedef counts_type::size_type       size_type;
     typedef counts_type::difference_type difference_type;
       
     typedef counts_type::key_type        key_type;
+    typedef counts_type::mapped_type     mapped_type;
   
     typedef counts_type::const_iterator const_iterator;
     typedef counts_type::iterator       iterator;
@@ -58,7 +58,7 @@ struct ttable_type
     typedef counts_type::const_reference const_reference;
     typedef counts_type::reference       reference;
   
-    count_map_type() { counts.set_empty_key(word_pair_type()); }
+    count_map_type() { counts.set_empty_key(word_type()); }
 
     inline const_iterator begin() const { return counts.begin(); }
     inline       iterator begin()       { return counts.begin(); }
@@ -68,7 +68,7 @@ struct ttable_type
     inline const_iterator find(const key_type& x) const { return counts.find(x); }
     inline       iterator find(const key_type& x)       { return counts.find(x); }
     
-    void insert(const key_type& key) { counts.insert(key); }
+    mapped_type& operator[](const key_type& key) { return counts[key]; }
     
     size_type size() const { return counts.size(); }
     bool empty() const { return counts.empty(); }
@@ -78,7 +78,9 @@ struct ttable_type
     
     count_map_type& operator+=(const count_map_type& x)
     {
-      counts.insert(x.counts.begin(), x.counts.end());
+      const_iterator citer_end = x.counts.end();
+      for (const_iterator citer = x.counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
       return *this;
     }
     
@@ -125,11 +127,108 @@ struct ttable_type
   count_dict_type ttable;
 };
 
+
+struct ttable_pair_type
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef std::pair<word_type, word_type> word_pair_type;
+  
+  struct count_map_type
+  {
+    typedef google::dense_hash_map<word_pair_type, count_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > counts_type;
+
+    typedef counts_type::value_type      value_type;
+    typedef counts_type::size_type       size_type;
+    typedef counts_type::difference_type difference_type;
+      
+    typedef counts_type::key_type        key_type;
+    typedef counts_type::mapped_type     mapped_type;
+  
+    typedef counts_type::const_iterator const_iterator;
+    typedef counts_type::iterator       iterator;
+  
+    typedef counts_type::const_reference const_reference;
+    typedef counts_type::reference       reference;
+  
+    count_map_type() { counts.set_empty_key(word_pair_type()); }
+
+    inline const_iterator begin() const { return counts.begin(); }
+    inline       iterator begin()       { return counts.begin(); }
+    inline const_iterator end() const { return counts.end(); }
+    inline       iterator end()       { return counts.end(); }
+    
+    inline const_iterator find(const key_type& x) const { return counts.find(x); }
+    inline       iterator find(const key_type& x)       { return counts.find(x); }
+    
+    mapped_type& operator[](const key_type& key) { return counts[key]; }
+    
+    size_type size() const { return counts.size(); }
+    bool empty() const { return counts.empty(); }
+
+    void swap(count_map_type& x) { counts.swap(x.counts); }
+    void clear() { counts.clear(); }
+    
+    count_map_type& operator+=(const count_map_type& x)
+    {
+      const_iterator citer_end = x.counts.end();
+      for (const_iterator citer = x.counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
+      return *this;
+    }
+    
+    counts_type counts;
+  };
+  
+  typedef utils::alloc_vector<count_map_type, std::allocator<count_map_type> > count_dict_type;
+  
+  ttable_pair_type() {}
+  
+  count_map_type& operator[](const word_type& word)
+  {
+    return ttable[word.id()];
+  }
+
+  const count_map_type& operator[](const word_type& word) const
+  {
+    return ttable[word.id()];
+  }  
+  
+  void clear() { ttable.clear(); }
+  void swap(ttable_pair_type& x)
+  {
+    ttable.swap(x.ttable);
+  }
+  
+  size_type size() const { return ttable.size(); }
+  bool empty() const { return ttable.empty(); }
+  bool exists(size_type pos) const { return ttable.exists(pos); }
+  bool exists(const word_type& word) const { return ttable.exists(word.id()); }
+  
+  void resize(size_type __size) { ttable.resize(__size); }
+  
+  
+  ttable_pair_type& operator+=(const ttable_pair_type& x)
+  {
+    for (size_type i = 0; i != x.ttable.size(); ++ i) 
+      if (x.ttable.exists(i))
+	ttable[i] += x.ttable[i];
+    
+    return *this;
+  }
+  
+  count_dict_type ttable;
+};
+
 path_type source_file = "-";
 path_type target_file = "-";
 path_type alignment_file = "-";
-path_type output_prev_file = "-";
-path_type output_next_file = "-";
+path_type output_file;
+path_type output_prev_file;
+path_type output_next_file;
+
+int kbest = 0;
 
 bool inverse_mode = false;
 
@@ -137,9 +236,10 @@ int threads = 2;
 
 int debug = 0;
 
+void dump_pair(const path_type& path, const ttable_pair_type& lexicon);
 void dump(const path_type& path, const ttable_type& lexicon);
 
-void learn(ttable_type& ttable_prev, ttable_type& ttable_next);
+void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type& ttable_next);
 
 void options(int argc, char** argv);
 
@@ -150,21 +250,27 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(threads, 1);
     
-    ttable_type ttable_prev;
-    ttable_type ttable_next;
+    ttable_type      ttable;
+    ttable_pair_type ttable_prev;
+    ttable_pair_type ttable_next;
       
-    learn(ttable_prev, ttable_next);
+    learn(ttable, ttable_prev, ttable_next);
       
     // final dumping...
     boost::thread_group workers_dump;
+
+    if (! output_file.empty())
+      workers_dump.add_thread(new boost::thread(boost::bind(dump,
+							    boost::cref(output_file),
+							    boost::cref(ttable))));
       
     if (! output_prev_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump,
+      workers_dump.add_thread(new boost::thread(boost::bind(dump_pair,
 							    boost::cref(output_prev_file),
 							    boost::cref(ttable_prev))));
       
     if (! output_next_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump,
+      workers_dump.add_thread(new boost::thread(boost::bind(dump_pair,
 							    boost::cref(output_next_file),
 							    boost::cref(ttable_next))));
       
@@ -177,24 +283,79 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+template <typename Tp>
+struct compare_pvalue
+{
+  bool operator()(const Tp& x, const Tp& y) const
+  {
+    return x.first->second < y.first->second;
+  }
+};
 
 void dump(const path_type& path, const ttable_type& lexicon)
 {
+  // we do sorting...
+  typedef std::pair<const ttable_type::count_map_type::value_type*, word_type> pvalue_type;
+  typedef std::vector<pvalue_type, std::allocator<pvalue_type> > sorted_type;
+  
+  sorted_type sorted;
+  
+  {
+    ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
+    ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
+    for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
+      if (*siter) {
+	const word_type source(word_type::id_type(siter - siter_begin));
+	const ttable_type::count_map_type& dict = *(*siter);
+	
+	if (dict.empty()) continue;
+	
+	ttable_type::count_map_type::const_iterator titer_end = dict.end();
+	for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
+	  sorted.push_back(std::make_pair(&(*titer), source));
+      }
+  }
+  
+  std::sort(sorted.begin(), sorted.end(), compare_pvalue<pvalue_type>());
+  
   utils::compress_ostream os(path, 1024 * 1024);
   
-  ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
-  ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
-  for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
-    if (*siter) {
-      const word_type source(word_type::id_type(siter - siter_begin));
-      const ttable_type::count_map_type& dict = *(*siter);
-      
-      if (dict.empty()) continue;
-      
-      ttable_type::count_map_type::const_iterator titer_end = dict.end();
-      for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
-	os << titer->first << ' ' << titer->second << ' '  << source << '\n';
-    }
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+    os << siter->first->first << ' ' << siter->second << ' ' << siter->first->second << '\n';
+}
+
+void dump_pair(const path_type& path, const ttable_pair_type& lexicon)
+{
+  // we do sorting...
+  typedef std::pair<const ttable_pair_type::count_map_type::value_type*, word_type> pvalue_type;
+  typedef std::vector<pvalue_type, std::allocator<pvalue_type> > sorted_type;
+
+  sorted_type sorted;
+  
+  {
+    ttable_pair_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
+    ttable_pair_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
+    for (ttable_pair_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
+      if (*siter) {
+	const word_type source(word_type::id_type(siter - siter_begin));
+	const ttable_pair_type::count_map_type& dict = *(*siter);
+	
+	if (dict.empty()) continue;
+	
+	ttable_pair_type::count_map_type::const_iterator titer_end = dict.end();
+	for (ttable_pair_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
+	  sorted.push_back(std::make_pair(&(*titer), source));
+      }
+  }
+  
+  std::sort(sorted.begin(), sorted.end(), compare_pvalue<pvalue_type>());
+    
+  utils::compress_ostream os(path, 1024 * 1024);
+
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+    os << siter->first->first.first << ' ' << siter->first->first.second << ' ' << siter->second << ' ' << siter->first->second << '\n';
 }
 
 struct TaskLearn
@@ -253,8 +414,9 @@ struct TaskLearn
 	    const word_type& source_next = (aiter->source + 1 == biter->source.size() ? vocab_type::EOS : biter->source[aiter->source + 1]);
 	    const word_type& target_word = biter->target[aiter->target];
 	    
-	    ttable_prev[target_word].insert(std::make_pair(source_prev, source_word));
-	    ttable_next[target_word].insert(std::make_pair(source_word, source_next));
+	    ++ ttable[target_word][source_word];
+	    ++ ttable_prev[target_word][std::make_pair(source_prev, source_word)];
+	    ++ ttable_next[target_word][std::make_pair(source_word, source_next)];
 	  }
 	  
 	  aiter_prev = aiter;
@@ -264,11 +426,12 @@ struct TaskLearn
   }
   
   queue_type& queue;
-  ttable_type ttable_prev;
-  ttable_type ttable_next;
+  ttable_type      ttable;
+  ttable_pair_type ttable_prev;
+  ttable_pair_type ttable_next;
 };
 
-void learn(ttable_type& ttable_prev, ttable_type& ttable_next)
+void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type& ttable_next)
 {
   typedef TaskLearn learner_type;
   
@@ -278,6 +441,7 @@ void learn(ttable_type& ttable_prev, ttable_type& ttable_next)
   
   typedef std::vector<learner_type, std::allocator<learner_type> > learner_set_type;
   
+  ttable.clear();
   ttable_prev.clear();
   ttable_next.clear();
   
@@ -341,6 +505,12 @@ void learn(ttable_type& ttable_prev, ttable_type& ttable_next)
   
   // merge!  
   for (size_t i = 0; i != learners.size(); ++ i) {
+    if (ttable.empty())
+      learners[i].ttable.swap(ttable);
+    else
+      ttable += learners[i].ttable;
+    learners[i].ttable.clear();
+
     if (ttable_prev.empty())
       learners[i].ttable_prev.swap(ttable_prev);
     else
@@ -373,10 +543,13 @@ void options(int argc, char** argv)
     ("target",    po::value<path_type>(&target_file), "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     
+    ("output",      po::value<path_type>(&output_file),      "output for source, target")
     ("output-prev", po::value<path_type>(&output_prev_file), "output for source-1, source, target")
     ("output-next", po::value<path_type>(&output_next_file), "output for source, source+1, target")
     
-    ("inverse",   po::bool_switch(&inverse_mode),                          "inverse alignment")
+    ("kbest", po::value<int>(&kbest), "kbest output")
+    
+    ("inverse", po::bool_switch(&inverse_mode), "inverse alignment")
 
     ("threads", po::value<int>(&threads), "# of threads")
     
