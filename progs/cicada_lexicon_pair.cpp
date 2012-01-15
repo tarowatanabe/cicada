@@ -288,7 +288,7 @@ struct compare_pvalue
 {
   bool operator()(const Tp& x, const Tp& y) const
   {
-    return x.first->second < y.first->second;
+    return x.first->second > y.first->second;
   }
 };
 
