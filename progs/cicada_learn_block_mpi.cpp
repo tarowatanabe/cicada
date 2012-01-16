@@ -96,6 +96,7 @@ bool yield_dependency = false;
 int iteration = 10;
 int block_size = 8;
 int kbest_size = 1000;
+bool kbest_diverse_mode = false;
 
 // solver parameters
 bool learn_lbfgs  = false;
@@ -127,7 +128,6 @@ bool project_weight = false;
 bool line_search_mode = false;    // perform line-search
 bool mert_search_mode = false;    // perform MERT search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
-
 
 int debug = 0;
 
@@ -1333,9 +1333,10 @@ void options(int argc, char** argv)
     ("yield-alignment",  po::bool_switch(&yield_alignment),                                "alignment yield")
     ("yield-dependency", po::bool_switch(&yield_dependency),                               "dependency yield")
     
-    ("iteration", po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
-    ("block",     po::value<int>(&block_size)->default_value(block_size), "block (or batch, bin) size")
-    ("kbest",     po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
+    ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
+    ("block",         po::value<int>(&block_size)->default_value(block_size), "block (or batch, bin) size")
+    ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
+    ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
     
     ("learn-lbfgs",    po::bool_switch(&learn_lbfgs),    "batch LBFGS algorithm")
     ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
