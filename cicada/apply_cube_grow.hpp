@@ -389,7 +389,7 @@ namespace cicada
       
       // perform coarse scoring from the 1-best antecedents...
       if (scores_edge[edge.id] == semiring::traits<score_type>::zero()) {
-	feature_set_type features(candidate.out_edge.features);
+	feature_set_type features(edge.features);
 	
 	const state_type node_state = model.apply(node_states_coarse, edge, features, is_goal);
 	
@@ -401,7 +401,7 @@ namespace cicada
 	
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	  score*= scores_node[*titer];
+	  score *= scores_node[*titer];
 	
 	if (score > scores_node[edge.head]) {
 	  scores_node[edge.head] = score;
