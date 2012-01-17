@@ -409,7 +409,6 @@ namespace cicada
 	  node_states_coarse[edge.head] = node_state;
 	} else
 	  model.deallocate(node_state);
-	
       }
       
       candidate.score = scores_edge[edge.id];
