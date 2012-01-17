@@ -410,6 +410,8 @@ namespace cicada
 	} else
 	  model.deallocate(node_state);
       }
+
+      candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
       candidate.score = scores_edge[edge.id];
       for (size_t i = 0; i != j.size(); ++ i) {
