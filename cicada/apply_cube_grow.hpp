@@ -194,11 +194,11 @@ namespace cicada
 	
 	scores_edge.clear();
 	scores_edge.reserve(graph_in.edges.size());
-	scores_edge.resize(graph_in.edges.size());
+	scores_edge.resize(graph_in.edges.size(), semiring::traits<score_type>::zero());
 
 	scores_node.clear();
 	scores_node.reserve(graph_in.nodes.size());
-	scores_node.resize(graph_in.nodes.size());
+	scores_node.resize(graph_in.nodes.size(), semiring::traits<score_type>::zero());
 
 	states.clear();
 	states.reserve(graph_in.nodes.size());
@@ -388,7 +388,7 @@ namespace cicada
       candidate_type& candidate = candidates.back();
       
       // perform coarse scoring from the 1-best antecedents...
-      if (scores_edge[edge.id] != score_type()) {
+      if (scores_edge[edge.id] == semiring::traits<score_type>::zero()) {
 	feature_set_type features(candidate.out_edge.features);
 	
 	const state_type node_state = model.apply(node_states_coarse, edge, features, is_goal);
