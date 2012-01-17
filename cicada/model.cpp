@@ -109,7 +109,7 @@ namespace cicada
   
     void deallocate(const state_type& state)
     {
-      if (state_size == 0 || states.empty()) return;
+      if (state.empty() || state_size == 0 || states.empty()) return;
       
       *reinterpret_cast<pointer*>(const_cast<state_type&>(state).base) = cache;
       cache = state.base;
