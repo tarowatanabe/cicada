@@ -3,8 +3,8 @@
 //  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__APPLY_CUBE_GROW__HPP__
-#define __CICADA__APPLY_CUBE_GROW__HPP__ 1
+#ifndef __CICADA__APPLY_CUBE_GROW_COARSE__HPP__
+#define __CICADA__APPLY_CUBE_GROW_COARSE__HPP__ 1
 
 #include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
@@ -55,7 +55,7 @@ namespace cicada
   // semiring and function to compute semiring from a feature vector
 
   template <typename Semiring, typename Function>
-  struct ApplyCubeGrow
+  struct ApplyCubeGrowCoarse
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
@@ -77,8 +77,6 @@ namespace cicada
     typedef Semiring score_type;
     
     typedef Function function_type;
-
-    typedef std::vector<score_type, std::allocator<score_type> > score_set_type;
     
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
@@ -137,13 +135,17 @@ namespace cicada
     typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
 
+    typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
+
     struct State
     {
       State(const size_type& hint, const size_type& state_size)
 	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size)),
+	  nodes_coarse(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
       {
 	nodes.set_empty_key(state_type());
+	nodes_coarse.set_empty_key(state_type());
 	
 	uniques.set_empty_key(0);
       }
@@ -155,6 +157,7 @@ namespace cicada
       candidate_set_unique_type uniques;
       
       state_node_map_type nodes;
+      state_node_map_type nodes_coarse;
 
       bool fired;
     };
@@ -162,9 +165,9 @@ namespace cicada
     typedef State cand_state_type;
     typedef std::vector<cand_state_type, std::allocator<cand_state_type> > cand_state_set_type;
     
-    ApplyCubeGrow(const model_type& _model,
-		  const function_type& _function,
-		  const int _cube_size_max)
+    ApplyCubeGrowCoarse(const model_type& _model,
+			const function_type& _function,
+			const int _cube_size_max)
       : model(_model),
 	function(_function),
 	cube_size_max(_cube_size_max)
@@ -189,17 +192,11 @@ namespace cicada
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
 
 	node_states_coarse.clear();
-	node_states_coarse.reserve(graph_in.nodes.size());
-	node_states_coarse.resize(graph_in.nodes.size());
+	node_states_coarse.reserve(graph_in.nodes.size() * cube_size_max);
+
+	node_maps.clear();
+	node_maps.reserve(graph_in.nodes.size() * cube_size_max);
 	
-	scores_edge.clear();
-	scores_edge.reserve(graph_in.edges.size());
-	scores_edge.resize(graph_in.edges.size());
-
-	scores_node.clear();
-	scores_node.reserve(graph_in.nodes.size());
-	scores_node.resize(graph_in.nodes.size());
-
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
@@ -323,6 +320,8 @@ namespace cicada
 	// If possible, state merge
 	if (is_goal) {
 	  if (! graph_out.is_valid()) {
+	    // true-id to coarse-id mapping
+	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
 	    
 	    graph_out.goal = graph_out.add_node().id;
@@ -339,6 +338,8 @@ namespace cicada
 	  
 	  result_type result = state.nodes.insert(std::make_pair(candidate.state, 0));
 	  if (result.second) {
+	    // true-id to coarse-id mapping
+	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
 	    
 	    result.first->second = graph_out.add_node().id;
@@ -362,7 +363,6 @@ namespace cicada
 
       candidate_type& candidate = const_cast<candidate_type&>(__item);
       
-#if 0
       candidate.score = semiring::traits<score_type>::one();
       for (size_t i = 0; i != candidate.j.size(); ++ i) {
 	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
@@ -371,12 +371,17 @@ namespace cicada
 	candidate.out_edge.tails[i] = antecedent.out_edge.head;
 	candidate.score *= antecedent.score;
       }
-#endif
-      candidate.score /= scores_edge[candidate.in_edge->head];
+      
+      const id_type node_id_coarse = candidate.out_edge.head;
+      
+      // assign node-id of in-graph for scoring...
+      const_cast<id_type&>(candidate.out_edge.head) = candidate.in_edge->head;
       
       candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
       
-      candidate.score *= function(candidate.out_edge.features);
+      const_cast<id_type&>(candidate.out_edge.head) = node_id_coarse;
+      
+      candidate.score    *= function(candidate.out_edge.features);
       
       state.buf.push(&candidate);
     }
@@ -387,39 +392,40 @@ namespace cicada
       
       candidate_type& candidate = candidates.back();
       
-      // perform coarse scoring from the 1-best antecedents...
-      if (scores_edge[edge.id] != score_type()) {
-	feature_set_type features(candidate.out_edge.features);
-	
-	const state_type node_state = model.apply(node_states_coarse, edge, features, is_goal);
-	
-	score_type score = function(features);
-	
-	scores_edge[edge.id] = score;
-	
-	// compute the max of scores_node...
-	
-	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	  score*= scores_node[*titer];
-	
-	if (score > scores_node[edge.head]) {
-	  scores_node[edge.head] = score;
-	  model.deallocate(node_states_coarse[edge.head]);
-	  node_states_coarse[edge.head] = node_state;
-	} else
-	  model.deallocate(node_state);
-	
-      }
+      candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
-      candidate.score = scores_edge[edge.id];
+      candidate.score = semiring::traits<score_type>::one();
       for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
-	// assign real-node-id
-	candidate.out_edge.tails[i] = antecedent.out_edge.head;
+	// assign coarse node id
+	candidate.out_edge.tails[i] = node_maps[antecedent.out_edge.head];
 	candidate.score *= antecedent.score;
       }
+      
+      // perform "estimated" coarse model application
+      feature_set_type features(candidate.out_edge.features);
+      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, features, is_goal);
+      
+      candidate.score *= function(features);
+      
+      // no state merging...
+      //candidate.node = node_states_coarse.size();
+      //node_states_coarse.push_back(node_state);
+      
+      // state merging... so that we may reuse state structure
+      typedef std::pair<state_node_map_type::iterator, bool> result_type;
+
+      result_type result = state.nodes_coarse.insert(std::make_pair(node_state, 0));
+      if (result.second) {
+	result.first->second = node_states_coarse.size();
+	
+	node_states_coarse.push_back(node_state);
+      } else
+	model.deallocate(node_state);
+      
+      // assign coarse-id
+      candidate.out_edge.head = result.first->second;
       
       return &candidate;
     };
@@ -427,14 +433,12 @@ namespace cicada
     
   private:
     candidate_set_type  candidates;
-    
     state_set_type      node_states;
     state_set_type      node_states_coarse;
-    score_set_type      scores_node;
-    score_set_type      scores_edge;
-    
     cand_state_set_type states;
-    
+
+    node_map_type       node_maps;
+
     const model_type& model;
     const function_type& function;
     size_type  cube_size_max;
@@ -442,18 +446,18 @@ namespace cicada
   
   template <typename Function>
   inline
-  void apply_cube_grow(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  void apply_cube_grow_coarse(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
   {
-    ApplyCubeGrow<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size)(source, target);
   }
 
   template <typename Function>
   inline
-  void apply_cube_grow(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
+  void apply_cube_grow_coarse(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
   {
     HyperGraph target;
     
-    ApplyCubeGrow<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size)(source, target);
     
     source.swap(target);
   }

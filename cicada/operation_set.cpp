@@ -58,8 +58,9 @@ namespace cicada
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false]  no pruning feature application\n\
-\tprune=[true|false]  cube-pruning for feature application\n\
-\tgrow=[true|false]   cube-growing for feature application\n\
+\tprune=[true|false]         cube-pruning for feature application\n\
+\tgrow=[true|false]          cube-growing for feature application\n\
+\tgrow-coarse=[true|false]   cube-growing for feature application with coarse feature\n\
 \tforced=[true|false] forced feature application\n\
 \tsparse=[true|false] apply sparse features only\n\
 \tdense=[true|false]  apply non-sparse features only\n\

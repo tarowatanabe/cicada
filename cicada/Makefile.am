@@ -282,6 +282,7 @@ libcicadainclude_HEADERS = \
 alignment.hpp \
 apply.hpp \
 apply_cube_grow.hpp \
+apply_cube_grow_coarse.hpp \
 apply_cube_prune.hpp \
 apply_exact.hpp \
 apply_incremental.hpp \

@@ -36,6 +36,7 @@ namespace cicada
       bool exact;
       bool prune;
       bool grow;
+      bool grow_coarse;
       bool incremental;
   
       bool forced;

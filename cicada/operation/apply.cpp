@@ -22,7 +22,7 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -39,6 +39,8 @@ namespace cicada
 	  prune = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "grow")
 	  grow = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "grow-coarse")
+	  grow_coarse = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "incremental")
 	  incremental = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "forced")
@@ -62,13 +64,17 @@ namespace cicada
       }
 
       // default to prune...
-      switch (int(exact) + prune + grow + incremental) {
+      switch (int(exact) + prune + grow + grow_coarse + incremental) {
       case 0: prune = true; break; // default to cube-prune
       case 1: break; // OK
       default:
-	throw std::runtime_error("specify one of exact/prune/grow/incremental");
+	throw std::runtime_error("specify one of exact/prune/grow/grow-coarse/incremental");
       }
 
+      if (prune || grow || grow_coarse || incremental)
+	if (size <= 0)
+	  throw std::runtime_error("invalid beam size: " + utils::lexical_cast<std::string>(size));
+      
       if (sparse && dense)
 	throw std::runtime_error("either sparse|dense");
       
@@ -147,7 +153,7 @@ namespace cicada
       name = (std::string("apply-")
 	      + std::string(state_full ? "full-" : (state_less ? "less-" : ""))
 	      + std::string(sparse ? "sparse-" : (dense ? "dense-" : ""))
-	      + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))));
+	      + (exact ? "exact" : (incremental ? "incremental" : (grow_coarse ? "grow-coarse" : (grow ? "grow" : "prune")))));
     }
     
     void Apply::operator()(data_type& data) const
@@ -187,6 +193,11 @@ namespace cicada
 	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
 	else
 	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
+      } else if (grow_coarse) {
+	if (weights_one)
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	else
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
       } else {
 	if (weights_one)
 	  cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size);

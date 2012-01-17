@@ -165,6 +165,8 @@ namespace cicada
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
     {
+      // first, we wil compute a coarse -LM scoring...
+      
       const_cast<model_type&>(model).initialize();
 
       if (model.is_stateless()) {
