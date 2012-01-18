@@ -1,4 +1,4 @@
-2012-1-x
+2012-1-18
 INCOMPATIBLE CHANGE: revised internal indexing for tree-grammars. (You do not have to re-index, but the size is slightly smaller)
 Better ngram feature computation by pre-transforming into word-id
 Faster compose-phrase for phrase-based SMT :-)
