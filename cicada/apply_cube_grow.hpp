@@ -38,19 +38,6 @@ namespace cicada
   //  url       = {http://www.aclweb.org/anthology/P07-1019}
   //  }
   //
-  // with coarse heuristic
-  // @InProceedings { vilar09:coarseHeuristic,
-  //  author= {Vilar, David and Ney, Hermann},
-  //  title= {On LM Heuristics for the Cube Growing Algorithm},
-  //  booktitle= {Annual Conference of the European Association for Machine Translation},
-  //  year= 2009,
-  //  pages= {242-249},
-  //  address= {Barcelona, Spain},
-  //  month= may,
-  //  booktitlelink= {http://www.talp.cat/eamt09/},
-  // pdf = {http://www-i6.informatik.rwth-aachen.de/publications/downloader.php?id=617&row=pdf}
-  //}
-
   
   // semiring and function to compute semiring from a feature vector
 
@@ -183,23 +170,15 @@ namespace cicada
 	ApplyStateLess __applier(model);
 	__applier(graph_in, graph_out);
       } else {
+	
+	// cube-pruning step
+	cube_prune(graph_in);
+	
 	candidates.clear();
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
-
-	node_states_coarse.clear();
-	node_states_coarse.reserve(graph_in.nodes.size());
-	node_states_coarse.resize(graph_in.nodes.size());
 	
-	scores_edge.clear();
-	scores_edge.reserve(graph_in.edges.size());
-	scores_edge.resize(graph_in.edges.size(), semiring::traits<score_type>::zero());
-
-	scores_node.clear();
-	scores_node.reserve(graph_in.nodes.size());
-	scores_node.resize(graph_in.nodes.size(), semiring::traits<score_type>::zero());
-
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
@@ -387,30 +366,6 @@ namespace cicada
       
       candidate_type& candidate = candidates.back();
       
-      // perform coarse scoring from the 1-best antecedents...
-      if (scores_edge[edge.id] == semiring::traits<score_type>::zero()) {
-	feature_set_type features(edge.features);
-	
-	const state_type node_state = model.apply(node_states_coarse, edge, features, is_goal);
-	
-	score_type score = function(features);
-	
-	scores_edge[edge.id] = score;
-	
-	// compute the max of scores_node...
-	
-	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	  score *= scores_node[*titer];
-	
-	if (score > scores_node[edge.head]) {
-	  scores_node[edge.head] = score;
-	  model.deallocate(node_states_coarse[edge.head]);
-	  node_states_coarse[edge.head] = node_state;
-	} else
-	  model.deallocate(node_state);
-      }
-      
       candidate.score = scores_edge[edge.id];
       for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
@@ -423,6 +378,61 @@ namespace cicada
       return &candidate;
     };
     
+
+    void cube_prune(const hypergraph_type& graph)
+    {
+      // currently, we perform 1-best search... but it will be extended to cube-pruning...
+      node_states_coarse.clear();
+      node_states_coarse.reserve(graph.nodes.size());
+      node_states_coarse.resize(graph.nodes.size());
+      
+      scores_edge.clear();
+      scores_edge.reserve(graph.edges.size());
+      scores_edge.resize(graph.edges.size(), semiring::traits<score_type>::zero());
+      
+      scores_node.clear();
+      scores_node.reserve(graph.nodes.size());
+      scores_node.resize(graph.nodes.size(), semiring::traits<score_type>::zero());
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+	const node_type& node = *niter;
+
+	const bool is_goal = (graph.goal == node.id);
+	
+	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const edge_type& edge = graph.edges[*eiter];
+	  
+	  feature_set_type features(edge.features);
+	  
+	  const state_type node_state = model.apply(node_states_coarse, edge, features, is_goal);
+	  
+	  score_type score = function(features);
+	  
+	  scores_edge[edge.id] = score;
+	  
+	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	    score *= scores_node[*titer];
+	  
+	  if (score > scores_node[node.id]) {
+	    scores_node[edge.head] = score;
+	    model.deallocate(node_states_coarse[edge.head]);
+	    node_states_coarse[edge.head] = node_state;
+	  } else
+	    model.deallocate(node_state);
+	}
+      }
+      
+      // deallocate model state...
+      state_set_type::const_iterator siter_end = node_states_coarse.end();
+      for (state_set_type::const_iterator siter = node_states_coarse.begin(); siter != siter_end; ++ siter)
+	model.deallocate(*siter);
+      
+      scores_node.clear();
+      node_states_coarse.clear();
+    }
     
   private:
     candidate_set_type  candidates;
