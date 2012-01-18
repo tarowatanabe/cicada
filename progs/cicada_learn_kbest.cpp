@@ -85,6 +85,7 @@ bool line_search = false;
 bool mert_search = false;
 bool sample_vector = false;
 bool direct_loss = false;
+bool conservative_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -139,6 +140,10 @@ int main(int argc, char ** argv)
       throw std::runtime_error("eitehr learn-{lbfgs,linear,svm}");
     if (int(learn_lbfgs) + learn_linear + learn_svm == 0)
       learn_lbfgs = true;
+    
+    if (conservative_loss && line_search)
+      throw std::runtime_error("we do not allow both conservative-update and line-search");
+
     
     if (learn_lbfgs && regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
@@ -1007,8 +1012,9 @@ struct OptimizeSVM
     
     Encoder(queue_type& __queue,
 	    const hypothesis_map_type& __kbests,
-	    const hypothesis_map_type& __oracles)
-      : queue(__queue), kbests(__kbests), oracles(__oracles) {}
+	    const hypothesis_map_type& __oracles,
+	    const weight_set_type& __weights)
+      : queue(__queue), kbests(__kbests), oracles(__oracles), weights(__weights) {}
 
     template <typename Iterator1, typename Iterator2, typename Features>
     void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
@@ -1130,10 +1136,29 @@ struct OptimizeSVM
 	    positions.push_back(i);
 	  
 	  std::sort(positions.begin(), positions.end(), greater_loss(losses_sample));
-	  
-	  for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
-	    features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
-	    losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
+
+	  if (conservative_loss) {
+	    for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
+	      const double margin = cicada::dot_product(weights, features_sample[*piter].begin(), features_sample[*piter].end(), 0.0);
+	      const double loss = losses_sample[*piter];
+
+	      if (loss_margin) {
+		if (loss - margin > 0.0) {
+		  features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
+		  losses.push_back(loss - margin);
+		}
+	      } else {
+		if (1.0 - margin > 0.0) {
+		  features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
+		  losses.push_back(1.0 - margin);
+		}
+	      }
+	    }
+	  } else {
+	    for (pos_set_type::const_iterator piter = positions.begin(); piter != positions.begin() + sample_size; ++ piter) {
+	      features.insert(features_sample[*piter].begin(), features_sample[*piter].end());
+	      losses.push_back(loss_margin ? losses_sample[*piter] : 1.0);
+	    }
 	  }
 	} else {
 	  
@@ -1156,13 +1181,29 @@ struct OptimizeSVM
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
-	      
-	      if (loss_margin) {
-		features.insert(feats.begin(), feats.end());
-		losses.push_back(loss);
+
+	      if (conservative_loss) {
+		const double margin = cicada::dot_product(weights, feats.begin(), feats.end(), 0.0);
+		
+		if (loss_margin) {
+		  if (loss - margin > 0.0) {
+		    features.insert(feats.begin(), feats.end());
+		    losses.push_back(loss - margin);
+		  }
+		} else {
+		  if (1.0 - margin > 0.0) {
+		    features.insert(feats.begin(), feats.end());
+		    losses.push_back(1.0 - margin);
+		  }
+		}
 	      } else {
-		features.insert(feats.begin(), feats.end());
-		losses.push_back(1.0);
+		if (loss_margin) {
+		  features.insert(feats.begin(), feats.end());
+		  losses.push_back(loss);
+		} else {
+		  features.insert(feats.begin(), feats.end());
+		  losses.push_back(1.0);
+		}
 	      }
 	    }
 	}
@@ -1177,6 +1218,7 @@ struct OptimizeSVM
     queue_type& queue;
     const hypothesis_map_type& kbests;
     const hypothesis_map_type& oracles;
+    const weight_set_type&     weights;
     
     sample_set_type features;
     loss_set_type   losses;
@@ -1332,7 +1374,7 @@ struct OptimizeSVM
     : weights(), objective(0.0), tolerance(0.1)
   {
     encoder_type::queue_type queue;
-    encoder_set_type encoders(threads, encoder_type(queue, kbests, oracles));
+    encoder_set_type encoders(threads, encoder_type(queue, kbests, oracles, weights_prev));
     
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
@@ -1380,8 +1422,11 @@ struct OptimizeSVM
     objective *= C;
     
     size_type actives = 0;
-
     weights.clear();
+    
+    if (conservative_loss)
+      weights = weights_prev;
+    
     alpha_set_type::const_iterator aiter = alpha.begin();
     for (size_type i = 0; i != encoders.size(); ++ i)
       for (size_type j = 0; j != encoders[i].features.size(); ++ j, ++ aiter) 
@@ -2510,12 +2555,13 @@ void options(int argc, char** argv)
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
 
-    ("loss-margin",      po::bool_switch(&loss_margin),      "direct loss margin")
-    ("softmax-margin",   po::bool_switch(&softmax_margin),   "softmax margin")
-    ("line-search",      po::bool_switch(&line_search),      "perform line search in each iteration")
-    ("mert-search",      po::bool_switch(&mert_search),      "perform one-dimensional mert")
-    ("sample-vector",    po::bool_switch(&sample_vector),    "perform samling")
-    ("direct-loss",      po::bool_switch(&direct_loss),      "compute loss by directly treating hypothesis score")
+    ("loss-margin",       po::bool_switch(&loss_margin),       "direct loss margin")
+    ("softmax-margin",    po::bool_switch(&softmax_margin),    "softmax margin")
+    ("line-search",       po::bool_switch(&line_search),       "perform line search in each iteration")
+    ("mert-search",       po::bool_switch(&mert_search),       "perform one-dimensional mert")
+    ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
+    ("direct-loss",       po::bool_switch(&direct_loss),       "compute loss by directly treating hypothesis score")
+    ("conservative-loss", po::bool_switch(&conservative_loss), "conservative loss")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

@@ -89,6 +89,7 @@ bool mert_search = false;
 bool mert_search_local = false;
 bool sample_vector = false;
 bool direct_loss = false;
+bool conservative_loss = false;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -4430,6 +4431,7 @@ void options(int argc, char** argv)
     ("mert-search-local", po::bool_switch(&mert_search_local), "perform local one-dimensional mert")
     ("sample-vector",     po::bool_switch(&sample_vector),     "perform samling")
     ("direct-loss",       po::bool_switch(&direct_loss),       "compute loss by directly treating hypothesis score")
+    ("conservative-loss", po::bool_switch(&conservative_loss), "conservative loss")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
