@@ -179,9 +179,14 @@ namespace cicada
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
 	
+	scores.clear();
+	scores.reserve(graph_in.nodes.size() * cube_size_max);
+	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
+
+	
 	
 	for (size_t j = 0; j != cube_size_max; ++ j) {
 	  const size_type edge_size_prev = graph_out.edges.size();
@@ -303,10 +308,13 @@ namespace cicada
 	if (is_goal) {
 	  if (! graph_out.is_valid()) {
 	    node_states.push_back(candidate.state);
+	    scores.push_back(candidate.score);
 	    
 	    graph_out.goal = graph_out.add_node().id;
-	  } else
+	  } else {
 	    model.deallocate(candidate.state);
+	    scores[graph_out.goal] = std::max(scores[graph_out.goal], candidate.score);
+	  }
 	  
 	  // assign true head
 	  candidate.out_edge.head = graph_out.goal;
@@ -319,10 +327,13 @@ namespace cicada
 	  result_type result = state.nodes.insert(std::make_pair(candidate.state, 0));
 	  if (result.second) {
 	    node_states.push_back(candidate.state);
+	    scores.push_back(candidate.score);
 	    
 	    result.first->second = graph_out.add_node().id;
-	  } else
+	  } else {
 	    model.deallocate(candidate.state);
+	    scores[result.first->second] = std::max(scores[result.first->second], candidate.score);
+	  }
 	  
 	  // assign true head
 	  candidate.out_edge.head = result.first->second;
@@ -341,21 +352,10 @@ namespace cicada
 
       candidate_type& candidate = const_cast<candidate_type&>(__item);
       
-#if 0
-      candidate.score = semiring::traits<score_type>::one();
-      for (size_t i = 0; i != candidate.j.size(); ++ i) {
-	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
-	
-	// assign real-node-id!
-	candidate.out_edge.tails[i] = antecedent.out_edge.head;
-	candidate.score *= antecedent.score;
-      }
-#endif
-      candidate.score /= scores_edge[candidate.in_edge->head];
-      
       candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
       
       candidate.score *= function(candidate.out_edge.features);
+      candidate.score /= scores_edge[candidate.in_edge->head];
       
       state.buf.push(&candidate);
     }
@@ -372,7 +372,7 @@ namespace cicada
 	
 	// assign real-node-id
 	candidate.out_edge.tails[i] = antecedent.out_edge.head;
-	candidate.score *= antecedent.score;
+	candidate.score *= scores[antecedent.out_edge.head];
       }
       
       return &candidate;
@@ -438,6 +438,8 @@ namespace cicada
     candidate_set_type  candidates;
     
     state_set_type      node_states;
+    score_set_type      scores;
+
     state_set_type      node_states_coarse;
     score_set_type      scores_node;
     score_set_type      scores_edge;

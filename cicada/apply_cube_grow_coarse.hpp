@@ -78,6 +78,8 @@ namespace cicada
     
     typedef Function function_type;
     
+    typedef std::vector<score_type, std::allocator<score_type> > score_set_type;
+
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
@@ -190,6 +192,9 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
+
+	scores.clear();
+	scores.reserve(graph_in.nodes.size() * cube_size_max);
 
 	node_states_coarse.clear();
 	node_states_coarse.reserve(graph_in.nodes.size() * cube_size_max);
@@ -323,10 +328,13 @@ namespace cicada
 	    // true-id to coarse-id mapping
 	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
+	    scores.push_back(candidate.score);
 	    
 	    graph_out.goal = graph_out.add_node().id;
-	  } else
+	  } else {
 	    model.deallocate(candidate.state);
+	    scores[graph_out.goal] = std::max(scores[graph_out.goal], candidate.score);
+	  }
 	  
 	  // assign true head
 	  candidate.out_edge.head = graph_out.goal;
@@ -341,10 +349,13 @@ namespace cicada
 	    // true-id to coarse-id mapping
 	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
+	    scores.push_back(candidate.score);
 	    
 	    result.first->second = graph_out.add_node().id;
-	  } else
+	  } else {
 	    model.deallocate(candidate.state);
+	    scores[result.first->second] = std::max(scores[result.first->second], candidate.score);
+	  }
 	  
 	  // assign true head
 	  candidate.out_edge.head = result.first->second;
@@ -369,7 +380,7 @@ namespace cicada
 	
 	// assign real-node-id!
 	candidate.out_edge.tails[i] = antecedent.out_edge.head;
-	candidate.score *= antecedent.score;
+	candidate.score *= scores[antecedent.out_edge.head];
       }
       
       const id_type node_id_coarse = candidate.out_edge.head;
@@ -392,15 +403,13 @@ namespace cicada
       
       candidate_type& candidate = candidates.back();
       
-      candidate.out_edge.tails = edge_type::node_set_type(j.size());
-      
       candidate.score = semiring::traits<score_type>::one();
       for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
 	// assign coarse node id
 	candidate.out_edge.tails[i] = node_maps[antecedent.out_edge.head];
-	candidate.score *= antecedent.score;
+	candidate.score *= scores[antecedent.out_edge.head];
       }
       
       // perform "estimated" coarse model application
@@ -434,6 +443,8 @@ namespace cicada
   private:
     candidate_set_type  candidates;
     state_set_type      node_states;
+    score_set_type      scores;
+
     state_set_type      node_states_coarse;
     cand_state_set_type states;
 
