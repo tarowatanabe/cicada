@@ -417,9 +417,9 @@ namespace cicada
 	    score *= scores_node[*titer];
 	  
 	  if (score > scores_node[node.id]) {
-	    scores_node[edge.head] = score;
-	    model.deallocate(node_states_coarse[edge.head]);
-	    node_states_coarse[edge.head] = node_state;
+	    scores_node[node.id] = score;
+	    model.deallocate(node_states_coarse[node.id]);
+	    node_states_coarse[node.id] = node_state;
 	  } else
 	    model.deallocate(node_state);
 	}
