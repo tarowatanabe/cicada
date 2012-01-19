@@ -1,11 +1,12 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS_ISTREAM_LINE_ITERATOR__HPP__
 #define __UTILS_ISTREAM_LINE_ITERATOR__HPP__ 1
 
+#include <cstddef>
 #include <string>
 #include <iostream>
 #include <iterator>
