@@ -171,8 +171,8 @@ namespace cicada
 	__applier(graph_in, graph_out);
       } else {
 	
-	// cube-pruning step
-	cube_prune(graph_in);
+	// no ... cube-pruning step
+	//cube_prune(graph_in);
 	
 	candidates.clear();
 	
@@ -349,7 +349,11 @@ namespace cicada
     void push_buf(const candidate_type& __item, cand_state_type& state, const bool is_goal, hypergraph_type& graph_out)
     {
       // push this item into state.buf with "correct" score
-
+      
+#if 1
+      state.buf.push(&__item);
+#endif
+#if 0
       candidate_type& candidate = const_cast<candidate_type&>(__item);
       
       candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
@@ -358,6 +362,7 @@ namespace cicada
       candidate.score /= scores_edge[candidate.in_edge->head];
       
       state.buf.push(&candidate);
+#endif
     }
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, cand_state_type& state, const bool is_goal, hypergraph_type& graph_out)
@@ -366,6 +371,22 @@ namespace cicada
       
       candidate_type& candidate = candidates.back();
       
+#if 1
+      candidate.score = semiring::traits<score_type>::one();
+      for (size_t i = 0; i != j.size(); ++ i) {
+	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
+	
+	// assign real-node-id
+	candidate.out_edge.tails[i] = antecedent.out_edge.head;
+	candidate.score *= scores[antecedent.out_edge.head];
+      }
+      
+      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, is_goal);
+      
+      candidate.score *= function(candidate.out_edge.features);
+#endif
+      
+#if 0
       candidate.score = scores_edge[edge.id];
       for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
@@ -374,6 +395,7 @@ namespace cicada
 	candidate.out_edge.tails[i] = antecedent.out_edge.head;
 	candidate.score *= scores[antecedent.out_edge.head];
       }
+#endif
       
       return &candidate;
     };
