@@ -95,6 +95,8 @@ namespace cicada
 	
 	lexicon_parsed_type lexicon_parsed;
 	code_set_type codes;
+
+	smooth = std::numeric_limits<weight_type>::infinity();
 	
 	while (iter != iter_end) {
 	  lexicon_parsed.clear();
@@ -113,7 +115,10 @@ namespace cicada
 	    codes.push_back(word_type(*liter).id());
 	  
 	  lexicon.insert(&(*codes.begin()), codes.size(), weight);
+	  
+	  smooth = std::min(smooth, weight);
 	}
+
       } else {
 	typedef boost::fusion::tuple<std::string, std::string, weight_type > lexicon_parsed_type;
 	typedef boost::spirit::istream_iterator iterator_type;
