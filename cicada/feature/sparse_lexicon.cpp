@@ -95,7 +95,7 @@ namespace cicada
       typedef cicada::Lexicon lexicon_type;
       
       SparseLexiconImpl()
-	: lexicon(0), lexicon_prefix(0), lexicon_suffix(0), uniques(), words(), caches(),
+	: lexicon(0), lexicon_prefix(0), lexicon_suffix(0), caches(),
 	  skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false),
 	  pair_mode(false),
 	  prefix_mode(false),
@@ -399,7 +399,6 @@ namespace cicada
       
       void clear()
       {
-	uniques.clear();
 	words.clear();
 	caches.clear();
 
@@ -448,10 +447,11 @@ namespace cicada
       
       cache_normalize_set_type cache_source;
       cache_normalize_set_type cache_target;
+
+      cache_set_type   caches;
       
       word_unique_type uniques;
       word_set_type    words;
-      cache_set_type   caches;
       
       word_pair_set_type words_prefix;
       word_pair_set_type words_suffix;
