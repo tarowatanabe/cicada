@@ -164,7 +164,7 @@ namespace cicada
 		  }
 		  
 		  if (! normalizers_target.empty()) {
-		    const cache_normalize_type::word_set_type& normalized_target = normalize(target,  normalizers_target, cache_target);
+		    const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
 		    
 		    cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 		    for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer)
@@ -172,8 +172,8 @@ namespace cicada
 		  }
 		  
 		  if (! normalizers_source.empty() && ! normalizers_target.empty()) {
-		    const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
-		    const cache_normalize_type::word_set_type& normalized_target = normalize(target,  normalizers_target, cache_target);
+		    const cache_normalize_type::word_set_type& normalized_source = normalize(source, normalizers_source, cache_source);
+		    const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
 		    
 		    cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
 		    for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter) {
@@ -224,6 +224,55 @@ namespace cicada
 	
 	if (forced_feature || feature_type::exists(name))
 	  features[name] += 1.0;
+	
+	if (! normalizers_source.empty()) {
+	  const cache_normalize_type::word_set_type normalized_source_prev = normalize(source.first,  normalizers_source, cache_source);
+	  const cache_normalize_type::word_set_type normalized_source_next = normalize(source.second, normalizers_source, cache_source);
+
+	  cache_normalize_type::word_set_type::const_iterator piter_end = normalized_source_prev.end();
+	  for (cache_normalize_type::word_set_type::const_iterator piter = normalized_source_prev.begin(); piter != piter_end; ++ piter) {
+	    cache_normalize_type::word_set_type::const_iterator niter_end = normalized_source_next.end();
+	    for (cache_normalize_type::word_set_type::const_iterator niter = normalized_source_next.begin(); niter != niter_end; ++ niter) {
+	      const std::string name = (prefix + ':'
+					+ tag + static_cast<const std::string&>(*piter)
+					+ ':' + static_cast<const std::string&>(*niter)
+					+ '_' + static_cast<const std::string&>(target));
+	      
+	      if (forced_feature || feature_type::exists(name))
+		features[name] += 1.0;
+	      
+	      if (! normalizers_target.empty()) {
+		const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
+		
+		cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+		for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
+		  const std::string name = (prefix + ':'
+					    + tag + static_cast<const std::string&>(*piter)
+					    + ':' + static_cast<const std::string&>(*niter)
+					    + '_' + static_cast<const std::string&>(*titer));
+		  
+		  if (forced_feature || feature_type::exists(name))
+		    features[name] += 1.0;
+		}
+	      }
+	    }
+	  }
+	}
+	
+	if (! normalizers_target.empty()) {
+	  const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
+	  
+	  cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+	  for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
+	    const std::string name = (prefix + ':'
+				      + tag + static_cast<const std::string&>(source.first)
+				      + ':' + static_cast<const std::string&>(source.second)
+				      + '_' + static_cast<const std::string&>(*titer));
+	    
+	    if (forced_feature || feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
       }
       
       void assign(const lattice_type& lattice)
