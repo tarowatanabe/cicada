@@ -36,7 +36,6 @@ namespace cicada
       
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
-      typedef cicada::Sentence sentence_type;
       typedef cicada::Lattice       lattice_type;
       typedef cicada::HyperGraph    hypergraph_type;
 
@@ -140,68 +139,33 @@ namespace cicada
       {
 	const phrase_type& phrase = edge.rule->rhs;
 	
-	phrase_type::const_iterator piter_end = phrase.end();
-	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
-	  if (piter->is_terminal() && ! skipper(*piter)) {
-	    const word_type& target = *piter;
+	phrase_type::const_iterator titer_end = phrase.end();
+	for (phrase_type::const_iterator titer = phrase.begin(); titer != titer_end; ++ titer) 
+	  if (titer->is_terminal() && ! skipper(*titer)) {
+	    const word_type& target = *titer;
 	    
-	    if (! caches.exists(piter->id())) {
+	    if (! caches.exists(titer->id())) {
 	      feature_unordered_set_type features;
 	      
-	      sentence_type::const_iterator witer_end = words.end();
-	      for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) 
-		if (exists(*witer, target)) {
-		  const word_type& source = *witer;
-		  
-		  apply(source, target, features);
-		  
-		  if (! normalizers_source.empty()) {
-		    const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
-		    
-		    cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
-		    for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter)
-		      apply(*siter, target, features);
-		  }
-		  
-		  if (! normalizers_target.empty()) {
-		    const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
-		    
-		    cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
-		    for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer)
-		      apply(source, *titer, features);
-		  }
-		  
-		  if (! normalizers_source.empty() && ! normalizers_target.empty()) {
-		    const cache_normalize_type::word_set_type& normalized_source = normalize(source, normalizers_source, cache_source);
-		    const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
-		    
-		    cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
-		    for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter) {
-		      cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
-		      for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer)
-			apply(*siter, *titer, features);
-		    }
-		  }
-		}
+	      word_set_type::const_iterator witer_end = words.end();
+	      for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) 
+		if (exists(*witer, target))
+		  apply(*witer, target, features);
 	      
-	      {
-		word_pair_set_type::const_iterator witer_end = words_prefix.end();
-		for (word_pair_set_type::const_iterator witer = words_prefix.begin(); witer != witer_end; ++ witer) 
-		  if (! lexicon_prefix || exists(*lexicon_prefix, *witer, target))
-		    apply("-", *witer, target, features);
-	      }
+	      word_pair_set_type::const_iterator piter_end = words_prefix.end();
+	      for (word_pair_set_type::const_iterator piter = words_prefix.begin(); piter != piter_end; ++ piter) 
+		if (! lexicon_prefix || exists(*lexicon_prefix, *piter, target))
+		  apply("-", *piter, target, features);
 	      
-	      {
-		word_pair_set_type::const_iterator witer_end = words_suffix.end();
-		for (word_pair_set_type::const_iterator witer = words_suffix.begin(); witer != witer_end; ++ witer) 
-		  if (! lexicon_suffix || exists(*lexicon_suffix, *witer, target))
-		    apply("+", *witer, target, features);
-	      }
+	      word_pair_set_type::const_iterator siter_end = words_suffix.end();
+	      for (word_pair_set_type::const_iterator siter = words_suffix.begin(); siter != siter_end; ++ siter) 
+		if (! lexicon_suffix || exists(*lexicon_suffix, *siter, target))
+		  apply("+", *siter, target, features);
 	      
-	      caches[piter->id()] = features;
+	      caches[titer->id()] = features;
 	    }
 	    
-	    features += caches[piter->id()];
+	    features += caches[titer->id()];
 	  }
       }
 
@@ -212,6 +176,42 @@ namespace cicada
 	
 	if (forced_feature || feature_type::exists(name))
 	  features[name] += 1.0;
+	
+	if (! normalizers_source.empty()) {
+	  const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
+	  
+	  cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
+	  for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter) {
+	    const std::string name = prefix + ":" + static_cast<const std::string&>(*siter) + "_" + static_cast<const std::string&>(target);
+	    
+	    if (forced_feature || feature_type::exists(name))
+	      features[name] += 1.0;
+	    
+	    if (! normalizers_target.empty()) {
+	      const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
+	      
+	      cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+	      for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
+		const std::string name = prefix + ":" + static_cast<const std::string&>(*siter) + "_" + static_cast<const std::string&>(*titer);
+		
+		if (forced_feature || feature_type::exists(name))
+		  features[name] += 1.0;
+	      }
+	    }
+	  }
+	}
+	
+	if (! normalizers_target.empty()) {
+	  const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
+	  
+	  cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
+	  for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
+	    const std::string name = prefix + ":" + static_cast<const std::string&>(source) + "_" + static_cast<const std::string&>(*titer);
+	    
+	    if (forced_feature || feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
       }
       
       template <typename Features>
@@ -450,7 +450,7 @@ namespace cicada
       cache_normalize_set_type cache_target;
       
       word_unique_type uniques;
-      sentence_type    words;
+      word_set_type    words;
       cache_set_type   caches;
       
       word_pair_set_type words_prefix;
