@@ -157,3 +157,6 @@ use of expected-BLEU for direct optimization based on Rosti's work
     and see thesis "lexical features for SMT" by Jacob Devlin
 
 Use of optimized-pegasos for pro.
+
+revise static create interface:
+  currently, we return reference, but it is safer to return pointer...?
