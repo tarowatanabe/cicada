@@ -304,6 +304,12 @@ namespace cicada
       std::string name;
 
       std::string lexicon;
+      std::string lexicon_prefix;
+      std::string lexicon_suffix;
+      
+      bool pair_mode = true;
+      bool prefix_mode = true;
+      bool suffix_mode = true;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "cluster-source") {
@@ -328,6 +334,16 @@ namespace cicada
 	  name = piter->second;
 	else if (utils::ipiece(piter->first) == "lexicon")
           lexicon = piter->second;
+	else if (utils::ipiece(piter->first) == "lexicon-prefix")
+          lexicon_prefix = piter->second;
+	else if (utils::ipiece(piter->first) == "lexicon-suffix")
+          lexicon_suffix = piter->second;
+	else if (utils::ipiece(piter->first) == "pair")
+	  pair_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "prefix")
+	  prefix_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "suffix")
+	  suffix_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }

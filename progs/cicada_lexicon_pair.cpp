@@ -225,8 +225,8 @@ path_type source_file = "-";
 path_type target_file = "-";
 path_type alignment_file = "-";
 path_type output_file;
-path_type output_prev_file;
-path_type output_next_file;
+path_type output_prefix_file;
+path_type output_suffix_file;
 
 int kbest = 0;
 
@@ -239,7 +239,7 @@ int debug = 0;
 void dump_pair(const path_type& path, const ttable_pair_type& lexicon);
 void dump(const path_type& path, const ttable_type& lexicon);
 
-void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type& ttable_next);
+void learn(ttable_type& ttable, ttable_pair_type& ttable_prefix, ttable_pair_type& ttable_suffix);
 
 void options(int argc, char** argv);
 
@@ -251,10 +251,10 @@ int main(int argc, char ** argv)
     threads = utils::bithack::max(threads, 1);
     
     ttable_type      ttable;
-    ttable_pair_type ttable_prev;
-    ttable_pair_type ttable_next;
+    ttable_pair_type ttable_prefix;
+    ttable_pair_type ttable_suffix;
       
-    learn(ttable, ttable_prev, ttable_next);
+    learn(ttable, ttable_prefix, ttable_suffix);
       
     // final dumping...
     boost::thread_group workers_dump;
@@ -263,16 +263,16 @@ int main(int argc, char ** argv)
       workers_dump.add_thread(new boost::thread(boost::bind(dump,
 							    boost::cref(output_file),
 							    boost::cref(ttable))));
-      
-    if (! output_prev_file.empty())
+       
+    if (! output_prefix_file.empty())
       workers_dump.add_thread(new boost::thread(boost::bind(dump_pair,
-							    boost::cref(output_prev_file),
-							    boost::cref(ttable_prev))));
+							    boost::cref(output_prefix_file),
+							    boost::cref(ttable_prefix))));
       
-    if (! output_next_file.empty())
+    if (! output_suffix_file.empty())
       workers_dump.add_thread(new boost::thread(boost::bind(dump_pair,
-							    boost::cref(output_next_file),
-							    boost::cref(ttable_next))));
+							    boost::cref(output_suffix_file),
+							    boost::cref(ttable_suffix))));
       
     workers_dump.join_all();
   }
@@ -418,26 +418,26 @@ struct TaskLearn
 	
 	std::sort(biter->alignment.begin(), biter->alignment.end());
 		
-	alignment_type::const_iterator aiter_prev = biter->alignment.end();
+	alignment_type::const_iterator aiter_prefix = biter->alignment.end();
 	alignment_type::const_iterator aiter_end = biter->alignment.end();
 	for (alignment_type::const_iterator aiter = biter->alignment.begin(); aiter != aiter_end; ++ aiter) {
-	  if (aiter_prev == aiter_end || *aiter != *aiter_prev) {
+	  if (aiter_prefix == aiter_end || *aiter != *aiter_prefix) {
 	    if (aiter->source >= static_cast<int>(biter->source.size()))
 	      throw std::runtime_error("invalid word alignment");
 	    if (aiter->target >= static_cast<int>(biter->target.size()))
 	      throw std::runtime_error("invalid word alignment");
 	    
 	    const word_type& source_word = biter->source[aiter->source];
-	    const word_type& source_prev = (aiter->source == 0 ? vocab_type::BOS : biter->source[aiter->source - 1]);
-	    const word_type& source_next = (aiter->source + 1 == biter->source.size() ? vocab_type::EOS : biter->source[aiter->source + 1]);
+	    const word_type& source_prefix = (aiter->source == 0 ? vocab_type::BOS : biter->source[aiter->source - 1]);
+	    const word_type& source_suffix = (aiter->source + 1 == biter->source.size() ? vocab_type::EOS : biter->source[aiter->source + 1]);
 	    const word_type& target_word = biter->target[aiter->target];
 	    
 	    ++ ttable[target_word][source_word];
-	    ++ ttable_prev[target_word][std::make_pair(source_prev, source_word)];
-	    ++ ttable_next[target_word][std::make_pair(source_word, source_next)];
+	    ++ ttable_prefix[target_word][std::make_pair(source_prefix, source_word)];
+	    ++ ttable_suffix[target_word][std::make_pair(source_word, source_suffix)];
 	  }
 	  
-	  aiter_prev = aiter;
+	  aiter_prefix = aiter;
 	}
       }
     }
@@ -445,11 +445,11 @@ struct TaskLearn
   
   queue_type& queue;
   ttable_type      ttable;
-  ttable_pair_type ttable_prev;
-  ttable_pair_type ttable_next;
+  ttable_pair_type ttable_prefix;
+  ttable_pair_type ttable_suffix;
 };
 
-void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type& ttable_next)
+void learn(ttable_type& ttable, ttable_pair_type& ttable_prefix, ttable_pair_type& ttable_suffix)
 {
   typedef TaskLearn learner_type;
   
@@ -460,8 +460,8 @@ void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type&
   typedef std::vector<learner_type, std::allocator<learner_type> > learner_set_type;
   
   ttable.clear();
-  ttable_prev.clear();
-  ttable_next.clear();
+  ttable_prefix.clear();
+  ttable_suffix.clear();
   
   queue_type       queue;
   learner_set_type learners(threads, learner_type(queue));
@@ -529,17 +529,17 @@ void learn(ttable_type& ttable, ttable_pair_type& ttable_prev, ttable_pair_type&
       ttable += learners[i].ttable;
     learners[i].ttable.clear();
 
-    if (ttable_prev.empty())
-      learners[i].ttable_prev.swap(ttable_prev);
+    if (ttable_prefix.empty())
+      learners[i].ttable_prefix.swap(ttable_prefix);
     else
-      ttable_prev += learners[i].ttable_prev;
-    learners[i].ttable_prev.clear();
+      ttable_prefix += learners[i].ttable_prefix;
+    learners[i].ttable_prefix.clear();
 
-    if (ttable_next.empty())
-      learners[i].ttable_next.swap(ttable_next);
+    if (ttable_suffix.empty())
+      learners[i].ttable_suffix.swap(ttable_suffix);
     else
-      ttable_next += learners[i].ttable_next;
-    learners[i].ttable_next.clear();    
+      ttable_suffix += learners[i].ttable_suffix;
+    learners[i].ttable_suffix.clear();    
   }
   utils::resource accumulate_end;
   
@@ -561,9 +561,9 @@ void options(int argc, char** argv)
     ("target",    po::value<path_type>(&target_file), "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     
-    ("output",      po::value<path_type>(&output_file),      "output for source, target")
-    ("output-prev", po::value<path_type>(&output_prev_file), "output for source-1, source, target")
-    ("output-next", po::value<path_type>(&output_next_file), "output for source, source+1, target")
+    ("output",      po::value<path_type>(&output_file),          "output for source, target")
+    ("output-prefix", po::value<path_type>(&output_prefix_file), "output for source-1, source, target")
+    ("output-suffix", po::value<path_type>(&output_suffix_file), "output for source, source+1, target")
     
     ("kbest", po::value<int>(&kbest), "kbest output")
     

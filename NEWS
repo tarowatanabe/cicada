@@ -1,3 +1,6 @@
+2012-1-x
+Added MIRA-like optimization for PRO-style learning
+
 2012-1-18
 INCOMPATIBLE CHANGE: revised internal indexing for tree-grammars. (You do not have to re-index, but the size is slightly smaller)
 Better ngram feature computation by pre-transforming into word-id
