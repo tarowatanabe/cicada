@@ -239,99 +239,94 @@ namespace cicada
       {
 	clear();
 	
-	if (pair_mode) {
-	  if (unique_source) {
-	    lattice_type::const_iterator liter_end = lattice.end();
-	    for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	      lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	      for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-		if (! skipper(aiter->label) && exists(aiter->label))
-		  uniques.insert(aiter->label);
-	    }
-	    
-	    word_unique_type::const_iterator uiter_end = uniques.end();
-	    for (word_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
-	      words.push_back(*uiter);
-	    
-	  } else {
-	    lattice_type::const_iterator liter_end = lattice.end();
-	    for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	      lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	      for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-		if (! skipper(aiter->label) && exists(aiter->label))
-		  words.push_back(aiter->label);
-	    }
+	pos_set_type  positions;
+	
+	lattice_prev.clear();
+	lattice_prev.resize(lattice.size() + 1);
+	lattice_prev.front().push_back(vocab_type::BOS);
+	
+	for (size_t pos = 0; pos != lattice.size(); ++ pos) {
+	  positions.clear();
+          
+	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
+	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
+	    if (! skipper(aiter->label)) {
+	      
+	      if (pair_mode && exists(aiter->label))
+		words.push_back(aiter->label);
+	      
+	      lattice_prev[pos + aiter->distance].push_back(aiter->label);
+	      
+	      // we will compute pair of lattice_prev[pos] and words
+	      if (prefix_mode || suffix_mode) {
+		word_set_type::const_iterator piter_end = lattice_prev[pos].end();
+		for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
+		  
+		  if (prefix_mode)
+		    if (! lexicon_prefix || exists(*lexicon_prefix, *piter, aiter->label))
+		      words_prefix.push_back(std::make_pair(*piter, aiter->label));
+		  
+		  if (suffix_mode)
+		    if (*piter != vocab_type::BOS && (! lexicon_suffix || exists(*lexicon_suffix, *piter, aiter->label)))
+		      words_suffix.push_back(std::make_pair(*piter, aiter->label));
+		}
+	      }
+	    } else
+	      positions.insert(pos + aiter->distance);
 	  }
-
-	  std::sort(words.begin(), words.end());
+	  
+	  // copy lattice_prev[pos] into  positons.
+	  pos_set_type::const_iterator piter_end = positions.end();
+	  for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	    lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
 	}
 	
-	if (prefix_mode || suffix_mode) {
-	   word_set_type words;
-	   pos_set_type  positions;
-	   
-	   lattice_prev.clear();
-	   lattice_prev.resize(lattice.size() + 1);
-	   lattice_prev.front().push_back(vocab_type::BOS);
-	   
-	   for (size_t pos = 0; pos != lattice.size(); ++ pos) {
-	     positions.clear();
-          
-	     lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
-	     for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
-	       if (! skipper(aiter->label)) {
-		 words.clear();
-		 words.push_back(aiter->label);
-              
-		 lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
-              
-		 // we will compute pair of lattice_prev[pos] and words
-		 word_set_type::const_iterator piter_end = lattice_prev[pos].end();
-		 for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
-                
-		   word_set_type::const_iterator niter_end = words.end();
-		   for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
-		     
-		     if (! lexicon_prefix || exists(*lexicon_prefix, *piter, *niter))
-		       words_prefix.push_back(std::make_pair(*piter, *niter));
-		     
-		     if (*piter != vocab_type::BOS && (! lexicon_suffix || exists(*lexicon_suffix, *piter, *niter)))
-		       words_suffix.push_back(std::make_pair(*piter, *niter));
-		   }
-		 }
-	       } else
-		 positions.insert(pos + aiter->distance);
-	     }
-	     
-	     // copy lattice_prev[pos] into  positons.
-	     pos_set_type::const_iterator piter_end = positions.end();
-	     for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	       lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
-	   }
-	   
-	   // we will compute pair of lattice_prev[lattice.size()] and EOS
-	   word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
-	   for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
-	     if (! lexicon_suffix || exists(*lexicon_suffix, *piter, vocab_type::EOS))
-	       words_suffix.push_back(std::make_pair(*piter, vocab_type::EOS));
-	   
-	   if (unique_source) {
-	     uniques_prefix.clear();
-	     uniques_suffix.clear();
-	     
-	     uniques_prefix.insert(words_prefix.begin(), words_prefix.end());
-	     uniques_suffix.insert(words_suffix.begin(), words_suffix.end());
-	     
-	     words_prefix.clear();
-	     words_suffix.clear();
-	     
-	     words_prefix.insert(words_prefix.end(), uniques_prefix.begin(), uniques_prefix.end());
-	     words_suffix.insert(words_suffix.end(), uniques_suffix.begin(), uniques_suffix.end());
-	   }
-	   
-	   std::sort(words_prefix.begin(), words_prefix.end());
-	   std::sort(words_suffix.begin(), words_suffix.end());
+	if (suffix_mode) {
+	  // we will compute pair of lattice_prev[lattice.size()] and EOS
+	  word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
+	  for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
+	    if (! lexicon_suffix || exists(*lexicon_suffix, *piter, vocab_type::EOS))
+	      words_suffix.push_back(std::make_pair(*piter, vocab_type::EOS));
 	}
+	
+	if (pair_mode) {
+	  if (unique_source) {
+	    uniques.clear();
+	    uniques.insert(words.begin(), words.end());
+	    
+	    words.clear();
+	    words.insert(words.end(), uniques.begin(), uniques.end());
+	  }
+	  
+	  std::sort(words.begin(), words.end());
+	} else
+	  words.clear();
+	
+	if (prefix_mode) {
+	  if (unique_source) {
+	    uniques_prefix.clear();
+	    uniques_prefix.insert(words_prefix.begin(), words_prefix.end());
+	    
+	    words_prefix.clear();
+	    words_prefix.insert(words_prefix.end(), uniques_prefix.begin(), uniques_prefix.end());
+	  }
+	  
+	  std::sort(words_prefix.begin(), words_prefix.end());
+	} else
+	  words_prefix.clear();
+	
+	if (suffix_mode) {
+	  if (unique_source) {
+	    uniques_suffix.clear();
+	    uniques_suffix.insert(words_suffix.begin(), words_suffix.end());
+	    
+	    words_suffix.clear();
+	    words_suffix.insert(words_suffix.end(), uniques_suffix.begin(), uniques_suffix.end());
+	  }
+	  
+	  std::sort(words_suffix.begin(), words_suffix.end());
+	} else
+	  words_suffix.clear();
       }
       
       const cache_normalize_type::word_set_type& normalize(const word_type& word,
