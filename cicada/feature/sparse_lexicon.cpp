@@ -68,9 +68,17 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef symbol_type word_type;
+      typedef std::pair<word_type, word_type> word_pair_type;
       
-      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
+      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_unique_type;
+      
+      typedef std::vector<word_pair_type, std::allocator<word_pair_type> > word_pair_set_type;
+      typedef google::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > word_pair_unique_type;
 
+      typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
+      typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
+      typedef std::set<size_type, std::less<size_type>, std::allocator<size_type> > pos_set_type;
+      
       typedef utils::alloc_vector<feature_linear_set_type, std::allocator<feature_linear_set_type> > cache_set_type;
 
       struct CacheNormalize
@@ -93,7 +101,11 @@ namespace cicada
 	  pair_mode(false),
 	  prefix_mode(false),
 	  suffix_mode(false)
-      { uniques.set_empty_key(word_type());  }
+      {
+	uniques.set_empty_key(word_type()); 
+	uniques_prefix.set_empty_key(word_pair_type()); 
+        uniques_suffix.set_empty_key(word_pair_type()); 
+      }
 
       struct skipper_epsilon
       {
@@ -172,6 +184,20 @@ namespace cicada
 		  }
 		}
 	      
+	      {
+		word_pair_set_type::const_iterator witer_end = words_prefix.end();
+		for (word_pair_set_type::const_iterator witer = words_prefix.begin(); witer != witer_end; ++ witer) 
+		  if (! lexicon_prefix || exists(*lexicon_prefix, *witer, target))
+		    apply("-", *witer, target, features);
+	      }
+	      
+	      {
+		word_pair_set_type::const_iterator witer_end = words_suffix.end();
+		for (word_pair_set_type::const_iterator witer = words_suffix.begin(); witer != witer_end; ++ witer) 
+		  if (! lexicon_suffix || exists(*lexicon_suffix, *witer, target))
+		    apply("+", *witer, target, features);
+	      }
+	      
 	      caches[piter->id()] = features;
 	    }
 	    
@@ -187,7 +213,19 @@ namespace cicada
 	if (forced_feature || feature_type::exists(name))
 	  features[name] += 1.0;
       }
-
+      
+      template <typename Features>
+      void apply(const char* tag, const word_pair_type& source, const word_type& target, Features& features)
+      {
+	const std::string name = (prefix + ':'
+				  + tag + static_cast<const std::string&>(source.first)
+				  + ':' + static_cast<const std::string&>(source.second)
+				  + '_' + static_cast<const std::string&>(target));
+	
+	if (forced_feature || feature_type::exists(name))
+	  features[name] += 1.0;
+      }
+      
       void assign(const lattice_type& lattice)
       {
 	if (skip_sgml_tag)
@@ -201,30 +239,99 @@ namespace cicada
       {
 	clear();
 	
-	if (unique_source) {
-	  lattice_type::const_iterator liter_end = lattice.end();
-	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label) && exists(aiter->label))
-		uniques.insert(aiter->label);
+	if (pair_mode) {
+	  if (unique_source) {
+	    lattice_type::const_iterator liter_end = lattice.end();
+	    for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	      lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	      for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+		if (! skipper(aiter->label) && exists(aiter->label))
+		  uniques.insert(aiter->label);
+	    }
+	    
+	    word_unique_type::const_iterator uiter_end = uniques.end();
+	    for (word_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
+	      words.push_back(*uiter);
+	    
+	  } else {
+	    lattice_type::const_iterator liter_end = lattice.end();
+	    for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	      lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	      for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+		if (! skipper(aiter->label) && exists(aiter->label))
+		  words.push_back(aiter->label);
+	    }
 	  }
-	  
-	  word_set_type::const_iterator uiter_end = uniques.end();
-	  for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
-	    words.push_back(*uiter);
-	  
-	} else {
-	  lattice_type::const_iterator liter_end = lattice.end();
-	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      if (! skipper(aiter->label) && exists(aiter->label))
-		words.push_back(aiter->label);
-	  }
+
+	  std::sort(words.begin(), words.end());
 	}
 	
-	std::sort(words.begin(), words.end());
+	if (prefix_mode || suffix_mode) {
+	   word_set_type words;
+	   pos_set_type  positions;
+	   
+	   lattice_prev.clear();
+	   lattice_prev.resize(lattice.size() + 1);
+	   lattice_prev.front().push_back(vocab_type::BOS);
+	   
+	   for (size_t pos = 0; pos != lattice.size(); ++ pos) {
+	     positions.clear();
+          
+	     lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
+	     for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter) {
+	       if (! skipper(aiter->label)) {
+		 words.clear();
+		 words.push_back(aiter->label);
+              
+		 lattice_prev[pos + aiter->distance].insert(lattice_prev[pos + aiter->distance].end(), words.begin(), words.end());
+              
+		 // we will compute pair of lattice_prev[pos] and words
+		 word_set_type::const_iterator piter_end = lattice_prev[pos].end();
+		 for (word_set_type::const_iterator piter = lattice_prev[pos].begin(); piter != piter_end; ++ piter) {
+                
+		   word_set_type::const_iterator niter_end = words.end();
+		   for (word_set_type::const_iterator niter = words.begin(); niter != niter_end; ++ niter) {
+		     
+		     if (! lexicon_prefix || exists(*lexicon_prefix, *piter, *niter))
+		       words_prefix.push_back(std::make_pair(*piter, *niter));
+		     
+		     if (*piter != vocab_type::BOS && (! lexicon_suffix || exists(*lexicon_suffix, *piter, *niter)))
+		       words_suffix.push_back(std::make_pair(*piter, *niter));
+		   }
+		 }
+	       } else
+		 positions.insert(pos + aiter->distance);
+	     }
+	     
+	     // copy lattice_prev[pos] into  positons.
+	     pos_set_type::const_iterator piter_end = positions.end();
+	     for (pos_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	       lattice_prev[*piter].insert(lattice_prev[*piter].end(), lattice_prev[pos].begin(), lattice_prev[pos].end());
+	   }
+	   
+	   // we will compute pair of lattice_prev[lattice.size()] and EOS
+	   word_set_type::const_iterator piter_end = lattice_prev[lattice.size()].end();
+	   for (word_set_type::const_iterator piter = lattice_prev[lattice.size()].begin(); piter != piter_end; ++ piter)
+	     if (! lexicon_suffix || exists(*lexicon_suffix, *piter, vocab_type::EOS))
+	       words_suffix.push_back(std::make_pair(*piter, vocab_type::EOS));
+	   
+	   if (unique_source) {
+	     uniques_prefix.clear();
+	     uniques_suffix.clear();
+	     
+	     uniques_prefix.insert(words_prefix.begin(), words_prefix.end());
+	     uniques_suffix.insert(words_suffix.begin(), words_suffix.end());
+	     
+	     words_prefix.clear();
+	     words_suffix.clear();
+	     
+	     words_prefix.insert(words_prefix.end(), uniques_prefix.begin(), uniques_prefix.end());
+	     words_suffix.insert(words_suffix.end(), uniques_suffix.begin(), uniques_suffix.end());
+	   }
+	   
+	   std::sort(words_prefix.begin(), words_prefix.end());
+	   std::sort(words_suffix.begin(), words_suffix.end());
+	}
       }
       
       const cache_normalize_type::word_set_type& normalize(const word_type& word,
@@ -251,6 +358,9 @@ namespace cicada
 	uniques.clear();
 	words.clear();
 	caches.clear();
+
+	words_prefix.clear();
+	words_suffix.clear();
       }
       
       void clear_cache()
@@ -268,6 +378,22 @@ namespace cicada
       {
 	return (! lexicon) || (lexicon->exists(&source, (&source) + 1));
       }
+      
+      bool exists(const lexicon_type& lexicon, const word_pair_type& prev, const word_type& next)
+      {
+        word_type codes[2];
+        codes[0] = prev.first;
+        codes[1] = prev.second;
+        return lexicon.exists(codes, codes + 2, next);
+      }
+      
+      bool exists(const lexicon_type& lexicon, const word_type& prev, const word_type& next)
+      {
+        word_type codes[2];
+        codes[0] = prev;
+        codes[1] = next;
+        return lexicon.exists(codes, codes + 2);
+      }
 
       lexicon_type* lexicon;
       lexicon_type* lexicon_prefix;
@@ -279,9 +405,16 @@ namespace cicada
       cache_normalize_set_type cache_source;
       cache_normalize_set_type cache_target;
       
-      word_set_type  uniques;
-      sentence_type  words;
-      cache_set_type caches;
+      word_unique_type uniques;
+      sentence_type    words;
+      cache_set_type   caches;
+      
+      word_pair_set_type words_prefix;
+      word_pair_set_type words_suffix;
+      
+      word_pair_unique_type  uniques_prefix;
+      word_pair_unique_type  uniques_suffix;
+      word_map_type          lattice_prev;
       
       bool skip_sgml_tag;
       bool unique_source;
@@ -357,6 +490,19 @@ namespace cicada
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
+
+      if (int(pair_mode) + prefix_mode + suffix_mode == 0)
+	throw std::runtime_error("no sparse-lexicon feature?");
+
+      if (! lexicon.empty() && ! pair_mode)
+	throw std::runtime_error("we have lexicon, but no pair feature? " + lexicon);
+
+      if (! lexicon_prefix.empty() && ! prefix_mode)
+	throw std::runtime_error("we have prefix-lexicon, but no prefix feature? " + lexicon_prefix);
+
+      if (! lexicon_suffix.empty() && ! suffix_mode)
+	throw std::runtime_error("we have suffix-lexicon, but no suffix feature? " + lexicon_suffix);
+      
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
 
