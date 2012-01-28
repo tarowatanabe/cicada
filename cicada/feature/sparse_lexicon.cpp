@@ -494,7 +494,7 @@ namespace cicada
       std::string lexicon_prefix;
       std::string lexicon_suffix;
       
-      bool pair_mode = true;
+      bool pair_mode = false;
       bool prefix_mode = false;
       bool suffix_mode = false;
       
@@ -534,19 +534,18 @@ namespace cicada
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
-
+      
+      if (! lexicon.empty())
+	pair_mode = true;
+      
+      if (! lexicon_prefix.empty())
+	prefix_mode = true;
+      
+      if (! lexicon_suffix.empty())
+	suffix_mode = true;
+      
       if (int(pair_mode) + prefix_mode + suffix_mode == 0)
 	throw std::runtime_error("no sparse-lexicon feature?");
-
-      if (! lexicon.empty() && ! pair_mode)
-	throw std::runtime_error("we have lexicon, but no pair feature? " + lexicon);
-
-      if (! lexicon_prefix.empty() && ! prefix_mode)
-	throw std::runtime_error("we have prefix-lexicon, but no prefix feature? " + lexicon_prefix);
-
-      if (! lexicon_suffix.empty() && ! suffix_mode)
-	throw std::runtime_error("we have suffix-lexicon, but no suffix feature? " + lexicon_suffix);
-      
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
 
