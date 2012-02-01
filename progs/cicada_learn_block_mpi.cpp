@@ -56,6 +56,7 @@ typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
 path_type input_file;
+path_type input_oracle_file;
 
 bool input_id_mode = false;
 bool input_bitext_mode = false;
@@ -125,6 +126,7 @@ double eta0 = 0.2;
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
+bool merge_oracle_mode = false;
 bool line_search_mode = false;    // perform line-search
 bool mert_search_mode = false;    // perform MERT search
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
@@ -140,6 +142,7 @@ void options(int argc, char** argv);
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
+		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights);
 void synchronize();
@@ -284,6 +287,14 @@ int main(int argc, char ** argv)
     // read input data
     event_set_type events;
     read_events(input_file, events, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+
+    event_set_type events_oracle;
+    if (! input_oracle_file.empty()) {
+      if (input_oracle_file != "-" && !boost::filesystem::exists(input_oracle_file))
+	throw std::runtime_error("no oracle input? " + input_oracle_file.string());
+      
+      read_events(input_oracle_file, events_oracle, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+    }
     
     // read reference data
     scorer_document_type scorers(scorer_name);
@@ -291,6 +302,10 @@ int main(int argc, char ** argv)
     
     if (scorers.size() != events.size())
       throw std::runtime_error("training sample size and reference translation size does not match");
+    
+    if (! events_oracle.empty())
+      if (scorers.size() != events.size())
+	throw std::runtime_error("oracle size and reference translation size does not match");
     
     // weights
     weight_set_type weights;
@@ -307,103 +322,103 @@ int main(int argc, char ** argv)
     // perform learning...
     if (yield_sentence) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
-	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_alignment) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
-	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_dependency) {
       if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pa)
-	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
-	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_arow)
-	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_nherd)
-	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
-	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, scorers, weights);      
+	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
-	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_linear)
-	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_svm)
-	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, events, scorers, weights);
+	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
     } else
       throw std::runtime_error("invalid yield");
     
@@ -644,6 +659,7 @@ void reduce_points(Points& points)
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
+		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights)
 {
@@ -674,6 +690,7 @@ void cicada_learn(operation_set_type& operations,
   
   segment_set_type     segments_block;
   hypothesis_map_type  kbests_block;
+  hypothesis_map_type  kbests_oracle_block;
   hypothesis_map_type  oracles_block;
   scorer_document_type scorers_block(scorers);
 
@@ -712,6 +729,7 @@ void cicada_learn(operation_set_type& operations,
     while (siter != siter_end) {
       segments_block.clear();
       kbests_block.clear();
+      kbests_oracle_block.clear();
       oracles_block.clear();
       scorers_block.clear();
       
@@ -729,13 +747,30 @@ void cicada_learn(operation_set_type& operations,
 	segments_block.push_back(id);
 	kbests_block.push_back(kbests);
 	scorers_block.push_back(scorers[id]);
+	
+	if (! events_oracle.empty()) {
+	  if (events_oracle[id].empty())
+	    throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
+	  
+	  kbest_generator(operations, events_oracle[id], weights, kbests);
+	  
+	  if (kbests.empty())
+	    throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
+	  
+	  if (merge_oracle_mode)
+	    kbests_block.back().insert(kbests_block.back().end(), kbests.begin(), kbests.end());
+	  else
+	    kbests_oracle_block.push_back(kbests);
+	}
       }
       
       // no kbests?
       if (segments_block.empty()) continue;
       
       // oracle computation
-      std::pair<score_ptr_type, score_ptr_type> scores = oracle_generator(kbests_block, scorers_block, oracles_block, generator);
+      std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_block.empty()
+							  ? oracle_generator(kbests_block, scorers_block, oracles_block, generator)
+							  : oracle_generator(kbests_block, kbests_oracle_block, scorers_block, oracles_block, generator));
       
       // insert into kbests-all
       if (mert_search_mode)
@@ -1294,7 +1329,8 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("input",        po::value<path_type>(&input_file)->default_value(input_file),               "input file")
+    ("input-oracle", po::value<path_type>(&input_oracle_file)->default_value(input_oracle_file), "input oracle file")
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
@@ -1370,6 +1406,7 @@ void options(int argc, char** argv)
     ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
     ("project-weight", po::bool_switch(&project_weight),     "project L2 weight")
+    ("merge-oracle",   po::bool_switch(&merge_oracle_mode),  "merge oracle kbests")
     ("line-search",    po::bool_switch(&line_search_mode),   "perform line search")
     ("mert-search",    po::bool_switch(&mert_search_mode),   "perform mert search")
     ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
