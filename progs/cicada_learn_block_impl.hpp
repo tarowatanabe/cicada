@@ -2967,6 +2967,9 @@ struct Oracle
     if (! score_oracle)
       throw std::runtime_error("no oracle evaluation score?");
 
+    // copy!
+    oracles = kbests_oracle;
+
     return std::make_pair(score_1best, score_oracle);
   }
     
