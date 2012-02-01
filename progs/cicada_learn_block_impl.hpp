@@ -2937,9 +2937,10 @@ struct Oracle
 	  *score_segment -= *hyp.score;
 	}
       }
-
-    for (size_t id = 0; id != kbests_oracle.size(); ++ id) 
-      if (! kbests_oracle[id].empty()) {
+    
+    const size_t kbests_size = utils::bithack::min(kbests_oracle.size(), kbests.size());
+    for (size_t id = 0; id != kbests_size; ++ id) 
+      if (! kbests_oracle[id].empty() && ! kbests[id].empty()) {
 	score_ptr_type score_segment = score_1best->clone();
 	*score_segment -= *kbests[id].front().score;
 	
