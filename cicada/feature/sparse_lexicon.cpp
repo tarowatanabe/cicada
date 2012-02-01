@@ -545,7 +545,7 @@ namespace cicada
 	suffix_mode = true;
       
       if (int(pair_mode) + prefix_mode + suffix_mode == 0)
-	throw std::runtime_error("no sparse-lexicon feature?");
+	pair_mode = true;
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
 
