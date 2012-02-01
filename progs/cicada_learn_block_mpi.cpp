@@ -56,7 +56,7 @@ typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
 path_type input_file;
-path_type input_oracle_file;
+path_type oracle_file;
 
 bool input_id_mode = false;
 bool input_bitext_mode = false;
@@ -289,11 +289,11 @@ int main(int argc, char ** argv)
     read_events(input_file, events, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
 
     event_set_type events_oracle;
-    if (! input_oracle_file.empty()) {
-      if (input_oracle_file != "-" && !boost::filesystem::exists(input_oracle_file))
-	throw std::runtime_error("no oracle input? " + input_oracle_file.string());
+    if (! oracle_file.empty()) {
+      if (oracle_file != "-" && !boost::filesystem::exists(oracle_file))
+	throw std::runtime_error("no oracle input? " + oracle_file.string());
       
-      read_events(input_oracle_file, events_oracle, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+      read_events(oracle_file, events_oracle, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
     }
     
     // read reference data
@@ -1329,8 +1329,8 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("input",        po::value<path_type>(&input_file)->default_value(input_file),               "input file")
-    ("input-oracle", po::value<path_type>(&input_oracle_file)->default_value(input_oracle_file), "input oracle file")
+    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("oracle", po::value<path_type>(&oracle_file)->default_value(oracle_file), "oracle file")
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
