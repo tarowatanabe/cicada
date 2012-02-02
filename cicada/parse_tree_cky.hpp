@@ -275,14 +275,14 @@ namespace cicada
     
     struct Candidate
     {
-      Candidate() : active_rule(0), active_tree(0), rule_first(), rule_last(), tree_first(), tree_last(), score(), level(0) {}
+      Candidate() : active_rule(0), active_tree(0), rule_first(), rule_iter(), rule_last(), tree_first(), tree_iter(), tree_last(), score(), level(0) {}
       Candidate(const active_rule_type* __active,
 		typename rule_candidate_set_type::const_iterator __first,
 		typename rule_candidate_set_type::const_iterator __last,
 		const score_type& __score,
 		const int __level=0)
 	: active_rule(__active), active_tree(0),
-	  rule_first(__first), rule_last(__last), tree_first(), tree_last(),
+	  rule_first(__first), rule_iter(__first), rule_last(__last), tree_first(), tree_iter(), tree_last(),
 	  score(__score),
 	  level(__level) {}
       Candidate(const active_tree_type* __active,
@@ -291,7 +291,7 @@ namespace cicada
 		const score_type& __score,
 		const int __level=0)
 	: active_rule(0), active_tree(__active),
-	  rule_first(), rule_last(), tree_first(__first), tree_last(__last),
+	  rule_first(), rule_iter(), rule_last(), tree_first(__first), tree_iter(__first), tree_last(__last),
 	  score(__score),
 	  level(__level) {}
       
@@ -299,8 +299,10 @@ namespace cicada
       const active_tree_type* active_tree;
       
       typename rule_candidate_set_type::const_iterator rule_first;
+      typename rule_candidate_set_type::const_iterator rule_iter;
       typename rule_candidate_set_type::const_iterator rule_last;
       typename tree_candidate_set_type::const_iterator tree_first;
+      typename tree_candidate_set_type::const_iterator tree_iter;
       typename tree_candidate_set_type::const_iterator tree_last;
             
       score_type score;
@@ -311,7 +313,7 @@ namespace cicada
 
       score_type candidate_score() const
       {
-	return score * (active_rule ? rule_first->score : tree_first->score);
+	return score * (active_rule ? rule_iter->score : tree_iter->score);
       }
     };
     
@@ -582,7 +584,7 @@ namespace cicada
 	    
 	    if (item->is_tree()) {
 	      const active_tree_type& active = *(item->active_tree);
-	      const tree_candidate_type& rule = *(item->tree_first);
+	      const tree_candidate_type& rule = *(item->tree_iter);
 	      
 	      if (item->level > 0) {
 		const symbol_type label_prev = non_terminals[active.tails.front()];
@@ -590,7 +592,7 @@ namespace cicada
 		
 		unary_tree_set_type& unaries = unary_tree_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 		
-		if (! unaries.insert(&(*(item->tree_first))).second) {
+		if (! unaries.insert(&(*(item->tree_iter))).second) {
 		  typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		  if (niter == node_map.end())
 		    throw std::runtime_error("no node-map?");
@@ -625,20 +627,20 @@ namespace cicada
 					  item->level);
 
 	      // next queue!
-	      ++ const_cast<candidate_type*>(item)->tree_first;
-	      if (item->tree_first != item->tree_last)
+	      ++ const_cast<candidate_type*>(item)->tree_iter;
+	      if (item->tree_iter != item->tree_last)
 		heap.push(item);
 	      
 	    } else {
 	      const active_rule_type& active = *(item->active_rule);
-	      const rule_candidate_type& rule = *(item->rule_first);
+	      const rule_candidate_type& rule = *(item->rule_iter);
 	      
 	      if (item->level > 0) {
 		const symbol_type label_prev = non_terminals[active.tails.front()];
 		const symbol_type label_next = rule.lhs;
 		
 		unary_rule_set_type& unaries = unary_rule_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
-		if (! unaries.insert(&(*(item->rule_first))).second) {
+		if (! unaries.insert(&(*(item->rule_iter))).second) {
 		  typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		  if (niter == node_map.end())
 		    throw std::runtime_error("no node-map?");
@@ -673,8 +675,8 @@ namespace cicada
 					  item->level);
 	      
 	      // next queue!
-	      ++ const_cast<candidate_type*>(item)->rule_first;
-	      if (item->rule_first != item->rule_last)
+	      ++ const_cast<candidate_type*>(item)->rule_iter;
+	      if (item->rule_iter != item->rule_last)
 		heap.push(item);
 	    }
 	    

@@ -212,11 +212,12 @@ namespace cicada
     
     struct Candidate
     {
-      Candidate() : active(), first(), last(), score(), level(0) {}
+      Candidate() : active(), first(), iter(), last(), score(), level(0) {}
       
       const active_type* active;
       
       typename rule_candidate_set_type::const_iterator first;
+      typename rule_candidate_set_type::const_iterator iter;
       typename rule_candidate_set_type::const_iterator last;
       
       score_type score;
@@ -230,7 +231,7 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score * x->first->score < y->score * y->first->score;
+	return x->score * x->iter->score < y->score * y->iter->score;
       }
     };
     
@@ -434,6 +435,7 @@ namespace cicada
 	      
 	      cand.active = &(*citer);
 	      cand.first = rules.begin();
+	      cand.iter = rules.begin();
 	      cand.last  = rules.end();
 	      
 	      cand.score = score_antecedent;
@@ -459,13 +461,13 @@ namespace cicada
 	    // check unary rule, and see if this edge is already inserted!
 	    
 	    const active_type& active = *(item->active);
-	    const rule_candidate_type& rule = *(item->first);
+	    const rule_candidate_type& rule = *(item->iter);
 	    const score_type score = item->score * rule.score;
 	    
 	    if (pruner(first, last, rule.rule->lhs)) {
 	      // next queue!
-	      ++ const_cast<candidate_type*>(item)->first;
-	      if (item->first != item->last)
+	      ++ const_cast<candidate_type*>(item)->iter;
+	      if (item->iter != item->last)
 		heap.push(item);
 	      
 	      continue;
@@ -491,7 +493,7 @@ namespace cicada
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
-	      if (! unaries.insert(&(*(item->first))).second) {
+	      if (! unaries.insert(&(*(item->iter))).second) {
 		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
@@ -510,8 +512,8 @@ namespace cicada
 					first, last, item->level);
 	    
 	    // next queue!
-	    ++ const_cast<candidate_type*>(item)->first;
-	    if (item->first != item->last)
+	    ++ const_cast<candidate_type*>(item)->iter;
+	    if (item->iter != item->last)
 	      heap.push(item);
 	    
 	    // apply unary rule
@@ -546,6 +548,7 @@ namespace cicada
 	      
 	      cand.active = &(actives_unary.back());
 	      cand.first = rules.begin();
+	      cand.iter  = rules.begin();
 	      cand.last  = rules.end();
 	      
 	      cand.score = score_antecedent;
