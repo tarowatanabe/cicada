@@ -397,14 +397,22 @@ namespace cicada
     
     struct less_non_terminal
     {
-      less_non_terminal(const non_terminal_set_type& __non_terminals) : non_terminals(__non_terminals) {}
+      less_non_terminal(const non_terminal_set_type& __non_terminals,
+			const score_set_type& __scores)
+	: non_terminals(__non_terminals),
+	  scores(__scores) {}
       
       bool operator()(const hypergraph_type::id_type& x, const hypergraph_type::id_type& y) const
       {
-	return non_terminals[x] < non_terminals[y] || (non_terminals[x] == non_terminals[y] && x < y);
+	return (non_terminals[x] < non_terminals[y]
+		|| (non_terminals[x] == non_terminals[y]
+		    && (scores[x] > scores[y]
+			|| (scores[x] == scores[y]
+			    && x < y))));
       }
       
       const non_terminal_set_type& non_terminals;
+      const score_set_type&        scores;
     };
 
     struct VerifyNone
@@ -714,7 +722,7 @@ namespace cicada
 	    passive_set_type& passive_arcs = passives(first, last);
 	    
 	    passive_set_type(passive_arcs).swap(passive_arcs);
-	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals));
+	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals, scores));
 	  }
 
 	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
