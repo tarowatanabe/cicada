@@ -410,16 +410,10 @@ namespace cicada
       //   year = {2010},
       //   pages = {267--274},
       //   location = {Paris, France}
-      //
-      // original cube-pruning
-      candidate_type query(candidate.j);
       
-      query.in_edge = candidate.in_edge;
-      index_set_type& j = query.j;
-      
+      index_set_type j = candidate.j;
       size_type inserted = 0;
       for (size_t i = 0; i != candidate.j.size(); ++ i) {
-	
 	++ j[i];
 	
 	if (j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size())) {
