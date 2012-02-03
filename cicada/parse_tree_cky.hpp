@@ -163,7 +163,7 @@ namespace cicada
     
     typedef std::vector<active_tree_chart_type, std::allocator<active_tree_chart_type> > active_tree_chart_set_type;
     typedef std::vector<active_rule_chart_type, std::allocator<active_rule_chart_type> > active_rule_chart_set_type;
-
+        
     struct TreeCandidate
     {
       score_type    score;
@@ -272,6 +272,8 @@ namespace cicada
     typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
 #endif
+
+    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
     {
@@ -297,6 +299,8 @@ namespace cicada
       
       const active_rule_type* active_rule;
       const active_tree_type* active_tree;
+
+      index_set_type j;
       
       typename rule_candidate_set_type::const_iterator rule_first;
       typename rule_candidate_set_type::const_iterator rule_iter;
@@ -417,6 +421,68 @@ namespace cicada
       const score_set_type&        scores;
     };
 
+    struct PassiveMap
+    {
+      typedef std::vector<size_type, std::allocator<size_type> >       position_set_type;
+      typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
+
+      struct reference
+      {
+	reference(const size_type& __pos,
+		  const position_set_type& __positions,
+		  const passive_set_type& __passives)
+	  : pos(__pos), positions(__positions), passives(__passives) {}
+	
+	const passive_type& operator[](const size_type x) const { return passives[positions[pos] + x]; }
+	
+	const passive_type& front() const { return passives[positions[pos]]; } 
+	const passive_type& back() const { return passives[positions[pos+ 1] - 1]; }
+	
+	size_type size() const { return positions[pos + 1] - positions[pos]; }
+	bool empty() const { return positions[pos + 1] == positions[pos]; }
+	
+	size_type pos;
+	const position_set_type& positions;
+	const passive_set_type&  passives;
+      };
+
+      typedef reference const_reference;
+
+      PassiveMap() : positions(), passives() { clear(); }
+            
+      reference operator[](const size_type x) const
+      {
+	return reference(x, positions, passives);
+      }
+      
+      
+      template <typename Iterator>
+      size_type insert(Iterator first, Iterator last)
+      {
+	passives.insert(passives.end(), first, last);
+	positions.push_back(passives.size());
+	
+	return size() - 1;
+      }
+      
+      size_type size() const { return positions.size() - 1; }
+      bool empty() const { return size() == 0; }
+      
+      void clear()
+      {
+	positions.clear();
+	passives.clear();
+	
+	positions.push_back(0);
+      }
+      
+    private:
+      position_set_type positions;
+      passive_set_type  passives;
+    };
+    
+    typedef PassiveMap passive_map_type;
+
     struct VerifyNone
     {
       template <typename Transducer>
@@ -473,9 +539,11 @@ namespace cicada
       tree_tables.clear();
       tree_tables.reserve(tree_grammar.size());
       tree_tables.resize(tree_grammar.size());
-    
+      
+      passive_set_type passive_arcs;
+      
       // initialize active chart
-
+      
       for (size_t table = 0; table != tree_grammar.size(); ++ table) {
 	const tree_transducer_type::id_type root = tree_grammar[table].root();
 	
@@ -524,7 +592,7 @@ namespace cicada
 	  
 	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
 	    active_tree_set_type&  cell = actives_tree[table](first, last);
-
+	    
 	    typename active_tree_set_type::const_iterator citer_end = cell.end();
 	    for (typename active_tree_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 	      const tree_candidate_set_type& rules = candidate_trees(table, citer->node);
@@ -535,9 +603,12 @@ namespace cicada
 	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
-		score_antecedent *= scores[*titer];
+		score_antecedent *= scores[passive_map[*titer].front()];
 	      
 	      candidates.push_back(candidate_type(&(*citer), rules.begin(), rules.end(), score_antecedent));
+	      
+	      candidates.back().j = index_set_type(0, citer->tails.size());
+	      
 	      heap.push(&candidates.back());
 	    }
 	  }
@@ -555,15 +626,17 @@ namespace cicada
 	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
-		score_antecedent *= scores[*titer];
+		score_antecedent *= scores[passive_map[*titer].front()];
 	      
 	      candidates.push_back(candidate_type(&(*citer), rules.begin(), rules.end(), score_antecedent));
+	      
+	      candidates.back().j = index_set_type(0, citer->tails.size());
+	      
 	      heap.push(&candidates.back());
 	    }
 	  }
 	  
-	  
-	  passive_set_type& passive_arcs = passives(first, last);
+	  passive_arcs.clear();
 	  
 	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
 	    // pop-best...
@@ -613,24 +686,37 @@ namespace cicada
 					    first,
 					    last,
 					    utils::bithack::branch(unique_goal && rule.rule->label == goal, 0, item->level));
-	      } else
-		node_passive = apply_rule(score,
-					  rule.lhs,
-					  rule.rule,
-					  active.features + rule.features,
-					  active.attributes + rule.attributes,
-					  active.tails,
-					  passive_arcs,
-					  graph,
-					  first,
-					  last,
-					  item->level);
-
-	      // next queue!
-	      ++ const_cast<candidate_type*>(item)->tree_iter;
-	      if (item->tree_iter != item->tree_last)
-		heap.push(item);
-	      
+	      } else {
+		if (item->j.empty())
+		  node_passive = apply_rule(score,
+					    rule.lhs,
+					    rule.rule,
+					    active.features + rule.features,
+					    active.attributes + rule.attributes,
+					    active.tails,
+					    passive_arcs,
+					    graph,
+					    first,
+					    last,
+					    item->level);
+		else {
+		  hypergraph_type::edge_type::node_set_type tails(active.tails);
+		  for (size_t i = 0; i != tails.size(); ++ i)
+		    tails[i] = passive_map[active.tails[i]][item->j[i]];
+		  
+		  node_passive = apply_rule(score,
+					    rule.lhs,
+					    rule.rule,
+					    active.features + rule.features,
+					    active.attributes + rule.attributes,
+					    tails,
+					    passive_arcs,
+					    graph,
+					    first,
+					    last,
+					    item->level);
+		}
+	      }
 	    } else {
 	      const active_rule_type& active = *(item->active_rule);
 	      const rule_candidate_type& rule = *(item->rule_iter);
@@ -661,24 +747,41 @@ namespace cicada
 					    first,
 					    last,
 					    utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
-	      } else
-		node_passive = apply_rule(score,
-					  rule.lhs,
-					  rule.rule,
-					  active.features + rule.features,
-					  active.attributes + rule.attributes,
-					  active.tails,
-					  passive_arcs,
-					  graph,
-					  first,
-					  last,
-					  item->level);
-	      
-	      // next queue!
-	      ++ const_cast<candidate_type*>(item)->rule_iter;
-	      if (item->rule_iter != item->rule_last)
-		heap.push(item);
+	      } else {
+		if (item->j.empty())
+		  node_passive = apply_rule(score,
+					    rule.lhs,
+					    rule.rule,
+					    active.features + rule.features,
+					    active.attributes + rule.attributes,
+					    active.tails,
+					    passive_arcs,
+					    graph,
+					    first,
+					    last,
+					    item->level);
+		else {
+		  hypergraph_type::edge_type::node_set_type tails(active.tails);
+		  for (size_t i = 0; i != tails.size(); ++ i)
+		    tails[i] = passive_map[active.tails[i]][item->j[i]];
+		  
+		  node_passive = apply_rule(score,
+					    rule.lhs,
+					    rule.rule,
+					    active.features + rule.features,
+					    active.attributes + rule.attributes,
+					    tails,
+					    passive_arcs,
+					    graph,
+					    first,
+					    last,
+					    item->level);
+		}
+	      }
 	    }
+
+	    // next queue!
+	    push_succ(item);
 	    
 	    if (! node_passive.second) continue;
 	    
@@ -720,39 +823,53 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  {
-	    passive_set_type& passive_arcs = passives(first, last);
+	  if (! passive_arcs.empty()) {
+	    if (passive_arcs.size() == 1)
+	      passives(first, last).push_back(passive_map.insert(passive_arcs.begin(), passive_arcs.end()));
+	    else {
+	      std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals, scores));
+	      
+	      // construct passives!
+	      passive_set_type& arcs_new = passives(first, last);
+	      
+	      size_t i_first = 0;
+	      for (size_t i = 1; i != passive_arcs.size(); ++ i)
+		if (non_terminals[i_first] != non_terminals[i]) {
+		  arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.begin() + i));
+		  i_first = i;
+		}
+	      
+	      if (i_first != passive_arcs.size())
+		arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.end()));
+	    }
 	    
-	    passive_set_type(passive_arcs).swap(passive_arcs);
-	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals, scores));
+	    // extend root with passive items at [first, last)
+	    for (size_t table = 0; table != tree_grammar.size(); ++ table) {
+	      const tree_transducer_type& transducer = tree_grammar[table];
+	    
+	      const active_tree_set_type& active_arcs  = actives_tree[table](first, first);
+	      const passive_set_type&     passive_arcs = passives(first, last);
+	    
+	      active_tree_set_type& cell = actives_tree[table](first, last);
+	    
+	      extend_actives(transducer, active_arcs, passive_arcs, cell);
+	    }
+	  
+	    for (size_t table = 0; table != grammar.size(); ++ table) {
+	      const transducer_type& transducer = grammar[table];
+	    
+	      if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+	    
+	      const active_rule_set_type&  active_arcs  = actives_rule[table](first, first);
+	      const passive_set_type&      passive_arcs = passives(first, last);
+	    
+	      active_rule_set_type& cell = actives_rule[table](first, last);
+	      
+	      extend_actives(transducer, active_arcs, passive_arcs, cell);
+	    }
 	  }
-
+	  
 	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
-	  
-	  // extend root with passive items at [first, last)
-	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
-	    const tree_transducer_type& transducer = tree_grammar[table];
-	    
-	    const active_tree_set_type& active_arcs  = actives_tree[table](first, first);
-	    const passive_set_type&     passive_arcs = passives(first, last);
-	    
-	    active_tree_set_type& cell = actives_tree[table](first, last);
-	    
-	    extend_actives(transducer, active_arcs, passive_arcs, cell);
-	  }
-	  
-	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
-	    
-	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
-	    
-	    const active_rule_set_type&  active_arcs  = actives_rule[table](first, first);
-	    const passive_set_type&      passive_arcs = passives(first, last);
-	    
-	    active_rule_set_type& cell = actives_rule[table](first, last);
-	    
-	    extend_actives(transducer, active_arcs, passive_arcs, cell);
-	  }
 	}
       
       //
@@ -785,34 +902,42 @@ namespace cicada
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-	  const node_set_type& node_set = node_graph_tree[passive_arcs[p]];
+	  typename passive_map_type::const_reference ref = passive_map[passive_arcs[p]];
 	  
-	  typename node_set_type::const_iterator giter = node_set.find(goal);
-	  if (giter != node_set.end()) {
-	    if (graph.is_valid())
-	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(passive_arcs[p]));
+	  for (size_type i = 0; i != ref.size(); ++ i) {
+	    const node_set_type& node_set = node_graph_tree[ref[i]];
 	    
-	    graph.goal = giter->second;
+	    typename node_set_type::const_iterator giter = node_set.find(goal);
+	    if (giter != node_set.end()) {
+	      if (graph.is_valid())
+		throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(ref[i]));
+	      
+	      graph.goal = giter->second;
+	    }
 	  }
 	}
 	
       } else {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-	  const node_set_type& node_set = node_graph_tree[passive_arcs[p]];
+	  typename passive_map_type::const_reference ref = passive_map[passive_arcs[p]];
 	  
-	  typename node_set_type::const_iterator giter = node_set.find(goal);
-	  if (giter == node_set.end()) continue;
-	  
-	  hypergraph_type::edge_type& edge = graph.add_edge(&(giter->second), &(giter->second) + 1);
-	  edge.rule = goal_rule;
-	  edge.attributes[attr_span_first] = attribute_set_type::int_type(0);
-	  edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice.size());
-	  
-	  if (! graph.is_valid())
-	    graph.goal = graph.add_node().id;
-	  
-	  graph.connect_edge(edge.id, graph.goal);
+	  for (size_type i = 0; i != ref.size(); ++ i) {
+	    const node_set_type& node_set = node_graph_tree[ref[i]];
+	    
+	    typename node_set_type::const_iterator giter = node_set.find(goal);
+	    if (giter == node_set.end()) continue;
+	    
+	    hypergraph_type::edge_type& edge = graph.add_edge(&(giter->second), &(giter->second) + 1);
+	    edge.rule = goal_rule;
+	    edge.attributes[attr_span_first] = attribute_set_type::int_type(0);
+	    edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice.size());
+	    
+	    if (! graph.is_valid())
+	      graph.goal = graph.add_node().id;
+	    
+	    graph.connect_edge(edge.id, graph.goal);
+	  }
 	}
       }
       
@@ -822,6 +947,73 @@ namespace cicada
     }
 
   private:
+
+    void push_succ(const candidate_type* item)
+    {
+      if (item->is_tree()) {
+	if (item->j.empty() || item->tree_iter != item->tree_first) {
+	  ++ const_cast<candidate_type*>(item)->tree_iter;
+	  if (item->tree_iter != item->tree_last)
+	    heap.push(item);
+	} else {
+	  if (item->tree_iter + 1 != item->tree_last) {
+	    candidates.push_back(*item);
+	    candidate_type& cand = candidates.back();
+	    ++ cand.tree_iter;
+	    heap.push(&cand);
+	  }
+	  
+	  for (size_type i = 0; i != item->j.size(); ++ i) {
+	    typename passive_map_type::const_reference ref = passive_map[item->active_tree->tails[i]];
+	    
+	    if (item->j[i] + 1 < static_cast<int>(ref.size())) {
+	      candidates.push_back(*item);
+	      candidate_type& cand = candidates.back();
+	      
+	      ++ cand.j[i];
+	      
+	      // we need to adjust scores!
+	      cand.score *= scores[ref[cand.j[i]]] / scores[ref[cand.j[i] - 1]];
+	      
+	      heap.push(&cand);
+	    }
+	    
+	    if (item->j[i]) break;
+	  }
+	}
+      } else {
+	if (item->j.empty() || item->rule_iter != item->rule_first) {
+	  ++ const_cast<candidate_type*>(item)->rule_iter;
+	  if (item->rule_iter != item->rule_last)
+	    heap.push(item);
+	} else {
+	  if (item->rule_iter + 1 != item->rule_last) {
+	    candidates.push_back(*item);
+	    candidate_type& cand = candidates.back();
+	    ++ cand.rule_iter;
+	    heap.push(&cand);
+	  }
+	  
+	  for (size_type i = 0; i != item->j.size(); ++ i) {
+	    typename passive_map_type::const_reference ref = passive_map[item->active_rule->tails[i]];
+	    
+	    if (item->j[i] + 1 < static_cast<int>(ref.size())) {
+	      candidates.push_back(*item);
+	      candidate_type& cand = candidates.back();
+	      
+	      ++ cand.j[i];
+	      
+	      // we need to adjust scores!
+	      cand.score *= scores[ref[cand.j[i]]] / scores[ref[cand.j[i] - 1]];
+	      
+	      heap.push(&cand);
+	    }
+	    
+	    if (item->j[i]) break;
+	  }
+	}
+      }
+    }
     
     std::pair<hypergraph_type::id_type, bool> apply_rule(const score_type& score,
 							 const symbol_type& lhs,
@@ -1131,7 +1323,7 @@ namespace cicada
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
 	    
 	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
-	      const symbol_type& non_terminal = non_terminals[*piter];
+	      const symbol_type& non_terminal = non_terminals[passive_map[*piter].front()];
 	      
 	      if (label != non_terminal) {
 		node = transducer.next(aiter->node, non_terminal);
@@ -1234,6 +1426,8 @@ namespace cicada
     active_rule_set_type       actives_rule_unary;
     active_tree_set_type       actives_tree_unary;
 
+    passive_map_type           passive_map;
+    
     candidate_set_type    candidates;
     candidate_heap_type   heap;
 
