@@ -87,6 +87,7 @@ mpi_device_bcast.hpp \
 mpi_stream.hpp \
 mpi_stream_simple.hpp \
 mpi_traits.hpp \
+mulvector2.hpp \
 packed_device.hpp \
 packed_vector.hpp \
 piece.hpp \

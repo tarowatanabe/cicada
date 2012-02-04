@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_CKY__HPP__
@@ -28,6 +28,7 @@
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/mulvector2.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -235,7 +236,8 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score * x->iter->score < y->score * y->iter->score;
+	//return x->score * x->iter->score < y->score * y->iter->score;
+	return x->score < y->score;
       }
     };
     
@@ -269,69 +271,9 @@ namespace cicada
       const score_set_type&        scores;
     };
     
-    struct PassiveMap
-    {
-      typedef std::vector<size_type, std::allocator<size_type> >       position_set_type;
-      typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
-
-      struct reference
-      {
-	reference(const size_type& __pos,
-		  const position_set_type& __positions,
-		  const passive_set_type& __passives)
-	  : pos(__pos), positions(__positions), passives(__passives) {}
-	
-	const passive_type& operator[](const size_type x) const { return passives[positions[pos] + x]; }
-	
-	const passive_type& front() const { return passives[positions[pos]]; } 
-	const passive_type& back() const { return passives[positions[pos+ 1] - 1]; }
-	
-	size_type size() const { return positions[pos + 1] - positions[pos]; }
-	bool empty() const { return positions[pos + 1] == positions[pos]; }
-	
-	size_type pos;
-	const position_set_type& positions;
-	const passive_set_type&  passives;
-      };
-
-      typedef reference const_reference;
-
-      PassiveMap() : positions(), passives() { clear(); }
-            
-      reference operator[](const size_type x) const
-      {
-	return reference(x, positions, passives);
-      }
-      
-      
-      template <typename Iterator>
-      size_type insert(Iterator first, Iterator last)
-      {
-	passives.insert(passives.end(), first, last);
-	positions.push_back(passives.size());
-	
-	return size() - 1;
-      }
-      
-      size_type size() const { return positions.size() - 1; }
-      bool empty() const { return size() == 0; }
-      
-      void clear()
-      {
-	positions.clear();
-	passives.clear();
-	
-	positions.push_back(0);
-      }
-      
-    private:
-      position_set_type positions;
-      passive_set_type  passives;
-    };
+    typedef std::vector<passive_type, std::allocator<passive_type> > derivation_set_type;
+    typedef utils::mulvector2<passive_type, std::allocator<passive_type> > derivation_map_type;
     
-    typedef PassiveMap passive_map_type;
-
-
     struct PruneNone
     {
       bool operator()(const int first, const int last) const
@@ -366,7 +308,7 @@ namespace cicada
       passives.clear();
       non_terminals.clear();
       scores.clear();
-      passive_map.clear();
+      derivation_map.clear();
 
       actives.reserve(grammar.size());
       passives.reserve(lattice.size() + 1);
@@ -374,13 +316,11 @@ namespace cicada
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
 
-      
-    
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
 
-      passive_set_type derivations;
+      derivation_set_type derivations;
     
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -500,7 +440,7 @@ namespace cicada
 	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
-		score_antecedent *= scores[passive_map[*titer].front()];
+		score_antecedent *= scores[derivation_map[*titer].front()];
 	      
 	      candidates.push_back(candidate_type());
 	      candidate_type& cand = candidates.back();
@@ -512,7 +452,7 @@ namespace cicada
 	      cand.iter  = rules.begin();
 	      cand.last  = rules.end();
 	      
-	      cand.score = score_antecedent;
+	      cand.score = score_antecedent * cand.iter->score;
 	      cand.level = 0;
 	      
 	      heap.push(&cand);
@@ -536,7 +476,7 @@ namespace cicada
 	    
 	    const active_type& active = *(item->active);
 	    const rule_candidate_type& rule = *(item->iter);
-	    const score_type score = item->score * rule.score;
+	    const score_type score = item->score;
 	    
 	    if (pruner(first, last, rule.rule->lhs)) {
 	      // next queue!
@@ -589,7 +529,7 @@ namespace cicada
 		// transform active.tails into actual tails
 		hypergraph_type::edge_type::node_set_type tails(active.tails);
 		for (size_t i = 0; i != tails.size(); ++ i)
-		  tails[i] = passive_map[active.tails[i]][item->j[i]];
+		  tails[i] = derivation_map[active.tails[i]][item->j[i]];
 		
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					  tails.begin(), tails.end(), derivations, graph,
@@ -636,7 +576,7 @@ namespace cicada
 	      cand.iter  = rules.begin();
 	      cand.last  = rules.end();
 	      
-	      cand.score = score_antecedent;
+	      cand.score = score_antecedent * cand.iter->score;
 	      cand.level = item->level + 1;
 	      
 	      heap.push(&cand);
@@ -645,7 +585,7 @@ namespace cicada
 	  
 	  if (! derivations.empty()) {
 	    if (derivations.size() == 1)
-	      passives(first, last).push_back(passive_map.insert(derivations.begin(), derivations.end()));
+	      passives(first, last).push_back(derivation_map.push_back(derivations.begin(), derivations.end()));
 	    else {
 	      std::sort(derivations.begin(), derivations.end(), less_non_terminal(non_terminals, scores));
 	      
@@ -657,7 +597,7 @@ namespace cicada
 	      size_t i_first = 0;
 	      for (size_t i = 1; i != derivations.size(); ++ i)
 		if (non_terminals[derivations[i_first]] != non_terminals[derivations[i]]) {
-		  passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.begin() + i));
+		  passive_arcs.push_back(derivation_map.push_back(derivations.begin() + i_first, derivations.begin() + i));
 
 		  //std::cerr << "\trange: [" << i_first << ", " << i << ")" << std::endl;
 		  
@@ -665,7 +605,7 @@ namespace cicada
 		}
 	      
 	      if (i_first != derivations.size()) {
-		passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.end()));
+		passive_arcs.push_back(derivation_map.push_back(derivations.begin() + i_first, derivations.end()));
 		
 		//std::cerr << "\trange: [" << i_first << ", " << derivations.size() << ")" << std::endl;
 	      }
@@ -697,22 +637,22 @@ namespace cicada
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	  if (non_terminals[passive_map[passive_arcs[p]].front()] == goal) {
+	  if (non_terminals[derivation_map[passive_arcs[p]].front()] == goal) {
 	    if (graph.is_valid())
-	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(passive_map[passive_arcs[p]].front()));
+	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(derivation_map[passive_arcs[p]].front()));
 	    
-	    if (passive_map[passive_arcs[p]].size() > 1)
+	    if (derivation_map[passive_arcs[p]].size() > 1)
 	      throw std::runtime_error("multiple goal???");
 	    
-	    graph.goal = passive_map[passive_arcs[p]].front();
+	    graph.goal = derivation_map[passive_arcs[p]].front();
 	  }
       } else {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	  if (non_terminals[passive_map[passive_arcs[p]].front()] == goal) {
+	  if (non_terminals[derivation_map[passive_arcs[p]].front()] == goal) {
 	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
 	    
-	    typename passive_map_type::const_reference ref = passive_map[passive_arcs[p]];
+	    typename derivation_map_type::const_reference ref = derivation_map[passive_arcs[p]];
 	    
 	    for (size_t i = 0; i != ref.size(); ++ i) {
 	      const passive_type& id = ref[i];
@@ -743,20 +683,25 @@ namespace cicada
     void push_succ(const candidate_type* item)
     {
       if (item->j.empty() || item->iter != item->first) {
-	++ const_cast<candidate_type*>(item)->iter;
-	if (item->iter != item->last)
+	if (item->iter + 1 != item->last) {
+	  const_cast<candidate_type*>(item)->score /= item->iter->score;
+	  ++ const_cast<candidate_type*>(item)->iter;
+	  const_cast<candidate_type*>(item)->score *= item->iter->score;
 	  heap.push(item);
+	}
       } else {
 	if (item->iter + 1 != item->last) {
 	  // make new candidate... we do not have to make an adjustment for scores...
 	  candidates.push_back(*item);
 	  candidate_type& cand = candidates.back();
+	  cand.score /= cand.iter->score;
 	  ++ cand.iter;
+	  cand.score *= cand.iter->score;
 	  heap.push(&cand);
 	}
 	
 	for (size_type i = 0; i != item->j.size(); ++ i) {
-	  typename passive_map_type::const_reference ref = passive_map[item->active->tails[i]];
+	  typename derivation_map_type::const_reference ref = derivation_map[item->active->tails[i]];
 	  
 	  if (item->j[i] + 1 < static_cast<int>(ref.size())) {
 	    // make new candidate
@@ -785,7 +730,7 @@ namespace cicada
 							 const attribute_set_type& attributes,
 							 Iterator first,
 							 Iterator last,
-							 passive_set_type& passives,
+							 derivation_set_type& derivations,
 							 hypergraph_type& graph,
 							 const int lattice_first,
 							 const int lattice_last,
@@ -807,9 +752,9 @@ namespace cicada
       std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
       if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
-	  
+	
+	derivations.push_back(node.id);
 	non_terminals.push_back(rule->lhs);
-	passives.push_back(node.id);
 	scores.push_back(score);
 	  
 	result.first->second = node.id;
@@ -848,7 +793,7 @@ namespace cicada
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
 	    
 	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
-	      const symbol_type& non_terminal = non_terminals[passive_map[*piter].front()];
+	      const symbol_type& non_terminal = non_terminals[derivation_map[*piter].front()];
 	      
 	      if (label != non_terminal) {
 		node = transducer.next(aiter->node, non_terminal);
@@ -916,7 +861,7 @@ namespace cicada
     active_chart_set_type  actives;
     passive_chart_type     passives;
     active_set_type        actives_unary;
-    passive_map_type       passive_map;
+    derivation_map_type    derivation_map;
 
     unary_rule_map_type   unary_map;
     node_map_type         node_map;
