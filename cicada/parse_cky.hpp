@@ -366,18 +366,21 @@ namespace cicada
       passives.clear();
       non_terminals.clear();
       scores.clear();
+      passive_map.clear();
 
       actives.reserve(grammar.size());
       passives.reserve(lattice.size() + 1);
     
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
+
+      
     
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
 
-      passive_set_type passive_arcs;
+      passive_set_type derivations;
     
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -516,7 +519,7 @@ namespace cicada
 	    }
 	  }
 
-	  passive_arcs.clear();
+	  derivations.clear();
 	  
 	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
 	    // pop-best...
@@ -573,14 +576,14 @@ namespace cicada
 		scores[niter->second] = std::max(scores[niter->second], score);
 	      } else
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
-					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
+					  active.tails.begin(), active.tails.end(), derivations, graph,
 					  first, last, utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
 	    } else {
 	      // transform acive.tails into tails! if j is not empty!
 
 	      if (item->j.empty())
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
-					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
+					  active.tails.begin(), active.tails.end(), derivations, graph,
 					  first, last, item->level);
 	      else {
 		// transform active.tails into actual tails
@@ -589,7 +592,7 @@ namespace cicada
 		  tails[i] = passive_map[active.tails[i]][item->j[i]];
 		
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
-					  tails.begin(), tails.end(), passive_arcs, graph,
+					  tails.begin(), tails.end(), derivations, graph,
 					  first, last, item->level);
 	      }
 	    }
@@ -640,24 +643,32 @@ namespace cicada
 	    }
 	  }
 	  
-	  if (! passive_arcs.empty()) {
-	    if (passive_arcs.size() == 1)
-	      passives(first, last).push_back(passive_map.insert(passive_arcs.begin(), passive_arcs.end()));
+	  if (! derivations.empty()) {
+	    if (derivations.size() == 1)
+	      passives(first, last).push_back(passive_map.insert(derivations.begin(), derivations.end()));
 	    else {
-	      std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals, scores));
+	      std::sort(derivations.begin(), derivations.end(), less_non_terminal(non_terminals, scores));
+	      
+	      //std::cerr << "derivations: " << derivations.size() << std::endl;
 	      
 	      // construct passives!
-	      passive_set_type& arcs_new = passives(first, last);
+	      passive_set_type& passive_arcs = passives(first, last);
 	      
 	      size_t i_first = 0;
-	      for (size_t i = 1; i != passive_arcs.size(); ++ i)
-		if (non_terminals[i_first] != non_terminals[i]) {
-		  arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.begin() + i));
+	      for (size_t i = 1; i != derivations.size(); ++ i)
+		if (non_terminals[derivations[i_first]] != non_terminals[derivations[i]]) {
+		  passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.begin() + i));
+
+		  //std::cerr << "\trange: [" << i_first << ", " << i << ")" << std::endl;
+		  
 		  i_first = i;
 		}
 	      
-	      if (i_first != passive_arcs.size())
-		arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.end()));
+	      if (i_first != derivations.size()) {
+		passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.end()));
+		
+		//std::cerr << "\trange: [" << i_first << ", " << derivations.size() << ")" << std::endl;
+	      }
 	    }
 	    
 	    // extend root with passive items at [first, last)

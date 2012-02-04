@@ -518,6 +518,7 @@ namespace cicada
       node_graph_tree.clear();
       non_terminals.clear();
       scores.clear();
+      passive_map.clear();
 
       tail_map.clear();
       symbol_map.clear();
@@ -540,7 +541,7 @@ namespace cicada
       tree_tables.reserve(tree_grammar.size());
       tree_tables.resize(tree_grammar.size());
       
-      passive_set_type passive_arcs;
+      passive_set_type derivations;
       
       // initialize active chart
       
@@ -636,7 +637,7 @@ namespace cicada
 	    }
 	  }
 	  
-	  passive_arcs.clear();
+	  derivations.clear();
 	  
 	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
 	    // pop-best...
@@ -681,7 +682,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    active.tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -694,7 +695,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    active.tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -710,7 +711,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -742,7 +743,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    active.tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -755,7 +756,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    active.tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -771,7 +772,7 @@ namespace cicada
 					    active.features + rule.features,
 					    active.attributes + rule.attributes,
 					    tails,
-					    passive_arcs,
+					    derivations,
 					    graph,
 					    first,
 					    last,
@@ -823,24 +824,24 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  if (! passive_arcs.empty()) {
-	    if (passive_arcs.size() == 1)
-	      passives(first, last).push_back(passive_map.insert(passive_arcs.begin(), passive_arcs.end()));
+	  if (! derivations.empty()) {
+	    if (derivations.size() == 1)
+	      passives(first, last).push_back(passive_map.insert(derivations.begin(), derivations.end()));
 	    else {
-	      std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals, scores));
+	      std::sort(derivations.begin(), derivations.end(), less_non_terminal(non_terminals, scores));
 	      
 	      // construct passives!
-	      passive_set_type& arcs_new = passives(first, last);
+	      passive_set_type& passive_arcs = passives(first, last);
 	      
 	      size_t i_first = 0;
-	      for (size_t i = 1; i != passive_arcs.size(); ++ i)
-		if (non_terminals[i_first] != non_terminals[i]) {
-		  arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.begin() + i));
+	      for (size_t i = 1; i != derivations.size(); ++ i)
+		if (non_terminals[derivations[i_first]] != non_terminals[derivations[i]]) {
+		  passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.begin() + i));
 		  i_first = i;
 		}
 	      
-	      if (i_first != passive_arcs.size())
-		arcs_new.push_back(passive_map.insert(passive_arcs.begin() + i_first, passive_arcs.end()));
+	      if (i_first != derivations.size())
+		passive_arcs.push_back(passive_map.insert(derivations.begin() + i_first, derivations.end()));
 	    }
 	    
 	    // extend root with passive items at [first, last)
