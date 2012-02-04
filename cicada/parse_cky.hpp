@@ -506,7 +506,7 @@ namespace cicada
 	      candidate_type& cand = candidates.back();
 	      
 	      cand.active = &(*citer);
-	      cand.j = index_set_type(0, citer->tails.size());
+	      cand.j = index_set_type(citer->tails.size(), 0);
 	      
 	      cand.first = rules.begin();
 	      cand.iter  = rules.begin();

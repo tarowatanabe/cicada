@@ -608,7 +608,7 @@ namespace cicada
 	      
 	      candidates.push_back(candidate_type(&(*citer), rules.begin(), rules.end(), score_antecedent));
 	      
-	      candidates.back().j = index_set_type(0, citer->tails.size());
+	      candidates.back().j = index_set_type(citer->tails.size(), 0);
 	      
 	      heap.push(&candidates.back());
 	    }
@@ -631,7 +631,7 @@ namespace cicada
 	      
 	      candidates.push_back(candidate_type(&(*citer), rules.begin(), rules.end(), score_antecedent));
 	      
-	      candidates.back().j = index_set_type(0, citer->tails.size());
+	      candidates.back().j = index_set_type(citer->tails.size(), 0);
 	      
 	      heap.push(&candidates.back());
 	    }
