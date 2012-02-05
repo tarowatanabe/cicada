@@ -55,6 +55,7 @@ sample_piece
 sample_program_options
 sample_random_seed
 sample_simple_vector
+sample_small_vector
 sample_sparse_map
 sample_static_allocator
 sample_subprocess

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_COARSE__HPP__
@@ -25,6 +25,8 @@
 #include <utils/bithack.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/indexed_set.hpp>
+#include <utils/mulvector2.hpp>
+#include <utils/sgi_hash_map.hpp>
 
 #include <google/dense_hash_map>
 
@@ -184,9 +186,15 @@ namespace cicada
       
       typedef Span span_type;
       typedef Span tail_type;
-      typedef utils::simple_vector<tail_type, std::allocator<tail_type> > tail_set_type;
-      typedef utils::chunk_vector<tail_set_type, 4096 / sizeof(tail_set_type), std::allocator<tail_set_type> >  tail_map_type;
+      typedef utils::simple_vector<tail_type, std::allocator<tail_type> > tails_type;
+      typedef utils::mulvector2<tail_type, std::allocator<tail_type> >    tails_map_type;
+      typedef typename tails_map_type::const_reference tails_mapped_type;
       typedef size_type tails_id_type;
+      
+      typedef utils::simple_vector<id_type, std::allocator<id_type> > closure_type;
+      typedef utils::mulvector2<id_type, std::allocator<id_type> > closure_map_type;
+      typedef typename closure_map_type::const_reference closure_mapped_type;
+      typedef size_type closure_id_type;
       
       struct Edge
       {
@@ -201,10 +209,11 @@ namespace cicada
       struct UnaryEdge
       {
 	id_type tail;
+	closure_id_type closure;
 	score_type score;
 	
-	UnaryEdge() : tail(id_type(-1)), score() {}
-	UnaryEdge(const id_type& __tail, const score_type& __score) : tail(__tail), score(__score) {}
+	UnaryEdge() : tail(id_type(-1)), closure(0), score() {}
+	UnaryEdge(const id_type& __tail, const closure_id_type& __closure, const score_type& __score) : tail(__tail), closure(__closure), score(__score) {}
       };
       
       typedef Edge edge_type;
@@ -237,18 +246,15 @@ namespace cicada
 	unary_edge_set_type edges;
       };
       
-      
       struct Unary
       {
-	id_type     id;
-	score_type  score;
+	id_type         id;
+	score_type      score;
+	closure_id_type closure;
 	
-	Unary() : id(), score() {}
-	Unary(const id_type& __id, const score_type& __score)
-	  : id(__id), score(__score) {}
-	template <typename Label, typename Score>
-	Unary(const std::pair<Label, Score>& x)
-	  : id(x.first), score(x.second) {}
+	Unary() : id(), score(), closure(0) {}
+	Unary(const id_type& __id, const score_type& __score, const closure_id_type& __closure)
+	  : id(__id), score(__score), closure(__closure) {}
       };
       
       typedef Active       active_type;
@@ -271,7 +277,24 @@ namespace cicada
       typedef std::deque<unary_set_type, std::allocator<unary_set_type> > unary_map_type;
       typedef std::vector<bool, std::allocator<bool> > unary_computed_type;
       
-      typedef google::dense_hash_map<id_type, score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
+      
+      struct closure_score_type
+      {
+	closure_type closure;
+	score_type   score;
+	
+	closure_score_type() : closure(), score() {}
+	closure_score_type(const closure_type& __closure, const score_type& __score) : closure(__closure), score(__score) {}
+      };
+      //typedef google::dense_hash_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				      std::allocator<std::pair<const id_type, closure_score_type> > > closure_set_type;
+#else
+    typedef sgi::hash_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+			  std::allocator<std::pair<const id_type, closure_score_type> > > closure_set_type;
+#endif
       
       typedef utils::indexed_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_map_type;
       
@@ -282,8 +305,10 @@ namespace cicada
 	
 	score_type final_inside;
 	score_type final_outside;
+
+	score_type score;
 	
-	InsideOutsideScore() : inside(), outside(), final_inside(), final_outside() {}
+	InsideOutsideScore() : inside(), outside(), final_inside(), final_outside(), score() {}
       };
       typedef InsideOutsideScore score_pair_type;
       typedef std::vector<score_pair_type, std::allocator<score_pair_type> > score_pair_set_type;
@@ -298,8 +323,8 @@ namespace cicada
 	       const bool __pos_mode=false)
 	: goal(__goal), grammar(__grammar), function(__function), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode)
       {
-	closure.set_empty_key(id_type(-1));
-	closure_next.set_empty_key(id_type(-1));
+	//closure.set_empty_key(id_type(-1));
+	//closure_next.set_empty_key(id_type(-1));
       }
 
     public:      
@@ -329,7 +354,9 @@ namespace cicada
 	passives_unary.resize(lattice.size() + 1);
 
 	tails_map.clear();
-	tails_map.push_back(tail_set_type());
+	tails_map.push_back();
+	
+	closure_map.clear();
 	
 	goal_id = id_map(goal);
 	
@@ -373,10 +400,17 @@ namespace cicada
 	    if (inside_outside(first, last).empty()) continue;
 	    
 	    label_score_set_type& labels_scores = scores(first, last);
-	    const score_pair_set_type& scores   = inside_outside(first, last);
+	    const score_pair_set_type& inside_outside_scores   = inside_outside(first, last);
+
+	    //std::cerr << "span: " << first << ".." << last << std::endl;
 	    
-	    for (id_type id = 0; id != static_cast<id_type>(scores.size()); ++ id) {
-	      const score_type score = std::max(scores[id].final_inside * scores[id].final_outside, scores[id].inside * scores[id].outside);
+	    for (id_type id = 0; id != static_cast<id_type>(inside_outside_scores.size()); ++ id) {
+	      //const score_type score = std::max(inside_outside_scores[id].final_inside * inside_outside_scores[id].final_outside,
+	      //                                  inside_outside_scores[id].inside * inside_outside_scores[id].outside);
+	      const score_type& score = inside_outside_scores[id].score;
+	      
+	      //std::cerr << "\tid: " << id << " score: " << score << std::endl;
+	      
 	      if (score != cicada::semiring::traits<score_type>::zero())
 		labels_scores[symbol_map[id]] = score / score_sum;
 	    }
@@ -414,8 +448,20 @@ namespace cicada
 		for (typename unary_edge_set_type::const_iterator eiter = unaries[id].edges.begin(); eiter != eiter_end; ++ eiter) {
 		  const unary_edge_type& edge = *eiter;
 		  
-		  score_type& score = scores_outside[edge.tail].outside;
-		  score = std::max(score, score_head * edge.score);
+		  score_type& outside = scores_outside[edge.tail].outside;
+		  outside = std::max(outside, score_head * edge.score);
+		  
+		  const score_type score = score_head * edge.score * scores_outside[edge.tail].inside;
+		  
+		  const closure_mapped_type closure = closure_map[edge.closure];
+		  typename closure_mapped_type::const_iterator citer_end = closure.end();
+		  for (typename closure_mapped_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+		    score_type& score_update = scores_outside[*citer].score;
+		    
+		    score_update = std::max(score_update, score);
+		  }
+		  
+		  //std::cerr << "closure size: " << closure.size() << std::endl;
 		}
 	      }
 	    
@@ -433,12 +479,12 @@ namespace cicada
 		  
 		  const score_type score_edge = score_head * edge.score;
 		  
-		  const tail_set_type& tails = tails_map[edge.tails];
+		  const tails_mapped_type tails = tails_map[edge.tails];
 		  
-		  typename tail_set_type::const_iterator titer_end = tails.end();
-		  for (typename tail_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+		  typename tails_mapped_type::const_iterator titer_end = tails.end();
+		  for (typename tails_mapped_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
 		    score_type score_outside = score_edge;
-		    for (typename tail_set_type::const_iterator niter = tails.begin(); niter != titer_end; ++ niter)
+		    for (typename tails_mapped_type::const_iterator niter = tails.begin(); niter != titer_end; ++ niter)
 		      if (titer != niter)
 			score_outside *= inside_outside(niter->first, niter->last)[niter->id].final_inside;
 		    
@@ -559,10 +605,10 @@ namespace cicada
 		if (rules.empty()) continue;
 		
 		score_type score_tails = cicada::semiring::traits<score_type>::one();
-		const tail_set_type& tails = tails_map[citer->edge.tails];
+		const tails_mapped_type tails = tails_map[citer->edge.tails];
 
-		typename tail_set_type::const_iterator titer_end = tails.end();
-		for (typename tail_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer)
+		typename tails_mapped_type::const_iterator titer_end = tails.end();
+		for (typename tails_mapped_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer)
 		  score_tails *= inside_outside(titer->first, titer->last)[titer->id].final_inside;
 		
 		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
@@ -617,7 +663,7 @@ namespace cicada
 		    
 		    //std::cerr << "head: " << citer->id << " tail: " << id << " score: " << citer->score << " tail: " << score_tail << std::endl;
 		    
-		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->score));
+		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->closure, citer->score));
 		    scores_inside[citer->id].final_inside = std::max(scores_inside[citer->id].final_inside, score_tail * citer->score);
 		  }
 		}
@@ -685,11 +731,11 @@ namespace cicada
 	  
 	  closure.clear();
 	  closure_next.clear();
-	  closure.insert(std::make_pair(child, cicada::semiring::traits<score_type>::one()));
+	  closure.insert(std::make_pair(child, closure_score_type(closure_type(1, child), cicada::semiring::traits<score_type>::one())));
 	  
 	  for (;;) {
 	    bool equilibrate = true;
-
+	    
 	    closure_next = closure;
 	    
 	    typename closure_set_type::const_iterator citer_end = closure.end();
@@ -712,14 +758,18 @@ namespace cicada
 		  // we assume max-like estimate grammar!
 		  if (lhs == child) continue;
 		  
-		  const score_type score = function(riter->features) * citer->second;
+		  const score_type score = function(riter->features) * citer->second.score;
 		  
-		  std::pair<typename closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
-		  if (result.second)
+		  std::pair<typename closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, closure_score_type(closure_type(), score)));
+		  if (result.second) {
 		    equilibrate = false;
-		  else if (result.first->second < score) {
+		    result.first->second.closure = citer->second.closure;
+		    result.first->second.closure.push_back(lhs);
+		  } else if (result.first->second.score < score) {
 		    equilibrate = false;
-		    result.first->second = score;
+		    result.first->second.score = score;
+		    result.first->second.closure = citer->second.closure;
+		    result.first->second.closure.push_back(lhs);
 		  }
 		}
 	      }
@@ -733,7 +783,19 @@ namespace cicada
 	  
 	  unaries[child].clear();
 	  unaries[child].reserve(closure.size());
-	  unaries[child].insert(unaries[child].end(), closure.begin(), closure.end());
+	  
+	  typename closure_set_type::const_iterator citer_end = closure.end();
+	  for (typename closure_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+	    // convert closure to closure-id
+
+#if 0
+	    std::cerr << "closure: " << child << " " << citer->first << " seq: ";
+	    std::copy(citer->second.closure.begin(), citer->second.closure.end(), std::ostream_iterator<id_type>(std::cerr, " "));
+	    std::cerr << "score: "<< citer->second.score << std::endl;
+#endif
+	    
+	    unaries[child].push_back(unary_type(citer->first, citer->second.score, closure_map.push_back(citer->second.closure.begin(), citer->second.closure.end())));
+	  }
 	  std::sort(unaries[child].begin(), unaries[child].end(), less_id<unary_type>());
 	}
 	return unaries[child];
@@ -754,9 +816,9 @@ namespace cicada
 	if (! passives.empty())
 	  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	    if (transducer.has_next(aiter->node)) {
-	      const tail_set_type& tails_prev = tails_map[aiter->edge.tails];
+	      const tails_mapped_type tails_prev = tails_map[aiter->edge.tails];
 
-	      tail_set_type tails(tails_prev.size() + 1);
+	      tails_type tails(tails_prev.size() + 1);
 	      std::copy(tails_prev.begin(), tails_prev.end(), tails.begin());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passives.size()); ++ id)
@@ -767,10 +829,7 @@ namespace cicada
 		  
 		  tails.back() = tail_type(first, last, id);
 		  
-		  const tails_id_type tails_id = tails_map.size();
-		  tails_map.push_back(tails);
-
-		  cell.push_back(active_type(node, edge_type(tails_id, aiter->edge.score)));
+		  cell.push_back(active_type(node, edge_type(tails_map.push_back(tails.begin(), tails.end()), aiter->edge.score)));
 		  
 		  found = true;
 		}
@@ -804,7 +863,8 @@ namespace cicada
       passive_chart_type       passives;
       passive_unary_chart_type passives_unary;
 
-      tail_map_type tails_map;
+      tails_map_type   tails_map;
+      closure_map_type closure_map;
       
       unary_map_type      unaries;
       unary_computed_type unaries_computed;

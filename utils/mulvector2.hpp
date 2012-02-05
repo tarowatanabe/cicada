@@ -161,6 +161,11 @@ namespace utils
       return size() - 1;
     }
     
+    void reserve(size_type size1, size_type size2)
+    {
+      offsets.reserve(size1 + 1);
+      impl.reserve(size1 * size2);
+    }
     
     void clear()
     {

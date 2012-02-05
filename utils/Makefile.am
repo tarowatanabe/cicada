@@ -101,6 +101,7 @@ resource.hpp \
 sgi_hash_map.hpp \
 sgi_hash_set.hpp \
 simple_vector.hpp \
+small_vector.hpp \
 space_separator.hpp \
 sparse_hashtable.hpp \
 sparse_map.hpp \
@@ -154,6 +155,7 @@ sample_piece \
 sample_program_options \
 sample_random_seed \
 sample_simple_vector \
+sample_small_vector \
 sample_sparse_map \
 sample_static_allocator \
 sample_subprocess \
@@ -300,6 +302,10 @@ sample_program_options_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_
 sample_simple_vector_SOURCES = sample_simple_vector.cpp
 sample_simple_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_simple_vector_LDADD = $(BOOST_THREAD_LIBS)
+
+sample_small_vector_SOURCES = sample_small_vector.cpp
+sample_small_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+sample_small_vector_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_static_allocator_SOURCES = sample_static_allocator.cpp
 sample_static_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
