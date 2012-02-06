@@ -248,7 +248,6 @@ format: ICU's number/date format rules\n\
       else
 	return transducer_ptr_type(new GrammarUnknown(signature, file));
     } else {
-      
 #ifdef HAVE_TLS
       if (! __transducers_tls) {
 	__transducers.reset(new transducer_map_type());
