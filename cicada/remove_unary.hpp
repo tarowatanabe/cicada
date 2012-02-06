@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__REMOVE_UNARY__HPP__
@@ -12,6 +12,7 @@
 
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
+#include <utils/small_vector.hpp>
 
 namespace cicada
 {
@@ -26,7 +27,7 @@ namespace cicada
 
     typedef hypergraph_type::rule_type rule_type;
 
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     typedef std::vector<bool, std::allocator<bool> > removed_type;
     
     struct filter_edge

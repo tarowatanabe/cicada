@@ -36,6 +36,7 @@
 #include "utils/sgi_hash_set.hpp"
 #include "utils/chart.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/small_vector.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>

@@ -31,6 +31,7 @@
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
 
 #include <google/dense_hash_map>
@@ -274,7 +275,7 @@ namespace cicada
 			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
 #endif
 
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
     {

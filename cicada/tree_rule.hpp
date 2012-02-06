@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__TREE_RULE__HPP__
@@ -12,6 +12,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/symbol_vector.hpp>
 #include <cicada/feature_vector.hpp>
+#include <cicada/small_vector.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
@@ -25,7 +26,7 @@ namespace cicada
     typedef cicada::Symbol       label_type;
     typedef cicada::Vocab        vocab_type;
     
-    typedef utils::simple_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
+    typedef utils::small_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
 
     typedef boost::shared_ptr<TreeRule> rule_ptr_type;
     

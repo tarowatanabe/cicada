@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__KBEST__HPP__
@@ -13,7 +13,7 @@
 #include <cicada/semiring/traits.hpp>
 
 #include <utils/bithack.hpp>
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/b_heap.hpp>
@@ -83,7 +83,7 @@ namespace cicada
 	throw std::runtime_error("invalid hypergraph...");
     }
     
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     struct Derivation
     {

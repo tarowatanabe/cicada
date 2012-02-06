@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__REMOVE_SYMBOL__HPP__
@@ -21,6 +21,7 @@
 #include <utils/mathop.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/bithack.hpp>
+#include <utils/small_vector.hpp>
 
 namespace cicada
 {
@@ -367,7 +368,7 @@ namespace cicada
       target.initialize_distance();
     }
 
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_set_type;
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
     

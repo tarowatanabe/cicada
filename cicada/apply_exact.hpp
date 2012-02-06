@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__APPLY_EXACT__HPP__
@@ -15,7 +15,7 @@
 
 #include <google/dense_hash_map>
 
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -42,7 +42,7 @@ namespace cicada
     typedef model_type::state_type     state_type;
     typedef model_type::state_set_type state_set_type;
         
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;

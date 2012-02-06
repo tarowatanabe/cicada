@@ -57,6 +57,8 @@ namespace utils {
 
     static inline size_type capacity(const size_type& size)
     {
+      if (size <= small_threshold) return small_threshold;
+
       const size_t power2 = bithack::branch(bithack::is_power2(size),
 					    size,
 					    static_cast<size_type>(bithack::next_largest_power2(size)));
@@ -65,7 +67,7 @@ namespace utils {
       const size_t size_power2_alloc = power2 * sizeof(value_type);
       const size_t size_256          = size_t(256) / sizeof(value_type);
       
-      return bithack::branch(size_alloc > 256 || size == 0, size, bithack::branch(size_power2_alloc > 256, size_256, power2));
+      return bithack::branch(size_alloc > 256, size, bithack::branch(size_power2_alloc > 256, size_256, power2));
     }
     
     bool empty() const { return ! __size; }

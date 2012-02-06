@@ -14,7 +14,7 @@
 
 #include <google/dense_hash_set>
 
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 
@@ -80,7 +80,7 @@ namespace cicada
     
     typedef std::vector<score_type, std::allocator<score_type> > score_set_type;
 
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
     {

@@ -135,4 +135,12 @@ int main(int argc, char** argv)
   intvec2.swap(intvec3);
   
   std::cerr << "size: " << intvec2.size() << " " << intvec3.size() << std::endl;
+
+  utils::small_vector<int> intvec4(2, 666);
+  utils::small_vector<int> intvec5(2);
+
+  intvec5.clear();
+  intvec4.swap(intvec5);
+  
+  std::cerr << "size: " << intvec4.size() << " " << intvec5.size() << std::endl;
 }

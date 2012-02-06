@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__APPLY_CUBE_PRUNE__HPP__
@@ -15,7 +15,7 @@
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
 
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 
@@ -67,7 +67,7 @@ namespace cicada
     
     typedef Function function_type;
     
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
     {

@@ -27,6 +27,8 @@
 #include <utils/indexed_set.hpp>
 #include <utils/mulvector2.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 
 #include <google/dense_hash_map>
 
@@ -191,7 +193,7 @@ namespace cicada
       typedef typename tails_map_type::const_reference tails_mapped_type;
       typedef size_type tails_id_type;
       
-      typedef utils::simple_vector<id_type, std::allocator<id_type> > closure_type;
+      typedef utils::small_vector<id_type, std::allocator<id_type> > closure_type;
       typedef utils::mulvector2<id_type, std::allocator<id_type> > closure_map_type;
       typedef typename closure_map_type::const_reference closure_mapped_type;
       typedef size_type closure_id_type;

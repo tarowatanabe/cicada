@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__HYPERGRAPH__HPP__
@@ -15,7 +15,7 @@
 #include <cicada/attribute_vector.hpp>
 #include <cicada/rule.hpp>
 
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/piece.hpp>
 
@@ -58,7 +58,7 @@ namespace cicada
     
     struct Edge
     {
-      typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
+      typedef utils::small_vector<id_type, std::allocator<id_type> > node_set_type;
       typedef cicada::Rule rule_type;
       
       Edge()

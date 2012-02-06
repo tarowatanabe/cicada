@@ -28,6 +28,7 @@
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
 
 #include <google/dense_hash_map>
@@ -211,7 +212,7 @@ namespace cicada
 
 #endif
     
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
     struct Candidate
     {
