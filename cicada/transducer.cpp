@@ -18,8 +18,12 @@
 
 #include <boost/filesystem.hpp>
 
+#include "utils/hashmurmur.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/spinlock.hpp"
+#include "utils/sgi_hash_map.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 namespace cicada
 {
@@ -59,6 +63,40 @@ format: ICU's number/date format rules\n\
 ";
     return desc;
   }
+  
+  template <typename Tp>
+  struct hash_string : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const Tp& x) const
+    {
+      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+    }
+  };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<std::string, Transducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+				  std::allocator<std::pair<const std::string, Transducer::transducer_ptr_type> > > transducer_map_type;
+#else
+  typedef sgi::hash_map<std::string, Transducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			std::allocator<std::pair<const std::string, Transducer::transducer_ptr_type> > > transducer_map_type;
+#endif
+  
+  
+  namespace impl
+  {
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    
+    static mutex_type          __transducer_mutex;
+    static transducer_map_type __transducer_map;
+  };
+  
+#ifdef HAVE_TLS
+  static __thread transducer_map_type* __transducers_tls = 0;
+  static boost::thread_specific_ptr<transducer_map_type> __transducers;
+#else
+  static utils::thread_specific_ptr<transducer_map_type> __transducers;
+#endif
 
   Transducer::transducer_ptr_type Transducer::create(const utils::piece& parameter)
   {
@@ -210,14 +248,43 @@ format: ICU's number/date format rules\n\
       else
 	return transducer_ptr_type(new GrammarUnknown(signature, file));
     } else {
-      const path_type path = param.name();
-      if (path != "-" && ! boost::filesystem::exists(path))
-	throw std::runtime_error("invalid parameter: " + parameter);
       
-      if (path != "-" && boost::filesystem::is_directory(path))
-	return transducer_ptr_type(new GrammarStatic(parameter));
-      else
-	return transducer_ptr_type(new GrammarShared(parameter));
+#ifdef HAVE_TLS
+      if (! __transducers_tls) {
+	__transducers.reset(new transducer_map_type());
+	__transducers_tls = __transducers.get();
+      }
+      transducer_map_type& transducers_map = *__transducers_tls;
+#else
+      if (! __transducers.get())
+	__transducers.reset(new transducer_map_type());
+      
+      transducer_map_type& transducers_map = *__transducers;
+#endif
+      
+      transducer_map_type::iterator iter = transducers_map.find(parameter);
+      if (iter == transducers_map.end()) {	
+	impl::lock_type lock(impl::__transducer_mutex);
+	
+	transducer_map_type::iterator iter_global = impl::__transducer_map.find(parameter);
+	if (iter_global == impl::__transducer_map.end()) {
+	  const path_type path = param.name();
+	  if (path != "-" && ! boost::filesystem::exists(path))
+	    throw std::runtime_error("invalid parameter: " + parameter);
+	  
+	  transducer_ptr_type ptr;
+	  if (path != "-" && boost::filesystem::is_directory(path))
+	    ptr.reset(new GrammarStatic(parameter));
+	  else
+	    ptr.reset(new GrammarShared(parameter));
+	  
+	  iter_global = impl::__transducer_map.insert(std::make_pair(parameter, ptr)).first;
+	}
+	
+	iter = transducers_map.insert(*iter_global).first;
+      }
+      
+      return iter->second;
     }
   }
 };
