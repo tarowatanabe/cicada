@@ -17,6 +17,7 @@
 #include <cicada/parameter.hpp>
 
 #include <boost/filesystem.hpp>
+#include <boost/thread.hpp>
 
 #include "utils/hashmurmur.hpp"
 #include "utils/lexical_cast.hpp"
@@ -84,8 +85,8 @@ format: ICU's number/date format rules\n\
   
   namespace impl
   {
-    typedef utils::spinlock             mutex_type;
-    typedef mutex_type::scoped_lock     lock_type;
+    typedef boost::mutex            mutex_type;
+    typedef mutex_type::scoped_lock lock_type;
     
     static mutex_type          __transducer_mutex;
     static transducer_map_type __transducer_map;

@@ -10,6 +10,7 @@
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
+#include <boost/thread.hpp>
 
 #include "lexicon.hpp"
 #include "parameter.hpp"
@@ -21,8 +22,6 @@
 #include "utils/spinlock.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/thread_specific_ptr.hpp"
-
-#include <boost/thread.hpp>
 
 namespace cicada
 {
@@ -213,8 +212,8 @@ namespace cicada
 
   namespace impl
   {
-    typedef utils::spinlock             mutex_type;
-    typedef mutex_type::scoped_lock     lock_type;
+    typedef boost::mutex            mutex_type;
+    typedef mutex_type::scoped_lock lock_type;
     
     static mutex_type       __lexicon_mutex;
     static lexicon_map_type __lexicon_map;

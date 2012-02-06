@@ -123,8 +123,8 @@ namespace cicada
 
   namespace impl
   {
-    typedef utils::spinlock             mutex_type;
-    typedef mutex_type::scoped_lock     lock_type;
+    typedef boost::mutex            mutex_type;
+    typedef mutex_type::scoped_lock lock_type;
     
     static mutex_type     __ngram_mutex;
     static ngram_map_type __ngram_map;

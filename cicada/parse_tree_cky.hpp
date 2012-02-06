@@ -316,13 +316,6 @@ namespace cicada
 
       bool is_rule() const { return active_rule; }
       bool is_tree() const { return active_tree; }
-
-#if 0
-      score_type candidate_score() const
-      {
-	return score * (active_rule ? rule_iter->score : tree_iter->score);
-      }
-#endif
     };
     
     typedef Candidate candidate_type;
@@ -333,7 +326,6 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	//return x->candidate_score() < y->candidate_score();
 	return x->score < y->score;
       }
     };
@@ -596,8 +588,6 @@ namespace cicada
 	    //
 	    
 	    // check unary rule, and see if this edge is already inserted!
-	    
-	    //const score_type score = item->candidate_score();
 	    const score_type score = item->score;
 	    
 	    std::pair<hypergraph_type::id_type, bool> node_passive;

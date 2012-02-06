@@ -11,6 +11,7 @@
 #include <cicada/parameter.hpp>
 
 #include <boost/filesystem.hpp>
+#include <boost/thread.hpp>
 
 #include "utils/hashmurmur.hpp"
 #include "utils/lexical_cast.hpp"
@@ -61,8 +62,8 @@ fallback: fallback source-to-target transfer rule\n\
   
   namespace impl
   {
-    typedef utils::spinlock             mutex_type;
-    typedef mutex_type::scoped_lock     lock_type;
+    typedef boost::mutex            mutex_type;
+    typedef mutex_type::scoped_lock lock_type;
     
     static mutex_type               __tree_transducer_mutex;
     static tree_transducer_map_type __tree_transducer_map;
