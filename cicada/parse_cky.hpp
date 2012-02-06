@@ -603,11 +603,6 @@ namespace cicada
 	    else {
 	      std::sort(derivations.begin(), derivations.end(), less_non_terminal(non_terminals, scores));
 	      
-	      //std::cerr << "derivations: " << derivations.size() << std::endl;
-	      
-	      // construct passives!
-	      //passive_set_type passive_arcs = passives(first, last);
-	      
 	      size_t i_first = 0;
 	      for (size_t i = 1; i != derivations.size(); ++ i)
 		if (non_terminals[derivations[i_first]] != non_terminals[derivations[i]]) {
