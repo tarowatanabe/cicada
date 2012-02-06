@@ -12,6 +12,13 @@
 
 #include <boost/filesystem.hpp>
 
+#include "utils/hashmurmur.hpp"
+#include "utils/lexical_cast.hpp"
+#include "utils/compress_stream.hpp"
+#include "utils/spinlock.hpp"
+#include "utils/sgi_hash_map.hpp"
+#include "utils/thread_specific_ptr.hpp"
+
 namespace cicada
 {
   
@@ -33,7 +40,41 @@ fallback: fallback source-to-target transfer rule\n\
     return desc;
   }
 
+
+  template <typename Tp>
+  struct hash_string : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const Tp& x) const
+    {
+      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+    }
+  };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<std::string, TreeTransducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+				  std::allocator<std::pair<const std::string, TreeTransducer::transducer_ptr_type> > > tree_transducer_map_type;
+#else
+  typedef sgi::hash_map<std::string, TreeTransducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			std::allocator<std::pair<const std::string, TreeTransducer::transducer_ptr_type> > > tree_transducer_map_type;
+#endif
   
+  
+  namespace impl
+  {
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    
+    static mutex_type               __tree_transducer_mutex;
+    static tree_transducer_map_type __tree_transducer_map;
+  };
+  
+#ifdef HAVE_TLS
+  static __thread tree_transducer_map_type* __tree_transducers_tls = 0;
+  static boost::thread_specific_ptr<tree_transducer_map_type> __tree_transducers;
+#else
+  static utils::thread_specific_ptr<tree_transducer_map_type> __tree_transducers;
+#endif
+
   TreeTransducer::transducer_ptr_type TreeTransducer::create(const utils::piece& parameter)
   {
     typedef cicada::Parameter parameter_type;
@@ -55,14 +96,42 @@ fallback: fallback source-to-target transfer rule\n\
       
       return transducer_ptr_type(new TreeGrammarFallback(non_terminal));
     } else {
-      const path_type path = param.name();
-      if (path != "-" && ! boost::filesystem::exists(path))
-	throw std::runtime_error("invalid parameter: " + parameter);
+#ifdef HAVE_TLS
+      if (! __tree_transducers_tls) {
+	__tree_transducers.reset(new tree_transducer_map_type());
+	__tree_transducers_tls = __tree_transducers.get();
+      }
+      tree_transducer_map_type& tree_transducers_map = *__tree_transducers_tls;
+#else
+      if (! __tree_transducers.get())
+	__tree_transducers.reset(new tree_transducer_map_type());
       
-      if (path != "-" && boost::filesystem::is_directory(path))
-	return transducer_ptr_type(new TreeGrammarStatic(parameter));
-      else
-	return transducer_ptr_type(new TreeGrammarShared(parameter));
+      tree_transducer_map_type& tree_transducers_map = *__tree_transducers;
+#endif
+      
+      tree_transducer_map_type::iterator iter = tree_transducers_map.find(parameter);
+      if (iter == tree_transducers_map.end()) {	
+	impl::lock_type lock(impl::__tree_transducer_mutex);
+	
+	tree_transducer_map_type::iterator iter_global = impl::__tree_transducer_map.find(parameter);
+	if (iter_global == impl::__tree_transducer_map.end()) {
+	  const path_type path = param.name();
+	  if (path != "-" && ! boost::filesystem::exists(path))
+	    throw std::runtime_error("invalid parameter: " + parameter);
+	  
+	  transducer_ptr_type ptr;
+	  if (path != "-" && boost::filesystem::is_directory(path))
+	    ptr.reset(new TreeGrammarStatic(parameter));
+	  else
+	    ptr.reset(new TreeGrammarShared(parameter));
+	  
+	  iter_global = impl::__tree_transducer_map.insert(std::make_pair(parameter, ptr)).first;
+	}
+	
+	iter = tree_transducers_map.insert(*iter_global).first;
+      }
+      
+      return iter->second;
     }
   }
   
