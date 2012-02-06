@@ -97,6 +97,9 @@ namespace cicada
       node_map.set_empty_key(symbol_level_type());
     }
     
+    typedef utils::mulvector2<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_map_type;
+    typedef size_type tails_id_type;
+    
     struct Active
     {
       Active(const transducer_type::id_type& __node,
@@ -246,8 +249,11 @@ namespace cicada
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
     typedef hypergraph_type::id_type passive_type;
-    typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
-    typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
+    //typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
+    typedef utils::chart<passive_type, std::allocator<passive_type> > passive_chart_type;
+    
+    typedef utils::mulvector2<passive_type, std::allocator<passive_type> > passive_map_type;
+    typedef typename passive_map_type::const_reference passive_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
@@ -274,6 +280,7 @@ namespace cicada
     
     typedef std::vector<passive_type, std::allocator<passive_type> > derivation_set_type;
     typedef utils::mulvector2<passive_type, std::allocator<passive_type> > derivation_map_type;
+    typedef typename derivation_map_type::const_reference derivation_mapped_type;
     
     struct PruneNone
     {
@@ -309,19 +316,23 @@ namespace cicada
       passives.clear();
       non_terminals.clear();
       scores.clear();
+      
       derivation_map.clear();
-
+      passive_map.clear();
+      passive_map.reserve((lattice.size() + 1) * (((lattice.size() + 1) >> 1) + 1), utils::bithack::max(beam_size >> 1, 1));
+      
       actives.reserve(grammar.size());
       passives.reserve(lattice.size() + 1);
-    
+      
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
-      passives.resize(lattice.size() + 1);
+      passives.resize(lattice.size() + 1, passive_map.push_back());
 
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
 
       derivation_set_type derivations;
+      derivation_set_type passive_arcs;
     
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -351,7 +362,7 @@ namespace cicada
 	      active_set_type& cell = actives[table](first, last);
 	      for (size_t middle = first + 1; middle < last; ++ middle) {
 		const active_set_type&  active_arcs  = actives[table](first, middle);
-		const passive_set_type& passive_arcs = passives(middle, last);
+		const passive_set_type passive_arcs = passive_map[passives(middle, last)];
 		
 		extend_actives(transducer, active_arcs, passive_arcs, cell);
 	      }
@@ -584,16 +595,18 @@ namespace cicada
 	    }
 	  }
 	  
+	  passive_arcs.clear();
+	  
 	  if (! derivations.empty()) {
 	    if (derivations.size() == 1)
-	      passives(first, last).push_back(derivation_map.push_back(derivations.begin(), derivations.end()));
+	      passive_arcs.push_back(derivation_map.push_back(derivations.begin(), derivations.end()));
 	    else {
 	      std::sort(derivations.begin(), derivations.end(), less_non_terminal(non_terminals, scores));
 	      
 	      //std::cerr << "derivations: " << derivations.size() << std::endl;
 	      
 	      // construct passives!
-	      passive_set_type& passive_arcs = passives(first, last);
+	      //passive_set_type passive_arcs = passives(first, last);
 	      
 	      size_t i_first = 0;
 	      for (size_t i = 1; i != derivations.size(); ++ i)
@@ -611,6 +624,8 @@ namespace cicada
 		//std::cerr << "\trange: [" << i_first << ", " << derivations.size() << ")" << std::endl;
 	      }
 	    }
+
+	    passives(first, last) = passive_map.push_back(passive_arcs.begin(), passive_arcs.end());
 	    
 	    // extend root with passive items at [first, last)
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -619,7 +634,7 @@ namespace cicada
 	      if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 	      
 	      const active_set_type&  active_arcs  = actives[table](first, first);
-	      const passive_set_type& passive_arcs = passives(first, last);
+	      const passive_set_type passive_arcs = passive_map[passives(first, last)];
 	      
 	      active_set_type& cell = actives[table](first, last);
 	      
@@ -636,7 +651,7 @@ namespace cicada
       // revise this!
       
       if (unique_goal) {
-	passive_set_type& passive_arcs = passives(0, lattice.size());
+	const passive_set_type passive_arcs = passive_map[passives(0, lattice.size())];
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	  if (non_terminals[derivation_map[passive_arcs[p]].front()] == goal) {
 	    if (graph.is_valid())
@@ -648,12 +663,12 @@ namespace cicada
 	    graph.goal = derivation_map[passive_arcs[p]].front();
 	  }
       } else {
-	passive_set_type& passive_arcs = passives(0, lattice.size());
+	const passive_set_type passive_arcs = passive_map[passives(0, lattice.size())];
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	  if (non_terminals[derivation_map[passive_arcs[p]].front()] == goal) {
 	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
 	    
-	    typename derivation_map_type::const_reference ref = derivation_map[passive_arcs[p]];
+	    derivation_mapped_type ref = derivation_map[passive_arcs[p]];
 	    
 	    for (size_t i = 0; i != ref.size(); ++ i) {
 	      const passive_type& id = ref[i];
@@ -702,7 +717,7 @@ namespace cicada
 	}
 	
 	for (size_type i = 0; i != item->j.size(); ++ i) {
-	  typename derivation_map_type::const_reference ref = derivation_map[item->active->tails[i]];
+	  derivation_mapped_type ref = derivation_map[item->active->tails[i]];
 	  
 	  if (item->j[i] + 1 < static_cast<int>(ref.size())) {
 	    // make new candidate
@@ -779,8 +794,8 @@ namespace cicada
       typename active_set_type::const_iterator aiter_begin = actives.begin();
       typename active_set_type::const_iterator aiter_end   = actives.end();
       
-      passive_set_type::const_iterator piter_begin = passives.begin();
-      passive_set_type::const_iterator piter_end   = passives.end();
+      typename passive_set_type::const_iterator piter_begin = passives.begin();
+      typename passive_set_type::const_iterator piter_end   = passives.end();
 
       bool found = false;
       
@@ -793,7 +808,7 @@ namespace cicada
 	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
 	    
-	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
+	    for (typename passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	      const symbol_type& non_terminal = non_terminals[derivation_map[*piter].front()];
 	      
 	      if (label != non_terminal) {
@@ -862,7 +877,9 @@ namespace cicada
     active_chart_set_type  actives;
     passive_chart_type     passives;
     active_set_type        actives_unary;
+    
     derivation_map_type    derivation_map;
+    passive_map_type       passive_map;
 
     unary_rule_map_type   unary_map;
     node_map_type         node_map;

@@ -143,4 +143,7 @@ int main(int argc, char** argv)
   intvec4.swap(intvec5);
   
   std::cerr << "size: " << intvec4.size() << " " << intvec5.size() << std::endl;
+
+  std::cerr << "pointers: " << intvec4.begin() << " " << &(intvec4)  << std::endl;
+  std::cerr << "pointers: " << intvec5.begin() << " " << &(intvec5)  << std::endl;
 }
