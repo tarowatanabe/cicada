@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__SYMBOL_VECTOR__HPP__
@@ -13,7 +13,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/symbol_sequence.hpp>
 #include <utils/piece.hpp>
@@ -26,7 +26,7 @@ namespace cicada
     typedef cicada::Symbol  symbol_type;
     
   private:
-    typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > symbol_vector_impl_type;
+    typedef utils::small_vector<symbol_type, std::allocator<symbol_type> > symbol_vector_impl_type;
 
     typedef symbol_vector_impl_type impl_type;
     
