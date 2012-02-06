@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -18,6 +18,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
+#include "utils/small_vector.hpp"
 
 // faster ngram state representation inspired by
 //
@@ -82,7 +83,7 @@ namespace cicada
 
       struct CacheContext
       {
-	typedef utils::simple_vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > phrase_type;
+	typedef utils::small_vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > phrase_type;
 
 	ngram_state_type state;
 	phrase_type      ngram;

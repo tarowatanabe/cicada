@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "sparse_ngram.hpp"
@@ -14,6 +14,7 @@
 #include "utils/piece.hpp"
 #include "utils/indexed_trie.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/small_vector.hpp"
 
 namespace cicada
 {
@@ -58,7 +59,7 @@ namespace cicada
 
       typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > trie_type;
 
-      typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
+      typedef utils::small_vector<feature_type, std::allocator<feature_type> > feature_list_type;
       
       typedef utils::chunk_vector<feature_list_type, 4096 / sizeof(feature_list_type), std::allocator<feature_list_type> > cache_feature_type;
       typedef std::vector<bool, std::allocator<bool> >                           checked_feature_type;
@@ -69,7 +70,7 @@ namespace cicada
 
       struct CacheContext
       {
-	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	typedef utils::small_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
 	
 	phrase_type      context;
 	phrase_type      ngram;
@@ -80,7 +81,7 @@ namespace cicada
 
       struct CacheNGram
       {
-	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	typedef utils::small_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
 	
 	phrase_type      ngram;
 	feature_linear_set_type features;

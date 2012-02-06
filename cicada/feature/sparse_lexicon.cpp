@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <set>
@@ -18,6 +18,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/alloc_vector.hpp"
 #include "utils/array_power2.hpp"
+#include "utils/small_vector.hpp"
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -82,7 +83,7 @@ namespace cicada
 
       struct CacheNormalize
       {
-	typedef utils::simple_vector<word_type, std::allocator<word_type> > word_set_type;
+	typedef utils::small_vector<word_type, std::allocator<word_type> > word_set_type;
 	
 	word_type::id_type word;
 	word_set_type      normalized;
