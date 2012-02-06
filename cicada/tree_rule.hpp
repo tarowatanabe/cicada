@@ -12,8 +12,8 @@
 #include <cicada/vocab.hpp>
 #include <cicada/symbol_vector.hpp>
 #include <cicada/feature_vector.hpp>
-#include <cicada/small_vector.hpp>
 
+#include <utils/simple_vector.hpp>
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
 
@@ -26,7 +26,7 @@ namespace cicada
     typedef cicada::Symbol       label_type;
     typedef cicada::Vocab        vocab_type;
     
-    typedef utils::small_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
+    typedef utils::simple_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
 
     typedef boost::shared_ptr<TreeRule> rule_ptr_type;
     
