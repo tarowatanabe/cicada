@@ -358,7 +358,10 @@ namespace cicada
 	tails_map.clear();
 	tails_map.push_back();
 	
-	closure_map.clear();
+	// symbol_map.clear();
+	// closure_map.clear();
+	// unaries.clear();
+	// unaries_computed.clear();
 	
 	goal_id = id_map(goal);
 	
@@ -518,6 +521,8 @@ namespace cicada
 	    // check pruning!
 	    if (pruner(first, last)) continue;
 
+	    //std::cerr << "span: " << first << ".." << last << std::endl;
+
 	    score_pair_set_type& scores_inside = inside_outside(first, last);
 
 	    scores_inside.reserve(symbol_map.size());
@@ -645,7 +650,7 @@ namespace cicada
 	      
 	      passive_unary.reserve(symbol_map.size());
 	      
-	      id_type id_closure_max = 0;
+	      //id_type id_closure_max = 0;
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
@@ -670,12 +675,14 @@ namespace cicada
 		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->closure, citer->score));
 		    scores_inside[citer->id].final_inside = std::max(scores_inside[citer->id].final_inside, score_tail * citer->score);
 		    
-		    id_closure_max = utils::bithack::max(id_closure_max, closure_map[citer->closure].back());
+		    //id_closure_max = utils::bithack::max(id_closure_max, closure_map[citer->closure].back());
 		  }
 		}
 	      
+#if 0
 	      if (id_closure_max >= static_cast<id_type>(scores_inside.size()))
 		scores_inside.resize(id_closure_max + 1);
+#endif
 	      
 	      //passive_unary_set_type(passive_unary).swap(passive_unary);
 	    }
@@ -803,7 +810,7 @@ namespace cicada
 	    std::cerr << "score: "<< citer->second.score << std::endl;
 #endif
 
-	    std::sort(citer->second.closure.begin(), citer->second.closure.end());
+	    //std::sort(citer->second.closure.begin(), citer->second.closure.end());
 	    
 	    unaries[child].push_back(unary_type(citer->first, citer->second.score, closure_map.push_back(citer->second.closure.begin(), citer->second.closure.end())));
 	  }
