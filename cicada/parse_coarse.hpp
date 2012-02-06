@@ -645,6 +645,8 @@ namespace cicada
 	      
 	      passive_unary.reserve(symbol_map.size());
 	      
+	      id_type id_closure_max = 0;
+	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
 		  // child to parent...
@@ -667,8 +669,13 @@ namespace cicada
 		    
 		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->closure, citer->score));
 		    scores_inside[citer->id].final_inside = std::max(scores_inside[citer->id].final_inside, score_tail * citer->score);
+		    
+		    id_closure_max = utils::bithack::max(id_closure_max, closure_map[citer->closure].back());
 		  }
 		}
+	      
+	      if (id_closure_max >= static_cast<id_type>(scores_inside.size()))
+		scores_inside.resize(id_closure_max + 1);
 	      
 	      //passive_unary_set_type(passive_unary).swap(passive_unary);
 	    }
@@ -786,8 +793,8 @@ namespace cicada
 	  unaries[child].clear();
 	  unaries[child].reserve(closure.size());
 	  
-	  typename closure_set_type::const_iterator citer_end = closure.end();
-	  for (typename closure_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+	  typename closure_set_type::iterator citer_end = closure.end();
+	  for (typename closure_set_type::iterator citer = closure.begin(); citer != citer_end; ++ citer) {
 	    // convert closure to closure-id
 
 #if 0
@@ -795,6 +802,8 @@ namespace cicada
 	    std::copy(citer->second.closure.begin(), citer->second.closure.end(), std::ostream_iterator<id_type>(std::cerr, " "));
 	    std::cerr << "score: "<< citer->second.score << std::endl;
 #endif
+
+	    std::sort(citer->second.closure.begin(), citer->second.closure.end());
 	    
 	    unaries[child].push_back(unary_type(citer->first, citer->second.score, closure_map.push_back(citer->second.closure.begin(), citer->second.closure.end())));
 	  }
