@@ -779,6 +779,12 @@ struct OptimizeXBLEU
 		    ngram_set_type& __ngrams,
 		    count_set_type& __counts)
 	: index(__index), ngrams(__ngrams), counts(__counts) {}
+
+      template <typename Edge, typename Weight, typename Counts>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
+      {
+	
+      }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
@@ -817,6 +823,22 @@ struct OptimizeXBLEU
 	  gradients_matched(__gradients_matched),
 	  gradients_hypo(__gradients_hypo)
       {}
+
+      template <typename Edge, typename Weight, typename Counts>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
+      {
+	for (int n = 1; n <= order; ++ n) 
+	  if (hypo[n] > weight_type()) {
+	    feature_set_type::const_iterator fiter_end = edge.features.end();
+	    for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	      if (fiter->second != 0.0) {
+		const weight_type value(fiter->second);
+		
+		gradients_matched[n][fiter->first] -= value * weight * matched[n];
+		gradients_hypo[n][fiter->first]    -= value * weight * hypo[n];
+	      }
+	  }
+      }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
@@ -832,11 +854,11 @@ struct OptimizeXBLEU
 	
 	if (ngrams[id].empty())
 	  throw std::runtime_error("no ngram storage?");
-
+	
 	const size_type order = ngrams[id].size();
 	
-	const weight_type scale_matched = weight * counts[id].mu_prime - weight * matched[order];
-	const weight_type scale_hypo    = weight - weight * hypo[order];
+	const weight_type scale_matched = weight * counts[id].mu_prime;
+	const weight_type scale_hypo    = weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -1017,11 +1039,21 @@ struct OptimizeXBLEU
       reduce_weights(task.g_matched[n]);
       reduce_weights(task.g_hypo[n]);
     }
-        
+    
+    // smoothing...
+    {
+      double smoothing = 0.5;
+      for (int n = 1; n <= order; ++ n) {
+	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
+	  task.c_matched[n] = smoothing;
+	smoothing *= 0.5;
+      }
+    }
+    
     // compute P
     double P = 0.0;
     for (int n = 1; n <= order; ++ n)
-      if (task.c_matched[n] > 0.0 && task.c_hypo[n] > 0.0)
+      if (task.c_hypo[n] > 0.0)
 	P += (1.0 / order) * (utils::mathop::log(task.c_matched[n]) - utils::mathop::log(task.c_hypo[n]));
     
     // compute C and B
@@ -1029,30 +1061,33 @@ struct OptimizeXBLEU
     const double B = task.brevity_penalty(1.0 - C);
     
     // for computing g...
-    const double gamma_exp_P = scale * utils::mathop::exp(P);
+    const double exp_P = utils::mathop::exp(P);
+    const double gamma_exp_P = scale * exp_P;
     const double C_dC        = C * task.derivative_brevity_penalty(1.0 - C);
     
     // compute g..
     // since we minimiz by the LBFGS, we need to adjust the gradient... thus, we will factor negative values...
     std::fill(g, g + size, 0.0);
-    for (int n = 1; n <= order; ++ n) {
-      const double factor_matched = - (task.c_matched[n] > 0.0 ? (gamma_exp_P * B / order) / task.c_matched[n] : 0.0);
-      const double factor_hypo    = - (task.c_hypo[n] > 0.0 ? (gamma_exp_P * B / order) / task.c_hypo[n] : 0.0);
-      
-      for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
-	g[i] += factor_matched * task.g_matched[n][i];
-	g[i] -= factor_hypo * task.g_hypo[n][i];
+    for (int n = 1; n <= order; ++ n) 
+      if (task.c_hypo[n] > 0.0) {
+	const double factor_matched = - (gamma_exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = - (gamma_exp_P * B / order) / task.c_hypo[n];
+	
+	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	  g[i] += factor_matched * task.g_matched[n][i];
+	  g[i] -= factor_hypo * task.g_hypo[n][i];
+	}
       }
-    }
     
-    {
-      const double factor = - C_dC / task.c_hypo[1];
+    if (task.c_hypo[1] > 0.0) {
+      // I think the missed exp(P) is a bug in Rosti et al. (2011)
+      const double factor = - exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
     
     // xBLEU...
-    const double objective_bleu = utils::mathop::exp(P) * B;
+    const double objective_bleu = exp_P * B;
     
     // we need to minimize negative bleu...
     double objective = - objective_bleu;

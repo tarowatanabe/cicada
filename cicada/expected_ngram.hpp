@@ -123,6 +123,8 @@ namespace cicada
 	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    weight *= inside[*niter];
+
+	  op(edge, weight, counts);
 	  
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);
@@ -351,6 +353,12 @@ namespace cicada
     template <typename Counts>
     struct expected_ngram_op
     {
+      template <typename Edge, typename Weight>
+      void operator()(const Edge& edge, const Weight& weight, Counts& counts) const
+      {
+	// no op
+      }
+
       template <typename Edge, typename Weight, typename Iterator>
       void operator()(const Edge& edge, const Weight& weight, Counts& counts, Iterator first, Iterator last) const
       {
