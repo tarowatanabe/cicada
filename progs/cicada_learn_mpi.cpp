@@ -14,9 +14,12 @@
 #include <deque>
 
 #include "cicada_impl.hpp"
+#include "cicada_text_impl.hpp"
 
 #include "cicada/prune.hpp"
 #include "cicada/operation/functional.hpp"
+#include "cicada/expected_ngram.hpp"
+#include "cicada/ngram_count_set.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -32,6 +35,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -40,6 +44,7 @@
 #include <boost/thread.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/random.hpp>
+#include <boost/math/special_functions/expm1.hpp>
 
 #include "lbfgs.h"
 
@@ -49,6 +54,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 path_set_type forest_path;
 path_set_type intersected_path;
+path_set_type refset_path;
 path_type weights_path;
 path_set_type weights_history_path;
 path_type output_path = "-";
@@ -58,19 +64,27 @@ path_type bound_lower_file;
 path_type bound_upper_file;
 
 int iteration = 100;
+
 bool learn_lbfgs = false;
 bool learn_sgd = false;
+bool learn_xbleu = false;
 bool learn_mira = false;
 bool learn_nherd = false;
 bool learn_arow = false;
 bool learn_cw = false;
 bool learn_pegasos = false;
+
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double scale = 1.0;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+
+// scorers
+std::string scorer_name = "bleu:order=4,exact=true";
+bool scorer_list = false;
 
 bool unite_forest = false;
 
@@ -94,8 +108,15 @@ template <typename Optimizer>
 struct OptimizeOnline;
 template <typename Optimizer>
 struct OptimizeOnlineMargin;
+struct OptimizeXBLEU;
 struct OptimizeLBFGS;
 
+void read_refset(const path_set_type& files,
+		 scorer_document_type& scorers);
+void read_forest(const path_set_type& forest_path,
+		 const scorer_document_type& scorers,
+		 hypergraph_set_type& forest,
+		 scorer_document_type& scorers_forest);
 void read_forest(const path_set_type& forest_path,
 		 const path_set_type& intersected_path,
 		 hypergraph_set_type& graphs_forest,
@@ -115,9 +136,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd + learn_xbleu > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd + learn_xbleu == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -130,9 +151,11 @@ int main(int argc, char ** argv)
     
     if (forest_path.empty())
       throw std::runtime_error("no forest?");
-    if (intersected_path.empty())
+    if (! learn_xbleu && intersected_path.empty())
       throw std::runtime_error("no intersected forest?");
-
+    if (learn_xbleu && refset_path.empty())
+      throw std::runtime_error("no reference translations?");
+    
     if (! bound_lower_file.empty())
       if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
 	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
@@ -141,11 +164,24 @@ int main(int argc, char ** argv)
       if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
 	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
 
+    scorer_document_type scorers(scorer_name);
+    if (! refset_path.empty())
+      read_refset(refset_path, scorers);
+    
     hypergraph_set_type graphs_forest;
     hypergraph_set_type graphs_intersected;
-        
-    read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
-
+    
+    if (! intersected_path.empty())
+      read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
+    else {
+      scorer_document_type scorers_forest(scorer_name);
+      
+      read_forest(forest_path, scorers, graphs_forest, scorers_forest);
+      
+      scorers_forest.swap(scorers);
+    }
+    
+    
     weight_set_type weights;
     if (mpi_rank ==0 && ! weights_path.empty()) {
       if (! boost::filesystem::exists(weights_path))
@@ -631,6 +667,103 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
     return 0.0;
   }
 }
+
+struct OptimizeXBLEU
+{
+  OptimizeXBLEU(const hypergraph_set_type& __forests,
+		const scorer_document_type& __scorers,
+		weight_set_type& __weights,
+		size_t __instances)
+    : forests(__forests), scorers(__scorers), weights(__weights), instances(__instances) {}
+
+  struct Task
+  {
+    
+    double brevity_penalty(const double x) const
+    {
+      using namespace boost::math::policies;
+      typedef policy<domain_error<errno_on_error>,
+		     pole_error<errno_on_error>,
+		     overflow_error<errno_on_error>,
+		     rounding_error<errno_on_error>,
+		     evaluation_error<errno_on_error> > policy_type;
+      
+      // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+      return boost::math::expm1(x) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+    }
+
+    double derivative_brevity_penalty(const double x) const
+    {
+      const double expx     = std::exp(x);
+      const double exp1000x = std::exp(1000.0 * x);
+      
+      //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
+      return (expx - boost::math::expm1(x) * 1000.0 * exp1000x / (1.0 + exp1000x)) / (1.0 + exp1000x);
+    }
+    
+    double clip_count(const double x, const double clip) const
+    {
+      return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+    }
+    
+    double derivative_clip_count(const double x, const double clip) const
+    {
+      const double exp1000x = std::exp(1000.0 * (x - clip));
+      
+      //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
+      return (1.0 - (x - clip) * (1000.0 * exp1000x) / (1.0 + exp1000x)) / (1.0 + exp1000x);
+    }
+
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
+    
+    typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+    typedef cicada::NGramCountSet ngram_counts_type;
+
+
+    Task(const hypergraph_set_type& __forests,
+	 const scorer_document_type& __scorers,
+	 const weight_set_type& __weights)
+      : forests(__forests), scorers(__scorers), weights(__weights), objective(0.0), g() {}
+    
+    void operator()()
+    {
+      ngram_counts_type ngram_counts;
+      
+      objective = 0.0;
+      g.clear();
+      
+      for (size_t i = 0; i != forests.size(); ++ i) {
+	const hypergraph_type& forest = forests[i];
+	
+	if (! forest.is_valid()) continue;
+	
+	// here, we will implement forest xBLEU...
+	
+	// collect expected ngrams
+	ngram_counts.clear();
+	cicada::expected_ngram(forest, cicada::operation::weight_scaled_function<weight_type>(weights, scale), ngram_counts, 4);
+	
+	
+      }
+    }
+    
+    const hypergraph_set_type& forests;
+    const scorer_document_type& scorers;
+    const weight_set_type& weights;
+    
+    double          objective;
+    weight_set_type g;
+  };
+  
+  
+
+  const hypergraph_set_type& forests;
+  const scorer_document_type& scorers;
+  weight_set_type& weights;
+  size_t instances;
+};
   
 
 struct OptimizeLBFGS
@@ -939,6 +1072,144 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   }
 }
 
+void read_refset(const path_set_type& files, scorer_document_type& scorers)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
+    
+  scorers.clear();
+
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
+      if (id >= static_cast<int>(scorers.size()))
+	scorers.resize(id + 1);
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+      
+      scorers[id]->insert(id_sentence.second);
+    }
+  }
+}
+
+void read_forest(const path_set_type& forest_path,
+		 const scorer_document_type& scorers,
+		 hypergraph_set_type& forests,
+		 scorer_document_type& scorers_forest)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (unite_forest) {
+    size_t id;
+    
+    std::string line;
+    hypergraph_type graph;
+    
+    for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
+    
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading forest: " << piter->string() << std::endl;
+      
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest = (*piter) / file_name;
+      
+	if (! boost::filesystem::exists(path_forest)) break;
+	
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	
+	if (id >= forests.size())
+	  forests.resize(id + 1);
+	
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+	
+	forests[id].unite(graph);
+      }
+    }
+
+    if (forests.size() > scorers.size())
+      throw std::runtime_error("invalid scorers");
+
+    scorers_forest = scorers;
+  } else {
+    size_t id;
+    
+    std::string line;
+    
+    for (size_t pos = 0; pos != forest_path.size(); ++ pos) {
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading forest: " << forest_path[pos].string() << std::endl;
+      
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest = forest_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	
+	forests.push_back(hypergraph_type());
+	
+	if (id >= scorers.size())
+	  throw std::runtime_error("invalid scorers");
+	
+	scorers_forest.push_back(scorers[id]);
+	
+	if (! forests.back().assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+      }
+    }
+  }
+}
+
 
 void read_forest(const path_set_type& forest_path,
 		 const path_set_type& intersected_path,
@@ -1225,6 +1496,7 @@ void options(int argc, char** argv)
     ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),      "forest path(s)")
     ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(), "intersected forest path(s)")
     ("oracle",      po::value<path_set_type>(&intersected_path)->multitoken(), "oracle forest path(s) (an alias for --intersected)")
+    ("refset",      po::value<path_set_type>(&refset_path)->multitoken(),      "reference translation(s)")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("weights-history", po::value<path_set_type>(&weights_history_path)->multitoken(), "parameter history")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
@@ -1238,6 +1510,7 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")
     ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU algorithm")
     ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
     ("learn-nherd",   po::bool_switch(&learn_nherd),   "online NHERD algorithm")
     ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
@@ -1246,8 +1519,12 @@ void options(int argc, char** argv)
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
+    ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
+    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
 
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
+    
     ("unite",    po::bool_switch(&unite_forest), "unite forest sharing the same id")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")

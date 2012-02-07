@@ -222,6 +222,39 @@ namespace cicada
 	
       return score_ptr_type(bleu.release());
     }
+    
+    BleuScorer::count_type BleuScorer::reference_length(const double& length) const
+    {
+      int reference_size = 0;
+      double min_diff = boost::numeric::bounds<double>::highest();
+      
+      for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
+	const double diff = ::fabs(*siter - length);
+
+	if (diff < min_diff) {
+	  min_diff = diff;
+	  reference_size = *siter;
+	} else if (diff == min_diff)
+	  reference_size = utils::bithack::min(reference_size, *siter);
+      }
+      
+      return reference_size;
+    }
+    
+    BleuScorer::count_type BleuScorer::find(const SymbolVector& ngram) const
+    {
+      typedef SymbolVector ngram_type;
+      
+      ngram_set_type::id_type id = ngrams.root();
+      ngram_type::const_iterator iter_end = ngram.end();
+      for (ngram_type::const_iterator iter = ngram.begin(); iter != iter_end; ++ iter) {
+	id = ngrams.find(id, *iter);
+	
+	if (ngrams.is_root(id)) break;
+      }
+      
+      return (ngrams.is_root(id) ? 0.0 : ngrams[id]);
+    }
 
   };
 };

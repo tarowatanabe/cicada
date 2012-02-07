@@ -15,6 +15,7 @@
 #include <utility>
 
 #include <cicada/eval/score.hpp>
+#include <cicada/symbol_vector.hpp>
 
 #include <utils/compact_trie_dense.hpp>
 #include <utils/simple_vector.hpp>
@@ -175,8 +176,12 @@ namespace cicada
       }
       
       void insert(const sentence_type& __sentence);
-
+      
       score_ptr_type score(const sentence_type& __sentence) const;
+      
+      // bleu specific interface...
+      count_type reference_length(const double& length) const;
+      count_type find(const SymbolVector& ngram) const;
 
     private:
       ngram_set_type ngrams;

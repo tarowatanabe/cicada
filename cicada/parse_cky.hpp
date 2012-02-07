@@ -687,6 +687,13 @@ namespace cicada
       // we will sort to remove unreachable nodes......
       if (graph.is_valid())
 	graph.topologically_sort();
+      
+      // clear unused structures
+      actives.clear();
+      passives.clear();
+      non_terminals.clear();
+      scores.clear();
+      rule_tables.clear();
     }
 
   private:

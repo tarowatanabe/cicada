@@ -731,7 +731,6 @@ namespace cicada
       
       const unary_set_type& unary_closure(const id_type& child)
       {
-	
 	//
 	// given this child state, compute closure...
 	// we do not allow cycle, and keep only max-rules
@@ -802,20 +801,24 @@ namespace cicada
 	  
 	  typename closure_set_type::iterator citer_end = closure.end();
 	  for (typename closure_set_type::iterator citer = closure.begin(); citer != citer_end; ++ citer) {
-	    // convert closure to closure-id
-
 #if 0
 	    std::cerr << "closure: " << child << " " << citer->first << " seq: ";
 	    std::copy(citer->second.closure.begin(), citer->second.closure.end(), std::ostream_iterator<id_type>(std::cerr, " "));
 	    std::cerr << "score: "<< citer->second.score << std::endl;
 #endif
-
+	    
 	    //std::sort(citer->second.closure.begin(), citer->second.closure.end());
 	    
 	    unaries[child].push_back(unary_type(citer->first, citer->second.score, closure_map.push_back(citer->second.closure.begin(), citer->second.closure.end())));
 	  }
+	  
 	  std::sort(unaries[child].begin(), unaries[child].end(), less_id<unary_type>());
+	  
+	  // clear unused closures
+	  closure.clear();
+	  closure_next.clear();
 	}
+	
 	return unaries[child];
       }
       

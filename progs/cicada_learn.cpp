@@ -38,6 +38,8 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 path_set_type forest_path;
 path_set_type intersected_path;
+path_set_type refset_path;
+
 path_type weights_path;
 path_set_type weights_history_path;
 path_type output_path = "-";
@@ -47,15 +49,23 @@ path_type bound_lower_file;
 path_type bound_upper_file;
 
 int iteration = 100;
+
 bool learn_sgd = false;
 bool learn_lbfgs = false;
 bool learn_mira = false;
+bool learn_xbleu = false;
+
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double scale = 1.0;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+
+// scorers
+std::string scorer_name = "bleu:order=4,exact=true";
+bool scorer_list = false;
 
 bool unite_forest = false;
 
@@ -106,8 +116,10 @@ int main(int argc, char ** argv)
 
     if (forest_path.empty())
       throw std::runtime_error("no forest?");
-    if (intersected_path.empty())
+    if (! learn_xbleu && intersected_path.empty())
       throw std::runtime_error("no intersected forest?");
+    if (learn_xbleu && refset_path.empty())
+      throw std::runtime_error("no reference translations?");
 
     if (! bound_lower_file.empty())
       if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
@@ -122,7 +134,8 @@ int main(int argc, char ** argv)
     hypergraph_set_type graphs_forest;
     hypergraph_set_type graphs_intersected;
     
-    read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
+    if (! intersected_path.empty())
+      read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -846,6 +859,7 @@ void options(int argc, char** argv)
     ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),      "forest path")
     ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(), "intersected forest path")
     ("oracle",      po::value<path_set_type>(&intersected_path)->multitoken(), "oracle forest path(s) (an alias for --intersected)")
+    ("refset",      po::value<path_set_type>(&refset_path)->multitoken(),      "reference translation(s)")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("weights-history", po::value<path_set_type>(&weights_history_path)->multitoken(), "parameter history")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
@@ -859,10 +873,16 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
+    ("learn-xbleu",  po::bool_switch(&learn_xbleu),  "xBLEU algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
+    
+    ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
+    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
+    
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
     
     ("unite",    po::bool_switch(&unite_forest), "unite forest sharing the same id")
 

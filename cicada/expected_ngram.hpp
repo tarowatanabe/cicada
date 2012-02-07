@@ -20,7 +20,7 @@
 namespace cicada
 {
   
-  template <typename Function, typename Counts>
+  template <typename Function, typename Counts, typename Op>
   class ExpectedNGram
   {
   public:
@@ -38,6 +38,8 @@ namespace cicada
     
     typedef Function function_type;
     typedef typename function_type::value_type weight_type;
+    
+    typedef Op operation_type;
 
     typedef symbol_type word_type;
 
@@ -76,15 +78,14 @@ namespace cicada
     
   public:
     ExpectedNGram(Function __function,
+		  Op __op,
 		  const int __order,
 		  const bool __bos_eos=false)
       : function(__function),
+	op(__op),
 	order(__order),
 	bos_eos(__bos_eos) {}
-
     
-    
-
     void operator()(const hypergraph_type& graph, Counts& counts)
     {
       node_map.clear();
@@ -310,8 +311,10 @@ namespace cicada
       first = std::max(iter - context_size, first);
 	
       for (/**/; first != iter; ++ first)
-	for (Iterator iter2 = iter; iter2 != std::min(first + order, last); ++ iter2)
-	  counts[typename Counts::key_type(first, iter2 + 1)] += weight;
+	for (Iterator iter2 = iter; iter2 != std::min(first + order, last); ++ iter2) 
+	  op(counts, first, iter2 + 1, weight);
+      
+	  //counts[typename Counts::key_type(first, iter2 + 1)] += weight;
     }
 
 
@@ -320,7 +323,9 @@ namespace cicada
     {
       for (/**/; first != last; ++ first)
 	for (Iterator iter = first; iter != std::min(first + order, last); ++ iter)
-	  counts[typename Counts::key_type(first, iter + 1)] += weight;
+	  op(counts, first, iter + 1, weight);
+      
+	  //counts[typename Counts::key_type(first, iter + 1)] += weight;
     }
     
   private:
@@ -333,9 +338,23 @@ namespace cicada
 
     buffer_type buffer;
     
-    function_type function;
+    function_type  function;
+    operation_type op;
     int  order;
     bool bos_eos;
+  };
+  
+  namespace impl
+  {
+    template <typename Counts>
+    struct expected_ngram_op
+    {
+      template <typename Iterator, typename Weight>
+      void operator()(Counts& counts, Iterator first, Iterator last, const Weight& weight) const
+      {
+	counts[typename Counts::key_type(first, last)] += weight;
+      }
+    };
   };
   
   
@@ -343,7 +362,16 @@ namespace cicada
   inline
   void expected_ngram(const HyperGraph& graph, Function function, Counts& counts, const int order, const bool bos_eos=false)
   {
-    ExpectedNGram<Function, Counts> __expected(function, order, bos_eos);
+    ExpectedNGram<Function, Counts, impl::expected_ngram_op<Counts> > __expected(function, impl::expected_ngram_op<Counts>(), order, bos_eos);
+    
+    __expected(graph, counts);
+  }
+
+  template <typename Function, typename Counts, typename Operation>
+  inline
+  void expected_ngram(const HyperGraph& graph, Function function, Operation op, Counts& counts, const int order, const bool bos_eos=false)
+  {
+    ExpectedNGram<Function, Counts, Operation > __expected(function, op, order, bos_eos);
     
     __expected(graph, counts);
   }

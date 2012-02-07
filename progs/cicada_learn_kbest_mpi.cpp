@@ -35,6 +35,7 @@
 #include "utils/random_seed.hpp"
 #include "utils/map_file.hpp"
 #include "utils/tempfile.hpp"
+#include "utils/mulvector2.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -3329,6 +3330,29 @@ double optimize_cp(const scorer_document_type& scorers,
   
   return objective_master_min;
 }
+
+struct OptimizeExpBleu
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  
+  typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > sample_set_type;
+  
+  
+  struct Task
+  {
+    void operator()()
+    {
+      // for samples
+      //   compute p()
+      
+      
+      
+    }
+  };
+};
 
 struct OptimizeLBFGS
 {

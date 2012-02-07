@@ -20,6 +20,7 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/dot_product.hpp"
 #include "cicada/semiring.hpp"
+#include "cicada/eval.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -29,6 +30,9 @@ typedef cicada::Sentence        sentence_type;
 typedef cicada::Lattice         lattice_type;
 typedef cicada::Rule            rule_type;
 typedef cicada::HyperGraph      hypergraph_type;
+
+typedef cicada::eval::Scorer         scorer_type;
+typedef cicada::eval::ScorerDocument scorer_document_type;
 
 typedef hypergraph_type::feature_set_type    feature_set_type;
 typedef feature_set_type::feature_type feature_type;
