@@ -19,7 +19,7 @@
 #include "cicada/prune.hpp"
 #include "cicada/operation/functional.hpp"
 #include "cicada/expected_ngram.hpp"
-#include "cicada/ngram_count_set.hpp"
+#include "cicada/symbol_vector.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -36,6 +36,8 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/mathop.hpp"
+#include "utils/compact_trie_dense.hpp"
+#include "utils/indexed_trie.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -49,7 +51,6 @@
 #include "lbfgs.h"
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 path_set_type forest_path;
@@ -78,6 +79,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 double scale = 1.0;
+int order = 4;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
@@ -98,6 +100,11 @@ template <typename Optimize>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
 		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights);
+template <typename Optimize>
+double optimize_xbleu(const hypergraph_set_type& forests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights);
+
 template <typename Optimize, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
@@ -155,6 +162,8 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no intersected forest?");
     if (learn_xbleu && refset_path.empty())
       throw std::runtime_error("no reference translations?");
+    if (learn_xbleu && order <= 0)
+      throw std::runtime_error("invalid ngram order");
     
     if (! bound_lower_file.empty())
       if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
@@ -237,6 +246,8 @@ int main(int argc, char ** argv)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(graphs_forest, graphs_intersected, weights, generator);
     else if (learn_nherd)
       objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(graphs_forest, graphs_intersected, weights, generator);
+    else if (learn_xbleu)
+      objective = optimize_xbleu<OptimizeXBLEU>(graphs_forest, scorers, weights);
     else
       objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
 
@@ -670,11 +681,34 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 
 struct OptimizeXBLEU
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   OptimizeXBLEU(const hypergraph_set_type& __forests,
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
 		size_t __instances)
     : forests(__forests), scorers(__scorers), weights(__weights), instances(__instances) {}
+
+  double operator()()
+  {
+    lbfgs_parameter_t param;
+    lbfgs_parameter_init(&param);
+    
+    if (regularize_l1) {
+      param.orthantwise_c = C;
+      param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+    } else
+      param.orthantwise_c = 0.0;
+    
+    param.max_iterations = iteration;
+    
+    double objective = 0.0;
+    
+    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    
+    return objective;
+  }
 
   struct Task
   {
@@ -715,37 +749,217 @@ struct OptimizeXBLEU
     }
 
     typedef cicada::semiring::Log<double> weight_type;
-    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
-    
+    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef std::vector<gradient_type, std::allocator<gradient_type> > gradients_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
-    typedef cicada::NGramCountSet ngram_counts_type;
 
+    
+    typedef cicada::Symbol       word_type;
+    typedef cicada::SymbolVector ngram_type;
+    
+    struct Count
+    {
+      weight_type c;
+      weight_type mu_prime;
+      
+      Count() : c(), mu_prime() {}
+    };
+    typedef Count count_type;
+    typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
+    typedef std::vector<ngram_type, std::allocator<ngram_type> > ngram_set_type;
+    
+    typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > index_set_type;
+
+    typedef std::vector<double, std::allocator<double> > ngram_counts_type;
+    typedef std::vector<weight_set_type, std::allocator<weight_set_type> > feature_counts_type;
+    
+    struct CollectCounts
+    {
+      CollectCounts(index_set_type& __index,
+		    ngram_set_type& __ngrams,
+		    count_set_type& __counts)
+	: index(__index), ngrams(__ngrams), counts(__counts) {}
+      
+      template <typename Edge, typename Weight, typename Counts, typename Iterator>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
+      {
+	if (first == last) return;
+	
+	index_set_type::id_type id = index.root();
+	for (Iterator iter = first; iter != last; ++ iter)
+	  id = index.push(id, *iter);
+	
+	if (id >= ngrams.size())
+	  ngrams.resize(id + 1);
+	if (id >= counts.size())
+	  counts.resize(id + 1);
+	
+	counts[id].c += weight;
+	if (ngrams[id].empty())
+	  ngrams[id] = ngram_type(first, last);
+      }
+      
+      index_set_type& index;
+      ngram_set_type& ngrams;
+      count_set_type& counts;
+    };
+    
+    struct CollectExpectation
+    {
+      CollectExpectation(const index_set_type& __index,
+			 const ngram_set_type& __ngrams,
+			 const count_set_type& __counts,
+			 const weights_type& __matched,
+			 const weights_type& __hypo,
+			 gradients_type& __gradients_matched,
+			 gradients_type& __gradients_hypo)
+	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
+	  gradients_matched(__gradients_matched),
+	  gradients_hypo(__gradients_hypo)
+      {}
+      
+      template <typename Edge, typename Weight, typename Counts, typename Iterator>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
+      {
+	if (first == last) return;
+	
+	index_set_type::id_type id = index.root();
+	for (Iterator iter = first; iter != last; ++ iter) {
+	  id = index.find(id, *iter);
+	  if (index.is_root(id))
+	    throw std::runtime_error("no ngram?");
+	}
+	
+	if (ngrams[id].empty())
+	  throw std::runtime_error("no ngram storage?");
+
+	const size_type order = ngrams[id].size();
+	
+	const weight_type scale_matched = weight * counts[id].mu_prime - weight * matched[order];
+	const weight_type scale_hypo    = weight - weight * hypo[order];
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  if (fiter->second != 0.0) {
+	    const weight_type value(fiter->second);
+	    
+	    gradients_matched[order][fiter->first] += value * scale_matched;
+	    gradients_hypo[order][fiter->first]    += value * scale_hypo;
+	  }
+      }
+      
+      const index_set_type& index;
+      const ngram_set_type& ngrams;
+      const count_set_type& counts;
+      const weights_type& matched;
+      const weights_type& hypo;
+      gradients_type& gradients_matched;
+      gradients_type& gradients_hypo;
+    };
 
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
 	 const weight_set_type& __weights)
-      : forests(__forests), scorers(__scorers), weights(__weights), objective(0.0), g() {}
+      : forests(__forests), scorers(__scorers), weights(__weights),
+	c_matched(order + 1),
+	c_hypo(order + 1),
+	g_matched(order + 1),
+	g_hypo(order + 1),
+	r(0) {}
     
     void operator()()
     {
-      ngram_counts_type ngram_counts;
+      const word_type __tmp;
       
-      objective = 0.0;
-      g.clear();
+      index_set_type index;
+      ngram_set_type ngrams;
+      count_set_type counts;
+      weights_type   matched(order + 1);
+      weights_type   hypo(order + 1);
       
-      for (size_t i = 0; i != forests.size(); ++ i) {
-	const hypergraph_type& forest = forests[i];
+      weights_type   counts_matched(order + 1);
+      weights_type   counts_hypo(order + 1);
+      gradients_type gradients_matched(order + 1);
+      gradients_type gradients_hypo(order + 1);
+      
+      for (size_t n = 0; n != g_matched.size(); ++ n) {
+	gradients_matched[n].clear();
+	gradients_hypo[n].clear();
+	
+	g_matched[n].clear();
+	g_hypo[n].clear();
+      }
+      
+      std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
+      std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
+      std::fill(c_matched.begin(), c_matched.end(), 0.0);
+      std::fill(c_hypo.begin(), c_hypo.end(), 0.0);
+      r = 0.0;
+      
+      for (size_t id = 0; id != forests.size(); ++ id) {
+	const hypergraph_type& forest = forests[id];
 	
 	if (! forest.is_valid()) continue;
 	
+	const cicada::eval::BleuScorer* scorer = dynamic_cast<const cicada::eval::BleuScorer*>(scorers[id].get());
+	
+	if (! scorer)
+	  throw std::runtime_error("we do not have bleu scorer...");
+	
 	// here, we will implement forest xBLEU...
 	
-	// collect expected ngrams
-	ngram_counts.clear();
-	cicada::expected_ngram(forest, cicada::operation::weight_scaled_function<weight_type>(weights, scale), ngram_counts, 4);
+	// first, collect expected ngrams
+	index.clear();
+	counts.clear();
+	ngrams.clear();
 	
+	cicada::expected_ngram(forest,
+			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			       CollectCounts(index, ngrams, counts),
+			       index,
+			       order);
 	
+	// second, commpute clipped ngram counts (\mu')
+	std::fill(matched.begin(), matched.end(), weight_type());
+	std::fill(hypo.begin(), hypo.end(), weight_type());
+	
+	for (size_type i = 0; i != ngrams.size(); ++ i) 
+	  if (! ngrams[i].empty()) {
+	    const size_type order = ngrams[i].size();
+	    const double count = counts[i].c;
+	    const double clip = scorer->find(ngrams[i]);
+	    
+	    counts[i].mu_prime = derivative_clip_count(count, clip);
+	    
+	    // collect counts for further inside/outside
+	    matched[order] += counts[i].c * counts[i].mu_prime;
+	    hypo[order]    += counts[i].c;
+	    
+	    // collect global counts
+	    counts_matched[order] += clip_count(count, clip);
+	    counts_hypo[order]    += counts[i].c;
+	  }
+	
+	r += scorer->reference_length(hypo[1]);
+	
+	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
+	
+	cicada::expected_ngram(forest,
+			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			       CollectExpectation(index, ngrams, counts, matched, hypo, gradients_matched, gradients_hypo),
+			       index,
+			       order);
+      }
+      
+      std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
+      std::copy(counts_hypo.begin(), counts_hypo.end(), c_hypo.begin());
+      
+      for (size_t n = 1; n != g_matched.size(); ++ n) {
+	g_matched[n].allocate();
+	g_hypo[n].allocate();
+	
+	std::copy(gradients_matched[n].begin(), gradients_matched[n].end(), g_matched[n].begin());
+	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
       }
     }
     
@@ -753,12 +967,111 @@ struct OptimizeXBLEU
     const scorer_document_type& scorers;
     const weight_set_type& weights;
     
-    double          objective;
-    weight_set_type g;
+    ngram_counts_type   c_matched;
+    ngram_counts_type   c_hypo;
+    feature_counts_type g_matched;
+    feature_counts_type g_hypo;
+    double r;
   };
   
+  static lbfgsfloatval_t evaluate(void *instance,
+				  const lbfgsfloatval_t *x,
+				  lbfgsfloatval_t *g,
+				  const int size,
+				  const lbfgsfloatval_t step)
+  {
+    typedef Task                  task_type;
+    
+    const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+    const int mpi_size = MPI::COMM_WORLD.Get_size();
+    
+    OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
+    
+    // send notification!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+    
+    bcast_weights(0, optimizer.weights);
+    
+    task_type task(optimizer.forests, optimizer.scorers, optimizer.weights);
+    task();
+    
+    {
+      task_type::ngram_counts_type c_matched(order + 1, 0.0);
+      task_type::ngram_counts_type c_hypo(order + 1, 0.0);
+      double                       r(0.0);
+      
+      // reduce c_* and r 
+      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      task.c_matched.swap(c_matched);
+      task.c_hypo.swap(c_hypo);
+      task.r = r;
+    }
+    
+    // reduce g_*
+    for (int n = 1; n <= order; ++ n) {
+      // reduce matched counts..
+      reduce_weights(task.g_matched[n]);
+      reduce_weights(task.g_hypo[n]);
+    }
+        
+    // compute P
+    double P = 0.0;
+    for (int n = 1; n <= order; ++ n)
+      if (task.c_matched[n] > 0.0 && task.c_hypo[n] > 0.0)
+	P += (1.0 / order) * (utils::mathop::log(task.c_matched[n]) - utils::mathop::log(task.c_hypo[n]));
+    
+    // compute C and B
+    const double C = task.r / task.c_hypo[1];
+    const double B = task.brevity_penalty(1.0 - C);
+    
+    // for computing g...
+    const double gamma_exp_P = scale * utils::mathop::exp(P);
+    const double C_dC        = C * task.derivative_brevity_penalty(1.0 - C);
+    
+    // compute g..
+    // since we minimiz by the LBFGS, we need to adjust the gradient... thus, we will factor negative values...
+    std::fill(g, g + size, 0.0);
+    for (int n = 1; n <= order; ++ n) {
+      const double factor_matched = - (task.c_matched[n] > 0.0 ? (gamma_exp_P * B / order) / task.c_matched[n] : 0.0);
+      const double factor_hypo    = - (task.c_hypo[n] > 0.0 ? (gamma_exp_P * B / order) / task.c_hypo[n] : 0.0);
+      
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	g[i] += factor_matched * task.g_matched[n][i];
+	g[i] -= factor_hypo * task.g_hypo[n][i];
+      }
+    }
+    
+    {
+      const double factor = - C_dC / task.c_hypo[1];
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+	g[i] += factor * task.g_hypo[1][i];
+    }
+    
+    // xBLEU...
+    const double objective_bleu = utils::mathop::exp(P) * B;
+    
+    // we need to minimize negative bleu...
+    double objective = - objective_bleu;
+    
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
+	g[i] += C * x[i];
+	norm += x[i] * x[i];
+      }
+      objective += 0.5 * C * norm;
+    }
+    
+    if (debug >= 2)
+      std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << std::endl;
+    
+    return objective;
+  }
   
-
   const hypergraph_set_type& forests;
   const scorer_document_type& scorers;
   weight_set_type& weights;
@@ -1004,6 +1317,83 @@ struct OptimizeLBFGS
   weight_set_type& weights;
   size_t instances;
 };
+
+template <typename Optimize>
+double optimize_xbleu(const hypergraph_set_type& forests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+
+  int instances_local = 0;
+  for (size_t id = 0; id != forests.size(); ++ id)
+    instances_local += forests[id].is_valid();
+  
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  
+  if (mpi_rank == 0) {
+    const double objective = Optimize(forests, scorers, weights, instances)();
+    
+    // send termination!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+    
+    return objective;
+  } else {
+    enum {
+      NOTIFY = 0,
+      TERMINATION,
+    };
+    
+    MPI::Prequest requests[2];
+    
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    
+    for (int i = 0; i < 2; ++ i)
+      requests[i].Start();
+    
+    
+    while (1) {
+      if (MPI::Request::Waitany(2, requests))
+	break;
+      else {
+	typedef typename Optimize::Task task_type;
+
+	requests[NOTIFY].Start();
+	
+	bcast_weights(0, weights);
+	
+	task_type task(forests, scorers, weights);
+	task();
+	
+	typename task_type::ngram_counts_type c_matched(order + 1, 0.0);
+	typename task_type::ngram_counts_type c_hypo(order + 1, 0.0);
+	double                       r(0.0);
+	
+	// reduce c_* and r 
+	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	// reduce g_*
+	for (int n = 1; n <= order; ++ n) {
+	  // reduce matched counts..
+	  reduce_weights(task.g_matched[n]);
+	  reduce_weights(task.g_hypo[n]);
+	}
+      }
+    }
+    
+    if (requests[NOTIFY].Test())
+      requests[NOTIFY].Cancel();
+    
+    return 0.0;
+  }
+}
 
 template <typename Optimize>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
@@ -1521,6 +1911,7 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
+    ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")

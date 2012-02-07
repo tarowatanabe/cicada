@@ -140,7 +140,7 @@ namespace cicada
 	      tails[i] = node_map[edge.tails[i]][j[i]];
 	    
 	    // apply various ngram cconetxt...
-	    const state_type state = apply(edge.rule->rhs, tails, weight, counts, is_goal);
+	    const state_type state = apply(edge, tails, weight, counts, is_goal);
 	    
 	    if (! is_goal) {
 	      typename state_set_type::iterator biter = state_buf.find(state);
@@ -169,8 +169,10 @@ namespace cicada
     }
 
     template <typename Tails>
-    state_type apply(const context_type& context, const Tails& tails, const weight_type& weight, Counts& counts, const bool is_goal)
+    state_type apply(const edge_type& edge, const Tails& tails, const weight_type& weight, Counts& counts, const bool is_goal)
     {
+      const context_type& context = edge.rule->rhs;
+
       const int context_size = order - 1;
       
       buffer.clear();
@@ -181,7 +183,7 @@ namespace cicada
 	  if (*citer != vocab_type::EPSILON)
 	    buffer.push_back(*citer);
 	
-	collect_counts(buffer.begin(), buffer.end(), weight, counts);
+	collect_counts(edge, buffer.begin(), buffer.end(), weight, counts);
 
 	const state_type state(static_cast<int>(buffer.size()) <= context_size
 			       ? std::make_pair(context_type(buffer.begin(), buffer.end()),
@@ -193,12 +195,12 @@ namespace cicada
 	  buffer.insert(buffer.begin(), vocab_type::BOS);
 	  buffer.insert(buffer.end(), vocab_type::EOS);
 	  
-	  collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
+	  collect_counts(edge, buffer.begin(), buffer.begin() + 1, weight, counts);
 	  if (buffer.begin() + 1 != buffer.end() - 1)
-	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
+	    collect_counts(edge, buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
 	  
-	  collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
-	  collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
+	  collect_counts(edge, buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	  collect_counts(edge, buffer.end() - 1, buffer.end(), weight, counts);
 	}
 	
 	return state;
@@ -219,8 +221,8 @@ namespace cicada
 	    // collect ngram counts
 	    if (biter != buffer.end()) {
 	      if (biter_first != biter)
-		collect_counts(biter_first, biter, buffer.end(), weight, counts);
-	      collect_counts(biter, buffer.end(), weight, counts);
+		collect_counts(edge, biter_first, biter, buffer.end(), weight, counts);
+	      collect_counts(edge, biter, buffer.end(), weight, counts);
 	      biter = buffer.end();
 	    }
 
@@ -232,7 +234,7 @@ namespace cicada
 	    
 	    buffer.insert(buffer.end(), context_pair.first.begin(), context_pair.first.end());
 	    if (biter_first != biter && biter != buffer.end())
-	      collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	      collect_counts(edge, biter_first, biter, buffer.end(), weight, counts);
 	    biter = buffer.end();
 	    
 	    if (! context_pair.second.empty()) {
@@ -252,8 +254,8 @@ namespace cicada
 	    
 	if (biter != buffer.end()) {
 	  if (biter_first != biter)
-	    collect_counts(biter_first, biter, buffer.end(), weight, counts);
-	  collect_counts(biter, buffer.end(), weight, counts);
+	    collect_counts(edge, biter_first, biter, buffer.end(), weight, counts);
+	  collect_counts(edge, biter, buffer.end(), weight, counts);
 	  biter = buffer.end();
 	}
 	
@@ -281,21 +283,21 @@ namespace cicada
 	    buffer.insert(buffer.begin(), vocab_type::BOS);
 	    buffer.insert(buffer.end(), vocab_type::EOS);
 	    
-	    collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
-	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.begin() + 1 + prefix_size, weight, counts);
+	    collect_counts(edge, buffer.begin(), buffer.begin() + 1, weight, counts);
+	    collect_counts(edge, buffer.begin(), buffer.begin() + 1, buffer.begin() + 1 + prefix_size, weight, counts);
 	    
-	    collect_counts(buffer.end() - suffix_size - 1, buffer.end() - 1, buffer.end(), weight, counts);
-	    collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(edge, buffer.end() - suffix_size - 1, buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(edge, buffer.end() - 1, buffer.end(), weight, counts);
 	  } else {
 	    buffer.insert(buffer.begin(), vocab_type::BOS);
 	    buffer.insert(buffer.end(), vocab_type::EOS);
 	    
-	    collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
+	    collect_counts(edge, buffer.begin(), buffer.begin() + 1, weight, counts);
 	    if (buffer.begin() + 1 != buffer.end() - 1) 
-	      collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
+	      collect_counts(edge, buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
 	    
-	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
-	    collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(edge, buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(edge, buffer.end() - 1, buffer.end(), weight, counts);
 	  }
 	}
 	
@@ -304,7 +306,7 @@ namespace cicada
     }
 
     template <typename Iterator>
-    void collect_counts(Iterator first, Iterator iter, Iterator last, const weight_type& weight, Counts& counts)
+    void collect_counts(const edge_type& edge, Iterator first, Iterator iter, Iterator last, const weight_type& weight, Counts& counts)
     {
       const int context_size = order - 1;
       
@@ -312,18 +314,18 @@ namespace cicada
 	
       for (/**/; first != iter; ++ first)
 	for (Iterator iter2 = iter; iter2 != std::min(first + order, last); ++ iter2) 
-	  op(counts, first, iter2 + 1, weight);
+	  op(edge, weight, counts, first, iter2 + 1);
       
 	  //counts[typename Counts::key_type(first, iter2 + 1)] += weight;
     }
 
 
     template <typename Iterator>
-    void collect_counts(Iterator first, Iterator last, const weight_type& weight, Counts& counts)
+    void collect_counts(const edge_type& edge, Iterator first, Iterator last, const weight_type& weight, Counts& counts)
     {
       for (/**/; first != last; ++ first)
 	for (Iterator iter = first; iter != std::min(first + order, last); ++ iter)
-	  op(counts, first, iter + 1, weight);
+	  op(edge, weight, counts, first, iter + 1);
       
 	  //counts[typename Counts::key_type(first, iter + 1)] += weight;
     }
@@ -349,8 +351,8 @@ namespace cicada
     template <typename Counts>
     struct expected_ngram_op
     {
-      template <typename Iterator, typename Weight>
-      void operator()(Counts& counts, Iterator first, Iterator last, const Weight& weight) const
+      template <typename Edge, typename Weight, typename Iterator>
+      void operator()(const Edge& edge, const Weight& weight, Counts& counts, Iterator first, Iterator last) const
       {
 	counts[typename Counts::key_type(first, last)] += weight;
       }
