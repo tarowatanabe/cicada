@@ -1098,8 +1098,8 @@ struct OptimizeXBLEU
 		<< task.g_hypo[n] << std::flush;
 
       if (task.c_hypo[n] > 0.0) {
-	const double factor_matched = - (gamma_exp_P * B / order) / task.c_matched[n];
-	const double factor_hypo    = - (gamma_exp_P * B / order) / task.c_hypo[n];
+	const double factor_matched = (gamma_exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = (gamma_exp_P * B / order) / task.c_hypo[n];
 	
 	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
 	  g[i] += factor_matched * task.g_matched[n][i];
@@ -1110,7 +1110,7 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      const double factor = - exp_P * C_dC / task.c_hypo[1];
+      const double factor = exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
