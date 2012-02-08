@@ -688,16 +688,19 @@ struct OptimizeXBLEU
   OptimizeXBLEU(const hypergraph_set_type& __forests,
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
-		const size_t& __instances)
+		const size_t& __instances,
+		const double& __lambda)
     : forests(__forests),
       scorers(__scorers),
       weights(__weights),
-      instances(__instances) {}
+      instances(__instances),
+      lambda(__lambda) {}
   
   const hypergraph_set_type& forests;
   const scorer_document_type& scorers;
   weight_set_type& weights;
   size_t instances;
+  double lambda;
   
   double objective_opt;
   weight_set_type weights_opt;
@@ -1160,10 +1163,10 @@ struct OptimizeXBLEU
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
-	g[i] += C * x[i];
+	g[i] += optimizer.lambda * x[i];
 	norm += x[i] * x[i];
       }
-      objective += 0.5 * C * norm;
+      objective += 0.5 * optimizer.lambda * norm;
     }
     
     if (debug >= 2)
@@ -1439,7 +1442,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    Optimize optimizer(forests, scorers, weights, instances);
+    Optimize optimizer(forests, scorers, weights, instances, C);
     
     const double objective = optimizer();
 
