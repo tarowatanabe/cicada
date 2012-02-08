@@ -1403,7 +1403,9 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(forests, scorers, weights, instances)();
+    Optimize optimizer(forests, scorers, weights, instances);
+    
+    const double objective = optimizer();
 
     if (debug >= 3)
       std::cerr << "final weights:" << std::endl
