@@ -1144,7 +1144,7 @@ struct OptimizeXBLEU
     }
     
     // 100 times larger...
-    std::transform(g, g + size, g, std::bind2ns(std::multiplies<double>(), 100.0));
+    std::transform(g, g + size, g, std::bind2nd(std::multiplies<double>(), 100.0));
     
     // xBLEU...
     const double objective_bleu = exp_P * B;
