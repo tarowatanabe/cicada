@@ -1118,13 +1118,6 @@ struct OptimizeXBLEU
     // compute g..
     std::fill(g, g + size, 0.0);
     for (int n = 1; n <= order; ++ n)  {
-#if 0
-      std::cerr << "g-matched[" << n << "]" << std::endl
-		<< task.g_matched[n] << std::flush;
-      std::cerr << "g-hypo[" << n << "]" << std::endl
-		<< task.g_hypo[n] << std::flush;
-#endif
-
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = (gamma_exp_P * B / order) / task.c_matched[n];
 	const double factor_hypo    = (gamma_exp_P * B / order) / task.c_hypo[n];
@@ -1138,12 +1131,16 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      //const double factor = exp_P * C_dC / task.c_hypo[1];
-      const double factor = C_dC / task.c_hypo[1];
+      const double factor = exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
     
+    // dump g!
+    for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+      if (g[i] != 0.0 && feature_type(i) != feature_type())
+	std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
+	
     // xBLEU...
     const double objective_bleu = exp_P * B;
     
