@@ -737,7 +737,7 @@ struct OptimizeXBLEU
       std::cerr << std::endl;
       
       // copy from opt weights!
-      //weights = weights_opt;
+      weights = weights_opt;
     }
     
     if (debug >= 3)
@@ -1172,7 +1172,7 @@ struct OptimizeXBLEU
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
       optimizer.objective_opt = objective;
-      //optimizer.weights_opt = optimizer.weights;
+      optimizer.weights_opt = optimizer.weights;
     }
     
     return objective;
