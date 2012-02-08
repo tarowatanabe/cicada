@@ -1136,10 +1136,12 @@ struct OptimizeXBLEU
 	g[i] += factor * task.g_hypo[1][i];
     }
     
-    // dump g!
-    for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
-      if (g[i] != 0.0 && feature_type(i) != feature_type())
-	std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
+    if (debug >= 3) {
+      std::cerr << "grad:" << std::endl;
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+	if (g[i] != 0.0 && feature_type(i) != feature_type())
+	  std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
+    }
 	
     // xBLEU...
     const double objective_bleu = exp_P * B;
