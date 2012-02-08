@@ -1028,11 +1028,9 @@ struct OptimizeXBLEU
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
 
-#if 0
-    std::cerr << "weights:" << std::endl
-	      << optimizer.weights << std::flush;
-#endif
-      
+    if (debug >= 3)
+      std::cerr << "weights:" << std::endl
+		<< optimizer.weights << std::flush;
     
     bcast_weights(0, optimizer.weights);
     
