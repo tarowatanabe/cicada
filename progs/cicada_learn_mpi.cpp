@@ -690,6 +690,8 @@ struct OptimizeXBLEU
 		size_t __instances)
     : forests(__forests), scorers(__scorers), weights(__weights), instances(__instances) {}
 
+  lbfgsfloatval_t *__pointer;
+
   double operator()()
   {
     lbfgs_parameter_t param;
@@ -704,6 +706,8 @@ struct OptimizeXBLEU
     param.max_iterations = iteration;
     
     double objective = 0.0;
+    
+    __pointer = &(*weights.begin());
     
     lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
     
@@ -1036,8 +1040,13 @@ struct OptimizeXBLEU
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
 
+#if 0
     if (x != &(*optimizer.weights.begin()))
       std::cerr << "pointer differ?" << std::endl;
+    if (x != optimizer.__pointer)
+      std::cerr << "pointer differ????" << std::endl;
+    
+#endif
     
     bcast_weights(0, optimizer.weights);
     
