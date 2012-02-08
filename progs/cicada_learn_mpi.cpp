@@ -713,7 +713,10 @@ struct OptimizeXBLEU
     
     double objective = 0.0;
         
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    
+    if (result != 0) 
+      std::cerr << "lbfgs error: " << result << std::endl;
     
     if (debug >= 3)
       std::cerr << "lbfgs weights:" << std::endl
@@ -1099,7 +1102,6 @@ struct OptimizeXBLEU
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
     
     // compute g..
-    // since we minimiz by the LBFGS, we need to adjust the gradient... thus, we will factor negative values...
     std::fill(g, g + size, 0.0);
     for (int n = 1; n <= order; ++ n)  {
 #if 0
@@ -1183,8 +1185,11 @@ struct OptimizeLBFGS
     
     double objective = 0.0;
     
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
+    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
+    if (result != 0) 
+      std::cerr << "lbfgs error: " << result << std::endl;
+
     return objective;
   }
 
