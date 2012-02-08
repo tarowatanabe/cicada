@@ -754,7 +754,7 @@ struct OptimizeXBLEU
   {
     typedef cicada::semiring::Log<double> weight_type;
     
-    double brevity_penalty(const double x) const
+    weight_type brevity_penalty(const double x) const
     {
       typedef cicada::semiring::traits<weight_type> traits_type;
 
@@ -766,7 +766,7 @@ struct OptimizeXBLEU
       return numer / denom + traits_type::one();
     }
     
-    double derivative_brevity_penalty(const double x) const
+    weight_type derivative_brevity_penalty(const double x) const
     {
       typedef cicada::semiring::traits<weight_type> traits_type;
        
@@ -780,7 +780,7 @@ struct OptimizeXBLEU
       //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
     }
     
-    double clip_count(const double x, const double clip) const
+    weight_type clip_count(const double x, const double clip) const
     {
       typedef cicada::semiring::traits<weight_type> traits_type;
       
@@ -788,7 +788,7 @@ struct OptimizeXBLEU
       return weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip))) + weight_type(clip);
     }
     
-    double derivative_clip_count(const double x, const double clip) const
+    weight_type derivative_clip_count(const double x, const double clip) const
     {
       typedef cicada::semiring::traits<weight_type> traits_type;
       
@@ -887,7 +887,7 @@ struct OptimizeXBLEU
 	    feature_set_type::const_iterator fiter_end = edge.features.end();
 	    for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	      if (fiter->second != 0.0) {
-		const weight_type value(fiter->second);
+		const weight_type value(fiter->second * scale);
 		
 		gradients_matched[n][fiter->first] -= value * scale_matched;
 		gradients_hypo[n][fiter->first]    -= value * scale_hypo;
@@ -918,7 +918,7 @@ struct OptimizeXBLEU
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	  if (fiter->second != 0.0) {
-	    const weight_type value(fiter->second);
+	    const weight_type value(fiter->second * scale);
 	    
 	    gradients_matched[order][fiter->first] += value * scale_matched;
 	    gradients_hypo[order][fiter->first]    += value * scale_hypo;
@@ -1121,8 +1121,7 @@ struct OptimizeXBLEU
     
     // for computing g...
     const double exp_P = utils::mathop::exp(P);
-    const double gamma_exp_P = scale * exp_P;
-    const double C_dC        = C * task.derivative_brevity_penalty(1.0 - C);
+    const double C_dC  = C * task.derivative_brevity_penalty(1.0 - C);
 
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
     
@@ -1130,8 +1129,8 @@ struct OptimizeXBLEU
     std::fill(g, g + size, 0.0);
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
-	const double factor_matched = (gamma_exp_P * B / order) / task.c_matched[n];
-	const double factor_hypo    = (gamma_exp_P * B / order) / task.c_hypo[n];
+	const double factor_matched = (exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = (exp_P * B / order) / task.c_hypo[n];
 	
 	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
 	  g[i] += factor_matched * task.g_matched[n][i];
