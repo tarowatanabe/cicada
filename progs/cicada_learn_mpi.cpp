@@ -1035,6 +1035,9 @@ struct OptimizeXBLEU
     if (debug >= 3)
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
+
+    if (x != &(*optimizer.weights.begin()))
+      std::cerr << "pointer differ?" << std::endl;
     
     bcast_weights(0, optimizer.weights);
     
