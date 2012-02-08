@@ -83,7 +83,7 @@ $me [options]
   --regularize-l1           L1 regularization
   --regularize-l2           L2 regularization                (default)
   --scorer                  scorer            (default: $scorer)
-  --learn                   learner (lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp, mcp)
+  --learn                   learner (lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp, mcp, xbleu)
                             (WARNING: --learn-liner or --liblinear option is deprecated. use --learn linear)
   --learn-options           other learning options
   --zero-weights            learning from zero weights in each iteration
@@ -308,6 +308,15 @@ case $learn in
       exit 1
     fi
     learn_option=" --learn-svm"
+    break ;;
+  xbleu )
+    if test $kbest -eq 0; then
+      learner="cicada_learn_mpi"
+    else
+      echo "xbleu solver does not support kbest learning" >&2
+      exit 1
+    fi
+    learn_option=" --learn-xbleu"
     break ;;
   * )
     echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos, mira, cw, arow, cp, mcp"
@@ -666,6 +675,8 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     echo "learning ${root}weights.$iter" >&2
     qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --forest $tstset \
+	                --refset $refset \
+	                --scorer $scorer \
                         --oracle $learn_oracle \
                         $unite \
 	                $weights_option \
