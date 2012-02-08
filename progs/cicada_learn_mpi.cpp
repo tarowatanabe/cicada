@@ -709,7 +709,7 @@ struct OptimizeXBLEU
     
     __pointer = &(*weights.begin());
     
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate_xbleu, 0, this, &param);
     
     if (debug >= 3)
       std::cerr << "lbfgs weights:" << std::endl
@@ -1019,11 +1019,11 @@ struct OptimizeXBLEU
     double r;
   };
   
-  static lbfgsfloatval_t evaluate(void *instance,
-				  const lbfgsfloatval_t *x,
-				  lbfgsfloatval_t *g,
-				  const int size,
-				  const lbfgsfloatval_t step)
+  static lbfgsfloatval_t evaluate_xbleu(void *instance,
+					const lbfgsfloatval_t *x,
+					lbfgsfloatval_t *g,
+					const int size,
+					const lbfgsfloatval_t step)
   {
     typedef Task                  task_type;
     
