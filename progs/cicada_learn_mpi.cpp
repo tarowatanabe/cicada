@@ -715,8 +715,21 @@ struct OptimizeXBLEU
         
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
     
-    if (result != 0) 
-      std::cerr << "lbfgs error: " << result << std::endl;
+    if (result < 0) {
+      std::cerr << "lbfgs error: " << result << ' ';
+      switch (result) {
+      case LBFGSERR_INCORRECT_TMINMAX: std::cerr << "A logic error occurred; alternatively, the interval of uncertainty became too small."; break;
+      case LBFGSERR_ROUNDING_ERROR: std::cerr << "A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions."; break;
+      case LBFGSERR_MINIMUMSTEP: std::cerr << "The line-search step became smaller than lbfgs_parameter_t::min_step."; break;
+      case LBFGSERR_MAXIMUMSTEP: std::cerr << "The line-search step became larger than lbfgs_parameter_t::max_step."; break;
+      case LBFGSERR_MAXIMUMLINESEARCH: std::cerr << "The line-search routine reaches the maximum number of evaluations."; break;
+      case LBFGSERR_MAXIMUMITERATION: std::cerr << "The algorithm routine reaches the maximum number of iterations."; break;
+      case LBFGSERR_WIDTHTOOSMALL:  std::cerr << "Relative width of the interval of uncertainty is at most lbfgs_parameter_t::xtol."; break;
+      case LBFGSERR_INVALIDPARAMETERS: std::cerr << "A logic error (negative line-search step) occurred."; break;
+      case LBFGSERR_INCREASEGRADIENT: std::cerr << "The current search direction increases the objective function value."; break;
+      }
+      std::cerr << std::endl;
+    }
     
     if (debug >= 3)
       std::cerr << "lbfgs weights:" << std::endl
@@ -1187,7 +1200,7 @@ struct OptimizeLBFGS
     
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
-    if (result != 0) 
+    if (result < 0) 
       std::cerr << "lbfgs error: " << result << std::endl;
 
     return objective;
