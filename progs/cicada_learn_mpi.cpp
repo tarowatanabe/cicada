@@ -712,43 +712,54 @@ struct OptimizeXBLEU
 
   struct Task
   {
+    typedef cicada::semiring::Log<double> weight_type;
     
     double brevity_penalty(const double x) const
     {
-      using namespace boost::math::policies;
-      typedef policy<domain_error<errno_on_error>,
-		     pole_error<errno_on_error>,
-		     overflow_error<errno_on_error>,
-		     rounding_error<errno_on_error>,
-		     evaluation_error<errno_on_error> > policy_type;
-      
-      // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
-      return boost::math::expm1(x) / (1.0 + std::exp(1000.0 * x)) + 1.0;
-    }
+      typedef typename cicada::semiring::traits<weight_type> traits_type;
 
+      // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+
+      const weight_type numer = traits_type::exp(x) - traits_type::one();
+      const weight_type denom = traits_type::one() + traits_type::exp(1000.0 * x);
+      
+      return numer / denom + traits_type::one();
+    }
+    
     double derivative_brevity_penalty(const double x) const
     {
-      const double expx     = std::exp(x);
-      const double exp1000x = std::exp(1000.0 * x);
+      typedef typename cicada::semiring::traits<weight_type> traits_type;
+       
+      const weight_type expx     = traits_type::exp(x);
+      const weight_type expxm1   = expx - traits_type::one();
+      const weight_type exp1000x = traits_type::exp(1000.0 * x);
+      const weight_type p1exp1000x = exp1000x + traits_type::one();
+      
+      return expx / p1exp1000x - expxm1 * weight_type(1000.0) * exp1000x / (p1exp1000x * p1exp1000x);
       
       //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
-      return (expx - boost::math::expm1(x) * 1000.0 * exp1000x / (1.0 + exp1000x)) / (1.0 + exp1000x);
     }
     
     double clip_count(const double x, const double clip) const
     {
-      return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      
+      //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+      return weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip))) + weight_type(clip);
     }
     
     double derivative_clip_count(const double x, const double clip) const
     {
-      const double exp1000x = std::exp(1000.0 * (x - clip));
+      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      
+      const weight_type exp1000x = traits_type::exp(1000.0 * x);
+      const weight_type p1exp1000x = exp1000x + traits_type::one();
+      
+      return traits_type::one() / p1exp1000x - weight_type(x - clip) * weight_type(1000.0) * exp100x / (p1exp1000x * p1exp1000x);
       
       //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
-      return (1.0 - (x - clip) * (1000.0 * exp1000x) / (1.0 + exp1000x)) / (1.0 + exp1000x);
     }
 
-    typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_type;
     typedef std::vector<gradient_type, std::allocator<gradient_type> > gradients_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
@@ -909,8 +920,8 @@ struct OptimizeXBLEU
       gradients_type gradients_hypo(order + 1);
       
       for (size_t n = 0; n != g_matched.size(); ++ n) {
-	gradients_matched[n].clear();
-	gradients_hypo[n].clear();
+	gradients_matched[n].allocate();
+	gradients_hypo[n].allocate();
 	
 	g_matched[n].clear();
 	g_hypo[n].clear();
@@ -1016,6 +1027,10 @@ struct OptimizeXBLEU
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+
+    std::cerr << "weights:" << std::endl
+	      << optimizer.weights << std::flush;
+      
     
     bcast_weights(0, optimizer.weights);
     
@@ -1068,11 +1083,20 @@ struct OptimizeXBLEU
     const double exp_P = utils::mathop::exp(P);
     const double gamma_exp_P = scale * exp_P;
     const double C_dC        = C * task.derivative_brevity_penalty(1.0 - C);
+
+    std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
+
+    
     
     // compute g..
     // since we minimiz by the LBFGS, we need to adjust the gradient... thus, we will factor negative values...
     std::fill(g, g + size, 0.0);
-    for (int n = 1; n <= order; ++ n) 
+    for (int n = 1; n <= order; ++ n)  {
+      std::cerr << "g-matched[" << n << "]" << std::endl
+		<< task.g_matched[n] << std::flush;
+      std::cerr << "g-hypo[" << n << "]" << std::endl
+		<< task.g_hypo[n] << std::flush;
+
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = - (gamma_exp_P * B / order) / task.c_matched[n];
 	const double factor_hypo    = - (gamma_exp_P * B / order) / task.c_hypo[n];
@@ -1082,6 +1106,7 @@ struct OptimizeXBLEU
 	  g[i] -= factor_hypo * task.g_hypo[n][i];
 	}
       }
+    }
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
@@ -1421,8 +1446,8 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	// reduce g_*
 	for (int n = 1; n <= order; ++ n) {
 	  // reduce matched counts..
-	  reduce_weights(task.g_matched[n]);
-	  reduce_weights(task.g_hypo[n]);
+	  send_weights(task.g_matched[n]);
+	  send_weights(task.g_hypo[n]);
 	}
       }
     }
