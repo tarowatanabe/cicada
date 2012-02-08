@@ -689,8 +689,11 @@ struct OptimizeXBLEU
 		weight_set_type& __weights,
 		size_t __instances)
     : forests(__forests), scorers(__scorers), weights(__weights), instances(__instances) {}
-
-  lbfgsfloatval_t *__pointer;
+  
+  const hypergraph_set_type& forests;
+  const scorer_document_type& scorers;
+  weight_set_type& weights;
+  size_t instances;
 
   double operator()()
   {
@@ -706,10 +709,8 @@ struct OptimizeXBLEU
     param.max_iterations = iteration;
     
     double objective = 0.0;
-    
-    __pointer = &(*weights.begin());
-    
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate_xbleu, 0, this, &param);
+        
+    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
     
     if (debug >= 3)
       std::cerr << "lbfgs weights:" << std::endl
@@ -1019,11 +1020,11 @@ struct OptimizeXBLEU
     double r;
   };
   
-  static lbfgsfloatval_t evaluate_xbleu(void *instance,
-					const lbfgsfloatval_t *x,
-					lbfgsfloatval_t *g,
-					const int size,
-					const lbfgsfloatval_t step)
+  static lbfgsfloatval_t evaluate(void *instance,
+				  const lbfgsfloatval_t *x,
+				  lbfgsfloatval_t *g,
+				  const int size,
+				  const lbfgsfloatval_t step)
   {
     typedef Task                  task_type;
     
@@ -1039,14 +1040,6 @@ struct OptimizeXBLEU
     if (debug >= 3)
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
-
-#if 1
-    if (x != &(*optimizer.weights.begin()))
-      std::cerr << "pointer differ?" << std::endl;
-    if (x != optimizer.__pointer)
-      std::cerr << "pointer differ????" << std::endl;
-    
-#endif
     
     bcast_weights(0, optimizer.weights);
     
@@ -1151,11 +1144,6 @@ struct OptimizeXBLEU
     
     return objective;
   }
-  
-  const hypergraph_set_type& forests;
-  const scorer_document_type& scorers;
-  weight_set_type& weights;
-  size_t instances;
 };
   
 
@@ -1441,7 +1429,6 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
-    
     
     while (1) {
       if (MPI::Request::Waitany(2, requests))
