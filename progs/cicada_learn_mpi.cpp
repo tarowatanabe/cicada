@@ -1487,7 +1487,9 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(graphs_forest, graphs_intersected, weights, instances)();
+    Optimize optimizer(graphs_forest, graphs_intersected, weights, instances);
+    
+    const double objective = optimizer();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
