@@ -716,7 +716,7 @@ struct OptimizeXBLEU
     
     double brevity_penalty(const double x) const
     {
-      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      typedef cicada::semiring::traits<weight_type> traits_type;
 
       // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
 
@@ -728,7 +728,7 @@ struct OptimizeXBLEU
     
     double derivative_brevity_penalty(const double x) const
     {
-      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      typedef cicada::semiring::traits<weight_type> traits_type;
        
       const weight_type expx     = traits_type::exp(x);
       const weight_type expxm1   = expx - traits_type::one();
@@ -742,7 +742,7 @@ struct OptimizeXBLEU
     
     double clip_count(const double x, const double clip) const
     {
-      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      typedef cicada::semiring::traits<weight_type> traits_type;
       
       //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
       return weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip))) + weight_type(clip);
@@ -750,7 +750,7 @@ struct OptimizeXBLEU
     
     double derivative_clip_count(const double x, const double clip) const
     {
-      typedef typename cicada::semiring::traits<weight_type> traits_type;
+      typedef cicada::semiring::traits<weight_type> traits_type;
       
       const weight_type exp1000x = traits_type::exp(1000.0 * x);
       const weight_type p1exp1000x = exp1000x + traits_type::one();
