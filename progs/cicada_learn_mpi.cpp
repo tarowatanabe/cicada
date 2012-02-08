@@ -718,6 +718,7 @@ struct OptimizeXBLEU
     if (result < 0) {
       std::cerr << "lbfgs error: " << result << ' ';
       switch (result) {
+      case LBFGSERR_OUTOFINTERVAL: std::cerr << "The line-search step went out of the interval of uncertainty."; break;
       case LBFGSERR_INCORRECT_TMINMAX: std::cerr << "A logic error occurred; alternatively, the interval of uncertainty became too small."; break;
       case LBFGSERR_ROUNDING_ERROR: std::cerr << "A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions."; break;
       case LBFGSERR_MINIMUMSTEP: std::cerr << "The line-search step became smaller than lbfgs_parameter_t::min_step."; break;
