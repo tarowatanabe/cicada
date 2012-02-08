@@ -707,6 +707,10 @@ struct OptimizeXBLEU
     
     lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
     
+    if (debug >= 3)
+      std::cerr << "lbfgs weights:" << std::endl
+		<< weights << std::flush;
+
     return objective;
   }
 
