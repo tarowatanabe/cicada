@@ -1159,6 +1159,12 @@ struct OptimizeLBFGS
       weights(__weights),
       instances(__instances) {}
 
+  const hypergraph_set_type& graphs_forest;
+  const hypergraph_set_type& graphs_intersected;
+  
+  weight_set_type& weights;
+  size_t instances;
+
   double operator()()
   {
     lbfgs_parameter_t param;
@@ -1377,13 +1383,7 @@ struct OptimizeLBFGS
       std::cerr << "objective: " << objective << " non-regularized: " << objective_unregularized << std::endl;
     
     return objective;
-  }
-    
-  const hypergraph_set_type& graphs_forest;
-  const hypergraph_set_type& graphs_intersected;
-  
-  weight_set_type& weights;
-  size_t instances;
+  }    
 };
 
 template <typename Optimize>
