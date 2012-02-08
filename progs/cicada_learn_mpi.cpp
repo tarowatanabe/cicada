@@ -1028,8 +1028,10 @@ struct OptimizeXBLEU
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
 
+#if 0
     std::cerr << "weights:" << std::endl
 	      << optimizer.weights << std::flush;
+#endif
       
     
     bcast_weights(0, optimizer.weights);
@@ -1084,18 +1086,18 @@ struct OptimizeXBLEU
     const double gamma_exp_P = scale * exp_P;
     const double C_dC        = C * task.derivative_brevity_penalty(1.0 - C);
 
-    std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
-
-    
+    //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
     
     // compute g..
     // since we minimiz by the LBFGS, we need to adjust the gradient... thus, we will factor negative values...
     std::fill(g, g + size, 0.0);
     for (int n = 1; n <= order; ++ n)  {
+#if 0
       std::cerr << "g-matched[" << n << "]" << std::endl
 		<< task.g_matched[n] << std::flush;
       std::cerr << "g-hypo[" << n << "]" << std::endl
 		<< task.g_hypo[n] << std::flush;
+#endif
 
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = (gamma_exp_P * B / order) / task.c_matched[n];
