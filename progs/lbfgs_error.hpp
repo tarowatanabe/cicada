@@ -10,7 +10,7 @@
 static inline
 const char* lbfgs_error(const int error)
 {
-  switch (result) {
+  switch (error) {
   case LBFGS_SUCCESS:
     return "L-BFGS reaches convergence.";
   case LBFGS_ALREADY_MINIMIZED:
