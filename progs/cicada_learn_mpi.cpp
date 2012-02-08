@@ -687,8 +687,11 @@ struct OptimizeXBLEU
   OptimizeXBLEU(const hypergraph_set_type& __forests,
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
-		size_t __instances)
-    : forests(__forests), scorers(__scorers), weights(__weights), instances(__instances) {}
+		const size_t& __instances)
+    : forests(__forests),
+      scorers(__scorers),
+      weights(__weights),
+      instances(__instances) {}
   
   const hypergraph_set_type& forests;
   const scorer_document_type& scorers;
