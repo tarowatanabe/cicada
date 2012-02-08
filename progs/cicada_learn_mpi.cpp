@@ -1040,7 +1040,7 @@ struct OptimizeXBLEU
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
 
-#if 0
+#if 1
     if (x != &(*optimizer.weights.begin()))
       std::cerr << "pointer differ?" << std::endl;
     if (x != optimizer.__pointer)
