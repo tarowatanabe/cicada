@@ -1138,19 +1138,17 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      const double factor = exp_P * C_dC / task.c_hypo[1];
+      //const double factor = exp_P * C_dC / task.c_hypo[1];
+      const double factor = C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
-    
-    // 100 times larger...
-    std::transform(g, g + size, g, std::bind2nd(std::multiplies<double>(), 100.0));
     
     // xBLEU...
     const double objective_bleu = exp_P * B;
     
     // we need to minimize negative bleu...
-    double objective = - objective_bleu * 100;
+    double objective = - objective_bleu;
     
     if (regularize_l2) {
       double norm = 0.0;
