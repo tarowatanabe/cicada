@@ -1400,6 +1400,10 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   
   if (mpi_rank == 0) {
     const double objective = Optimize(forests, scorers, weights, instances)();
+
+    if (debug >= 3)
+      std::cerr << "final weights:" << std::endl
+		<< weights << std::flush;
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
