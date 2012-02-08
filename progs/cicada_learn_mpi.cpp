@@ -697,6 +697,9 @@ struct OptimizeXBLEU
   const scorer_document_type& scorers;
   weight_set_type& weights;
   size_t instances;
+  
+  double objective_opt;
+  weight_set_type weights_opt;
 
   double operator()()
   {
@@ -711,6 +714,7 @@ struct OptimizeXBLEU
     
     param.max_iterations = iteration;
     
+    objective_opt = std::numeric_limits<double>::infinity();
     double objective = 0.0;
         
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
@@ -730,6 +734,9 @@ struct OptimizeXBLEU
       case LBFGSERR_INCREASEGRADIENT: std::cerr << "The current search direction increases the objective function value."; break;
       }
       std::cerr << std::endl;
+      
+      // copy from opt weights!
+      weights = weights_opt;
     }
     
     if (debug >= 3)
@@ -1160,6 +1167,10 @@ struct OptimizeXBLEU
     
     if (debug >= 2)
       std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << std::endl;
+
+    // keep the best so forth...
+    if (objective <= objective_opt)
+      weights_opt = weights;
     
     return objective;
   }
