@@ -59,6 +59,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 double scale = 1.0;
+double eta0 = 0.2;
 int order = 4;
 
 bool loss_margin = false; // margin by loss, not rank-loss
@@ -881,6 +882,7 @@ void options(int argc, char** argv)
     
     ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
+    ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")

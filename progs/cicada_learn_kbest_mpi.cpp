@@ -82,6 +82,8 @@ bool learn_mcp = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double scale = 1.0;
+double eta0 = 0.2;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
@@ -4447,6 +4449,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
+    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
+    ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     
     ("loss-margin",       po::bool_switch(&loss_margin),       "direct loss margin")
     ("softmax-margin",    po::bool_switch(&softmax_margin),    "softmax margin")

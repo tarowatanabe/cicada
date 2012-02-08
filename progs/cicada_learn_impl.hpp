@@ -78,7 +78,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
@@ -136,7 +136,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
@@ -267,7 +267,7 @@ struct OptimizerSGDL1 : public OptimizerBase
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     penalty += eta * lambda;
@@ -322,7 +322,7 @@ struct OptimizerSGDL1 : public OptimizerBase
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     penalty += eta * lambda;
@@ -894,7 +894,7 @@ struct OptimizerPegasos : public OptimizerBase
     if (loss - margin > 0.0) {
       //const double eta = 1.0 / (lambda * (epoch + 2));
       // exponential decay...
-      const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+      const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
       ++ epoch;
       
       rescale(1.0 - eta * lambda);
@@ -929,7 +929,7 @@ struct OptimizerPegasos : public OptimizerBase
     if (loss - margin > 0.0) {
       //const double eta = 1.0 / (lambda * (epoch + 2));
       // exponential decay...
-      const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+      const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
       ++ epoch;
       
       rescale(1.0 - eta * lambda);
@@ -953,7 +953,7 @@ struct OptimizerPegasos : public OptimizerBase
 		  const double loss=1.0)
   {
     // exponential decay...
-    const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
+    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
