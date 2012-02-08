@@ -827,15 +827,19 @@ struct OptimizeXBLEU
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
+	
 	for (int n = 1; n <= order; ++ n) 
 	  if (hypo[n] > weight_type()) {
+	    const weight_type scale_matched = weight * matched[n];
+	    const weight_type scale_hypo    = weight * hypo[n];
+	    
 	    feature_set_type::const_iterator fiter_end = edge.features.end();
 	    for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	      if (fiter->second != 0.0) {
 		const weight_type value(fiter->second);
 		
-		gradients_matched[n][fiter->first] -= value * weight * matched[n];
-		gradients_hypo[n][fiter->first]    -= value * weight * hypo[n];
+		gradients_matched[n][fiter->first] -= value * scale_matched;
+		gradients_hypo[n][fiter->first]    -= value * scale_hypo;
 	      }
 	  }
       }

@@ -140,6 +140,7 @@ sparse-lexicon: sparse lexicon feature\n\
 \tpair=[true|false]   use of simple source/target pair (default: true)\n\
 \tprefix=[true|false] use of source prefix\n\
 \tsuffix=[true|false] use of source suffix\n\
+\tfertility=[true|false] lexical fertility feature\n\
 sparse-ngram: sparse ngram feature\n\
 \torder=<order>\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\

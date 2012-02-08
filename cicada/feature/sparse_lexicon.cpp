@@ -100,7 +100,8 @@ namespace cicada
 	  skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false),
 	  pair_mode(false),
 	  prefix_mode(false),
-	  suffix_mode(false)
+	  suffix_mode(false),
+	  fertility_mode(false)
       {
 	uniques.set_empty_key(word_type()); 
 	uniques_prefix.set_empty_key(word_pair_type()); 
@@ -148,20 +149,37 @@ namespace cicada
 	    if (! caches.exists(titer->id())) {
 	      feature_unordered_set_type features;
 	      
+	      size_t fertility_pair = 0;
+	      size_t fertility_prefix = 0;
+	      size_t fertility_suffix = 0;
 	      word_set_type::const_iterator witer_end = words.end();
 	      for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) 
-		if (exists(*witer, target))
+		if (exists(*witer, target)) {
 		  apply(*witer, target, features);
+		  ++ fertility_pair;
+		}
 	      
 	      word_pair_set_type::const_iterator piter_end = words_prefix.end();
 	      for (word_pair_set_type::const_iterator piter = words_prefix.begin(); piter != piter_end; ++ piter) 
-		if (! lexicon_prefix || exists(*lexicon_prefix, *piter, target))
+		if (! lexicon_prefix || exists(*lexicon_prefix, *piter, target)) {
 		  apply("-", *piter, target, features);
+		  ++ fertility_prefix;
+		}
 	      
 	      word_pair_set_type::const_iterator siter_end = words_suffix.end();
 	      for (word_pair_set_type::const_iterator siter = words_suffix.begin(); siter != siter_end; ++ siter) 
-		if (! lexicon_suffix || exists(*lexicon_suffix, *siter, target))
+		if (! lexicon_suffix || exists(*lexicon_suffix, *siter, target)) {
 		  apply("+", *siter, target, features);
+		  ++ fertility_suffix;
+		}
+	      
+	      if (fertility_pair)
+		apply(":", target, fertility_pair, features);
+	      if (fertility_prefix)
+		apply("-", target, fertility_prefix, features);
+	      if (fertility_suffix)
+		apply("+", target, fertility_prefix, features);
+	      
 	      
 	      caches[titer->id()] = features;
 	    }
@@ -169,6 +187,7 @@ namespace cicada
 	    features += caches[titer->id()];
 	  }
       }
+
 
       template <typename Features>
       void apply(const word_type& source, const word_type& target, Features& features)
@@ -274,6 +293,21 @@ namespace cicada
 	      features[name] += 1.0;
 	  }
 	}
+      }
+      
+      template <typename Features>
+      void apply(const char* tag, const word_type& target, const int fertility, Features& features)
+      {
+	const int fertility_power2 = utils::bithack::branch(utils::bithack::is_power2(fertility),
+							    fertility,
+							    static_cast<int>(utils::bithack::next_largest_power2(fertility)));
+	
+	const std::string name = (prefix + ":fertility"
+				  + tag + static_cast<const std::string&>(target)
+				  + '|' + utils::lexical_cast<std::string>(fertility_power2));
+	
+	if (forced_feature || feature_type::exists(name))
+	  features[name] += 1.0;
       }
       
       void assign(const lattice_type& lattice)
@@ -470,6 +504,7 @@ namespace cicada
       bool pair_mode;
       bool prefix_mode;
       bool suffix_mode;
+      bool fertility_mode;
     };
     
     SparseLexicon::SparseLexicon(const std::string& parameter)
@@ -498,6 +533,7 @@ namespace cicada
       bool pair_mode = false;
       bool prefix_mode = false;
       bool suffix_mode = false;
+      bool fertility_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "cluster-source") {
@@ -532,6 +568,8 @@ namespace cicada
 	  prefix_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "suffix")
 	  suffix_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "fertility")
+	  fertility_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -567,6 +605,7 @@ namespace cicada
       lexicon_impl->pair_mode   = pair_mode;
       lexicon_impl->prefix_mode = prefix_mode;
       lexicon_impl->suffix_mode = suffix_mode;
+      lexicon_impl->fertility_mode = fertility_mode;
       
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("sparse-lexicon") : name);
