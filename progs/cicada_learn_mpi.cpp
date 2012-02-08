@@ -1143,11 +1143,14 @@ struct OptimizeXBLEU
 	g[i] += factor * task.g_hypo[1][i];
     }
     
+    // 100 times larger...
+    std::transform(g, g + size, g, std::bind2ns(std::multiplies<double>(), 100.0));
+    
     // xBLEU...
     const double objective_bleu = exp_P * B;
     
     // we need to minimize negative bleu...
-    double objective = - objective_bleu;
+    double objective = - objective_bleu * 100;
     
     if (regularize_l2) {
       double norm = 0.0;
