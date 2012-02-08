@@ -1169,9 +1169,9 @@ struct OptimizeXBLEU
       std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << std::endl;
 
     // keep the best so forth...
-    if (objective <= objective_opt) {
-      objective_opt = objective;
-      weights_opt = weights;
+    if (objective <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective;
+      optimizer.weights_opt = optimizer.weights;
     }
     
     return objective;
