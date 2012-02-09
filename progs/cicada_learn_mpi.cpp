@@ -690,12 +690,14 @@ struct OptimizeXBLEU
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
 		const size_t& __instances,
-		const double& __lambda)
+		const double& __lambda,
+		const feature_type& __feature_scale)
     : forests(__forests),
       scorers(__scorers),
       weights(__weights),
       instances(__instances),
-      lambda(__lambda) {}
+      lambda(__lambda),
+      feature_scale(__feature_scale) {}
   
   const hypergraph_set_type& forests;
   const scorer_document_type& scorers;
@@ -703,6 +705,8 @@ struct OptimizeXBLEU
   
   size_t instances;
   double lambda;
+
+  const feature_type& feature_scale;
     
   double objective_opt;
   weight_set_type weights_opt;
@@ -854,9 +858,13 @@ struct OptimizeXBLEU
 			 const count_set_type& __counts,
 			 const weights_type& __matched,
 			 const weights_type& __hypo,
+			 const weight_set_type& __weights,
+			 const double& __scale,
+			 const feature_type& __feature_scale,
 			 gradients_type& __gradients_matched,
 			 gradients_type& __gradients_hypo)
 	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
+	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
 	  gradients_matched(__gradients_matched),
 	  gradients_hypo(__gradients_hypo)
       {}
@@ -864,6 +872,8 @@ struct OptimizeXBLEU
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
+	const weight_type value_scale = cicada::dot_product(edge.features, weights);
+
 	for (int n = 1; n <= order; ++ n) 
 	  if (hypo[n] > weight_type()) {
 	    const weight_type scale_matched = weight * matched[n];
@@ -877,6 +887,9 @@ struct OptimizeXBLEU
 		gradients_matched[n][fiter->first] -= value * scale_matched;
 		gradients_hypo[n][fiter->first]    -= value * scale_hypo;
 	      }
+	    
+	    gradients_matched[n][feature_scale] -= value_scale * scale_matched;
+	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
       }
       
@@ -899,6 +912,8 @@ struct OptimizeXBLEU
 	
 	const weight_type scale_matched = weight * counts[id].mu_prime;
 	const weight_type scale_hypo    = weight;
+
+	const weight_type value_scale = cicada::dot_product(edge.features, weights);
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -908,6 +923,9 @@ struct OptimizeXBLEU
 	    gradients_matched[order][fiter->first] += value * scale_matched;
 	    gradients_hypo[order][fiter->first]    += value * scale_hypo;
 	  }
+	
+	gradients_matched[order][feature_scale] += value_scale * scale_matched;
+	gradients_hypo[order][feature_scale]    += value_scale * scale_hypo;
       }
       
       const index_set_type& index;
@@ -915,6 +933,10 @@ struct OptimizeXBLEU
       const count_set_type& counts;
       const weights_type& matched;
       const weights_type& hypo;
+
+      const weight_set_type& weights;
+      const double& scale;
+      const feature_type& feature_scale;
       
       gradients_type& gradients_matched;
       gradients_type& gradients_hypo;
@@ -922,8 +944,9 @@ struct OptimizeXBLEU
 
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
-	 const weight_set_type& __weights)
-      : forests(__forests), scorers(__scorers), weights(__weights),
+	 const weight_set_type& __weights,
+	 const feature_type& __feature_scale)
+      : forests(__forests), scorers(__scorers), weights(__weights), feature_scale(__feature_scale),
 	c_matched(order + 1),
 	c_hypo(order + 1),
 	g_matched(order + 1),
@@ -944,6 +967,8 @@ struct OptimizeXBLEU
       weights_type   counts_hypo(order + 1);
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
+
+      const double scale = weights[feature_scale];
       
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1009,7 +1034,9 @@ struct OptimizeXBLEU
 	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectExpectation(index, ngrams, counts, matched, hypo, gradients_matched, gradients_hypo),
+			       CollectExpectation(index, ngrams, counts, matched, hypo,
+						  weights, scale, feature_scale,
+						  gradients_matched, gradients_hypo),
 			       index,
 			       order);
       }
@@ -1029,6 +1056,7 @@ struct OptimizeXBLEU
     const hypergraph_set_type& forests;
     const scorer_document_type& scorers;
     const weight_set_type& weights;
+    const feature_type& feature_scale;
     
     ngram_counts_type   c_matched;
     ngram_counts_type   c_hypo;
@@ -1060,7 +1088,7 @@ struct OptimizeXBLEU
     
     bcast_weights(0, optimizer.weights);
     
-    task_type task(optimizer.forests, optimizer.scorers, optimizer.weights);
+    task_type task(optimizer.forests, optimizer.scorers, optimizer.weights, optimizer.feature_scale);
     task();
     
     {
@@ -1418,7 +1446,10 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-
+  const feature_type feature_scale(":feature-scale:");
+  
+  weights[feature_scale] = scale;
+  
   int instances_local = 0;
   for (size_t id = 0; id != forests.size(); ++ id)
     instances_local += forests[id].is_valid();
@@ -1427,7 +1458,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    Optimize optimizer(forests, scorers, weights, instances, C);
+    Optimize optimizer(forests, scorers, weights, instances, C, feature_scale);
     
     const double objective = optimizer();
 
@@ -1464,7 +1495,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	
 	bcast_weights(0, weights);
 	
-	task_type task(forests, scorers, weights);
+	task_type task(forests, scorers, weights, feature_scale);
 	task();
 	
 	typename task_type::ngram_counts_type c_matched(order + 1, 0.0);
