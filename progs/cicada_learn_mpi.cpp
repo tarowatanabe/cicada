@@ -1060,7 +1060,7 @@ struct OptimizeXBLEU
 	const double e_segment = double(entropy);
 	e += e_segment;
 	
-	if (debug >= 3)
+	if (debug >= 4)
 	  std::cerr << "entropy: " << e_segment << std::endl;
 	
 	// second, commpute clipped ngram counts (\mu')
