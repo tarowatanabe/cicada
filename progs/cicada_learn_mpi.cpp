@@ -1155,7 +1155,7 @@ struct OptimizeXBLEU
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << std::endl;
+      std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << " BP: " << B << std::endl;
 
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
