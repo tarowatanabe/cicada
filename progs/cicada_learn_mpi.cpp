@@ -1568,6 +1568,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	typename task_type::ngram_counts_type c_matched(order + 1, 0.0);
 	typename task_type::ngram_counts_type c_hypo(order + 1, 0.0);
 	double                       r(0.0);
+	double                       e(0.0);
 	
 	// reduce c_* and r 
 	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
