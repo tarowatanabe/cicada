@@ -921,8 +921,7 @@ struct OptimizeXBLEU
 	  }
 	
 	// we do minus (for entropy) and minus (for - templerature), thus plus...
-	// no...
-	const double entropy_factor = weight_type(- (cicada::semiring::log(weight) + 1.0) * temperature) * weight;
+	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -1240,7 +1239,7 @@ struct OptimizeXBLEU
     const double entropy = task.e / optimizer.instances;
     
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu + (temperature * entropy);
+    double objective = - objective_bleu - (temperature * entropy);
     
     if (regularize_l2) {
       double norm = 0.0;
