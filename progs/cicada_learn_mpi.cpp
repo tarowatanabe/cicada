@@ -920,6 +920,7 @@ struct OptimizeXBLEU
 	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
 	
+	// we do minus (for entropy) and minus (for - templerature), thus plus...
 	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
@@ -1235,9 +1236,10 @@ struct OptimizeXBLEU
     
     // xBLEU...
     const double objective_bleu = exp_P * B;
+    const double entropy = task.e / optimizer.instances;
     
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu - (temperature * task.e / optimizer.instances);
+    double objective = - objective_bleu - (temperature * entropy);
     
     if (regularize_l2) {
       double norm = 0.0;
@@ -1250,7 +1252,11 @@ struct OptimizeXBLEU
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective << " xBLEU: " << objective_bleu << " BP: " << B << std::endl;
+      std::cerr << "objective: " << objective
+		<< " xBLEU: " << objective_bleu
+		<< " BP: " << B
+		<< " entripy: " << entropy
+		<< std::endl;
 
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
