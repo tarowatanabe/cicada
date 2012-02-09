@@ -738,7 +738,7 @@ struct OptimizeXBLEU
       std::cerr << "lbfgs error: " << lbfgs_error(result) << std::endl;
       
       // copy from opt weights!
-      weights = weights_opt;
+      //weights = weights_opt;
     }
     
     if (debug >= 3)
@@ -920,7 +920,7 @@ struct OptimizeXBLEU
 	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
 	
-	// we do minus (for entropy) and minus (for - templerature), thus plus...
+	// we do minus (for entropy) and minus (for - temperature), thus plus...
 	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
@@ -1259,11 +1259,13 @@ struct OptimizeXBLEU
 		<< " scale: " << optimizer.weights[optimizer.feature_scale]
 		<< std::endl;
 
+#if 0
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
       optimizer.objective_opt = objective;
       optimizer.weights_opt = optimizer.weights;
     }
+#endif
     
     return objective;
   }
