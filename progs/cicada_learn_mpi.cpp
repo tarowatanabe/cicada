@@ -920,8 +920,8 @@ struct OptimizeXBLEU
 	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
 	
-	// we do minus (for entropy) and minus (for - temperature), thus plus...
-	const double entropy_factor = weight_type(- (cicada::semiring::log(weight) + 1.0) * temperature) * weight;
+	// we do minus (for entropy)  and - temperature, thus, plus
+	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -1110,7 +1110,6 @@ struct OptimizeXBLEU
       
       g.allocate();
       std::copy(gradient.begin(), gradient.end(), g.begin());
-
     }
     
     const hypergraph_set_type& forests;
@@ -1210,8 +1209,8 @@ struct OptimizeXBLEU
     std::copy(task.g.begin(), task.g.end(), g);
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
-	const double factor_matched = (exp_P * B / order) / task.c_matched[n];
-	const double factor_hypo    = (exp_P * B / order) / task.c_hypo[n];
+	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / task.c_hypo[n];
 	
 	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
 	  g[i] += factor_matched * task.g_matched[n][i];
@@ -1222,7 +1221,7 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      const double factor = exp_P * C_dC / task.c_hypo[1];
+      const double factor = - exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
