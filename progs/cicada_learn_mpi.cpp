@@ -219,11 +219,6 @@ int main(int argc, char ** argv)
       bcast_weights(rank, weights);
     }
 
-    if (debug && mpi_rank == 0)
-      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
-    
-    weights.allocate();
-
     weight_set_type bounds_lower;
     weight_set_type bounds_upper;
     
@@ -232,6 +227,11 @@ int main(int argc, char ** argv)
     
     if (! bound_upper_file.empty())
       read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+    
+    weights.allocate();
 
     double objective = 0.0;
 
@@ -1210,8 +1210,8 @@ struct OptimizeXBLEU
     std::copy(task.g.begin(), task.g.end(), g);
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
-	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
-	const double factor_hypo    = - (exp_P * B / order) / task.c_hypo[n];
+	const double factor_matched = (exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = (exp_P * B / order) / task.c_hypo[n];
 	
 	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
 	  g[i] += factor_matched * task.g_matched[n][i];
@@ -1222,7 +1222,7 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      const double factor = - exp_P * C_dC / task.c_hypo[1];
+      const double factor = exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
