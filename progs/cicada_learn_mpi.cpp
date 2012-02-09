@@ -770,7 +770,7 @@ struct OptimizeXBLEU
       const weight_type exp1000x = traits_type::exp(1000.0 * x);
       const weight_type p1exp1000x = traits_type::one() + exp1000x;
       
-      return expx / p1exp1000x - (expxm1 * weight_type(1000.0) * exp1000x) / (p1exp1000x * p1exp1000x);
+      return (expx / p1exp1000x) - (expxm1 * weight_type(1000.0) * exp1000x) / (p1exp1000x * p1exp1000x);
       
       //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
     }
@@ -780,7 +780,7 @@ struct OptimizeXBLEU
       typedef cicada::semiring::traits<weight_type> traits_type;
       
       //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
-      return weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip))) + weight_type(clip);
+      return (weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip)))) + weight_type(clip);
     }
     
     weight_type derivative_clip_count(const double x, const double clip) const
@@ -790,7 +790,7 @@ struct OptimizeXBLEU
       const weight_type exp1000xmc = traits_type::exp(1000.0 * (x - clip));
       const weight_type p1exp1000xmc = exp1000xmc + traits_type::one();
       
-      return traits_type::one() / p1exp1000xmc - (weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc);
+      return (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
       
       //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
     }
