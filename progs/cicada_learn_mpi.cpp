@@ -738,8 +738,8 @@ struct OptimizeXBLEU
       std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
       
     // copy from opt weights!
-    // if (result < 0)
-    //   weights = weights_opt;
+     if (result < 0)
+       weights = weights_opt;
     
     if (debug >= 3)
       std::cerr << "lbfgs weights:" << std::endl
@@ -1259,7 +1259,7 @@ struct OptimizeXBLEU
 		<< " scale: " << optimizer.weights[optimizer.feature_scale]
 		<< std::endl;
 
-#if 0
+#if 1
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
       optimizer.objective_opt = objective;
