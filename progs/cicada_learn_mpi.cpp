@@ -79,13 +79,14 @@ bool learn_pegasos = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double scale = 1.0;
+double eta0 = 0.2;
+int order = 4;
+
 double temperature = 0.5;
 //double temperature_start = 1000;
 //double temperature_end = 0.001;
 //double temperature_rate = 0.5;
-double scale = 1.0;
-double eta0 = 0.2;
-int order = 4;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
@@ -820,16 +821,29 @@ struct OptimizeXBLEU
     
     struct CollectCounts
     {
-      CollectCounts(index_set_type& __index,
+      CollectCounts(const weight_set_type& __weights,
+		    const double& __scale,
+		    const feature_type& __feature_scale,
+		    index_set_type& __index,
 		    ngram_set_type& __ngrams,
 		    count_set_type& __counts,
-		    weight_type& __entropy)
-	: index(__index), ngrams(__ngrams), counts(__counts), entropy(__entropy) {}
+		    weight_type& __entropy,
+		    gradient_type& __expectation)
+	: weights(__weights), scale(__scale), feature_scale(__feature_scale),
+	  index(__index), ngrams(__ngrams), counts(__counts),
+	  entropy(__entropy), expectation(__expectation) {}
       
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
 	entropy -= weight * cicada::semiring::log(weight);
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  if (fiter->second != 0.0)
+	    expectation[fiter->first] += weight_type(fiter->second * scale) * weight;
+	
+	expectation[feature_scale] += weight_type(cicada::dot_product(edge.features, weights)) * weight;
       }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
@@ -851,10 +865,15 @@ struct OptimizeXBLEU
 	  ngrams[id] = ngram_type(first, last);
       }
       
+      const weight_set_type& weights;
+      const double& scale;
+      const feature_type& feature_scale;
+      
       index_set_type& index;
       ngram_set_type& ngrams;
       count_set_type& counts;
       weight_type& entropy;
+      gradient_type& expectation;
     };
     
     struct CollectExpectation
@@ -867,19 +886,22 @@ struct OptimizeXBLEU
 			 const weight_set_type& __weights,
 			 const double& __scale,
 			 const feature_type& __feature_scale,
+			 const gradient_type& __expectation,
 			 gradients_type& __gradients_matched,
-			 gradients_type& __gradients_hypo)
+			 gradients_type& __gradients_hypo,
+			 gradient_type& __gradient)
 	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
-	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
+	  weights(__weights), scale(__scale), feature_scale(__feature_scale), expectation(__expectation),
 	  gradients_matched(__gradients_matched),
-	  gradients_hypo(__gradients_hypo)
+	  gradients_hypo(__gradients_hypo),
+	  gradient(__gradient)
       {}
 
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
 	const weight_type value_scale = cicada::dot_product(edge.features, weights);
-
+	
 	for (int n = 1; n <= order; ++ n) 
 	  if (hypo[n] > weight_type()) {
 	    const weight_type scale_matched = weight * matched[n];
@@ -897,6 +919,15 @@ struct OptimizeXBLEU
 	    gradients_matched[n][feature_scale] -= value_scale * scale_matched;
 	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
+	
+	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  if (fiter->second != 0.0)
+	    gradient[fiter->first] += entropy_factor * (fiter->second - expectation[fiter->first]);
+	
+	gradient[feature_scale] += entropy_factor * (value_scale - expectation[feature_scale]);
       }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
@@ -939,13 +970,16 @@ struct OptimizeXBLEU
       const count_set_type& counts;
       const weights_type& matched;
       const weights_type& hypo;
-
+      
       const weight_set_type& weights;
       const double& scale;
       const feature_type& feature_scale;
+
+      const gradient_type& expectation;
       
       gradients_type& gradients_matched;
       gradients_type& gradients_hypo;
+      gradient_type& gradient;
     };
 
     Task(const hypergraph_set_type& __forests,
@@ -973,9 +1007,11 @@ struct OptimizeXBLEU
       weights_type   counts_hypo(order + 1);
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
-
-      const double scale = weights[feature_scale];
+      gradient_type  gradient;
+      gradient_type  expectation;
       
+      const double scale = weights[feature_scale];
+            
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
 	gradients_hypo[n].allocate();
@@ -983,12 +1019,16 @@ struct OptimizeXBLEU
 	g_matched[n].clear();
 	g_hypo[n].clear();
       }
+
+      gradient.allocate();
+      g.clear();
       
       std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
       std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
       std::fill(c_matched.begin(), c_matched.end(), 0.0);
       std::fill(c_hypo.begin(), c_hypo.end(), 0.0);
       r = 0.0;
+      e = 0.0;
       
       for (size_t id = 0; id != forests.size(); ++ id) {
 	const hypergraph_type& forest = forests[id];
@@ -1006,17 +1046,21 @@ struct OptimizeXBLEU
 	index.clear();
 	counts.clear();
 	ngrams.clear();
-
+	
 	weight_type entropy;
+	expectation.clear();
 	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectCounts(index, ngrams, counts, entropy),
+			       CollectCounts(weights, scale, feature_scale, index, ngrams, counts, entropy, expectation),
 			       index,
 			       order);
-
+	
+	const double e_segment = double(entropy);
+	e += e_segment;
+	
 	if (debug >= 3)
-	  std::cerr << "entropy: " << double(entropy) << std::endl;
+	  std::cerr << "entropy: " << e_segment << std::endl;
 	
 	// second, commpute clipped ngram counts (\mu')
 	std::fill(matched.begin(), matched.end(), weight_type());
@@ -1046,7 +1090,8 @@ struct OptimizeXBLEU
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectExpectation(index, ngrams, counts, matched, hypo,
 						  weights, scale, feature_scale,
-						  gradients_matched, gradients_hypo),
+						  expectation,
+						  gradients_matched, gradients_hypo, gradient),
 			       index,
 			       order);
       }
@@ -1061,6 +1106,10 @@ struct OptimizeXBLEU
 	std::copy(gradients_matched[n].begin(), gradients_matched[n].end(), g_matched[n].begin());
 	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
       }
+      
+      g.allocate();
+      std::copy(gradient.begin(), gradient.end(), g.begin());
+
     }
     
     const hypergraph_set_type& forests;
@@ -1072,7 +1121,9 @@ struct OptimizeXBLEU
     ngram_counts_type   c_hypo;
     feature_counts_type g_matched;
     feature_counts_type g_hypo;
+    weight_set_type     g;
     double r;
+    double e;
   };
   
   static lbfgsfloatval_t evaluate(void *instance,
@@ -1105,15 +1156,18 @@ struct OptimizeXBLEU
       task_type::ngram_counts_type c_matched(order + 1, 0.0);
       task_type::ngram_counts_type c_hypo(order + 1, 0.0);
       double                       r(0.0);
+      double                       e(0.0);
       
       // reduce c_* and r 
       MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
       MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
       MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
       
       task.c_matched.swap(c_matched);
       task.c_hypo.swap(c_hypo);
       task.r = r;
+      task.e = e;
     }
     
     // reduce g_*
@@ -1122,6 +1176,7 @@ struct OptimizeXBLEU
       reduce_weights(task.g_matched[n]);
       reduce_weights(task.g_hypo[n]);
     }
+    reduce_weights(task.g);
     
     // smoothing...
     {
@@ -1146,11 +1201,12 @@ struct OptimizeXBLEU
     // for computing g...
     const double exp_P = utils::mathop::exp(P);
     const double C_dC  = C * task.derivative_brevity_penalty(1.0 - C);
-
+    
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
     
     // compute g..
-    std::fill(g, g + size, 0.0);
+    //std::fill(g, g + size, 0.0);
+    std::copy(task.g.begin(), task.g.end(), g);
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = (exp_P * B / order) / task.c_matched[n];
@@ -1176,19 +1232,20 @@ struct OptimizeXBLEU
 	if (g[i] != 0.0 && feature_type(i) != feature_type())
 	  std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
     }
-	
+    
     // xBLEU...
     const double objective_bleu = exp_P * B;
     
-    // we need to minimize negative bleu...
-    double objective = - objective_bleu;
+    // we need to minimize negative bleu... + regularized by average entropy...
+    double objective = - objective_bleu - (temperature * task.e / optimizer.instances);
     
     if (regularize_l2) {
       double norm = 0.0;
-      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
-	g[i] += optimizer.lambda * x[i];
-	norm += x[i] * x[i];
-      }
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i)
+	if (i != optimizer.feature_scale.id()) {
+	  g[i] += optimizer.lambda * x[i];
+	  norm += x[i] * x[i];
+	}
       objective += 0.5 * optimizer.lambda * norm;
     }
     
@@ -1516,6 +1573,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
 	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
 	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
 	
 	// reduce g_*
 	for (int n = 1; n <= order; ++ n) {
@@ -1523,6 +1581,8 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	  send_weights(task.g_matched[n]);
 	  send_weights(task.g_hypo[n]);
 	}
+	send_weights(task.g);
+	
       }
     }
     
@@ -2053,6 +2113,8 @@ void options(int argc, char** argv)
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+    
+    ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
