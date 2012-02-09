@@ -921,7 +921,7 @@ struct OptimizeXBLEU
 	  }
 	
 	// we do minus (for entropy) and minus (for - temperature), thus plus...
-	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
+	const double entropy_factor = weight_type(- (cicada::semiring::log(weight) + 1.0) * temperature) * weight;
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
