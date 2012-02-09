@@ -1011,7 +1011,7 @@ struct OptimizeXBLEU
 	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectCounts(index, ngrams, counts, entopy),
+			       CollectCounts(index, ngrams, counts, entropy),
 			       index,
 			       order);
 
