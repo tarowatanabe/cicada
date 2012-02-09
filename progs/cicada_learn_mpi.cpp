@@ -1069,9 +1069,9 @@ struct OptimizeXBLEU
 	
 	for (size_type i = 0; i != ngrams.size(); ++ i) 
 	  if (! ngrams[i].empty()) {
-	    const size_type order = ngrams[i].size();
-	    const double count = counts[i].c;
-	    const double clip = scorer->find(ngrams[i]);
+	    const size_type    order = ngrams[i].size();
+	    const weight_type& count = counts[i].c;
+	    const double       clip = scorer->find(ngrams[i]);
 	    
 	    counts[i].mu_prime = derivative_clip_count(count, clip);
 	    
