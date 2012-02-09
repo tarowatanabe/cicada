@@ -1256,6 +1256,7 @@ struct OptimizeXBLEU
 		<< " xBLEU: " << objective_bleu
 		<< " BP: " << B
 		<< " entropy: " << entropy
+		<< " scale: " << optimizer.weights[optimizer.feature_scale]
 		<< std::endl;
 
     // keep the best so forth...
