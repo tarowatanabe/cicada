@@ -926,7 +926,7 @@ struct OptimizeXBLEU
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	  if (fiter->second != 0.0)
-	    gradient[fiter->first] += entropy_factor * (fiter->second - expectation[fiter->first]);
+	    gradient[fiter->first] += entropy_factor * (weight_type(fiter->second * scale) - expectation[fiter->first]);
 	
 	gradient[feature_scale] += entropy_factor * (value_scale - expectation[feature_scale]);
       }
