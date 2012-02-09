@@ -79,6 +79,10 @@ bool learn_pegasos = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double temperature = 0.5;
+//double temperature_start = 1000;
+//double temperature_end = 0.001;
+//double temperature_rate = 0.5;
 double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
@@ -818,13 +822,14 @@ struct OptimizeXBLEU
     {
       CollectCounts(index_set_type& __index,
 		    ngram_set_type& __ngrams,
-		    count_set_type& __counts)
-	: index(__index), ngrams(__ngrams), counts(__counts) {}
-
+		    count_set_type& __counts,
+		    weight_type& __entropy)
+	: index(__index), ngrams(__ngrams), counts(__counts), entropy(__entropy) {}
+      
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
-	
+	entropy -= weight * cicada::semiring::log(weight);
       }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
@@ -849,6 +854,7 @@ struct OptimizeXBLEU
       index_set_type& index;
       ngram_set_type& ngrams;
       count_set_type& counts;
+      weight_type& entropy;
     };
     
     struct CollectExpectation
@@ -1000,12 +1006,17 @@ struct OptimizeXBLEU
 	index.clear();
 	counts.clear();
 	ngrams.clear();
+
+	weight_type entropy;
 	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectCounts(index, ngrams, counts),
+			       CollectCounts(index, ngrams, counts, entopy),
 			       index,
 			       order);
+
+	if (debug >= 3)
+	  std::cerr << "entropy: " << double(entropy) << std::endl;
 	
 	// second, commpute clipped ngram counts (\mu')
 	std::fill(matched.begin(), matched.end(), weight_type());
@@ -1031,7 +1042,6 @@ struct OptimizeXBLEU
 	r += scorer->reference_length(hypo[1]);
 	
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
-	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectExpectation(index, ngrams, counts, matched, hypo,
