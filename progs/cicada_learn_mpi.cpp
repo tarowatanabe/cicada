@@ -1284,7 +1284,7 @@ struct OptimizeXBLEU
     reduce_weights(task.g);
     
     // smoothing...
-#if 0
+#if 1
     {
       double smoothing = 1e-40;
       for (int n = 1; n <= order; ++ n) {
