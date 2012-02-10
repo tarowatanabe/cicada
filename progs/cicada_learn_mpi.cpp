@@ -1004,6 +1004,7 @@ struct OptimizeXBLEU
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
       
+      weight_type    entropy;
       weights_type   entropy_inside;
       gradient_type  gradient;
       gradient_type  expectation;
@@ -1104,13 +1105,11 @@ struct OptimizeXBLEU
 			       entropy_function(weights, scale));
 	const weight_type& Z = entropy_inside.back();
 	
-	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R.weight / Z;
-	const double e_segment = double(entropy);
-	
-	e += e_segment;
+	const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R.weight / Z);
+	entropy += entropy_segment;
 	
 	if (debug >= 4)
-	  std::cerr << "entropy: " << e_segment << std::endl;
+	  std::cerr << "entropy: " << double(entropy_segment) << std::endl;
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
@@ -1126,6 +1125,8 @@ struct OptimizeXBLEU
       
       g.allocate();
       std::copy(gradient.begin(), gradient.end(), g.begin());
+
+      e = entropy;
     }
     
     const hypergraph_set_type& forests;
