@@ -1195,7 +1195,7 @@ struct OptimizeXBLEU
     
     // smoothing...
     {
-      double smoothing = 0.1;
+      double smoothing = 0.0001;
       for (int n = 1; n <= order; ++ n) {
 	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
 	  task.c_matched[n] = smoothing;
