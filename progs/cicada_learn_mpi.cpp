@@ -959,9 +959,10 @@ struct OptimizeXBLEU
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
+	const double value = cicada::dot_product(edge.features, weights) * scale;
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(value);
 	
-	return value_type(weight, weight * weight_type(cicada::semiring::log(weight)));
+	return value_type(weight, weight * weight_type(value));
       }
       
       const weight_set_type& weights;
@@ -1135,14 +1136,17 @@ struct OptimizeXBLEU
 
 	{
 	  entropy_pr_inside.clear();
-	  entropy_pr_inside.resize(forest.nodes.size(), pr_weight_type());
+	  entropy_pr_inside.resize(forest.nodes.size());
 	  
 	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
-	  std::cerr << "pair P: " << entropy_pr_inside.back().p
-		    << " R: " << entropy_pr_inside.back().r
-		    << " Z: " << Z
-		    << " R: " << R.weight << std::endl;
+	  const weight_type& Z = entropy_pr_inside.back().p;
+	  const weight_type& R = entropy_pr_inside.back().R;
+
+	  const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R / Z);
+	  
+	  if (debug >= 4)
+	    std::cerr << "entropy: " << double(entropy_segment) << std::endl;
 	}
 	
 	// fifth, compute derivatives...
