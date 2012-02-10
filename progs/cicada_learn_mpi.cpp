@@ -959,10 +959,9 @@ struct OptimizeXBLEU
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	const double value = cicada::dot_product(edge.features, weights) * scale;
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(value);
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
 	
-	return value_type(weight, weight * weight_type(value));
+	return value_type(weight, weight * weight_type(cicada::semiring::log(weight)));
       }
       
       const weight_set_type& weights;
@@ -1136,7 +1135,7 @@ struct OptimizeXBLEU
 
 	{
 	  entropy_pr_inside.clear();
-	  entropy_pr_inside.resize(forest.nodes.size());
+	  entropy_pr_inside.resize(forest.nodes.size(), pr_weight_type());
 	  
 	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
