@@ -790,11 +790,8 @@ struct OptimizeXBLEU
       const weight_type exp1000xmc = traits_type::exp(1000.0 * (x - clip));
       const weight_type p1exp1000xmc = exp1000xmc + traits_type::one();
       
-      const weight_type result = (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
+      return (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
       
-      if (result < weight_type())
-	std::cerr << "negative: " << x << " clip: " <<  clip << std::endl;
-
       //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
     }
 
