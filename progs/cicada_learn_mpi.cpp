@@ -1191,8 +1191,16 @@ struct OptimizeXBLEU
 	
 	entropy += entropy_segment;
 	
+	const entropy_gradient_type::accumulated_type& dZ = entropy_gradient.dZ;
+	const entropy_gradient_type::accumulated_type& dR = entropy_gradient.dR;
 	
+	entropy_gradient_type::accumulated_type::const_iterator ziter_end = dZ.end();
+	for (entropy_gradient_type::accumulated_type::const_iterator ziter = dZ.begin(); ziter != ziter_end; ++ ziter)
+	  gradient[ziter->first] += weight_type(- temperature) * ziter->second * ((cicada::semiring::traits<weight_type>::one() / Z) + R / (Z * Z));
 	
+	entropy_gradient_type::accumulated_type::const_iterator riter_end = dR.end();
+	for (entropy_gradient_type::accumulated_type::const_iterator riter = dR.begin(); riter != riter_end; ++ riter)
+	  gradient[riter->first] -= weight_type(- temperature) * riter->second / Z;
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
@@ -1345,8 +1353,8 @@ struct OptimizeXBLEU
     const double entropy = task.e / optimizer.instances;
     
     // we need to minimize negative bleu... + regularized by average entropy...
-    //double objective = - objective_bleu - (temperature * entropy);
-    double objective = - objective_bleu;
+    double objective = - objective_bleu - (temperature * entropy);
+    //double objective = - objective_bleu;
     
     if (regularize_l2) {
       double norm = 0.0;
