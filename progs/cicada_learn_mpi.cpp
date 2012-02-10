@@ -1195,7 +1195,7 @@ struct OptimizeXBLEU
     
     // smoothing...
     {
-      double smoothing = 0.0001;
+      double smoothing = 1e-10;
       for (int n = 1; n <= order; ++ n) {
 	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
 	  task.c_matched[n] = smoothing;
@@ -1262,14 +1262,13 @@ struct OptimizeXBLEU
     // we need to minimize negative bleu... + regularized by average entropy...
     //double objective = - objective_bleu - (temperature * entropy);
     double objective = - objective_bleu;
-
+    
     if (regularize_l2) {
       double norm = 0.0;
-      for (size_t i = 0; i < static_cast<size_t>(size); ++ i)
-	if (i != optimizer.feature_scale.id()) {
-	  g[i] += optimizer.lambda * x[i];
-	  norm += x[i] * x[i];
-	}
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
+	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
+	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
+      }
       objective += 0.5 * optimizer.lambda * norm;
     }
     
