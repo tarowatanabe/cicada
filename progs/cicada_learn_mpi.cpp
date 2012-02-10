@@ -976,8 +976,6 @@ struct OptimizeXBLEU
       weight_type weight;
     };
 
-    
-
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
 	 const weight_set_type& __weights,
@@ -1228,7 +1226,7 @@ struct OptimizeXBLEU
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
     
     // compute g..
-    //std::fill(g, g + size, 0.0);
+    std::fill(g, g + size, 0.0);
     //std::copy(task.g.begin(), task.g.end(), g);
     std::transform(task.g.begin(), task.g.end(), g, std::bind2nd(std::multiplies<double>(), 1.0 / optimizer.instances));
     for (int n = 1; n <= order; ++ n)  {
