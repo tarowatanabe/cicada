@@ -1007,7 +1007,7 @@ struct OptimizeXBLEU
       gradient_type  gradient;
       gradient_type  expectation;
       
-      //const double scale = weights[feature_scale];
+      const double scale = weights[feature_scale];
             
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1263,9 +1263,6 @@ struct OptimizeXBLEU
     //double objective = - objective_bleu - (temperature * entropy);
     double objective = - objective_bleu;
 
-    // temporarily....
-    g[optimizer.feature_scale.id()] = 0.0;
-    
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < static_cast<size_t>(size); ++ i)
