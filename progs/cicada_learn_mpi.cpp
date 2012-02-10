@@ -1157,9 +1157,6 @@ struct OptimizeXBLEU
 	    std::cerr << "order: " << n << " matched: " << matched[n] << " hypo: " << hypo[n] << std::endl;
 	
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
-	// NOTE: \nabla Z / Z - (Z \nablaR - R \nalbdaZ) / Z^2
-	//       = (1 / Z + R / Z^2) \nabla Z - (1 / Z) \nabla R
-	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectExpectation(index, ngrams, counts, matched, hypo,
@@ -1288,7 +1285,7 @@ struct OptimizeXBLEU
     
     // smoothing...
     {
-      double smoothing = 1e-10;
+      double smoothing = 1e-40;
       for (int n = 1; n <= order; ++ n) {
 	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
 	  task.c_matched[n] = smoothing;
