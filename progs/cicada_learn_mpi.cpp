@@ -973,8 +973,8 @@ struct OptimizeXBLEU
     {
       struct value_type
       {
-	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale)
-	  : features(__features), weights(__weights), scale(__scale) {}
+	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	  : features(__features), weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
 	
 	friend
 	value_type operator*(const value_type& x, const entropy_weight_type& weight)
@@ -988,19 +988,21 @@ struct OptimizeXBLEU
 	const feature_set_type& features;
 	const weight_set_type& weights;
 	const double scale;
+	const feature_type feature_scale;
       };
-
-      entropy_gradient_function(const weight_set_type& __weights, const double& __scale)
-	: weights(__weights), scale(__scale) {}
+      
+      entropy_gradient_function(const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	: weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return value_type(edge.features, weights, scale);
+	return value_type(edge.features, weights, scale, feature_scale);
       }
       
       const weight_set_type& weights;
       const double scale;
+      const feature_type feature_scale;
     };
     
 
@@ -1012,9 +1014,28 @@ struct OptimizeXBLEU
       {
 	proxy_type(accumulated_type& __dZ, accumulated_type& __dR) : dZ(__dZ), dR(__dR) {}
 	
-	proxy_type& operator+=(const entropy_gradient_function::value_type& value) 
+	proxy_type& operator+=(const entropy_gradient_function::value_type& x) 
 	{
+	  const double value = cicada::dot_product(x.features, x.weights);
+	  const double log_p_e = value * x.scale;
+	  const weight_type p_e = cicada::semiring::traits<weight_type>::exp(log_p_e);
+
+	  // dZ += \lnabla p_e * x.inside_outside.p;
+	  // dR += (1 + \log p_e) * \nalba p_e * x.inside_outside.p + \lnabla p_e * x.inside_outside.r;
 	  
+	  feature_set_type::const_iterator fiter_end = x.features.end();
+	  for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter) 
+	    if (fiter->second != 0.0) {
+	      const weight_type value(fiter->second * x.scale);
+	      
+	      dZ[fiter->first] += value * p_e * x.inside_outside.p;
+	      dR[fiter->first] += (weight_type(1.0 + log_p_e) * value * p_e * x.inside_outside.p + value * p_e * x.inside_outside.r);
+	    }
+	  
+	  const weight_type value_scale(value);
+
+	  dZ[x.feature_scale] += value_scale * p_e * x.inside_outside.p;
+	  dR[x.feature_scale] += (weight_type(1.0 + log_p_e) * value_scale * p_e * x.inside_outside.p + value_scale * p_e * x.inside_outside.r);
 	  
 	  return *this;
 	}
@@ -1154,7 +1175,11 @@ struct OptimizeXBLEU
 
 	entropy_gradient_type entropy_gradient;
 	
-	cicada::inside_outside(forest, entropy_inside, entropy_gradient, entropy_function(weights, scale), entropy_gradient_function(weights, scale));
+	cicada::inside_outside(forest,
+			       entropy_inside,
+			       entropy_gradient,
+			       entropy_function(weights, scale),
+			       entropy_gradient_function(weights, scale, feature_scale));
 	
 	const weight_type& Z = entropy_inside.back().p;
 	const weight_type& R = entropy_inside.back().r;
@@ -1165,6 +1190,9 @@ struct OptimizeXBLEU
 	  std::cerr << "entropy: " << double(entropy_segment) << std::endl;
 	
 	entropy += entropy_segment;
+	
+	
+	
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
