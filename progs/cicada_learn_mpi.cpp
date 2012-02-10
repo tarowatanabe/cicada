@@ -1141,7 +1141,7 @@ struct OptimizeXBLEU
 	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
 	  const weight_type& Z = entropy_pr_inside.back().p;
-	  const weight_type& R = entropy_pr_inside.back().R;
+	  const weight_type& R = entropy_pr_inside.back().r;
 
 	  const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R / Z);
 	  
