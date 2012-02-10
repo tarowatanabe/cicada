@@ -1119,7 +1119,7 @@ struct OptimizeXBLEU
 	
 	// forth, compute entorpy...
 	entropy_inside.clear();
-	entropy_inside.resize(forest.nodes.size());
+	entropy_inside.resize(forest.nodes.size(), weight_type());
 	
 	entropy_x R;
 	cicada::inside_outside(forest,
@@ -1137,7 +1137,7 @@ struct OptimizeXBLEU
 
 	{
 	  entropy_pr_inside.clear();
-	  entropy_pr_inside.resize(forest.nodes.size());
+	  entropy_pr_inside.resize(forest.nodes.size(), pr_weight_type());
 	  
 	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
