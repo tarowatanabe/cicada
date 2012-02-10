@@ -948,6 +948,24 @@ struct OptimizeXBLEU
       gradients_type& gradients_hypo;
     };
 
+    struct entropy_function
+    {
+      typedef weight_type value_type;
+
+      entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
+	
+	return weight * cicada::semiring::log(weight);
+      }
+
+      const weight_set_type& weights;
+      const double& scale;
+    };
+
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
 	 const weight_set_type& __weights,
@@ -973,6 +991,8 @@ struct OptimizeXBLEU
       weights_type   counts_hypo(order + 1);
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
+      
+      weights_type   entropy_inside;
       gradient_type  gradient;
       gradient_type  expectation;
       
@@ -1008,25 +1028,12 @@ struct OptimizeXBLEU
 	
 	// here, we will implement forest xBLEU...
 	
+	
 	// first, collect expected ngrams
 	index.clear();
 	counts.clear();
 	ngrams.clear();
-	
-#if 0
-	weight_type R;
-	weight_type Z;
-	expectation.clear();
-	// compute entropy...
-	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R / Z;
-	const double e_segment = double(entropy);
-	
-	e += e_segment;
-	
-	if (debug >= 4)
-	  std::cerr << "entropy: " << e_segment << std::endl;
-#endif
-	
+		
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectCounts(index, ngrams, counts),
@@ -1071,6 +1078,27 @@ struct OptimizeXBLEU
 						  gradients_matched, gradients_hypo),
 			       index,
 			       order);
+
+	
+	// forth, compute entorpy...
+	entropy_inside.clear();
+	entropy_inside.resize(forest.nodes.size());
+	
+	weight_type R;
+	cicada::inside_outside(forest,
+			       entropy_inside,
+			       R,
+			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			       entropy_function(weights, scale));
+	const weight_type& Z = entropy_inside.back();
+	
+	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R / Z;
+	const double e_segment = double(entropy);
+	
+	e += e_segment;
+	
+	if (debug >= 4)
+	  std::cerr << "entropy: " << e_segment << std::endl;
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
@@ -1221,7 +1249,8 @@ struct OptimizeXBLEU
     const double entropy = task.e / optimizer.instances;
     
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu - (temperature * entropy);
+    //double objective = - objective_bleu - (temperature * entropy);
+    double objective = - objective_bleu;
     
     if (regularize_l2) {
       double norm = 0.0;
