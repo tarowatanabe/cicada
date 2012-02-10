@@ -966,7 +966,7 @@ struct OptimizeXBLEU
       }
       
       const weight_set_type& weights;
-      const double& scale;
+      const double scale;
     };
 
     typedef std::vector<pr_weight_type, std::allocator<pr_weight_type> > pr_weights_type;
@@ -984,16 +984,17 @@ struct OptimizeXBLEU
 	
 	return weight * weight_type(cicada::semiring::log(weight));
       }
-
+      
       const weight_set_type& weights;
       const double& scale;
     };
-
+    
     struct entropy_x
     {
       typedef weight_type value_type;
       
       entropy_x() : weight() {}
+      
       weight_type& operator[](size_t pos)  { return weight; }
       
       weight_type weight;
