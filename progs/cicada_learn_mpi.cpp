@@ -959,7 +959,7 @@ struct OptimizeXBLEU
       {
 	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
 	
-	return weight * cicada::semiring::log(weight);
+	return weight * weight_type(cicada::semiring::log(weight));
       }
 
       const weight_set_type& weights;
