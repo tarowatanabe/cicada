@@ -1199,7 +1199,7 @@ struct OptimizeXBLEU
       for (int n = 1; n <= order; ++ n) {
 	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
 	  task.c_matched[n] = smoothing;
-	smoothing *= 0.5;
+	smoothing *= 0.1;
       }
     }
 
