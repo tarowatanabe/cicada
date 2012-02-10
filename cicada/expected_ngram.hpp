@@ -112,7 +112,7 @@ namespace cicada
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
 	const bool is_goal = (node.id == graph.goal);
-
+	
 	state_buf.clear();
 	
 	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -123,7 +123,7 @@ namespace cicada
 	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    weight *= inside[*niter];
-
+	  
 	  op(edge, weight, counts);
 	  
 	  index_set_type j_ends(edge.tails.size(), 0);
@@ -133,10 +133,8 @@ namespace cicada
 	    j_ends[i] = node_map[edge.tails[i]].size();
 
 	  edge_type::node_set_type tails(edge.tails.size());
-
-	
+	  
 	  for (;;) {
-	    
 	    // current tails...
 	    for (size_t i = 0; i != edge.tails.size(); ++ i)
 	      tails[i] = node_map[edge.tails[i]][j[i]];

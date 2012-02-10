@@ -821,29 +821,15 @@ struct OptimizeXBLEU
     
     struct CollectCounts
     {
-      CollectCounts(const weight_set_type& __weights,
-		    const double& __scale,
-		    const feature_type& __feature_scale,
-		    index_set_type& __index,
+      CollectCounts(index_set_type& __index,
 		    ngram_set_type& __ngrams,
-		    count_set_type& __counts,
-		    weight_type& __entropy,
-		    gradient_type& __expectation)
-	: weights(__weights), scale(__scale), feature_scale(__feature_scale),
-	  index(__index), ngrams(__ngrams), counts(__counts),
-	  entropy(__entropy), expectation(__expectation) {}
+		    count_set_type& __counts)
+	: index(__index), ngrams(__ngrams), counts(__counts) {}
       
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
-	entropy -= weight * cicada::semiring::log(weight);
 	
-	feature_set_type::const_iterator fiter_end = edge.features.end();
-	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	  if (fiter->second != 0.0)
-	    expectation[fiter->first] += weight_type(fiter->second * scale) * weight;
-	
-	expectation[feature_scale] += weight_type(cicada::dot_product(edge.features, weights)) * weight;
       }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
@@ -861,19 +847,14 @@ struct OptimizeXBLEU
 	  counts.resize(id + 1);
 	
 	counts[id].c += weight;
+	
 	if (ngrams[id].empty())
 	  ngrams[id] = ngram_type(first, last);
       }
       
-      const weight_set_type& weights;
-      const double& scale;
-      const feature_type& feature_scale;
-      
       index_set_type& index;
       ngram_set_type& ngrams;
       count_set_type& counts;
-      weight_type& entropy;
-      gradient_type& expectation;
     };
     
     struct CollectExpectation
@@ -886,15 +867,12 @@ struct OptimizeXBLEU
 			 const weight_set_type& __weights,
 			 const double& __scale,
 			 const feature_type& __feature_scale,
-			 const gradient_type& __expectation,
 			 gradients_type& __gradients_matched,
-			 gradients_type& __gradients_hypo,
-			 gradient_type& __gradient)
+			 gradients_type& __gradients_hypo)
 	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
-	  weights(__weights), scale(__scale), feature_scale(__feature_scale), expectation(__expectation),
+	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
 	  gradients_matched(__gradients_matched),
-	  gradients_hypo(__gradients_hypo),
-	  gradient(__gradient)
+	  gradients_hypo(__gradients_hypo)
       {}
 
       template <typename Edge, typename Weight, typename Counts>
@@ -919,16 +897,6 @@ struct OptimizeXBLEU
 	    gradients_matched[n][feature_scale] -= value_scale * scale_matched;
 	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
-	
-	// we do minus (for entropy)  and - temperature, thus, plus
-	const double entropy_factor = weight_type((cicada::semiring::log(weight) + 1.0) * temperature) * weight;
-	
-	feature_set_type::const_iterator fiter_end = edge.features.end();
-	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	  if (fiter->second != 0.0)
-	    gradient[fiter->first] += entropy_factor * (weight_type(fiter->second * scale) - expectation[fiter->first]);
-	
-	gradient[feature_scale] += entropy_factor * (value_scale - expectation[feature_scale]);
       }
       
       template <typename Edge, typename Weight, typename Counts, typename Iterator>
@@ -975,12 +943,9 @@ struct OptimizeXBLEU
       const weight_set_type& weights;
       const double& scale;
       const feature_type& feature_scale;
-
-      const gradient_type& expectation;
       
       gradients_type& gradients_matched;
       gradients_type& gradients_hypo;
-      gradient_type& gradient;
     };
 
     Task(const hypergraph_set_type& __forests,
@@ -1048,21 +1013,26 @@ struct OptimizeXBLEU
 	counts.clear();
 	ngrams.clear();
 	
-	weight_type entropy;
+#if 0
+	weight_type R;
+	weight_type Z;
 	expectation.clear();
-	
-	cicada::expected_ngram(forest,
-			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectCounts(weights, scale, feature_scale, index, ngrams, counts, entropy, expectation),
-			       index,
-			       order);
-	
+	// compute entropy...
+	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R / Z;
 	const double e_segment = double(entropy);
+	
 	e += e_segment;
 	
 	if (debug >= 4)
 	  std::cerr << "entropy: " << e_segment << std::endl;
-	
+#endif
+
+	cicada::expected_ngram(forest,
+			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			       CollectCounts(index, ngrams, counts),
+			       index,
+			       order);
+		
 	// second, commpute clipped ngram counts (\mu')
 	std::fill(matched.begin(), matched.end(), weight_type());
 	std::fill(hypo.begin(), hypo.end(), weight_type());
@@ -1071,7 +1041,7 @@ struct OptimizeXBLEU
 	  if (! ngrams[i].empty()) {
 	    const size_type    order = ngrams[i].size();
 	    const weight_type& count = counts[i].c;
-	    const double       clip = scorer->find(ngrams[i]);
+	    const weight_type  clip = scorer->find(ngrams[i]);
 	    
 	    counts[i].mu_prime = derivative_clip_count(count, clip);
 	    
@@ -1085,14 +1055,16 @@ struct OptimizeXBLEU
 	  }
 	
 	r += scorer->reference_length(hypo[1]);
-	
+
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
+	// NOTE: \nabla Z / Z - (Z \nablaR - R \nalbdaZ) / Z^2
+	//       = (1 / Z + R / Z^2) \nabla Z - (1 / Z) \nabla R
+	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectExpectation(index, ngrams, counts, matched, hypo,
 						  weights, scale, feature_scale,
-						  expectation,
-						  gradients_matched, gradients_hypo, gradient),
+						  gradients_matched, gradients_hypo),
 			       index,
 			       order);
       }
@@ -1210,8 +1182,8 @@ struct OptimizeXBLEU
     std::transform(task.g.begin(), task.g.end(), g, std::bind2nd(std::multiplies<double>(), 1.0 / optimizer.instances));
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
-	const double factor_matched = (exp_P * B / order) / task.c_matched[n];
-	const double factor_hypo    = (exp_P * B / order) / task.c_hypo[n];
+	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / task.c_hypo[n];
 	
 	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
 	  g[i] += factor_matched * task.g_matched[n][i];
@@ -1222,7 +1194,7 @@ struct OptimizeXBLEU
     
     if (task.c_hypo[1] > 0.0) {
       // I think the missed exp(P) is a bug in Rosti et al. (2011)
-      const double factor = exp_P * C_dC / task.c_hypo[1];
+      const double factor = - exp_P * C_dC / task.c_hypo[1];
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
 	g[i] += factor * task.g_hypo[1][i];
     }
