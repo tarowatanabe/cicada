@@ -1156,13 +1156,17 @@ struct OptimizeXBLEU
     
     // smoothing...
     {
-      double smoothing = 0.5;
+      double smoothing = 0.1;
       for (int n = 1; n <= order; ++ n) {
 	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
 	  task.c_matched[n] = smoothing;
 	smoothing *= 0.5;
       }
     }
+
+    if (debug >= 3)
+      for (int n = 1; n <= order; ++ n)
+	std::cerr << "order: " << n << " M: " << task.c_matched[n] << " H: " << task.c_hypo[n] << std::endl;
     
     // compute P
     double P = 0.0;
