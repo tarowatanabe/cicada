@@ -976,7 +976,8 @@ struct OptimizeXBLEU
       gradient_type  gradient;
       gradient_type  expectation;
       
-      const double scale = weights[feature_scale];
+      // for testing!
+      //const double scale = weights[feature_scale];
             
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1086,6 +1087,9 @@ struct OptimizeXBLEU
       
       g.allocate();
       std::copy(gradient.begin(), gradient.end(), g.begin());
+
+      // forced zero...
+      g[feature_scale] = 0.0;
     }
     
     const hypergraph_set_type& forests;
