@@ -1164,9 +1164,11 @@ struct OptimizeXBLEU
       }
     }
 
-    if (debug >= 3)
+    if (debug >= 3) {
       for (int n = 1; n <= order; ++ n)
 	std::cerr << "order: " << n << " M: " << task.c_matched[n] << " H: " << task.c_hypo[n] << std::endl;
+      std::cerr << "r: " << r << std::endl;
+    }
     
     // compute P
     double P = 0.0;
