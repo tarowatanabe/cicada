@@ -966,6 +966,18 @@ struct OptimizeXBLEU
       const double& scale;
     };
 
+    struct entropy_x
+    {
+      typedef weight_type value_type;
+      
+      entropy_x() : weight() {}
+      weight_type& operator[](size_t pos)  { return weight; }
+      
+      weight_type weight;
+    };
+
+    
+
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
 	 const weight_set_type& __weights,
@@ -1084,7 +1096,7 @@ struct OptimizeXBLEU
 	entropy_inside.clear();
 	entropy_inside.resize(forest.nodes.size());
 	
-	weight_type R;
+	entropy_x R;
 	cicada::inside_outside(forest,
 			       entropy_inside,
 			       R,
@@ -1092,7 +1104,7 @@ struct OptimizeXBLEU
 			       entropy_function(weights, scale));
 	const weight_type& Z = entropy_inside.back();
 	
-	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R / Z;
+	const weight_type entropy = weight_type(cicada::semiring::log(Z)) - R.weight / Z;
 	const double e_segment = double(entropy);
 	
 	e += e_segment;
