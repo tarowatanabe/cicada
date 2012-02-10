@@ -1026,13 +1026,13 @@ struct OptimizeXBLEU
 	if (debug >= 4)
 	  std::cerr << "entropy: " << e_segment << std::endl;
 #endif
-
+	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectCounts(index, ngrams, counts),
 			       index,
 			       order);
-		
+	
 	// second, commpute clipped ngram counts (\mu')
 	std::fill(matched.begin(), matched.end(), weight_type());
 	std::fill(hypo.begin(), hypo.end(), weight_type());
@@ -1055,7 +1055,11 @@ struct OptimizeXBLEU
 	  }
 	
 	r += scorer->reference_length(hypo[1]);
-
+	
+	if (debug >= 4)
+	  for (int n = 1; n <= order; ++ n)
+	    std::cerr << "order: " << n << " matched: " << matched[n] << " hypo: " << hypo[n] << std::endl;
+	
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
 	// NOTE: \nabla Z / Z - (Z \nablaR - R \nalbdaZ) / Z^2
 	//       = (1 / Z + R / Z^2) \nabla Z - (1 / Z) \nabla R
