@@ -1007,7 +1007,7 @@ struct OptimizeXBLEU
       gradient_type  gradient;
       gradient_type  expectation;
       
-      const double scale = weights[feature_scale];
+      //const double scale = weights[feature_scale];
             
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1123,7 +1123,7 @@ struct OptimizeXBLEU
       
       g.allocate();
       std::copy(gradient.begin(), gradient.end(), g.begin());
-
+      
       e = entropy;
     }
     
@@ -1262,6 +1262,9 @@ struct OptimizeXBLEU
     // we need to minimize negative bleu... + regularized by average entropy...
     //double objective = - objective_bleu - (temperature * entropy);
     double objective = - objective_bleu;
+
+    // temporarily....
+    g[optimizer.feature_scale.id()] = 0.0;
     
     if (regularize_l2) {
       double norm = 0.0;
