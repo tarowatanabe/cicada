@@ -950,17 +950,17 @@ struct OptimizeXBLEU
 
     typedef cicada::semiring::Expectation<weight_type, weight_type> pr_weight_type;
 
-    struct pr_function
+    struct pr_entropy_function
     {
       typedef pr_weight_type value_type;
       
-      pr_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      pr_entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
 	const double value = cicada::dot_product(edge.features, weights) * scale;
-	const double weight = cicada::semiring::traits<weight_type>::exp(value);
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(value);
 	
 	return value_type(weight, weight * weight_type(value));
       }
@@ -1138,7 +1138,7 @@ struct OptimizeXBLEU
 	  entropy_pr_inside.clear();
 	  entropy_pr_inside.resize(forest.nodes.size());
 	  
-	  cicada::inside(forest, entropy_pr_inside, pr_function(weights, scale));
+	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
 	  std::cerr << "pair P: " << entropy_pr_inside.back().p
 		    << " R: " << entropy_pr_inside.back().r
