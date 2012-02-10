@@ -1228,7 +1228,7 @@ struct OptimizeXBLEU
     // compute g..
     std::fill(g, g + size, 0.0);
     //std::copy(task.g.begin(), task.g.end(), g);
-    std::transform(task.g.begin(), task.g.end(), g, std::bind2nd(std::multiplies<double>(), 1.0 / optimizer.instances));
+    //std::transform(task.g.begin(), task.g.end(), g, std::bind2nd(std::multiplies<double>(), 1.0 / optimizer.instances));
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
