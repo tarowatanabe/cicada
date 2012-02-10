@@ -948,6 +948,29 @@ struct OptimizeXBLEU
       gradients_type& gradients_hypo;
     };
 
+    typedef cicada::semiring::Expectation<weight_type, weight_type> pr_weight_type;
+
+    struct pr_function
+    {
+      typedef pr_weight_type value_type;
+      
+      pr_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	const double value = cicada::dot_product(edge.features, weights) * scale;
+	const double weight = cicada::semiring::traits<weight_type>::exp(value);
+	
+	return value_type(weight, weight * weight_type(value));
+      }
+      
+      const weight_set_type& weights;
+      const double& scale;
+    };
+
+    typedef std::vector<pr_weight_type, std::allocator<pr_weight_type> > pr_weights_type;
+    
     struct entropy_function
     {
       typedef weight_type value_type;
@@ -1004,8 +1027,10 @@ struct OptimizeXBLEU
       
       weight_type    entropy;
       weights_type   entropy_inside;
+      pr_weights_type entropy_pr_inside;
       gradient_type  gradient;
-      gradient_type  expectation;
+      gradient_type  dR;
+      gradient_type  dZ;
       
       const double scale = weights[feature_scale];
             
@@ -1108,6 +1133,24 @@ struct OptimizeXBLEU
 	
 	if (debug >= 4)
 	  std::cerr << "entropy: " << double(entropy_segment) << std::endl;
+
+	{
+	  entropy_pr_inside.clear();
+	  entropy_pr_inside.resize(forest.nodes.size());
+	  
+	  cicada::inside(forest, entropy_pr_inside, pr_function(weights, scale));
+	  
+	  std::cerr << "pair P: " << entropy_pr_inside.back().p
+		    << " R: " << entropy_pr_inside.back().r
+		    << " Z: " << Z
+		    << " R: " << R.weight << std::endl;
+	}
+	
+	// fifth, compute derivatives...
+	dR.clear();
+	dZ.clear();
+	
+	
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
