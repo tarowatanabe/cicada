@@ -81,8 +81,8 @@ namespace cicada
     template <typename Tp, typename Tr>
     struct traits<Expectation<Tp, Tr> >
     {
-      static inline Tp zero() { return Expectation<Tp, Tr>::zero();  }
-      static inline Tp one()  { return Expectation<Tp, Tr>::one(); }
+      static inline Expectation<Tp,Tr> zero() { return Expectation<Tp, Tr>::zero();  }
+      static inline Expectation<Tp,Tr> one()  { return Expectation<Tp, Tr>::one(); }
     };
 
   };

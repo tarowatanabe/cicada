@@ -950,11 +950,11 @@ struct OptimizeXBLEU
 
     typedef cicada::semiring::Expectation<weight_type, weight_type> entropy_weight_type;
 
-    struct pr_entropy_function
+    struct entropy_function
     {
       typedef entropy_weight_type value_type;
       
-      pr_entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
@@ -969,36 +969,70 @@ struct OptimizeXBLEU
       const double scale;
     };
 
-    typedef std::vector<entropy_weight_type, std::allocator<entropy_weight_type> > pr_weights_type;
-    
-    struct entropy_function
+    struct entropy_gradient_function
     {
-      typedef weight_type value_type;
+      struct value_type
+      {
+	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale)
+	  : features(__features), weights(__weights), scale(__scale) {}
+	
+	friend
+	value_type operator*(const value_type& x, const entropy_weight_type& weight)
+	{
+	  const_cast<value_type&>(x).inside_outside = weight;
+	  return x;
+	}
+	
+	entropy_weight_type inside_outside;
+	
+	const feature_set_type& features;
+	const weight_set_type& weights;
+	const double scale;
+      };
 
-      entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      entropy_gradient_function(const weight_set_type& __weights, const double& __scale)
+	: weights(__weights), scale(__scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
-	
-	return weight * weight_type(cicada::semiring::log(weight));
+	return value_type(edge.features, weights, scale);
       }
       
       const weight_set_type& weights;
-      const double& scale;
+      const double scale;
     };
     
-    struct entropy_x
+
+    struct entropy_gradient_type
     {
-      typedef weight_type value_type;
+      typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+
+      struct proxy_type
+      {
+	proxy_type(accumulated_type& __dZ, accumulated_type& __dR) : dZ(__dZ), dR(__dR) {}
+	
+	proxy_type& operator+=(const entropy_gradient_function::value_type& value) 
+	{
+	  
+	  
+	  return *this;
+	}
+	
+	accumulated_type& dZ;
+	accumulated_type& dR;
+      };
       
-      entropy_x() : weight() {}
+      typedef proxy_type value_type;
       
-      weight_type& operator[](size_t pos)  { return weight; }
+      proxy_type operator[](size_t id) { return proxy_type(dZ, dR); }
       
-      weight_type weight;
+      accumulated_type dZ;
+      accumulated_type dR;
     };
+
+    typedef std::vector<entropy_weight_type, std::allocator<entropy_weight_type> > entropy_weights_type;
+    
 
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
@@ -1026,12 +1060,9 @@ struct OptimizeXBLEU
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
       
-      weight_type    entropy;
-      weights_type   entropy_inside;
-      pr_weights_type entropy_pr_inside;
-      gradient_type  gradient;
-      gradient_type  dR;
-      gradient_type  dZ;
+      weight_type          entropy;
+      entropy_weights_type entropy_inside;
+      gradient_type        gradient;
       
       const double scale = weights[feature_scale];
             
@@ -1119,42 +1150,21 @@ struct OptimizeXBLEU
 	
 	// forth, compute entorpy...
 	entropy_inside.clear();
-	entropy_inside.resize(forest.nodes.size(), weight_type());
+	entropy_inside.resize(forest.nodes.size(), entropy_weight_type());
+
+	entropy_gradient_type entropy_gradient;
 	
-	entropy_x R;
-	cicada::inside_outside(forest,
-			       entropy_inside,
-			       R,
-			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       entropy_function(weights, scale));
-	const weight_type& Z = entropy_inside.back();
+	cicada::inside_outside(forest, entropy_inside, entropy_gradient, entropy_function(weights, scale), entropy_gradient_function(weights, scale));
 	
-	const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R.weight / Z);
-	entropy += entropy_segment;
+	const weight_type& Z = entropy_inside.back().p;
+	const weight_type& R = entropy_inside.back().r;
+	
+	const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R / Z);
 	
 	if (debug >= 4)
 	  std::cerr << "entropy: " << double(entropy_segment) << std::endl;
-
-	{
-	  entropy_pr_inside.clear();
-	  entropy_pr_inside.resize(forest.nodes.size(), entropy_weight_type());
-	  
-	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
-	  
-	  const weight_type& Z = entropy_pr_inside.back().p;
-	  const weight_type& R = entropy_pr_inside.back().r;
-
-	  const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R / Z);
-	  
-	  if (debug >= 4)
-	    std::cerr << "entropy: " << double(entropy_segment) << std::endl;
-	}
 	
-	// fifth, compute derivatives...
-	dR.clear();
-	dZ.clear();
-	
-	
+	entropy += entropy_segment;
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
