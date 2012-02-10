@@ -51,7 +51,7 @@ namespace cicada
       Expectation& operator*=(const Expectation& x)
       {
 	r = x.r * p + r * x.p;
-	p *= p;
+	p *= x.p;
 	return *this;
       }
       

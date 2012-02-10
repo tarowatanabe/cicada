@@ -948,11 +948,11 @@ struct OptimizeXBLEU
       gradients_type& gradients_hypo;
     };
 
-    typedef cicada::semiring::Expectation<weight_type, weight_type> pr_weight_type;
+    typedef cicada::semiring::Expectation<weight_type, weight_type> entropy_weight_type;
 
     struct pr_entropy_function
     {
-      typedef pr_weight_type value_type;
+      typedef entropy_weight_type value_type;
       
       pr_entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
       
@@ -969,7 +969,7 @@ struct OptimizeXBLEU
       const double scale;
     };
 
-    typedef std::vector<pr_weight_type, std::allocator<pr_weight_type> > pr_weights_type;
+    typedef std::vector<entropy_weight_type, std::allocator<entropy_weight_type> > pr_weights_type;
     
     struct entropy_function
     {
@@ -1137,7 +1137,7 @@ struct OptimizeXBLEU
 
 	{
 	  entropy_pr_inside.clear();
-	  entropy_pr_inside.resize(forest.nodes.size(), pr_weight_type());
+	  entropy_pr_inside.resize(forest.nodes.size(), entropy_weight_type());
 	  
 	  cicada::inside(forest, entropy_pr_inside, pr_entropy_function(weights, scale));
 	  
