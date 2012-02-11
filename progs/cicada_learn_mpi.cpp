@@ -2218,7 +2218,7 @@ void options(int argc, char** argv)
     
     ("regularize-l1",      po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2",      po::bool_switch(&regularize_l2), "L2-regularization")
-    ("regularize-entropy", po::bool_switch(&regularize_l2), " entropy regularization")
+    ("regularize-entropy", po::bool_switch(&regularize_entropy), " entropy regularization")
     
     ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
     ("C2",            po::value<double>(&C2)->default_value(C2),       "an alternative regularization constant")
