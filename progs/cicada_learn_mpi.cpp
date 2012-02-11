@@ -78,18 +78,21 @@ bool learn_pegasos = false;
 
 bool regularize_l1 = false;
 bool regularize_l2 = false;
+bool regularize_entropy = false;
 double C = 1.0;
+double C2 = 1.0;
 double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
 
 double temperature = 0.5;
-//double temperature_start = 1000;
-//double temperature_end = 0.001;
-//double temperature_rate = 0.5;
+double temperature_start = 1000;
+double temperature_end = 0.001;
+double temperature_rate = 0.5;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+bool annealing_mode = false;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
@@ -1060,7 +1063,7 @@ struct OptimizeXBLEU
       
       weight_type          entropy;
       entropy_weights_type entropy_inside;
-      gradient_type        gradient;
+      gradient_type        gradient_entropy;
       
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1070,8 +1073,8 @@ struct OptimizeXBLEU
 	g_hypo[n].clear();
       }
 
-      gradient.allocate();
-      g.clear();
+      gradient_entropy.allocate();
+      g_entropy.clear();
       
       std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
       std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
@@ -1165,14 +1168,17 @@ struct OptimizeXBLEU
 	
 	const entropy_gradient_type::accumulated_type& dZ = entropy_gradient.dZ;
 	const entropy_gradient_type::accumulated_type& dR = entropy_gradient.dR;
+
+	// compute...
+	// \frac{\nabla Z}{Z} - \frac{Z \nabla \bar{r} - \bar{r} \nabla Z}{Z^2}
 	
 	entropy_gradient_type::accumulated_type::const_iterator ziter_end = dZ.end();
 	for (entropy_gradient_type::accumulated_type::const_iterator ziter = dZ.begin(); ziter != ziter_end; ++ ziter)
-	  gradient[ziter->first] += weight_type(- temperature) * ziter->second * ((cicada::semiring::traits<weight_type>::one() / Z) + R / (Z * Z));
+	  gradient_entropy[ziter->first] += ziter->second * ((cicada::semiring::traits<weight_type>::one() / Z) + R / (Z * Z));
 	
 	entropy_gradient_type::accumulated_type::const_iterator riter_end = dR.end();
 	for (entropy_gradient_type::accumulated_type::const_iterator riter = dR.begin(); riter != riter_end; ++ riter)
-	  gradient[riter->first] -= weight_type(- temperature) * riter->second / Z;
+	  gradient_entropy[riter->first] -= riter->second / Z;
       }
       
       std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
@@ -1186,8 +1192,8 @@ struct OptimizeXBLEU
 	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
       }
       
-      g.allocate();
-      std::copy(gradient.begin(), gradient.end(), g.begin());
+      g_entropy.allocate();
+      std::copy(gradient_entropy.begin(), gradient_entropy.end(), g_entropy.begin());
       
       e = entropy;
     }
@@ -1200,7 +1206,7 @@ struct OptimizeXBLEU
     ngram_counts_type   c_hypo;
     feature_counts_type g_matched;
     feature_counts_type g_hypo;
-    weight_set_type     g;
+    weight_set_type     g_entropy;
     double r;
     double e;
   };
@@ -1255,7 +1261,7 @@ struct OptimizeXBLEU
       reduce_weights(task.g_matched[n]);
       reduce_weights(task.g_hypo[n]);
     }
-    reduce_weights(task.g);
+    reduce_weights(task.g_entropy);
     
     // smoothing...
 #if 1
@@ -1290,11 +1296,26 @@ struct OptimizeXBLEU
     const double C_dC  = C * task.derivative_brevity_penalty(1.0 - C);
     
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
+
+        // xBLEU...
+    const double objective_bleu = exp_P * B;
+    const double entropy = task.e / optimizer.instances;
     
     // compute g..
     std::fill(g, g + size, 0.0);
     //std::copy(task.g.begin(), task.g.end(), g);
-    std::transform(task.g.begin(), task.g.end(), g, std::bind2nd(std::multiplies<double>(), 1.0 / optimizer.instances));
+
+    // entropy
+    if (regularize_entropy) {
+      // 0.5 * (entropy - C2)^2
+      // 
+      // thus, derivative is: (entropy - C2) * \nabla entropy
+      // we need to consider average of entropy...
+      
+      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) * (1.0 / optimizer.instances)));
+    } else
+      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / optimizer.instances));
+    
     for (int n = 1; n <= order; ++ n)  {
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
@@ -1320,13 +1341,9 @@ struct OptimizeXBLEU
 	if (g[i] != 0.0 && feature_type(i) != feature_type())
 	  std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
     }
-    
-    // xBLEU...
-    const double objective_bleu = exp_P * B;
-    const double entropy = task.e / optimizer.instances;
-    
+        
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu - (temperature * entropy);
+    double objective = - objective_bleu + (regularize_entropy ? (entropy - C2) * (entropy - C2) : - (temperature * entropy));
     //double objective = - objective_bleu;
     
     if (regularize_l2) {
@@ -1673,7 +1690,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	  send_weights(task.g_matched[n]);
 	  send_weights(task.g_hypo[n]);
 	}
-	send_weights(task.g);
+	send_weights(task.g_entropy);
 	
       }
     }
@@ -2199,14 +2216,22 @@ void options(int argc, char** argv)
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
     ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
     
-    ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
-    ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
+    ("regularize-l1",      po::bool_switch(&regularize_l1), "L1-regularization")
+    ("regularize-l2",      po::bool_switch(&regularize_l2), "L2-regularization")
+    ("regularize-entropy", po::bool_switch(&regularize_l2), " entropy regularization")
+    
     ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
+    ("C2",            po::value<double>(&C2)->default_value(C2),       "an alternative regularization constant")
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
     
-    ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
+    ("temperature",       po::value<double>(&temperature)->default_value(temperature),             "temperature")
+    ("temperature-start", po::value<double>(&temperature_start)->default_value(temperature_start), "start temperature for annealing")
+    ("temperature-end",   po::value<double>(&temperature_end)->default_value(temperature_end),     "end temperature for annealing")
+    ("temperature-rate",  po::value<double>(&temperature_rate)->default_value(temperature_rate),   "annealing rate")
+
+    ("annealing", po::bool_switch(&annealing_mode), "annealing")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
