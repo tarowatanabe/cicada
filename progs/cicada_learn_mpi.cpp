@@ -1343,7 +1343,7 @@ struct OptimizeXBLEU
     }
         
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu + (regularize_entropy ? (entropy - C2) * (entropy - C2) : - (temperature * entropy));
+    double objective = - objective_bleu + (regularize_entropy ? (entropy - C2) * (entropy - C2) : - temperature * entropy);
     //double objective = - objective_bleu;
     
     if (regularize_l2) {
@@ -2216,8 +2216,8 @@ void options(int argc, char** argv)
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
     ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
     
-    ("regularize-l1",      po::bool_switch(&regularize_l1), "L1-regularization")
-    ("regularize-l2",      po::bool_switch(&regularize_l2), "L2-regularization")
+    ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
+    ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
     ("regularize-entropy", po::bool_switch(&regularize_entropy), " entropy regularization")
     
     ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
