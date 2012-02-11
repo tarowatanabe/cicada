@@ -1343,7 +1343,7 @@ struct OptimizeXBLEU
     }
         
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu + (regularize_entropy ? (entropy - C2) * (entropy - C2) : - temperature * entropy);
+    double objective = - objective_bleu + (regularize_entropy ? 0.5 * (entropy - C2) * (entropy - C2) : - temperature * entropy);
     //double objective = - objective_bleu;
     
     if (regularize_l2) {
