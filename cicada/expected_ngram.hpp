@@ -124,8 +124,6 @@ namespace cicada
 	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    weight *= inside[*niter];
 	  
-	  op(edge, weight, counts);
-	  
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);
 	  
@@ -138,6 +136,9 @@ namespace cicada
 	    // current tails...
 	    for (size_t i = 0; i != edge.tails.size(); ++ i)
 	      tails[i] = node_map[edge.tails[i]][j[i]];
+	    
+	    // operation at virtua node
+	    op(edge, weight, counts);
 	    
 	    // apply various ngram cconetxt...
 	    const state_type state = apply(edge, tails, weight, counts, is_goal);

@@ -161,3 +161,6 @@ revise static create interface:
 
 small-vector reimplement:
   we will occupy two-pointers (at least 16-byte) and use only 32-bit (= 4 byte) size indicator, so that we can use 12-byte for storage...
+
+
+Entropy-target regularization by { H(x) - \delta }^2
