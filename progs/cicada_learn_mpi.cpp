@@ -1682,7 +1682,9 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     } else 
       objective = optimizer();
     
-    if (quenching_mode)
+    if (quenching_mode) {
+      temperature = 0.0;
+      
       for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
 	if (debug >= 2)
 	  std::cerr << "quench: " << quench << std::endl;
@@ -1691,6 +1693,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	
 	objective = optimizer();
       }
+    }
 
     
     if (debug >= 3)
