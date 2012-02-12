@@ -1638,7 +1638,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     double objective = 0.0;
     
     if (annealing_mode) {
-      for (temperature = temperature_start; temperature > temperature_end; temperature *= temperature_rate) {
+      for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
 	if (debug >= 2)
 	  std::cerr << "temperature: " << temperature << std::endl;
 	
