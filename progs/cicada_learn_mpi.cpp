@@ -1232,6 +1232,8 @@ struct OptimizeXBLEU
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
     
+    // bcast temperature
+    MPI::COMM_WORLD.Bcast(&temperature, 1, MPI::DOUBLE, 0);
     bcast_weights(0, optimizer.weights);
     
     task_type task(optimizer.forests, optimizer.scorers, optimizer.weights);
@@ -1635,8 +1637,18 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   if (mpi_rank == 0) {
     Optimize optimizer(forests, scorers, weights, instances, C);
     
-    const double objective = optimizer();
-
+    double objective = 0.0;
+    
+    if (annealing_mode) {
+      for (temperature = temperature_start; temperature > temperature_end; temperature *= temperature_rate) {
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+	
+	objective = optimizer();
+      }
+    } else 
+      objective = optimizer();
+    
     if (debug >= 3)
       std::cerr << "final weights:" << std::endl
 		<< weights << std::flush;
@@ -1668,6 +1680,8 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 
 	requests[NOTIFY].Start();
 	
+	// bcast temperature
+	MPI::COMM_WORLD.Bcast(&temperature, 1, MPI::DOUBLE, 0);
 	bcast_weights(0, weights);
 	
 	task_type task(forests, scorers, weights);
