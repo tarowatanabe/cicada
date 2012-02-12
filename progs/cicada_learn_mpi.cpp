@@ -698,12 +698,14 @@ struct OptimizeXBLEU
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
 		const size_t& __instances,
-		const double& __lambda)
+		const double& __lambda,
+		const feature_type& __feature_scale)
     : forests(__forests),
       scorers(__scorers),
       weights(__weights),
       instances(__instances),
-      lambda(__lambda) {}
+      lambda(__lambda),
+      feature_scale(__feature_scale) {}
   
   const hypergraph_set_type& forests;
   const scorer_document_type& scorers;
@@ -711,6 +713,7 @@ struct OptimizeXBLEU
   
   size_t instances;
   double lambda;
+  const feature_type& feature_scale;
 
   double objective_opt;
   weight_set_type weights_opt;
@@ -865,10 +868,11 @@ struct OptimizeXBLEU
 			 const weights_type& __hypo,
 			 const weight_set_type& __weights,
 			 const double& __scale,
+			 const feature_type& __feature_scale,
 			 gradients_type& __gradients_matched,
 			 gradients_type& __gradients_hypo)
 	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
-	  weights(__weights), scale(__scale), 
+	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
 	  gradients_matched(__gradients_matched),
 	  gradients_hypo(__gradients_hypo)
       {}
@@ -876,6 +880,8 @@ struct OptimizeXBLEU
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
       {
+	const weight_type value_scale(cicada::dot_product(edge.features, weights));
+
 	for (int n = 1; n <= order; ++ n) 
 	  if (hypo[n] > weight_type()) {
 	    const weight_type scale_matched = weight * matched[n];
@@ -889,6 +895,9 @@ struct OptimizeXBLEU
 		gradients_matched[n][fiter->first] -= value * scale_matched;
 		gradients_hypo[n][fiter->first]    -= value * scale_hypo;
 	      }
+	    
+	    gradients_matched[n][feature_scale] -= value_scale * scale_matched;
+	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
 	  }
       }
       
@@ -912,6 +921,8 @@ struct OptimizeXBLEU
 	const weight_type scale_matched = weight * counts[id].mu_prime;
 	const weight_type scale_hypo    = weight;
 
+	const weight_type value_scale(cicada::dot_product(edge.features, weights));
+
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	  if (fiter->second != 0.0) {
@@ -920,6 +931,9 @@ struct OptimizeXBLEU
 	    gradients_matched[order][fiter->first] += value * scale_matched;
 	    gradients_hypo[order][fiter->first]    += value * scale_hypo;
 	  }
+	
+	gradients_matched[order][feature_scale] += value_scale * scale_matched;
+	gradients_hypo[order][feature_scale]    += value_scale * scale_hypo;
       }
       
       const index_set_type& index;
@@ -930,6 +944,7 @@ struct OptimizeXBLEU
       
       const weight_set_type& weights;
       const double& scale;
+      const feature_type& feature_scale;
       
       gradients_type& gradients_matched;
       gradients_type& gradients_hypo;
@@ -960,8 +975,8 @@ struct OptimizeXBLEU
     {
       struct value_type
       {
-	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale)
-	  : features(__features), weights(__weights), scale(__scale) {}
+	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	  : features(__features), weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
 	
 	friend
 	value_type operator*(const value_type& x, const entropy_weight_type& weight)
@@ -975,19 +990,21 @@ struct OptimizeXBLEU
 	const feature_set_type& features;
 	const weight_set_type& weights;
 	const double scale;
+	const feature_type& feature_scale;
       };
       
-      entropy_gradient_function(const weight_set_type& __weights, const double& __scale)
-	: weights(__weights), scale(__scale) {}
+      entropy_gradient_function(const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	: weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return value_type(edge.features, weights, scale);
+	return value_type(edge.features, weights, scale, feature_scale);
       }
       
       const weight_set_type& weights;
       const double scale;
+      const feature_type& feature_scale;
     };
     
 
@@ -1004,7 +1021,8 @@ struct OptimizeXBLEU
 	  const double value = cicada::dot_product(x.features, x.weights);
 	  const double log_p_e = value * x.scale;
 	  const weight_type p_e = cicada::semiring::traits<weight_type>::exp(log_p_e);
-
+	  const weight_type value_scale(value);
+	  
 	  // dZ += \lnabla p_e * x.inside_outside.p;
 	  // dR += (1 + \log p_e) * \nalba p_e * x.inside_outside.p + \lnabla p_e * x.inside_outside.r;
 	  
@@ -1017,6 +1035,8 @@ struct OptimizeXBLEU
 	      dR[fiter->first] += (weight_type(1.0 + log_p_e) * value * p_e * x.inside_outside.p + value * p_e * x.inside_outside.r);
 	    }
 	  
+	  dZ[x.feature_scale] += value_scale * p_e * x.inside_outside.p;
+	  dR[x.feature_scale] += (weight_type(1.0 + log_p_e) * value_scale * p_e * x.inside_outside.p + value_scale * p_e * x.inside_outside.r);
 	  
 	  return *this;
 	}
@@ -1038,8 +1058,9 @@ struct OptimizeXBLEU
 
     Task(const hypergraph_set_type& __forests,
 	 const scorer_document_type& __scorers,
-	 const weight_set_type& __weights)
-      : forests(__forests), scorers(__scorers), weights(__weights),
+	 const weight_set_type& __weights,
+	 const feature_type& __feature_scale)
+      : forests(__forests), scorers(__scorers), weights(__weights), feature_scale(__feature_scale),
 	c_matched(order + 1),
 	c_hypo(order + 1),
 	g_matched(order + 1),
@@ -1138,7 +1159,7 @@ struct OptimizeXBLEU
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectExpectation(index, ngrams, counts, matched, hypo,
-						  weights, scale,
+						  weights, scale, feature_scale,
 						  gradients_matched, gradients_hypo),
 			       index,
 			       order);
@@ -1154,7 +1175,7 @@ struct OptimizeXBLEU
 			       entropy_inside,
 			       entropy_gradient,
 			       entropy_function(weights, scale),
-			       entropy_gradient_function(weights, scale));
+			       entropy_gradient_function(weights, scale, feature_scale));
 	
 	const weight_type& Z = entropy_inside.back().p;
 	const weight_type& R = entropy_inside.back().r;
@@ -1201,6 +1222,7 @@ struct OptimizeXBLEU
     const hypergraph_set_type& forests;
     const scorer_document_type& scorers;
     const weight_set_type& weights;
+    const feature_type& feature_scale;
     
     ngram_counts_type   c_matched;
     ngram_counts_type   c_hypo;
@@ -1234,7 +1256,7 @@ struct OptimizeXBLEU
     
     bcast_weights(0, optimizer.weights);
     
-    task_type task(optimizer.forests, optimizer.scorers, optimizer.weights);
+    task_type task(optimizer.forests, optimizer.scorers, optimizer.weights, optimizer.feature_scale);
     task();
     
     {
@@ -1349,8 +1371,8 @@ struct OptimizeXBLEU
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
-	g[i] += optimizer.lambda * x[i];
-	norm += x[i] * x[i];
+	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
+	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
       }
       objective += 0.5 * optimizer.lambda * norm;
     }
@@ -1360,6 +1382,7 @@ struct OptimizeXBLEU
 		<< " xBLEU: " << objective_bleu
 		<< " BP: " << B
 		<< " entropy: " << entropy
+		<< " scale: " << optimizer.weights[optimizer.feature_scale]
 		<< std::endl;
 
 #if 1
@@ -1624,7 +1647,11 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-    
+  
+  const feature_type feature_scale(":feature-scale:");
+  
+  weights[feature_scale] = scale;
+  
   int instances_local = 0;
   for (size_t id = 0; id != forests.size(); ++ id)
     instances_local += forests[id].is_valid();
@@ -1633,7 +1660,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    Optimize optimizer(forests, scorers, weights, instances, C);
+    Optimize optimizer(forests, scorers, weights, instances, C, feature_scale);
     
     double objective = 0.0;
     
@@ -1680,7 +1707,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	
 	bcast_weights(0, weights);
 	
-	task_type task(forests, scorers, weights);
+	task_type task(forests, scorers, weights, feature_scale);
 	task();
 	
 	typename task_type::ngram_counts_type c_matched(order + 1, 0.0);
