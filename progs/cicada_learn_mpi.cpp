@@ -85,14 +85,20 @@ double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
 
+bool annealing_mode = false;
+bool quenching_mode = false;
+
 double temperature = 0.5;
 double temperature_start = 1000;
 double temperature_end = 0.001;
 double temperature_rate = 0.5;
 
+double quench_start = 0.01;
+double quench_end = 100;
+double quench_rate = 10;
+
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
-bool annealing_mode = false;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
@@ -1676,6 +1682,17 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     } else 
       objective = optimizer();
     
+    if (quenching_mode)
+      for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
+	if (debug >= 2)
+	  std::cerr << "quench: " << quench << std::endl;
+	
+	weights[feature_scale] = quench;
+	
+	objective = optimizer();
+      }
+
+    
     if (debug >= 3)
       std::cerr << "final weights:" << std::endl
 		<< weights << std::flush;
@@ -2264,13 +2281,18 @@ void options(int argc, char** argv)
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+
+    ("annealing", po::bool_switch(&annealing_mode), "annealing")
+    ("quenching", po::bool_switch(&quenching_mode), "quenching")
     
     ("temperature",       po::value<double>(&temperature)->default_value(temperature),             "temperature")
     ("temperature-start", po::value<double>(&temperature_start)->default_value(temperature_start), "start temperature for annealing")
     ("temperature-end",   po::value<double>(&temperature_end)->default_value(temperature_end),     "end temperature for annealing")
     ("temperature-rate",  po::value<double>(&temperature_rate)->default_value(temperature_rate),   "annealing rate")
 
-    ("annealing", po::bool_switch(&annealing_mode), "annealing")
+    ("quench-start", po::value<double>(&quench_start)->default_value(quench_start), "start quench for annealing")
+    ("quench-end",   po::value<double>(&quench_end)->default_value(quench_end),     "end quench for annealing")
+    ("quench-rate",  po::value<double>(&quench_rate)->default_value(quench_rate),   "quenching rate")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
