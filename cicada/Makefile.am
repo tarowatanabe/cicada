@@ -228,6 +228,7 @@ operation/binarize.hpp \
 operation/clear.hpp \
 operation/compose.hpp \
 operation/debinarize.hpp \
+operation/expand_ngram.hpp \
 operation/expected_ngram.hpp \
 operation/functional.hpp \
 operation/generate.hpp \
@@ -256,6 +257,7 @@ operation/binarize.cpp \
 operation/clear.cpp \
 operation/compose.cpp \
 operation/debinarize.cpp \
+operation/expand_ngram.cpp \
 operation/expected_ngram.cpp \
 operation/intersect.cpp \
 operation/generate.cpp \

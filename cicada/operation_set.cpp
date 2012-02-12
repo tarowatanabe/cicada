@@ -23,6 +23,7 @@
 #include "operation/generate.hpp"
 #include "operation/apply.hpp"
 #include "operation/debinarize.hpp"
+#include "operation/expand_ngram.hpp"
 #include "operation/expected_ngram.hpp"
 #include "operation/parse.hpp"
 #include "operation/posterior.hpp"
@@ -120,6 +121,8 @@ compose-tree-cky: composition from tree with tree grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\
 \tunique-goal=[true|false] unique goal\n\
 debinarize: de-binarize forest\n\
+expand-ngram: expand hypergrpah by ngram\n\
+\torder=<ngram order>\n\
 expected-ngram: expected ngram computation\n\
 \torder=<ngram order>\n\
 \tbos-eos=[true|false] include <s> and </s> in ngrams\n\
@@ -370,6 +373,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::Debinarize(*piter, debug)));
       else if (param_name == "expected-ngram")
 	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
+      else if (param_name == "expand-ngram")
+	operations.push_back(operation_ptr_type(new operation::ExpandNGram(*piter, debug)));      
       else if (param_name == "output") {
 	// we do extra checking so that all the output directed to either the same directory or output-file
 	std::auto_ptr<operation::Output> output(new operation::Output(*piter, output_data, debug));
