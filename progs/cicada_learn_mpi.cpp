@@ -1232,8 +1232,6 @@ struct OptimizeXBLEU
       std::cerr << "weights:" << std::endl
 		<< optimizer.weights << std::flush;
     
-    // bcast temperature
-    MPI::COMM_WORLD.Bcast(&temperature, 1, MPI::DOUBLE, 0);
     bcast_weights(0, optimizer.weights);
     
     task_type task(optimizer.forests, optimizer.scorers, optimizer.weights);
@@ -1680,8 +1678,6 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 
 	requests[NOTIFY].Start();
 	
-	// bcast temperature
-	MPI::COMM_WORLD.Bcast(&temperature, 1, MPI::DOUBLE, 0);
 	bcast_weights(0, weights);
 	
 	task_type task(forests, scorers, weights);
