@@ -323,6 +323,64 @@ namespace cicada
   private:
     map_type __map;
   };
+  
+  template <typename T1, typename A1, typename T2>
+  inline
+  FeatureVectorUnordered<T1,A1> operator+(const FeatureVectorUnordered<T1,A1>& x, const T2& y)
+  {
+    FeatureVectorUnordered<T1,A1> features(x);
+    features += y;
+    return features;
+  }
+
+  template <typename T2, typename T1, typename A1>
+  inline
+  FeatureVectorUnordered<T1,A1> operator+(const T2& x, const FeatureVectorUnordered<T1,A1>& y)
+  {
+    FeatureVectorUnordered<T1,A1> features(y);
+    features += x;
+    return features;
+  }
+
+  template <typename T1, typename A1, typename T2>
+  inline
+  FeatureVectorUnordered<T1,A1> operator*(const FeatureVectorUnordered<T1,A1>& x, const T2& y)
+  {
+    if (y == T2()) return FeatureVectorUnordered<T1,A1>();
+    
+    FeatureVectorUnordered<T1,A1> features(x);
+    features *= y;
+    return features;
+  }
+
+  template <typename T2, typename T1, typename A1>
+  inline
+  FeatureVectorUnordered<T1,A1> operator*(const T2& x, const FeatureVectorUnordered<T1,A1>& y)
+  {
+    if (x == T2()) return FeatureVectorUnordered<T1,A1>();
+    
+    FeatureVectorUnordered<T1,A1> features(y);
+    features *= x;
+    return features;
+  }
+
+  template <typename T1, typename A1, typename T2>
+  inline
+  FeatureVectorUnordered<T1,A1> operator-(const FeatureVectorUnordered<T1,A1>& x, const T2& y)
+  {
+    FeatureVectorUnordered<T1,A1> features(x);
+    features -= y;
+    return features;
+  }
+  
+  template <typename T1, typename A1, typename T2>
+  inline
+  FeatureVectorUnordered<T1,A1> operator/(const FeatureVectorUnordered<T1,A1>& x, const T2& y)
+  {
+    FeatureVectorUnordered<T1,A1> features(x);
+    features /= y;
+    return features;
+  }
 };
 
 namespace std

@@ -1464,7 +1464,7 @@ struct OptimizeLBFGS
   struct Task
   {
     typedef cicada::semiring::Log<double> weight_type;
-    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
 
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
