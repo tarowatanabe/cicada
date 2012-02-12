@@ -1355,7 +1355,7 @@ struct OptimizeXBLEU
       // thus, derivative is: (entropy - C2) * \nabla entropy
       // we need to consider average of entropy...
       
-      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) * (1.0 / optimizer.instances)));
+      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) /optimizer.instances));
     } else
       std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / optimizer.instances));
     
