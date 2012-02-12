@@ -1103,6 +1103,8 @@ struct OptimizeXBLEU
       std::fill(c_hypo.begin(), c_hypo.end(), 0.0);
       r = 0.0;
       e = 0.0;
+
+      const double scale = weights[feautre_scale];
       
       for (size_t id = 0; id != forests.size(); ++ id) {
 	const hypergraph_type& forest = forests[id];
