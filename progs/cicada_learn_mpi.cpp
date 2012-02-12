@@ -180,6 +180,19 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no reference translations?");
     if (learn_xbleu && order <= 0)
       throw std::runtime_error("invalid ngram order");
+
+    if (annealing_mode) {
+      if (! (temperature_end < temperature_start))
+	throw std::runtime_error("temperature should start higher, then decreased");
+      if (temperature_rate <= 0.0 || temperature_rate >= 1.0)
+	throw std::runtime_error("temperature rate should be 0.0 < rate < 1.0: " + utils::lexical_cast<std::string>(temperature_rate));
+    }
+    if (quenching_mode) {
+      if (! (quench_start < quench_end))
+	throw std::runtime_error("quenching should start lower, then increased");
+      if (quench_rate <= 1.0)
+	throw std::runtime_error("quenching rate should be > 1.0: " + utils::lexical_cast<std::string>(quench_rate)); 
+    }
     
     if (! bound_lower_file.empty())
       if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
