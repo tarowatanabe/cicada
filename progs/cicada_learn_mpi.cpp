@@ -1104,7 +1104,7 @@ struct OptimizeXBLEU
       r = 0.0;
       e = 0.0;
 
-      const double scale = weights[feautre_scale];
+      const double scale = weights[feature_scale];
       
       for (size_t id = 0; id != forests.size(); ++ id) {
 	const hypergraph_type& forest = forests[id];
