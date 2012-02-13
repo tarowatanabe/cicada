@@ -1859,7 +1859,7 @@ struct OptimizeXBLEU
 	  Z_reference += prob * bleu->length_reference;
 	    
 	  // collect entropy...
-	  Z_entropy += prob * cicada::semiring::log(prob);
+	  Z_entropy -= prob * cicada::semiring::log(prob);
 	    
 	  // collect expectation
 	  sample_set_type::const_reference::const_iterator fiter_end = features_kbest[id][k].end();
