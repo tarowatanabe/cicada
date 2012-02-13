@@ -199,8 +199,10 @@ int main(int argc, char** argv)
 	  std::string::const_iterator iter_end  = line.end();
 	
 	  if (! boost::spirit::qi::parse(iter, iter_end, parser, feature_weight))
-	    if (iter != iter_end)
+	    if (iter != iter_end) {
+	      std::cerr << "WARNING: ignoring: " << line << std::endl;
 	      continue;
+	    }
 	
 	  const std::string& feature = boost::fusion::get<0>(feature_weight);
 	  const int&         pos     = boost::fusion::get<1>(feature_weight);
@@ -233,8 +235,10 @@ int main(int argc, char** argv)
 
 	  // if failed, continue!
 	  if (! boost::spirit::qi::parse(iter, end, parser, feature_weight))
-	    if (iter != end)
+	    if (iter != end) {
+	      std::cerr << "WARNING: ignoring: " << line << std::endl;
 	      continue;
+	    }
 	
 	  const std::string& feature = boost::fusion::get<0>(feature_weight);
 	  const int&         pos     = boost::fusion::get<1>(feature_weight);
