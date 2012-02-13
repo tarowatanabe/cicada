@@ -3636,10 +3636,10 @@ struct OptimizeXBLEU
 	    
 	    // collect scaled bleu stats
 	    for (int n = 1; n <= order; ++ n) {
-	      if (n < bleu->ngrams_reference.size())
-		hypo[n] += prob * bleu->ngrams_reference[n];
-	      if (n < bleu->ngrams_hypothesis.size())
-		matched[n] += prob * bleu->ngrams_hypothesis[n];
+	      if (n - 1 < bleu->ngrams_reference.size())
+		hypo[n] += prob * bleu->ngrams_reference[n - 1];
+	      if (n - 1 < bleu->ngrams_hypothesis.size())
+		matched[n] += prob * bleu->ngrams_hypothesis[n - 1];
 	    }
 	    
 	    // collect reference length
@@ -3695,11 +3695,11 @@ struct OptimizeXBLEU
 	      
 	      // bleu statistics
 	      for (int n = 1; n <= order; ++ n) {
-		if (n < bleu->ngrams_reference.size())
-		  gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n];
+		if (n - 1 < bleu->ngrams_reference.size())
+		  gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
 		
-		if (n < bleu->ngrams_hypothesis.size())
-		  gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n];
+		if (n - 1 < bleu->ngrams_hypothesis.size())
+		  gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
 	      }
 	      
 	      // reference lengths
@@ -3712,11 +3712,11 @@ struct OptimizeXBLEU
 	    const weight_type value_scale(margin);
 	    
 	    for (int n = 1; n <= order; ++ n) {
-	      if (n < bleu->ngrams_reference.size())
-		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n];
+	      if (n - 1 < bleu->ngrams_reference.size())
+		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n - 1];
 	      
-	      if (n < bleu->ngrams_hypothesis.size())
-		gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n];
+	      if (n - 1 < bleu->ngrams_hypothesis.size())
+		gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n - 1];
 	    }
 	    
 	    gradient_reference[feature_scale] += value_scale * prob * bleu->length_reference;
