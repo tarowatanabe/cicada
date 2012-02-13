@@ -1341,13 +1341,12 @@ struct OptimizeXBLEU
     
     //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
 
-        // xBLEU...
+    // xBLEU...
     const double objective_bleu = exp_P * B;
     const double entropy = task.e / optimizer.instances;
     
     // compute g..
     std::fill(g, g + size, 0.0);
-    //std::copy(task.g.begin(), task.g.end(), g);
 
     // entropy
     if (regularize_entropy) {
@@ -1708,7 +1707,6 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	objective = optimizer();
       }
     }
-
     
     if (debug >= 3)
       std::cerr << "final weights:" << std::endl

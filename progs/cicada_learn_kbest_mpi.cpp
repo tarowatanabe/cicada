@@ -36,6 +36,7 @@
 #include "utils/map_file.hpp"
 #include "utils/tempfile.hpp"
 #include "utils/mulvector2.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -47,6 +48,7 @@
 
 #include "lbfgs.h"
 #include "lbfgs_fortran.h"
+#include "lbfgs_error.hpp"
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -140,6 +142,10 @@ double optimize_cp(const scorer_document_type& scorers,
 		   const weights_history_type& weights_history,
 		   weight_set_type& weights);
 template <typename Optimize>
+double optimize_xbleu(const hypothesis_map_type& kbests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights);
+template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      const weight_set_type& bounds_lower,
@@ -170,6 +176,7 @@ struct OptimizeOnlineMargin;
 struct OptimizeCP;
 struct OptimizeMCP;
 struct OptimizeLBFGS;
+struct OptimizeXBLEU;
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void send_weights(const weight_set_type& weights);
@@ -346,6 +353,8 @@ int main(int argc, char ** argv)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
     else if (learn_mcp)
       objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
+    else if (learn_xbleu)
+      objective = optimize_xbleu<OptimizeXBLEU>(kbests, scorers, weights);
     else 
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
 
@@ -3423,6 +3432,9 @@ struct OptimizeXBLEU
   double lambda;
   const feature_type feature_scale;
 
+  double objective_opt;
+  weight_set_type weights_opt;
+
   double operator()()
   {
     lbfgs_parameter_t param;
@@ -3436,10 +3448,18 @@ struct OptimizeXBLEU
     
     param.max_iterations = iteration;
     
+    objective_opt = std::numeric_limits<double>::infinity();
     double objective = 0.0;
     
-    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
     
+    if (debug)
+      std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
+    
+    // copy from opt weights!
+    if (result < 0)
+      weights = weights_opt;
+
     return objective;
   }
 
@@ -3515,7 +3535,7 @@ struct OptimizeXBLEU
 	c_hypo(order + 1),
 	g_matched(order + 1),
 	g_hypo(order + 1),
-	g_ref(),
+	g_reference(),
 	g_entropy(),
 	r(0),
 	e(0)
@@ -3531,7 +3551,7 @@ struct OptimizeXBLEU
     ngram_counts_type   c_hypo;
     feature_counts_type g_matched;
     feature_counts_type g_hypo;
-    weight_set_type     g_ref;
+    weight_set_type     g_reference;
     weight_set_type     g_entropy;
     double r;
     double e;
@@ -3548,9 +3568,9 @@ struct OptimizeXBLEU
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
       
-      weight_type    ref;
+      weight_type    reference;
       weight_type    entropy;
-      gradient_type  gradient_ref;
+      gradient_type  gradient_reference;
       gradient_type  gradient_entropy;
       
       margins_type  margins;
@@ -3563,9 +3583,9 @@ struct OptimizeXBLEU
 	g_hypo[n].clear();
       }
       
-      gradient_ref.allocate();
+      gradient_reference.allocate();
       gradient_entropy.allocate();
-      g_ref.clear();
+      g_reference.clear();
       g_entropy.clear();
       
       std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
@@ -3587,8 +3607,9 @@ struct OptimizeXBLEU
 	  expectation.clear();
 	  
 	  weight_type Z;
-	  weight_type Z_ref;
+	  weight_type Z_reference;
 	  weight_type Z_entropy;
+	  weight_type dR;
 	  
 	  const size_type features_start = features_pos;
 	  
@@ -3606,7 +3627,8 @@ struct OptimizeXBLEU
 	  for (size_type k = 0, i = features_start; k != kbests[id].size(); ++ k, ++ i) {
 	    const hypothesis_type& kbest = kbests[id][k];
 	    
-	    const weight_type prob = cicada::semiring::traits<weight_type>::exp(margins[k] * scale) / Z;
+	    const double& margin = margins[k];
+	    const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
 	    
 	    const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
 	    if (! bleu)
@@ -3621,7 +3643,7 @@ struct OptimizeXBLEU
 	    }
 	    
 	    // collect reference length
-	    Z_ref += prob * bleu->length_reference;
+	    Z_reference += prob * bleu->length_reference;
 	    
 	    // collect entropy...
 	    Z_entropy += prob * cicada::semiring::log(prob);
@@ -3630,15 +3652,21 @@ struct OptimizeXBLEU
 	    sample_set_type::const_reference::const_iterator fiter_end = features_kbest[i].end();
 	    for (sample_set_type::const_reference::const_iterator fiter = features_kbest[i].begin(); fiter != fiter_end; ++ fiter)
 	      expectation[fiter->first] += prob * weight_type(fiter->second * scale);
+	    
+	    expectation[feature_scale] += prob * weight_type(margin);
+	    
+	    dR += weight_type(1.0 + cicada::semiring::log(prob)) * prob;
 	  }
 	  
 	  // accumulate
-	  ref += Z_ref;
+	  std::transform(hypo.begin(), hypo.end(), hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
+	  std::transform(matched.begin(), matched.end(), matched.begin(), counts_matched.begin(), std::plus<weight_type>());
+	  
+	  reference += Z_reference;
 	  entropy += Z_entropy;
 	  
 	  expectation_type::const_iterator eiter_end = expectation.end();
 	  for (expectation_type::const_iterator eiter = expectation.begin(); eiter != eiter_end; ++ eiter) {
-	    
 	    // collect bleus...
 	    for (int n = 1; n <= order; ++ n) {
 	      gradients_hypo[n][eiter->first] -= eiter->second * hypo[n];
@@ -3646,14 +3674,17 @@ struct OptimizeXBLEU
 	    }
 	    
 	    // reference lengths
-	    gradient_ref[eiter->first] -= eiter->second * Z_ref;
+	    gradient_reference[eiter->first] -= eiter->second * Z_reference;
+	    
+	    // entropy gradient...
+	    gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
 	  }
 	  
 	  // third pass, collect gradients...
 	  for (size_type k = 0, i = features_start; k != kbests[id].size(); ++ k, ++ i) {
 	    const hypothesis_type& kbest = kbests[id][k];
 	    
-	    const double margin = margins[k];
+	    const double& margin = margins[k];
 	    const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
 	    const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
 	    
@@ -3672,25 +3703,213 @@ struct OptimizeXBLEU
 	      }
 	      
 	      // reference lengths
-	      gradient_ref[fiter->first] += value * prob * bleu->length_reference;
+	      gradient_reference[fiter->first] += value * prob * bleu->length_reference;
 	      
 	      // entropy: we will collect minus values!
-	      gradient_entropy[fiter->first] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * (value - expectation[fiter->first]);
+	      gradient_entropy[fiter->first] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * value;
 	    }
+	    
+	    const weight_type value_scale(margin);
+	    
+	    for (int n = 1; n <= order; ++ n) {
+	      if (n < bleu->ngrams_reference.size())
+		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n];
+	      
+	      if (n < bleu->ngrams_hypothesis.size())
+		gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n];
+	    }
+	    
+	    gradient_reference[feature_scale] += value_scale * prob * bleu->length_reference;
+	    gradient_entropy[feature_scale] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * value_scale;
 	  }
 	}
       
+      // copy from weight space to double space
+      std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
+      std::copy(counts_hypo.begin(), counts_hypo.end(), c_hypo.begin());
+      
+      for (size_t n = 1; n != g_matched.size(); ++ n) {
+	g_matched[n].allocate();
+	g_hypo[n].allocate();
+	
+	std::copy(gradients_matched[n].begin(), gradients_matched[n].end(), g_matched[n].begin());
+	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
+      }
+      
+      g_reference.allocate();
+      g_entropy.allocate();
+      std::copy(gradient_reference.begin(), gradient_reference.end(), g_reference.begin());
+      std::copy(gradient_entropy.begin(), gradient_entropy.end(), g_entropy.begin());
+
+      r = reference;
+      e = entropy;
     }
   };
   
   static lbfgsfloatval_t evaluate(void *instance,
 				  const lbfgsfloatval_t *x,
 				  lbfgsfloatval_t *g,
-				  const int n,
+				  const int size,
 				  const lbfgsfloatval_t step)
   {
+    typedef Task task_type;
     
-    return 0.0;
+    const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+    const int mpi_size = MPI::COMM_WORLD.Get_size();
+    
+    OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
+    
+    // send notification!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+    
+    if (debug >= 3)
+      std::cerr << "weights:" << std::endl
+		<< optimizer.weights << std::flush;
+    
+    bcast_weights(0, optimizer.weights);
+    
+    task_type task(optimizer.kbests, optimizer.features_kbest, optimizer.scorers, optimizer.weights, optimizer.feature_scale);
+    task();
+    
+    {
+      task_type::ngram_counts_type c_matched(order + 1, 0.0);
+      task_type::ngram_counts_type c_hypo(order + 1, 0.0);
+      double                       r(0.0);
+      double                       e(0.0);
+      
+      // reduce c_* and r 
+      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      task.c_matched.swap(c_matched);
+      task.c_hypo.swap(c_hypo);
+      task.r = r;
+      task.e = e;
+    }
+    
+    
+    // reduce g_*
+    for (int n = 1; n <= order; ++ n) {
+      // reduce matched counts..
+      reduce_weights(task.g_matched[n]);
+      reduce_weights(task.g_hypo[n]);
+    }
+    reduce_weights(task.g_reference);
+    reduce_weights(task.g_entropy);
+    
+    // smoothing...
+#if 1
+    {
+      double smoothing = 1e-40;
+      for (int n = 1; n <= order; ++ n) {
+	if (task.c_hypo[n] > 0.0 && task.c_matched[n] <= 0.0)
+	  task.c_matched[n] = smoothing;
+	smoothing *= 0.1;
+      }
+    }
+#endif
+    
+    if (debug >= 3) {
+      for (int n = 1; n <= order; ++ n)
+	std::cerr << "order: " << n << " M: " << task.c_matched[n] << " H: " << task.c_hypo[n] << std::endl;
+      std::cerr << "r: " << task.r << std::endl;
+    }
+
+    // compute P
+    double P = 0.0;
+    for (int n = 1; n <= order; ++ n)
+      if (task.c_hypo[n] > 0.0)
+	P += (1.0 / order) * (utils::mathop::log(task.c_matched[n]) - utils::mathop::log(task.c_hypo[n]));
+
+    // compute C and B
+    const double C = task.r / task.c_hypo[1];
+    const double B = task.brevity_penalty(1.0 - C);
+
+    // for computing g...
+    const double exp_P = utils::mathop::exp(P);
+    const double C_dC  = C * task.derivative_brevity_penalty(1.0 - C);
+    
+    // xBLEU...
+    const double objective_bleu = exp_P * B;
+    const double entropy = task.e / optimizer.instances;
+    
+    // compute g..
+    std::fill(g, g + size, 0.0);
+    
+    // entropy
+    if (regularize_entropy) {
+      // 0.5 * (entropy - C2)^2
+      // 
+      // thus, derivative is: (entropy - C2) * \nabla entropy
+      // we need to consider average of entropy...
+      
+      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) /optimizer.instances));
+    } else
+      std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / optimizer.instances));
+    
+    for (int n = 1; n <= order; ++ n)  {
+      if (task.c_hypo[n] > 0.0) {
+	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / task.c_hypo[n];
+	
+	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	  g[i] += factor_matched * task.g_matched[n][i];
+	  g[i] -= factor_hypo * task.g_hypo[n][i];
+	}
+      }
+    }
+    
+    if (task.c_hypo[1] > 0.0) {
+      const double factor_ref  = exp_P * C_dC / task.r;
+      const double factor_hypo = exp_P * C_dC / task.c_hypo[1];
+      
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	g[i] += factor_ref  * task.g_reference[i];
+	g[i] -= factor_hypo * task.g_hypo[1][i];
+      }
+    }
+
+    if (debug >= 3) {
+      std::cerr << "grad:" << std::endl;
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+	if (g[i] != 0.0 && feature_type(i) != feature_type())
+	  std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
+    }
+    
+    // we need to minimize negative bleu... + regularized by average entropy...
+    double objective = - objective_bleu + (regularize_entropy ? 0.5 * (entropy - C2) * (entropy - C2) : - temperature * entropy);
+    //double objective = - objective_bleu;
+    
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
+	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
+	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
+      }
+      objective += 0.5 * optimizer.lambda * norm;
+    }
+    
+    if (debug >= 2)
+      std::cerr << "objective: " << objective
+		<< " xBLEU: " << objective_bleu
+		<< " BP: " << B
+		<< " entropy: " << entropy
+		<< " scale: " << optimizer.weights[optimizer.feature_scale]
+		<< std::endl;
+    
+    
+#if 1
+    // keep the best so forth...
+    if (objective <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective;
+      optimizer.weights_opt = optimizer.weights;
+    }
+#endif
+    
+    return objective;
   }
   
 };
@@ -4062,6 +4281,128 @@ struct OptimizeLBFGS
   weight_set_type& weights;
   size_t instances;
 };
+
+template <typename Optimize>
+double optimize_xbleu(const hypothesis_map_type& kbests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  const feature_type feature_scale(":feature-scale:");
+  
+  weights[feature_scale] = scale;
+  
+  typename Optimize::sample_set_type features;
+
+  int instances_local = 0;
+  for (size_t id = 0; id != kbests.size(); ++ id) 
+    if (! kbests[id].empty()) {
+      
+      for (size_type k = 0; k != kbests[id].size(); ++ k)
+	features.push_back(kbests[id][k].features.begin(), kbests[id][k].features.end());
+      
+      ++ instances_local;
+    }
+  
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  
+  if (mpi_rank == 0) {
+    Optimize optimizer(kbests, features, scorers, weights, instances, C, feature_scale);
+    
+    double objective = 0.0;
+    
+    if (annealing_mode) {
+      for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+	
+	objective = optimizer();
+      }
+    } else 
+      objective = optimizer();
+    
+    if (quenching_mode) {
+      temperature = 0.0;
+      
+      for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
+	if (debug >= 2)
+	  std::cerr << "quench: " << quench << std::endl;
+	
+	weights[feature_scale] = quench;
+	
+	objective = optimizer();
+      }
+    }
+    
+    // send termination!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+    
+    return objective;
+  } else {
+    enum {
+      NOTIFY = 0,
+      TERMINATION,
+    };
+    
+    MPI::Prequest requests[2];
+
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    
+    for (int i = 0; i < 2; ++ i)
+      requests[i].Start();
+
+    while (1) {
+      if (MPI::Request::Waitany(2, requests))
+	break;
+      else {
+	typedef typename Optimize::Task task_type;
+	
+	requests[NOTIFY].Start();
+	
+	bcast_weights(0, weights);
+	
+	task_type task(kbests, features, scorers, weights, feature_scale);
+	task();
+	
+	typename task_type::ngram_counts_type c_matched(order + 1, 0.0);
+	typename task_type::ngram_counts_type c_hypo(order + 1, 0.0);
+	double                       r(0.0);
+	double                       e(0.0);
+	
+	// reduce c_* and r 
+	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	task.c_matched.swap(c_matched);
+	task.c_hypo.swap(c_hypo);
+	task.r = r;
+	task.e = e;
+	
+	// reduce g_*
+	for (int n = 1; n <= order; ++ n) {
+	  // reduce matched counts..
+	  send_weights(task.g_matched[n]);
+	  send_weights(task.g_hypo[n]);
+	}
+	send_weights(task.g_reference);
+	send_weights(task.g_entropy);
+      }
+    }
+    
+    if (requests[NOTIFY].Test())
+      requests[NOTIFY].Cancel();
+    
+    return 0.0;
+  }
+}
+
 
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
