@@ -3659,8 +3659,8 @@ struct OptimizeXBLEU
 	  }
 	  
 	  // accumulate
-	  std::transform(hypo.begin(), hypo.end(), hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
-	  std::transform(matched.begin(), matched.end(), matched.begin(), counts_matched.begin(), std::plus<weight_type>());
+	  std::transform(hypo.begin(), hypo.end(), hypo_hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
+	  std::transform(matched.begin(), matched.end(), counts_matched.begin(), counts_matched.begin(), std::plus<weight_type>());
 	  
 	  reference += Z_reference;
 	  entropy += Z_entropy;
