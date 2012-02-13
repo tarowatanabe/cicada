@@ -656,7 +656,7 @@ namespace cicada
 	throw std::runtime_error("this is not Bleu feature: " + parameter);
 
       int order = 4;
-      bool exact = false;
+      bool exact = true;
       bool skip_sgml_tag = false;
 
       const cicada::Tokenizer* tokenizer = 0;

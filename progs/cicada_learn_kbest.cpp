@@ -32,6 +32,8 @@
 #include "utils/random_seed.hpp"
 #include "utils/map_file.hpp"
 #include "utils/tempfile.hpp"
+#include "utils/mulvector2.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -43,6 +45,7 @@
 #include <boost/numeric/conversion/bounds.hpp>
 
 #include "lbfgs.h"
+#include "lbfgs_error.hpp"
 #include "liblinear/linear.h"
 
 typedef cicada::eval::Scorer         scorer_type;
@@ -66,6 +69,7 @@ path_set_type refset_files;
 
 int iteration = 100;
 bool learn_sgd = false;
+bool learn_xbleu = false;
 bool learn_lbfgs = false;
 bool learn_mira = false;
 bool learn_linear = false;
@@ -75,11 +79,26 @@ int linear_solver = L2R_L2LOSS_SVC_DUAL;
 
 bool regularize_l1 = false;
 bool regularize_l2 = false;
+bool regularize_entropy = false;
 
 double eps = std::numeric_limits<double>::infinity();
 double C = 1.0;
+double C2 = 1.0;
 double scale = 1.0;
 double eta0 = 0.2;
+int order = 4;
+
+bool annealing_mode = false;
+bool quenching_mode = false;
+
+double temperature = 0.0;
+double temperature_start = 1000;
+double temperature_end = 0.001;
+double temperature_rate = 0.5;
+
+double quench_start = 0.01;
+double quench_end = 100;
+double quench_rate = 10;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
@@ -113,6 +132,10 @@ void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
 
 template <typename Optimizer>
+double optimize_xbleu(const hypothesis_map_type& kbests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights);
+template <typename Optimizer>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
@@ -132,20 +155,20 @@ double optimize_mert(const scorer_document_type& scorers,
 struct OptimizeLinear;
 struct OptimizeSVM;
 struct OptimizeLBFGS;
+struct OptimizeXBLEU;
 
 int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_linear + learn_svm > 1)
+    if (int(learn_lbfgs) + learn_linear + learn_svm + learn_xbleu > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,linear,svm}");
-    if (int(learn_lbfgs) + learn_linear + learn_svm == 0)
+    if (int(learn_lbfgs) + learn_linear + learn_svm + learn_xbleu == 0)
       learn_lbfgs = true;
     
     if (conservative_loss && line_search)
       throw std::runtime_error("we do not allow both conservative-update and line-search");
-
     
     if (learn_lbfgs && regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
@@ -157,9 +180,27 @@ int main(int argc, char ** argv)
     
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
-    if (oracle_path.empty())
-      throw std::runtime_error("no oracke kbest?");
+    if (! learn_xbleu && oracle_path.empty())
+      throw std::runtime_error("no oracle kbest?");
+    if (learn_xbleu && refset_files.empty())
+      throw std::runtime_error("no reference translations?");
+    if (learn_xbleu && order <= 0)
+      throw std::runtime_error("invalid ngram order");
     
+    if (annealing_mode) {
+      if (! (temperature_end < temperature_start))
+	throw std::runtime_error("temperature should start higher, then decreased");
+      if (temperature_rate <= 0.0 || temperature_rate >= 1.0)
+	throw std::runtime_error("temperature rate should be 0.0 < rate < 1.0: " + utils::lexical_cast<std::string>(temperature_rate));
+    }
+    
+    if (quenching_mode) {
+      if (! (quench_start < quench_end))
+	throw std::runtime_error("quenching should start lower, then increased");
+      if (quench_rate <= 1.0)
+	throw std::runtime_error("quenching rate should be > 1.0: " + utils::lexical_cast<std::string>(quench_rate)); 
+    }
+
     if (! bound_lower_file.empty())
       if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
 	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
@@ -209,8 +250,6 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
-    weights.allocate();
-    
     weight_set_type bounds_lower;
     weight_set_type bounds_upper;
     
@@ -220,6 +259,7 @@ int main(int argc, char ** argv)
     if (! bound_upper_file.empty())
       read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
     
+    weights.allocate();
     
     double objective = 0.0;
     
@@ -232,6 +272,8 @@ int main(int argc, char ** argv)
       objective = optimize_svm<OptimizeLinear>(kbests, oracles, bounds_lower, bounds_upper, weights);
     else if (learn_svm)
       objective = optimize_svm<OptimizeSVM>(kbests, oracles, bounds_lower, bounds_upper, weights);
+    else if (learn_xbleu)
+      objective = optimize_xbleu<OptimizeXBLEU>(kbests, scorers, weights);
     else
       objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
     
@@ -1565,6 +1607,517 @@ public:
   const double tolerance;
 };
 
+struct OptimizeXBLEU
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef hypothesis_type::feature_value_type feature_value_type;
+  typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > sample_set_type;
+  typedef std::vector<sample_set_type, std::allocator<sample_set_type> > sample_map_type;
+  
+  OptimizeXBLEU(const hypothesis_map_type& __kbests,
+		const sample_map_type& __features_kbest,
+		const scorer_document_type& __scorers,
+		weight_set_type& __weights,
+		const double& __lambda,
+		const feature_type& __feature_scale)
+    : kbests(__kbests),
+      features_kbest(__features_kbest),
+      scorers(__scorers),
+      weights(__weights),
+      lambda(__lambda),
+      feature_scale(__feature_scale)
+  { }
+  
+  const hypothesis_map_type& kbests;
+  const sample_map_type&     features_kbest;
+  const scorer_document_type& scorers;
+  weight_set_type& weights;
+  
+  double lambda;
+  const feature_type feature_scale;
+
+  double objective_opt;
+  weight_set_type weights_opt;
+  
+  double operator()()
+  {
+    lbfgs_parameter_t param;
+    lbfgs_parameter_init(&param);
+    
+    if (regularize_l1) {
+      param.orthantwise_c = C;
+      param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+    } else
+      param.orthantwise_c = 0.0;
+    
+    param.max_iterations = iteration;
+    
+    objective_opt = std::numeric_limits<double>::infinity();
+    double objective = 0.0;
+    
+    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    
+    if (debug)
+      std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
+    
+    // copy from opt weights!
+    if (result < 0)
+      weights = weights_opt;
+    
+    return objective;
+  }
+  
+  struct Task
+  {
+    typedef cicada::semiring::Log<double> weight_type;
+    
+    static weight_type brevity_penalty(const double x)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+
+      // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+      
+      return ((traits_type::exp(x) - traits_type::one()) / (traits_type::one() + traits_type::exp(1000.0 * x))) + traits_type::one();
+    }
+    
+    static weight_type derivative_brevity_penalty(const double x)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+       
+      const weight_type expx     = traits_type::exp(x);
+      const weight_type expxm1   = expx - traits_type::one();
+      const weight_type exp1000x = traits_type::exp(1000.0 * x);
+      const weight_type p1exp1000x = traits_type::one() + exp1000x;
+      
+      return (expx / p1exp1000x) - ((expxm1 * weight_type(1000.0) * exp1000x) / (p1exp1000x * p1exp1000x));
+      
+      //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
+    }
+    
+    static weight_type clip_count(const weight_type& x, const weight_type& clip)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+      
+      //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+      return (weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip)))) + weight_type(clip);
+    }
+    
+    static weight_type derivative_clip_count(const weight_type& x, const weight_type& clip)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+      
+      const weight_type exp1000xmc = traits_type::exp(1000.0 * (x - clip));
+      const weight_type p1exp1000xmc = exp1000xmc + traits_type::one();
+      
+      return (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
+      
+      //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
+    }
+
+    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef std::vector<gradient_type, std::allocator<gradient_type> > gradients_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+    
+    typedef std::vector<double, std::allocator<double> > ngram_counts_type;
+    typedef std::vector<weight_set_type, std::allocator<weight_set_type> > feature_counts_type;
+    
+    typedef std::vector<double, std::allocator<double> > margins_type;
+
+    typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > expectation_type;
+    
+    // queue...
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+    
+    Task(queue_type& __queue,
+	 const hypothesis_map_type& __kbests,
+	 const sample_map_type& __features_kbest,
+	 const scorer_document_type& __scorers,
+	 const weight_set_type& __weights,
+	 const feature_type& __feature_scale)
+      : queue(__queue),
+	kbests(__kbests),
+	features_kbest(__features_kbest),
+	scorers(__scorers),
+	weights(__weights),
+	feature_scale(__feature_scale),
+	c_matched(order + 1),
+	c_hypo(order + 1),
+	g_matched(order + 1),
+	g_hypo(order + 1),
+	g_reference(),
+	g_entropy(),
+	r(0),
+	e(0)
+    { }
+    
+    queue_type& queue;
+
+    const hypothesis_map_type& kbests;
+    const sample_map_type& features_kbest;
+    const scorer_document_type& scorers;
+    const weight_set_type& weights;
+    const feature_type feature_scale;
+    
+    ngram_counts_type   c_matched;
+    ngram_counts_type   c_hypo;
+    feature_counts_type g_matched;
+    feature_counts_type g_hypo;
+    weight_set_type     g_reference;
+    weight_set_type     g_entropy;
+    double r;
+    double e;
+    
+    void operator()()
+    {
+      weights_type    matched(order + 1);
+      weights_type    hypo(order + 1);
+      expectation_type expectation;
+      
+      weights_type    counts_matched(order + 1);
+      weights_type    counts_hypo(order + 1);
+      
+      gradients_type gradients_matched(order + 1);
+      gradients_type gradients_hypo(order + 1);
+      
+      weight_type    reference;
+      weight_type    entropy;
+      gradient_type  gradient_reference;
+      gradient_type  gradient_entropy;
+      
+      margins_type  margins;
+
+      for (size_t n = 1; n != g_matched.size(); ++ n) {
+	gradients_matched[n].allocate();
+	gradients_hypo[n].allocate();
+	
+	g_matched[n].clear();
+	g_hypo[n].clear();
+      }
+      
+      gradient_reference.allocate();
+      gradient_entropy.allocate();
+      g_reference.clear();
+      g_entropy.clear();
+      
+      std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
+      std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
+      std::fill(c_matched.begin(), c_matched.end(), 0.0);
+      std::fill(c_hypo.begin(), c_hypo.end(), 0.0);
+      r = 0.0;
+      e = 0.0;
+      
+      const double scale = weights[feature_scale];
+      
+      for (;;) {
+	int id = 0;
+	queue.pop(id);
+	if (id < 0) break;
+	
+	margins.clear();
+	  
+	std::fill(matched.begin(), matched.end(), weight_type());
+	std::fill(hypo.begin(), hypo.end(), weight_type());
+	expectation.clear();
+	  
+	weight_type Z;
+	weight_type Z_reference;
+	weight_type Z_entropy;
+	weight_type dR;
+	  
+	// first pass... compute margin and Z
+	for (size_type k = 0; k != kbests[id].size(); ++ k) {
+	  const hypothesis_type& kbest = kbests[id][k];
+	  
+	  const double margin  = cicada::dot_product(weights, features_kbest[id][k].begin(), features_kbest[id][k].end(), 0.0);
+	    
+	  margins.push_back(margin);
+	  Z += cicada::semiring::traits<weight_type>::exp(margin * scale);
+	}
+
+	// second pass... compute sums (counts, etc.)
+	for (size_type k = 0; k != kbests[id].size(); ++ k) {
+	  const hypothesis_type& kbest = kbests[id][k];
+	    
+	  const double& margin = margins[k];
+	  const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
+	    
+	  const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+	  if (! bleu)
+	    throw std::runtime_error("no bleu statistics?");
+	    
+	  // collect scaled bleu stats
+	  for (int n = 1; n <= order; ++ n) {
+	    if (n - 1 < bleu->ngrams_reference.size())
+	      hypo[n] += prob * bleu->ngrams_reference[n - 1];
+	    if (n - 1 < bleu->ngrams_hypothesis.size())
+	      matched[n] += prob * bleu->ngrams_hypothesis[n - 1];
+	  }
+	    
+	  // collect reference length
+	  Z_reference += prob * bleu->length_reference;
+	    
+	  // collect entropy...
+	  Z_entropy += prob * cicada::semiring::log(prob);
+	    
+	  // collect expectation
+	  sample_set_type::const_reference::const_iterator fiter_end = features_kbest[id][k].end();
+	  for (sample_set_type::const_reference::const_iterator fiter = features_kbest[id][k].begin(); fiter != fiter_end; ++ fiter)
+	    expectation[fiter->first] += prob * weight_type(fiter->second * scale);
+	  
+	  expectation[feature_scale] += prob * weight_type(margin);
+	    
+	  dR += weight_type(1.0 + cicada::semiring::log(prob)) * prob;
+	}
+	  
+	// accumulate
+	std::transform(hypo.begin(), hypo.end(), counts_hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
+	std::transform(matched.begin(), matched.end(), counts_matched.begin(), counts_matched.begin(), std::plus<weight_type>());
+	  
+	reference += Z_reference;
+	entropy += Z_entropy;
+	  
+	expectation_type::const_iterator eiter_end = expectation.end();
+	for (expectation_type::const_iterator eiter = expectation.begin(); eiter != eiter_end; ++ eiter) {
+	  // collect bleus...
+	  for (int n = 1; n <= order; ++ n) {
+	    gradients_hypo[n][eiter->first] -= eiter->second * hypo[n];
+	    gradients_matched[n][eiter->first] -= eiter->second * matched[n];
+	  }
+	    
+	  // reference lengths
+	  gradient_reference[eiter->first] -= eiter->second * Z_reference;
+	    
+	  // entropy gradient...
+	  gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+	}
+	  
+	// third pass, collect gradients...
+	for (size_type k = 0; k != kbests[id].size(); ++ k) {
+	  const hypothesis_type& kbest = kbests[id][k];
+	    
+	  const double& margin = margins[k];
+	  const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
+	  const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+	    
+	  // collect feature expectations etc...
+	  sample_set_type::const_reference::const_iterator fiter_end = features_kbest[id][k].end();
+	  for (sample_set_type::const_reference::const_iterator fiter = features_kbest[id][k].begin(); fiter != fiter_end; ++ fiter) {
+	    const weight_type value(fiter->second * scale);
+	      
+	    // bleu statistics
+	    for (int n = 1; n <= order; ++ n) {
+	      if (n - 1 < bleu->ngrams_reference.size())
+		gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
+		
+	      if (n - 1 < bleu->ngrams_hypothesis.size())
+		gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
+	    }
+	      
+	    // reference lengths
+	    gradient_reference[fiter->first] += value * prob * bleu->length_reference;
+	      
+	    // entropy: we will collect minus values!
+	    gradient_entropy[fiter->first] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * value;
+	  }
+	    
+	  const weight_type value_scale(margin);
+	    
+	  for (int n = 1; n <= order; ++ n) {
+	    if (n - 1 < bleu->ngrams_reference.size())
+	      gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n - 1];
+	      
+	    if (n - 1 < bleu->ngrams_hypothesis.size())
+	      gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n - 1];
+	  }
+	    
+	  gradient_reference[feature_scale] += value_scale * prob * bleu->length_reference;
+	  gradient_entropy[feature_scale] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * value_scale;
+	}
+      }
+      
+      // copy from weight space to double space
+      std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
+      std::copy(counts_hypo.begin(), counts_hypo.end(), c_hypo.begin());
+      
+      for (size_t n = 1; n != g_matched.size(); ++ n) {
+	g_matched[n].allocate();
+	g_hypo[n].allocate();
+	
+	std::copy(gradients_matched[n].begin(), gradients_matched[n].end(), g_matched[n].begin());
+	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
+      }
+      
+      g_reference.allocate();
+      g_entropy.allocate();
+      std::copy(gradient_reference.begin(), gradient_reference.end(), g_reference.begin());
+      std::copy(gradient_entropy.begin(), gradient_entropy.end(), g_entropy.begin());
+
+      r = reference;
+      e = entropy;
+    }
+  };
+  
+  static lbfgsfloatval_t evaluate(void *instance,
+				  const lbfgsfloatval_t *x,
+				  lbfgsfloatval_t *g,
+				  const int size,
+				  const lbfgsfloatval_t step)
+  {
+    typedef Task                  task_type;
+    typedef task_type::queue_type queue_type;
+    
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+    OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
+    
+    queue_type queue;
+    task_set_type tasks(threads, task_type(queue,
+					   optimizer.kbests,
+					   optimizer.features_kbest,
+					   optimizer.scorers,
+					   optimizer.weights,
+					   optimizer.feature_scale));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    size_type instances = 0;
+    for (size_t id = 0; id != optimizer.kbests.size(); ++ id)
+      if (! optimizer.kbests[id].empty()) {
+	queue.push(id);
+	++ instances;
+      }
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    // clear g...
+    std::fill(g, g + size, 0.0);
+    
+    workers.join_all();
+    
+    // collect statistics
+    task_type::ngram_counts_type c_matched(order + 1, 0.0);
+    task_type::ngram_counts_type c_hypo(order + 1, 0.0);
+
+    task_type::feature_counts_type g_matched(order + 1);
+    task_type::feature_counts_type g_hypo(order + 1);
+    weight_set_type g_reference;
+    weight_set_type g_entropy;
+    
+    double r(0.0);
+    double e(0.0);
+      
+    for (int i = 0; i < threads; ++ i) {
+      std::transform(tasks[i].c_matched.begin(), tasks[i].c_matched.end(), c_matched.begin(), c_matched.begin(), std::plus<double>());
+      std::transform(tasks[i].c_hypo.begin(), tasks[i].c_hypo.end(), c_hypo.begin(), c_hypo.begin(), std::plus<double>());
+      
+      for (int n = 1; n <= order; ++ n) {
+	g_matched[n] += tasks[i].g_matched[n];
+	g_hypo[n] += tasks[i].g_hypo[n];
+      }
+      
+      g_reference += tasks[i].g_reference;
+      g_entropy += tasks[i].g_entropy;
+      
+      r += tasks[i].r;
+      e += tasks[i].e;
+    }
+    
+    // smoothing..
+    {
+      double smoothing = 1e-40;
+      for (int n = 1; n <= order; ++ n) {
+	if (c_hypo[n] > 0.0 && c_matched[n] <= 0.0)
+	  c_matched[n] = smoothing;
+	smoothing *= 0.1;
+      }
+    }
+
+    // compute P
+    double P = 0.0;
+    for (int n = 1; n <= order; ++ n)
+      if (c_hypo[n] > 0.0)
+	P += (1.0 / order) * (utils::mathop::log(c_matched[n]) - utils::mathop::log(c_hypo[n]));
+
+    // compute C and B
+    const double C = r / c_hypo[1];
+    const double B = task_type::brevity_penalty(1.0 - C);
+    
+    // for computing g...
+    const double exp_P = utils::mathop::exp(P);
+    const double C_dC  = C * task_type::derivative_brevity_penalty(1.0 - C);
+    
+    // xBLEU...
+    const double objective_bleu = exp_P * B;
+    const double entropy = e / instances;
+    
+    // entropy
+    if (regularize_entropy) {
+      // 0.5 * (entropy - C2)^2
+      // 
+      // thus, derivative is: (entropy - C2) * \nabla entropy
+      // we need to consider average of entropy...
+      
+      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) / instances));
+    } else
+      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
+    
+    for (int n = 1; n <= order; ++ n) 
+      if (c_hypo[n] > 0.0) {
+	const double factor_matched = - (exp_P * B / order) / c_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / c_hypo[n];
+	
+	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	  g[i] += factor_matched * g_matched[n][i];
+	  g[i] -= factor_hypo * g_hypo[n][i];
+	}
+      }
+    
+    if (c_hypo[1] > 0.0) {
+      const double factor_ref  = - exp_P * C_dC / r;
+      const double factor_hypo = - exp_P * C_dC / c_hypo[1];
+      
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	g[i] -= factor_ref  * g_reference[i];
+	g[i] += factor_hypo * g_hypo[1][i];
+      }
+    }
+    
+    // we need to minimize negative bleu... + regularized by average entropy...
+    double objective = - objective_bleu + (regularize_entropy ? 0.5 * (entropy - C2) * (entropy - C2) : - temperature * entropy);
+    
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
+	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
+	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
+      }
+      objective += 0.5 * optimizer.lambda * norm;
+    }
+
+    if (debug >= 2)
+      std::cerr << "objective: " << objective
+		<< " xBLEU: " << objective_bleu
+		<< " BP: " << B
+		<< " entropy: " << entropy
+		<< " scale: " << optimizer.weights[optimizer.feature_scale]
+		<< std::endl;
+    
+    
+    // keep the best so forth...
+    if (objective <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective;
+      optimizer.weights_opt = optimizer.weights;
+    }
+    
+    return objective;
+  }
+};
+
 
 struct OptimizeLBFGS
 {
@@ -1882,6 +2435,54 @@ struct OptimizeLBFGS
   
   weight_set_type& weights;
 };
+
+template <typename Optimizer>
+double optimize_xbleu(const hypothesis_map_type& kbests,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights)
+{
+  const feature_type feature_scale(":feature-scale:");
+  
+  weights[feature_scale] = scale;
+  
+  typename Optimizer::sample_map_type features(kbests.size());
+  for (size_t id = 0; id != kbests.size(); ++ id)
+    if (! kbests[id].empty()) {
+      
+      for (size_t k = 0; k != kbests[id].size(); ++ k)
+	features[id].push_back(kbests[id][k].features.begin(), kbests[id][k].features.end());
+    }
+
+  Optimizer optimizer(kbests, features, scorers, weights, C, feature_scale);
+  
+  double objective = 0.0;
+  
+  if (annealing_mode) {
+    for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
+      if (debug >= 2)
+	std::cerr << "temperature: " << temperature << std::endl;
+	
+      objective = optimizer();
+    }
+  } else 
+    objective = optimizer();
+    
+  if (quenching_mode) {
+    temperature = 0.0;
+      
+    for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
+      if (debug >= 2)
+	std::cerr << "quench: " << quench << std::endl;
+	
+      weights[feature_scale] = quench;
+	
+      objective = optimizer();
+    }
+  }
+    
+  return objective;
+}
+
 
 template <typename Optimizer>
 double optimize_batch(const hypothesis_map_type& kbests,
@@ -2542,6 +3143,7 @@ void options(int argc, char** argv)
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
+    ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU algorithm")
     ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
     ("learn-svm",    po::bool_switch(&learn_svm),    "structural SVM")
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
@@ -2552,12 +3154,29 @@ void options(int argc, char** argv)
      " 5: \tL1-regularized L2-loss support vector classification\n"
      " 6: \tL1-regularized logistic regression\n"
      " 7: \tL2-regularized logistic regression (dual)")
-    ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
-    ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
+    
+    ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
+    ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
+    ("regularize-entropy", po::bool_switch(&regularize_entropy), " entropy regularization")
+    
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
+    ("C2",            po::value<double>(&C2)->default_value(C2),       "an alternative regularization constant")
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
+    ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+
+    ("annealing", po::bool_switch(&annealing_mode), "annealing")
+    ("quenching", po::bool_switch(&quenching_mode), "quenching")
+    
+    ("temperature",       po::value<double>(&temperature)->default_value(temperature),             "temperature")
+    ("temperature-start", po::value<double>(&temperature_start)->default_value(temperature_start), "start temperature for annealing")
+    ("temperature-end",   po::value<double>(&temperature_end)->default_value(temperature_end),     "end temperature for annealing")
+    ("temperature-rate",  po::value<double>(&temperature_rate)->default_value(temperature_rate),   "annealing rate")
+
+    ("quench-start", po::value<double>(&quench_start)->default_value(quench_start), "start quench for annealing")
+    ("quench-end",   po::value<double>(&quench_end)->default_value(quench_end),     "end quench for annealing")
+    ("quench-rate",  po::value<double>(&quench_rate)->default_value(quench_rate),   "quenching rate")
 
     ("loss-margin",       po::bool_switch(&loss_margin),       "direct loss margin")
     ("softmax-margin",    po::bool_switch(&softmax_margin),    "softmax margin")

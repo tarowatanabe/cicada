@@ -94,7 +94,7 @@ int order = 4;
 bool annealing_mode = false;
 bool quenching_mode = false;
 
-double temperature = 0.5;
+double temperature = 0.0;
 double temperature_start = 1000;
 double temperature_end = 0.001;
 double temperature_rate = 0.5;
@@ -3376,28 +3376,6 @@ double optimize_cp(const scorer_document_type& scorers,
   return objective_master_min;
 }
 
-struct OptimizeExpBleu
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef hypothesis_type::feature_value_type feature_value_type;
-  
-  typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > sample_set_type;
-  
-  
-  struct Task
-  {
-    void operator()()
-    {
-      // for samples
-      //   compute p()
-      
-      
-      
-    }
-  };
-};
 
 struct OptimizeXBLEU
 {
@@ -3801,7 +3779,6 @@ struct OptimizeXBLEU
     reduce_weights(task.g_entropy);
     
     // smoothing...
-#if 1
     {
       double smoothing = 1e-40;
       for (int n = 1; n <= order; ++ n) {
@@ -3810,7 +3787,6 @@ struct OptimizeXBLEU
 	smoothing *= 0.1;
       }
     }
-#endif
     
     if (debug >= 3) {
       for (int n = 1; n <= order; ++ n)
@@ -3880,7 +3856,6 @@ struct OptimizeXBLEU
     
     // we need to minimize negative bleu... + regularized by average entropy...
     double objective = - objective_bleu + (regularize_entropy ? 0.5 * (entropy - C2) * (entropy - C2) : - temperature * entropy);
-    //double objective = - objective_bleu;
     
     if (regularize_l2) {
       double norm = 0.0;
@@ -3900,13 +3875,11 @@ struct OptimizeXBLEU
 		<< std::endl;
     
     
-#if 1
     // keep the best so forth...
     if (objective <= optimizer.objective_opt) {
       optimizer.objective_opt = objective;
       optimizer.weights_opt = optimizer.weights;
     }
-#endif
     
     return objective;
   }

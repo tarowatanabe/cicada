@@ -187,21 +187,20 @@ int main(int argc, char** argv)
       feature_weight_type feature_weight;
       
       {
-	typedef boost::spirit::istream_iterator iter_type;
-      
 	utils::compress_istream is(weights_file, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
+	
+	std::string line;
+	feature_weight_parser<std::string::const_iterator> parser;
       
-	feature_weight_parser<iter_type> parser;
-	iter_type iter(is);
-	iter_type iter_end;
-      
-	while (iter != iter_end) {
+	while (std::getline(is, line)) {
 	  boost::fusion::get<0>(feature_weight).clear();
+	  
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator iter_end  = line.end();
 	
 	  if (! boost::spirit::qi::parse(iter, iter_end, parser, feature_weight))
 	    if (iter != iter_end)
-	      throw std::runtime_error("weight parsing failed");
+	      continue;
 	
 	  const std::string& feature = boost::fusion::get<0>(feature_weight);
 	  const int&         pos     = boost::fusion::get<1>(feature_weight);
@@ -232,9 +231,10 @@ int main(int argc, char** argv)
 
 	  boost::fusion::get<0>(feature_weight).clear();
 
+	  // if failed, continue!
 	  if (! boost::spirit::qi::parse(iter, end, parser, feature_weight))
 	    if (iter != end)
-	      throw std::runtime_error("weight parsing failed");
+	      continue;
 	
 	  const std::string& feature = boost::fusion::get<0>(feature_weight);
 	  const int&         pos     = boost::fusion::get<1>(feature_weight);

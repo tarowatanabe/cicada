@@ -498,22 +498,7 @@ struct OptimizeLBFGS
 	graphs_intersected(__graphs_intersected),
 	instances(__instances)
     {}
-    
-    struct gradients_type
-    {
-      typedef gradient_type value_type;
 
-      template <typename Index>
-      gradient_type& operator[](Index)
-      {
-	return gradient;
-      }
-
-      void clear() { gradient.clear(); }
-      
-      gradient_type gradient;
-    };
-    
     struct weight_function
     {
       typedef weight_type value_type;
@@ -529,30 +514,66 @@ struct OptimizeLBFGS
       
       const weight_set_type& weights;
     };
-
+    
     struct feature_function
     {
-      typedef gradient_type value_type;
-
+      struct value_type
+      {
+	value_type(const feature_set_type& __features,
+		   const weight_set_type& __weights)
+	  : features(__features), weights(__weights) {}
+	
+	friend
+	value_type operator*(value_type x, const weight_type& weight)
+	{
+	  x.inside_outside = weight;
+	  return x;
+	}
+	
+	weight_type inside_outside;
+	const feature_set_type& features;
+	const weight_set_type&  weights;
+      };
+      
       feature_function(const weight_set_type& __weights) : weights(__weights) {}
-
+      
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	// p_e r_e
-	gradient_type grad;
-	
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights));
-	
-	feature_set_type::const_iterator fiter_end = edge.features.end();
-	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	  if (fiter->second != 0.0)
-	    grad[fiter->first] = weight_type(fiter->second) * weight;
-	
-	return grad;
+	return value_type(edge.features, weights);
       }
       
       const weight_set_type& weights;
+    };
+    
+    struct gradients_type
+    {
+      struct value_type
+      {
+	value_type(gradient_type& __gradient) : gradient(__gradient) {}
+	
+	value_type& operator+=(const feature_function::value_type& x)
+	{
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(x.features, x.weights)) * x.inside_outside;
+	  
+	  feature_set_type::const_iterator fiter_end = x.features.end();
+	  for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter)
+	    gradient[fiter->first] += weight_type(fiter->second) * weight;
+	  
+	  return *this;
+	}
+	
+	gradient_type& gradient;
+      };
+      
+      value_type operator[](size_t pos)
+      {
+	return value_type(gradient);
+      }
+      
+      void clear() { gradient.clear(); }
+      
+      gradient_type gradient;
     };
 
     void operator()()
