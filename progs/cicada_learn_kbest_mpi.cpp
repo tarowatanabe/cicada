@@ -3850,7 +3850,7 @@ struct OptimizeXBLEU
     } else
       std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / optimizer.instances));
     
-    for (int n = 1; n <= order; ++ n)  {
+    for (int n = 1; n <= order; ++ n) 
       if (task.c_hypo[n] > 0.0) {
 	const double factor_matched = - (exp_P * B / order) / task.c_matched[n];
 	const double factor_hypo    = - (exp_P * B / order) / task.c_hypo[n];
@@ -3860,18 +3860,17 @@ struct OptimizeXBLEU
 	  g[i] -= factor_hypo * task.g_hypo[n][i];
 	}
       }
-    }
     
     if (task.c_hypo[1] > 0.0) {
-      const double factor_ref  = exp_P * C_dC / task.r;
-      const double factor_hypo = exp_P * C_dC / task.c_hypo[1];
+      const double factor_ref  = - exp_P * C_dC / task.r;
+      const double factor_hypo = - exp_P * C_dC / task.c_hypo[1];
       
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
-	g[i] += factor_ref  * task.g_reference[i];
-	g[i] -= factor_hypo * task.g_hypo[1][i];
+	g[i] -= factor_ref  * task.g_reference[i];
+	g[i] += factor_hypo * task.g_hypo[1][i];
       }
     }
-
+    
     if (debug >= 3) {
       std::cerr << "grad:" << std::endl;
       for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
