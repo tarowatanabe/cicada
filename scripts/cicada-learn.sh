@@ -283,7 +283,7 @@ fi
 learner="cicada_learn_mpi"
 learn_option=""
 case $learn in
-  lbfgs | sgd | pegasos | mira | cw | arow | nherd | cp | mcp )
+  lbfgs | sgd | pegasos | mira | cw | arow | nherd | cp | mcp | xbleu )
     if test $kbest -gt 0; then
       learner="cicada_learn_kbest_mpi"
     else 
@@ -308,15 +308,6 @@ case $learn in
       exit 1
     fi
     learn_option=" --learn-svm"
-    break ;;
-  xbleu )
-    if test $kbest -eq 0; then
-      learner="cicada_learn_mpi"
-    else
-      echo "xbleu solver does not support kbest learning" >&2
-      exit 1
-    fi
-    learn_option=" --learn-xbleu"
     break ;;
   * )
     echo "learning algorithm can be either lbfgs, linear, svm, sgd, pegasos, mira, cw, arow, cp, mcp"
