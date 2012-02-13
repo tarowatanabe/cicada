@@ -187,6 +187,7 @@ int main(int argc, char ** argv)
       if (temperature_rate <= 0.0 || temperature_rate >= 1.0)
 	throw std::runtime_error("temperature rate should be 0.0 < rate < 1.0: " + utils::lexical_cast<std::string>(temperature_rate));
     }
+    
     if (quenching_mode) {
       if (! (quench_start < quench_end))
 	throw std::runtime_error("quenching should start lower, then increased");
