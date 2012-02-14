@@ -126,6 +126,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights,
 		       Generator& generator);
+
+struct OptimizeXBLEU;
 struct OptimizeLBFGS;
 
 template <typename Optimizer, typename Generator>
@@ -232,7 +234,7 @@ int main(int argc, char ** argv)
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
     } else if (learn_xbleu)
       objective = optimize_xbleu<OptimizeXBLEU>(graphs_forest, scorers, weights);
-    } else
+    else
       objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
     
     if (debug)
