@@ -99,6 +99,7 @@ double quench_rate = 10;
 
 bool loss_margin = false; // margin by loss, not rank-loss
 bool softmax_margin = false;
+bool scale_fixed = false;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
@@ -1497,6 +1498,9 @@ struct OptimizeXBLEU
       objective += 0.5 * optimizer.lambda * norm;
     }
     
+    if (scale_fixed)
+      g[optimizer.feature_scale.id()] = 0.0;
+    
     if (debug >= 2)
       std::cerr << "objective: " << objective
 		<< " xBLEU: " << objective_bleu
@@ -2426,6 +2430,8 @@ void options(int argc, char** argv)
     ("quench-start", po::value<double>(&quench_start)->default_value(quench_start), "start quench for annealing")
     ("quench-end",   po::value<double>(&quench_end)->default_value(quench_end),     "end quench for annealing")
     ("quench-rate",  po::value<double>(&quench_rate)->default_value(quench_rate),   "quenching rate")
+
+    ("scale-fixed", po::bool_switch(&scale_fixed), "fixed scaling")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
