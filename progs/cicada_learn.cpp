@@ -15,6 +15,7 @@
 #include <deque>
 
 #include "cicada_impl.hpp"
+#include "cicada_text_impl.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -79,6 +80,12 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
+void read_refset(const path_set_type& files,
+		 scorer_document_type& scorers);
+void read_forest(const path_set_type& forest_path,
+		 const scorer_document_type& scorers,
+		 hypergraph_set_type& forest,
+		 scorer_document_type& scorers_forest);
 void read_forest(const path_set_type& forest_path,
 		 const path_set_type& intersected_path,
 		 hypergraph_set_type& graphs_forest,
@@ -132,12 +139,23 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
     
     threads = utils::bithack::max(1, threads);
-    
+
+    scorer_document_type scorers(scorer_name);
+    if (! refset_path.empty())
+      read_refset(refset_path, scorers);
+
     hypergraph_set_type graphs_forest;
     hypergraph_set_type graphs_intersected;
     
     if (! intersected_path.empty())
       read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
+    else {
+      scorer_document_type scorers_forest(scorer_name);
+      
+      read_forest(forest_path, scorers, graphs_forest, scorers_forest);
+      
+      scorers_forest.swap(scorers);
+    }
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -725,6 +743,141 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   return Optimizer(graphs_forest, graphs_intersected, weights)();
 }
 
+void read_refset(const path_set_type& files, scorer_document_type& scorers)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
+    
+  scorers.clear();
+
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
+      if (id >= static_cast<int>(scorers.size()))
+	scorers.resize(id + 1);
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+      
+      scorers[id]->insert(id_sentence.second);
+    }
+  }
+}
+
+void read_forest(const path_set_type& forest_path,
+		 const scorer_document_type& scorers,
+		 hypergraph_set_type& forests,
+		 scorer_document_type& scorers_forest)
+{
+  if (unite_forest) {
+    size_t id;
+    
+    std::string line;
+    hypergraph_type graph;
+    
+    for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
+    
+      if (debug)
+	std::cerr << "reading forest: " << piter->string() << std::endl;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest = (*piter) / file_name;
+      
+	if (! boost::filesystem::exists(path_forest)) break;
+	
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	
+	if (id >= forests.size())
+	  forests.resize(id + 1);
+	
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+	
+	forests[id].unite(graph);
+      }
+    }
+
+    if (forests.size() > scorers.size())
+      throw std::runtime_error("invalid scorers");
+
+    scorers_forest = scorers;
+  } else {
+    size_t id;
+    
+    std::string line;
+    
+    for (size_t pos = 0; pos != forest_path.size(); ++ pos) {
+      if (debug)
+	std::cerr << "reading forest: " << forest_path[pos].string() << std::endl;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest = forest_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end  = line.end();
+	
+	if (! parse_id(id, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	
+	forests.push_back(hypergraph_type());
+	
+	if (id >= scorers.size())
+	  throw std::runtime_error("invalid scorers");
+	
+	scorers_forest.push_back(scorers[id]);
+	
+	if (! forests.back().assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+      }
+    }
+  }
+}
+
 void read_forest(const path_set_type& forest_path,
 		 const path_set_type& intersected_path,
 		 hypergraph_set_type& graphs_forest,
@@ -735,7 +888,6 @@ void read_forest(const path_set_type& forest_path,
     size_t id_intersected;
     
     std::string line;
-    
     hypergraph_type graph;
     
     for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
