@@ -36,7 +36,8 @@ semiring/expectation.hpp \
 semiring/log.hpp \
 semiring/logprob.hpp \
 semiring/tropical.hpp \
-semiring/traits.hpp
+semiring/traits.hpp \
+semiring/tuple.hpp
 
 libcicada_semiring_la_SOURCES = \
 semiring/envelope.cpp

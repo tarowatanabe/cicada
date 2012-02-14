@@ -14,5 +14,6 @@
 #include <cicada/semiring/logprob.hpp>
 #include <cicada/semiring/log.hpp>
 #include <cicada/semiring/tropical.hpp>
+#include <cicada/semiring/tuple.hpp>
 
 #endif

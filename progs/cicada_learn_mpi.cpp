@@ -824,6 +824,10 @@ struct OptimizeXBLEU
     
     typedef cicada::Symbol       word_type;
     typedef cicada::SymbolVector ngram_type;
+
+    typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > index_set_type;
+    typedef utils::simple_vector<index_set_type::id_type, std::allocator<index_set_type::id_type> > id_set_type;
+    typedef std::vector<id_set_type, std::allocator<id_set_type> > id_map_type;
     
     struct Count
     {
@@ -836,7 +840,6 @@ struct OptimizeXBLEU
     typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
     typedef std::vector<ngram_type, std::allocator<ngram_type> > ngram_set_type;
     
-    typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > index_set_type;
 
     typedef std::vector<double, std::allocator<double> > ngram_counts_type;
     typedef std::vector<weight_set_type, std::allocator<weight_set_type> > feature_counts_type;
@@ -845,8 +848,9 @@ struct OptimizeXBLEU
     {
       CollectCounts(index_set_type& __index,
 		    ngram_set_type& __ngrams,
-		    count_set_type& __counts)
-	: index(__index), ngrams(__ngrams), counts(__counts) {}
+		    count_set_type& __counts,
+		    id_map_type& __ids)
+	: index(__index), ngrams(__ngrams), counts(__counts), ids(__ids) {}
       
       template <typename Edge, typename Weight, typename Counts>
       void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
@@ -872,103 +876,172 @@ struct OptimizeXBLEU
 	
 	if (ngrams[id].empty())
 	  ngrams[id] = ngram_type(first, last);
+	
+	ids[edge.id].push_back(id);
       }
       
       index_set_type& index;
       ngram_set_type& ngrams;
       count_set_type& counts;
+      id_map_type& ids;
     };
     
-    struct CollectExpectation
+    typedef cicada::semiring::Tuple<weight_type> ngram_weight_type;
+    typedef cicada::semiring::Expectation<weight_type, ngram_weight_type> bleu_weight_type;
+    typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_weights_type;
+    
+    struct bleu_function
     {
-      CollectExpectation(const index_set_type& __index,
-			 const ngram_set_type& __ngrams,
+      typedef bleu_weight_type value_type;
+      
+      bleu_function(const ngram_set_type& __ngrams,
+		    const count_set_type& __counts,
+		    const id_map_type& __ids,
+		    const weight_set_type& __weights,
+		    const double& __scale)
+	: ngrams(__ngrams), counts(__counts), ids(__ids),
+	  weights(__weights), scale(__scale) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	const double margin = cicada::dot_product(edge.features, weights);
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * scale);
+	
+	value_type bleu(weight, ngram_weight_type(order * 2, weight_type()));
+	
+	id_set_type::const_iterator iter_end = ids[edge.id].end();
+	for (id_set_type::const_iterator iter = ids[edge.id].begin(); iter != iter_end; ++ iter) {
+	  const int n = ngrams[*iter].size();
+	  const int index = (n - 1) << 1;
+	  
+	  bleu.r[index] += weight;
+	  bleu.r[index + 1] += counts[*iter].mu_prime * weight;
+	}
+	
+	return bleu;
+      }
+      
+      const ngram_set_type&  ngrams;
+      const count_set_type&  counts;
+      const id_map_type&     ids;
+      const weight_set_type& weights;
+      const double           scale;
+    };
+    
+    struct bleu_gradient_function
+    {
+      struct value_type
+      {
+	value_type(const hypergraph_type::edge_type& __edge)
+	  : edge(__edge) {}
+	
+	friend
+	value_type operator*(value_type x, const bleu_weight_type& weight)
+	{
+	  x.inside_outside = weight;
+	  return x;
+	}
+	
+	bleu_weight_type inside_outside;
+	const hypergraph_type::edge_type& edge;
+      };
+      
+      bleu_gradient_function() {}
+      
+      value_type operator()(const hypergraph_type::edge_type& edge) const
+      {
+	return value_type(edge);
+      }
+    };
+    
+    struct bleu_gradient_type
+    {
+      typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > accumulated_type;
+      typedef std::vector<accumulated_type, std::allocator<accumulated_type> > accumulated_set_type;
+
+      struct value_type
+      {
+	value_type& operator+=(const bleu_gradient_function::value_type& x)
+	{
+	  const double margin = cicada::dot_product(x.edge.features, impl.weights);
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * impl.scale);
+	  const weight_type value_scale(margin);
+	  
+	  bleu_weight_type bleu(weight, ngram_weight_type(order * 2, weight_type()));
+	  
+	  id_set_type::const_iterator iter_end = impl.ids[x.edge.id].end();
+	  for (id_set_type::const_iterator iter = impl.ids[x.edge.id].begin(); iter != iter_end; ++ iter) {
+	    const int n = impl.ngrams[*iter].size();
+	    const int index = (n - 1) << 1;
+	    
+	    bleu.r[index] += weight;
+	    bleu.r[index + 1] += impl.counts[*iter].mu_prime * weight;
+	  }
+	  
+	  bleu *= x.inside_outside;
+	  
+	  // accumulate gradients....
+	  for (int n = 1; n <= order; ++ n) 
+	    if (impl.matched[n] > weight_type()) {
+	      const int index = (n - 1) << 1;
+	      const weight_type scale_matched = bleu.r[index + 1] - weight * impl.matched[n];
+	      const weight_type scale_hypo    = bleu.r[index]     - weight * impl.hypo[n];
+	      
+	      feature_set_type::const_iterator fiter_end = x.edge.features.end();
+	      for (feature_set_type::const_iterator fiter = x.edge.features.begin(); fiter != fiter_end; ++ fiter)
+		if (fiter->second != 0.0) {
+		  const weight_type value(fiter->second * impl.scale);
+		  
+		  impl.dM[n][fiter->first] += value * scale_matched;
+		  impl.dH[n][fiter->first] += value * scale_hypo;
+		}
+	      
+	      impl.dM[n][impl.feature_scale] += value_scale * scale_matched;
+	      impl.dH[n][impl.feature_scale] += value_scale * scale_hypo;
+	    }
+	  
+	  return *this;
+	}
+	
+	value_type(bleu_gradient_type& __impl) : impl(__impl) {}
+	
+	bleu_gradient_type& impl;
+      };
+      
+      value_type operator[](size_t id) { return value_type(*this); }
+      
+      bleu_gradient_type(const ngram_set_type& __ngrams,
 			 const count_set_type& __counts,
+			 const id_map_type& __ids,
 			 const weights_type& __matched,
 			 const weights_type& __hypo,
 			 const weight_set_type& __weights,
 			 const double& __scale,
-			 const feature_type& __feature_scale,
-			 gradients_type& __gradients_matched,
-			 gradients_type& __gradients_hypo)
-	: index(__index), ngrams(__ngrams), counts(__counts), matched(__matched), hypo(__hypo),
+			 const feature_type& __feature_scale) 
+	: ngrams(__ngrams), counts(__counts), ids(__ids),
+	  matched(__matched), hypo(__hypo),
 	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
-	  gradients_matched(__gradients_matched),
-	  gradients_hypo(__gradients_hypo)
-      {}
-
-      template <typename Edge, typename Weight, typename Counts>
-      void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
-      {
-	const weight_type value_scale(cicada::dot_product(edge.features, weights));
-
-	for (int n = 1; n <= order; ++ n) 
-	  if (hypo[n] > weight_type()) {
-	    const weight_type scale_matched = weight * matched[n];
-	    const weight_type scale_hypo    = weight * hypo[n];
-	    
-	    feature_set_type::const_iterator fiter_end = edge.features.end();
-	    for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	      if (fiter->second != 0.0) {
-		const weight_type value(fiter->second * scale);
-		
-		gradients_matched[n][fiter->first] -= value * scale_matched;
-		gradients_hypo[n][fiter->first]    -= value * scale_hypo;
-	      }
-	    
-	    gradients_matched[n][feature_scale] -= value_scale * scale_matched;
-	    gradients_hypo[n][feature_scale]    -= value_scale * scale_hypo;
-	  }
-      }
+	  dM(order + 1),
+	  dH(order + 1) {}
       
-      template <typename Edge, typename Weight, typename Counts, typename Iterator>
-      void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
-      {
-	if (first == last) return;
-	
-	index_set_type::id_type id = index.root();
-	for (Iterator iter = first; iter != last; ++ iter) {
-	  id = index.find(id, *iter);
-	  if (index.is_root(id))
-	    throw std::runtime_error("no ngram?");
-	}
-	
-	if (ngrams[id].empty())
-	  throw std::runtime_error("no ngram storage?");
-	
-	const size_type order = ngrams[id].size();
-	
-	const weight_type scale_matched = weight * counts[id].mu_prime;
-	const weight_type scale_hypo    = weight;
-
-	const weight_type value_scale(cicada::dot_product(edge.features, weights));
-
-	feature_set_type::const_iterator fiter_end = edge.features.end();
-	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	  if (fiter->second != 0.0) {
-	    const weight_type value(fiter->second * scale);
-	    
-	    gradients_matched[order][fiter->first] += value * scale_matched;
-	    gradients_hypo[order][fiter->first]    += value * scale_hypo;
-	  }
-	
-	gradients_matched[order][feature_scale] += value_scale * scale_matched;
-	gradients_hypo[order][feature_scale]    += value_scale * scale_hypo;
-      }
       
-      const index_set_type& index;
-      const ngram_set_type& ngrams;
-      const count_set_type& counts;
-      const weights_type& matched;
-      const weights_type& hypo;
+      const ngram_set_type&  ngrams;
+      const count_set_type&  counts;
+      const id_map_type&     ids;
+      
+      const weights_type&    matched;
+      const weights_type&    hypo;
       
       const weight_set_type& weights;
-      const double& scale;
-      const feature_type& feature_scale;
+      const double           scale;
+      const feature_type     feature_scale;
       
-      gradients_type& gradients_matched;
-      gradients_type& gradients_hypo;
+      accumulated_set_type dM;
+      accumulated_set_type dH;
     };
+    
+    
 
     typedef cicada::semiring::Expectation<weight_type, weight_type> entropy_weight_type;
 
@@ -999,9 +1072,9 @@ struct OptimizeXBLEU
 	  : features(__features), weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
 	
 	friend
-	value_type operator*(const value_type& x, const entropy_weight_type& weight)
+	value_type operator*(value_type x, const entropy_weight_type& weight)
 	{
-	  const_cast<value_type&>(x).inside_outside = weight;
+	  x.inside_outside = weight;
 	  return x;
 	}
 	
@@ -1094,6 +1167,8 @@ struct OptimizeXBLEU
       index_set_type index;
       ngram_set_type ngrams;
       count_set_type counts;
+      id_map_type    ids;
+      
       weights_type   matched(order + 1);
       weights_type   hypo(order + 1);
       
@@ -1101,10 +1176,14 @@ struct OptimizeXBLEU
       weights_type   counts_hypo(order + 1);
       gradients_type gradients_matched(order + 1);
       gradients_type gradients_hypo(order + 1);
+
+      bleu_weights_type bleu_inside;
       
       weight_type          entropy;
       entropy_weights_type entropy_inside;
       gradient_type        gradient_entropy;
+
+      
       
       for (size_t n = 0; n != g_matched.size(); ++ n) {
 	gradients_matched[n].allocate();
@@ -1143,10 +1222,13 @@ struct OptimizeXBLEU
 	index.clear();
 	counts.clear();
 	ngrams.clear();
+	ids.clear();
+	
+	ids.resize(forest.edges.size());
 		
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectCounts(index, ngrams, counts),
+			       CollectCounts(index, ngrams, counts, ids),
 			       index,
 			       order);
 	
@@ -1177,14 +1259,35 @@ struct OptimizeXBLEU
 	  for (int n = 1; n <= order; ++ n)
 	    std::cerr << "order: " << n << " matched: " << matched[n] << " hypo: " << hypo[n] << std::endl;
 	
+	
+	
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
-	cicada::expected_ngram(forest,
-			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
-			       CollectExpectation(index, ngrams, counts, matched, hypo,
-						  weights, scale, feature_scale,
-						  gradients_matched, gradients_hypo),
-			       index,
-			       order);
+	bleu_inside.clear();
+	bleu_inside.resize(forest.nodes.size(), bleu_weight_type());
+	
+	bleu_gradient_type bleu_gradient(ngrams, counts, ids,
+					 matched, hypo,
+					 weights, scale, feature_scale);
+	
+	cicada::inside_outside(forest,
+			       bleu_inside,
+			       bleu_gradient,
+			       bleu_function(ngrams, counts, ids, weights, scale),
+			       bleu_gradient_function());
+	
+	for (int n = 1; n <= order; ++ n) {
+	  const weight_type& Z = bleu_inside.back().p;
+	  const bleu_gradient_type::accumulated_set_type& dM = bleu_gradient.dM;
+	  const bleu_gradient_type::accumulated_set_type& dH = bleu_gradient.dH;
+	  
+	  bleu_gradient_type::accumulated_type::const_iterator miter_end = dM[n].end();
+	  for (bleu_gradient_type::accumulated_type::const_iterator miter = dM[n].begin(); miter != miter_end; ++ miter)
+	    gradients_matched[n][miter->first] += miter->second / Z;
+	  
+	  bleu_gradient_type::accumulated_type::const_iterator hiter_end = dH[n].end();
+	  for (bleu_gradient_type::accumulated_type::const_iterator hiter = dH[n].begin(); hiter != hiter_end; ++ hiter)
+	    gradients_hypo[n][hiter->first] += hiter->second / Z;
+	}
 
 	
 	// forth, compute entorpy...
