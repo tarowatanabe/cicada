@@ -985,8 +985,8 @@ struct OptimizeXBLEU
 	  for (int n = 1; n <= order; ++ n) 
 	    if (impl.matched[n] > weight_type()) {
 	      const int index = (n - 1) << 1;
-	      const weight_type scale_matched = bleu.r[index + 1] - weight * impl.matched[n];
-	      const weight_type scale_hypo    = bleu.r[index]     - weight * impl.hypo[n];
+	      const weight_type scale_matched = bleu.r[index + 1] - bleu.p * impl.matched[n];
+	      const weight_type scale_hypo    = bleu.r[index]     - bleu.p * impl.hypo[n];
 	      
 	      feature_set_type::const_iterator fiter_end = x.edge.features.end();
 	      for (feature_set_type::const_iterator fiter = x.edge.features.begin(); fiter != fiter_end; ++ fiter)
