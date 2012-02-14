@@ -150,9 +150,7 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_path, 1024 * 1024);
       is >> weights;
     }
-    
-    weights.allocate();
-    
+        
     weight_set_type bounds_lower;
     weight_set_type bounds_upper;
     
@@ -161,7 +159,9 @@ int main(int argc, char ** argv)
     
     if (! bound_upper_file.empty())
       read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
-
+    
+    weights.allocate();
+    
     double objective = 0.0;
     
     boost::mt19937 generator;

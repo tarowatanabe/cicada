@@ -2,6 +2,7 @@
 Added MIRA-like optimization for PRO-style learning
 Better parse-cky/parse-tree-cky with correct cube-pruning
 Smaller memory usage by removing spurious heap allocations
+New: xBLEU training at cicada_learn{,_kbest}{,_mpi}
 
 2012-1-18
 INCOMPATIBLE CHANGE: revised internal indexing for tree-grammars. (You do not have to re-index, but the size is slightly smaller)
