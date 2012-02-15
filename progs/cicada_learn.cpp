@@ -189,7 +189,7 @@ int main(int argc, char ** argv)
     hypergraph_set_type graphs_forest;
     hypergraph_set_type graphs_intersected;
     
-    if (! intersected_path.empty())
+    if (! learn_xbleu)
       read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
     else {
       scorer_document_type scorers_forest(scorer_name);
