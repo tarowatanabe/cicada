@@ -1357,12 +1357,17 @@ struct OptimizeLBFGS
     
     param.max_iterations = iteration;
     
+    objective_opt = std::numeric_limits<double>::infinity();
     double objective = 0.0;
     
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
     if (debug)
       std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
+    
+    // copy from opt weights!
+    if (result < 0)
+      weights = weights_opt;
     
     return objective;
   }
@@ -1599,6 +1604,12 @@ struct OptimizeLBFGS
     if (debug >= 2)
       std::cerr << "objective: " << objective << std::endl;
     
+    // keep the best so forth...
+    if (objective <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective;
+      optimizer.weights_opt = optimizer.weights;
+    }
+    
     return objective;
   }
   
@@ -1606,6 +1617,9 @@ struct OptimizeLBFGS
   const hypergraph_set_type& graphs_intersected;
   
   weight_set_type& weights;
+  
+  double objective_opt;
+  weight_set_type weights_opt;
 };
 
 template <typename Optimizer>
