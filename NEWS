@@ -1,4 +1,4 @@
-2012-2-x
+2012-2-15
 Added MIRA-like optimization for PRO-style learning
 Better parse-cky/parse-tree-cky with correct cube-pruning
 Smaller memory usage by removing spurious heap allocations
