@@ -125,6 +125,10 @@ void options(int argc, char** argv);
 
 void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
+		hypothesis_map_type& kbests,
+		kbest_map_type& kbest_map);
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles,
@@ -238,7 +242,10 @@ int main(int argc, char ** argv)
     hypothesis_map_type oracles;
     kbest_map_type      kbest_map;
     
-    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
+    if (! learn_xbleu)
+      read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
+    else
+      read_kbest(scorers, kbest_path, kbests, kbest_map);
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -2845,7 +2852,7 @@ struct TaskReadSync
       
       kbest_map.push_back(mappos);
       
-      {
+      if (! boost::fusion::get<0>(paths).empty()) {
 	utils::compress_istream is(boost::fusion::get<0>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	  
@@ -2872,7 +2879,7 @@ struct TaskReadSync
 	}
       }
 
-      {
+      if (! boost::fusion::get<1>(paths).empty()) {
 	utils::compress_istream is(boost::fusion::get<1>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	  
@@ -3098,6 +3105,138 @@ void read_kbest(const scorer_document_type& scorers,
     // uniques...
     unique_kbest(kbests);
     unique_kbest(oracles);
+  }
+}
+
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
+		hypothesis_map_type& kbests,
+		kbest_map_type& kbest_map)
+{
+  kbest_map.clear();
+
+  if (unite_kbest) {
+    typedef TaskReadUnite task_type;
+    typedef task_type::queue_type queue_type;
+
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
+    queue_type queue(threads);
+    task_set_type tasks(threads, task_type(queue));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
+      if (debug)
+	std::cerr << "reading kbest: " << piter->string() << std::endl;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_kbest = (*piter) / file_name;
+	
+	if (! boost::filesystem::exists(path_kbest)) break;
+	
+	queue.push(std::make_pair(path_kbest, path_type()));
+      }
+    }
+    
+    for (int i = 0; i != threads; ++ i)
+      queue.push(std::make_pair(path_type(), path_type()));
+    
+    workers.join_all();
+    
+    size_t kbests_size  = 0;
+    for (int i = 0; i != threads; ++ i)
+      kbests_size = utils::bithack::max(kbests_size, tasks[i].kbests.size());
+    
+    kbests.reserve(kbests_size);
+    kbests.resize(kbests_size);
+    
+    // assign kbest-map
+    kbest_map.reserve(kbests_size);
+    kbest_map.resize(kbests_size);
+    for (size_t seg = 0; seg != kbests_size; ++ seg)
+      kbest_map[seg] = seg;
+
+    for (int i = 0; i != threads; ++ i) {
+      for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
+	kbests[id].insert(kbests[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
+      
+      tasks[i].kbests.clear();
+    }
+    
+    unique_kbest(kbests);
+    
+    if (! scorers.empty()) {
+      if (scorers.size() != kbests.size())
+	throw std::runtime_error("refset size do not match with kbest size");
+      
+      loss_kbest(kbests, scorers);
+    } else {
+      // fill zero loss to oracles, and one loss to kbests.
+      
+      for (size_t id = 0; id != kbests.size(); ++ id) {
+	hypothesis_set_type::iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	  kiter->loss = 1.0;
+      }
+    }
+    
+  } else {
+    typedef TaskReadSync task_type;
+    
+    typedef task_type::queue_type     queue_type;
+    typedef task_type::path_pair_type path_pair_type;
+    
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
+    queue_type queue(threads);
+    task_set_type tasks(threads, task_type(queue, scorers));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    size_t refpos = 0;
+    for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
+      if (debug)
+	std::cerr << "reading kbest: " << kbest_path[pos].string() << std::endl;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_kbest  = kbest_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_kbest)) break;
+	
+	queue.push(path_pair_type(path_kbest, path_type(), refpos ++, i));
+      }
+    }
+    
+    for (int i = 0; i != threads; ++ i)
+      queue.push(path_pair_type(path_type(), path_type(), size_t(-1), size_t(-1)));
+    
+    workers.join_all();
+    
+    size_t kbests_size  = 0;
+    for (int i = 0; i != threads; ++ i)
+      kbests_size  += tasks[i].kbests.size();
+    
+    kbests.reserve(kbests_size);
+    kbest_map.reserve(kbests_size);
+    
+    for (int i = 0; i != threads; ++ i) {
+      kbests.insert(kbests.end(), tasks[i].kbests.begin(), tasks[i].kbests.end());
+      kbest_map.insert(kbest_map.end(), tasks[i].kbest_map.begin(), tasks[i].kbest_map.end());
+      
+      tasks[i].kbests.clear();
+    }
+    
+    // uniques...
+    unique_kbest(kbests);
   }
 }
 
