@@ -114,13 +114,14 @@ namespace cicada
       struct Score
       {
 	double distance;
+	double precision;
 	double penalty;
 	
-	Score() : distance(0.0), penalty(0.0) {}
-	
+	Score() : distance(0.0), precision(0.0), penalty(0.0) {}
 	Score(const double& __distance,
+	      const double& __precision,
 	      const double& __penalty)
-	  : distance(__distance), penalty(__penalty) {}
+	  : distance(__distance), precision(__precision), penalty(__penalty) {}
       };
       
       typedef Score value_type;
@@ -155,8 +156,12 @@ namespace cicada
 	  ++ bigrams[bigram_type(*(siter - 1), *siter)];
       }
     
-      value_type operator()(const sentence_type& hyp, const weight_type& weight, const bool spearman) const
+      value_type operator()(const sentence_type& hyp, const bool spearman) const
       {
+	// no score
+	if (hyp.empty())
+	  return value_type();
+	
 	alignment_type& align = const_cast<alignment_type&>(align_impl);
 	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
 	
@@ -170,6 +175,8 @@ namespace cicada
 	
 	const size_t hyp_size = hyp.size();
 	const size_t ref_size = ref.size();
+	
+	const double bp = std::min(1.0, std::exp(1.0 - double(ref_size) / hyp_size));
 	
 	for (size_t i = 0; i != hyp_size; ++ i)
 	  for (size_t j = 0; j != ref_size; ++ j)
@@ -202,12 +209,13 @@ namespace cicada
 	      }
 	    }
 	
-	if (align.size() <= 1)
-	  return value_type(0.0, utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight));
-		
-	value_type value;
-	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
-
+	if (align.size() == 1 && ref_size == 1)
+	  return value_type(1.0, 1.0 / hyp.size(), bp);
+	else if (align.size() <= 1)
+	  return value_type(0.0, 0.0, bp);
+	
+	value_type value(0.0, static_cast<double>(align.size()) / hyp.size(), bp);
+	
 	// we use binomial coefficient found in boost.math
 	if (spearman) {
 	  //
@@ -257,7 +265,8 @@ namespace cicada
    
     RibesScorer::RibesScorer(const RibesScorer& x)
       : Scorer(static_cast<const Scorer&>(*this)),
-	weight(x.weight)
+	alpha(x.alpha),
+	beta(x.beta)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
@@ -277,7 +286,8 @@ namespace cicada
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
       
-      weight = x.weight;
+      alpha = x.alpha;
+      beta = x.beta;
       
       return *this;
     }
@@ -294,7 +304,7 @@ namespace cicada
     {
       sentence_type sentence;
       tokenize(__sentence, sentence);
-
+      
       impl.push_back(new impl_type(sentence));
     }
     
@@ -311,9 +321,11 @@ namespace cicada
 	for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	  const impl_type& evaluator = *(*iter);
 	  
-	  const impl_type::value_type value = evaluator(sentence, weight, spearman);
+	  const impl_type::value_type value = evaluator(sentence, spearman);
 	  
-	  ribes->distance = std::max(ribes->distance, value.distance * value.penalty);
+	  ribes->distance = std::max(ribes->distance, (value.distance
+						       * utils::mathop::pow(value.precision, alpha)
+						       * utils::mathop::pow(value.penalty, beta)));
 	}
 	
 	ribes->penalty = 1;

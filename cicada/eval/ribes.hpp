@@ -38,9 +38,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 	
-	return (distance == rhs->distance
-		&& penalty == rhs->penalty);
-	
+	return (distance == rhs->distance && penalty == rhs->penalty);
       }
       
       void assign(const score_type& score)
@@ -69,20 +67,20 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 
-	distance -= rhs->distance;
-	penalty  -= rhs->penalty;
+	distance  -= rhs->distance;
+	penalty   -= rhs->penalty;
       }
 
       void multiplies_equal(const double& scale)
       {
-	distance *= scale;
-	penalty  *= scale;
+	distance  *= scale;
+	penalty   *= scale;
       }
       
       void divides_equal(const double& scale)
       {
-	distance /= scale;
-	penalty  /= scale;
+	distance  /= scale;
+	penalty   /= scale;
       }
       
       score_ptr_type zero() const
@@ -101,7 +99,7 @@ namespace cicada
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
       static score_ptr_type decode(const utils::piece& encoded);
       
-    private:
+    public:
       count_type distance;
       count_type penalty;
     };
@@ -119,10 +117,10 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RibesScorer() : impl(), weight(), spearman(false), kendall(true) { }
-      RibesScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(false), kendall(true) {}
-      RibesScorer(const weight_type& __weight, const bool __spearman)
-	: impl(), weight(__weight), spearman(__spearman), kendall(! __spearman) {}
+      RibesScorer() : impl(), alpha(), beta(), spearman(false), kendall(true) { }
+      RibesScorer(const weight_type& __alpha, const weight_type& __beta) : impl(), alpha(__alpha), beta(__beta), spearman(false), kendall(true) {}
+      RibesScorer(const weight_type& __alpha, const weight_type& __beta, const bool __spearman)
+	: impl(), alpha(__alpha), beta(__beta), spearman(__spearman), kendall(! __spearman) {}
       
       RibesScorer(const RibesScorer& x);
       ~RibesScorer();
@@ -139,7 +137,8 @@ namespace cicada
       
     private:
       impl_set_type impl;
-      weight_type  weight;
+      weight_type  alpha;
+      weight_type  beta;
       bool spearman;
       bool kendall;
     };
