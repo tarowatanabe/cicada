@@ -18,6 +18,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
+#include <cicada/remove_epsilon.hpp>
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -405,7 +406,7 @@ namespace cicada
       }
       
       if (target.goal != hypergraph_type::invalid)
-	remove_epsilon(target);
+	cicada::remove_epsilon(target);
     }
 
   private:
@@ -741,11 +742,15 @@ namespace cicada
 	  niter = grammar_nodes[0].non_terminals.insert(std::make_pair(non_terminal, id)).first;
 	}
 	
-	int tail_pos = 0;
+	int non_terminal_pos = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
-	    const symbol_type& non_terminal = non_terminals[edge.tails[tail_pos]];
+	    const int __non_terminal_index = siter->non_terminal_index();
+	    const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	    ++ non_terminal_pos;
+	    
+	    const symbol_type& non_terminal = non_terminals[edge.tails[pos]];
 	    
 	    const id_type grammar_node = niter->second;
 	    
@@ -755,8 +760,6 @@ namespace cicada
 	      grammar_nodes.push_back(grammar_node_type());
 	      niter = grammar_nodes[grammar_node].non_terminals.insert(std::make_pair(non_terminal, id)).first;
 	    }
-	    
-	    ++ tail_pos;
 	  } else {
 	    const symbol_type& terminal = *siter;
 	    
@@ -775,7 +778,7 @@ namespace cicada
       }
     }
 
-
+#if 0
     typedef std::vector<bool, std::allocator<bool> > removed_type;
 
     struct filter_epsilon
@@ -896,7 +899,7 @@ namespace cicada
       // final sort...
       graph.topologically_sort();
     }
-    
+#endif
     
   private:  
     const grammar_type& grammar;
