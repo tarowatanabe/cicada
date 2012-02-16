@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EVAL__RIBES__HPP__
@@ -47,8 +47,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 	
-	distance  = rhs->distance;
-	penalty   = rhs->penalty;
+	distance = rhs->distance;
+	penalty  = rhs->penalty;
       }
 
       void plus_equal(const score_type& score)
@@ -57,8 +57,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 
-	distance  += rhs->distance;
-	penalty   += rhs->penalty;
+	distance += rhs->distance;
+	penalty  += rhs->penalty;
       }
       
       void minus_equal(const score_type& score)
@@ -67,20 +67,20 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 
-	distance  -= rhs->distance;
-	penalty   -= rhs->penalty;
+	distance -= rhs->distance;
+	penalty  -= rhs->penalty;
       }
 
       void multiplies_equal(const double& scale)
       {
-	distance  *= scale;
-	penalty   *= scale;
+	distance *= scale;
+	penalty  *= scale;
       }
       
       void divides_equal(const double& scale)
       {
-	distance  /= scale;
-	penalty   /= scale;
+	distance /= scale;
+	penalty  /= scale;
       }
       
       score_ptr_type zero() const
