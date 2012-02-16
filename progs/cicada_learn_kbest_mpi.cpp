@@ -125,6 +125,10 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
+		hypothesis_map_type& kbests,
+		kbest_map_type&      kbest_map);
 void read_kbest(const  scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
@@ -272,7 +276,10 @@ int main(int argc, char ** argv)
     hypothesis_map_type oracles;
     kbest_map_type      kbest_map;
     
-    read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
+    if (! learn_xbleu)
+      read_kbest(scorers, kbest_path, oracle_path, kbests, oracles, kbest_map);
+    else
+      read_kbest(scorers, kbest_path, kbests, kbest_map);
     
     weight_set_type weights;
     if (mpi_rank == 0 && ! weights_path.empty()) {
@@ -4656,7 +4663,138 @@ void unique_kbest(hypothesis_map_type& kbests)
     }
 }
 
+void read_kbest(const scorer_document_type& scorers,
+		const path_set_type& kbest_path,
+		hypothesis_map_type& kbests,
+		kbest_map_type&      kbest_map)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  const bool error_metric = scorers.error_metric();
+  const double loss_factor = (error_metric ? 1.0 : - 1.0);
+  
+  parser_type parser;
+  kbest_feature_type kbest;
 
+  kbest_map.clear();
+  
+  if (unite_kbest) {
+    for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading kbest: " << piter->string() << std::endl;
+      
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_kbest = (*piter) / file_name;
+	
+	if (! boost::filesystem::exists(path_kbest)) break;
+	
+	if (i >= kbests.size())
+	  kbests.resize(i + 1);
+	
+	utils::compress_istream is(path_kbest, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id != i)
+	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(id));
+	  
+	  kbests[i].push_back(hypothesis_type(kbest));
+	  
+	  hypothesis_type& kbest = kbests[i].back();
+	  
+	  if (! scorers.empty()) {
+	    if (i >= scorers.size())
+	      throw std::runtime_error("reference positions outof index");
+	    
+	    kbest.score = scorers[i]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
+	    kbest.loss  = kbest.score->score() * loss_factor;
+	  } else
+	    kbest.loss = 1;
+	}
+      }
+    }
+    
+    kbest_map.reserve(kbests.size());
+    kbest_map.resize(kbests.size());
+    for (size_t seg = 0; seg != kbests.size(); ++ seg)
+      kbest_map[seg] = seg;
+    
+  } else {
+    
+    const size_type refset_size = scorers.size() / kbest_path.size();
+    
+    for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading kbest: " << kbest_path[pos].string() << std::endl;
+      
+      const size_type refset_offset = refset_size * pos;
+      
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_kbest  = kbest_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_kbest)) break;
+	
+	kbests.resize(kbests.size() + 1);
+	kbest_map.push_back(i);
+	
+	const size_type refset_pos = refset_offset + i;
+	
+	utils::compress_istream is(path_kbest, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  if (boost::fusion::get<0>(kbest) != i)
+	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
+	  
+	  kbests.back().push_back(hypothesis_type(kbest));
+	  
+	  hypothesis_type& kbest = kbests.back().back();
+	  
+	  if (! scorers.empty()) {
+	    kbest.score = scorers[refset_pos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
+	    kbest.loss  = kbest.score->score() * loss_factor;
+	  } else
+	    kbest.loss = 1;
+	}
+      }
+    }
+  }
+
+  // uniques...
+  unique_kbest(kbests);
+  kbest_map_type(kbest_map).swap(kbest_map);
+}
+  
 void read_kbest(const scorer_document_type& scorers,
 		const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
