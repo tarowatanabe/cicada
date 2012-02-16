@@ -440,6 +440,34 @@ struct LearnSVM : public LearnBase
   f_set_type     f;
 };
 
+struct LearnXBLEU : public LearnBase
+{
+  
+  template <typename Iterator>
+  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
+  {
+    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
+  {
+    // we will collect gradients from kbests
+    
+    
+  }
+  
+};
+
+struct LearnXBLEUL2 : public LearnXBLEU
+{
+  
+};
+
+struct LearnXBLEUL1 : public LearnXBLEU
+{
+  
+};
+
 struct LearnExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
