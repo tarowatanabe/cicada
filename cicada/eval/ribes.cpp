@@ -266,7 +266,8 @@ namespace cicada
     RibesScorer::RibesScorer(const RibesScorer& x)
       : Scorer(static_cast<const Scorer&>(*this)),
 	alpha(x.alpha),
-	beta(x.beta)
+	beta(x.beta),
+	spearman(x.spearman)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
@@ -288,6 +289,7 @@ namespace cicada
       
       alpha = x.alpha;
       beta = x.beta;
+      spearman = x.spearman;
       
       return *this;
     }
