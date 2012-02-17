@@ -571,7 +571,7 @@ namespace cicada
     
     void insert_edge(const edge_type& edge)
     {
-      if (edge.passive && edge.active)
+      if (edge.is_completed())
 	if (! traversals.insert(traversal_type(edge.active, edge.passive, edge.is_active())).second)
 	  return;
       
