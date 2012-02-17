@@ -74,11 +74,11 @@ namespace cicada
     typedef uint32_t id_type;
     typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
 
-    typedef utils::small_vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
-    
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
     {
+      typedef utils::small_vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+      
       grammar_node_type(const bool __is_root)
 	: edges(), is_root(__is_root) { initialize(); }
       grammar_node_type()
@@ -87,7 +87,7 @@ namespace cicada
       id_map_type terminals;
       id_map_type non_terminals;
       
-      id_set_type edges;
+      edge_set_type edges;
       bool is_root;
       
     private:
@@ -121,7 +121,7 @@ namespace cicada
       const edge_type* passive;
       
       // backptr to source hypergraph's edge
-      id_set_type edges;
+      const grammar_node_type* edges;
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -129,7 +129,7 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(q0), last(q0), terminal(transducer_id_type(-1, 0)),
 	  active(0), passive(0),
-	  edges() {}
+	  edges(0) {}
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -138,18 +138,18 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(q0), last(q0), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(0),
-	  edges() {}
+	  edges(0) {}
 
       
       // created by scan... we will always have terminal
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last, const transducer_id_type& __terminal,
 	   const edge_type& __active,
-	   const id_set_type& __edges)
+	   const grammar_node_type& __edges)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(__terminal),
 	  active(&__active), passive(0),
-	  edges(__edges) {}
+	  edges(&__edges) {}
       
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last, const transducer_id_type& __terminal,
@@ -157,32 +157,32 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(__terminal),
 	  active(&__active), passive(0),
-	  edges() {}
+	  edges(0) {}
       
       // construct by complete
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive,
-	   const id_set_type& __edges)
+	   const grammar_node_type& __edges)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(&__passive),
-	  edges(__edges) {}
+	  edges(&__edges) {}
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(&__passive),
-	  edges() {}
+	  edges(0) {}
       
       // for query...
       Edge(const transducer_id_type& __first, const transducer_id_type& __last)
 	: first(__first), last(__last) {}
       
     public:
-      bool is_passive() const { return ! edges.empty(); }
-      bool is_active() const { return edges.empty(); }
+      bool is_passive() const { return edges; }
+      bool is_active() const { return ! edges; }
       bool is_scanned() const { return active && !passive && dot != 0; }
       bool is_predicted() const { return dot->is_root; }
       bool is_completed() const { return active && passive; }
@@ -445,7 +445,7 @@ namespace cicada
 	  // test if we reached a leaf...
 	  if (transducer.has_next(last_next)) {
 	    if (has_rule)
-	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edges));
+	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next));
 	    if (has_next)
 	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge));
 	  }
@@ -453,7 +453,7 @@ namespace cicada
 	  // test if we have a phrase... we will back to root()
 	  if (! transducer.rules(last_next).empty()) {
 	    if (has_rule)
-	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edges));
+	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next));
 	    if (has_next)
 	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge));
 	  }
@@ -477,7 +477,7 @@ namespace cicada
 	    // test if we reached a leaf...
 	    if (transducer.has_next(last_next)) {
 	      if (has_rule)
-		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edges));
+		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next));
 	      if (has_next)
 		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge));
 	    }
@@ -485,7 +485,7 @@ namespace cicada
 	    // test if we have a phrase... we will back to root()
 	    if (! transducer.rules(last_next).empty()) {
 	      if (has_rule)
-		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edges));
+		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next));
 	      if (has_next)
 		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge));
 	    }
@@ -535,7 +535,7 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edges));
+	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next));
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive));
       }
@@ -562,7 +562,7 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edges));
+	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next));
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive));
       }
@@ -674,7 +674,7 @@ namespace cicada
       } else
 	throw std::runtime_error("where this edge comes from?");
       
-      if (edge.edges.empty()) {
+      if (edge.is_active()) {
 	hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
 	
 	switch (tails.size()) {
@@ -685,7 +685,7 @@ namespace cicada
 	
 	target.connect_edge(graph_edge.id, node_head.id);
       } else {
-	for (size_t i = 0; i != edge.edges.size(); ++ i) {
+	for (size_t i = 0; i != edge.edges->edges.size(); ++ i) {
 	  hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
 	  
 	  switch (tails.size()) {
@@ -694,8 +694,8 @@ namespace cicada
 	  case 2: graph_edge.rule = rule_x1_x2;   break;
 	  }
 	  
-	  graph_edge.features   = source.edges[edge.edges[i]].features;
-	  graph_edge.attributes = source.edges[edge.edges[i]].attributes;
+	  graph_edge.features   = source.edges[edge.edges->edges[i]].features;
+	  graph_edge.attributes = source.edges[edge.edges->edges[i]].attributes;
 	  
 	  target.connect_edge(graph_edge.id, node_head.id);
 	}
