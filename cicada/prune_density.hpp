@@ -66,13 +66,21 @@ namespace cicada
 
     typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
+
+    typedef std::pair<weight_type, id_type> value_type;
+    typedef std::vector<value_type, std::allocator<value_type> > sorted_type;
     
+    template <typename Tp>
+    struct greater_first
+    {
+      bool operator()(const Tp& x, const Tp& y) const { return x.first > y.first; }
+    };
+
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target.clear();
       if (! source.is_valid())
 	return;
-      
       weight_type viterbi_weight;
       int         viterbi_length;
       viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
@@ -89,15 +97,32 @@ namespace cicada
       
       inside_outside(source, inside, posterior, function, function);
       
-      posterior_type sorted(posterior);
+      sorted_type sorted(source.edges.size());
       
-      std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), std::greater<weight_type>());
-      
-      const weight_type cutoff = sorted[prune_size];
-      
-      removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)
-	removed[id] = (posterior[id] < cutoff);
+	sorted[id] = std::make_pair(posterior[id], id);
+      
+      std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), greater_first<value_type>());
+      
+      const weight_type cutoff = sorted[prune_size].first;
+      
+      typename sorted_type::const_iterator siter = sorted.begin();
+      typename sorted_type::const_iterator siter_end = sorted.end();
+      typename sorted_type::const_iterator siter_last = siter + prune_size;
+
+      removed_type removed(source.edges.size(), false);
+      
+      bool found_equal = false;
+      for (/**/; siter != siter_last; ++ siter)
+	found_equal |= (siter->first == cutoff);
+      
+      if (found_equal) {
+	for (/**/; siter != siter_end; ++ siter)
+	  removed[siter->second] = (siter->first != cutoff);
+      } else {
+	for (/**/; siter != siter_end; ++ siter)
+	  removed[siter->second] = true;
+      }
       
       topologically_sort(source, target, filter_pruned(removed), validate);
     }
