@@ -648,12 +648,24 @@ namespace cicada
 	// we will have two nodes... active and passive
 	
 	non_terminal_node_set_type::const_iterator niter_active = non_terminal_nodes.find(edge.active);
-	if (niter_active == non_terminal_nodes.end())
-	  throw std::runtime_error("error during completion for active?");
-
+	if (niter_active == non_terminal_nodes.end()) {
+	  const bool exists = (edges_unique_active.find(edge.active) != edges_unique_active.end());
+	  
+	  if (exists)
+	    throw std::runtime_error("error during completion for active?");
+	  else
+	    throw std::runtime_error("error during completion for active? (no active?)");
+	}
+	
 	non_terminal_node_set_type::const_iterator niter_passive = non_terminal_nodes.find(edge.passive);
-	if (niter_passive == non_terminal_nodes.end())
-	  throw std::runtime_error("error during completion for passive?");
+	if (niter_passive == non_terminal_nodes.end()) {
+	  const bool exists = (edges_unique_passive.find(edge.passive) != edges_unique_passive.end());
+	  
+	  if (exists)
+	    throw std::runtime_error("error during completion for passive?");
+	  else
+	    throw std::runtime_error("error during completion for passive? (non passive?)");
+	}
 	
 	tails.push_back(niter_active->second);
 	tails.push_back(niter_passive->second);
@@ -725,8 +737,6 @@ namespace cicada
 
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
-      
-      
       
       grammar_nodes.clear();
       grammar_nodes.resize(1);
