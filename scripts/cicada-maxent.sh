@@ -29,6 +29,8 @@ hosts_file=""
 
 ### decoding config
 config=""
+preprocess=""
+postprocess=""
 compose="compose-cky"
 
 ### linear learning
@@ -63,6 +65,8 @@ $me [options]
   Decoding options
   -c, --config              Configuration file (required)
   --compose                 Composition algorithm (default: $compose)
+  --preprocess              operations before composition
+  --postprocess             operations after composition
   
   Training options
   -C, --C                   hyperparameter                   (default: $C)
@@ -143,6 +147,14 @@ while test $# -gt 0 ; do
   --compose )
     test $# = 1 && eval "$exit_missing_arg"
     compose=$2
+    shift; shift ;;
+  --preprocess )
+    test $# = 1 && eval "$exit_missing_arg"
+    preprocess=$2
+    shift; shift ;;
+  --postprocess )
+    test $# = 1 && eval "$exit_missing_arg"
+    postprocess=$2
     shift; shift ;;
 
 ### test set and reference set
@@ -396,7 +408,9 @@ echo "composition ${root}forest-maxent" >&2
 qsubwrapper decode -l ${root}forest.maxent.log `cicadapath cicada_mpi` \
 	--input $devset \
 	--config ${root}cicada.config.maxent \
+        $preprocess \
         --operation $compose \
+        $postprocess \
         --operation output:directory=${root}forest-maxent \
  	\
 	--debug || exit 1

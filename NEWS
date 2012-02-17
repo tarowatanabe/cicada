@@ -2,6 +2,7 @@
 Bugfix: Adde brevity penalty for RIBES
 Bugfix: Do not read oracles when learning by xBLEU
 New: added permute-deterministic which deterministically permute hyperedges wrt the category of the head.
+New: added filter for alignment: Currently, we support inverse, permutation
 
 2012-2-15
 Added MIRA-like optimization for PRO-style learning
