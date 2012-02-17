@@ -199,17 +199,26 @@ namespace cicada
     {
       const edge_type* active;
       const edge_type* passive;
-      int is_active;
+      size_type is_active;
       
       Traversal(const edge_type* __active, const edge_type* __passive, const bool __is_active)
 	: active(__active), passive(__passive), is_active(__is_active) {}
-
+      
       Traversal()
 	: active(0), passive(0), is_active(0) {}
     };
     typedef Traversal traversal_type;
     
-    typedef utils::hashmurmur<size_type> traversal_hash_type;
+    struct traversal_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const traversal_type& x) const
+      {
+	return hasher_type::operator()(x.active, hasher_type::operator()(x.passive, x.is_active));
+      }
+    };
+    
     struct traversal_equal_type
     {
       bool operator()(const traversal_type& x, const traversal_type& y) const
@@ -587,7 +596,7 @@ namespace cicada
       
       // add into hypergraph...
 
-      const hypergraph_type::node_type* terminal = 0;
+      hypergraph_type::id_type terminal = hypergraph_type::invalid;
       
       if (edge.terminal.first >= 0) {
 	const grammar_type::rule_pair_set_type& rules = grammar[edge.terminal.first].rules(edge.terminal.second);
@@ -613,7 +622,7 @@ namespace cicada
 	    niter = terminal_nodes.insert(std::make_pair(edge.terminal, node.id)).first;
 	  }
 	  
-	  terminal = &target.nodes[niter->second];
+	  terminal = niter->second;
 	}
       }
       
@@ -642,30 +651,22 @@ namespace cicada
 	  throw std::runtime_error("error during scanning?");
 	
 	tails.push_back(niter->second);
-	if (terminal)
-	  tails.push_back(terminal->id);
+	if (terminal != hypergraph_type::invalid)
+	  tails.push_back(terminal);
 	
       } else if (edge.is_completed()) {
 	// we will have two nodes... active and passive
 	
 	non_terminal_node_set_type::const_iterator niter_active = non_terminal_nodes.find(edge.active);
 	if (niter_active == non_terminal_nodes.end()) {
-	  const bool exists = (edges_unique_active.find(edge.active) != edges_unique_active.end());
 	  
-	  if (exists)
-	    throw std::runtime_error("error during completion for active?");
-	  else
-	    throw std::runtime_error("error during completion for active? (no active?)");
+	  throw std::runtime_error("error during completion for active?");
 	}
 	
 	non_terminal_node_set_type::const_iterator niter_passive = non_terminal_nodes.find(edge.passive);
 	if (niter_passive == non_terminal_nodes.end()) {
-	  const bool exists = (edges_unique_passive.find(edge.passive) != edges_unique_passive.end());
 	  
-	  if (exists)
-	    throw std::runtime_error("error during completion for passive?");
-	  else
-	    throw std::runtime_error("error during completion for passive? (non passive?)");
+	  throw std::runtime_error("error during completion for passive?");
 	}
 	
 	tails.push_back(niter_active->second);
