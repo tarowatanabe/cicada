@@ -184,7 +184,7 @@ namespace cicada
     public:
       bool is_passive() const { return edges; }
       bool is_active() const { return ! edges; }
-      bool is_scanned() const { return active && !passive && dot != 0; }
+      bool is_scanned() const { return active && ! passive && dot; }
       bool is_predicted() const { return dot->is_root; }
       bool is_completed() const { return active && passive; }
     };
@@ -628,17 +628,17 @@ namespace cicada
       }
       
       // now, get node...
-      non_terminal_node_set_type::iterator niter = non_terminal_nodes.find(&edge);
-      if (niter == non_terminal_nodes.end())
-	niter = non_terminal_nodes.insert(std::make_pair(&edge, target.add_node().id)).first;
+      std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&edge, 0));
+      if (result.second)
+	result.first->second = target.add_node().id;
       
-      hypergraph_type::node_type& node_head = target.nodes[niter->second];
+      const hypergraph_type::id_type node_head = result.first->second;
       
       if (edge.lhs == goal_symbol
 	  && edge.is_passive()
 	  && edge.first == transducer_id_type(-1, 0)
 	  && edge.last == transducer_id_type(-1, 0))
-	goal_nodes.insert(node_head.id);
+	goal_nodes.insert(node_head);
       
       std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
       
@@ -646,7 +646,7 @@ namespace cicada
 	
       } else if (edge.is_scanned()) {
 	// we will have one node... + terminal node if terminal exists!
-
+	
 	non_terminal_node_set_type::iterator niter = non_terminal_nodes.find(edge.active);
 	if (niter == non_terminal_nodes.end())
 	  throw std::runtime_error("error during scanning?");
@@ -659,34 +659,12 @@ namespace cicada
 	// we will have two nodes... active and passive
 	
 	non_terminal_node_set_type::const_iterator niter_active = non_terminal_nodes.find(edge.active);
-	if (niter_active == non_terminal_nodes.end()) {
-	  const bool has_active  = edge.active->active;
-	  const bool has_passive = edge.active->passive;
-
-	  const bool has_active_node  = (has_active && non_terminal_nodes.find(edge.active->active) != non_terminal_nodes.end());
-	  const bool has_passive_node = (has_passive && non_terminal_nodes.find(edge.active->passive) != non_terminal_nodes.end());
-	  
-	  throw std::runtime_error(std::string("error during completion for active?")
-				   + ' ' + utils::lexical_cast<std::string>(has_active)
-				   + ' ' + utils::lexical_cast<std::string>(has_passive)
-				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
-				   + ' ' + utils::lexical_cast<std::string>(has_passive_node));
-	}
+	if (niter_active == non_terminal_nodes.end()) 
+	  throw std::runtime_error("error during completion for active?");
 	
 	non_terminal_node_set_type::const_iterator niter_passive = non_terminal_nodes.find(edge.passive);
-	if (niter_passive == non_terminal_nodes.end()) {
-	  const bool has_active  = edge.passive->active;
-	  const bool has_passive = edge.passive->passive;
-	  
-	  const bool has_active_node  = (has_active && non_terminal_nodes.find(edge.passive->active) != non_terminal_nodes.end());
-	  const bool has_passive_node = (has_passive && non_terminal_nodes.find(edge.passive->passive) != non_terminal_nodes.end());
-	  
-	  throw std::runtime_error(std::string("error during completion for passive?")
-				   + ' ' + utils::lexical_cast<std::string>(has_active)
-				   + ' ' + utils::lexical_cast<std::string>(has_passive)
-				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
-				   + ' ' + utils::lexical_cast<std::string>(has_passive_node));
-	}
+	if (niter_passive == non_terminal_nodes.end())
+	  throw std::runtime_error("error during completion for passive?");
 	
 	tails.push_back(niter_active->second);
 	tails.push_back(niter_passive->second);
@@ -702,7 +680,7 @@ namespace cicada
 	case 2: graph_edge.rule = rule_x1_x2;   break;
 	}
 	
-	target.connect_edge(graph_edge.id, node_head.id);
+	target.connect_edge(graph_edge.id, node_head);
       } else {
 	for (size_t i = 0; i != edge.edges->edges.size(); ++ i) {
 	  hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
@@ -716,7 +694,7 @@ namespace cicada
 	  graph_edge.features   = source.edges[edge.edges->edges[i]].features;
 	  graph_edge.attributes = source.edges[edge.edges->edges[i]].attributes;
 	  
-	  target.connect_edge(graph_edge.id, node_head.id);
+	  target.connect_edge(graph_edge.id, node_head);
 	}
       }
     }
