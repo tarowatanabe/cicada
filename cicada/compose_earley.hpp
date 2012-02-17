@@ -56,8 +56,6 @@ namespace cicada
       : grammar(__grammar), yield_source(__yield_source)
 
     {
-      edges_unique_active.set_empty_key(0);
-      edges_unique_passive.set_empty_key(0);
 
       traversals.set_empty_key(traversal_type());
 
@@ -261,44 +259,6 @@ namespace cicada
       }
     };
     
-    struct edge_unique_active_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const edge_type* x) const
-      {
-	// passive edge do not care about what dot we have consumed...
-	return (x ? hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()))) : size_t(0));
-      }
-    };
-    
-    struct edge_unique_passive_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const edge_type* x) const
-      {
-	// passive edge do not care about what dot we have consumed...
-	return (x ? hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())) : size_t(0));
-      }
-    };
-    
-    struct edge_unique_active_equal_type
-    {
-      bool operator()(const edge_type* x, const edge_type* y) const
-      {
-	// passive edge do not care dot...
-	return ((x == y) || (x && y && x->lhs == y->lhs && x->first == y->first && x->last == y->last && x->dot == y->dot));
-      }
-    };
-    struct edge_unique_passive_equal_type
-    {
-      bool operator()(const edge_type* x, const edge_type* y) const
-      {
-	// passive edge do not care dot...
-	return ((x == y) || (x && y && x->lhs == y->lhs && x->first == y->first && x->last == y->last));
-      }
-    };
 
     
     struct edge_active_hash_type : public utils::hashmurmur<size_t>
@@ -333,8 +293,6 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const edge_type*, edge_unique_active_hash_type, edge_unique_active_equal_type >   edge_set_unique_active_type;
-    typedef google::dense_hash_set<const edge_type*, edge_unique_passive_hash_type, edge_unique_passive_equal_type > edge_set_unique_passive_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
@@ -583,16 +541,20 @@ namespace cicada
     
     void connect_edge(const edge_type& edge, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (edge.is_passive()) {
-	if (edges_unique_passive.insert(&edge).second) {
+      // now, get node...
+      std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&edge, 0));
+      if (result.second)
+	result.first->second = target.add_node().id;
+      
+      const hypergraph_type::id_type node_head = result.first->second;
+      
+      if (result.second) {
+	if (edge.is_passive())
 	  edges_passive.insert(&edge);
-	  agenda_finishing.push_back(&edge);
-	}
-      } else {
-	if (edges_unique_active.insert(&edge).second) {
+	else
 	  edges_active.insert(&edge);
-	  agenda_finishing.push_back(&edge);
-	}
+	
+	agenda_finishing.push_back(&edge);
       }
       
       // add into hypergraph...
@@ -626,14 +588,7 @@ namespace cicada
 	  terminal = niter->second;
 	}
       }
-      
-      // now, get node...
-      std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&edge, 0));
-      if (result.second)
-	result.first->second = target.add_node().id;
-      
-      const hypergraph_type::id_type node_head = result.first->second;
-      
+            
       if (edge.lhs == goal_symbol
 	  && edge.is_passive()
 	  && edge.first == transducer_id_type(-1, 0)
@@ -713,8 +668,6 @@ namespace cicada
       agenda_finishing.clear();
       agenda_exploration.clear();
 
-      edges_unique_active.clear();
-      edges_unique_passive.clear();
       edges_active.clear();
       edges_passive.clear();
 
@@ -819,8 +772,6 @@ namespace cicada
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
     
-    edge_set_unique_active_type  edges_unique_active;
-    edge_set_unique_passive_type edges_unique_passive;
     edge_set_active_type  edges_active;
     edge_set_passive_type edges_passive;
 
