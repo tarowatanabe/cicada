@@ -81,6 +81,7 @@ namespace cicada
       target.clear();
       if (! source.is_valid())
 	return;
+      
       weight_type viterbi_weight;
       int         viterbi_length;
       viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
@@ -125,6 +126,9 @@ namespace cicada
       }
       
       topologically_sort(source, target, filter_pruned(removed), validate);
+      
+      if (! target.is_valid())
+	target = source;
     }
 
     const function_type& function;

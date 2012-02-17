@@ -76,6 +76,9 @@ namespace cicada
 	removed[id] = (posterior[id] < cutoff);
       
       topologically_sort(source, target, filter_pruned(removed), validate);
+      
+      if (! target.is_valid())
+	target = source;
     }
 
     const function_type& function;
