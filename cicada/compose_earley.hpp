@@ -29,6 +29,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
+#include <utils/lexical_cast.hpp>
 
 namespace cicada
 {
@@ -667,9 +668,9 @@ namespace cicada
 	  
 	  throw std::runtime_error(std::string("error during completion for active?")
 				   + ' ' + utils::lexical_cast<std::string>(has_active)
-				   + ' ' + utils::lexical_cast<std::string>(has_passie)
+				   + ' ' + utils::lexical_cast<std::string>(has_passive)
 				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
-				   + ' ' + utils::lexical_cast<std::string>(has_passie_node));
+				   + ' ' + utils::lexical_cast<std::string>(has_passive_node));
 	}
 	
 	non_terminal_node_set_type::const_iterator niter_passive = non_terminal_nodes.find(edge.passive);
@@ -682,9 +683,9 @@ namespace cicada
 	  
 	  throw std::runtime_error(std::string("error during completion for passive?")
 				   + ' ' + utils::lexical_cast<std::string>(has_active)
-				   + ' ' + utils::lexical_cast<std::string>(has_passie)
+				   + ' ' + utils::lexical_cast<std::string>(has_passive)
 				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
-				   + ' ' + utils::lexical_cast<std::string>(has_passie_node));
+				   + ' ' + utils::lexical_cast<std::string>(has_passive_node));
 	}
 	
 	tails.push_back(niter_active->second);
@@ -762,7 +763,7 @@ namespace cicada
       // assigne pseudo non-terminals
       non_terminal_set_type non_terminals(source.nodes.size());
       for (size_type id = 0; id < source.nodes.size(); ++ id) {
-	non_terminals[id] = std::string("[NODE_") + boost::lexical_cast<std::string>(id) + ']';
+	non_terminals[id] = std::string("[NODE_") + utils::lexical_cast<std::string>(id) + ']';
 	//non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
       }
 
