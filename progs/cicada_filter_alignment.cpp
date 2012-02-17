@@ -95,15 +95,15 @@ int main(int argc, char** argv)
 	    if (has_permutation_target) {
 	      if (aiter->target >= static_cast<int>(permutation_target.size()))
 		throw std::runtime_error("invalid target permutation");
-		      
+	      
 	      aiter->target = permutation_target[aiter->target];
 	    }
 	  }
 	  
-	  if (inverse_mode) {
+	  if (inverse_mode)
 	    alignment.inverse();
-	    std::sort(alignment.begin(), alignment.end());
-	  }
+	  
+	  std::sort(alignment.begin(), alignment.end());
 	  
 	  os << alignment << '\n';
 	}
