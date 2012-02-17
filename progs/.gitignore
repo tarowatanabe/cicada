@@ -49,6 +49,7 @@ cicada_extract_score_mpi
 cicada_extract_sort
 cicada_extract_tree
 cicada_extract_tree_mpi
+cicada_filter_alignment
 cicada_filter_bitext
 cicada_filter_cabocha
 cicada_filter_config

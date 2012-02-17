@@ -46,6 +46,7 @@ bin_PROGRAMS = \
 	cicada_extract_sort \
 	cicada_extract_tree \
 	cicada_extract_tree_mpi \
+	cicada_filter_alignment \
 	cicada_filter_bitext \
 	cicada_filter_cabocha \
 	cicada_filter_config \
@@ -212,6 +213,9 @@ cicada_filter_pialign_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_filter_refset_SOURCES = cicada_filter_refset.cpp
 cicada_filter_refset_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_alignment_SOURCES = cicada_filter_alignment.cpp
+cicada_filter_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_bitext_SOURCES = cicada_filter_bitext.cpp
 cicada_filter_bitext_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
