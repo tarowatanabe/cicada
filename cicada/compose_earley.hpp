@@ -735,7 +735,7 @@ namespace cicada
 	      grammar_nodes.push_back(grammar_node_type());
 	      niter = grammar_nodes[grammar_node].non_terminals.insert(std::make_pair(non_terminal, id)).first;
 	    }
-	  } else {
+	  } else if (*siter != vocab_type::EPSILON) {
 	    const symbol_type& terminal = *siter;
 	    
 	    const id_type grammar_node = niter->second;
