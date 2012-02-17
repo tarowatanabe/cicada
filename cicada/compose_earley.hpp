@@ -659,14 +659,32 @@ namespace cicada
 	
 	non_terminal_node_set_type::const_iterator niter_active = non_terminal_nodes.find(edge.active);
 	if (niter_active == non_terminal_nodes.end()) {
+	  const bool has_active  = edge.active->active;
+	  const bool has_passive = edge.active->passive;
+
+	  const bool has_active_node  = (has_active && non_terminal_nodes.find(edge.active->active) != non_terminal_nodes.end());
+	  const bool has_passive_node = (has_passive && non_terminal_nodes.find(edge.active->passive) != non_terminal_nodes.end());
 	  
-	  throw std::runtime_error("error during completion for active?");
+	  throw std::runtime_error(std::string("error during completion for active?")
+				   + ' ' + utils::lexical_cast<std::string>(has_active)
+				   + ' ' + utils::lexical_cast<std::string>(has_passie)
+				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
+				   + ' ' + utils::lexical_cast<std::string>(has_passie_node));
 	}
 	
 	non_terminal_node_set_type::const_iterator niter_passive = non_terminal_nodes.find(edge.passive);
 	if (niter_passive == non_terminal_nodes.end()) {
+	  const bool has_active  = edge.passive->active;
+	  const bool has_passive = edge.passive->passive;
 	  
-	  throw std::runtime_error("error during completion for passive?");
+	  const bool has_active_node  = (has_active && non_terminal_nodes.find(edge.passive->active) != non_terminal_nodes.end());
+	  const bool has_passive_node = (has_passive && non_terminal_nodes.find(edge.passive->passive) != non_terminal_nodes.end());
+	  
+	  throw std::runtime_error(std::string("error during completion for passive?")
+				   + ' ' + utils::lexical_cast<std::string>(has_active)
+				   + ' ' + utils::lexical_cast<std::string>(has_passie)
+				   + ' ' + utils::lexical_cast<std::string>(has_active_node)
+				   + ' ' + utils::lexical_cast<std::string>(has_passie_node));
 	}
 	
 	tails.push_back(niter_active->second);
