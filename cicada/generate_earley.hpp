@@ -58,8 +58,7 @@ namespace cicada
     GenerateEarley(const int __depth, const int __width)
       : depth(__depth), width(__width)
     {
-      edges_unique_active.set_empty_key(0);
-      edges_unique_passive.set_empty_key(0);
+      edges_unique.set_empty_key(0);
 
       traversals.set_empty_key(traversal_type());
 
@@ -212,44 +211,33 @@ namespace cicada
     typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
     
     // edge hash/comparison
-    
-    struct edge_unique_active_hash_type : public utils::hashmurmur<size_t>
+    struct edge_unique_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const edge_type* x) const
       {
 	// passive edge do not care about what dot we have consumed...
-	return (x ? hasher_type::operator()(x->dot, hasher_type::operator()(x->depth, x->lhs.id())) : size_t(0));
+	
+	if (! x)
+	  return 0;
+	else if (x->is_active())
+	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->depth, x->lhs.id()));
+	else
+	  return hasher_type::operator()(x->depth, x->lhs.id());
       }
     };
     
-    struct edge_unique_passive_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const edge_type* x) const
-      {
-	// passive edge do not care about what dot we have consumed...
-	return (x ? hasher_type::operator()(x->depth, x->lhs.id()) : size_t(0));
-      }
-    };
-    
-    struct edge_unique_active_equal_type
+    struct edge_unique_equal_type
     {
       bool operator()(const edge_type* x, const edge_type* y) const
       {
 	// passive edge do not care dot...
-	return ((x == y) || (x && y && x->lhs == y->lhs && x->depth == y->depth && x->dot == y->dot));
-      }
-    };
-    
-    struct edge_unique_passive_equal_type
-    {
-      bool operator()(const edge_type* x, const edge_type* y) const
-      {
-	// passive edge do not care dot...
-	return ((x == y) || (x && y && x->lhs == y->lhs && x->depth == y->depth));
+	return ((x == y) || (x && y
+			     && x->is_active() == y->is_active()
+			     && x->lhs == y->lhs
+			     && x->depth == y->depth
+			     && (x->is_passive() || x->dot == y->dot)));
       }
     };
     
@@ -273,17 +261,15 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const edge_type*, edge_unique_active_hash_type, edge_unique_active_equal_type >   edge_set_unique_active_type;
-    typedef google::dense_hash_set<const edge_type*, edge_unique_passive_hash_type, edge_unique_passive_equal_type > edge_set_unique_passive_type;
-
+    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+    
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_ptr_set_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
-
-
     
     // edge to traversal graph mappings...
     typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
+    
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -456,23 +442,20 @@ namespace cicada
     
     void connect_edge(const edge_type& edge, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (edge.is_passive()) {
-	if (edges_unique_passive.insert(&edge).second) {
+      if (edges_unique.insert(&edge).second) {
+	if (edge.is_passive())
 	  edges_passive[edge.depth].push_back(&edge);
-	  agenda_finishing.push_back(&edge);
-	}
-      } else {
-	if (edges_unique_active.insert(&edge).second) {
+	else
 	  edges_active[edge.depth].push_back(&edge);
-	  agenda_finishing.push_back(&edge);
-	}
+	
+	agenda_finishing.push_back(&edge);
       }
       
       if (! edge.is_passive()) return;
       
       // Edge is completed or scanned...
       // we will uncover structure...
-            
+      
       //
       // we can access rule by source.edges[edge].rule
       //
@@ -732,8 +715,8 @@ namespace cicada
 	  grammar_nodes[niter->second].features += edge.features;
       }
 
-      edges_unique_active.clear();
-      edges_unique_passive.clear();
+      edges_unique.clear();
+      
       edges_active.clear();
       edges_passive.clear();
 
@@ -763,8 +746,7 @@ namespace cicada
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
     
-    edge_set_unique_active_type  edges_unique_active;
-    edge_set_unique_passive_type edges_unique_passive;
+    edge_set_unique_type  edges_unique;
     edge_set_active_type  edges_active;
     edge_set_passive_type edges_passive;
   };
