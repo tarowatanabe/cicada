@@ -79,7 +79,7 @@ namespace cicada
 	      const int __non_terminal_index = siter->non_terminal_index();
 	      const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, pos, __non_terminal_index - 1);
 	      
-	      *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal(pos + 1);
+	      *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal();
 	      ++ pos;
 	    }
 	}

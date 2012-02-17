@@ -374,8 +374,10 @@ namespace cicada
 	}
       }
       
-      if (target.goal != hypergraph_type::invalid)
+      if (target.goal != hypergraph_type::invalid) {
+	cicada::topologically_sort(target);
 	cicada::remove_epsilon(target);
+      }
     }
 
   private:
