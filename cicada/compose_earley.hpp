@@ -27,6 +27,8 @@
 #include <utils/chart.hpp>
 #include <utils/sgi_hash_set.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/simple_vector.hpp>
+#include <utils/small_vector.hpp>
 
 namespace cicada
 {
@@ -71,22 +73,23 @@ namespace cicada
 
     typedef uint32_t id_type;
     typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
+
+    typedef utils::small_vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
     
-  
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
     {
       grammar_node_type(const bool __is_root)
-	: edge(hypergraph_type::invalid), is_root(__is_root) { initialize(); }
+	: edges(), is_root(__is_root) { initialize(); }
       grammar_node_type()
-	: edge(hypergraph_type::invalid), is_root(false) { initialize(); }
+	: edges(), is_root(false) { initialize(); }
       
       id_map_type terminals;
       id_map_type non_terminals;
       
-      hypergraph_type::id_type edge;
+      id_set_type edges;
       bool is_root;
-
+      
     private:
       void initialize()
       {
@@ -96,9 +99,9 @@ namespace cicada
     };
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
-
+    
     typedef std::pair<int, transducer_type::id_type> transducer_id_type;
-
+    
     struct Edge
     {
       typedef Edge edge_type;
@@ -118,7 +121,7 @@ namespace cicada
       const edge_type* passive;
       
       // backptr to source hypergraph's edge
-      hypergraph_type::id_type edge;
+      id_set_type edges;
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -126,7 +129,7 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(q0), last(q0), terminal(transducer_id_type(-1, 0)),
 	  active(0), passive(0),
-	  edge(hypergraph_type::invalid) {}
+	  edges() {}
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -135,18 +138,18 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(q0), last(q0), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(0),
-	  edge(hypergraph_type::invalid) {}
+	  edges() {}
 
       
       // created by scan... we will always have terminal
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last, const transducer_id_type& __terminal,
 	   const edge_type& __active,
-	   const hypergraph_type::id_type& __edge)
+	   const id_set_type& __edges)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(__terminal),
 	  active(&__active), passive(0),
-	  edge(__edge) {}
+	  edges(__edges) {}
       
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last, const transducer_id_type& __terminal,
@@ -154,32 +157,32 @@ namespace cicada
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(__terminal),
 	  active(&__active), passive(0),
-	  edge(hypergraph_type::invalid) {}
+	  edges() {}
       
       // construct by complete
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive,
-	   const hypergraph_type::id_type& __edge)
+	   const id_set_type& __edges)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(&__passive),
-	  edge(__edge) {}
+	  edges(__edges) {}
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const transducer_id_type& __first, const transducer_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive)
 	: lhs(__lhs), dot(&__dot),
 	  first(__first), last(__last), terminal(transducer_id_type(-1, 0)),
 	  active(&__active), passive(&__passive),
-	  edge(hypergraph_type::invalid) {}
+	  edges() {}
       
       // for query...
       Edge(const transducer_id_type& __first, const transducer_id_type& __last)
 	: first(__first), last(__last) {}
       
     public:
-      bool is_passive() const { return edge != hypergraph_type::invalid; }
-      bool is_active() const { return edge == hypergraph_type::invalid; }
+      bool is_passive() const { return ! edges.empty(); }
+      bool is_active() const { return edges.empty(); }
       bool is_scanned() const { return active && !passive && dot != 0; }
       bool is_predicted() const { return dot->is_root; }
       bool is_completed() const { return active && passive; }
@@ -190,8 +193,6 @@ namespace cicada
 
     typedef utils::chunk_vector<edge_type, 1024 * 16 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
     typedef std::deque<const edge_type*, std::allocator<const edge_type*> > agenda_type;
-    
-    
     
     // traversal structure to keep only unique edges...
     struct Traversal
@@ -429,13 +430,13 @@ namespace cicada
 	  
 	  const grammar_node_type& dot_next = grammar_nodes[titer->second];
 	  
-	  const bool has_rule = dot_next.edge != hypergraph_type::invalid;
+	  const bool has_rule = ! dot_next.edges.empty();
 	  const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	  
 	  // test if we reached a leaf...
 	  if (transducer.has_next(last_next)) {
 	    if (has_rule)
-	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edge));
+	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edges));
 	    if (has_next)
 	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge));
 	  }
@@ -443,7 +444,7 @@ namespace cicada
 	  // test if we have a phrase... we will back to root()
 	  if (! transducer.rules(last_next).empty()) {
 	    if (has_rule)
-	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edge));
+	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edges));
 	    if (has_next)
 	      insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge));
 	  }
@@ -461,13 +462,13 @@ namespace cicada
 	    
 	    const grammar_node_type& dot_next = grammar_nodes[titer->second];
 	    
-	    const bool has_rule = dot_next.edge != hypergraph_type::invalid;
+	    const bool has_rule = ! dot_next.edges.empty();
 	    const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	    
 	    // test if we reached a leaf...
 	    if (transducer.has_next(last_next)) {
 	      if (has_rule)
-		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edge));
+		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge, dot_next.edges));
 	      if (has_next)
 		insert_edge(edge_type(edge.lhs, dot_next, edge.first, std::make_pair(table, last_next), transducer_id_type(-1, 0), edge));
 	    }
@@ -475,7 +476,7 @@ namespace cicada
 	    // test if we have a phrase... we will back to root()
 	    if (! transducer.rules(last_next).empty()) {
 	      if (has_rule)
-		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edge));
+		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge, dot_next.edges));
 	      if (has_next)
 		insert_edge(edge_type(edge.lhs, dot_next, edge.first, transducer_id_type(-1, 0), std::make_pair(table, last_next), edge));
 	    }
@@ -521,11 +522,11 @@ namespace cicada
 	
 	const grammar_node_type& dot_next = grammar_nodes[niter->second];
 	
-	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
+	const bool has_rule = ! dot_next.edges.empty();
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edges));
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive));
       }
@@ -548,11 +549,11 @@ namespace cicada
 
 	const grammar_node_type& dot_next = grammar_nodes[niter->second];
 	
-	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
+	const bool has_rule = ! dot_next.edges.empty();
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive, dot_next.edges));
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive));
       }
@@ -672,21 +673,32 @@ namespace cicada
       } else
 	throw std::runtime_error("where this edge comes from?");
       
-      hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
-      
-      // TODO: add rule
-      switch (tails.size()) {
-      case 0: graph_edge.rule = rule_epsilon; break;
-      case 1: graph_edge.rule = rule_x1;      break;
-      case 2: graph_edge.rule = rule_x1_x2;   break;
+      if (edge.edges.empty()) {
+	hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
+	
+	switch (tails.size()) {
+	case 0: graph_edge.rule = rule_epsilon; break;
+	case 1: graph_edge.rule = rule_x1;      break;
+	case 2: graph_edge.rule = rule_x1_x2;   break;
+	}
+	
+	target.connect_edge(graph_edge.id, node_head.id);
+      } else {
+	for (size_t i = 0; i != edge.edges.size(); ++ i) {
+	  hypergraph_type::edge_type& graph_edge = target.add_edge(tails.begin(), tails.end());
+	  
+	  switch (tails.size()) {
+	  case 0: graph_edge.rule = rule_epsilon; break;
+	  case 1: graph_edge.rule = rule_x1;      break;
+	  case 2: graph_edge.rule = rule_x1_x2;   break;
+	  }
+	  
+	  graph_edge.features   = source.edges[edge.edges[i]].features;
+	  graph_edge.attributes = source.edges[edge.edges[i]].attributes;
+	  
+	  target.connect_edge(graph_edge.id, node_head.id);
+	}
       }
-
-      if (edge.edge != hypergraph_type::invalid) {
-	graph_edge.features   = source.edges[edge.edge].features;
-	graph_edge.attributes = source.edges[edge.edge].attributes;
-      }
-      
-      target.connect_edge(graph_edge.id, node_head.id);
     }
 
 
@@ -784,132 +796,9 @@ namespace cicada
 	  }
 	}
 	
-	grammar_nodes[niter->second].edge = edge.id;
+	grammar_nodes[niter->second].edges.push_back(edge.id);
       }
     }
-
-#if 0
-    typedef std::vector<bool, std::allocator<bool> > removed_type;
-
-    struct filter_epsilon
-    {
-      const removed_type& removed;
-      
-      filter_epsilon(const removed_type& __removed) : removed(__removed) {}
-      
-      template <typename Edge>
-      bool operator()(const Edge& edge) const
-      {
-	return removed[edge.id];
-      }
-    };
-    
-
-    void remove_epsilon(hypergraph_type& graph)
-    {
-      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
-      typedef std::vector<edge_set_type, std::allocator<edge_set_type> > node_map_type;
-
-      hypergraph_type graph_removed;
-
-      removed_type removed(graph.edges.size(), false);
-      node_map_type out_edges(graph.nodes.size());
-      
-      bool new_epsilon = false;
-      
-      do {
-	removed.clear();
-	removed.resize(graph.edges.size(), false);
-
-	// compute out-edges...
-	{
-	  out_edges.clear();
-	  out_edges.resize(graph.nodes.size());
-
-	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    const hypergraph_type::edge_type& edge = *eiter;
-	    
-	    hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	      out_edges[*niter].push_back(edge.id);
-	  }
-	}
-	
-	// then, iterate again... and mark removed for epsilon rules...
-	hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-	for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
-	  if (eiter->tails.empty() && eiter->rule == rule_epsilon) {
-	    const hypergraph_type::edge_type& edge = *eiter;
-	    
-	    removed[edge.id] = true;
-	    
-	    if (! edge.features.empty()) {
-	      if (graph.nodes[edge.head].edges.size() != 1) {
-		// cannot propagate features...
-		// or, do we evenly distribute this...?
-	      } else {
-		edge_set_type::const_iterator eiter_end = out_edges[edge.head].end();
-		for (edge_set_type::const_iterator eiter = out_edges[edge.head].begin(); eiter != eiter_end; ++ eiter)
-		  graph.edges[*eiter].features += edge.features;
-	      }
-	    }
-	  }
-	
-	// removed epsilon edges...
-	graph_removed.clear();
-	topologically_sort(graph, graph_removed, filter_epsilon(removed), false);
-	graph.swap(graph_removed);
-	
-	// re-compute out-edges
-	{
-	  out_edges.clear();
-	  out_edges.resize(graph.nodes.size());
-	  
-	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    const hypergraph_type::edge_type& edge = *eiter;
-	    
-	    hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	      out_edges[*niter].push_back(edge.id);
-	  }
-	}
-
-	new_epsilon = false;
-	
-	// fix no-edge nodes...
-	hypergraph_type::node_set_type::iterator niter_end = graph.nodes.end();
-	for (hypergraph_type::node_set_type::iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) 
-	  if (niter->edges.empty()) {
-	    const hypergraph_type::node_type& node = *niter;
-	    
-	    edge_set_type::const_iterator eiter_end = out_edges[node.id].end();
-	    for (edge_set_type::const_iterator eiter = out_edges[node.id].begin(); eiter != eiter_end; ++ eiter) {
-	      hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	      
-	      if (edge.tails.size() == 2) {
-		edge.rule = rule_x1;
-		
-		hypergraph_type::edge_type::node_set_type tails(1, edge.tails.front() == node.id ? edge.tails.back() : edge.tails.front());
-		
-		edge.tails = tails;
-		
-	      } else {
-		edge.rule = rule_epsilon;
-		edge.tails = hypergraph_type::edge_type::node_set_type();
-		
-		new_epsilon = true;
-	      }
-	    }
-	  }
-	
-      } while (new_epsilon);
-      
-      // final sort...
-      graph.topologically_sort();
-    }
-#endif
     
   private:  
     const grammar_type& grammar;
