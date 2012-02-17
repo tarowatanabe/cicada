@@ -20,6 +20,7 @@ namespace cicada
     class Permute : public Operation
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > exclude_set_type;
+      typedef exclude_set_type deterministic_set_type;
 
       struct Filter
       {
@@ -35,12 +36,27 @@ namespace cicada
 	}
       };
 
+      struct FilterDeterministic
+      {
+	FilterDeterministic(const deterministic_set_type& __deterministics)
+	  : deterministics(__deterministics) {}
+	
+	const deterministic_set_type& deterministics;
+	
+	template <typename Cat>
+	bool operator()(const Cat& x) const
+	{
+	  return deterministics.find(x) != deterministics.end();
+	}	
+      };
+
     public:
       Permute(const std::string& parameter, const int __debug);
       
       void operator()(data_type& data) const;
-
-      exclude_set_type excludes;
+      
+      exclude_set_type       excludes;
+      deterministic_set_type deterministics;
       int size;
       
       int debug;

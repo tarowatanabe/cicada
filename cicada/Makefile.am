@@ -367,6 +367,7 @@ parse_phrase.hpp \
 parse_tree.hpp \
 parse_tree_cky.hpp \
 permute.hpp \
+permute_deterministic.hpp \
 posterior.hpp \
 prune.hpp \
 prune_beam.hpp \

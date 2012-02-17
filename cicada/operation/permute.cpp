@@ -6,6 +6,7 @@
 
 #include <cicada/parameter.hpp>
 #include <cicada/permute.hpp>
+#include <cicada/permute_deterministic.hpp>
 
 #include <cicada/operation/permute.hpp>
 
@@ -20,12 +21,12 @@ namespace cicada
   namespace operation
   {
     Permute::Permute(const std::string& parameter, const int __debug)
-      : base_type("permute"),
-	excludes(), size(0), debug(__debug)
+      : excludes(), size(0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
       excludes.set_empty_key(symbol_type());
+      deterministics.set_empty_key(symbol_type());
     
       param_type param(parameter);
       if (utils::ipiece(param.name()) != "permute")
@@ -36,9 +37,19 @@ namespace cicada
 	  size = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "exclude")
 	  excludes.insert(piter->second);
+	else if (utils::ipiece(piter->first) == "deterministic")
+	  deterministics.insert(piter->second);	
 	else
 	  std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;
       }
+      
+      if (! deterministics.empty()) {
+	if (! excludes.empty())
+	  throw std::runtime_error("both deterministic + exlusion?");
+	
+	name = "permute-deterministic";
+      } else
+	name = "permute";
     }
     
     void Permute::operator()(data_type& data) const
@@ -53,7 +64,9 @@ namespace cicada
     
       utils::resource start;
 	
-      if (excludes.empty())
+      if (! deterministics.empty())
+	cicada::permute_deterministic(hypergraph, permuted, FilterDeterministic(deterministics));
+      else if (excludes.empty())
 	cicada::permute(hypergraph, permuted, size);
       else
 	cicada::permute(hypergraph, permuted, Filter(excludes), size);

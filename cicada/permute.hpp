@@ -65,6 +65,8 @@ namespace cicada
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target = source;
+
+      if (! target.is_valid()) return;
       
       permutation_type permutation;
       

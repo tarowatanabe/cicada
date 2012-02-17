@@ -213,6 +213,7 @@ parse-tree-cky: parsing for tree-matching\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
 \texclude=[a non-terminal] to prohibit permutation.\n\
+\tdeterministic=[a non-terminal] to deterministically permute\n\
 posterior: compute posterior features\n\
 \tname=feature name (default: posterior)\n\
 \tscale=scaling for score\n\
