@@ -56,19 +56,21 @@ namespace cicada
       : grammar(__grammar), yield_source(__yield_source)
 
     {
-
       traversals.set_empty_key(traversal_type());
-
       terminal_nodes.set_empty_key(transducer_id_type(-1, 0));
       non_terminal_nodes.set_empty_key(0);
       
       goal_nodes.set_empty_key(hypergraph_type::id_type(-1));
+      
+      rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_x1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_x1_x2 =  rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
     //
     // compose source hypergraph with FST grammar in grammar...!
     //
-    
 
     typedef uint32_t id_type;
     typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
@@ -259,8 +261,6 @@ namespace cicada
       }
     };
     
-
-    
     struct edge_active_hash_type : public utils::hashmurmur<size_t>
     {
       size_t operator()(const edge_type* x) const
@@ -311,7 +311,8 @@ namespace cicada
     typedef google::dense_hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type> > terminal_node_set_type;
     typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
     typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
-
+    
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -659,46 +660,27 @@ namespace cicada
 
     void initialize_grammar(const hypergraph_type& source)
     {
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-      
       edges.clear();
       
       traversals.clear();
       terminal_nodes.clear();
       non_terminal_nodes.clear();
-
+      
       agenda_finishing.clear();
       agenda_exploration.clear();
-
+      
       edges_active.clear();
       edges_passive.clear();
-
+      
       goal_nodes.clear();
       
-      if (! rule_epsilon)
-	rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-      
-      if (! rule_goal)
-	rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X1)));
-      
-      if (! rule_x1)
-	rule_x1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X1)));
-      
-      if (! rule_x1_x2) {
-	std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
-	sequence.front() = vocab_type::X1;
-	sequence.back() = vocab_type::X2;
-	
-	rule_x1_x2 =  rule_type::create(rule_type(vocab_type::X, sequence.begin(), sequence.end()));
-      }
-
-      
       // assigne pseudo non-terminals
-      non_terminal_set_type non_terminals(source.nodes.size());
-      for (size_type id = 0; id < source.nodes.size(); ++ id) {
+      non_terminals.clear();
+      non_terminals.reserve(source.nodes.size());
+      non_terminals.resize(source.nodes.size());
+      
+      for (size_type id = 0; id < source.nodes.size(); ++ id)
 	non_terminals[id] = std::string("[NODE_") + utils::lexical_cast<std::string>(id) + ']';
-	//non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
-      }
 
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
@@ -778,6 +760,8 @@ namespace cicada
     edge_set_passive_type edges_passive;
 
     goal_node_set_type goal_nodes;
+    
+    non_terminal_set_type non_terminals;
   };
   
   inline
