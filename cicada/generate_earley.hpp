@@ -189,7 +189,7 @@ namespace cicada
     {
       const edge_type* active;
       const edge_type* passive;
-      int is_active;
+      size_t is_active;
       
       Traversal(const edge_type* __active, const edge_type* __passive, const bool __is_active)
 	: active(__active), passive(__passive), is_active(__is_active) {}
@@ -199,7 +199,16 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    typedef utils::hashmurmur<size_type> traversal_hash_type;
+    struct traversal_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const traversal_type& x) const
+      {
+	return hasher_type::operator()(x.active, hasher_type::operator()(x.passive, x.is_active));
+      }
+    };
+    
     struct traversal_equal_type
     {
       bool operator()(const traversal_type& x, const traversal_type& y) const
