@@ -12,6 +12,8 @@
 #include <cicada/kbest.hpp>
 #include <cicada/inside_outside.hpp>
 
+#include <google/dense_hash_set>
+
 namespace cicada
 {
   template <typename Function>
@@ -47,12 +49,18 @@ namespace cicada
 
     struct traversal
     {
-      typedef int value_type;
+      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
       
+      typedef edge_set_type value_type;
+
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	// nothing!
+	yield.clear();
+	
+	yield.push_back(edge.id);
+	for (/**/; first != last; ++ first)
+	  yield.insert(yield.end(), first->begin(), first->end());
       }
     };
     
@@ -64,6 +72,8 @@ namespace cicada
 	return false;
       }
     };
+
+    typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > edge_set_type;
     
     PruneKBest(const function_type& __function,
 	       const size_type __kbest_size,
@@ -85,15 +95,18 @@ namespace cicada
       
       kbest_derivations_type derivations(source, kbest_size, traversal(), function, kbest_filter());
       
-      int derivation;
-      weight_type weight;
+      edge_set_type edges;
+      edges.set_empty_key(hypergraph_type::invalid);
+      
+      typename traversal::value_type derivation;
       size_type   k = 0;
       for (/**/; k != kbest_size; ++ k) {
-	weight_type weight_curr;
+	weight_type weight;
 	
-	if (! derivations(k, derivation, weight_curr))
+	if (! derivations(k, derivation, weight))
 	  break;
-	weight = weight_curr;
+	
+	edges.insert(derivation.begin(), derivation.end());
       }
       
       if (k != kbest_size) {
@@ -105,6 +118,12 @@ namespace cicada
       posterior_type posterior(source.edges.size());
       
       inside_outside(source, inside, posterior, function, function);
+      
+      weight_type weight(cicada::semiring::traits<weight_type>::max());
+      
+      typename edge_set_type::const_iterator eiter_end = edges.end();
+      for (typename edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter)
+	weight = std::min(weight, posterior[*eiter]);
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)
