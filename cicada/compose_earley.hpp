@@ -57,10 +57,11 @@ namespace cicada
 
     {
       traversals.set_empty_key(traversal_type());
+      
       terminal_nodes.set_empty_key(transducer_id_type(-1, 0));
       non_terminal_nodes.set_empty_key(0);
       
-      goal_nodes.set_empty_key(hypergraph_type::id_type(-1));
+      goal_nodes.set_empty_key(hypergraph_type::invalid);
       
       rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
@@ -101,7 +102,7 @@ namespace cicada
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
     
-    typedef std::pair<int, transducer_type::id_type> transducer_id_type;
+    typedef std::pair<int64_t, transducer_type::id_type> transducer_id_type;
     
     struct Edge
     {
@@ -265,7 +266,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->last);
+	return utils::hashmurmur<size_t>::operator()(x->last.second, x->last.first);
       }
     };
     
@@ -281,7 +282,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->first);
+	return utils::hashmurmur<size_t>::operator()(x->first.second, x->first.first);
       }
     };
     
