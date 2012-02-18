@@ -339,7 +339,7 @@ namespace cicada
 	const grammar_node_type& dot_next = grammar_nodes[titer->second];
 	
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
-	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
+	const bool has_next = (! dot_next.terminals.empty()) || (! dot_next.non_terminals.empty());
 	
 
 	// actually, we need to increment edge.span.second! but temporary disabled
@@ -392,7 +392,7 @@ namespace cicada
 	const grammar_node_type& dot_next = grammar_nodes[niter->second];
 	
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
-	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
+	const bool has_next = (! dot_next.terminals.empty()) || (! dot_next.non_terminals.empty());
 	
 	if (has_rule)
 	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
@@ -420,7 +420,7 @@ namespace cicada
 	const grammar_node_type& dot_next = grammar_nodes[niter->second];
 	
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
-	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
+	const bool has_next = (! dot_next.terminals.empty()) || (! dot_next.non_terminals.empty());
 	
 	if (has_rule)
 	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
