@@ -442,20 +442,191 @@ struct LearnSVM : public LearnBase
 
 struct LearnXBLEU : public LearnBase
 {
+  typedef cicada::semiring::Log<double> weight_type;
+  
+  static weight_type brevity_penalty(const double x)
+  {
+    typedef cicada::semiring::traits<weight_type> traits_type;
+
+    // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+      
+    return ((traits_type::exp(x) - traits_type::one()) / (traits_type::one() + traits_type::exp(1000.0 * x))) + traits_type::one();
+  }
+    
+  static weight_type derivative_brevity_penalty(const double x)
+  {
+    typedef cicada::semiring::traits<weight_type> traits_type;
+    
+    const weight_type expx     = traits_type::exp(x);
+    const weight_type expxm1   = expx - traits_type::one();
+    const weight_type exp1000x = traits_type::exp(1000.0 * x);
+    const weight_type p1exp1000x = traits_type::one() + exp1000x;
+      
+    return (expx / p1exp1000x) - ((expxm1 * weight_type(1000.0) * exp1000x) / (p1exp1000x * p1exp1000x));
+      
+    //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
+  }
+    
+  static weight_type clip_count(const weight_type& x, const weight_type& clip)
+  {
+    typedef cicada::semiring::traits<weight_type> traits_type;
+    
+    //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+    return (weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip)))) + weight_type(clip);
+  }
+  
+  static weight_type derivative_clip_count(const weight_type& x, const weight_type& clip)
+  {
+    typedef cicada::semiring::traits<weight_type> traits_type;
+    
+    const weight_type exp1000xmc = traits_type::exp(1000.0 * (x - clip));
+    const weight_type p1exp1000xmc = exp1000xmc + traits_type::one();
+    
+    return (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
+    
+    //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
+  }
+  
+  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
+  typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
+
+  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > expectation_type;
+  typedef std::vector<expectation_type, std::allocator<expectation_type> > expectations_type;
+  
+  typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+  
+  typedef std::vector<double, std::allocator<double> > margins_type;
+
+  void clear()
+  {
+    counts_matched.reserve(order + 1);
+    counts_hypo.reserve(order + 1);
+    
+    gradients_matched.reserve(order + 1);
+    gradients_hypo.reserve(order + 1);
+
+    counts_matched.resize(order + 1);
+    counts_hypo.resize(order + 1);
+    
+    gradients_matched.resize(order + 1);
+    gradients_hypo.resize(order + 1);
+    
+    std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
+    std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
+    counts_reference = weight_type();
+    
+    for (int n = 1; n <= order; ++ n) {
+      gradients_matched[n].clear();
+      gradients_hypo[n].clear();
+    }
+    gradients_reference.clear();
+  }
   
   template <typename Iterator>
   boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
-  
-  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
+
+  void encode(const hypothesis_set_type& kbests,
+	      const hypothesis_set_type& oracles,
+	      const weight_set_type& weights,
+	      const double& weight_scale)
   {
     // we will collect gradients from kbests
+    weight_type Z;
+    weight_type Z_reference;
+    weight_type Z_entropy;
+
+    margins.clear();
+    hypo.clear();
+    matched.clear();
+
+    hypo.resize(order + 1);
+    matched.resize(order + 1);
     
+    // first pass... compute margin and Z
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      const hypothesis_type& kbest = kbests[k];
+      
+      const double margin  = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0) * weight_scale;
+      
+      margins.push_back(margin);
+      Z += cicada::semiring::traits<weight_type>::exp(margin * scale);
+    }
+    
+    // second pass.. compute sums
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      const hypothesis_type& kbest = kbests[k];
+      
+      const double& margin = margins[k];
+      const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
+      
+      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+      if (! bleu)
+	throw std::runtime_error("no bleu statistics?");
+      
+      // collect scaled bleu stats
+      for (int n = 1; n <= order; ++ n) {
+	if (n - 1 < bleu->ngrams_reference.size())
+	  hypo[n] += prob * bleu->ngrams_reference[n - 1];
+	if (n - 1 < bleu->ngrams_hypothesis.size())
+	  matched[n] += prob * bleu->ngrams_hypothesis[n - 1];
+      }
+      
+      // collect reference length
+      Z_reference += prob * bleu->length_reference;
+    }
+    
+    // accumulate
+    std::transform(hypo.begin(), hypo.end(), counts_hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
+    std::transform(matched.begin(), matched.end(), counts_matched.begin(), counts_matched.begin(), std::plus<weight_type>());
+    counts_reference += Z_reference;
+    
+    // third pass, collect gradients...
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      const hypothesis_type& kbest = kbests[k];
+      
+      const double& margin = margins[k];
+      const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
+      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+      
+      hypothesis_type::feature_set_type::const_iterator fiter_end = kbest.features.end();
+      for (hypothesis_type::feature_set_type::const_iterator fiter = kbest.features.begin(); fiter != fiter_end; ++ fiter) {
+	const weight_type value(fiter->second * scale);
+	
+	// bleu statistics
+	for (int n = 1; n <= order; ++ n) {
+	  if (n - 1 < bleu->ngrams_reference.size())
+	    gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
+	  
+	  if (n - 1 < bleu->ngrams_hypothesis.size())
+	    gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
+	  
+	  gradients_hypo[n][fiter->first] -= value * prob * hypo[n];
+	  gradients_matched[n][fiter->first] -= value * prob * matched[n];
+	}
+	
+	// reference lengths
+	gradients_reference[fiter->first] += value * prob * (bleu->length_reference - Z_reference);
+      }
+    }
     
   }
   
+  // required for learn()
+  weights_type counts_matched;
+  weights_type counts_hypo;
+  weight_type  counts_reference;
+  
+  gradients_type gradients_matched;
+  gradients_type gradients_hypo;
+  gradient_type  gradients_reference;
+  
+  // local variables
+  margins_type margins;
+  weights_type matched;
+  weights_type hypo;
 };
 
 struct LearnXBLEUL2 : public LearnXBLEU
