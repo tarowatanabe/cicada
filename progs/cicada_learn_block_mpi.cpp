@@ -101,6 +101,7 @@ bool kbest_diverse_mode = false;
 
 // solver parameters
 bool learn_lbfgs  = false;
+bool learn_xbleu = false;
 bool learn_pegasos = false;
 bool learn_opegasos = false;
 bool learn_pa = false;
@@ -207,9 +208,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+    if (int(learn_lbfgs) + learn_xbleu + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
       throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
-    if (int(learn_lbfgs) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+    if (int(learn_lbfgs) + learn_xbleu + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_lbfgs = true;
 
     
@@ -232,6 +233,9 @@ int main(int argc, char ** argv)
       throw std::runtime_error("block size must be possitive: " + utils::lexical_cast<std::string>(block_size));
     if (kbest_size <= 0)
       throw std::runtime_error("kbest size must be possitive: " + utils::lexical_cast<std::string>(kbest_size));
+    
+    if (order <= 0)
+      throw std::runtime_error("ngram order for xBLEU must be positive");
     
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
@@ -340,6 +344,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_xbleu && regularize_l1)
+	cicada_learn<LearnXBLEUL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_l2)
+	cicada_learn<LearnXBLEUL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
@@ -373,6 +381,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_xbleu && regularize_l1)
+	cicada_learn<LearnXBLEUL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_l2)
+	cicada_learn<LearnXBLEUL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
@@ -406,6 +418,10 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_osgd && regularize_l2)
 	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_xbleu && regularize_l1)
+	cicada_learn<LearnXBLEUL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_l2)
+	cicada_learn<LearnXBLEUL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l2)
 	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_el && regularize_l1)
@@ -1385,6 +1401,7 @@ void options(int argc, char** argv)
     ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
     ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
     ("learn-osgd",     po::bool_switch(&learn_osgd),     "online optimized-SGD algorithm")
+    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
     ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected-loss")
     ("learn-svm",      po::bool_switch(&learn_svm),      "SVM for structured output")

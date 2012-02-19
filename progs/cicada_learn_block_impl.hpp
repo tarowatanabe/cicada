@@ -34,6 +34,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/config.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -490,15 +491,20 @@ struct LearnXBLEU : public LearnBase
   typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
   typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
 
-  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > expectation_type;
-  typedef std::vector<expectation_type, std::allocator<expectation_type> > expectations_type;
+  typedef cicada::FeatureVectorUnordered<double, std::allocator<double> > expectation_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   
   typedef std::vector<double, std::allocator<double> > margins_type;
 
+  typedef std::deque<sample_set_type, std::allocator<sample_set_type> >       sample_map_type;
+  typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
+
   void clear()
   {
+    features.clear();
+    bleus.clear();
+    
     counts_matched.reserve(order + 1);
     counts_hypo.reserve(order + 1);
     
@@ -527,16 +533,32 @@ struct LearnXBLEU : public LearnBase
   {
     return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
+  
+  // we need features + bleu stats...
+  
+  void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
+  {
+    features.push_back(sample_set_type());
+    bleus.push_back(score_ptr_set_type());
+    
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      features.back().insert(kbests[k].features.begin(), kbests[k].features.end());
+      bleus.back().push_back(kbests[k].score);
+    }
+  }
 
-  void encode(const hypothesis_set_type& kbests,
-	      const hypothesis_set_type& oracles,
+
+  void encode(const sample_set_type& features,
+	      const score_ptr_set_type& bleus,
 	      const weight_set_type& weights,
 	      const double& weight_scale)
   {
+    if (features.size() != bleus.size())
+      throw std::runtime_error("# of training data do not match");
+
     // we will collect gradients from kbests
     weight_type Z;
     weight_type Z_reference;
-    weight_type Z_entropy;
 
     margins.clear();
     hypo.clear();
@@ -546,23 +568,19 @@ struct LearnXBLEU : public LearnBase
     matched.resize(order + 1);
     
     // first pass... compute margin and Z
-    for (size_type k = 0; k != kbests.size(); ++ k) {
-      const hypothesis_type& kbest = kbests[k];
-      
-      const double margin  = cicada::dot_product(weights, kbest.features.begin(), kbest.features.end(), 0.0) * weight_scale;
+    for (size_type k = 0; k != features.size(); ++ k) {
+      const double margin  = cicada::dot_product(weights, features[k].begin(), features[k].end(), 0.0) * weight_scale;
       
       margins.push_back(margin);
       Z += cicada::semiring::traits<weight_type>::exp(margin * scale);
     }
     
     // second pass.. compute sums
-    for (size_type k = 0; k != kbests.size(); ++ k) {
-      const hypothesis_type& kbest = kbests[k];
-      
+    for (size_type k = 0; k != features.size(); ++ k) {
       const double& margin = margins[k];
       const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
       
-      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(bleus[k].get());
       if (! bleu)
 	throw std::runtime_error("no bleu statistics?");
       
@@ -584,35 +602,101 @@ struct LearnXBLEU : public LearnBase
     counts_reference += Z_reference;
     
     // third pass, collect gradients...
-    for (size_type k = 0; k != kbests.size(); ++ k) {
-      const hypothesis_type& kbest = kbests[k];
-      
+    for (size_type k = 0; k != features.size(); ++ k) {
       const double& margin = margins[k];
       const weight_type prob = cicada::semiring::traits<weight_type>::exp(margin * scale) / Z;
-      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(kbest.score.get());
+      const cicada::eval::Bleu* bleu = dynamic_cast<const cicada::eval::Bleu*>(bleus[k].get());
       
-      hypothesis_type::feature_set_type::const_iterator fiter_end = kbest.features.end();
-      for (hypothesis_type::feature_set_type::const_iterator fiter = kbest.features.begin(); fiter != fiter_end; ++ fiter) {
+      sample_set_type::value_type::const_iterator fiter_end = features[k].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter) {
 	const weight_type value(fiter->second * scale);
 	
 	// bleu statistics
 	for (int n = 1; n <= order; ++ n) {
+	  weight_type& grad_hypo    = gradients_hypo[n][fiter->first];
+	  weight_type& grad_matched = gradients_matched[n][fiter->first];
+	  
 	  if (n - 1 < bleu->ngrams_reference.size())
-	    gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
+	    grad_hypo += value * prob * bleu->ngrams_reference[n - 1];
 	  
 	  if (n - 1 < bleu->ngrams_hypothesis.size())
-	    gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
+	    grad_matched += value * prob * bleu->ngrams_hypothesis[n - 1];
 	  
-	  gradients_hypo[n][fiter->first] -= value * prob * hypo[n];
-	  gradients_matched[n][fiter->first] -= value * prob * matched[n];
+	  grad_hypo    -= value * prob * hypo[n];
+	  grad_matched -= value * prob * matched[n];
 	}
 	
 	// reference lengths
 	gradients_reference[fiter->first] += value * prob * (bleu->length_reference - Z_reference);
       }
     }
-    
   }
+
+  double encode(expectation_type& g)
+  {
+    g.clear();
+    
+    // smoothing...
+    {
+      double smoothing = 1e-40;
+      for (int n = 1; n <= order; ++ n) {
+	if (counts_hypo[n] > weight_type() && counts_matched[n] <= weight_type())
+	  counts_matched[n] = smoothing;
+	smoothing *= 0.1;
+      }
+    }
+
+    // compute P
+    double P = 0.0;
+    for (int n = 1; n <= order; ++ n)
+      if (counts_hypo[n] > weight_type())
+	P += (1.0 / order) * (cicada::semiring::log(counts_matched[n]) - cicada::semiring::log(counts_hypo[n]));
+    
+    // compute C and B
+    const double C = counts_reference / counts_hypo[1];
+    const double B = brevity_penalty(1.0 - C);
+    
+    // for computing g...
+    const double exp_P = utils::mathop::exp(P);
+    const double C_dC  = C * derivative_brevity_penalty(1.0 - C);
+    
+    // xBLEU...
+    const double objective = exp_P * B;
+    
+    // we will collect minus gradient for minimizing negative-xBLEU
+    
+    for (int n = 1; n <= order; ++ n) 
+      if (counts_hypo[n] > weight_type()) {
+	const double factor_matched = - (exp_P * B / order) / counts_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / counts_hypo[n];
+	
+	gradient_type::const_iterator miter_end = gradients_matched[n].end();
+	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter)
+	  g[miter->first] += factor_matched * miter->second;
+	
+	gradient_type::const_iterator hiter_end = gradients_hypo[n].end();
+	for (gradient_type::const_iterator hiter = gradients_hypo[n].begin(); hiter != hiter_end; ++ hiter)
+	  g[hiter->first] -= factor_hypo * hiter->second;
+      }
+    
+    if (counts_hypo[1] > weight_type()) {
+      const double factor_ref  = - (exp_P * C_dC) / counts_reference;
+      const double factor_hypo = - (exp_P * C_dC) / counts_hypo[1];
+      
+      gradient_type::const_iterator riter_end = gradients_reference.end();
+      for (gradient_type::const_iterator riter = gradients_reference.begin(); riter != riter_end; ++ riter)
+	g[riter->first] -= factor_ref * riter->second;
+      
+      gradient_type::const_iterator hiter_end = gradients_hypo[1].end();
+      for (gradient_type::const_iterator hiter = gradients_hypo[1].begin(); hiter != hiter_end; ++ hiter)
+	g[hiter->first] += factor_hypo * hiter->second;
+    }
+    
+    return objective;
+  }
+  
+  sample_map_type    features;
+  score_ptr_map_type bleus;
   
   // required for learn()
   weights_type counts_matched;
@@ -631,12 +715,167 @@ struct LearnXBLEU : public LearnBase
 
 struct LearnXBLEUL2 : public LearnXBLEU
 {
+  LearnXBLEUL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
+  void initialize(weight_set_type& weights)
+  {
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= weight_scale;
+    
+    weight_scale = 1.0;
+    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  double learn(weight_set_type& weights)
+  {
+    if (features.empty()) {
+      clear();
+      return 0.0;
+    }
+    
+    // collect gradient
+    for (size_type k = 0; k != features.size(); ++ k)
+      LearnXBLEU::encode(features[k], bleus[k], weights, weight_scale);
+    
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    rescale(weights, 1.0 - eta * lambda);
+    
+    // compute gradient...
+    const double objective = LearnXBLEU::encode(g);
+    
+    double a_norm = 0.0;
+    double pred = 0.0;
+    expectation_type::const_iterator giter_end = g.end();
+    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+      // we will update "minus" value...
+      
+      double& x = weights[giter->first];
+      const double alpha = - static_cast<double>(giter->second) * eta;
+      
+      a_norm += alpha * alpha;
+      pred += 2.0 * x * alpha;
+      
+      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+      x += alpha / weight_scale;
+    }
+    
+    // avoid numerical instability...
+    weight_norm += a_norm + pred * weight_scale;
+    
+    if (weight_norm > 1.0 / lambda || project_weight)
+      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+    
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
+    
+    clear();
+    
+    return objective;
+  }
+  
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    weight_norm *= scaling * scaling;
+    if (scaling != 0.0)
+      weight_scale *= scaling;
+    else {
+      weight_scale = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+
+  expectation_type g;
+  
+  size_type instances;
+  
+  size_type epoch;
+  double    lambda;
+  
+  double weight_scale;
+  double weight_norm;
 };
 
 struct LearnXBLEUL1 : public LearnXBLEU
 {
+  typedef cicada::WeightVector<double> penalty_set_type;
   
+  LearnXBLEUL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
+
+  void initialize(weight_set_type& weights)
+  {
+
+  }
+
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    if (features.empty()) {
+      clear();
+      return 0.0;
+    }
+    
+    // collect gradient
+    for (size_type k = 0; k != features.size(); ++ k)
+      LearnXBLEU::encode(features[k], bleus[k], weights, 1.0);
+
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+
+    penalty += eta * lambda;
+    
+    // compute gradient...
+    const double objective = LearnXBLEU::encode(g);
+    
+    expectation_type::const_iterator giter_end = g.end();
+    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+      // we will update "minus" value...
+      
+      double& x = weights[giter->first];
+      x += - static_cast<double>(giter->second) * eta;
+      
+      // apply penalty
+      apply(x, penalties[giter->first], penalty);
+    }
+    
+    clear();
+    
+    return objective;    
+  }
+
+  void apply(double& x, double& penalty, const double& cummulative)
+  {
+    const double x_half = x;
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - cummulative);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + cummulative);
+    penalty += x - x_half;
+  }
+  
+  expectation_type g;
+  
+  size_type instances;
+  
+  size_type epoch;
+  double    lambda;
+  
+  penalty_set_type penalties;
+  double penalty;
 };
 
 struct LearnExpectedLoss : public LearnBase
@@ -748,7 +987,7 @@ struct LearnExpectedLoss : public LearnBase
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
     const size_type num_samples = (instances + block_size - 1) / block_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
