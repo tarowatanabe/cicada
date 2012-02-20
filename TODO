@@ -61,15 +61,7 @@ Implement RIBES for mteval
    Can we implement RIBES feature...?
    It is global in that we have to perform "alignment" as in METEOR...
 
-Use parse-cky inside parse-coarse instead of compose-cky for (potentially) faster parsing with less memory consumption
-
 Add incremental version of MERT?
-
-reimplement liblinear functionality...???
-   liblinear does not allow starting from an intermediata state, like alpha from previous iterations
-   liblinear does not run in threading
-   
-   Implement with template techniques...?
 
 Correctly implement cutting-plane algorithms:
    we need to merge feature vector into a bundle, then, iterative add new vectors...
@@ -141,3 +133,9 @@ revise static create interface:
   currently, we return reference, but it is safer to return pointer...?
 
 rename learn_block as learn_online_kbest
+
+Earley composition with skipping
+   Like phrase-based SMT, allow local skipping... very hard...
+
+Earley composition with CFG!
+   Like phrasal composition, we perform CKY over the Earley generated forest of string.... very hard...

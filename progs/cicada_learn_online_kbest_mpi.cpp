@@ -135,7 +135,7 @@ bool dump_weights_mode   = false; // dump current weights... for debugging purpo
 
 int debug = 0;
 
-#include "cicada_learn_block_impl.hpp"
+#include "cicada_learn_online_kbest_impl.hpp"
 
 // forward declarations...
 
