@@ -500,7 +500,7 @@ struct LearnXBLEU : public LearnBase
   typedef std::deque<sample_set_type, std::allocator<sample_set_type> >       sample_map_type;
   typedef std::deque<score_ptr_set_type, std::allocator<score_ptr_set_type> > score_ptr_map_type;
 
-  LearnXBLeu() { clear(); }
+  LearnXBLEU() { clear(); }
 
   void clear()
   {
