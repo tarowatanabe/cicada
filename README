@@ -87,6 +87,7 @@ Various learning components are implemented:
    - Small/large feature set learned by iteratively construncting training samples with rank-learning.
      + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
      + we have a script-based implementation + single-binary implementation for efficiency
+   - xBLEU learning which directly maximize expected-BLEU (not BLEU expectaiton) [35]
 
 Word clustering tool is also included to support word alignment learning + translation [20]
 
@@ -525,4 +526,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {646--655},
   url       = {http://www.aclweb.org/anthology/D10-1063}
+}
+
+[35]
+@InProceedings{rosti-EtAl:2011:WMT,
+  author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
+  title     = {Expected BLEU Training for Graphs: BBN System Description for WMT11 System Combination Task},
+  booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
+  month     = {July},
+  year      = {2011},
+  address   = {Edinburgh, Scotland},
+  publisher = {Association for Computational Linguistics},
+  pages     = {159--165},
+  url       = {http://www.aclweb.org/anthology/W11-2119}
 }
