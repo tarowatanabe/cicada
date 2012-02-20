@@ -124,22 +124,7 @@ Deprecate old learn-online code...?
 
 hypergraph variant of learn-block?
 
-Add softmax-margin... How? (assume duplicates as in mert code?)
-
 octavian support?
-
-ngram feature should use id-based encoding, not word based for efficient oov computation
-
-add NHERD to our set of learning algorithms and add online learner to block-learner
-
-add lower/upper bound for online learner as restrictions for updates...?
-
-
-Compressed feature vector representation
-   for liblinear training, we cannot use a compact form, thus, still use mmap based impelementation
-   for hypothesis storage, use a compact notation of features
-       use of delta encoded feature representation (assuming non random access iterators)
-       + value representation using either char/short/int/float/double
 
 Implement succinct-rtrie:
   this is a trie-like structure, but it's purpose is a reverse index: given id, query data of string.
@@ -150,14 +135,9 @@ remote grammar and tree-grammar:
   set up server for grammar(s) and query from clients
   performs composition/parse/generation at the server side with larger memory (meaning with larger grammar)
   
-use of expected-BLEU for direct optimization based on Rosti's work:
-    and see thesis "lexical features for SMT" by Jacob Devlin
-
 Use of optimized-pegasos for pro.
 
 revise static create interface:
   currently, we return reference, but it is safer to return pointer...?
 
-small-vector reimplement:
-  we will occupy two-pointers (at least 16-byte) and use only 32-bit (= 4 byte) size indicator, so that we can use 12-byte for storage...
-
+rename learn_block as learn_online_kbest
