@@ -87,7 +87,8 @@ Various learning components are implemented:
    - Small/large feature set learned by iteratively construncting training samples with rank-learning.
      + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
      + we have a script-based implementation + single-binary implementation for efficiency
-   - xBLEU learning which directly maximize expected-BLEU (not BLEU expectaiton) [35]
+   - xBLEU objective learned either by L-BFGS or SGD, which directly maximize expected-BLEU (not BLEU expectaiton) [35]
+     + Now, this is a recommended optimization method (either kbest or hypergraph learning)
 
 Word clustering tool is also included to support word alignment learning + translation [20]
 
