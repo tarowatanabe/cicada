@@ -851,9 +851,12 @@ void cicada_learn(operation_set_type& operations,
       weights *= 1.0 / updated_total;
     }
     
+    size_t num_non_zero_prev = 0;
+    for (size_t i = 0; i != weights_prev.size(); ++ i)
+      num_non_zero_prev += (weights_prev[i] != 0.0);
+    
     // perform line-search....
-    if (line_search_mode && ! weights_prev.empty()) {
-      
+    if (line_search_mode && num_non_zero_prev) {
       points.clear();
       const boost::fusion::tuple<double, double, double> grad_norm = learner.gradient(weights, weights_prev, std::back_inserter(points));
 
@@ -955,7 +958,7 @@ void cicada_learn(operation_set_type& operations,
       bcast_weights(weights);
     }
 
-    if (mert_search_mode && ! weights_prev.empty()) {
+    if (mert_search_mode && num_non_zero_prev) {
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
