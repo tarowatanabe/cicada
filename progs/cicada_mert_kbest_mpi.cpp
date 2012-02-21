@@ -745,14 +745,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    const utils::piece id_str = *iter; 
 	    
 	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	    
-	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece x_str = *iter;
-	    
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
 	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
@@ -801,9 +795,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
 	  const EnvelopeKBest::line_type& line = *liter;
 	  
-	  os << id << " ||| ";
+	  os << id << ' ';
 	  utils::encode_base64(line.x, std::ostream_iterator<char>(os));
-	  os << " ||| " << line.hypothesis->score->encode() << '\n';
+	  os << ' ' << line.hypothesis->score->encode() << '\n';
 	}
       }
   }

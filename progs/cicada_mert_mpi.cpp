@@ -767,14 +767,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    const utils::piece id_str = *iter; 
 	    
 	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	    
-	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece x_str = *iter;
-	    
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
 	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
@@ -828,9 +822,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	
 	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
 	
-	os << id << " ||| ";
+	os << id << ' ';
 	utils::encode_base64(line->x, std::ostream_iterator<char>(os));
-	os << " ||| " << scorers[id]->score(yield)->encode() << '\n';
+	os << ' ' << scorers[id]->score(yield)->encode() << '\n';
       }
     }
   }
