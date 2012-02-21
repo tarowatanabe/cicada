@@ -757,7 +757,7 @@ void cicada_learn(operation_set_type& operations,
       weights *= 1.0 / updated_total;
     }
     
-    if (mert_search_mode) {
+    if (mert_search_mode && ! weights_prev.empty()) {
       typedef cicada::optimize::LineSearch line_search_type;
       
       typedef line_search_type::segment_type          segment_type;
