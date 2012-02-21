@@ -852,7 +852,7 @@ void cicada_learn(operation_set_type& operations,
     }
     
     // perform line-search....
-    if (line_search_mode) {
+    if (line_search_mode && ! weights_prev.empty()) {
       
       points.clear();
       const boost::fusion::tuple<double, double, double> grad_norm = learner.gradient(weights, weights_prev, std::back_inserter(points));
