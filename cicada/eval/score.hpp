@@ -222,43 +222,44 @@ namespace cicada
       
     public:
       ScorerDocument()
-	: parameter() {}
+	: m_parameter() {}
       ScorerDocument(const std::string& __parameter)
-	: parameter(__parameter) {}
+	: m_parameter(__parameter) {}
       
-      inline       scorer_ptr_type& operator[](size_type pos)       { return scorers[pos]; }
-      inline const scorer_ptr_type& operator[](size_type pos) const { return scorers[pos]; }
+      inline       scorer_ptr_type& operator[](size_type pos)       { return m_scorers[pos]; }
+      inline const scorer_ptr_type& operator[](size_type pos) const { return m_scorers[pos]; }
 
-      inline const_iterator begin() const { return scorers.begin(); }
-      inline       iterator begin()       { return scorers.begin(); }
+      inline const_iterator begin() const { return m_scorers.begin(); }
+      inline       iterator begin()       { return m_scorers.begin(); }
       
-      inline const_iterator end() const { return scorers.end(); }
-      inline       iterator end()       { return scorers.end(); }
-
-      void push_back(const scorer_ptr_type& x) { scorers.push_back(x); }
+      inline const_iterator end() const { return m_scorers.end(); }
+      inline       iterator end()       { return m_scorers.end(); }
+      
+      void push_back(const scorer_ptr_type& x) { m_scorers.push_back(x); }
       
       bool error_metric() const
       {
-	return scorer_type::create(parameter)->error_metric();
+	return scorer_type::create(m_parameter)->error_metric();
       }
 
-      void resize(size_type x) { scorers.resize(x); }
-      void clear() { scorers.clear(); }
-
-      size_type size() const { return scorers.size(); }
-      bool empty() const { return scorers.empty(); }
+      void resize(size_type x) { m_scorers.resize(x); }
+      void clear() { m_scorers.clear(); }
       
-      scorer_ptr_type create() { return scorer_type::create(parameter); }
+      size_type size() const { return m_scorers.size(); }
+      bool empty() const { return m_scorers.empty(); }
+      
+      scorer_ptr_type create() const { return scorer_type::create(m_parameter); }
+      const std::string& parameter() const { return m_parameter; }
       
       void swap(ScorerDocument& x)
       {
-	scorers.swap(x.scorers);
-	parameter.swap(x.parameter);
+	m_scorers.swap(x.m_scorers);
+	m_parameter.swap(x.m_parameter);
       }
       
     private:
-      scorer_set_type scorers;
-      std::string     parameter;
+      scorer_set_type m_scorers;
+      std::string     m_parameter;
     };
     
   };
