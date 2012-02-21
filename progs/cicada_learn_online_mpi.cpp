@@ -710,8 +710,10 @@ void cicada_learn(operation_set_type& operations,
 	*score_oracle += *(scores.second);
       
       if (debug >= 2)
-	std::cerr << "score batch       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
-		  << "score accumulated 1best: " << score_1best->score()  << " oracle: " << score_oracle->score() << std::endl;
+	std::cerr << "batch 1best:  " << *scores.first << std::endl
+		  << "batch oracle: " << *scores.second << std::endl
+		  << "accumulated 1best:  " << *score_1best << std::endl
+		  << "accumulated oracle: " << *score_oracle << std::endl;
       
       // encode into learner...
       for (size_t i = 0; i != forests_batch.size(); ++ i)
@@ -728,7 +730,8 @@ void cicada_learn(operation_set_type& operations,
       reduce_score_pair(score_1best, score_oracle);
       
       if (mpi_rank == 0)
-	std::cerr << "score total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
+	std::cerr << "total 1best:  " << *score_1best << std::endl
+		  << "total oracle: " << *score_oracle << std::endl;
     }
     
     // randomize..
