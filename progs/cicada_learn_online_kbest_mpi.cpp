@@ -309,7 +309,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("training sample size and reference translation size does not match");
     
     if (! events_oracle.empty())
-      if (scorers.size() != events.size())
+      if (scorers.size() != events_oracle.size())
 	throw std::runtime_error("oracle size and reference translation size does not match");
     
     // weights

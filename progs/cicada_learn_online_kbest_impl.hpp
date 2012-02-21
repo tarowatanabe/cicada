@@ -745,7 +745,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
       LearnXBLEU::encode(features[k], bleus[k], weights, weight_scale);
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -834,7 +834,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
       LearnXBLEU::encode(features[k], bleus[k], weights, 1.0);
 
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
 
@@ -988,7 +988,7 @@ struct LearnExpectedLoss : public LearnBase
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SD-L1
     ++ epoch;
     
@@ -1158,7 +1158,7 @@ struct LearnExpectedLossL1 : public LearnBase
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -1393,7 +1393,7 @@ struct LearnOExpectedLoss : public LearnBase
     
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -1676,7 +1676,7 @@ struct LearnPegasos : public LearnOnlineMargin
     //const double k_norm = 1.0 / (features.size());
     const double k_norm = 1.0 / k; // it is wrong, but works quite well in practice
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -1823,7 +1823,7 @@ struct LearnOPegasos : public LearnOnlineMargin
     const size_type k = features.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -2203,7 +2203,7 @@ struct LearnMIRA : public LearnOnlineMargin
     alpha.resize(index.size(), 0.0);
     
     {
-      const size_type num_samples = (instances + block_size - 1) / block_size;
+      const size_type num_samples = (instances + batch_size - 1) / batch_size;
       
       HMatrix H(features, index);
       MMatrix M(features, index);
@@ -2373,7 +2373,7 @@ struct LearnSGDL1 : public LearnLR
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -2473,7 +2473,7 @@ struct LearnSGDL2 : public LearnLR
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
@@ -2652,7 +2652,7 @@ struct LearnOSGDL2 : public LearnLR
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + block_size - 1) / block_size;
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
         
