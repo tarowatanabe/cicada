@@ -804,8 +804,8 @@ void cicada_learn(operation_set_type& operations,
 	*score_oracle += *(scores.second);
       
       if (debug >= 2)
-	std::cerr << "devset batch       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
-		  << "devset accumulated 1best: " << score_1best->score()  << " oracle: " << score_oracle->score() << std::endl;
+	std::cerr << "score batch       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
+		  << "score accumulated 1best: " << score_1best->score()  << " oracle: " << score_oracle->score() << std::endl;
       
       // encode into learner...
       for (size_t i = 0; i != kbests_batch.size(); ++ i)
@@ -822,7 +822,7 @@ void cicada_learn(operation_set_type& operations,
       reduce_score_pair(score_1best, score_oracle);
       
       if (mpi_rank == 0)
-	std::cerr << "devset total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
+	std::cerr << "score total: 1best: " << score_1best->score() << " oracle: " << score_oracle->score() << std::endl;
     }
     
     // randomize..

@@ -9,7 +9,7 @@
 #include <string>
 
 #include <cicada/feature_function.hpp>
-#include <cicada/eval.hpp>
+#include <cicada/eval/score.hpp>
 
 // purely virtual scorer function...
 

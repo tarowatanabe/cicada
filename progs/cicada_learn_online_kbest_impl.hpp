@@ -3549,8 +3549,8 @@ struct Oracle
 inline
 void read_refset(const path_type& refset_path,
 		 scorer_document_type& scorers,
-		 const size_t shard_rank,
-		 const size_t shard_size)
+		 const size_t shard_rank=0,
+		 const size_t shard_size=1)
 {
   typedef boost::spirit::istream_iterator iter_type;
   typedef cicada_sentence_parser<iter_type> parser_type;
