@@ -831,21 +831,15 @@ void cicada_learn(operation_set_type& operations,
 	    tokenizer_type::iterator iter = tokenizer.begin();
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece id_str = *iter; 
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
+	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece x_str = *iter;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
+	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece score_str = *iter;
-	
+	    
 	    const int id = utils::lexical_cast<int>(id_str);
 	    if (id_prev != id)
 	      segments.push_back(segment_set_type());
@@ -901,9 +895,9 @@ void cicada_learn(operation_set_type& operations,
 	    for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	      const envelope_type::line_ptr_type& line = *eiter;
 	      
-	      os << id << " ||| ";
+	      os << id << ' ';
 	      utils::encode_base64(line->x, std::ostream_iterator<char>(os));
-	      os << " ||| " << yield_generator(line, scorers[id])->encode() << '\n';
+	      os << ' ' << yield_generator(line, scorers[id])->encode() << '\n';
 	    }
 	  }
       }

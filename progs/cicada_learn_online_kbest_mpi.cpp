@@ -1017,17 +1017,11 @@ void cicada_learn(operation_set_type& operations,
 	    tokenizer_type::iterator iter = tokenizer.begin();
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece id_str = *iter; 
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
+	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece x_str = *iter;
-	
-	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	
+	    
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece score_str = *iter;
@@ -1081,9 +1075,9 @@ void cicada_learn(operation_set_type& operations,
 	    for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
 	      const EnvelopeKBest::line_type& line = *liter;
 	      
-	      os << id << " ||| ";
+	      os << id << ' ';
 	      utils::encode_base64(line.x, std::ostream_iterator<char>(os));
-	      os << " ||| " << line.hypothesis->score->encode() << '\n';
+	      os << ' ' << line.hypothesis->score->encode() << '\n';
 	    }
 	  }
       }
