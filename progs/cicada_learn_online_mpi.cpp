@@ -852,7 +852,8 @@ void cicada_learn(operation_set_type& operations,
 	}
 	
 	if (! segments.empty()) {
-	  line_search_type line_search;
+	  // debug...
+	  line_search_type line_search(4);
 	  
 	  const optimum_type optimum = line_search(segments, -1.0, 1.0, scorers.error_metric());
 	  
