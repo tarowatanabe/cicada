@@ -63,10 +63,10 @@ namespace cicada
       
       goal_nodes.set_empty_key(hypergraph_type::invalid);
       
-      rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-      rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
-      rule_x1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
-      rule_x1_x2 =  rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
+      rule_epsilon = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      rule_goal    = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_x1      = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(1, vocab_type::X)));
+      rule_x1_x2   = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(2, vocab_type::X)));
     }
     
     //
@@ -530,7 +530,6 @@ namespace cicada
 	  insert_edge(edge_type(active.lhs, dot_next, active.first, passive.last, active, passive));
       }
     }
-
     
     void insert_edge(const edge_type& edge)
     {
@@ -657,7 +656,6 @@ namespace cicada
 	}
       }
     }
-
 
     void initialize_grammar(const hypergraph_type& source)
     {
