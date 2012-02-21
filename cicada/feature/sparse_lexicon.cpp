@@ -173,13 +173,14 @@ namespace cicada
 		  ++ fertility_suffix;
 		}
 	      
-	      if (fertility_pair)
-		apply(":", target, fertility_pair, features);
-	      if (fertility_prefix)
-		apply("-", target, fertility_prefix, features);
-	      if (fertility_suffix)
-		apply("+", target, fertility_prefix, features);
-	      
+	      if (fertility_mode) {
+		if (fertility_pair)
+		  apply(":", target, fertility_pair, features);
+		if (fertility_prefix)
+		  apply("-", target, fertility_prefix, features);
+		if (fertility_suffix)
+		  apply("+", target, fertility_prefix, features);
+	      }
 	      
 	      caches[titer->id()] = features;
 	    }
