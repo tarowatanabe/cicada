@@ -757,9 +757,11 @@ void cicada_learn(operation_set_type& operations,
       weights *= 1.0 / updated_total;
     }
 
-    size_t num_non_zero_prev = 0;
+    int num_non_zero_prev = 0;
     for (size_t i = 0; i != weights_prev.size(); ++ i)
       num_non_zero_prev += (weights_prev[i] != 0.0);
+    
+    MPI::COMM_WORLD.Bcast(&num_non_zero_prev, 1, MPI::INT, 0);
     
     if (mert_search_mode && num_non_zero_prev) {
       typedef cicada::optimize::LineSearch line_search_type;
