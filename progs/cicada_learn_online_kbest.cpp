@@ -95,7 +95,7 @@ bool yield_dependency = false;
 
 // learning parameters
 int iteration = 10;
-int block_size = 8;
+int batch_size = 8;
 int kbest_size = 1000;
 bool kbest_diverse_mode = false;
 
@@ -229,8 +229,8 @@ int main(int argc, char ** argv)
     if (scale <= 0.0)
       throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
 
-    if (block_size <= 0)
-      throw std::runtime_error("block size must be possitive: " + utils::lexical_cast<std::string>(block_size));
+    if (batch_size <= 0)
+      throw std::runtime_error("batch size must be possitive: " + utils::lexical_cast<std::string>(batch_size));
     if (kbest_size <= 0)
       throw std::runtime_error("kbest size must be possitive: " + utils::lexical_cast<std::string>(kbest_size));
     
@@ -705,11 +705,11 @@ void cicada_learn(operation_set_type& operations,
   
   hypothesis_set_type kbests;
   
-  segment_set_type     segments_block;
-  hypothesis_map_type  kbests_block;
-  hypothesis_map_type  kbests_oracle_block;
-  hypothesis_map_type  oracles_block;
-  scorer_document_type scorers_block(scorers);
+  segment_set_type     segments_batch;
+  hypothesis_map_type  kbests_batch;
+  hypothesis_map_type  kbests_oracle_batch;
+  hypothesis_map_type  oracles_batch;
+  scorer_document_type scorers_batch(scorers);
 
   hypothesis_map_type kbests_all;
 
@@ -744,13 +744,13 @@ void cicada_learn(operation_set_type& operations,
     segment_set_type::const_iterator siter_end = segments.end();
     
     while (siter != siter_end) {
-      segments_block.clear();
-      kbests_block.clear();
-      kbests_oracle_block.clear();
-      oracles_block.clear();
-      scorers_block.clear();
+      segments_batch.clear();
+      kbests_batch.clear();
+      kbests_oracle_batch.clear();
+      oracles_batch.clear();
+      scorers_batch.clear();
       
-      segment_set_type::const_iterator siter_last = std::min(siter + block_size, siter_end);
+      segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
       for (/**/; siter != siter_last; ++ siter) {
 	const size_t id = *siter;
 	
@@ -761,9 +761,9 @@ void cicada_learn(operation_set_type& operations,
 	// no translations?
 	if (kbests.empty()) continue;
 	
-	segments_block.push_back(id);
-	kbests_block.push_back(kbests);
-	scorers_block.push_back(scorers[id]);
+	segments_batch.push_back(id);
+	kbests_batch.push_back(kbests);
+	scorers_batch.push_back(scorers[id]);
 	
 	if (! events_oracle.empty()) {
 	  if (events_oracle[id].empty())
@@ -775,23 +775,23 @@ void cicada_learn(operation_set_type& operations,
 	    throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
 	  
 	  if (merge_oracle_mode)
-	    kbests_block.back().insert(kbests_block.back().end(), kbests.begin(), kbests.end());
+	    kbests_batch.back().insert(kbests_batch.back().end(), kbests.begin(), kbests.end());
 	  else
-	    kbests_oracle_block.push_back(kbests);
+	    kbests_oracle_batch.push_back(kbests);
 	}
       }
       
       // no kbests?
-      if (segments_block.empty()) continue;
+      if (segments_batch.empty()) continue;
       
       // oracle computation
-      std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_block.empty()
-							  ? oracle_generator(kbests_block, scorers_block, oracles_block, generator)
-							  : oracle_generator(kbests_block, kbests_oracle_block, scorers_block, oracles_block, generator));
+      std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_batch.empty()
+							  ? oracle_generator(kbests_batch, scorers_batch, oracles_batch, generator)
+							  : oracle_generator(kbests_batch, kbests_oracle_batch, scorers_batch, oracles_batch, generator));
       
       // insert into kbests-all
       if (mert_search_mode)
-	kbests_all.insert(kbests_all.end(), kbests_block.begin(), kbests_block.end());
+	kbests_all.insert(kbests_all.end(), kbests_batch.begin(), kbests_batch.end());
 
       if (! score_1best)
 	score_1best = scores.first;
@@ -804,12 +804,12 @@ void cicada_learn(operation_set_type& operations,
 	*score_oracle += *(scores.second);
       
       if (debug >= 2)
-	std::cerr << "devset block       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
+	std::cerr << "devset batch       1best: " << scores.first->score() << " oracle: " << scores.second->score() << std::endl
 		  << "devset accumulated 1best: " << score_1best->score()  << " oracle: " << score_oracle->score() << std::endl;
       
       // encode into learner...
-      for (size_t i = 0; i != kbests_block.size(); ++ i)
-	learner.encode(segments_block[i], kbests_block[i], oracles_block[i]);
+      for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	learner.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
       
       // perform learning...
       learner.learn(weights);
@@ -1387,7 +1387,7 @@ void options(int argc, char** argv)
     ("yield-dependency", po::bool_switch(&yield_dependency),                               "dependency yield")
     
     ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
-    ("block",         po::value<int>(&block_size)->default_value(block_size), "block (or batch, bin) size")
+    ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
     ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
     
