@@ -822,7 +822,7 @@ void cicada_learn(operation_set_type& operations,
 	  is.push(utils::mpi_device_source(rank, envelope_tag, 4096));
 
 	  std::string line;
-	  int id_prev = -1;
+	  size_t id_prev = size_t(-1);
       
 	  while (std::getline(is, line)) {
 	    const utils::piece line_piece(line);
@@ -840,7 +840,7 @@ void cicada_learn(operation_set_type& operations,
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece score_str = *iter;
 	    
-	    const int id = utils::lexical_cast<int>(id_str);
+	    const size_t id = utils::lexical_cast<size_t>(id_str);
 	    if (id_prev != id)
 	      segments.push_back(segment_set_type());
 	    
