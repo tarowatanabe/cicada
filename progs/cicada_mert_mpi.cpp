@@ -913,9 +913,6 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 	    const utils::piece id_str = *iter;
 	    
 	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	    
-	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece score_str = *iter;
 	    
@@ -955,7 +952,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
-      os << id << " ||| " << scorers[id]->score(yield)->encode() << '\n';
+      os << id << ' ' << scorers[id]->score(yield)->encode() << '\n';
     }
   }
   

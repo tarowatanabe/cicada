@@ -893,9 +893,6 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 	    const utils::piece id_str = *iter;
 	    
 	    ++ iter;
-	    if (iter == tokenizer.end() || *iter != "|||") continue;
-	    
-	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    const utils::piece score_str = *iter;
 	    
@@ -940,7 +937,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 	  }
 	}
 	
-	os << id << " ||| " << score_ptr->encode() << '\n';
+	os << id << ' ' << score_ptr->encode() << '\n';
       }
   }
   
