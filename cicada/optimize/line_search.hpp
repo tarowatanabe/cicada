@@ -303,7 +303,10 @@ namespace cicada
 	heap_type heap;
 	
 	if (debug >= 4)
-	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	  std::cerr << "minimum: " << range.first
+		    << " maximum: " << range.second
+		    << " segments: " << segments.size()
+		    << std::endl;
 	
 	score_ptr_type stat;
 	score_set_type scores(segments.size());
@@ -410,7 +413,10 @@ namespace cicada
 	heap_type heap;
 	
 	if (debug >= 4)
-	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	  std::cerr << "minimum: " << range.first
+		    << " maximum: " << range.second
+		    << " segments: " << segments.size()
+		    << std::endl;
 	
 	score_ptr_type stat;
 	score_set_type scores(segments.size());
@@ -536,7 +542,10 @@ namespace cicada
 	heap_type heap;
 	
 	if (debug >= 4)
-	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	  std::cerr << "minimum: " << range.first
+		    << " maximum: " << range.second
+		    << " segments: " << segments.size()
+		    << std::endl;
 	
 	score_ptr_type stat;
 	score_set_type scores(segments.size());
@@ -661,7 +670,10 @@ namespace cicada
 	heap_type heap;
 	
 	if (debug >= 4)
-	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	  std::cerr << "minimum: " << range.first
+		    << " maximum: " << range.second
+		    << " segments: " << segments.size()
+		    << std::endl;
 	
 	score_ptr_type stat;
 	score_set_type scores(segments.size());
