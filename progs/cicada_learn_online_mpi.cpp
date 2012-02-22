@@ -689,7 +689,7 @@ void cicada_learn(operation_set_type& operations,
       if (forests_oracle_batch.empty())
 	scores = oracle_generator(weights, forests_batch, scorers_batch, functions_batch, oracles_batch, generator);
       else {
-	oracles_batch = forests_oracle_batch;
+	oracles_batch.swap(forests_oracle_batch);
 	forests_oracle_batch.clear();
 	
 	scores = oracle_generator(weights, forests_batch, oracles_batch, scorers_batch, generator);
