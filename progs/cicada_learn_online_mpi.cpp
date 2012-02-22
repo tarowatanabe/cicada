@@ -605,7 +605,9 @@ void cicada_learn(operation_set_type& operations,
   hypergraph_document_type oracles_batch;
   scorer_document_type     scorers_batch(scorers);
   function_document_type   functions_batch;
+  
   hypergraph_document_type forests_all;
+  segment_set_type         segments_all;
   
 
   dumper_type::queue_type queue_dumper;
@@ -626,6 +628,7 @@ void cicada_learn(operation_set_type& operations,
       std::cerr << "iteration: " << (iter + 1) << std::endl;
 
     forests_all.clear();
+    segments_all.clear();
     
     int updated = 0;
     score_ptr_type score_1best;
@@ -696,8 +699,10 @@ void cicada_learn(operation_set_type& operations,
       }
       
       // insert into forest-all
-      if (mert_search_mode)
+      if (mert_search_mode) {
 	forests_all.insert(forests_all.end(), forests_batch.begin(), forests_batch.end());
+	segments_all.insert(segments_all.end(), segments_batch.begin(), segments_batch.end());
+      }
 
       if (! score_1best)
 	score_1best = scores.first;
@@ -812,7 +817,7 @@ void cicada_learn(operation_set_type& operations,
 	    for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	      const envelope_type::line_ptr_type& line = *eiter;
 	      
-	      segments.back().push_back(std::make_pair(line->x, yield_generator(line, scorers[id])));
+	      segments.back().push_back(std::make_pair(line->x, yield_generator(line, scorers[segments_all[id]])));
 	    }
 	  }
 	
@@ -884,7 +889,7 @@ void cicada_learn(operation_set_type& operations,
 
 	for (size_t id = 0; id != forests_all.size(); ++ id)
 	  if (forests_all[id].is_valid()) {
-	    envelopes.clear();
+	    aenvelopes.clear();
 	    envelopes.resize(forests_all[id].nodes.size());
 	    
 	    cicada::inside(forests_all[id], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
@@ -898,7 +903,7 @@ void cicada_learn(operation_set_type& operations,
 	      
 	      os << id << ' ';
 	      utils::encode_base64(line->x, std::ostream_iterator<char>(os));
-	      os << ' ' << yield_generator(line, scorers[id])->encode() << '\n';
+	      os << ' ' << yield_generator(line, scorers[segments_all[id]])->encode() << '\n';
 	    }
 	  }
       }
@@ -912,6 +917,7 @@ void cicada_learn(operation_set_type& operations,
     
     // clear all the forest
     forests_all.clear();
+    segments_all.clear();
     
     // dump...
     if (dump_weights_mode && mpi_rank == 0)
