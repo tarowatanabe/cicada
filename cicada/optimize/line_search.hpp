@@ -384,7 +384,7 @@ namespace cicada
 	  
 	  if (point > range.second) break;   // out of range for upper-bound, quit!
 	  if (point < range.first) continue; // out of range for lower-bound...
-	  //if (std::fabs(point) < interval_min) continue; // interval is very small
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
 	  const double objective = score;
 	  
@@ -495,7 +495,7 @@ namespace cicada
 	  
 	  if (point > range.second) break;   // out of range for upper-bound, quit!
 	  if (point < range.first) continue; // out of range for lower-bound...
-	  //if (std::fabs(point) < interval_min) continue; // interval is very small
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
 	  const double objective = score;
 	  
@@ -623,7 +623,7 @@ namespace cicada
 	  
 	  if (point > range.second) break;   // out of range for upper-bound, quit!
 	  if (point < range.first) continue; // out of range for lower-bound...
-	  //if (std::fabs(point) < interval_min) continue; // interval is very small
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
 	  const double objective = score + regularizer(point);
 	  
@@ -752,7 +752,7 @@ namespace cicada
 	  
 	  if (point > range.second) break;   // out of range for upper-bound, quit!
 	  if (point < range.first) continue; // out of range for lower-bound...
-	  //if (std::fabs(point) < interval_min) continue; // interval is very small
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
 	  const double objective = score + regularizer(origin, direction, lower, upper);
 	  
