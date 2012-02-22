@@ -973,9 +973,7 @@ struct YieldSentence
   template <typename Line>
   score_ptr_type operator()(const Line& x, const scorer_ptr_type& scorer) const
   {
-    const sentence_type yield = x->yield(cicada::operation::sentence_traversal());
-    
-    return scorer->score(yield);
+    return scorer->score(x->yield(cicada::operation::sentence_traversal()));
   }
 };
 
