@@ -990,7 +990,6 @@ void cicada_learn(operation_set_type& operations,
 	EnvelopeKBest envelopes(origin, direction);
 	
 	segment_document_type segments;
-	segments.reserve((kbests_all.size() + 1) * mpi_size);
 	
 	for (size_t id = 0; id != kbests_all.size(); ++ id) 
 	  if (! kbests_all[id].empty()) {

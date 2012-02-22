@@ -793,7 +793,6 @@ void cicada_learn(operation_set_type& operations,
 	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 	
 	segment_document_type segments;
-	segments.reserve((forests_all.size() + 1) * mpi_size);
 
 	envelope_set_type envelopes;
 	
