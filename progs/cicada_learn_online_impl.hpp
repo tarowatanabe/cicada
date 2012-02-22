@@ -1474,8 +1474,8 @@ void read_events(const path_type& input_path,
 		 event_set_type& events,
 		 const bool directory_mode,
 		 const bool id_mode,
-		 const size_t shard_rank,
-		 const size_t shard_size)
+		 const size_t shard_rank=0,
+		 const size_t shard_size=1)
 {
   namespace qi = boost::spirit::qi;
   namespace standard = boost::spirit::standard;

@@ -581,7 +581,7 @@ void options(int argc, char** argv)
   po::options_description opts_command("command line options");
   opts_command.add_options()
     ("config",  po::value<path_type>(),                    "configuration file")
-    ("threads", po::value<int>(&threads),                  "# of threads (highly experimental)")
+    ("threads", po::value<int>(&threads),                  "# of threads")
     ("debug",   po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
