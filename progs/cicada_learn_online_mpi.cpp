@@ -889,7 +889,7 @@ void cicada_learn(operation_set_type& operations,
 
 	for (size_t id = 0; id != forests_all.size(); ++ id)
 	  if (forests_all[id].is_valid()) {
-	    aenvelopes.clear();
+	    envelopes.clear();
 	    envelopes.resize(forests_all[id].nodes.size());
 	    
 	    cicada::inside(forests_all[id], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
