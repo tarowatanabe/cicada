@@ -17,9 +17,6 @@
 #include <sstream>
 #include <vector>
 
-#include "cicada_kbest_impl.hpp"
-#include "cicada_mert_kbest_impl.hpp"
-
 #include "cicada/semiring.hpp"
 #include "cicada/eval.hpp"
 
@@ -53,6 +50,9 @@
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
+
+typedef scorer_type::score_ptr_type  score_ptr_type;
+typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
 
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 typedef feature_function_ptr_set_type function_document_type;

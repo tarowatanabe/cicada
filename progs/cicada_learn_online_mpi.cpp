@@ -26,7 +26,6 @@
 #include <cstdlib>
 
 #include "cicada_impl.hpp"
-#include "cicada_kbest_impl.hpp"
 #include "cicada_text_impl.hpp"
 
 #include "utils/program_options.hpp"
