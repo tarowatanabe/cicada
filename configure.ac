@@ -91,7 +91,7 @@ else
   if test "x$ac_have_google_sparsehash" = "xno"; then
     AS_ERROR("no sparsehash")
   else
-      AC_DEFINE([HAVE_GOOGLE_SPARSEHASH], 1, [Define to 1 if you have (old) sparsehash.])
+    AC_DEFINE([HAVE_GOOGLE_SPARSEHASH], 1, [Define to 1 if you have (old) sparsehash.])
   fi
 fi
 
