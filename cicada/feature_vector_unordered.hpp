@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__FEATURE_VECTOR_UNORDERED__HPP__
@@ -15,7 +15,7 @@
 
 #include <cicada/feature.hpp>
 
-#include <google/dense_hash_map>
+#include <utils/dense_hash_map.hpp>
 
 //
 // feature vector, for use as "temporary" unordered vector for faster access, w/o sorting

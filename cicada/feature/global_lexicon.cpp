@@ -7,8 +7,7 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/piece.hpp"
-
-#include <google/dense_hash_set>
+#include "utils/dense_hash_set.hpp"
 
 namespace cicada
 {

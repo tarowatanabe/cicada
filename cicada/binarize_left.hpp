@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__BINARIZE_LEFT__HPP__
@@ -10,10 +10,9 @@
 
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/dense_hash_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
-
-#include <google/dense_hash_map>
 
 namespace cicada
 {

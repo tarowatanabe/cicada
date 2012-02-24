@@ -29,8 +29,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
-
-#include <google/dense_hash_map>
+#include <utils/dense_hash_map.hpp>
 
 namespace cicada
 {

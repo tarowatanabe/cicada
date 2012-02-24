@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <utility>
@@ -12,11 +12,9 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
+#include "utils/dense_hash_map.hpp"
 
 #include <boost/tuple/tuple.hpp>
-
-#include <google/dense_hash_set>
-#include <google/dense_hash_map>
 
 namespace cicada
 {

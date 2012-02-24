@@ -19,8 +19,6 @@
 
 #include <boost/program_options.hpp>
 
-#include <google/dense_hash_set>
-
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
 

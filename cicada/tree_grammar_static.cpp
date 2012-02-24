@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -53,8 +53,6 @@
 #include <boost/fusion/include/std_pair.hpp>
 
 #include <boost/thread.hpp>
-
-#include <google/dense_hash_set>
 
 namespace cicada
 {

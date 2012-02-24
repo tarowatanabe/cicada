@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_filter_extract_impl.hpp"
@@ -19,8 +19,7 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
-
-#include <google/dense_hash_set>
+#include <utils/dense_hash_set.hpp>
 
 typedef boost::filesystem::path path_type;
 

@@ -58,6 +58,8 @@ compress_stream.hpp \
 config.hpp \
 config.h \
 dense_hashtable.hpp \
+dense_hash_map.hpp \
+dense_hash_set.hpp \
 dense_map.hpp \
 dense_set.hpp \
 double_base64_generator.hpp \
@@ -103,6 +105,8 @@ sgi_hash_set.hpp \
 simple_vector.hpp \
 small_vector.hpp \
 space_separator.hpp \
+sparse_hash_map.hpp \
+sparse_hash_set.hpp \
 sparse_hashtable.hpp \
 sparse_map.hpp \
 sparse_set.hpp \

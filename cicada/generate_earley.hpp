@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__GENERATE_EARLEY__HPP__
@@ -24,9 +24,8 @@
 #include <cicada/inside_outside.hpp>
 #include <cicada/semiring.hpp>
 
-#include <google/dense_hash_set>
-#include <google/dense_hash_map>
-
+#include <utils/dense_hash_set.hpp>
+#include <utils/dense_hash_map.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/sgi_hash_set.hpp>

@@ -12,9 +12,8 @@
 
 #include <cicada/semiring/traits.hpp>
 
-#include <google/dense_hash_set>
-#include <google/dense_hash_map>
-
+#include <utils/dense_hash_set.hpp>
+#include <utils/dense_hash_map.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>

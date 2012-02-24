@@ -376,6 +376,7 @@ prune_edge.hpp \
 prune_kbest.hpp \
 push_bos_eos.hpp \
 quantizer.hpp \
+query.hpp \
 query_cky.hpp \
 query_tree.hpp \
 query_tree_cky.hpp \

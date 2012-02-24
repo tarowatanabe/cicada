@@ -18,8 +18,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
-
-#include <google/dense_hash_set>
+#include <utils/dense_hash_set.hpp>
 
 namespace cicada
 {

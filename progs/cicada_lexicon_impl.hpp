@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA_LEXICON_IMPL__HPP__
@@ -23,9 +23,8 @@
 
 #include <boost/filesystem.hpp>
 
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
-
+#include <utils/dense_hash_map.hpp>
+#include <utils/dense_hash_set.hpp>
 #include <utils/alloc_vector.hpp>
 #include <utils/bithack.hpp>
 #include <utils/sgi_hash_map.hpp>

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__PERMUTE__HPP__
@@ -10,7 +10,7 @@
 
 #include <cicada/operation.hpp>
 
-#include <google/dense_hash_set>
+#include <utils/dense_hash_set.hpp>
 
 namespace cicada
 {

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__GRAMMAR_UNKNOWN__HPP__
@@ -12,8 +12,7 @@
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/signature.hpp>
 
-#include <google/dense_hash_map>
-
+#include <utils/dense_hash_map.hpp>
 #include <utils/compact_trie_dense.hpp>
 #include <utils/hashmurmur.hpp>
 

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__FILTER_EXTRACT_IMPL__HPP__
@@ -22,13 +22,12 @@
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/mathop.hpp>
+#include <utils/dense_hash_map.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/tree_rule.hpp>
-
-#include <google/dense_hash_map>
 
 struct RootCount
 {

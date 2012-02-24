@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "decode.hpp"
@@ -11,10 +11,9 @@
 
 #include "ter.hpp"
 
-#include <google/dense_hash_set>
-
 #include <boost/functional/hash.hpp>
 
+#include <utils/dense_hash_set.hpp>
 #include <utils/vector2.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__GRAMMAR_CHINESE__HPP__
@@ -15,8 +15,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 
-#include <google/dense_hash_set>
-
+#include <utils/dense_hash_set.hpp>
 
 namespace cicada
 {

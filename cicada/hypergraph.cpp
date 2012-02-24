@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -24,8 +24,7 @@
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
-
-#include <google/dense_hash_map>
+#include "utils/dense_hash_map.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,

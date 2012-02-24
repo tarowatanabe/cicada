@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -15,8 +15,7 @@
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 #include <utils/hashmurmur.hpp>
-
-#include <google/dense_hash_map>
+#include <utils/dense_hash_map.hpp>
 
 namespace cicada
 {

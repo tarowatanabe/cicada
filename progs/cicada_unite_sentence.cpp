@@ -20,10 +20,9 @@
 #include "utils/program_options.hpp"
 #include "utils/resource.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/dense_hash_set.hpp"
 
 #include <boost/program_options.hpp>
-
-#include <google/dense_hash_set>
 
 struct TER
 {

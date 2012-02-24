@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -30,12 +30,11 @@
 #include <utils/mathop.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/random_seed.hpp>
+#include <utils/dense_hash_map.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
-
-#include <google/dense_hash_map>
 
 typedef int64_t          count_type;
 typedef int32_t          cluster_id_type;

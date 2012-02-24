@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__SPARSE_HASHTABLE__H__
@@ -9,8 +9,7 @@
 #include <string>
 #include <memory>
 
-#include <google/sparse_hash_set>
-
+#include <utils/sparse_hash_set.hpp>
 #include <utils/memory.hpp>
 
 namespace utils

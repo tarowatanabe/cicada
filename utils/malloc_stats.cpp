@@ -17,8 +17,12 @@
 #include <malloc/malloc.h>
 #endif
 
-#if defined(HAVE_GOOGLE_MALLOC_EXTENSION_H) && defined(HAVE_GOOGLE_MALLOC_EXTENSION)
-#include <google/malloc_extension.h>
+#if defined(HAVE_GOOGLE_MALLOC_EXTENSION)
+  #if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
+    #include <gperftools/malloc_extension.h>
+  #elif defined(HAVE_GOOGLE_MALLOC_EXTENSION_H)
+    #include <google/malloc_extension.h>
+  #endif
 #endif
 
 #if defined(HAVE_JEMALLOC_H) && defined(HAVE_JEMALLOC_STATS)

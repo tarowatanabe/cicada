@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -65,16 +65,14 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/base64.hpp>
 #include <utils/random_seed.hpp>
+#include <utils/dense_hash_map.hpp>
+#include <utils/dense_hash_set.hpp>
 
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
-
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
-
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef hypergraph_type::rule_type     rule_type;

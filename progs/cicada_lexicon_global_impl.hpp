@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <algorithm>
@@ -19,15 +19,14 @@
 #include <utils/mathop.hpp>
 #include <utils/sgi_hash_set.hpp>
 #include <utils/random_seed.hpp>
+#include <utils/dense_hash_map.hpp>
+#include <utils/dense_hash_set.hpp>
 
 #include "cicada/symbol.hpp"
 #include "cicada/vocab.hpp"
 #include "cicada/sentence.hpp"
 
 #include "lbfgs.h"
-
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
 
 #include "liblinear/linear.h"
 

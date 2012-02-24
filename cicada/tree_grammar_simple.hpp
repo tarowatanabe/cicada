@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__TREE_GRAMMAR_SIMPLE__HPP__
@@ -11,7 +11,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/tree_grammar_mutable.hpp>
 
-#include <google/dense_hash_set>
+#include <utils/dense_hash_set.hpp>
 
 namespace cicada
 {

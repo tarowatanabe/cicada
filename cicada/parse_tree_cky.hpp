@@ -33,9 +33,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
-
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
+#include <utils/dense_hash_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
 

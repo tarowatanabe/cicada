@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_GHKM_IMPL__HPP__
@@ -47,9 +47,8 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/vector_set.hpp>
-
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
+#include <utils/dense_hash_map.hpp>
+#include <utils/dense_hash_set.hpp>
 
 struct Bitext
 {

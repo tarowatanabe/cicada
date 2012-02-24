@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -22,12 +22,11 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/dense_hash_map.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-
-#include <google/dense_hash_map>
 
 typedef cicada::Symbol    word_type;
 typedef cicada::Sentence  sentence_type;

@@ -12,7 +12,7 @@
 #include <cicada/kbest.hpp>
 #include <cicada/inside_outside.hpp>
 
-#include <google/dense_hash_set>
+#include <utils/dense_hash_set.hpp>
 
 namespace cicada
 {

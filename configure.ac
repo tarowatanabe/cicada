@@ -69,17 +69,33 @@ else
 fi
 AC_SUBST(SPARSEHASH_CPPFLAGS)
 
-AC_MSG_CHECKING(for sparsehash)
 save_CXXFLAGS="$CXXFLAGS"
 CXXFLAGS="$CXXFLAGS $SPARSEHASH_CPPFLAGS"
-AC_TRY_LINK([#include <string>
-	     #include <google/sparse_hash_map>],
-	      [], [ac_have_libsparsehash=yes], [ac_have_libsparsehash=no])
-CXXFLAGS="$save_CXXFLAGS"
-AC_MSG_RESULT($ac_have_libsparsehash)
-if test "x$ac_have_libsparsehash" = "xno"; then
-  AS_ERROR("no sparsehash")
+AC_MSG_CHECKING(for sparsehash)
+AC_TRY_COMPILE([#include <string>
+	        #include <sparsehash/sparse_hash_map>],
+  	        [], [ac_have_sparsehash=yes], [ac_have_sparsehash=no])
+
+AC_MSG_RESULT($ac_have_sparsehash)
+
+if test "x$ac_have_sparsehash" = "xyes"; then
+  AC_DEFINE([HAVE_SPARSEHASH], 1, [Define to 1 if you have sparsehash.])
+else
+  AC_MSG_CHECKING(for (old) sparsehash)
+  AC_TRY_COMPILE([#include <string>
+  	          #include <google/sparse_hash_map>],
+  	          [], [ac_have_google_sparsehash=yes], [ac_have_google_sparsehash=no])
+   
+  AC_MSG_RESULT($ac_have_google_sparsehash)
+
+  if test "x$ac_have_google_sparsehash" = "xno"; then
+    AS_ERROR("no sparsehash")
+  else
+      AC_DEFINE([HAVE_GOOGLE_SPARSEHASH], 1, [Define to 1 if you have (old) sparsehash.])
+  fi
 fi
+
+CXXFLAGS="$save_CXXFLAGS"
 
 AC_ARG_WITH(snappy,
         [AC_HELP_STRING([--with-snappy=DIR], [snappy in DIR])],
@@ -385,6 +401,7 @@ if test "x$ac_enable_tcmalloc" = "xyes"; then
    CXXFLAGS="$CXXFLAGS $TCMALLOC_CPPFLAGS"
    CPPFLAGS="$CPPFLAGS $TCMALLOC_CPPFLAGS"
    AC_CHECK_HEADERS([google/malloc_extension.h])
+   AC_CHECK_HEADERS([gperftools/malloc_extension.h])
    CXXFLAGS="$save_CXXFLAGS"
    CPPFLAGS="$save_CPPFLAGS"
 
@@ -393,9 +410,17 @@ if test "x$ac_enable_tcmalloc" = "xyes"; then
    save_LDFLAGS="$LDFLAGS"
    CXXFLAGS="$CXXFLAGS $TCMALLOC_CPPFLAGS"
    LDFLAGS="$LDFLAGS $TCMALLOC_LDFLAGS"
-   AC_TRY_LINK([#include <google/malloc_extension.h>],
+
+   AC_TRY_LINK([#include <gperftools/malloc_extension.h>],
                [MallocExtension::instance();],
 	       	    [have_malloc_extension=yes], [have_malloc_extension=no])
+  
+   if test "$have_malloc_extension" = "no"; then
+     AC_TRY_LINK([#include <google/malloc_extension.h>],
+                 [MallocExtension::instance();],
+  	       	    [have_malloc_extension=yes], [have_malloc_extension=no])
+   fi
+   
    CXXFLAGS="$save_CXXFLAGS"
    LDFLAGS="$save_LDFLAGS"
    AC_MSG_RESULT($have_malloc_extension)

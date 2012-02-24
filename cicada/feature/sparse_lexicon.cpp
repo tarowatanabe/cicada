@@ -19,9 +19,7 @@
 #include "utils/alloc_vector.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/small_vector.hpp"
-
-#include <google/dense_hash_set>
-#include <google/dense_hash_map>
+#include "utils/dense_hash_set.hpp"
 
 namespace cicada
 {

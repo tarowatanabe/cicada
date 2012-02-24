@@ -1,13 +1,12 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__COMPACT_TRIE_DENSE_SET__HPP__
 #define __UTILS__COMPACT_TRIE_DENSE_SET__HPP__ 1
 
-#include <google/dense_hash_map>
-
+#include <utils/dense_hash_map.hpp>
 #include <utils/chunk_vector.hpp>
 
 #include <boost/functional/hash.hpp>

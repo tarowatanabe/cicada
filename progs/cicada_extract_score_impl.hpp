@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_SCORE_IMPL__HPP__
@@ -61,8 +61,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/double_base64_parser.hpp>
 #include <utils/double_base64_generator.hpp>
-
-#include <google/dense_hash_map>
+#include <utils/dense_hash_map.hpp>
 
 class RootCount
 {

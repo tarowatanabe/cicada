@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // learn coarse grammar
@@ -38,9 +38,8 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
-
-#include <google/dense_hash_map>
-#include <google/dense_hash_set>
+#include <utils/dense_hash_map.hpp>
+#include <utils/dense_hash_set.hpp>
 
 typedef boost::filesystem::path path_type;
 

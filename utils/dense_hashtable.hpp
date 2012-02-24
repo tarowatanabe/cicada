@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__DENSE_HASHTABLE__H__
@@ -9,8 +9,7 @@
 #include <string>
 #include <memory>
 
-#include <google/dense_hash_set>
-
+#include <utils/dense_hash_set.hpp>
 #include <utils/memory.hpp>
 
 namespace utils
