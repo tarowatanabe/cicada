@@ -139,3 +139,6 @@ Earley composition with skipping
 
 Earley composition with CFG!
    Like phrasal composition, we perform CKY over the Earley generated forest of string.... very hard...
+
+optimized variant of SGD (and xBLEU?)
+  xBLEU is impossible given that the combination is already weighted!
