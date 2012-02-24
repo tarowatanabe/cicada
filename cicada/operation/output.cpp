@@ -21,7 +21,6 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
-#include <utils/sgi_hash_map.hpp>
 #include <utils/piece.hpp>
 #include <utils/dense_hash_map.hpp>
 

@@ -38,7 +38,7 @@
 #include <utils/tempfile.hpp>
 #include <utils/config.hpp>
 #include <utils/spinlock.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
 namespace utils
@@ -137,13 +137,8 @@ namespace utils
     typedef mutex_type::scoped_lock lock_type;
     typedef __map_alloc_file        map_file_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<void*, map_file_type*, boost::hash<void*>, std::equal_to<void*>,
-				    std::allocator<std::pair<const void*, map_file_type*> > > mapped_type;
-#else
-    typedef sgi::hash_map<void*, map_file_type*, boost::hash<void*>, std::equal_to<void*>,
-			  std::allocator<std::pair<const void*, map_file_type*> > > mapped_type;
-#endif
+    typedef utils::unordered_map<void*, map_file_type*, boost::hash<void*>, std::equal_to<void*>,
+				 std::allocator<std::pair<const void*, map_file_type*> > >::type mapped_type;
   
     typedef std::set<void*, std::less<void*>, std::allocator<void*> > removed_type;
     

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -33,7 +33,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/chart.hpp"
 #include "utils/space_separator.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -160,13 +160,8 @@ struct string_hash : public utils::hashmurmur<size_t>
   }
 };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<std::string, hypergraph_type::id_type, string_hash, std::equal_to<std::string>,
-				std::allocator<std::pair<const std::string, hypergraph_type::id_type> > > node_map_type;
-#else
-typedef sgi::hash_map<std::string, hypergraph_type::id_type, string_hash, std::equal_to<std::string>,
-		      std::allocator<std::pair<const std::string, hypergraph_type::id_type> > > node_map_type;
-#endif
+typedef utils::unordered_map<std::string, hypergraph_type::id_type, string_hash, std::equal_to<std::string>,
+			     std::allocator<std::pair<const std::string, hypergraph_type::id_type> > >::type node_map_type;
 
 typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_chart_type;
 

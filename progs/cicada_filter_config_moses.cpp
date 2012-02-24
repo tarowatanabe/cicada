@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // a simple moses.ini filter (coupled with weights file...)
@@ -24,8 +24,8 @@
 
 #include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -44,24 +44,12 @@ typedef boost::fusion::tuple<std::string, int, double> feature_weight_type;
 
 typedef std::vector<double, std::allocator<double> > weight_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<std::string, weight_set_type, feature_hash, std::equal_to<std::string>,
-				std::allocator<std::pair<const std::string, weight_set_type> > > feature_weight_set_type;
-typedef std::tr1::unordered_map<std::string, std::string, feature_hash, std::equal_to<std::string>,
-				std::allocator<std::pair<const std::string, std::string> > > feature_map_type;
-#else
-typedef sgi::hash_map<std::string, weight_set_type, feature_hash, std::equal_to<std::string>,
-		      std::allocator<std::pair<const std::string, weight_set_type> > > feature_weight_set_type
-typedef sgi::hash_map<std::string, std::string, feature_hash, std::equal_to<std::string>,
-		      std::allocator<std::pair<const std::string, std::string> > > feature_map_type;
-#endif
+typedef utils::unordered_map<std::string, weight_set_type, feature_hash, std::equal_to<std::string>,
+			     std::allocator<std::pair<const std::string, weight_set_type> > >::type feature_weight_set_type;
+typedef utils::unordered_map<std::string, std::string, feature_hash, std::equal_to<std::string>,
+			     std::allocator<std::pair<const std::string, std::string> > >::type feature_map_type;
 
-
-#ifdef HAVE_TR1_UNORDERED_SET
-typedef std::tr1::unordered_set<std::string, feature_hash, std::equal_to<std::string>, std::allocator<std::string> > feature_consumed_type;
-#else
-typedef sgi::hash_set<std::string, feature_hash, std::equal_to<std::string>, std::allocator<std::string> > feature_consumed_type;
-#endif
+typedef utils::unordered_set<std::string, feature_hash, std::equal_to<std::string>, std::allocator<std::string> >::type feature_consumed_type;
 
 template <typename Iterator>
 struct feature_weight_parser : boost::spirit::qi::grammar<Iterator, feature_weight_type()>

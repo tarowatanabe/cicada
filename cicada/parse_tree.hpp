@@ -24,8 +24,8 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
@@ -114,11 +114,7 @@ namespace cicada
     
     // for phrasal matching...
     
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
-#else
-    typedef sgi::hash_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
-#endif
+    typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
 
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
@@ -264,17 +260,11 @@ namespace cicada
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-				    std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > > tree_candidate_map_type;
-    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
-#else
-    typedef sgi::hash_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-			  std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > > tree_candidate_map_type;
-    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
-#endif
+    typedef utils::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+				 std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > >::type tree_candidate_map_type;
+    typedef utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				 std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
+  
     typedef std::vector<tree_candidate_map_type, std::allocator<tree_candidate_map_type> > tree_candidate_table_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
 

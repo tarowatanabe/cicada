@@ -27,7 +27,7 @@
 #include <utils/dense_hash_set.hpp>
 #include <utils/alloc_vector.hpp>
 #include <utils/bithack.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 
@@ -138,27 +138,15 @@ struct atable_type
   typedef std::pair<word_type, word_type> class_pair_type;
   typedef std::pair<index_type, index_type> range_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-				  std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
-#else
-  typedef sgi::hash_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-			std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
-#endif
+  typedef utils::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type count_dict_type;
 
   typedef difference_map_type mapped_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
-				  std::allocator<std::pair<const range_type, difference_map_type> > > cache_type;
-  typedef std::tr1::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-				  std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
-#else
-  typedef sgi::hash_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
-		      std::allocator<std::pair<const range_type, difference_map_type> > > cache_type;
-  typedef sgi::hash_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-			std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
-#endif
+  typedef utils::unordered_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       std::allocator<std::pair<const range_type, difference_map_type> > >::type cache_type;
+  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+			       std::allocator<std::pair<const class_pair_type, cache_type> > >::type cache_set_type;
 
   atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   

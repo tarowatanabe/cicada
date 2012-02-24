@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -15,7 +15,7 @@
 
 #include <utils/tempfile.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/spinlock.hpp>
 
@@ -131,13 +131,8 @@ namespace cicada
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
-#else
-  typedef sgi::hash_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
-#endif
+  typedef utils::unordered_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, Cluster> > >::type cluster_map_type;
 
   namespace impl
   {

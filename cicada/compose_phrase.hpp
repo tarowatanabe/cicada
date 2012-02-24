@@ -20,8 +20,8 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/bit_vector.hpp>
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/dense_hash_map.hpp>
 
 namespace cicada
@@ -91,20 +91,10 @@ namespace cicada
     
     typedef std::deque<state_type, std::allocator<state_type> > queue_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
-				    std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > > node_map_type;
-#else
-    typedef sgi::hash_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
-			  std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > > node_map_type;
-#endif
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-				    std::allocator<coverage_type > > coverage_set_type;
-#else
-    typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-			  std::allocator<coverage_type > > coverage_set_type;
-#endif
+    typedef utils::unordered_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
+				 std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > >::type node_map_type;
+    typedef utils::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
+				 std::allocator<coverage_type > >::type coverage_set_type;
 
     struct span_node_type
     {

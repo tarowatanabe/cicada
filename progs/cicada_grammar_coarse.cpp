@@ -30,8 +30,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
@@ -114,13 +113,8 @@ typedef Grammar grammar_type;
 typedef Lexicon lexicon_type;
 typedef ExpectedCounts expected_counts_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#endif
+typedef utils::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, grammar_type> > >::type count_set_type;
 
 path_type input_grammar_file = "-";
 path_type input_lexicon_file = "-";

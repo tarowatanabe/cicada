@@ -14,7 +14,7 @@
 
 #include <cicada/hypergraph.hpp>
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
 
@@ -51,13 +51,8 @@ namespace cicada
     typedef std::pair<direction_type, category_set_type> category_list_type;
     typedef std::vector<category_list_type, std::allocator<category_list_type> > category_map_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<symbol_type, category_map_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				    std::allocator<std::pair<const symbol_type, category_map_type> > > category_info_type;
-#else
-    typedef sgi::hash_map<symbol_type, category_map_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			  std::allocator<std::pair<const symbol_type, category_map_type> > > category_info_type;
-#endif    
+    typedef utils::unordered_map<symbol_type, category_map_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				 std::allocator<std::pair<const symbol_type, category_map_type> > >::type category_info_type;
     
   public:    
     HeadFinder() : __algorithm() {}

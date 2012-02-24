@@ -17,7 +17,6 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/sgi_hash_set.hpp>
 
 typedef boost::filesystem::path path_type;
 

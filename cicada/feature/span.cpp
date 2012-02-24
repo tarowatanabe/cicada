@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <utility>
@@ -8,7 +8,7 @@
 #include "cicada/feature/span.hpp"
 #include "cicada/parameter.hpp"
 
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/chart.hpp"
 #include "utils/piece.hpp"
@@ -52,15 +52,9 @@ namespace cicada
 
       typedef utils::chart<std::string, std::allocator<std::string> > label_chart_type;
       
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
-				      std::allocator<std::pair<const span_type, std::string> > > label_map_type;
-#else
-      typedef sgi::hash_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
-			    std::allocator<std::pair<const span_type, std::string> > > label_map_type;
+      typedef utils::unordered_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+				   std::allocator<std::pair<const span_type, std::string> > >::type label_map_type;
       
-#endif
-
       SpanImpl()
 	: forced_feature(false), attr_span_first("span-first"), attr_span_last("span-last") {}
       

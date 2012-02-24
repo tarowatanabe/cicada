@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include <vector>
 
@@ -11,7 +14,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/indexed_trie.hpp"
 #include "utils/chunk_vector.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/array.hpp>
@@ -68,13 +71,8 @@ namespace cicada
 
       
       typedef std::pair<dependency_type, dependency_type> dependency_pair_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
-				      std::allocator<std::pair<const dependency_pair_type, feature_list_type> > > feature_order_map_type;
-#else
-      typedef sgi::hash_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
-			    std::allocator<std::pair<const dependency_pair_type, feature_list_type> > > feature_order_map_type;
-#endif
+      typedef utils::unordered_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
+				   std::allocator<std::pair<const dependency_pair_type, feature_list_type> > >::type feature_order_map_type;
       
       // temporary...
       typedef std::vector<std::string, std::allocator<std::string> > feats_type;

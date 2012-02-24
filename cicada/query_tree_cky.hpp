@@ -24,8 +24,6 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
 #include <utils/bithack.hpp>
 #include <utils/dense_hash_map.hpp>
 #include <utils/dense_hash_set.hpp>

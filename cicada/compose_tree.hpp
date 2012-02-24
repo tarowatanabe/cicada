@@ -22,7 +22,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
 #include <utils/dense_hash_map.hpp>
@@ -103,11 +103,7 @@ namespace cicada
     
     // for phrasal matching...
     
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
-#else
-    typedef sgi::hash_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
-#endif
+    typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
     
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;

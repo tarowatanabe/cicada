@@ -32,8 +32,8 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/span_edge.hpp"
 
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
@@ -279,13 +279,8 @@ struct ExtractTree
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
   
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				  std::allocator<rule_pair_type> > rule_pair_set_type;
-#else
- typedef sgi::hash_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-		      std::allocator<rule_pair_type> > rule_pair_set_type;
-#endif
+  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
   
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
@@ -373,13 +368,8 @@ struct ExtractTree
   typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<range_type, node_set_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
-				  std::allocator<std::pair<const range_type, node_set_type> > > range_map_type;
-#else
-  typedef sgi::hash_map<range_type, node_set_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
-			std::allocator<std::pair<const range_type, node_set_type> > > range_map_type;
-#endif
+  typedef utils::unordered_map<range_type, node_set_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       std::allocator<std::pair<const range_type, node_set_type> > >::type range_map_type;
   
   typedef std::vector<bool, std::allocator<bool> > covered_type;
 
@@ -479,13 +469,8 @@ struct ExtractTree
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-				  std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
-#else
-  typedef sgi::hash_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-			std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
-#endif
+  typedef utils::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+			       std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > >::type rule_pair_set_local_type;
   
   struct DerivationGraph
   {
@@ -1415,14 +1400,8 @@ struct ExtractTree
   typedef std::pair<id_type, id_type> node_edge_type;
   typedef std::vector<node_edge_type, std::allocator<node_edge_type> > node_edge_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<range_tail_type, node_edge_set_type, range_tail_hash, std::equal_to<range_tail_type>,
-				  std::allocator<std::pair<const range_tail_type, node_edge_set_type> > > range_tail_map_type;
-#else
-  typedef sgi::hash_map<range_tail_type, node_edge_set_type, range_tail_hash, std::equal_to<range_tail_type>,
-			std::allocator<std::pair<const range_tail_type, node_edge_set_type> > > range_tail_map_type;
-
-#endif
+  typedef utils::unordered_map<range_tail_type, node_edge_set_type, range_tail_hash, std::equal_to<range_tail_type>,
+			       std::allocator<std::pair<const range_tail_type, node_edge_set_type> > >::type range_tail_map_type;
   
   range_tail_map_type range_tails;
 

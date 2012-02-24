@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_SCFG_IMPL__HPP__
@@ -25,8 +25,8 @@
 #include "cicada/span_vector.hpp"
 #include "cicada/vocab.hpp"
 
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
@@ -297,14 +297,8 @@ struct ExtractSCFG
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
   
-
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				  std::allocator<rule_pair_type> > rule_pair_set_type;
-#else
-  typedef sgi::hash_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-			std::allocator<rule_pair_type> > rule_pair_set_type;
-#endif
+  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
   
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
@@ -380,14 +374,8 @@ struct ExtractSCFG
   {
     typedef utils::chart<symbol_type, std::allocator<std::string> > label_chart_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<span_type, symbol_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
-				    std::allocator<std::pair<const span_type, symbol_type> > > label_map_type;
-#else
-    typedef sgi::hash_map<span_type, symbol_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
-			  std::allocator<std::pair<const span_type, symbol_type> > > label_map_type;
-  
-#endif
+    typedef utils::unordered_map<span_type, symbol_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+				 std::allocator<std::pair<const span_type, symbol_type> > >::type label_map_type;
     
     label_map_type   label_map;
     label_chart_type label_chart;

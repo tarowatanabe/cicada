@@ -29,7 +29,7 @@
 #include "cicada/optimize_qp.hpp"
 #include "cicada/optimize.hpp"
 
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/base64.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
@@ -151,12 +151,7 @@ struct LearnSVM : public LearnBase
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
-  
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
   
   struct HMatrix
   {
@@ -1499,11 +1494,7 @@ struct LearnOnlineMargin : public LearnBase
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
   
   void clear()
   {
@@ -2908,11 +2899,7 @@ struct LearnLinear
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
   
   static void print_string_stderr(const char *s)
   {

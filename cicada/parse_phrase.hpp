@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_PHRASE__HPP__
@@ -22,9 +22,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/bit_vector.hpp>
-
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 
 namespace cicada
 {
@@ -102,13 +100,8 @@ namespace cicada
     typedef utils::simple_vector<phrase_candidate_type, std::allocator<phrase_candidate_type> > phrase_candidate_set_type;
 
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				    std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > > phrase_candidate_map_type;
-#else
-    typedef sgi::hash_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-			  std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > > phrase_candidate_map_type;
-#endif
+    typedef utils::unordered_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				 std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > >::type phrase_candidate_map_type;
     typedef std::vector<phrase_candidate_map_type, std::allocator<phrase_candidate_map_type> > phrase_candidate_table_type;
     
     // coverage vector...

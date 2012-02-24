@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "format.hpp"
@@ -8,7 +8,7 @@
 #include "format/date.hpp"
 #include "format/number.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/thread_specific_ptr.hpp>
@@ -48,13 +48,8 @@ number: number format\n\
   
   typedef boost::shared_ptr<Format> format_ptr_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, format_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, format_ptr_type> > > format_map_type;
-#else
-  typedef sgi::hash_map<std::string, format_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, format_ptr_type> > > format_map_type;
-#endif
+  typedef utils::unordered_map<std::string, format_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, format_ptr_type> > >::type format_map_type;
   
 #ifdef HAVE_TLS
   static __thread format_map_type* __formats_tls = 0;

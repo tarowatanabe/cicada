@@ -44,13 +44,8 @@ struct Task
   path_set_type paths;
   const size_t  malloc_threshold;
   
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				  std::allocator<rule_pair_type> > rule_pair_set_type;
-#else
-  typedef sgi::hash_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-			std::allocator<rule_pair_type> > rule_pair_set_type;
-#endif
+  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
   template <typename Tp>
   struct less_ptr

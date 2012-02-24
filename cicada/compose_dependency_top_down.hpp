@@ -19,8 +19,8 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
 #include <utils/bit_vector.hpp>
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_set.hpp>
+#include <utils/unordered_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -59,21 +59,11 @@ namespace cicada
     typedef utils::bit_vector<1024> coverage_type;
     typedef boost::fusion::tuple<const coverage_type*, int, int> state_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
-				    std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
-#else
-    typedef sgi::hash_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
-			  std::allocator<std::pair<state_type, hypergraph_type::id_type> > > state_set_type;
-#endif
-
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-				    std::allocator<coverage_type > > coverage_set_type;
-#else
-    typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
-			  std::allocator<coverage_type > > coverage_set_type;
-#endif
+    typedef utils::unordered_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
+				 std::allocator<std::pair<state_type, hypergraph_type::id_type> > >::type state_set_type;
+  
+    typedef utils::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
+				 std::allocator<coverage_type > >::type coverage_set_type;
     
     typedef std::deque<state_type, std::allocator<state_type> > queue_type;
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > terminal_map_type;

@@ -100,8 +100,6 @@ random_seed.hpp \
 regex_group.hpp \
 repository.hpp \
 resource.hpp \
-sgi_hash_map.hpp \
-sgi_hash_set.hpp \
 simple_vector.hpp \
 small_vector.hpp \
 space_separator.hpp \
@@ -122,6 +120,8 @@ tempfile.hpp \
 thread_specific_ptr.hpp \
 json_string_generator.hpp \
 json_string_parser.hpp \
+unordered_map.hpp \
+unordered_set.hpp \
 vector_map.hpp \
 vector_set.hpp \
 vector2.hpp \

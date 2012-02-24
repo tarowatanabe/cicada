@@ -1,11 +1,11 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "operation.hpp"
 
 #include "utils/hashmurmur.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/thread_specific_ptr.hpp"
 
@@ -27,13 +27,8 @@ namespace cicada
       }
     };
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
-				    std::allocator<std::pair<const std::string, weights_path_type> > > weight_map_type;
-#else
-    typedef sgi::hash_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
-			  std::allocator<std::pair<const std::string, weights_path_type> > > weight_map_type;
-#endif
+    typedef utils::unordered_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
+				 std::allocator<std::pair<const std::string, weights_path_type> > >::type weight_map_type;
 
 #ifdef HAVE_TLS
     static __thread weight_map_type* __weights_tls = 0;

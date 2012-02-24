@@ -14,7 +14,7 @@
 
 #include <utils/hashmurmur.hpp>
 #include <utils/simple_vector.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 
 namespace cicada
@@ -67,11 +67,7 @@ namespace cicada
       }
     };
 
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type > > state_set_type;
-#else
-    typedef sgi::hash_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type > > state_set_type;
-#endif
+    typedef utils::unordered_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type > >::type state_set_type;
 
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
 

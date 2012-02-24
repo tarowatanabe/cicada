@@ -48,8 +48,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
@@ -171,13 +170,8 @@ public:
 
 typedef Grammar grammar_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#else
-typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-		      std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#endif
+typedef utils::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, grammar_type> > >::type count_set_type;
 
 typedef symbol_set_type ngram_type;
 class NGramCounts : public google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
@@ -2570,13 +2564,8 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
   
   typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#endif
+  typedef utils::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, rule_logprob_type> > >::type reachable_set_type;
   // we will first compute "reachable" rules...
   // reachable label -> rule mapping
   
@@ -2660,13 +2649,8 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
 
   typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#endif
+  typedef utils::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, rule_logprob_type> > >::type reachable_set_type;
   
   // compute reachables...
   reachable_set_type reachables;

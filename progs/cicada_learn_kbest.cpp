@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 
 //
 // k-best learner
@@ -28,7 +28,7 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/map_file.hpp"
 #include "utils/tempfile.hpp"
@@ -357,11 +357,7 @@ struct OptimizeLinear
     }
   };
   
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
   static void print_string_stderr(const char *s)
   {
@@ -1047,11 +1043,7 @@ struct OptimizeSVM
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
   
   typedef std::pair<size_type, size_type> pos_pair_type;
   typedef std::vector<pos_pair_type, std::allocator<pos_pair_type> > pos_pair_set_type;
@@ -2705,13 +2697,8 @@ struct TaskUnique
 	     hypothesis_map_type& __kbests)
     : queue(__queue), kbests(__kbests) {}
 
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-				  std::allocator<hypothesis_type> > hypothesis_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			std::allocator<hypothesis_type> > hypothesis_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
 
   void operator()()
   {

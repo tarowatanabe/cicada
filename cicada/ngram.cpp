@@ -1,11 +1,11 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "ngram.hpp"
 
 #include "utils/spinlock.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/thread_specific_ptr.hpp"
 
@@ -113,13 +113,8 @@ namespace cicada
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, NGram, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, NGram> > > ngram_map_type;
-#else
-  typedef sgi::hash_map<std::string, NGram, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, NGram> > > ngram_map_type;
-#endif
+  typedef utils::unordered_map<std::string, NGram, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, NGram> > >::type ngram_map_type;
 
   namespace impl
   {

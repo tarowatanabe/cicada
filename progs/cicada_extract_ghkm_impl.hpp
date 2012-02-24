@@ -32,8 +32,8 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/span_edge.hpp"
 
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/small_vector.hpp"
@@ -283,13 +283,8 @@ struct ExtractGHKM
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
   
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				  std::allocator<rule_pair_type> > rule_pair_set_type;
-#else
- typedef sgi::hash_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-		      std::allocator<rule_pair_type> > rule_pair_set_type;
-#endif
+  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
   
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
@@ -466,14 +461,8 @@ struct ExtractGHKM
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-				  std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
-#else
-  typedef sgi::hash_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-			std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
-#endif
-  
+  typedef utils::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+			       std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > >::type rule_pair_set_local_type;
   
   ExtractGHKM(const symbol_type& __non_terminal,
 	      const int __max_sentence_length,

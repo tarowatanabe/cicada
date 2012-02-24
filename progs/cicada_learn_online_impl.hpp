@@ -32,7 +32,6 @@
 #include "cicada/expected_ngram.hpp"
 #include "cicada/symbol_vector.hpp"
 
-#include "utils/sgi_hash_set.hpp"
 #include "utils/base64.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"

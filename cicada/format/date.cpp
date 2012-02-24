@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <vector>
@@ -16,7 +16,7 @@
 
 #include "date.hpp"
 
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/array_power2.hpp"
 
@@ -165,13 +165,8 @@ namespace cicada
 	       const std::string& locale_str_target)
     {
       // pre-defined rule-set
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
-	std::allocator<std::pair<const std::string, impl_type> > > impl_map_type;
-#else
-      typedef sgi::hash_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
-	std::allocator<std::pair<const std::string, impl_type> > > impl_map_type;
-#endif
+      typedef utils::unordered_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
+				   std::allocator<std::pair<const std::string, impl_type> > >::type impl_map_type;
       
       const icu::Locale locale_source(locale_str_source.c_str());
       const icu::Locale locale_target(locale_str_target.c_str());

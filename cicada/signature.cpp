@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "signature.hpp"
@@ -8,7 +8,7 @@
 
 #include "parameter.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 #include <utils/lexical_cast.hpp>
@@ -41,14 +41,8 @@ chinese: Chinese signature\n\
 
   typedef boost::shared_ptr<Signature> signature_ptr_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, signature_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, signature_ptr_type> > > signature_map_type;
-#else
-  typedef sgi::hash_map<std::string, signature_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, signature_ptr_type> > > signature_map_type;
-#endif
-
+  typedef utils::unordered_map<std::string, signature_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, signature_ptr_type> > >::type signature_map_type;
 
 #ifdef HAVE_TLS
   static __thread signature_map_type* __signatures_tls = 0;

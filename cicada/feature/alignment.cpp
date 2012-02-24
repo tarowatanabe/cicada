@@ -9,7 +9,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/hashmurmur.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/simple_vector.hpp"
 
 #include <boost/fusion/tuple.hpp>
@@ -146,14 +146,9 @@ namespace cicada
 	typedef boost::fusion::tuple<symbol_type, symbol_type, symbol_type, symbol_type, int> item_type;
 	typedef boost::array<feature_type, 5> features_type;
 	
-#ifdef HAVE_TR1_UNORDERED_MAP
-	typedef std::tr1::unordered_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
-					std::allocator<std::pair<const item_type, features_type> > > feature_map_type;
-#else
-	typedef sgi::hash_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
-			      std::allocator<std::pair<const item_type, features_type> > > feature_map_type;
-#endif
-
+	typedef utils::unordered_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
+				     std::allocator<std::pair<const item_type, features_type> > >::type feature_map_type;
+	
       public:
 	void operator()(const symbol_type& source_prev,
 			const symbol_type& target_prev,

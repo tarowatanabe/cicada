@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_PHRASE_IMPL__HPP__
@@ -23,7 +23,7 @@
 #include "cicada/sentence.hpp"
 #include "cicada/alignment.hpp"
 
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
@@ -227,15 +227,9 @@ struct ExtractPhrase
   typedef std::pair<int, int> span_type;
 
   typedef PhrasePair phrase_pair_type;
-  
 
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-				  std::allocator<phrase_pair_type> > phrase_pair_set_type;
-#else
-  typedef sgi::hash_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-			std::allocator<phrase_pair_type> > phrase_pair_set_type;
-#endif
+  typedef utils::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+			       std::allocator<phrase_pair_type> >::type phrase_pair_set_type;
   
   typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;

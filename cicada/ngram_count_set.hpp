@@ -9,7 +9,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/symbol_vector.hpp>
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 
 namespace cicada
 {
@@ -22,13 +22,8 @@ namespace cicada
     typedef double       count_type;
 
   private:
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-				    std::allocator<std::pair<const ngram_type, count_type> > > ngram_set_type;
-#else
-    typedef sgi::hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-			  std::allocator<std::pair<const ngram_type, count_type> > > ngram_set_type;
-#endif
+    typedef utils::unordered_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
+				 std::allocator<std::pair<const ngram_type, count_type> > >::type ngram_set_type;
     
 public:
     typedef ngram_set_type::size_type        size_type;

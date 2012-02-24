@@ -14,7 +14,6 @@
 #include "cicada/remove_epsilon.hpp"
 #include "cicada/unite.hpp"
 
-#include "utils/sgi_hash_map.hpp"
 #include "utils/program_options.hpp"
 
 #include <boost/program_options.hpp>

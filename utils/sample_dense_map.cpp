@@ -5,7 +5,7 @@
 #include <utils/dense_set.hpp>
 #include <utils/dense_map.hpp>
 #include <utils/resource.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 
 #include <boost/random.hpp>
@@ -59,14 +59,9 @@ int main(int argc, char** argv)
   generator.seed(time(0) * getpid());
 
   {
-    
-#ifdef HAVE_TR1_UNORDERED_MAP
     const char* hashname = "unordered-map";
-    std::tr1::unordered_map<int, int, utils::hashmurmur<size_t> > hashmap;
-#else
-    const char* hashname = "hash-map";
-    sgi::hash_map<int, int, utils::hashmurmur<size_t> > hashmap;
-#endif
+    utils::unordered_map<int, int, utils::hashmurmur<size_t> >::type hashmap;
+    
     const char* densename = "dense-map";
     utils::dense_map<int, int, utils::hashmurmur<size_t> > densemap;
     

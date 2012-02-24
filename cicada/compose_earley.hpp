@@ -24,7 +24,7 @@
 #include <utils/dense_hash_map.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
@@ -293,18 +293,10 @@ namespace cicada
       }
     };
     
-
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
-					 std::allocator<const edge_type*> > edge_set_active_type;
-    typedef std::tr1::unordered_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
-					 std::allocator<const edge_type*> > edge_set_passive_type;
-#else
-    typedef sgi::hash_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
-			       std::allocator<const edge_type*> > edge_set_active_type;
-    typedef sgi::hash_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
-			       std::allocator<const edge_type*> > edge_set_passive_type;
-#endif
+    typedef utils::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
+				      std::allocator<const edge_type*> >::type edge_set_active_type;
+    typedef utils::unordered_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
+				      std::allocator<const edge_type*> >::type edge_set_passive_type;
     
     // edge to traversal graph mappings...
     

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "tokenizer.hpp"
@@ -14,7 +14,7 @@
 #include "tokenizer/penntreebank.hpp"
 #include "tokenizer/stemmer.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/thread_specific_ptr.hpp>
@@ -58,13 +58,8 @@ tokenize: use the chain of tokenization\n\
   
   typedef boost::shared_ptr<Tokenizer> tokenizer_ptr_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, tokenizer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, tokenizer_ptr_type> > > tokenizer_map_type;
-#else
-  typedef sgi::hash_map<std::string, tokenizer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, tokenizer_ptr_type> > > tokenizer_map_type;
-#endif
+  typedef utils::unordered_map<std::string, tokenizer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, tokenizer_ptr_type> > >::type tokenizer_map_type;
 
 #ifdef HAVE_TLS
   static __thread tokenizer_map_type* __tokenizers_tls = 0;

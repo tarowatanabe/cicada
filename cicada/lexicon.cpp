@@ -20,7 +20,7 @@
 #include "utils/tempfile.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/spinlock.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/thread_specific_ptr.hpp"
 
 namespace cicada
@@ -202,13 +202,8 @@ namespace cicada
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, Lexicon, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, Lexicon> > > lexicon_map_type;
-#else
-  typedef sgi::hash_map<std::string, Lexicon, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, Lexicon> > > lexicon_map_type;
-#endif
+  typedef utils::unordered_map<std::string, Lexicon, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, Lexicon> > >::type lexicon_map_type;
 
   namespace impl
   {

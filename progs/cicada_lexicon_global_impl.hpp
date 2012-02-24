@@ -17,7 +17,6 @@
 #include <utils/repository.hpp>
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
-#include <utils/sgi_hash_set.hpp>
 #include <utils/random_seed.hpp>
 #include <utils/dense_hash_map.hpp>
 #include <utils/dense_hash_set.hpp>

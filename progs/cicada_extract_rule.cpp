@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -13,7 +13,7 @@
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/mathop.hpp"
 
 typedef cicada::HyperGraph hypergraph_type;
@@ -27,35 +27,18 @@ typedef std::vector<symbol_type, std::allocator<symbol_type> > context_type;
 typedef cicada::semiring::Logprob<double> weight_type;
 typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<rule_type, double, boost::hash<rule_type>, std::equal_to<rule_type>,
-				std::allocator<std::pair<const rule_type, double> > > count_set_type;
-#else
-typedef sgi::hash_map<rule_type, double, boost::hash<rule_type>, std::equal_to<rule_type>,
-		      std::allocator<std::pair<const rule_type, double> > > count_set_type;
-#endif
+typedef utils::unordered_map<rule_type, double, boost::hash<rule_type>, std::equal_to<rule_type>,
+			     std::allocator<std::pair<const rule_type, double> > >::type count_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, double> > > symbol_count_type;
-typedef std::tr1::unordered_map<symbol_set_type, double, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
-				std::allocator<std::pair<const symbol_set_type, double> > > symbol_set_count_type;
+typedef utils::unordered_map<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, double> > >::type symbol_count_type;
+typedef utils::unordered_map<symbol_set_type, double, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
+			     std::allocator<std::pair<const symbol_set_type, double> > >::type symbol_set_count_type;
 
-typedef std::tr1::unordered_map<symbol_type, symbol_set_count_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, symbol_set_count_type> > > lhs_rhs_count_type;
-typedef std::tr1::unordered_map<symbol_set_type, symbol_count_type, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
-				std::allocator<std::pair<const symbol_set_type, symbol_count_type> > > rhs_lhs_count_type;
-#else
-typedef sgi::hash_map<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-		      std::allocator<std::pair<const symbol_type, double> > > symbol_count_type;
-typedef sgi::hash_map<symbol_set_type, double, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
-		      std::allocator<std::pair<const symbol_set_type, double> > > symbol_set_count_type;
-
-typedef sgi::hash_map<symbol_type, symbol_set_count_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-		      std::allocator<std::pair<const symbol_type, symbol_set_count_type> > > lhs_rhs_count_type;
-typedef sgi::hash_map<symbol_set_type, symbol_count_type, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
-		      std::allocator<std::pair<const symbol_set_type, symbol_count_type> > > rhs_lhs_count_type;
-#endif
+typedef utils::unordered_map<symbol_type, symbol_set_count_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, symbol_set_count_type> > >::type lhs_rhs_count_type;
+typedef utils::unordered_map<symbol_set_type, symbol_count_type, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
+			     std::allocator<std::pair<const symbol_set_type, symbol_count_type> > >::type rhs_lhs_count_type;
 
 typedef boost::filesystem::path path_type;
 

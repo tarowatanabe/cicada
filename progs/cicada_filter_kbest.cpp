@@ -45,7 +45,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/simple_vector.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/lexical_cast.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -242,13 +242,8 @@ int main(int argc, char** argv)
       throw std::runtime_error("you can either --{merge, lattice} or --filter");
     
     if (merge_mode) {
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-	std::allocator<hypothesis_type> > hypothesis_set_type;
-#else
-      typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-	std::allocator<hypothesis_type> > hypothesis_set_type;
-#endif
+      typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				   std::allocator<hypothesis_type> >::type hypothesis_set_type;
       typedef std::deque<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
 
       typedef boost::spirit::istream_iterator iter_type;

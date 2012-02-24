@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -44,7 +44,6 @@
 
 #include "utils/resource.hpp"
 #include "utils/hashmurmur.hpp"
-#include "utils/sgi_hash_map.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"

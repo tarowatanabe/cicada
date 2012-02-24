@@ -22,8 +22,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
@@ -93,13 +92,8 @@ namespace cicada
     
     
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
-#else
-    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
-#endif
+    typedef utils::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				 std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
     // since we need to differentiate by lhs, we need to check "pos"

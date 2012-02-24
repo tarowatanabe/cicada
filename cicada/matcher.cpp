@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "matcher.hpp"
@@ -10,7 +10,7 @@
 #include "matcher/stemmer.hpp"
 #include "matcher/wordnet.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
@@ -43,13 +43,8 @@ wordnet: matching by wordnet synsets\n\
   
   typedef boost::shared_ptr<Matcher> matcher_ptr_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, matcher_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, matcher_ptr_type> > > matcher_map_type;
-#else
-  typedef sgi::hash_map<std::string, matcher_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, matcher_ptr_type> > > matcher_map_type;
-#endif
+  typedef utils::unordered_map<std::string, matcher_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, matcher_ptr_type> > >::type matcher_map_type;
 
 #ifdef HAVE_TLS
   static __thread matcher_map_type* __matchers_tls = 0;

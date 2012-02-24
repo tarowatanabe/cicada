@@ -18,9 +18,6 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/span_edge.hpp>
 
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
-
 namespace cicada
 {
   struct ComposeAlignment

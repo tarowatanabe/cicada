@@ -12,7 +12,7 @@
 
 #include "utils/mathop.hpp"
 #include "utils/bit_vector.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
 
 #include <boost/functional/hash.hpp>
@@ -131,17 +131,10 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
       
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
-				      std::allocator<std::pair<const unigram_type, int> > > unigram_count_type;
-      typedef std::tr1::unordered_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
-				      std::allocator<std::pair<const bigram_type, int> > > bigram_count_type;
-#else
-      typedef sgi::hash_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
-			    std::allocator<std::pair<const unigram_type, int> > > unigram_count_type;
-      typedef sgi::hash_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
-			    std::allocator<std::pair<const bigram_type, int> > > bigram_count_type;
-#endif
+      typedef utils::unordered_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
+				   std::allocator<std::pair<const unigram_type, int> > >::type unigram_count_type;
+      typedef utils::unordered_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
+				   std::allocator<std::pair<const bigram_type, int> > >::type bigram_count_type;
       
       void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams, bigram_count_type& bigrams) const
       {

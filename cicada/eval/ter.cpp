@@ -15,8 +15,7 @@
 
 #include <utils/dense_hash_set.hpp>
 #include <utils/vector2.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/bithack.hpp>
 #include <utils/lexical_cast.hpp>
 
@@ -186,13 +185,8 @@ namespace cicada
       typedef sentence_type ngram_type;
       typedef std::set<int, std::less<int>, std::allocator<int> > index_set_type;
       
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-				      std::allocator<std::pair<const ngram_type, index_set_type> > > ngram_index_map_type;
-#else
-      typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-			    std::allocator<std::pair<const ngram_type, index_set_type> > > ngram_index_map_type;
-#endif
+      typedef utils::unordered_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
+				   std::allocator<std::pair<const ngram_type, index_set_type> > >::type ngram_index_map_type;
       
       TERScorerImpl(const sentence_type& __ref)
 	: ref(__ref) {  }

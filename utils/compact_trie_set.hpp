@@ -7,7 +7,7 @@
 #define __UTILS__COMPACT_TRIE_SET__HPP__ 1
 
 #include <utils/chunk_vector.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 
 #include <boost/functional/hash.hpp>
 
@@ -42,13 +42,8 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
-    typedef std::tr1::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_root_type;
-#else
-    typedef sgi::hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
-    typedef sgi::hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_root_type;
-#endif
+    typedef utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
+    typedef utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_root_type;
     
     struct Node
     {

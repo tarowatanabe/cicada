@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -34,7 +34,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -81,11 +81,7 @@ struct hash_feature : public utils::hashmurmur<size_t>
   }
 };
 
-#ifdef HAVE_TR1_UNORDERED_SET
-typedef std::tr1::unordered_set<std::string, hash_feature, std::equal_to<std::string>, std::allocator<std::string> > feature_unique_type;
-#else
-typedef sgi::hash_set<std::string, hash_feature, std::equal_to<std::string>, std::allocator<std::string> > feature_unique_type;
-#endif
+typedef utils::unordered_set<std::string, hash_feature, std::equal_to<std::string>, std::allocator<std::string> >::type feature_unique_type;
 
 
 path_type input_file = "-";

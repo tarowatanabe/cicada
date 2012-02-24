@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__BINARIZE_ALL__HPP__
@@ -8,7 +8,7 @@
 
 #include <cicada/binarize_base.hpp>
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -42,17 +42,10 @@ namespace cicada
       }
     };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<tail_set_type, symbol_type, tail_set_hash, std::equal_to<tail_set_type>,
-				      std::allocator<std::pair<const tail_set_type, symbol_type> > > label_map_type;
-      typedef std::tr1::unordered_map<tail_symbol_pair_type, hypergraph_type::id_type, tail_symbol_pair_hash, std::equal_to<tail_symbol_pair_type>,
-				      std::allocator<std::pair<const tail_symbol_pair_type, hypergraph_type::id_type> > > node_map_type;
-#else
-      typedef sgi::hash_map<tail_set_type, symbol_type, tail_set_hash, std::equal_to<tail_set_type>,
-			    std::allocator<std::pair<const tail_set_type, symbol_type> > > label_map_type;
-      typedef sgi::hash_map<tail_symbol_pair_type, hypergraph_type::id_type, tail_symbol_pair_hash, std::equal_to<tail_symbol_pair_type>,
-			    std::allocator<std::pair<const tail_symbol_pair_type, hypergraph_type::id_type> > > node_map_type;
-#endif
+    typedef utils::unordered_map<tail_set_type, symbol_type, tail_set_hash, std::equal_to<tail_set_type>,
+				 std::allocator<std::pair<const tail_set_type, symbol_type> > >::type label_map_type;
+    typedef utils::unordered_map<tail_symbol_pair_type, hypergraph_type::id_type, tail_symbol_pair_hash, std::equal_to<tail_symbol_pair_type>,
+				 std::allocator<std::pair<const tail_symbol_pair_type, hypergraph_type::id_type> > >::type node_map_type;
 
     label_map_type label_map;
     node_map_type node_map;

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer.hpp"
@@ -14,7 +14,7 @@
 
 #include "parameter.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 #include "utils/lexical_cast.hpp"
@@ -55,14 +55,8 @@ nfkc: NFKC\n\
 
   typedef boost::shared_ptr<Stemmer> stemmer_ptr_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, stemmer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, stemmer_ptr_type> > > stemmer_map_type;
-#else
-  typedef sgi::hash_map<std::string, stemmer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, stemmer_ptr_type> > > stemmer_map_type;
-#endif
-
+  typedef utils::unordered_map<std::string, stemmer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, stemmer_ptr_type> > >::type stemmer_map_type;
 
 #ifdef HAVE_TLS
   static __thread stemmer_map_type* __stemmers_tls = 0;

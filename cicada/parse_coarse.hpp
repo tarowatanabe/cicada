@@ -26,7 +26,7 @@
 #include <utils/array_power2.hpp>
 #include <utils/indexed_set.hpp>
 #include <utils/mulvector2.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/dense_hash_map.hpp>
@@ -289,13 +289,8 @@ namespace cicada
       };
       //typedef google::dense_hash_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-				      std::allocator<std::pair<const id_type, closure_score_type> > > closure_set_type;
-#else
-    typedef sgi::hash_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-			  std::allocator<std::pair<const id_type, closure_score_type> > > closure_set_type;
-#endif
+      typedef utils::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				   std::allocator<std::pair<const id_type, closure_score_type> > >::type closure_set_type;
       
       typedef utils::indexed_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_map_type;
       

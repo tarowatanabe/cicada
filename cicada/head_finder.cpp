@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "parameter.hpp"
@@ -9,7 +9,7 @@
 #include "head/collins.hpp"
 #include "head/collins_modified.hpp"
 
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
@@ -40,13 +40,8 @@ chinese: Chinese head finder\n\
 
   typedef boost::shared_ptr<HeadFinder> finder_ptr_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, finder_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, finder_ptr_type> > > finder_map_type;
-#else
-  typedef sgi::hash_map<std::string, finder_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, finder_ptr_type> > > finder_map_type;
-#endif
+  typedef utils::unordered_map<std::string, finder_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, finder_ptr_type> > >::type finder_map_type;
   
 #ifdef HAVE_TLS
   static __thread finder_map_type* __finders_tls = 0;

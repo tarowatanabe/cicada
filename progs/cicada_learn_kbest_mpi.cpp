@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // kbest learner with MPI
@@ -37,6 +37,7 @@
 #include "utils/tempfile.hpp"
 #include "utils/mulvector2.hpp"
 #include "utils/mathop.hpp"
+#include "utils/unordered_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -809,11 +810,7 @@ struct OptimizeOnlineMargin
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
@@ -1690,11 +1687,7 @@ struct OptimizeCP
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
   template <typename Iterator1, typename Iterator2, typename Features>
   void construct_pair(Iterator1 oiter, Iterator1 oiter_end,
@@ -4640,13 +4633,8 @@ double optimize_mert(const scorer_document_type& scorers,
 
 void unique_kbest(hypothesis_map_type& kbests)
 {
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-				  std::allocator<hypothesis_type> > hypothesis_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			std::allocator<hypothesis_type> > hypothesis_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
   
   hypothesis_unique_type uniques;
   

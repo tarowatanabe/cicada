@@ -51,8 +51,7 @@
 #include <utils/repository.hpp>
 #include <utils/map_file.hpp>
 #include <utils/alloc_vector.hpp>
-#include <utils/sgi_hash_set.hpp>
-#include <utils/sgi_hash_map.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/base64.hpp>
@@ -1190,14 +1189,8 @@ struct PhrasePairModifyReducer
   typedef PhrasePairModifiedParser    modified_parser_type;
   typedef PhrasePairModifiedGenerator modified_generator_type;
 
-
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<modified_type, boost::hash<modified_type>, std::equal_to<modified_type>,
-				  std::allocator<modified_type> > modified_unique_type;
-#else
-typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<modified_type>,
-		      std::allocator<modified_type> > modified_unique_type;
-#endif
+  typedef utils::unordered_set<modified_type, boost::hash<modified_type>, std::equal_to<modified_type>,
+			       std::allocator<modified_type> >::type modified_unique_type;
   
   modified_parser_type    parser;
   modified_generator_type generator;

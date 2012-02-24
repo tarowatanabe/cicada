@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -43,8 +43,6 @@
 
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
 
 typedef boost::filesystem::path path_type;
 

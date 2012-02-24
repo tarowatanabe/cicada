@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -23,7 +23,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/spinlock.hpp"
-#include "utils/sgi_hash_map.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/thread_specific_ptr.hpp"
 
 namespace cicada
@@ -74,14 +74,8 @@ format: ICU's number/date format rules\n\
     }
   };
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<std::string, Transducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-				  std::allocator<std::pair<const std::string, Transducer::transducer_ptr_type> > > transducer_map_type;
-#else
-  typedef sgi::hash_map<std::string, Transducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
-			std::allocator<std::pair<const std::string, Transducer::transducer_ptr_type> > > transducer_map_type;
-#endif
-  
+  typedef utils::unordered_map<std::string, Transducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+			       std::allocator<std::pair<const std::string, Transducer::transducer_ptr_type> > >::type transducer_map_type;
   
   namespace impl
   {
