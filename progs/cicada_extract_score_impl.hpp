@@ -436,7 +436,7 @@ struct LexiconModel
 
   struct table_type
   {
-    typedef google::dense_hash_map<word_type, double, boost::hash<word_type> , std::equal_to<word_type> > __table_type;
+    typedef utils::dense_hash_map<word_type, double, boost::hash<word_type> , std::equal_to<word_type> >::type __table_type;
 
     table_type() : table() { table.set_empty_key(word_type()); }
 

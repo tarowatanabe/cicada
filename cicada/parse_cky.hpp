@@ -188,7 +188,7 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
+    typedef utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
     
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
 

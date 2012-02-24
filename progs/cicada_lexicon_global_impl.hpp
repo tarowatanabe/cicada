@@ -72,7 +72,7 @@ void read_bitexts(const path_type& path_source,
 		  word_set_type& vocab,
 		  const int kbest)
 {
-  typedef google::dense_hash_map<word_type, size_t, boost::hash<word_type>, std::equal_to<word_type> > word_count_set_type;
+  typedef utils::dense_hash_map<word_type, size_t, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_set_type;
   typedef std::vector<std::pair<word_type, size_t>, std::allocator<std::pair<word_type, size_t> > > word_count_sorted_type;
   
   typedef std::set<word_type, std::less<word_type>, std::allocator<word_type> > word_sorted_set_type;
@@ -299,7 +299,7 @@ struct Optimizer
     : bitexts(__bitexts.size()),
       word(__word)
   {
-    typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >  word_set_type;
+    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type  word_set_type;
     
     word_set_type cooc;
     cooc.set_empty_key(word_type());

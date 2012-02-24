@@ -68,7 +68,7 @@ namespace cicada
     //
     
     typedef uint32_t id_type;
-    typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
+    typedef utils::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type id_map_type;
     
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
@@ -215,7 +215,7 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
+    typedef utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
     
     // edge hash/comparison
     struct edge_unique_hash_type : public utils::hashmurmur<size_t>
@@ -268,14 +268,14 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+    typedef utils::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type >::type edge_set_unique_type;
     
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_ptr_set_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
     
     // edge to traversal graph mappings...
-    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
+    typedef utils::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type >::type non_terminal_node_set_type;
     
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)

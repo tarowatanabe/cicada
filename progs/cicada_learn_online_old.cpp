@@ -43,7 +43,6 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
-#include "utils/sgi_hash_map.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 

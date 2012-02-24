@@ -56,7 +56,7 @@ namespace cicada
       
       typedef symbol_type word_type;
       
-      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
+      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
       struct score_set_type
       {
 	double model1;

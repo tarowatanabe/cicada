@@ -73,7 +73,7 @@ namespace cicada
     {
       typedef hypergraph_type::id_type id_type;
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
-      typedef google::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > node_map_type;
+      typedef utils::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type node_map_type;
       typedef cicada::operation::edge_traversal::edge_set_type edge_set_type;
 
       if (! data.hypergraph.is_valid()) return;

@@ -307,7 +307,7 @@ struct ttable_type
 
   struct count_map_type
   {
-    typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > counts_type;
+    typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type counts_type;
 
     typedef counts_type::value_type      value_type;
     typedef counts_type::size_type       size_type;
@@ -452,7 +452,7 @@ struct aligned_type
   
   struct aligned_map_type
   {
-    typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > map_type;
+    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type map_type;
 
     typedef map_type::value_type      value_type;
     typedef map_type::size_type       size_type;

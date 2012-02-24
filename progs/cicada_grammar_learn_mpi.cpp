@@ -54,8 +54,8 @@
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_map.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
@@ -128,7 +128,7 @@ typedef Treebank treebank_type;
 
 typedef std::deque<treebank_type, std::allocator<treebank_type> > treebank_set_type;
 
-// use of google dense_map for holding const rule_type*, not rule_ptr_type!
+// use of utils dense_map for holding const rule_type*, not rule_ptr_type!
 
 template <typename Tp>
 struct ptr_hash : public boost::hash<Tp>
@@ -162,10 +162,10 @@ struct ptr_equal
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
+class Grammar : public utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
 {
 public:
-  typedef google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+  typedef utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
@@ -218,13 +218,8 @@ public:
 
 typedef Grammar grammar_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#else
-typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-		      std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#endif
+typedef utils::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, grammar_type> > >::type count_set_type;
 
 inline
 std::istream& operator>>(std::istream& is, count_set_type& counts)
@@ -268,10 +263,10 @@ std::ostream& operator<<(std::ostream& os, const count_set_type& x)
 }
 
 typedef symbol_set_type ngram_type;
-class NGramCounts : public google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
+class NGramCounts : public utils::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type
 {
 public:
-  typedef google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > count_set_type;
+  typedef utils::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type count_set_type;
 
   NGramCounts() : count_set_type() { count_set_type::set_empty_key(ngram_type()); }
 
@@ -319,10 +314,10 @@ public:
 };
 typedef NGramCounts ngram_count_set_type;
 
-class WordCounts : public google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+class WordCounts : public utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
 {
 public:
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > count_set_type;
+  typedef utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type count_set_type;
 
   WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
 
@@ -552,10 +547,10 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     return cache.coarse;
   }
 
-  class RuleCounts : public google::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >
+  class RuleCounts : public utils::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
   {
   public:
-    typedef google::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+    typedef utils::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
   
   public:
     RuleCounts() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
@@ -1411,7 +1406,7 @@ void grammar_merge(treebank_set_type& treebanks,
 		   Generator& generator,
 		   Maximizer maximizer)
 {
-  typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
+  typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type merged_set_type;
   typedef word_count_set_type scale_set_type;
   typedef word_count_set_type loss_set_type;
 
@@ -2220,7 +2215,7 @@ struct LexiconEstimate
   typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
   
   typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > ngram_set_type;
-  typedef google::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_map_type;
+  typedef utils::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type ngram_count_map_type;
   
   LexiconEstimate(const double& __prior, const int __order) : prior(__prior), order(__order) {}
   
@@ -2823,7 +2818,7 @@ void write_characters(const path_type& file,
 		      const double cutoff)
 {
   typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > sorted_type;
-  typedef google::dense_hash_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > sorted_map_type;
+  typedef utils::dense_hash_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type sorted_map_type;
   
   utils::compress_ostream os(file, 1024 * 1024);
   os.precision(10);
@@ -2870,13 +2865,8 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
   
   typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#endif
+  typedef utils::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, rule_logprob_type> > >::type reachable_set_type;
   // we will first compute "reachable" rules...
   // reachable label -> rule mapping
   
@@ -2960,13 +2950,8 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
 
   typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
-#endif
+  typedef utils::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, rule_logprob_type> > >::type reachable_set_type;
   
   // compute reachables...
   reachable_set_type reachables;

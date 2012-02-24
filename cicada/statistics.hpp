@@ -111,7 +111,7 @@ namespace cicada
     typedef Stat statistic_type;
     
   private:
-    typedef google::dense_hash_map<attribute_type, stat_type, boost::hash<attribute_type>, std::equal_to<attribute_type> > stat_set_type;
+    typedef utils::dense_hash_map<attribute_type, stat_type, boost::hash<attribute_type>, std::equal_to<attribute_type> >::type stat_set_type;
     
   public:
     typedef stat_set_type::value_type     value_type;

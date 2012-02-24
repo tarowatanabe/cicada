@@ -83,27 +83,27 @@ struct ptr_equal
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
+class Grammar : public utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
 {
 public:
-  typedef google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+  typedef utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
 };
 
-class Lexicon : public google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+class Lexicon : public utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
 {
 public:
-  typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >lexicon_type;
+  typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type lexicon_type;
 
   Lexicon() : lexicon_type() { lexicon_type::set_empty_key(symbol_type()); }
 };
 
-class ExpectedCounts : public google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+class ExpectedCounts : public utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
 {
 public:
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >expected_counts_type;
+  typedef utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type expected_counts_type;
   
   ExpectedCounts() : expected_counts_type() { expected_counts_type::set_empty_key(symbol_type()); }
 };

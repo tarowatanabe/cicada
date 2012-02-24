@@ -26,7 +26,7 @@ typedef std::vector<count_type, std::allocator<count_type> > count_unigram_type;
 
 struct count_map_type
 {
-  typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > counts_type;
+  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type counts_type;
 
   typedef counts_type::value_type      value_type;
   typedef counts_type::size_type       size_type;

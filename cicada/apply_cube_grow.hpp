@@ -120,8 +120,8 @@ namespace cicada
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
-    typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
+    typedef utils::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal >::type state_node_map_type;
+    typedef utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type >::type candidate_set_unique_type;
 
     struct State
     {

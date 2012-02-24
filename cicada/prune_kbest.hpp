@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PRUNE_KBEST__HPP__
@@ -73,7 +73,7 @@ namespace cicada
       }
     };
 
-    typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > edge_set_type;
+    typedef utils::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> >::type edge_set_type;
     
     PruneKBest(const function_type& __function,
 	       const size_type __kbest_size,

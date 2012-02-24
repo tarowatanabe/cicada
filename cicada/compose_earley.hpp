@@ -73,7 +73,7 @@ namespace cicada
     //
 
     typedef uint32_t id_type;
-    typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
+    typedef utils::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type id_map_type;
 
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
@@ -228,7 +228,7 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
+    typedef utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
     
     // edge hash/comparison
    struct edge_unique_hash_type : public utils::hashmurmur<size_t>
@@ -300,9 +300,9 @@ namespace cicada
     
     // edge to traversal graph mappings...
     
-    typedef google::dense_hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type> > terminal_node_set_type;
-    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
-    typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
+    typedef utils::dense_hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type> >::type terminal_node_set_type;
+    typedef utils::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type >::type non_terminal_node_set_type;
+    typedef utils::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> >::type goal_node_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     

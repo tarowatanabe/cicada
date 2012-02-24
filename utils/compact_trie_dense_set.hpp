@@ -42,8 +42,8 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-    typedef google::dense_hash_map<key_type, id_type, hash_type, equal_type > id_map_type;
-    typedef google::dense_hash_map<key_type, id_type, hash_type, equal_type > id_map_root_type;
+    typedef typename utils::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
+    typedef typename utils::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_root_type;
     
     struct Node
     {

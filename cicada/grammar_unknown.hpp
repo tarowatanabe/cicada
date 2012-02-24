@@ -31,10 +31,10 @@ namespace cicada
   private:
     typedef utils::compact_trie_dense<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				      std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
-    class unigram_set_type : public google::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >
+    class unigram_set_type : public utils::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >::type
     {
     public:
-      typedef google::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> > base_type;
+      typedef utils::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >::type base_type;
       
       unigram_set_type() : base_type() { base_type::set_empty_key(0); }
     };

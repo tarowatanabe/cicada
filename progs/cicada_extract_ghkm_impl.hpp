@@ -1281,8 +1281,8 @@ struct ExtractGHKM
 			     const sentence_type& sentence)
   {
     typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
-    typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
-    typedef google::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_set_type;
+    typedef utils::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_node_map_type;
+    typedef utils::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_set_type;
 
     // construc derivations wrt non-aligned words...
 

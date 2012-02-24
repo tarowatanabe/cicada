@@ -69,7 +69,7 @@ namespace cicada
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool validate=true)
     {
-      typedef google::dense_hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > id_set_type;
+      typedef utils::dense_hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type id_set_type;
       
       sorted.clear();
       

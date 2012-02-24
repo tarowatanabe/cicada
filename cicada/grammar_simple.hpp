@@ -27,7 +27,7 @@ namespace cicada
     GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, Iterator first, Iterator last, const bool __straight, const bool __inverted)
       : straight(__straight), inverted(__inverted)
     {
-      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > non_terminal_set_type;
+      typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type non_terminal_set_type;
       
       non_terminal_set_type non_terminals;
       non_terminals.set_empty_key(symbol_type());
@@ -117,7 +117,7 @@ namespace cicada
 
   private:
     typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
-    typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
+    typedef utils::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> >::type symbol_pair_set_type;
     
   public:
     void assign(const hypergraph_type& source, const lattice_type& target)
@@ -217,7 +217,7 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarPOS(*this)); }
 
   private:
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
 
   public:
     void assign(const lattice_type& lattice)
@@ -265,7 +265,7 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarInsertion(*this)); }
 
   private:
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
     
   public:
     void assign(const hypergraph_type& graph)
@@ -331,7 +331,7 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarDeletion(*this)); }
 
   private:
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
     
   public:
     void assign(const hypergraph_type& graph)

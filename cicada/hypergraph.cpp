@@ -440,7 +440,8 @@ namespace cicada
     typedef HyperGraph hypergraph_type;
     typedef hypergraph_type::rule_type rule_type;
 
-    typedef google::dense_hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
+    typedef utils::dense_hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
+				  std::allocator<std::pair<const rule_type*, int> > >::type rule_unique_map_type;
     
     os << '{';
     

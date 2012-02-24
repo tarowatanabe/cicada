@@ -42,7 +42,7 @@ struct ttable_type
 
   struct count_map_type
   {
-    typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > counts_type;
+    typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type counts_type;
 
     typedef counts_type::value_type      value_type;
     typedef counts_type::size_type       size_type;
@@ -136,7 +136,7 @@ struct ttable_pair_type
   
   struct count_map_type
   {
-    typedef google::dense_hash_map<word_pair_type, count_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > counts_type;
+    typedef utils::dense_hash_map<word_pair_type, count_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> >::type counts_type;
 
     typedef counts_type::value_type      value_type;
     typedef counts_type::size_type       size_type;

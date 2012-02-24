@@ -15,8 +15,8 @@
 #include "cicada/matcher.hpp"
 #include "cicada/eval/ter.hpp"
 
-#include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
+#include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/program_options.hpp"
 #include "utils/resource.hpp"
 #include "utils/lexical_cast.hpp"
@@ -91,11 +91,7 @@ struct MinimumEditDistance : public M
   typedef utils::vector2<operation_type, std::allocator<operation_type> > matrix_operation_type;
   typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
 
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >  word_set_type;
-#else
-  typedef sgi::hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >  word_set_type;
-#endif
+  typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type  word_set_type;
   typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
 
   MinimumEditDistance(const TER::weights_type& __weights,
@@ -242,16 +238,11 @@ struct TranslationErrorRate : public TER, public M
 
   typedef std::set<int, std::less<int>, std::allocator<int> > index_set_type;
   
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<word_type, index_set_type, boost::hash<word_type>, std::equal_to<word_type>,
-				  std::allocator<std::pair<const word_type, index_set_type> > > arc_unique_set_type;
-#else
-  typedef sgi::hash_map<word_type, index_set_type, boost::hash<word_type>, std::equal_to<word_type>,
-			std::allocator<std::pair<const word_type, index_set_type> > > arc_unique_set_type;
-#endif
+  typedef utils::unordered_map<word_type, index_set_type, boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, index_set_type> > >::type arc_unique_set_type;
   typedef std::vector<arc_unique_set_type, std::allocator<arc_unique_set_type> > lattice_unique_type;
 
-  typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;  
+  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_set_type;  
 
 
   typedef MinimumEditDistance<M> med_type;

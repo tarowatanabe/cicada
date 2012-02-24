@@ -247,7 +247,7 @@ namespace cicada
 
     typedef std::pair<word_type, size_type> word_node_type;
 
-    typedef google::dense_hash_map<word_node_type, size_type, utils::hashmurmur<size_t>, std::equal_to<word_node_type> > cache_node_type;
+    typedef utils::dense_hash_map<word_node_type, size_type, utils::hashmurmur<size_t>, std::equal_to<word_node_type>, std::allocator<word_node_type> >::type cache_node_type;
 
   public:
     GrammarStaticImpl(const std::string& parameter)

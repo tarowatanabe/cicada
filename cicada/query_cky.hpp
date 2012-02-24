@@ -96,10 +96,10 @@ namespace cicada
       }
     };
 
-    typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
+    typedef utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
     
-    typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
+    typedef utils::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type closure_level_type;
+    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type closure_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     

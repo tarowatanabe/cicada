@@ -38,7 +38,7 @@ namespace cicada
 			       std::allocator<symbol_set_type> > symbol_map_type;
     
     typedef boost::fusion::tuple<tail_map_type::index_type, symbol_map_type::index_type, symbol_type> internal_type;
-    typedef google::dense_hash_map<internal_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_type> > node_map_type;
+    typedef utils::dense_hash_map<internal_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_type> >::type node_map_type;
 
     BinarizeRight(const int __order=-1)
       : node_map(), order(__order)

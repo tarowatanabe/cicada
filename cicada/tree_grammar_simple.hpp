@@ -40,7 +40,7 @@ namespace cicada
       }
     };
 
-    typedef google::dense_hash_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal> graph_rule_ptr_set_type;
+    typedef utils::dense_hash_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal, std::allocator<graph_rule_ptr_type> >::type graph_rule_ptr_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
   public:

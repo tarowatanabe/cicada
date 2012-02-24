@@ -85,7 +85,7 @@ namespace cicada
     typedef utils::chunk_vector<item_type, 4096 / sizeof(item_type), std::allocator<item_type> > item_set_type;
     typedef utils::chart<item_set_type, std::allocator<item_set_type> >  active_chart_type;
     
-    typedef google::dense_hash_map<id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > node_map_type;
+    typedef utils::dense_hash_map<id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type node_map_type;
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)

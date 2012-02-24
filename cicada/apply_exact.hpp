@@ -46,7 +46,7 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
     
-    typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
+    typedef utils::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal >::type state_node_map_type;
         
     ApplyExact(const model_type& _model)
       : model(_model)

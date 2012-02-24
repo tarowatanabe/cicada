@@ -114,7 +114,7 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_map<span_node_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<span_node_type> > span_node_map_type;
+    typedef utils::dense_hash_map<span_node_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<span_node_type> >::type span_node_map_type;
 
     typedef std::vector<int, std::allocator<int> > node_set_type;
 

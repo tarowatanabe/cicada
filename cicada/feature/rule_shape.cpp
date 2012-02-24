@@ -50,10 +50,10 @@ namespace cicada
       
       typedef trie_type::id_type id_type;
       
-      class node_map_type : public google::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >
+      class node_map_type : public utils::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type
       {
       public:
-	typedef google::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > map_type;
+	typedef utile::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type map_type;
 	
 	node_map_type() : map_type() { map_type::set_empty_key(id_type(-1)); }
       };

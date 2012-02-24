@@ -26,7 +26,7 @@ typedef boost::filesystem::path path_type;
 typedef RootCount  root_count_type;
 typedef PhrasePair phrase_pair_type;
 
-typedef google::dense_hash_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type> > root_count_set_type;
+typedef utils::dense_hash_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type> >::type root_count_set_type;
 
 typedef LexiconModel lexicon_model_type;
 

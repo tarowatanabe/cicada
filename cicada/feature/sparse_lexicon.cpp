@@ -68,10 +68,10 @@ namespace cicada
       typedef symbol_type word_type;
       typedef std::pair<word_type, word_type> word_pair_type;
       
-      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_unique_type;
+      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_unique_type;
       
       typedef std::vector<word_pair_type, std::allocator<word_pair_type> > word_pair_set_type;
-      typedef google::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > word_pair_unique_type;
+      typedef utils::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> >::type word_pair_unique_type;
 
       typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
       typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;

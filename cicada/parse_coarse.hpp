@@ -72,10 +72,10 @@ namespace cicada
     typedef std::vector<grammar_type, std::allocator<grammar_type> > grammar_set_type;
     typedef std::vector<double, std::allocator<double> > threshold_set_type;
 
-    class LabelScoreSet : public google::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+    class LabelScoreSet : public utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
     {
     public:
-      typedef google::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > label_score_set_type;
+      typedef utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type label_score_set_type;
       
       LabelScoreSet() : label_score_set_type() { label_score_set_type::set_empty_key(symbol_type()); }
     };
@@ -287,8 +287,6 @@ namespace cicada
 	closure_score_type() : closure(), score() {}
 	closure_score_type(const closure_type& __closure, const score_type& __score) : closure(__closure), score(__score) {}
       };
-      //typedef google::dense_hash_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
-
       typedef utils::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				   std::allocator<std::pair<const id_type, closure_score_type> > >::type closure_set_type;
       

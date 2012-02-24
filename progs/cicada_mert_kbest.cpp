@@ -41,6 +41,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/unordered_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -695,13 +696,8 @@ struct TaskInit
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-				  std::allocator<hypothesis_type> > hypothesis_unique_type;
-#else
-  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			std::allocator<hypothesis_type> > hypothesis_unique_type;
-#endif
+  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
 
   TaskInit(queue_type&                 __queue,
 	   hypothesis_map_type&        __hypotheses,

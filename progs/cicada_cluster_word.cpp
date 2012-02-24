@@ -78,7 +78,7 @@ typedef std::vector<word_class_count_type, std::allocator<word_class_count_type 
 
 struct Cluster
 {
-  typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > word_count_type;
+  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_type;
   
   word_count_type words;
   count_type count;
@@ -580,7 +580,7 @@ void initial_cluster(const word_class_count_set_type& words,
 
 struct WordCount
 {
-  typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > word_count_type;
+  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_type;
   
   word_count_type words;
   count_type count;

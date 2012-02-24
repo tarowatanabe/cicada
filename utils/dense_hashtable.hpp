@@ -48,8 +48,9 @@ namespace utils
 		    && Equal::operator()(ExtractKey::operator()(*x), ExtractKey::operator()(*y))));
       }
     };
-
-    typedef google::dense_hash_set<value_type*, hasher, equal> hashtable_type;
+    
+    typedef typename Alloc::template rebind<value_type*>::other hashtable_alloc_type;
+    typedef typename utils::dense_hash_set<value_type*, hasher, equal, hashtable_alloc_type>::type hashtable_type;
     
     typedef typename hashtable_type::iterator       iterator_base_type;
     typedef typename hashtable_type::const_iterator const_iterator_base_type;

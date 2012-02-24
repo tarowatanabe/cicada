@@ -46,7 +46,7 @@ namespace cicada
     typedef ptrdiff_t difference_type;
 
   private:
-    typedef google::dense_hash_map<feature_type, Tp, boost::hash<feature_type>, std::equal_to<feature_type> > map_type;
+    typedef typename utils::dense_hash_map<feature_type, Tp, boost::hash<feature_type>, std::equal_to<feature_type>, std::allocator<std::pair<const feature_type, Tp> > >::type map_type;
      
   public:
     typedef typename map_type::key_type    key_type;
