@@ -47,8 +47,8 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-    typedef utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
-    typedef utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_root_type;
+    typedef typename utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
+    typedef typename utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_root_type;
     
     struct Node
     {
