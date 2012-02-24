@@ -810,7 +810,7 @@ struct OptimizeOnlineMargin
       return hasher_type()(x.begin(), x.end(), 0);
     }
   };
-  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
+  typedef typename utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
