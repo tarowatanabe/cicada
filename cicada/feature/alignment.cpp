@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "feature/alignment.hpp"
