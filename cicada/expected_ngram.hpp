@@ -67,7 +67,7 @@ namespace cicada
       }
     };
 
-    typedef utils::unordered_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type > >::type state_set_type;
+    typedef typename utils::unordered_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type > >::type state_set_type;
 
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
 

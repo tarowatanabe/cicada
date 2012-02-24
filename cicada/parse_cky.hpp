@@ -169,12 +169,12 @@ namespace cicada
     typedef RuleCandidate rule_candidate_type;
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     
-    typedef utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				 std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
-    typedef utils::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
-				 std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
+    typedef typename utils::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
     
     typedef std::pair<symbol_type, int> symbol_level_type;
     
@@ -188,12 +188,12 @@ namespace cicada
       }
     };
     
-    typedef utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
+    typedef typename utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
     
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
 
-    typedef utils::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
-				 std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > >::type unary_rule_map_type;
+    typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+					  std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > >::type unary_rule_map_type;
     
     typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     

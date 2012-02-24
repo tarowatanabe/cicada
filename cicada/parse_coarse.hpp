@@ -75,7 +75,7 @@ namespace cicada
     class LabelScoreSet : public utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
     {
     public:
-      typedef utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type label_score_set_type;
+      typedef typename utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type label_score_set_type;
       
       LabelScoreSet() : label_score_set_type() { label_score_set_type::set_empty_key(symbol_type()); }
     };
@@ -287,8 +287,8 @@ namespace cicada
 	closure_score_type() : closure(), score() {}
 	closure_score_type(const closure_type& __closure, const score_type& __score) : closure(__closure), score(__score) {}
       };
-      typedef utils::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-				   std::allocator<std::pair<const id_type, closure_score_type> > >::type closure_set_type;
+      typedef typename utils::unordered_map<id_type, closure_score_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+					    std::allocator<std::pair<const id_type, closure_score_type> > >::type closure_set_type;
       
       typedef utils::indexed_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_map_type;
       

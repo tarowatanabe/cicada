@@ -16,7 +16,7 @@
 #include <cicada/semiring.hpp>
 #include <cicada/span_vector.hpp>
 
-#include <utils/sgi_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 
 #include <boost/tuple/tuple.hpp>
@@ -751,13 +751,8 @@ namespace cicada
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::SpanVector span_set_type;
       
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<span_set_type, boost::hash<span_set_type>, std::equal_to<span_set_type>, std::allocator<span_set_type> > unique_type;
-#else
-      typedef sgi::hash_set<span_set_type, boost::hash<span_set_type>, std::equal_to<span_set_type>, std::allocator<span_set_type> > unique_type;
-#endif
+      typedef utils::unordered_set<span_set_type, boost::hash<span_set_type>, std::equal_to<span_set_type>, std::allocator<span_set_type> >::type unique_type;
       typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
- 
 
       kbest_span_filter_unique(const hypergraph_type& graph) : uniques(graph.nodes.size()) {}
   
@@ -781,11 +776,7 @@ namespace cicada
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::Alignment  alignment_type;
       
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<alignment_type, boost::hash<alignment_type>, std::equal_to<alignment_type>, std::allocator<alignment_type> > unique_type;
-#else
-      typedef sgi::hash_set<alignment_type, boost::hash<alignment_type>, std::equal_to<alignment_type>, std::allocator<alignment_type> > unique_type;
-#endif
+      typedef utils::unordered_set<alignment_type, boost::hash<alignment_type>, std::equal_to<alignment_type>, std::allocator<alignment_type> >::type unique_type;
       typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
  
 
@@ -811,11 +802,7 @@ namespace cicada
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::Dependency dependency_type;
       
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<dependency_type, boost::hash<dependency_type>, std::equal_to<dependency_type>, std::allocator<dependency_type> > unique_type;
-#else
-      typedef sgi::hash_set<dependency_type, boost::hash<dependency_type>, std::equal_to<dependency_type>, std::allocator<dependency_type> > unique_type;
-#endif
+      typedef utils::unordered_set<dependency_type, boost::hash<dependency_type>, std::equal_to<dependency_type>, std::allocator<dependency_type> >::type unique_type;
       typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
  
 
@@ -841,11 +828,7 @@ namespace cicada
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::Sentence sentence_type;
       
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<sentence_type, boost::hash<sentence_type>, std::equal_to<sentence_type>, std::allocator<sentence_type> > unique_type;
-#else
-      typedef sgi::hash_set<sentence_type, boost::hash<sentence_type>, std::equal_to<sentence_type>, std::allocator<sentence_type> > unique_type;
-#endif
+      typedef utils::unordered_set<sentence_type, boost::hash<sentence_type>, std::equal_to<sentence_type>, std::allocator<sentence_type> >::type unique_type;
       typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
  
 

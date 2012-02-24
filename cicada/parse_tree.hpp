@@ -114,7 +114,7 @@ namespace cicada
     
     // for phrasal matching...
     
-    typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_set_type;
+    typedef typename utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
 
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
@@ -140,8 +140,8 @@ namespace cicada
     typedef boost::fusion::tuple<typename internal_tail_set_type::index_type, typename internal_symbol_set_type::index_type, symbol_type> internal_label_type;
     typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
-    typedef utils::dense_hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type> >::type internal_label_map_type;
-    typedef utils::dense_hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type> >::type terminal_label_map_type;
+    typedef typename utils::dense_hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type> >::type internal_label_map_type;
+    typedef typename utils::dense_hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type> >::type terminal_label_map_type;
     
     struct State
     {
@@ -166,7 +166,7 @@ namespace cicada
 
     struct NodeMap
     {
-      typedef utils::dense_hash_map<symbol_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_type> >::type node_map_type;
+      typedef typename utils::dense_hash_map<symbol_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_type> >::type node_map_type;
 
       typedef node_map_type::value_type value_type;
       
@@ -260,10 +260,10 @@ namespace cicada
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
     
-    typedef utils::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-				 std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > >::type tree_candidate_map_type;
-    typedef utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				 std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
+    typedef typename utils::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+					  std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > >::type tree_candidate_map_type;
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
   
     typedef std::vector<tree_candidate_map_type, std::allocator<tree_candidate_map_type> > tree_candidate_table_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;

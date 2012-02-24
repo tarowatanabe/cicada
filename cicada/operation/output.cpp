@@ -67,7 +67,7 @@ namespace cicada
 
       typedef typename Function::value_type weight_type;
 
-      typedef utils::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type node_map_type;
+      typedef typename utils::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type node_map_type;
 
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
       

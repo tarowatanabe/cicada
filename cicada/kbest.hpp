@@ -139,8 +139,8 @@ namespace cicada
       }
     };
     
-    typedef utils::dense_hash_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
-				  std::allocator<const derivation_type*> >::type derivation_set_unique_type;
+    typedef typename utils::dense_hash_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
+					   std::allocator<const derivation_type*> >::type derivation_set_unique_type;
 
     
     struct State

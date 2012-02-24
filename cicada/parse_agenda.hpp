@@ -92,8 +92,8 @@ namespace cicada
     
     
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
-    typedef utils::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				 std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > >::type rule_candidate_map_type;
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
     // since we need to differentiate by lhs, we need to check "pos"
@@ -294,7 +294,7 @@ namespace cicada
       }
     };
     
-    typedef utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
+    typedef typename utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
     
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> >   edge_ptr_set_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
@@ -344,8 +344,8 @@ namespace cicada
       head_edge_set_type() : score(), head(hypergraph_type::invalid), edges() {}
     };
     
-    typedef utils::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type >::type discovered_active_type;
-    typedef utils::dense_hash_map<const edge_type*, head_edge_set_type, edge_passive_hash_type, edge_passive_equal_type >::type discovered_passive_type;
+    typedef typename utils::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type >::type discovered_active_type;
+    typedef typename utils::dense_hash_map<const edge_type*, head_edge_set_type, edge_passive_hash_type, edge_passive_equal_type >::type discovered_passive_type;
     
     ParseAgenda(const symbol_type& __goal,
 		const grammar_type& __grammar,

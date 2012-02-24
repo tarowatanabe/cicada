@@ -53,7 +53,7 @@ namespace cicada
       class node_map_type : public utils::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type
       {
       public:
-	typedef utile::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type map_type;
+	typedef utils::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type map_type;
 	
 	node_map_type() : map_type() { map_type::set_empty_key(id_type(-1)); }
       };
