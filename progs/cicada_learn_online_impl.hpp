@@ -38,9 +38,7 @@
 #include "utils/piece.hpp"
 #include "utils/config.hpp"
 #include "utils/mathop.hpp"
-#include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_trie.hpp"
-
 
 #include <boost/tokenizer.hpp>
 
