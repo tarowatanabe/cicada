@@ -4,6 +4,7 @@ Bugfix: Do not read oracles when learning by xBLEU
 New: added permute-deterministic which deterministically permute hyperedges wrt the category of the head.
 New: added filter for alignment: Currently, we support inverse, permutation
 New: added xBLEU to cicada_learn_block_mpi
+New: support the latest sparse hash (moved from google to sparsehash) and gperftools (renamed from google-perftools)
 
 2012-2-15
 Added MIRA-like optimization for PRO-style learning
