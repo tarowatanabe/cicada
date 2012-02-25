@@ -24,7 +24,6 @@ libutils_la_LIBADD = \
 	$(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS) \
 	$(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_IOSTREAMS_LIBS) \
 	$(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_FILESYSTEM_LIBS) \
-	$(BOOST_SYSTEM_LDFLAGS) $(BOOST_SYSTEM_LIBS) \
 	$(JEMALLOC_LDFLAGS) \
 	$(TCMALLOC_LDFLAGS)
 
@@ -279,23 +278,23 @@ sample_lexical_cast_LDADD = $(LIBUTILS)
 
 sample_lockfree_list_queue_SOURCES = sample_lockfree_list_queue.cpp
 sample_lockfree_list_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_lockfree_list_queue_LDADD = $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS)
+sample_lockfree_list_queue_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_lockfree_queue_SOURCES = sample_lockfree_queue.cpp
 sample_lockfree_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_lockfree_queue_LDADD = $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS)
+sample_lockfree_queue_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_malloc_stats_SOURCES = sample_malloc_stats.cpp
 sample_malloc_stats_LDADD = $(LIBUTILS)
 
 sample_map_file_allocator_SOURCES = sample_map_file_allocator.cpp
 sample_map_file_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_map_file_allocator_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS) $(perftools_LDADD)
+sample_map_file_allocator_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS) $(perftools_LDADD)
 
 
 sample_packed_vector_SOURCES = sample_packed_vector.cpp
 sample_packed_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_packed_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
+sample_packed_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
 sample_piece_SOURCES = sample_piece.cpp
 sample_piece_LDADD = $(LIBUTILS)
@@ -323,15 +322,15 @@ sample_random_seed_LDADD = $(LIBUTILS)
 
 sample_subprocess_SOURCES = sample_subprocess.cpp
 sample_subprocess_LDFLAGS = $(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS)
-sample_subprocess_LDADD = $(BOOST_IOSTREAMS_LIBS) $(BOOST_FILESYSTEM_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS)
+sample_subprocess_LDADD = $(BOOST_IOSTREAMS_LIBS) $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS)
 
 sample_succinct_vector_SOURCES = sample_succinct_vector.cpp
 sample_succinct_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_succinct_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS)
+sample_succinct_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
 
 sample_tempfile_SOURCES = sample_tempfile.cpp
 sample_tempfile_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_tempfile_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS) $(LIBUTILS)
+sample_tempfile_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
 sample_json_string_SOURCES = sample_json_string.cpp
 
@@ -343,5 +342,5 @@ sample_vector_set_SOURCES = sample_vector_set.cpp
 
 sample_vertical_coded_vector_SOURCES = sample_vertical_coded_vector.cpp
 sample_vertical_coded_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_vertical_coded_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS)
+sample_vertical_coded_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
 
