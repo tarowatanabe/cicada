@@ -49,9 +49,6 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 
-#include "lbfgs.h"
-#include "liblinear/linear.h"
-
 typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
@@ -100,7 +97,6 @@ int kbest_size = 1000;
 bool kbest_diverse_mode = false;
 
 // solver parameters
-bool learn_lbfgs  = false;
 bool learn_xbleu = false;
 bool learn_pegasos = false;
 bool learn_opegasos = false;
@@ -113,13 +109,9 @@ bool learn_sgd    = false;
 bool learn_osgd   = false;
 bool learn_el     = false;
 bool learn_oel     = false;
-bool learn_svm    = false;
-bool learn_linear = false;
-int linear_solver = L2R_L2LOSS_SVC_DUAL;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
-double eps = std::numeric_limits<double>::infinity();
 double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
@@ -208,10 +200,10 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_lbfgs) + learn_xbleu + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
-      throw std::runtime_error("you can specify either --learn-{lbfgs,mira,sgd,linear,svm}");
-    if (int(learn_lbfgs) + learn_xbleu + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_linear + learn_svm + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
-      learn_lbfgs = true;
+    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,mira,sgd,osgd,el,oel,pegasos,opegasos,pa,cw,arow}");
+    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+      learn_sgd = true;
 
     
     if (int(regularize_l1) + regularize_l2 > 1)
@@ -326,9 +318,7 @@ int main(int argc, char ** argv)
     
     // perform learning...
     if (yield_sentence) {
-      if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pa)
+      if (learn_pa)
 	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
 	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -354,18 +344,12 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_linear)
-	cicada_learn<LearnLinear, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_svm)
-	cicada_learn<LearnSVM, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
 	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else
 	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_alignment) {
-      if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pa)
+      if (learn_pa)
 	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
 	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -391,18 +375,12 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_linear)
-	cicada_learn<LearnLinear, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_svm)
-	cicada_learn<LearnSVM, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
 	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else
 	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_dependency) {
-      if (learn_lbfgs)
-	cicada_learn<LearnLBFGS, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pa)
+      if (learn_pa)
 	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_cw)
 	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -428,10 +406,6 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_linear)
-	cicada_learn<LearnLinear, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_svm)
-	cicada_learn<LearnSVM, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_pegasos)
 	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else
@@ -1393,7 +1367,6 @@ void options(int argc, char** argv)
     ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
     
-    ("learn-lbfgs",    po::bool_switch(&learn_lbfgs),    "batch LBFGS algorithm")
     ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
     ("learn-pegasos",  po::bool_switch(&learn_pegasos),  "online Pegasos algorithm")
     ("learn-opegasos", po::bool_switch(&learn_opegasos), "online optimized-Pegasos algorithm")
@@ -1406,20 +1379,9 @@ void options(int argc, char** argv)
     ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
     ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected-loss")
-    ("learn-svm",      po::bool_switch(&learn_svm),      "SVM for structured output")
-    ("learn-linear",   po::bool_switch(&learn_linear),   "liblinear algorithm")
-    ("solver",         po::value<int>(&linear_solver),   "liblinear solver type (default: 1)\n"
-     " 0: \tL2-regularized logistic regression (primal)\n"
-     " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
-     " 2: \tL2-regularized L2-loss support vector classification (primal)\n"
-     " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
-     " 5: \tL1-regularized L2-loss support vector classification\n"
-     " 6: \tL1-regularized logistic regression\n"
-     " 7: \tL2-regularized logistic regression (dual)")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),      "regularization constant")
-    ("eps",           po::value<double>(&eps),                      "tolerance for liblinear")
     ("scale",         po::value<double>(&scale),                    "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
