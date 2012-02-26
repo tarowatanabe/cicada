@@ -268,6 +268,7 @@ namespace cicada
 	  // scan... and score... state will be updated...
 	  if (! target.empty() && item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal()) {
 	    
+	    // new item...
 	    if (item == item_top) {
 	      candidates.push_back(*item_top);
 	      item = &candidates.back();
@@ -276,44 +277,31 @@ namespace cicada
 
 	    feature_set_type features;
 	    
-	    //std::cerr << "scan" << std::endl;
-	    
 	    model.apply_scan(item->state, node_states, item->out_edge, item->dot, features, is_goal);
 	    
-	    //std::cerr << "scan done" << std::endl;
-	    
 	    item->out_edge.features += features;
-	    
-	    const score_type score    = function(features);
-	    
-	    item->score    *= score;
+	    item->score *= function(features);
 	    
 	    // proceed dot(s)
 	    for (/**/; item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal(); ++ item->dot);
 	  }
 	  
+	  // complete or predict...
 	  if (item->dot == static_cast<int>(target.size())) {
+	    
+	    // new item...
 	    if (item == item_top) {
 	      candidates.push_back(*item_top);
 	      item = &candidates.back();
-	      item->state = model.clone(item->state);
+	      item->state = model.clone(item_top->state);
 	    }
 	    
-	    // complete...
 	    feature_set_type features;
 	    
-	    // scoring
-	    //std::cerr << "complete: " << (is_goal ? "goal" : "non-goal") << std::endl;
-	    
 	    model.apply_complete(item->state, node_states, item->out_edge, features, is_goal);
-
-	    //std::cerr << "complete done" << std::endl;
 	    
 	    item->out_edge.features += features;
-	    
-	    const score_type score    = function(features);
-	    
-	    item->score    *= score;
+	    item->score *= function(features);
 	    
 	    //
 	    // graph_out's node is differentiated by in_edge->head and current state...
@@ -334,7 +322,6 @@ namespace cicada
 	      
 	      break;
 	    } else {
-	      
 	      bool propagate = false;
 	      
 	      state_node_map_type::iterator siter = states[item->in_edge->head].nodes.find(item->state);
@@ -352,17 +339,18 @@ namespace cicada
 	      graph_out.connect_edge(edge_new.id, siter->second);
 
 	      if (! propagate) break;
-	      
-	      const score_type score    = item->score;
-	      
+
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
 	      // thus, we simply copy stat from item->parent...
 	      // but reassigned from siter->first by cloning...
 	      
+	      const score_type score = item->score;
+	      
+	      // we copy from parent, and use the score/state from the current item
 	      *item = *(item->parent);
 	      item->state = model.clone(siter->first);
-	      item->score    *= score;
+	      item->score = score;
 	      
 #if 0
 	      std::cerr << "parent head: " << item->in_edge->head
@@ -402,14 +390,11 @@ namespace cicada
 	      
 	      candidate_type& candidate = candidates.back();
 	      
-	      candidate.state = model.clone(item->state);
+	      candidate.state = model.clone(parent.state);
 	      
 	      model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
 	      
-	      const score_type score = function(candidate.out_edge.features);
-	      
-	      candidate.score = parent.score;
-	      candidate.score *= score;
+	      candidate.score = parent.score * function(candidate.out_edge.features);
 	      
 	      states[step + 1].buf.push(&candidate);
 	    }
@@ -421,17 +406,16 @@ namespace cicada
       
       // clear buf... at the same time, we will clear state associated with each candidate...
       
-#if 0
       typename candidate_heap_type::const_iterator biter_end = states[step].buf.end();
       for (typename candidate_heap_type::const_iterator biter = states[step].buf.begin(); biter != biter_end; ++ biter) {
 	model.deallocate((*biter)->state);
 	
-	// what to do with (*biter) == candidate_type* ??? 
+	// what to do with (*biter) (== candidate_type*) ??? 
 	// I want to cache this for further reuse...
 	// implement custom allocator similar to the state allocator in model?
 	
+	
       }
-#endif
       
       // shrink wrap...
       states[step].buf.clear();
