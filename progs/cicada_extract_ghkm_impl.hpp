@@ -475,7 +475,8 @@ struct ExtractGHKM
 	      const bool __inverse,
 	      const bool __swap_source_target,
 	      const bool __project_non_terminal,
-	      const bool __collapse)
+	      const bool __collapse_source,
+	      const bool __collapse_target)
     : non_terminal(__non_terminal),
       max_sentence_length(__max_sentence_length),
       max_nodes(__max_nodes),
@@ -487,7 +488,8 @@ struct ExtractGHKM
       inverse(__inverse),
       swap_source_target(__swap_source_target),
       project_non_terminal(__project_non_terminal),
-      collapse(__collapse),
+      collapse_source(__collapse_source),
+      collapse_target(__collapse_target),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
 
@@ -503,7 +505,8 @@ struct ExtractGHKM
   bool inverse;
   bool swap_source_target;
   bool project_non_terminal;
-  bool collapse;
+  bool collapse_source;
+  bool collapse_target;
   
   attribute_type attr_span_first;
   attribute_type attr_span_last;
@@ -1039,6 +1042,7 @@ struct ExtractGHKM
     }
 
     //std::cerr << "alignment: " << rule_pair.alignment << std::endl;
+
     
     if (swap_source_target) {
       //std::cerr << "swapping" << std::endl;
@@ -1072,13 +1076,21 @@ struct ExtractGHKM
       if ((scope + prev.is_non_terminal()) > max_scope)
 	return false;
     }
-    
-    if (collapse) {
+
+    if (collapse_source) {
       // collapse source-side
       
       trees.clear();
       rule_source.frontier(CollapseFrontierIterator(trees));
       rule_source = tree_rule_type(rule_source.label, trees.begin(), trees.end());
+    }
+
+    if (collapse_target) {
+      // collapse target-side
+      
+      trees.clear();
+      rule_target.frontier(CollapseFrontierIterator(trees));
+      rule_target = tree_rule_type(rule_target.label, trees.begin(), trees.end());
     }
     
     rule_pair.source.clear();
@@ -1735,11 +1747,12 @@ struct Task
        const bool inverse,
        const bool swap,
        const bool project,
-       const bool collapse,
+       const bool collapse_source,
+       const bool collapse_target,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, project, collapse),
+      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, project, collapse_source, collapse_target),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

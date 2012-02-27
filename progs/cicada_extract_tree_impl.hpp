@@ -1320,7 +1320,8 @@ struct ExtractTree
 	      const bool __exhaustive, 
 	      const bool __constrained,
 	      const bool __inverse,
-	      const bool __collapse)
+	      const bool __collapse_source,
+	      const bool __collapse_target)
     : max_nodes(__max_nodes),
       max_height(__max_height),
       max_compose(__max_compose),
@@ -1328,7 +1329,8 @@ struct ExtractTree
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
-      collapse(__collapse),
+      collapse_source(__collapse_source),
+      collapse_target(__collapse_target),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
 
@@ -1339,7 +1341,8 @@ struct ExtractTree
   bool exhaustive;
   bool constrained;
   bool inverse;
-  bool collapse;
+  bool collapse_source;
+  bool collapse_target;
 
   attribute_type attr_span_first;
   attribute_type attr_span_last;
@@ -1501,7 +1504,7 @@ struct ExtractTree
 	  derivation_edge_type& edge_target = graph_target.derivations[titer->first].edges[titer->second];
 	  
 	  if (edge_source.rule.empty())
-	    construct_rule(FrontierLinear(), source, node_source, graph_source, edge_source, collapse);
+	    construct_rule(FrontierLinear(), source, node_source, graph_source, edge_source, collapse_source);
 
 	  if (max_scope > 0 && edge_source.scope > max_scope) continue;
 	  
@@ -1520,7 +1523,7 @@ struct ExtractTree
 	      align.maps[i] = pos;
 	    }
 	    
-	    construct_rule(align, target, graph_target.derivations[titer->first], graph_target, edge_target, false);
+	    construct_rule(align, target, graph_target.derivations[titer->first], graph_target, edge_target, collapse_target);
 	  }
 	  
 	  rule_pair.source = edge_source.rule;
@@ -1748,11 +1751,12 @@ struct Task
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
-       const bool collapse,
+       const bool collapse_source,
+       const bool collapse_target,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, collapse),
+      extractor(max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, collapse_source, collapse_target),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

@@ -38,7 +38,8 @@ int max_scope = 0;
 bool exhaustive = false;
 bool constrained = false;
 bool inverse = false;
-bool collapse = false;
+bool collapse_source = false;
+bool collapse_target = false;
 
 double max_malloc = 8; // 8 GB
 int threads = 1;
@@ -77,7 +78,9 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, collapse, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, max_nodes, max_height, max_compose, max_scope,
+					   exhaustive, constrained, inverse, collapse_source, collapse_target,
+					   max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -163,10 +166,11 @@ void options(int argc, char** argv)
     ("max-compose",         po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
     ("max-scope",           po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
     
-    ("exhaustive",  po::bool_switch(&exhaustive),                           "exhausive extraction")
-    ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")
-    ("inverse",     po::bool_switch(&inverse),                              "inversed word alignment")
-    ("collapse",    po::bool_switch(&collapse),                             "collapse source side")
+    ("exhaustive",      po::bool_switch(&exhaustive),            "exhausive extraction")
+    ("constrained",     po::bool_switch(&constrained),           "constrained minimum extraction")
+    ("inverse",         po::bool_switch(&inverse),               "inversed word alignment")
+    ("collapse-source", po::bool_switch(&collapse_source),       "collapse source side")
+    ("collapse-target", po::bool_switch(&collapse_target),       "collapse target side")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ("threads",    po::value<int>(&threads),       "# of threads")

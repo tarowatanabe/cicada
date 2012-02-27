@@ -47,7 +47,8 @@ bool constrained = false;
 bool inverse = false;
 bool swap_source_target = false;
 bool project_non_terminal = false;
-bool collapse = false;
+bool collapse_source = false;
+bool collapse_target = false;
 
 double max_malloc = 8; // 8 GB
 
@@ -118,7 +119,7 @@ int main(int argc, char** argv)
     queue_type queue(queue_size);
     task_type task(queue, output_file, non_terminal,
 		   max_sentence_length, max_nodes, max_height, max_compose, max_scope,
-		   exhaustive, constrained, inverse, swap_source_target, project_non_terminal, collapse,
+		   exhaustive, constrained, inverse, swap_source_target, project_non_terminal, collapse_source, collapse_target,
 		   max_malloc);
     boost::thread worker(boost::ref(task));
 
@@ -323,12 +324,13 @@ void options(int argc, char** argv)
     ("max-compose",         po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
     ("max-scope",           po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
     
-    ("exhaustive",  po::bool_switch(&exhaustive),                           "exhausive extraction")
-    ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")
-    ("inverse",     po::bool_switch(&inverse),                              "inversed word alignment")
-    ("swap",        po::bool_switch(&swap_source_target),                   "swap source/target")
-    ("project",     po::bool_switch(&project_non_terminal),                 "project non-terminal symbols to string")
-    ("collapse",    po::bool_switch(&collapse),                             "collapse source side")
+    ("exhaustive",      po::bool_switch(&exhaustive),            "exhausive extraction")
+    ("constrained",     po::bool_switch(&constrained),           "constrained minimum extraction")
+    ("inverse",         po::bool_switch(&inverse),               "inversed word alignment")
+    ("swap",            po::bool_switch(&swap_source_target),    "swap source/target")
+    ("project",         po::bool_switch(&project_non_terminal),  "project non-terminal symbols to string")
+    ("collapse-source", po::bool_switch(&collapse_source),       "collapse source side")
+    ("collapse-target", po::bool_switch(&collapse_target),       "collapse target side")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;

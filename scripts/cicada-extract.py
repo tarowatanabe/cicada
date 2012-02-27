@@ -102,8 +102,10 @@ opt_parser = OptionParser(
                 metavar="COMPOSE", help="maximum rule composition (default: 0)"),
     make_option("--max-scope", default=0, action="store", type="int",
                 metavar="SCOPE", help="maximum rule scope (default: 0)"),
-    make_option("--collapse", default=None, action="store_true",
+    make_option("--collapse-source", default=None, action="store_true",
                 help="collapse source side for CKY parsing"),
+    make_option("--collapse-target", default=None, action="store_true",
+                help="collapse target side for CKY parsing"),
     make_option("--exhaustive", default=None, action="store_true",
                 help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
@@ -559,7 +561,8 @@ class ExtractGHKM(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
-                 collapse=None,
+                 collapse_source=None,
+                 collapse_target=None,
                  exhaustive=None,
                  constrained=None,
                  project=None,
@@ -620,8 +623,10 @@ class ExtractGHKM(Extract):
         command += " --max-compose %d" %(max_compose)
         command += " --max-scope %d"   %(max_scope)
         
-        if collapse:
-            command += " --collapse"
+        if collapse_source:
+            command += " --collapse-source"
+        if collapse_target:
+            command += " --collapse-target"
         if exhaustive:
             command += " --exhaustive"
         if constrained:
@@ -646,7 +651,8 @@ class ExtractTree(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
-                 collapse=None,
+                 collapse_source=None,
+                 collapse_target=None,
                  exhaustive=None,
                  constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -677,8 +683,10 @@ class ExtractTree(Extract):
         command += " --max-compose %d" %(max_compose)
         command += " --max-scope %d"   %(max_scope)
         
-        if collapse:
-            command += " --collapse"
+        if collapse_source:
+            command += " --collapse-source"
+        if collapse_target:
+            command += " --collapse-target"
         if exhaustive:
             command += " --exhaustive"
         if constrained:
@@ -839,7 +847,8 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_height=options.max_height,
                               max_compose=options.max_compose,
                               max_scope=options.max_scope,
-                              collapse=options.collapse,
+                              collapse_source=options.collapse_source,
+                              collapse_target=options.collapse_target,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
                               project=options.project,
@@ -853,7 +862,8 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_height=options.max_height,
                               max_compose=options.max_compose,
                               max_scope=options.max_scope,
-                              collapse=options.collapse,
+                              collapse_source=options.collapse_source,
+                              collapse_target=options.collapse_target,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,

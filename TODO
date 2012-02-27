@@ -93,7 +93,7 @@ Threaded cicada:
   assuming that the models/grammars are "untouched" by the main thread.
 
 Collapse and binarize the source side of the ghkm/tree grammar
-   Perform "collapsing" and do binarization
+   Perform "collapsing" and do binarization (either source or target)
    Perform lexicalization?
    Perform synchronous binarization? (we need to store all in memory...?)
      and left-to-right and target-left-to-right binarization
