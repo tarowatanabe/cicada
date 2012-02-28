@@ -534,6 +534,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   ### setup config file
   echo "generate config file ${root}cicada.config.$iter" >&2
+  date >&2
   qsubwrapper config `cicadapath cicada_filter_config` \
       --weights $weights \
       --kbest $kbest \
@@ -543,6 +544,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   
   ### actual decoding
   echo "decoding ${root}${output}-$iter" >&2
+  date >&2
   qsubwrapper decode -l ${root}decode.$iter.log `cicadapath cicada_mpi` \
 	--input $devset \
 	--config ${root}cicada.config.$iter \
@@ -551,6 +553,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   if test $kbest -eq 0; then
     echo "1-best ${root}1best-$iter" >&2
+    date >&2
     qsubwrapper onebest -l ${root}1best.$iter.log `cicadapath cicada_mpi` \
 	--input ${root}${output}-$iter \
 	--input-forest --input-directory \
@@ -558,6 +561,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 	--debug || exit 1
 
     echo "BLEU ${root}eval-$iter.1best" >&2
+    date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
         --refset $refset \
         --tstset ${root}1best-$iter \
@@ -565,6 +569,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
         --scorer $scorer || exit 1
   else
     echo "BLEU ${root}eval-$iter.1best" >&2
+    date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
         --refset $refset \
         --tstset ${root}${output}-$iter \
@@ -590,6 +595,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   ### compute oracles
   if test $kbest -eq 0; then
     echo "oracle translations ${root}${output}-${iter}.oracle" >&2
+    date >&2
     qsubwrapper oracle -t -l ${root}oracle.$iter.log `cicadapath cicada_oracle_mpi` \
         --refset $refset \
         --tstset $tstset_oracle \
@@ -602,6 +608,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
         --debug || exit 1
   else
     echo "oracle translations ${root}${output}-${iter}.oracle" >&2
+    date >&2
     qsubwrapper oracle -t -l ${root}oracle.$iter.log `cicadapath cicada_oracle_kbest_mpi` \
         --refset $refset \
         --tstset $tstset_oracle \
@@ -664,6 +671,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
+    date >&2
     qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --forest $tstset \
 	                --refset $refset \
@@ -683,6 +691,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
                         --debug=2 || exit 1
   else
     echo "learning ${root}weights.$iter" >&2
+    date >&2
     qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
 	                --refset $refset \
@@ -709,6 +718,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
       cp $weights_learn ${root}weights.$iter
     else
       echo "merging weights" >&2
+      date >&2
       qsubwrapper interpolate `cicadapath cicada_filter_weights` \
 	  --output ${root}weights.$iter \
 	  ${weights_last}:scale=`echo "1.0 - $interpolate_ratio" | bc`  \

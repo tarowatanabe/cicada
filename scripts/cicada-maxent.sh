@@ -397,6 +397,7 @@ qsubwrapper() {
 ### setup config file
 ### we will simply remove operation field..
 echo "generate config file ${root}cicada.config.maxent" >&2
+date >&2
 qsubwrapper config `cicadapath cicada_filter_config` \
       --remove-operation \
       --remove-feature-function \
@@ -405,6 +406,7 @@ qsubwrapper config `cicadapath cicada_filter_config` \
 
 ### actual composition
 echo "composition ${root}forest-maxent" >&2
+date >&2
 qsubwrapper decode -l ${root}forest.maxent.log `cicadapath cicada_mpi` \
 	--input $devset \
 	--config ${root}cicada.config.maxent \
@@ -416,6 +418,7 @@ qsubwrapper decode -l ${root}forest.maxent.log `cicadapath cicada_mpi` \
 	--debug || exit 1
   
 echo "oracle translations ${root}forest-maxent.oracle" >&2
+date >&2
 qsubwrapper oracle -t -l ${root}oracle.maxent.log `cicadapath cicada_oracle_mpi` \
         --refset $refset \
         --tstset ${root}forest-maxent \
@@ -433,6 +436,7 @@ if test "$regularize_l1" = yes; then
 fi
 
 echo "learning ${root}weights.maxent" >&2
+date >&2
 qsubwrapper learn -t -l ${root}learn.maxent.log `cicadapath cicada_learn_mpi` \
          --forest ${root}forest-maxent \
          --oracle ${root}forest-maxent.oracle \
