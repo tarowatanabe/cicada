@@ -466,7 +466,8 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   echo "decoding $output" >&2
-
+  date >&2
+  
   if test "$moses_thread" = yes; then
     
     kbest_file=${root}kbest.$kbest.$iter
@@ -517,6 +518,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   ### BLEU
   echo "BLEU ${root}eval-$iter.1best" >&2
+  date >&2
   qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
       --tstset ${root}kbest-$iter \
@@ -559,6 +561,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
 
   ## MERT
   echo "MERT ${root}weights.$iter" >&2
+  date >&2
   qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_kbest_mpi` \
 			--refset $refset \
 			--tstset $tstset \

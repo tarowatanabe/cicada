@@ -1,20 +1,18 @@
 Learning component in cicada:
 
-Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE/LEARN_BLOCK (may change in the future)
+Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE (may change in the future)
 
 MERT: cicada_mert{,_kbest}{,_mpi}
 
-MAXLIKE: cicada_maxlike{,_mpi}
+MAXLIKE: cicada_maxlike{,_mpi} (this is probably deprecated by cicada_learn...)
 
 LEARN: ciada_learn{,_kbest}{,_mpi}
        Generic learner which simply differentate correct translations to incorrect tranlsations by forest or kbests.
        The hyperparameter C is independent of data size, and is used as a scaling for L_{1,2} regularizer.
 
 LEARN_ONLINE: cicada_learn_online{,_mpi}
-
-LEARN_BLOCK: cicada_learn_block_mpi:
-	     This is a variant of cicada-learn.sh, or cicada-learn-linear.sh in that it works in an online fashion.
-	     Oracle translations are not computed globally, but only locally inside "block."
+       This is a variant of cicada-learn.sh, or cicada-learn-linear.sh in that it works in an online fashion.
+       Oracle translations are not computed globally, but only locally inside "block."
 
 We can easily tune weights by using tree scripts:
 
@@ -37,7 +35,6 @@ cicada-mert.sh
    (kbest will be always zero, since we will run hypergraph-MERT)
 
 cicada-learn.sh
-cicada-learn-linear.sh
    Learning script. We need to specify
       development data
       corresponding reference translations
@@ -47,3 +44,9 @@ cicada-learn-linear.sh
    ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
    When run in hypergraph-learning mode, kbest will be always set to zero.
    For learn-linear trainig we can run only in kbest mode, which will be set to 1000 by default.
+
+cicada-mert-moses.sh
+   MERT for moses!
+
+cicada-learn-moses.sh
+   Learning for moses!

@@ -434,6 +434,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   ### setup config file
   echo "generate config file ${root}cicada.config.$iter" >&2
+  date >&2
   qsubwrapper config `cicadapath cicada_filter_config` \
       --weights $weights \
       --kbest $kbest \
@@ -443,6 +444,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   
   ### actual decoding
   echo "decoding ${root}${output}-$iter" >&2
+  date >&2
   qsubwrapper decode -l ${root}decode.$iter.log `cicadapath cicada_mpi` \
 	--input $devset \
 	--config ${root}cicada.config.$iter \
@@ -451,6 +453,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   if test $kbest -eq 0; then
     echo "1-best ${root}1best-$iter" >&2
+    date >&2
     qsubwrapper onebest -l ${root}1best.$iter.log `cicadapath cicada_mpi` \
 	--input ${root}${output}-$iter \
 	--input-forest --input-directory \
@@ -458,6 +461,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	--debug || exit 1
 
     echo "BLEU ${root}eval-$iter.1best" >&2
+    date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
       --tstset ${root}1best-$iter \
@@ -465,6 +469,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --scorer $scorer || exit 1
   else
     echo "BLEU ${root}eval-$iter.1best" >&2
+    date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
         --refset $refset \
         --tstset ${root}${output}-$iter \
@@ -510,6 +515,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   ## MERT
   if test $kbest -eq 0; then
     echo "MERT ${root}weights.$iter" >&2
+    date >&2
     qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_mpi` \
 			--refset $refset \
 			--tstset $tstset \
@@ -531,6 +537,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--debug=2 || exit 1
   else
     echo "MERT ${root}weights.$iter" >&2
+    date >&2
     qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_kbest_mpi` \
 			--refset $refset \
 			--tstset $tstset \
