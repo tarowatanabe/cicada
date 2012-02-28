@@ -347,7 +347,7 @@ namespace cicada
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, siter->second.node);
 	      
-	      // we will propagate if failed insertion!
+	      // we will propagate if insertion succeed...
 	      if (! siter->second.edges.insert(item->in_edge->id).second) break;
 
 	      // some trick:
