@@ -226,8 +226,8 @@ namespace cicada
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
 	
 	states.clear();
-	states.reserve(graph_in.nodes.size() + 1);
-	states.resize(graph_in.nodes.size() + 1, cand_state_type(pop_size_max >> 1, model.state_size()));
+	states.reserve(graph_in.nodes.size());
+	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
 	
 	counts.clear();
 	counts.reserve(graph_in.nodes.size());
@@ -277,7 +277,8 @@ namespace cicada
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	  cardinality -= cicada::semiring::log(counts[*titer]);
 	
-	states[cardinality].buf.push(&candidate);
+	// - 1 to make an adjustment...
+	states[cardinality - 1].buf.push(&candidate);
       }
     }
     
