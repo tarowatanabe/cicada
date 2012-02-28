@@ -465,7 +465,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     mkdir -p $output || exit 1
   fi
 
-  echo "decoding $output" >&2
+  echo -n "decoding $output @ " >&2
   date >&2
   
   if test "$moses_thread" = yes; then
@@ -517,7 +517,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   ### END of moses specific changes...
 
   ### BLEU
-  echo "BLEU ${root}eval-$iter.1best" >&2
+  echo -n "BLEU ${root}eval-$iter.1best @ " >&2
   date >&2
   qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
@@ -560,7 +560,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   ## MERT
-  echo "MERT ${root}weights.$iter" >&2
+  echo -n "MERT ${root}weights.$iter @ " >&2
   date >&2
   qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_kbest_mpi` \
 			--refset $refset \

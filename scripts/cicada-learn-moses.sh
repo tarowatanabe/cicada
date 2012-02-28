@@ -562,7 +562,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     mkdir -p $output || exit 1
   fi
 
-  echo "decoding $output" >&2
+  echo -n "decoding $output @ " >&2
   date >&2
 
   if test "$moses_thread" = yes; then
@@ -628,7 +628,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   ### END of moses specific changes...
 
   ### BLEU
-  echo "BLEU ${root}eval-$iter.1best" >&2
+  echo -n "BLEU ${root}eval-$iter.1best @ " >&2
   date >&2
   qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
@@ -652,7 +652,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
   fi
 
   ### compute oracles
-  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
+  echo -n "oracle translations ${root}kbest-${iter}.oracle @ " >&2
   date >&2
   qsubwrapper oracle -t -l ${root}oracle.$iter.log `cicadapath cicada_oracle_kbest_mpi` \
         --refset $refset \
@@ -713,7 +713,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
-  echo "learning ${root}weights.$iter" >&2
+  echo -n "learning ${root}weights.$iter @ " >&2
   date >&2
   qsubwrapper learn -t -l ${root}learn.$iter.log `cicadapath $learner` \
                         --kbest  $tstset \
@@ -738,7 +738,7 @@ for ((iter=$iteration_first;iter<=iteration; ++ iter)); do
     if test "$weights_last" = ""; then
       cp $weights_learn ${root}weights.$iter
     else
-      echo "merging weights" >&2
+      echo -n "merging weights @ " >&2
       date >&2
       qsubwrapper interpolate `cicadapath cicada_filter_weights` \
 	  --output ${root}weights.$iter \

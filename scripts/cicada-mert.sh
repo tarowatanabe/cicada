@@ -433,7 +433,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   fi
 
   ### setup config file
-  echo "generate config file ${root}cicada.config.$iter" >&2
+  echo -n "generate config file ${root}cicada.config.$iter @ " >&2
   date >&2
   qsubwrapper config `cicadapath cicada_filter_config` \
       --weights $weights \
@@ -443,7 +443,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --output ${root}cicada.config.$iter || exit 1
   
   ### actual decoding
-  echo "decoding ${root}${output}-$iter" >&2
+  echo -n "decoding ${root}${output}-$iter @ " >&2
   date >&2
   qsubwrapper decode -l ${root}decode.$iter.log `cicadapath cicada_mpi` \
 	--input $devset \
@@ -452,7 +452,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	--debug || exit 1
 
   if test $kbest -eq 0; then
-    echo "1-best ${root}1best-$iter" >&2
+    echo -n "1-best ${root}1best-$iter @ " >&2
     date >&2
     qsubwrapper onebest -l ${root}1best.$iter.log `cicadapath cicada_mpi` \
 	--input ${root}${output}-$iter \
@@ -460,7 +460,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	--operation output:kbest=1,${weights},file=${root}1best-$iter \
 	--debug || exit 1
 
-    echo "BLEU ${root}eval-$iter.1best" >&2
+    echo -n "BLEU ${root}eval-$iter.1best @ " >&2
     date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
       --refset $refset \
@@ -468,7 +468,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --output ${root}eval-$iter.1best \
       --scorer $scorer || exit 1
   else
-    echo "BLEU ${root}eval-$iter.1best" >&2
+    echo -n "BLEU ${root}eval-$iter.1best @ " >&2
     date >&2
     qsubwrapper eval `cicadapath cicada_eval` \
         --refset $refset \
@@ -514,7 +514,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   ## MERT
   if test $kbest -eq 0; then
-    echo "MERT ${root}weights.$iter" >&2
+    echo -n "MERT ${root}weights.$iter @ " >&2
     date >&2
     qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_mpi` \
 			--refset $refset \
@@ -536,7 +536,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			\
 			--debug=2 || exit 1
   else
-    echo "MERT ${root}weights.$iter" >&2
+    echo -n "MERT ${root}weights.$iter @ " >&2
     date >&2
     qsubwrapper learn -t -l ${root}mert.$iter.log `cicadapath cicada_mert_kbest_mpi` \
 			--refset $refset \
