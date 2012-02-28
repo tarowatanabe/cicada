@@ -155,20 +155,19 @@ namespace cicada
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
-    struct node_edge_set_type
+    struct node_parent_set_type
     {
-      typedef typename utils::dense_hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type edge_set_type;
-
-      id_type       node;
-      edge_set_type edges;
-
-      node_edge_set_type() : node(), edges() { edges.set_empty_key(id_type(-1)); }
-      node_edge_set_type(const id_type& __node) : node(__node), edges() { edges.set_empty_key(id_type(-1)); }
+      typedef typename utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type parent_set_type;
+      
+      id_type         node;
+      parent_set_type parents;
+      
+      node_parent_set_type() : node(), parents() { parents.set_empty_key(0); }
+      node_parent_set_type(const id_type& __node) : node(__node), parents() { parents.set_empty_key(0); }
     };
     
-    typedef typename utils::unordered_map<state_type, node_edge_set_type, model_type::state_hash, model_type::state_equal,
-					  std::allocator<std::pair<const state_type, node_edge_set_type> > >::type state_node_map_type;
-    
+    typedef typename utils::unordered_map<state_type, node_parent_set_type, model_type::state_hash, model_type::state_equal,
+					  std::allocator<std::pair<const state_type, node_parent_set_type> > >::type state_node_map_type;
     
     struct State
     {
@@ -363,21 +362,19 @@ namespace cicada
 	      
 	      break;
 	    } else {
-	      typename state_node_map_type::iterator siter = states[item->in_edge->head].nodes.find(item->state);
-	      if (siter == states[item->in_edge->head].nodes.end()) {
+	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, node_parent_set_type()));
+	      if (result.second) {
 		node_states.push_back(item->state);
-		siter = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, graph_out.add_node().id)).first;
-		
-		//std::cerr << "new node id: " << siter->second << std::endl;
-	      } else 
+		result.first->second.node = graph_out.add_node().id;
+	      } else
 		model.deallocate(item->state);
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
-	      graph_out.connect_edge(edge_new.id, siter->second.node);
+	      graph_out.connect_edge(edge_new.id, result.first->second.node);
 	      
-	      // we will propagate if insertion succeed...
-	      if (! siter->second.edges.insert(item->in_edge->id).second) break;
-
+	      // if stat insertion succeed, or parent insertion succeed, we will propagate...
+	      if (! result.first->second.parents.insert(item->parent).second) break;
+	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
 	      // thus, we simply copy stat from item->parent...
@@ -387,7 +384,7 @@ namespace cicada
 	      
 	      // we copy from parent, and use the score/state from the current item
 	      *item = *(item->parent);
-	      item->state = model.clone(siter->first);
+	      item->state = model.clone(result.first->first);
 	      item->score = score;
 	      
 #if 0
@@ -403,7 +400,7 @@ namespace cicada
 	      const int __non_terminal_index = target[item->dot].non_terminal_index();
 	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, item->dot_antecedent, __non_terminal_index - 1);
 	      
-	      item->out_edge.tails[antecedent_index] = siter->second.node;
+	      item->out_edge.tails[antecedent_index] = result.first->second.node;
 	      
 	      ++ item->dot;
 	      ++ item->dot_antecedent;
