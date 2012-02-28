@@ -79,11 +79,9 @@ int linear_solver = L2R_L2LOSS_SVC_DUAL;
 
 bool regularize_l1 = false;
 bool regularize_l2 = false;
-bool regularize_entropy = false;
 
 double eps = std::numeric_limits<double>::infinity();
 double C = 1.0;
-double C2 = 1.0;
 double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
@@ -2057,15 +2055,7 @@ struct OptimizeXBLEU
     const double entropy = e / instances;
     
     // entropy
-    if (regularize_entropy) {
-      // 0.5 * (entropy - C2)^2
-      // 
-      // thus, derivative is: (entropy - C2) * \nabla entropy
-      // we need to consider average of entropy...
-      
-      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), (entropy - C2) / instances));
-    } else
-      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
+    std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
     
     for (int n = 1; n <= order; ++ n) 
       if (c_hypo[n] > 0.0) {
@@ -2089,7 +2079,7 @@ struct OptimizeXBLEU
     }
     
     // we need to minimize negative bleu... + regularized by average entropy...
-    double objective = - objective_bleu + (regularize_entropy ? 0.5 * (entropy - C2) * (entropy - C2) : - temperature * entropy);
+    double objective = - objective_bleu - temperature * entropy;
     
     if (regularize_l2) {
       double norm = 0.0;
@@ -3305,10 +3295,8 @@ void options(int argc, char** argv)
     
     ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
     ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
-    ("regularize-entropy", po::bool_switch(&regularize_entropy), " entropy regularization")
     
     ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
-    ("C2",            po::value<double>(&C2)->default_value(C2),       "an alternative regularization constant")
     ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
     ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
