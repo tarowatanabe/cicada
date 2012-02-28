@@ -35,6 +35,7 @@ semiring/envelope.hpp \
 semiring/expectation.hpp \
 semiring/log.hpp \
 semiring/logprob.hpp \
+semiring/pair.hpp \
 semiring/tropical.hpp \
 semiring/traits.hpp \
 semiring/tuple.hpp
