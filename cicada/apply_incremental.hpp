@@ -299,8 +299,8 @@ namespace cicada
 	    for (/**/; item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal(); ++ item->dot);
 	  }
 	  
-	  // complete or predict...
 	  if (item->dot == static_cast<int>(target.size())) {
+	    // complete...
 	    
 	    // new item...
 	    if (item == item_top) {
@@ -371,7 +371,7 @@ namespace cicada
 #endif
 	      
 	      const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
-
+	      
 	      const int __non_terminal_index = target[item->dot].non_terminal_index();
 	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, item->dot_antecedent, __non_terminal_index - 1);
 	      
@@ -409,7 +409,7 @@ namespace cicada
 	      states[step + 1].buf.push(&candidate);
 	    }
 	    
-	    continue;
+	    break;
 	  }
 	}
       }
