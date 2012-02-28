@@ -396,6 +396,14 @@ namespace cicada
 	
 	if (forest_mode) {
 	  if (data.hypergraph.is_valid()) {
+	    std::vector<length_function::value_type, std::allocator<length_function::value_type> >lengths(data.hypergraph.nodes.size());
+	    
+	    cicada::inside(data.hypergraph, lengths, length_function());
+	    
+	    const int length_shortest = - cicada::semiring::log(lengths.back().first);
+	    const int length_longest  =   cicada::semiring::log(lengths.back().second);
+	    
+#if 0
 	    std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
 	    std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
 	    
@@ -404,6 +412,7 @@ namespace cicada
 	    
 	    const int length_shortest = - log(lengths_shortest.back());
 	    const int length_longest  =   log(lengths_longest.back());
+#endif
 	    
 	    // # of unaries
 	    int unaries = 0;

@@ -175,6 +175,29 @@ namespace cicada
 	return cicada::semiring::traits<value_type>::exp(x.sum());
       }
     };
+
+    struct length_function
+    {
+      typedef cicada::Vocab vocab_type;
+      typedef cicada::Rule rule_type;
+      typedef cicada::semiring::Tropical<int> weight_type;
+      typedef cicada::semiring::Pair<weight_type, weight_type> value_type;
+      
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	int length = 0;
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
+	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+	
+	// since we will "max" at operator+, we will collect negative length for min, and positie lenght for max
+	
+	return value_type(cicada::semiring::traits<weight_type>::exp(- length),
+			  cicada::semiring::traits<weight_type>::exp(length));
+      }
+    };
     
     struct shortest_length_function
     {

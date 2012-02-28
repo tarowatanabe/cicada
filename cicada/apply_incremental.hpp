@@ -9,8 +9,10 @@
 #include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/model.hpp>
+#include <cicada/inside_outside.hpp>
 
 #include <cicada/semiring/traits.hpp>
+#include <cicada/semiring/tropical.hpp>
 
 #include <utils/dense_hash_set.hpp>
 #include <utils/unordered_map.hpp>
@@ -182,6 +184,20 @@ namespace cicada
     
     typedef State cand_state_type;
     typedef std::vector<cand_state_type, std::allocator<cand_state_type> > cand_state_set_type;
+
+    struct max_edge_function
+    {
+      typedef cicada::semiring::Tropical<int> value_type;
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	return cicada::semiring::traits<value_type>::exp(1);
+      }
+    };
+    typedef typename max_edge_function::value_type count_type;
+    
+    typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
     
     ApplyIncremental(const model_type& _model,
 		     const function_type& _function,
@@ -208,10 +224,15 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
-		
+	
 	states.clear();
-	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
+	states.reserve(graph_in.nodes.size() + 1);
+	states.resize(graph_in.nodes.size() + 1, cand_state_type(pop_size_max >> 1, model.state_size()));
+	
+	counts.clear();
+	counts.reserve(graph_in.nodes.size());
+	counts.resize(graph_in.nodes.size());
+	cicada::inside(graph_in, counts, max_edge_function());
 	
 	// initialization...
 	initialize_bins(graph_in);
@@ -250,7 +271,13 @@ namespace cicada
 	
 	candidate.score = function(candidate.out_edge.features);
 	
-	states.front().buf.push(&candidate);
+	int cardinality = cicada::semiring::log(counts[edge.head]);
+	
+	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	  cardinality -= cicada::semiring::log(counts[*titer]);
+	
+	states[cardinality].buf.push(&candidate);
       }
     }
     
@@ -406,7 +433,13 @@ namespace cicada
 	      
 	      candidate.score = parent.score * function(candidate.out_edge.features);
 	      
-	      states[step + 1].buf.push(&candidate);
+	      int cardinality = cicada::semiring::log(counts[edge.head]);
+	      
+	      edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	      for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		cardinality -= cicada::semiring::log(counts[*titer]);
+	      
+	      states[step + cardinality].buf.push(&candidate);
 	    }
 	    
 	    break;
@@ -436,6 +469,8 @@ namespace cicada
     candidate_set_type  candidates;
     state_set_type      node_states;
     cand_state_set_type states;
+    
+    count_set_type counts;
 
     const model_type& model;
     const function_type& function;
