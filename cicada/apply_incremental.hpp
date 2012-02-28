@@ -409,7 +409,7 @@ namespace cicada
 	      states[step + 1].buf.push(&candidate);
 	    }
 	    
-	    break;
+	    continue;
 	  }
 	}
       }
