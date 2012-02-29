@@ -195,10 +195,10 @@ namespace cicada
 		     const int _pop_size_max)
       : model(_model),
 	function(_function),
-	pop_size_max(_pop_size_max),
-	attr_scan("incremental-scan"),
-	attr_complete("incremental-complete"),
-	attr_predict("incremental-predict")
+	pop_size_max(_pop_size_max)
+	//attr_scan("incremental-scan"),
+	//attr_complete("incremental-complete"),
+	//attr_predict("incremental-predict")
     { 
       predictions.set_empty_key(0);
     }
@@ -262,7 +262,7 @@ namespace cicada
 	
 	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, true);
 
-	increment_attribute(candidate.out_edge.attributes, attr_predict);
+	//increment_attribute(candidate.out_edge.attributes, attr_predict);
 
 	candidate.score = function(candidate.out_edge.features);
 	
@@ -317,16 +317,14 @@ namespace cicada
 	    //std::cerr << "\t\tscan" << std::endl;
 
 	    // new item...
-	    if (item == item_top) {
-	      item = construct_candidate(*item_top);
-	      item->state = model.clone(item_top->state);
-	    }
+	    item = construct_candidate(*item);
+	    item->state = model.clone(item->state);
 
 	    feature_set_type features;
 	    
 	    model.apply_scan(item->state, node_states, item->out_edge, item->dot, features, is_goal);
 
-	    increment_attribute(item->out_edge.attributes, attr_scan);
+	    //increment_attribute(item->out_edge.attributes, attr_scan);
 	    
 	    item->out_edge.features += features;
 	    item->score *= function(features);
@@ -340,16 +338,14 @@ namespace cicada
 	    //std::cerr << "\t\tcompletion" << std::endl;
 	    
 	    // new item...
-	    if (item == item_top) {
-	      item = construct_candidate(*item_top);
-	      item->state = model.clone(item_top->state);
-	    }
+	    item = construct_candidate(*item);
+	    item->state = model.clone(item->state);
 	    
 	    feature_set_type features;
 	    
 	    model.apply_complete(item->state, node_states, item->out_edge, features, is_goal);
 
-	    increment_attribute(item->out_edge.attributes, attr_complete);
+	    //increment_attribute(item->out_edge.attributes, attr_complete);
 	    
 	    item->out_edge.features += features;
 	    item->score *= function(features);
@@ -473,7 +469,7 @@ namespace cicada
 	  
 	  model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
 
-	  increment_attribute(candidate.out_edge.attributes, attr_predict);
+	  //increment_attribute(candidate.out_edge.attributes, attr_predict);
 	  
 	  candidate.score = parent.score * function(candidate.out_edge.features);
 	  
@@ -545,9 +541,11 @@ namespace cicada
     const function_type& function;
     size_type  pop_size_max;
 
+#if 0
     attribute_type attr_scan;
     attribute_type attr_complete;
     attribute_type attr_predict;
+#endif
   };
   
   template <typename Function>
