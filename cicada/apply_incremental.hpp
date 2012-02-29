@@ -60,8 +60,12 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
     typedef hypergraph_type::rule_type rule_type;
 
-    typedef hypergraph_type::feature_set_type feature_set_type;
-
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
+    
     typedef Model model_type;
     
     typedef model_type::state_type     state_type;
@@ -179,12 +183,22 @@ namespace cicada
     
     typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
     
+    struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+    {
+      attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+      attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return 0; }
+      attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return 0; }
+    };
+
     ApplyIncremental(const model_type& _model,
 		     const function_type& _function,
 		     const int _pop_size_max)
       : model(_model),
 	function(_function),
-	pop_size_max(_pop_size_max)
+	pop_size_max(_pop_size_max),
+	attr_scan("incremental-scan"),
+	attr_complete("incremental-complete"),
+	attr_predict("incremental-predict")
     { 
       predictions.set_empty_key(0);
     }
@@ -247,7 +261,9 @@ namespace cicada
 	candidate_type& candidate = *construct_candidate(candidate_type(edge));
 	
 	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, true);
-	
+
+	increment_attribute(candidate.out_edge.attributes, attr_predict);
+
 	candidate.score = function(candidate.out_edge.features);
 	
 	int cardinality = cicada::semiring::log(counts[edge.head]);
@@ -309,6 +325,8 @@ namespace cicada
 	    feature_set_type features;
 	    
 	    model.apply_scan(item->state, node_states, item->out_edge, item->dot, features, is_goal);
+
+	    increment_attribute(item->out_edge.attributes, attr_scan);
 	    
 	    item->out_edge.features += features;
 	    item->score *= function(features);
@@ -330,6 +348,8 @@ namespace cicada
 	    feature_set_type features;
 	    
 	    model.apply_complete(item->state, node_states, item->out_edge, features, is_goal);
+
+	    increment_attribute(item->out_edge.attributes, attr_complete);
 	    
 	    item->out_edge.features += features;
 	    item->score *= function(features);
@@ -452,6 +472,8 @@ namespace cicada
 	  candidate.state = model.clone(parent.state);
 	  
 	  model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
+
+	  increment_attribute(candidate.out_edge.attributes, attr_predict);
 	  
 	  candidate.score = parent.score * function(candidate.out_edge.features);
 	  
@@ -500,6 +522,15 @@ namespace cicada
       const_cast<candidate_type*>(cand)->parent = candidate_list;
       candidate_list = const_cast<candidate_type*>(cand);
     }
+
+    void increment_attribute(attribute_set_type& attributes, const attribute_type& attr)
+    {
+      attribute_set_type::iterator iter = attributes.find(attr);
+      if (iter == attributes.end())
+	attributes[attr] = attribute_set_type::int_type(1);
+      else
+	attributes[attr] = boost::apply_visitor(__attribute_integer(), iter->second) + 1;
+    }
     
   private:
     candidate_set_type  candidates;
@@ -513,6 +544,10 @@ namespace cicada
     const model_type& model;
     const function_type& function;
     size_type  pop_size_max;
+
+    attribute_type attr_scan;
+    attribute_type attr_complete;
+    attribute_type attr_predict;
   };
   
   template <typename Function>
