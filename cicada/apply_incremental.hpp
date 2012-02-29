@@ -374,8 +374,8 @@ namespace cicada
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, result.first->second);
 	      
-	      // if stat insertion succeed, or parent insertion succeed, we will propagate...
-	      if (! parents[result.first->second].insert(item->parent).second) break;
+	      // if stat insertion succeed, or parent insertion succeed, we will propagate..... temporary...
+	      //if (! parents[result.first->second].insert(item->parent).second) break;
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
