@@ -151,7 +151,7 @@ namespace cicada
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
-    typedef std::vector<candidate_heap_type, std::allocator<candidate_heap_type> > candidate_heap_set_type;
+    typedef utils::chunk_vector<candidate_heap_type, 4096/sizeof(candidate_heap_type), std::allocator<candidate_heap_type> > candidate_heap_set_type;
     
     typedef std::pair<const candidate_type*, state_type> stack_state_type;
     
@@ -249,22 +249,27 @@ namespace cicada
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
-
+	
 	buf.clear();
-	buf.reserve(graph_in.nodes.size());
 	buf.resize(graph_in.nodes.size());
 	
-	counts.clear();
-	counts.reserve(graph_in.nodes.size());
-	counts.resize(graph_in.nodes.size());
-	cicada::inside(graph_in, counts, max_edge_function());
+	counts_inside.clear();
+	counts_inside.reserve(graph_in.nodes.size());
+	counts_inside.resize(graph_in.nodes.size());
+
+	counts_outside.clear();
+	counts_outside.reserve(graph_in.nodes.size());
+	counts_outside.resize(graph_in.nodes.size());
+	
+	cicada::inside(graph_in, counts_inside, max_edge_function());
+	cicada::outside(graph_in, counts_inside, counts_outside, max_edge_function());
 	
 	// initialization...
 	initialize_bins(graph_in);
-
+	
 	//std::cerr << "graph size: " << graph_in.nodes.size() << std::endl;
 	
-	for (int step = 0; step != static_cast<int>(graph_in.nodes.size()); ++ step)
+	for (size_t step = 0; step != buf.size(); ++ step)
 	  process_bins(step, graph_in, graph_out);
 	
 	//std::cerr << "topologically sort" << std::endl;
@@ -296,11 +301,11 @@ namespace cicada
 
 	candidate.score = function(candidate.out_edge.features);
 	
-	int cardinality = cicada::semiring::log(counts[edge.head]);
+	int cardinality = cicada::semiring::log(counts_inside[graph.goal]) - cicada::semiring::log(counts_outside[edge.head]);
 	
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	  cardinality -= cicada::semiring::log(counts[*titer]);
+	  cardinality -= cicada::semiring::log(counts_inside[*titer]);
 	
 	// - 1 to make an adjustment...
 	buf[cardinality - 1].push(&candidate);
@@ -496,18 +501,23 @@ namespace cicada
 	  candidate.state = model.clone(parent.state);
 	  
 	  model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
-
+	  
 	  //increment_attribute(candidate.out_edge.attributes, attr_predict);
 	  
 	  candidate.score = parent.score * function(candidate.out_edge.features);
 	  
-	  int cardinality = cicada::semiring::log(counts[edge.head]);
+	  int cardinality = cicada::semiring::log(counts_inside[graph_in.goal]) - cicada::semiring::log(counts_outside[edge.head]);
 	  
 	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    cardinality -= cicada::semiring::log(counts[*titer]);
+	    cardinality -= cicada::semiring::log(counts_inside[*titer]);
 	  
-	  buf[step + cardinality].push(&candidate);
+	  const int step_next = step + cardinality;
+	  
+	  if (step_next >= buf.size())
+	    buf.resize(step_next + 1);
+	  
+	  buf[step_next].push(&candidate);
 	}
       }
       
@@ -564,7 +574,8 @@ namespace cicada
 
     candidate_heap_set_type buf;
     
-    count_set_type counts;
+    count_set_type counts_inside;
+    count_set_type counts_outside;
     candidate_unique_set_type predictions;
 
     const model_type& model;
