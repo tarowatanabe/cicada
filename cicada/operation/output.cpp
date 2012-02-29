@@ -49,11 +49,13 @@ namespace cicada
 	hypergraph_type graph_empty;
 	if (! no_id)
 	  os << id << " ||| ";
-	if (graphviz_mode)
-	  cicada::graphviz(os, graph_empty) << '\n';
-	else if (treebank_mode)
-	  cicada::treebank(os, graph_empty) << " ||| ||| 0" << '\n';
-	else
+	if (graphviz_mode) {
+	  cicada::graphviz(os, graph_empty);
+	  os << '\n';
+	} else if (treebank_mode) {
+	  cicada::treebank(os, graph_empty);
+	  os << " ||| ||| 0" << '\n';
+	} else
 	  os << graph_empty << " ||| ||| 0" << '\n';
 	return;
       }
@@ -142,9 +144,10 @@ namespace cicada
 	if (! no_id)
 	  os << id << " ||| ";
 	
-	if (graphviz_mode)
-	  os << cicada::graphviz(os, graph_kbest) << '\n';
-	else {
+	if (graphviz_mode) {
+	  cicada::graphviz(os, graph_kbest);
+	  os << '\n';
+	} else {
 	  if (treebank_mode)
 	    cicada::treebank(os, graph_kbest);
 	  else
