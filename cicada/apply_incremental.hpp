@@ -200,6 +200,7 @@ namespace cicada
 	__applier(graph_in, graph_out);
       } else {
 	candidates.clear();
+	candidate_list = 0;
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
@@ -242,9 +243,7 @@ namespace cicada
       for (node_type::edge_set_type::const_iterator eiter = graph.nodes[graph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
 
-	candidates.push_back(candidate_type(edge));
-
-	candidate_type& candidate = candidates.back();
+	candidate_type& candidate = *construct_candidate(candidate_type(edge));
 	
 	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, true);
 	
@@ -292,9 +291,8 @@ namespace cicada
 	    
 	    // new item...
 	    if (item == item_top) {
-	      candidates.push_back(*item_top);
-	      item = &candidates.back();
-	      item->state = model.clone(item->state);
+	      item = construct_candidate(*item_top);
+	      item->state = model.clone(item_top->state);
 	    }
 
 	    feature_set_type features;
@@ -313,8 +311,7 @@ namespace cicada
 	    
 	    // new item...
 	    if (item == item_top) {
-	      candidates.push_back(*item_top);
-	      item = &candidates.back();
+	      item = construct_candidate(*item_top);
 	      item->state = model.clone(item_top->state);
 	    }
 	    
@@ -341,6 +338,7 @@ namespace cicada
 	      
 	      // we will not use item any more...
 	      // can we re-use this...?
+	      destroy_candidate(item);
 	      
 	      break;
 	    } else {
@@ -353,9 +351,6 @@ namespace cicada
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, result.first->second);
-	      
-	      // if stat insertion succeed, or parent insertion succeed, we will propagate..... temporary...
-	      //if (! parents[result.first->second].insert(item->parent).second) break;
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
@@ -391,13 +386,17 @@ namespace cicada
 	    }
 	    
 	  } else {
-	    
+	    // we will uniquify predictions...
 	    std::pair<typename candidate_unique_set_type::iterator, bool> result = predictions.insert(item);
 	    if (! result.second) {
+	      // re-assign score
+	      const_cast<score_type&>((*result.first)->score) = std::max((*result.first)->score, item->score);
+	      
+	      // this model is no longer used...
 	      model.deallocate(item->state);
 	      
-	      if (item->score > (*result.first)->score)
-		const_cast<score_type&>((*result.first)->score) =  item->score;
+	      // destroy this candidate
+	      destroy_candidate(item);
 	    }
 	    
 	    break;
@@ -410,7 +409,7 @@ namespace cicada
       for (typename candidate_unique_set_type::const_iterator piter = predictions.begin(); piter != piter_end; ++ piter) {
 	const candidate_type& parent = *(*piter);
 	const rule_type::symbol_set_type& target = parent.in_edge->rule->rhs;
-
+	
 	const int __non_terminal_index = target[parent.dot].non_terminal_index();
 	const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, parent.dot_antecedent, __non_terminal_index - 1);
 	
@@ -419,19 +418,17 @@ namespace cicada
 	node_type::edge_set_type::const_iterator eiter_end = antecedent_node.edges.end();
 	for (node_type::edge_set_type::const_iterator eiter = antecedent_node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const edge_type& edge = graph_in.edges[*eiter];
-	      
-	  candidates.push_back(candidate_type(parent, edge));
-	      
-	  candidate_type& candidate = candidates.back();
-	      
+	  
+	  candidate_type& candidate = *construct_candidate(candidate_type(parent, edge));
+	  
 	  candidate.state = model.clone(parent.state);
-	      
+	  
 	  model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, false);
-	      
+	  
 	  candidate.score = parent.score * function(candidate.out_edge.features);
-	      
+	  
 	  int cardinality = cicada::semiring::log(counts[edge.head]);
-	      
+	  
 	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	    cardinality -= cicada::semiring::log(counts[*titer]);
@@ -440,28 +437,45 @@ namespace cicada
 	}
       }
       
-      
-
-      // clear buf... at the same time, we will clear state associated with each candidate...
-      
+      // clear buf...
+      // since we will not propagate the states in the buf, we will deallocate...
+      // However, we should not reclaim candidate since they may be pointed out by other predicted candidates
       typename candidate_heap_type::const_iterator biter_end = states[step].buf.end();
-      for (typename candidate_heap_type::const_iterator biter = states[step].buf.begin(); biter != biter_end; ++ biter) {
+      for (typename candidate_heap_type::const_iterator biter = states[step].buf.begin(); biter != biter_end; ++ biter)
 	model.deallocate((*biter)->state);
-	
-	// what to do with (*biter) (== candidate_type*) ??? 
-	// I want to cache this for further reuse...
-	// implement custom allocator similar to the state allocator in model?
-	
-	
-      }
       
       // shrink wrap...
       states[step].buf.clear();
       candidate_heap_type(states[step].buf).swap(states[step].buf);
     };
     
+    candidate_type* construct_candidate(const candidate_type& cand)
+    {
+      if (candidate_list) {
+	candidate_type* cand_cached = candidate_list;
+	candidate_list = const_cast<candidate_type*>(cand_cached->parent);
+	
+	// assignment!
+	*cand_cached = cand;
+	
+	return cand_cached;
+      }
+
+      candidates.push_back(cand);
+      return &candidates.back();
+    }
+
+    void destroy_candidate(const candidate_type* cand)
+    {
+      if (! cand) return;
+      
+      const_cast<candidate_type*>(cand)->parent = candidate_list;
+      candidate_list = const_cast<candidate_type*>(cand);
+    }
+    
   private:
     candidate_set_type  candidates;
+    candidate_type*     candidate_list;
     state_set_type      node_states;
     cand_state_set_type states;
     
