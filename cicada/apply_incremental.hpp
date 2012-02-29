@@ -263,7 +263,7 @@ namespace cicada
     
     void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
+      //std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
 
       predictions.clear();
 
@@ -273,7 +273,7 @@ namespace cicada
 	
 	states[step].buf.pop();
 	
-#if 1
+#if 0
 	std::cerr << "popped head: " << item->in_edge->head
 		  << " edge: " << item->in_edge->id
 		  << " rule: " << *(item->in_edge->rule)
@@ -283,21 +283,23 @@ namespace cicada
 	
 	// we will iterate until completion...
 	for (int iter = 0;; ++ iter) {
+#if 0
 	  std::cerr << "\titer: " << iter
 		    << " head: " << item->in_edge->head
 		    << " edge: " << item->in_edge->id
 		    << " rule: " << *(item->in_edge->rule)
 		    << " dot: " << item->dot
 		    << std::endl;
-
-	    
+#endif	    
+	  
 	  const bool is_goal = (graph_in.goal == item->in_edge->head);
 	  
  	  const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
 	  
 	  // scan... and score... state will be updated...
 	  if (! target.empty() && item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal()) {
-	    
+	    //std::cerr << "\t\tscan" << std::endl;
+
 	    // new item...
 	    if (item == item_top) {
 	      item = construct_candidate(*item_top);
@@ -317,6 +319,7 @@ namespace cicada
 	  
 	  if (item->dot == static_cast<int>(target.size())) {
 	    // complete...
+	    //std::cerr << "\t\tcompletion" << std::endl;
 	    
 	    // new item...
 	    if (item == item_top) {
@@ -394,6 +397,8 @@ namespace cicada
 	    }
 	    
 	  } else {
+	    //std::cerr << "\t\tprediction" << std::endl;
+
 	    // we will uniquify predictions...
 	    std::pair<typename candidate_unique_set_type::iterator, bool> result = predictions.insert(item);
 	    if (! result.second) {
@@ -425,7 +430,7 @@ namespace cicada
 	}
       }
 
-      std::cerr << "predicted: " << predictions.size() << std::endl;
+      //std::cerr << "predicted: " << predictions.size() << std::endl;
       
       // perform actual prediction!
       typename candidate_unique_set_type::const_iterator piter_end = predictions.end();
