@@ -132,6 +132,8 @@ namespace cicada
       }
     };
     
+    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type>::type candidate_unique_set_type;
+    
     struct compare_heap_type
     {
       // we use less, so that when popped from heap, we will grab "greater" in back...
@@ -160,9 +162,7 @@ namespace cicada
     };
     
     typedef State cand_state_type;
-    typedef std::vector<cand_state_type, std::allocator<cand_state_type> > cand_state_set_type;
-    
-    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type>::type candidate_unique_set_type;
+    typedef std::vector<cand_state_type, std::allocator<cand_state_type> > cand_state_set_type;    
     
     struct max_edge_function
     {
@@ -177,6 +177,14 @@ namespace cicada
     typedef typename max_edge_function::value_type count_type;
     
     typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
+    
+    struct parent_set_type : public utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type
+    {
+      typedef typename  utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type set_type;
+      
+      parent_set_type() { set_type::set_empty_key(0); }
+    };
+    typedef utils::chunk_vector<parent_set_type, 4096 / sizeof(parent_set_type), std::allocator<parent_set_type> > parent_map_type;
     
     ApplyIncremental(const model_type& _model,
 		     const function_type& _function,
@@ -204,6 +212,8 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
+
+	parents.clear();
 
 	states.clear();
 	states.reserve(graph_in.nodes.size());
@@ -329,6 +339,7 @@ namespace cicada
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
 		node_states.push_back(item->state);
+		parents.push_back(parent_set_type());
 		graph_out.goal = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -337,7 +348,6 @@ namespace cicada
 	      graph_out.connect_edge(edge_new.id, graph_out.goal);
 	      
 	      // we will not use item any more...
-	      // can we re-use this...?
 	      destroy_candidate(item);
 	      
 	      break;
@@ -345,6 +355,7 @@ namespace cicada
 	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
+		parents.push_back(parent_set_type());
 		result.first->second = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -356,6 +367,13 @@ namespace cicada
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
 	      // thus, we simply copy stat from item->parent...
 	      // but reassigned from siter->first by cloning...
+	      
+	      if (! parents[result.first->second].insert(item->parent).second) {
+		// we will not use item any more...
+		destroy_candidate(item);
+		
+		break;
+	      }
 	      
 	      const score_type score = item->score;
 	      
@@ -401,7 +419,6 @@ namespace cicada
 	      if (! model_type::state_equal(model.state_size())((*result.first)->state, item->state))
 		std::cerr << "merged but different state?" << std::endl;
 #endif
-
 	      
 	      // re-assign score
 	      const_cast<score_type&>((*result.first)->score) = std::max((*result.first)->score, item->score);
@@ -492,6 +509,7 @@ namespace cicada
     candidate_type*     candidate_list;
     state_set_type      node_states;
     cand_state_set_type states;
+    parent_map_type     parents;
     
     count_set_type counts;
     candidate_unique_set_type predictions;
