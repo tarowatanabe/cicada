@@ -950,6 +950,9 @@ namespace cicada
       // add <s>
       if (final)
 	pimpl->ngram_predict_score(state);
+
+      features.erase(pimpl->feature_name);
+      features.erase(pimpl->feature_name_oov);
     }
     
     void NGram::apply_scan(state_ptr_type& state,
@@ -980,6 +983,8 @@ namespace cicada
 			       const bool final) const
     {
       // if final, add scoring for </s>
+
+      
       if (final) {
 	const double score = pimpl->ngram_complete_score(state);
 	
@@ -987,6 +992,11 @@ namespace cicada
 	  features[pimpl->feature_name] = score;
 	else
 	  features.erase(pimpl->feature_name);
+	
+	features.erase(pimpl->feature_name_oov);
+      } else {
+	features.erase(pimpl->feature_name);
+	features.erase(pimpl->feature_name_oov);
       }
     }
 
