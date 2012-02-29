@@ -262,7 +262,7 @@ namespace cicada
     
     void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      //std::cerr << "step: " << step << std::endl;
+      std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
 
       predictions.clear();
 
@@ -389,6 +389,20 @@ namespace cicada
 	    // we will uniquify predictions...
 	    std::pair<typename candidate_unique_set_type::iterator, bool> result = predictions.insert(item);
 	    if (! result.second) {
+#if 0
+	      std::cerr << "multiple prediction head: " << item->in_edge->head
+			<< " edge: " << item->in_edge->id
+			<< " rule: " << *(item->in_edge->rule)
+			<< " dot: " << item->dot
+			<< std::endl;
+#endif
+	      
+#if 0
+	      if (! model_type::state_equal(model.state_size())((*result.first)->state, item->state))
+		std::cerr << "merged but different state?" << std::endl;
+#endif
+
+	      
 	      // re-assign score
 	      const_cast<score_type&>((*result.first)->score) = std::max((*result.first)->score, item->score);
 	      
