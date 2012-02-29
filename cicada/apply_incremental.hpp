@@ -512,7 +512,7 @@ namespace cicada
 	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	    cardinality -= cicada::semiring::log(counts_inside[*titer]);
 	  
-	  const int step_next = step + cardinality;
+	  const size_type step_next = step + cardinality;
 	  
 	  if (step_next >= buf.size())
 	    buf.resize(step_next + 1);
