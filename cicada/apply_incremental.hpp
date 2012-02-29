@@ -283,8 +283,8 @@ namespace cicada
 	
 	// we will iterate until completion...
 	for (int iter = 0;; ++ iter) {
-	  std::cerr << "\titer: " << iter << std::endl;
-	  std::cerr << "\tcurrent head: " << item->in_edge->head
+	  std::cerr << "\titer: " << iter
+		    << " head: " << item->in_edge->head
 		    << " edge: " << item->in_edge->id
 		    << " rule: " << *(item->in_edge->rule)
 		    << " dot: " << item->dot
