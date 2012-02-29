@@ -272,7 +272,7 @@ namespace cicada
     
     void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
+      //std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
 
       predictions.clear();
 
