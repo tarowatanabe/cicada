@@ -14,8 +14,8 @@
 #include <cicada/semiring/traits.hpp>
 #include <cicada/semiring/tropical.hpp>
 
+#include <utils/dense_hash_map.hpp>
 #include <utils/dense_hash_set.hpp>
-#include <utils/unordered_map.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -155,26 +155,22 @@ namespace cicada
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
-    struct node_parent_set_type
+    struct parent_set_type : public utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type
     {
-      typedef typename utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type parent_set_type;
+      typedef typename  utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type set_type;
       
-      id_type         node;
-      parent_set_type parents;
-      
-      node_parent_set_type() : node(), parents() { parents.set_empty_key(0); }
-      node_parent_set_type(const id_type& __node) : node(__node), parents() { parents.set_empty_key(0); }
+      parent_set_type() { set_type::set_empty_key(0); }
     };
+    typedef utils::chunk_vector<parent_set_type, 4096/sizeof(parent_set_type), std::allocator<parent_set_type> > parent_map_type;
     
-    typedef typename utils::unordered_map<state_type, node_parent_set_type, model_type::state_hash, model_type::state_equal,
-					  std::allocator<std::pair<const state_type, node_parent_set_type> > >::type state_node_map_type;
+    typedef typename utils::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal>::type state_node_map_type;
     
     struct State
     {
       State(const size_type& hint, const size_type& state_size)
 	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size))
       {
-	
+	nodes.set_empty_key(state_type());
       }
       
       candidate_heap_type buf;
@@ -362,18 +358,19 @@ namespace cicada
 	      
 	      break;
 	    } else {
-	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, node_parent_set_type()));
+	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
-		result.first->second.node = graph_out.add_node().id;
+		parents.push_back(parent_set_type());
+		result.first->second = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
-	      graph_out.connect_edge(edge_new.id, result.first->second.node);
+	      graph_out.connect_edge(edge_new.id, result.first->second);
 	      
 	      // if stat insertion succeed, or parent insertion succeed, we will propagate...
-	      if (! result.first->second.parents.insert(item->parent).second) break;
+	      if (! parents[result.first->second].insert(item->parent).second) break;
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
@@ -400,7 +397,7 @@ namespace cicada
 	      const int __non_terminal_index = target[item->dot].non_terminal_index();
 	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, item->dot_antecedent, __non_terminal_index - 1);
 	      
-	      item->out_edge.tails[antecedent_index] = result.first->second.node;
+	      item->out_edge.tails[antecedent_index] = result.first->second;
 	      
 	      ++ item->dot;
 	      ++ item->dot_antecedent;
@@ -467,6 +464,7 @@ namespace cicada
     candidate_set_type  candidates;
     state_set_type      node_states;
     cand_state_set_type states;
+    parent_map_type     parents;
     
     count_set_type counts;
 
