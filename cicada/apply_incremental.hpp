@@ -369,15 +369,21 @@ namespace cicada
 	      
 	      break;
 	    } else {
+#if 0
 	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
 		result.first->second = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
+#endif
+	      
+	      node_states.push_back(item->state);
+	      const id_type node_id = graph_out.add_node().id;
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
-	      graph_out.connect_edge(edge_new.id, result.first->second);
+	      //graph_out.connect_edge(edge_new.id, result.first->second);
+	      graph_out.connect_edge(edge_new.id, node_id);
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
@@ -385,10 +391,12 @@ namespace cicada
 	      // but reassigned from siter->first by cloning...
 	      
 	      const score_type score = item->score;
+	      const state_type state = item->state;
 	      
 	      // we copy from parent, and use the score/state from the current item
 	      *item = *(item->parent);
-	      item->state = model.clone(result.first->first);
+	      //item->state = model.clone(result.first->first);
+	      item->state = model.clone(state);
 	      item->score = score;
 	      
 #if 0
@@ -404,7 +412,8 @@ namespace cicada
 	      const int __non_terminal_index = target[item->dot].non_terminal_index();
 	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, item->dot_antecedent, __non_terminal_index - 1);
 	      
-	      item->out_edge.tails[antecedent_index] = result.first->second;
+	      //item->out_edge.tails[antecedent_index] = result.first->second;
+	      item->out_edge.tails[antecedent_index] = node_id;
 	      
 	      ++ item->dot;
 	      ++ item->dot_antecedent;
