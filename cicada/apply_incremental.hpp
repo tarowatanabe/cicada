@@ -178,14 +178,6 @@ namespace cicada
     
     typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
     
-    struct parent_set_type : public utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type
-    {
-      typedef typename  utils::dense_hash_set<const candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const candidate_type*> >::type set_type;
-      
-      parent_set_type() { set_type::set_empty_key(0); }
-    };
-    typedef utils::chunk_vector<parent_set_type, 4096 / sizeof(parent_set_type), std::allocator<parent_set_type> > parent_map_type;
-    
     ApplyIncremental(const model_type& _model,
 		     const function_type& _function,
 		     const int _pop_size_max)
@@ -212,8 +204,6 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
-
-	parents.clear();
 
 	states.clear();
 	states.reserve(graph_in.nodes.size());
@@ -339,7 +329,6 @@ namespace cicada
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
 		node_states.push_back(item->state);
-		//parents.push_back(parent_set_type());
 		graph_out.goal = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -355,7 +344,6 @@ namespace cicada
 	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
-		//parents.push_back(parent_set_type());
 		result.first->second = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -367,15 +355,6 @@ namespace cicada
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
 	      // thus, we simply copy stat from item->parent...
 	      // but reassigned from siter->first by cloning...
-#if 0	      
-	      // we do not book keep, since we may find better candidate....
-	      if (! parents[result.first->second].insert(item->parent).second) {
-		// we will not use item any more...
-		destroy_candidate(item);
-		
-		break;
-	      }
-#endif
 	      
 	      const score_type score = item->score;
 	      
@@ -511,7 +490,6 @@ namespace cicada
     candidate_type*     candidate_list;
     state_set_type      node_states;
     cand_state_set_type states;
-    parent_map_type     parents;
     
     count_set_type counts;
     candidate_unique_set_type predictions;

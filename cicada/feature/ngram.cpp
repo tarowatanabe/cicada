@@ -669,11 +669,19 @@ namespace cicada
 	    oov += (buffer.back() == id_oov);
 	  }
 	
-	const state_score_type state_score = ngram_score(*ngram_state, buffer.begin(), buffer.end());
-	
-	*ngram_state = state_score.first;
-	
-	return state_score.second;
+	if (no_bos_eos && *ngram_state == ngram_state_type() && ! buffer.empty() && buffer.front() == id_bos)  {
+	  const state_score_type state_score = ngram_score(ngram->index.next(ngram_state_type(), id_bos), buffer.begin() + 1, buffer.end());
+	  
+	  *ngram_state = state_score.first;
+	  
+	  return state_score.second;
+	} else {
+	  const state_score_type state_score = ngram_score(*ngram_state, buffer.begin(), buffer.end());
+	  
+	  *ngram_state = state_score.first;
+	  
+	  return state_score.second;
+	}
       }
       
       double ngram_complete_score(state_ptr_type& state)
