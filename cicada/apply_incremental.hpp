@@ -87,11 +87,12 @@ namespace cicada
       
       score_type score;
       
-      Candidate() : parent(0), in_edge(0), dot(0), dot_antecedent(0) {}
+      Candidate()
+	: state(), parent(0), in_edge(0), dot(0), dot_antecedent(0) {}
       Candidate(const edge_type& __edge)
-	: parent(0), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
+	: state(), parent(0), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
       Candidate(const candidate_type& __parent, const edge_type& __edge)
-	: parent(&__parent), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
+	: state(), parent(&__parent), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
     };
     
     typedef Candidate candidate_type;
@@ -262,7 +263,7 @@ namespace cicada
     
     void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      //std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
+      std::cerr << "step: " << step << " buf: " << states[step].buf.size() << std::endl;
 
       predictions.clear();
 
@@ -272,8 +273,8 @@ namespace cicada
 	
 	states[step].buf.pop();
 	
-#if 0
-	std::cerr << "head: " << item->in_edge->head
+#if 1
+	std::cerr << "popped head: " << item->in_edge->head
 		  << " edge: " << item->in_edge->id
 		  << " rule: " << *(item->in_edge->rule)
 		  << " dot: " << item->dot
@@ -281,7 +282,15 @@ namespace cicada
 #endif
 	
 	// we will iterate until completion...
-	for (;;) {
+	for (int iter = 0;; ++ iter) {
+	  std::cerr << "\titer: " << iter << std::endl;
+	  std::cerr << "\tcurrent head: " << item->in_edge->head
+		    << " edge: " << item->in_edge->id
+		    << " rule: " << *(item->in_edge->rule)
+		    << " dot: " << item->dot
+		    << std::endl;
+
+	    
 	  const bool is_goal = (graph_in.goal == item->in_edge->head);
 	  
  	  const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
@@ -415,6 +424,8 @@ namespace cicada
 	  }
 	}
       }
+
+      std::cerr << "predicted: " << predictions.size() << std::endl;
       
       // perform actual prediction!
       typename candidate_unique_set_type::const_iterator piter_end = predictions.end();
