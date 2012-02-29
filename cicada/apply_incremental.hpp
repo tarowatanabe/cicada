@@ -339,7 +339,7 @@ namespace cicada
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
 		node_states.push_back(item->state);
-		parents.push_back(parent_set_type());
+		//parents.push_back(parent_set_type());
 		graph_out.goal = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -355,7 +355,7 @@ namespace cicada
 	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].nodes.insert(std::make_pair(item->state, 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
-		parents.push_back(parent_set_type());
+		//parents.push_back(parent_set_type());
 		result.first->second = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
@@ -367,13 +367,15 @@ namespace cicada
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
 	      // thus, we simply copy stat from item->parent...
 	      // but reassigned from siter->first by cloning...
-	      
+#if 0	      
+	      // we do not book keep, since we may find better candidate....
 	      if (! parents[result.first->second].insert(item->parent).second) {
 		// we will not use item any more...
 		destroy_candidate(item);
 		
 		break;
 	      }
+#endif
 	      
 	      const score_type score = item->score;
 	      
