@@ -219,10 +219,14 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
+
+	parents.clear();
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
+
+	
 	
 	counts.clear();
 	counts.reserve(graph_in.nodes.size());
