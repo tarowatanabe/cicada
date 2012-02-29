@@ -350,6 +350,7 @@ namespace cicada
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
 		node_states.push_back(item->state);
+		parents.push_back(parent_set_type());
 		graph_out.goal = graph_out.add_node().id;
 	      } else
 		model.deallocate(item->state);
