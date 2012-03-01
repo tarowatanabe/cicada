@@ -419,14 +419,16 @@ namespace cicada
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, result.first->second);
-
-#if 0
+	      
+	      // we will not propagate...
 	      if (! result.second) {
-		// we will not propagate...
+		// update score in the parent!
+		const_cast<score_type&>(item->parent->score) = std::max(item->parent->score, item->score);
+		
 		destroy_candidate(item);
+		
 		break;
 	      }
-#endif
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
