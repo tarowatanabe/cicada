@@ -262,7 +262,7 @@ namespace cicada
 	counts_outside.resize(graph_in.nodes.size());
 	
 	cicada::inside(graph_in, counts_inside, max_edge_function());
-	cicada::outside(graph_in, counts_inside, counts_outside, max_edge_function());
+	//cicada::outside(graph_in, counts_inside, counts_outside, max_edge_function());
 	
 	// initialization...
 	initialize_bins(graph_in);
@@ -301,7 +301,8 @@ namespace cicada
 
 	candidate.score = function(candidate.out_edge.features);
 	
-	int cardinality = cicada::semiring::log(counts_inside[graph.goal]) - cicada::semiring::log(counts_outside[edge.head]);
+	//int cardinality = cicada::semiring::log(counts_inside[graph.goal]) - cicada::semiring::log(counts_outside[edge.head]);
+	int cardinality = cicada::semiring::log(counts_inside[graph.goal]);
 	
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
@@ -506,7 +507,8 @@ namespace cicada
 	  
 	  candidate.score = parent.score * function(candidate.out_edge.features);
 	  
-	  int cardinality = cicada::semiring::log(counts_inside[graph_in.goal]) - cicada::semiring::log(counts_outside[edge.head]);
+	  //int cardinality = cicada::semiring::log(counts_inside[graph_in.goal]) - cicada::semiring::log(counts_outside[edge.head]);
+	  int cardinality = cicada::semiring::log(counts_inside[edge.head]);
 	  
 	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
