@@ -257,9 +257,9 @@ namespace cicada
 	counts_inside.reserve(graph_in.nodes.size());
 	counts_inside.resize(graph_in.nodes.size());
 
-	counts_outside.clear();
-	counts_outside.reserve(graph_in.nodes.size());
-	counts_outside.resize(graph_in.nodes.size());
+	//counts_outside.clear();
+	//counts_outside.reserve(graph_in.nodes.size());
+	//counts_outside.resize(graph_in.nodes.size());
 	
 	cicada::inside(graph_in, counts_inside, max_edge_function());
 	//cicada::outside(graph_in, counts_inside, counts_outside, max_edge_function());
@@ -516,8 +516,11 @@ namespace cicada
 	  
 	  const size_type step_next = step + cardinality;
 	  
+#if 0
+	  // this is not necessary...
 	  if (step_next >= buf.size())
 	    buf.resize(step_next + 1);
+#endif
 	  
 	  buf[step_next].push(&candidate);
 	}
@@ -559,6 +562,7 @@ namespace cicada
       candidate_list = const_cast<candidate_type*>(cand);
     }
 
+#if 0
     void increment_attribute(attribute_set_type& attributes, const attribute_type& attr)
     {
       attribute_set_type::iterator iter = attributes.find(attr);
@@ -567,6 +571,7 @@ namespace cicada
       else
 	attributes[attr] = boost::apply_visitor(__attribute_integer(), iter->second) + 1;
     }
+#endif
     
   private:
     candidate_set_type  candidates;
@@ -577,7 +582,7 @@ namespace cicada
     candidate_heap_set_type buf;
     
     count_set_type counts_inside;
-    count_set_type counts_outside;
+    //count_set_type counts_outside;
     candidate_unique_set_type predictions;
 
     const model_type& model;
