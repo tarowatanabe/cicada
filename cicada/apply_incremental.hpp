@@ -185,11 +185,6 @@ namespace cicada
     
     struct State : public state_node_map_type
     {
-      State() : state_node_map_type(0, stack_state_hash_type(0), stack_state_equal_type(0))
-      {
-	state_node_map_type::set_empty_key(stack_state_type(0, state_type()));
-      }
-      
       State(const size_type& hint, const size_type& state_size)
 	: state_node_map_type(hint >> 1, stack_state_hash_type(state_size), stack_state_equal_type(state_size))
       {
@@ -251,12 +246,9 @@ namespace cicada
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
 
-#if 0
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
-#endif
-	states = cand_state_type(graph_in.edges.size() * pop_size_max, model.state_size());
 	
 	buf.clear();
 	buf.resize(graph_in.nodes.size());
@@ -418,8 +410,7 @@ namespace cicada
 	      break;
 	    } else {
 	      // we will merge by the parent and state
-	      //std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
-	      std::pair<typename state_node_map_type::iterator, bool> result = states.insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
+	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
 		result.first->second = graph_out.add_node().id;
@@ -428,6 +419,14 @@ namespace cicada
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, result.first->second);
+
+#if 0
+	      if (! result.second) {
+		// we will not propagate...
+		destroy_candidate(item);
+		break;
+	      }
+#endif
 	      
 	      // some trick:
 	      // item->state is either deleted or inserted in states[item->in_edge->head].nodes
@@ -586,8 +585,7 @@ namespace cicada
     candidate_set_type  candidates;
     candidate_type*     candidate_list;
     state_set_type      node_states;
-    //cand_state_set_type states;
-    cand_state_type     states;
+    cand_state_set_type states;
 
     candidate_heap_set_type buf;
     
