@@ -196,20 +196,12 @@ namespace cicada
     
     struct max_edge_function
     {
-      typedef cicada::semiring::Tropical<int>    count_type;
-      typedef cicada::semiring::Tropical<double> weight_type;
-      
-      typedef cicada::semiring::Pair<count_type, weight_type> value_type;
-
-      max_edge_function(const function_type& __function) : function(__function) {}
-      
-      const function_type& function;
+      typedef cicada::semiring::Tropical<int> value_type;
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return value_type(cicada::semiring::traits<count_type>::exp(1),
-			  cicada::semiring::traits<weight_type>::exp(cicada::semiring::log(function(edge.features))));
+	return cicada::semiring::traits<value_type>::exp(1);
       }
     };
     typedef typename max_edge_function::value_type count_type;
@@ -268,7 +260,7 @@ namespace cicada
 	//counts_outside.reserve(graph_in.nodes.size());
 	//counts_outside.resize(graph_in.nodes.size());
 	
-	cicada::inside(graph_in, counts_inside, max_edge_function(function));
+	cicada::inside(graph_in, counts_inside, max_edge_function());
 	//cicada::outside(graph_in, counts_inside, counts_outside, max_edge_function());
 	
 	// initialization...
@@ -309,13 +301,11 @@ namespace cicada
 	candidate.score = function(candidate.out_edge.features);
 	
 	//int cardinality = cicada::semiring::log(counts_inside[graph.goal]) - cicada::semiring::log(counts_outside[edge.head]);
-	int cardinality = cicada::semiring::log(counts_inside[graph.goal].first);
+	int cardinality = cicada::semiring::log(counts_inside[graph.goal]);
 	
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-	  cardinality -= cicada::semiring::log(counts_inside[*titer].first);
-	  candidate.score *= cicada::semiring::traits<score_type>::exp(cicada::semiring::log(counts_inside[*titer].second));
-	}
+	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	  cardinality -= cicada::semiring::log(counts_inside[*titer]);
 	
 	// - 1 to make an adjustment...
 	buf[cardinality - 1].push(&candidate);
@@ -525,18 +515,14 @@ namespace cicada
 	  
 	  //increment_attribute(candidate.out_edge.attributes, attr_predict);
 	  
-	  candidate.score = (parent.score
-			     * function(candidate.out_edge.features)
-			     / cicada::semiring::traits<score_type>::exp(cicada::semiring::log(counts_inside[edge.head].second)));
-	  
+	  candidate.score = parent.score * function(candidate.out_edge.features);
+			     
 	  //int cardinality = cicada::semiring::log(counts_inside[graph_in.goal]) - cicada::semiring::log(counts_outside[edge.head]);
-	  int cardinality = cicada::semiring::log(counts_inside[edge.head].first);
+	  int cardinality = cicada::semiring::log(counts_inside[edge.head]);
 	  
 	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-	    cardinality -= cicada::semiring::log(counts_inside[*titer].first);
-	    candidate.score *= cicada::semiring::traits<score_type>::exp(cicada::semiring::log(counts_inside[*titer].second));
-	  }
+	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	    cardinality -= cicada::semiring::log(counts_inside[*titer]);
 	  
 	  const size_type step_next = step + cardinality;
 	  
