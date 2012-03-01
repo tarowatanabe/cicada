@@ -185,6 +185,11 @@ namespace cicada
     
     struct State : public state_node_map_type
     {
+      State() : state_node_map_type(0, stack_state_hash_type(0), stack_state_equal_type(0))
+      {
+	state_node_map_type::set_empty_key(stack_state_type(0, state_type()));
+      }
+      
       State(const size_type& hint, const size_type& state_size)
 	: state_node_map_type(hint >> 1, stack_state_hash_type(state_size), stack_state_equal_type(state_size))
       {
