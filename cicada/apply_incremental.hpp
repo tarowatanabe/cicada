@@ -246,9 +246,12 @@ namespace cicada
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
 
+#if 0
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
+#endif
+	states = cand_state_type(graph_in.edges.size() * pop_size_max, model.state_size());
 	
 	buf.clear();
 	buf.resize(graph_in.nodes.size());
@@ -410,7 +413,8 @@ namespace cicada
 	      break;
 	    } else {
 	      // we will merge by the parent and state
-	      std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
+	      //std::pair<typename state_node_map_type::iterator, bool> result = states[item->in_edge->head].insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
+	      std::pair<typename state_node_map_type::iterator, bool> result = states.insert(std::make_pair(std::make_pair(item->parent, item->state), 0));
 	      if (result.second) {
 		node_states.push_back(item->state);
 		result.first->second = graph_out.add_node().id;
@@ -577,7 +581,8 @@ namespace cicada
     candidate_set_type  candidates;
     candidate_type*     candidate_list;
     state_set_type      node_states;
-    cand_state_set_type states;
+    //cand_state_set_type states;
+    cand_state_type     states;
 
     candidate_heap_set_type buf;
     
