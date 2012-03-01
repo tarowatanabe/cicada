@@ -423,7 +423,7 @@ namespace cicada
 	      // we will not propagate...
 	      if (! result.second) {
 		// update score in the parent!
-		// I is possible since parent is alwas popped from the priority queues... is it correct?
+		// It is possible since parent is always popped from the priority queues... is it correct?
 		const_cast<score_type&>(item->parent->score) = std::max(item->parent->score, item->score);
 		
 		destroy_candidate(item);
