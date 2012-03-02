@@ -3848,6 +3848,7 @@ struct OptimizeXBLEU
     
     // we need to minimize negative bleu... + regularized by average entropy...
     double objective = - objective_bleu - temperature * entropy;
+    double objective_regularized = objective;
     
     if (regularize_l2) {
       double norm = 0.0;
@@ -3855,14 +3856,22 @@ struct OptimizeXBLEU
 	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
 	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
       }
+      
+      objective_regularized += 0.5 * optimizer.lambda * norm;
       objective += 0.5 * optimizer.lambda * norm;
+    } else if (regularize_l1) {
+      double norm = 0.0;
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i)
+	norm += std::fabs(x[i]);
+      
+      objective_regularized += optimizer.lambda * norm;
     }
     
     if (scale_fixed)
       g[optimizer.feature_scale.id()] = 0.0;
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective
+      std::cerr << "objective: " << objective_regularized
 		<< " xBLEU: " << objective_bleu
 		<< " BP: " << B
 		<< " entropy: " << entropy
@@ -3871,8 +3880,8 @@ struct OptimizeXBLEU
     
     
     // keep the best so forth...
-    if (objective <= optimizer.objective_opt) {
-      optimizer.objective_opt = objective;
+    if (std::isfinite(objective_regularized) && objective_regularized <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective_regularized;
       optimizer.weights_opt = optimizer.weights;
     }
     
@@ -4231,6 +4240,7 @@ struct OptimizeLBFGS
     MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
     
     const double objective_unregularized = objective;
+    double objective_regularized = objective;
     
     // L2...
     if (regularize_l2) {
@@ -4239,15 +4249,23 @@ struct OptimizeLBFGS
 	g[i] += C * x[i];
 	norm += x[i] * x[i];
       }
+      
+      objective_regularized += 0.5 * C * norm;
       objective += 0.5 * C * norm;
+    } else if (regularize_l1) {
+      double norm = 0.0;
+      for (int i = 0; i < n; ++ i)
+	norm += std::fabs(x[i]);
+      
+      objective_regularized += C * norm;
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective << " non-regularized: " << objective_unregularized << std::endl;
+      std::cerr << "objective: " << objective_regularized << " non-regularized: " << objective_unregularized << std::endl;
     
     // keep the best so forth...
-    if (objective <= optimizer.objective_opt) {
-      optimizer.objective_opt = objective;
+    if (std::isfinite(objective_regularized) && objective_regularized <= optimizer.objective_opt) {
+      optimizer.objective_opt = objective_regularized;
       optimizer.weights_opt = optimizer.weights;
     }
     
