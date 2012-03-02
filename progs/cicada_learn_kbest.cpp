@@ -2085,8 +2085,8 @@ struct OptimizeXBLEU
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
-	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
-	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
+	g[i] += optimizer.lambda * x[i];
+	norm += x[i] * x[i];
       }
       
       objective_regularized += 0.5 * optimizer.lambda * norm;
