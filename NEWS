@@ -1,4 +1,5 @@
 2012-2-x
+INCOMPATIBLE CHANGE: xBLEU regularization is modified: we will also regularize scaling factor together, which will cause different hyperparameter setting (--C)
 INCOMPATIBLE CHANGE: renamed cicada_learn_block_mpi to cicada_learn_online_kbest_mpi and use the block-wise algorithms for cicada_learn_online_mpi
 Bugfix: Adde brevity penalty for RIBES
 Bugfix: Do not read oracles when learning by xBLEU
