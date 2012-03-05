@@ -51,8 +51,10 @@ opt_parser = OptionParser(
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
                 help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
-    make_option("--pbs-hold", default="", action="store", type="string",
+    make_option("--pbs-after", default="", action="store", type="string",
                 help="PBS for launching processes after this process id", metavar="ID"),
+    make_option("--pbs-before", default="", action="store", type="string",
+                help="PBS for launching processes before this process id", metavar="ID"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
@@ -106,7 +108,7 @@ class PBS:
         for worker in self.workers:
             worker.join()
             
-    def run(self, command="", threads=1, memory=0.0, name="cicada-sh", logfile=None, hold=""):
+    def run(self, command="", threads=1, memory=0.0, name="cicada-sh", logfile=None, after="", before=""):
         pipe = cStringIO.StringIO()
         
         pipe.write("#!/bin/sh\n")
@@ -115,8 +117,11 @@ class PBS:
         pipe.write("#PBS -o /dev/null\n")
         pipe.write("#PBS -W block=true\n")
 
-        if hold:
-            pipe.write("#PBS -W depend=after:%s\n" %(hold))
+        if after:
+            pipe.write("#PBS -W depend=after:%s\n" %(after))
+
+        if before:
+            pipe.write("#PBS -W depend=after:%s\n" %(before))
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
@@ -260,7 +265,7 @@ if options.pbs:
     for line in sys.stdin:
         line = line.strip()
         if line:
-            pbs.run(command=line, threads=options.threads, memory=options.max_malloc, hold=options.pbs_hold)
+            pbs.run(command=line, threads=options.threads, memory=options.max_malloc, after=options.pbs_after, before=options.pbs_before)
 
 elif options.mpi:
     cicada = CICADA(options.cicada_dir)
