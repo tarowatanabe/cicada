@@ -27,11 +27,11 @@ namespace cicada
 	__cache.resize(word.id() + 1, vocab_type::EMPTY);
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
       
 	const size_t index = uword.moveIndex32(uword.length(), - int(size));
       
-	UnicodeString uword_suffix;
+	icu::UnicodeString uword_suffix;
 	uword.extractBetween(index, uword.length(), uword_suffix);
       
 	if (uword_suffix.length () < uword.length()) {

@@ -19,7 +19,7 @@ namespace cicada
     Lower::Lower() : pimpl(0)
     {
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<Transliterator> trans(Transliterator::createInstance(UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
+      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       
@@ -28,7 +28,7 @@ namespace cicada
     
     Lower::~Lower()
     {
-      std::auto_ptr<Transliterator> tmp(static_cast<Transliterator*>(pimpl));
+      std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
     }
     
     Stemmer::symbol_type Lower::operator[](const symbol_type& word) const
@@ -51,9 +51,9 @@ namespace cicada
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
 	
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
-	static_cast<Transliterator*>(pimpl)->transliterate(uword);
+	static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
 	
 	std::string word_lower;
 	uword.toUTF8String(word_lower);

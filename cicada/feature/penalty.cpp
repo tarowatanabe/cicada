@@ -44,10 +44,10 @@ namespace cicada
 	    __non_latin.resize(pos_flag + 1, false);
 	  
 	  if (! __non_latin[pos_scan]) {
-	    UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	    icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	    
 	    bool is_non_latin = false;
-	    StringCharacterIterator iter(uword);
+	    icu::StringCharacterIterator iter(uword);
 	    for (iter.setToStart(); iter.hasNext(); /**/)
 	      is_non_latin |= (iter.next32PostInc() >= 0x80);
 	    

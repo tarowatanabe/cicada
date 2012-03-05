@@ -67,8 +67,8 @@ namespace cicada
 
 	cache_type& cache = const_cast<cache_type&>(caches[hasher_type::operator()(input.begin(), input.end(), 0) & (caches.size() - 1)]);
 	if (cache.key != input) {
-	  UnicodeString uphrase = UnicodeString::fromUTF8(input);
-	  UnicodeString ugenerated;
+	  icu::UnicodeString uphrase = icu::UnicodeString::fromUTF8(input);
+	  icu::UnicodeString ugenerated;
 	  std::string   generated;
 	  
 	  phrase_unique_type uniques;
@@ -86,7 +86,7 @@ namespace cicada
 	    generator_set_type::const_iterator giter_end = generators.end();
 	    for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
 	      const generator_type* generator = *giter;
-	      UErrorCode    status(U_ZERO_ERROR);
+	      UErrorCode status(U_ZERO_ERROR);
 	    
 	      ugenerated.remove();
 	      generator->format(formattable, ugenerated, status);

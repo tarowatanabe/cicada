@@ -23,9 +23,9 @@ namespace cicada
       struct Matcher
       {
 	Matcher(const char* pattern) : matcher(0) { initialize(pattern); }
-	~Matcher() { std::auto_ptr<RegexMatcher> tmp(matcher); }
+	~Matcher() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
 	
-	bool operator()(const UnicodeString& x)
+	bool operator()(const icu::UnicodeString& x)
 	{
 	  matcher->reset(x);
 	  
@@ -40,12 +40,12 @@ namespace cicada
 	void initialize(const char* pattern)
 	{
 	  UErrorCode status = U_ZERO_ERROR;
-	  matcher = new RegexMatcher(UnicodeString::fromUTF8(pattern), 0, status);
+	  matcher = new icu::RegexMatcher(icu::UnicodeString::fromUTF8(pattern), 0, status);
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
 	}
       private:
-	RegexMatcher* matcher;
+	icu::RegexMatcher* matcher;
       };
 
       typedef Matcher matcher_type;
@@ -91,7 +91,7 @@ namespace cicada
 
 	impl_type& impl = *static_cast<impl_type*>(pimpl);
 	
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
 	std::string signature = "<UNK";
 

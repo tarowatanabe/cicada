@@ -76,8 +76,8 @@ namespace cicada
 	
 	cache_type& cache = const_cast<cache_type&>(caches[hasher_type::operator()(input.begin(), input.end(), 0) & (caches.size() - 1)]);
 	if (cache.key != input) {
-	  UnicodeString uphrase = UnicodeString::fromUTF8(input);
-	  UnicodeString ugenerated;
+	  icu::UnicodeString uphrase = icu::UnicodeString::fromUTF8(input);
+	  icu::UnicodeString ugenerated;
 	  std::string   generated;
 	
 	  phrase_unique_type uniques;
@@ -235,7 +235,7 @@ namespace cicada
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      UnicodeString rules_rbnf_source;
+      icu::UnicodeString rules_rbnf_source;
       const char* rules_tag = "RBNFRules";
       const char* fmt_tag   = "SpelloutRules";
       
@@ -260,7 +260,7 @@ namespace cicada
 	throw std::runtime_error("no RBNF rules?");
       
       if (has_rbnf_rule_set(*rbnf_source, "cardinal")) {
-	UnicodeString rules(rules_rbnf_source);
+	icu::UnicodeString rules(rules_rbnf_source);
 	
 	rules.findAndReplace("%spellout-numbering", "%%spellout-numbering");
 	rules.findAndReplace("%spellout-ordinal",   "%%spellout-ordinal");
@@ -276,7 +276,7 @@ namespace cicada
       }
       
       if (has_rbnf_rule_set(*rbnf_source, "ordinal")) {
-	UnicodeString rules(rules_rbnf_source);
+	icu::UnicodeString rules(rules_rbnf_source);
 	
 	rules.findAndReplace("%spellout-numbering", "%%spellout-numbering");
 	rules.findAndReplace("%spellout-cardinal",  "%%spellout-cardinal");
@@ -292,7 +292,7 @@ namespace cicada
       }
       
       if (has_rbnf_rule_set(*rbnf_source, "numbering")) {
-	UnicodeString rules(rules_rbnf_source);
+	icu::UnicodeString rules(rules_rbnf_source);
 	
 	rules.findAndReplace("%spellout-numbering-year",  "%%spellout-numbering-year");
 	rules.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
@@ -313,7 +313,7 @@ namespace cicada
 	if (! boost::filesystem::exists(path_source))
 	  throw std::runtime_error("no file? " + path_source.string());
 	
-	UnicodeString rules;
+	icu::UnicodeString rules;
 	
 	utils::compress_istream is(path_target);
 	std::string line;
@@ -330,7 +330,7 @@ namespace cicada
 				   + std::string(" offset: ") + utils::lexical_cast<std::string>(perror.offset));
 	
 	if (has_rbnf_rule_set(*nf_rule, "cardinal")) {
-	  UnicodeString rules_local(rules);
+	  icu::UnicodeString rules_local(rules);
 	  
 	  rules_local.findAndReplace("%spellout-numbering", "%%spellout-numbering");
 	  rules_local.findAndReplace("%spellout-ordinal",   "%%spellout-ordinal");
@@ -346,7 +346,7 @@ namespace cicada
 	}
 	
 	if (has_rbnf_rule_set(*nf_rule, "ordinal")) {
-	  UnicodeString rules_local(rules);
+	  icu::UnicodeString rules_local(rules);
 	  
 	  rules_local.findAndReplace("%spellout-numbering", "%%spellout-numbering");
 	  rules_local.findAndReplace("%spellout-cardinal",  "%%spellout-cardinal");
@@ -362,7 +362,7 @@ namespace cicada
 	}
 	
 	if (has_rbnf_rule_set(*nf_rule, "numbering")) {
-	  UnicodeString rules_local(rules);
+	  icu::UnicodeString rules_local(rules);
 	
 	  rules_local.findAndReplace("%spellout-numbering-year",  "%%spellout-numbering-year");
 	  rules_local.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
@@ -381,7 +381,7 @@ namespace cicada
 
     
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
+      std::auto_ptr<icu::NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
 
@@ -414,7 +414,7 @@ namespace cicada
 	if (! boost::filesystem::exists(path_target))
 	  throw std::runtime_error("no file? " + path_target.string());
 	
-	UnicodeString rules;
+	icu::UnicodeString rules;
 	
 	utils::compress_istream is(path_target);
 	std::string line;
@@ -453,7 +453,7 @@ namespace cicada
       }
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> nf_target(icu::NumberFormat::createInstance(locale_target, status));
+      std::auto_ptr<icu::NumberFormat> nf_target(icu::NumberFormat::createInstance(locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
@@ -464,12 +464,12 @@ namespace cicada
 #if 0
       // currently, we will disable currency parsing/generation
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> curr_source(icu::NumberFormat::createCurrencyInstance(locale_source, status));
+      std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createCurrencyInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> curr_target(icu::NumberFormat::createCurrencyInstance(locale_target, status));
+      std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createCurrencyInstance(locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
       

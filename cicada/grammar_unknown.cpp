@@ -169,7 +169,7 @@ namespace cicada
 	rules_new.push_back(rule_pair_type(rule, riter->target, riter->features, riter->attributes));
       }
     } else {
-      UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
       
       rule_pair_set_type::const_iterator riter_end = __rules.end();
       for (rule_pair_set_type::const_iterator riter = __rules.begin(); riter != riter_end; ++ riter) {

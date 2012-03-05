@@ -103,9 +103,9 @@ namespace cicada
       {
       public:
 	Replace(const char* pattern, const char* subst) : matcher(0) { initialize(pattern, subst); }
-	~Replace() { std::auto_ptr<RegexMatcher> tmp(matcher); }
+	~Replace() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
       
-	const UnicodeString& operator()(UnicodeString& uline)
+	const icu::UnicodeString& operator()(icu::UnicodeString& uline)
 	{
 	  if (! matcher)
 	    throw std::runtime_error("no matcher...");
@@ -122,16 +122,16 @@ namespace cicada
 	void initialize(const char* pattern, const char* subst)
 	{
 	  UErrorCode status = U_ZERO_ERROR;
-	  matcher = new RegexMatcher(UnicodeString::fromUTF8(pattern), 0, status);
+	  matcher = new icu::RegexMatcher(icu::UnicodeString::fromUTF8(pattern), 0, status);
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
 	  
-	  substitute = UnicodeString::fromUTF8(subst);
+	  substitute = icu::UnicodeString::fromUTF8(subst);
 	}
 	
       private:
-	RegexMatcher* matcher;
-	UnicodeString substitute;
+	icu::RegexMatcher* matcher;
+	icu::UnicodeString substitute;
       };
       
       struct ReplaceAll
@@ -139,9 +139,9 @@ namespace cicada
   
       public:
 	ReplaceAll(const char* pattern, const char* subst) : matcher(0) { initialize(pattern, subst); }
-	~ReplaceAll() { std::auto_ptr<RegexMatcher> tmp(matcher); }
+	~ReplaceAll() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
 	
-	const UnicodeString& operator()(UnicodeString& uline)
+	const icu::UnicodeString& operator()(icu::UnicodeString& uline)
 	{
 	  if (! matcher)
 	    throw std::runtime_error("no matcher...");
@@ -162,16 +162,16 @@ namespace cicada
 	void initialize(const char* pattern, const char* subst)
 	{
 	  UErrorCode status = U_ZERO_ERROR;
-	  matcher = new RegexMatcher(UnicodeString::fromUTF8(pattern), 0, status);
+	  matcher = new icu::RegexMatcher(icu::UnicodeString::fromUTF8(pattern), 0, status);
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
 	  
-	  substitute = UnicodeString::fromUTF8(subst);
+	  substitute = icu::UnicodeString::fromUTF8(subst);
 	}
 
       private:
-	RegexMatcher* matcher;
-	UnicodeString substitute;
+	icu::RegexMatcher* matcher;
+	icu::UnicodeString substitute;
       };
       
       ArabicImpl()
@@ -185,7 +185,7 @@ namespace cicada
       
       std::string operator()(const std::string& word)
       {
-	UnicodeString uword = UnicodeString::fromUTF8(word);
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(word);
 	
 	normalize_ya_alef_maqsoura(uword);
 	

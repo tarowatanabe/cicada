@@ -31,36 +31,36 @@ namespace cicada
 	// Any-Latin, NFKD, remove accents, NFKC
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError status_parse;
-	Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
-								  UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
-								  UTRANS_FORWARD, status_parse, status);
+	icu::Transliterator* __trans = icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("AnyLatinNoAccents"),
+									    icu::UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
+									    UTRANS_FORWARD, status_parse, status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
 	
 	// register here...
-	Transliterator::registerInstance(__trans);
+	icu::Transliterator::registerInstance(__trans);
       }
     };
     
     struct LatinImpl : public LatinDetail
     {
     private:
-      Transliterator* trans;
+      icu::Transliterator* trans;
       
     public:
       LatinImpl() : LatinDetail(), trans(0)
       {
 	UErrorCode status = U_ZERO_ERROR;
-	trans = Transliterator::createInstance(UnicodeString::fromUTF8("AnyLatinNoAccents"),
-					       UTRANS_FORWARD,
-					       status);
+	trans = icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("AnyLatinNoAccents"),
+						    UTRANS_FORWARD,
+						    status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       }
-      ~LatinImpl() { std::auto_ptr<Transliterator> tmp(trans); }
+      ~LatinImpl() { std::auto_ptr<icu::Transliterator> tmp(trans); }
       
     public:
-      void operator()(UnicodeString& data) { trans->transliterate(data); }
+      void operator()(icu::UnicodeString& data) { trans->transliterate(data); }
     };
     
     Latin::Latin() : pimpl(new impl_type()) {}
@@ -86,7 +86,7 @@ namespace cicada
       
       if (__cache[word.id()] == vocab_type::EMPTY) {
 	
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
 	pimpl->operator()(uword);
       

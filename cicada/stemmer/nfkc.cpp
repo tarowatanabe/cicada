@@ -29,11 +29,11 @@ namespace cicada
 	__cache.resize(word.id() + 1, vocab_type::EMPTY);
       
       if (__cache[word.id()] == vocab_type::EMPTY) {
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	UnicodeString uword_nfkc;
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword_nfkc;
 	
 	UErrorCode status = U_ZERO_ERROR;
-	Normalizer::normalize(uword, UNORM_NFKC, 0, uword_nfkc, status);
+	icu::Normalizer::normalize(uword, UNORM_NFKC, 0, uword_nfkc, status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error("normalization failed");
 	

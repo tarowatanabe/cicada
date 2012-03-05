@@ -20,7 +20,7 @@ namespace cicada
     English::English() : pimpl(0) 
     {
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<Transliterator> trans(Transliterator::createInstance(UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
+      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       
@@ -29,7 +29,7 @@ namespace cicada
     
     English::~English()
     {
-      std::auto_ptr<Transliterator> tmp(static_cast<Transliterator*>(pimpl));
+      std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
     }
     
     Signature::symbol_type English::operator[](const symbol_type& word) const
@@ -48,7 +48,7 @@ namespace cicada
 	__cache.resize(word.id() + 1, vocab_type::EMPTY);
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 
 	std::string signature = "<UNK";
 	
@@ -62,7 +62,7 @@ namespace cicada
 	UChar32 ch0 = 0;
 	UChar32 ch_1 = 0;
 	UChar32 ch_2 = 0;
-	StringCharacterIterator iter(uword);
+	icu::StringCharacterIterator iter(uword);
 	for (iter.setToStart(); iter.hasNext(); ++ length) {
 	  UChar32 ch = iter.next32PostInc();
 	  
@@ -89,7 +89,7 @@ namespace cicada
 	}
 	
 	// transform into lower...
-	static_cast<Transliterator*>(pimpl)->transliterate(uword);
+	static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
 	ch_2 = (ch_2 ? u_tolower(ch_2) : ch_2);
 	ch_1 = (ch_1 ? u_tolower(ch_1) : ch_1);
 	

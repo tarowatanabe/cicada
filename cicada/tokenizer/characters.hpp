@@ -27,14 +27,14 @@ namespace cicada
 	tokenized.clear();
 	sentence_type::const_iterator siter_end = source.end();
 	for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	  UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*siter));
+	  icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(*siter));
 	  
-	  StringCharacterIterator iter(uword);
+	  icu::StringCharacterIterator iter(uword);
 	  for (iter.setToStart(); iter.hasNext(); /**/) {
 	    const UChar32 c = iter.next32PostInc();
 	    
 	    buffer.clear();
-	    UnicodeString(c).toUTF8String(buffer);
+	    icu::UnicodeString(c).toUTF8String(buffer);
 	    
 	    tokenized.push_back(word_type(buffer.begin(), buffer.end()));
 	  }

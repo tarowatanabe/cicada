@@ -29,15 +29,15 @@ namespace cicada
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
       
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
       
 	if (u_getIntPropertyValue(uword.char32At(0), UCHAR_NUMERIC_TYPE) == U_NT_NONE
 	    && u_getIntPropertyValue(uword.char32At(uword.length() - 1), UCHAR_NUMERIC_TYPE) == U_NT_NONE)
 	  __cache[word.id()] = word;
 	else {
 	  bool found = false;
-	  UnicodeString uword_digits("<digit-");
-	  StringCharacterIterator iter(uword);
+	  icu::UnicodeString uword_digits("<digit-");
+	  icu::StringCharacterIterator iter(uword);
 	  for (iter.setToStart(); iter.hasNext(); /**/) {
 	    UChar32 c = iter.next32PostInc();
 	  
