@@ -56,6 +56,7 @@ compact_trie_dense_set.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \
+crp.hpp \
 dense_hashtable.hpp \
 dense_hash_map.hpp \
 dense_hash_set.hpp \
@@ -99,7 +100,9 @@ random_seed.hpp \
 regex_group.hpp \
 repository.hpp \
 resource.hpp \
+sampler.hpp \
 simple_vector.hpp \
+slice_sampler.hpp \
 small_vector.hpp \
 space_separator.hpp \
 sparse_hash_map.hpp \

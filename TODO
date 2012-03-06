@@ -30,7 +30,6 @@ Support word alignment training!
   Intersection with the supplied alignment: supervised training!
     Can we do this, given that word alignment space is rather constrained...
 
-
 Implement scalable training by L1 regularized feature selection:
   1. Collect features.. it is the hardest part...
      Decode-and-extract features
@@ -87,11 +86,6 @@ Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
 Global lexicon learning by liblinear...?
    We will add bias feature, then learn...
 
-Threaded cicada:
-  It turned out to be difficult: we can clone models and grammars, but 
-  the problem is when... Actually, we should clone "after" threads are created,
-  assuming that the models/grammars are "untouched" by the main thread.
-
 Collapse and binarize the source side of the ghkm/tree grammar
    Perform "collapsing" and do binarization (either source or target)
    Perform lexicalization?
@@ -127,8 +121,6 @@ remote grammar and tree-grammar:
   set up server for grammar(s) and query from clients
   performs composition/parse/generation at the server side with larger memory (meaning with larger grammar)
   
-Use of optimized-pegasos for pro.
-
 revise static create interface:
   currently, we return reference, but it is safer to return pointer...?
 
@@ -142,3 +134,6 @@ Earley composition with CFG!
 
 optimized variant of SGD (and xBLEU?)
   xBLEU is impossible given that the combination is already weighted!
+
+PYP language model
+    Probably easy... Use the parallel training from Graham.

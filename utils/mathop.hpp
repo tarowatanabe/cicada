@@ -13,6 +13,7 @@
 
 #include <boost/math/special_functions/log1p.hpp>
 #include <boost/math/special_functions/digamma.hpp>
+#include <boost/math/special_functions/gamma.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
 
 namespace utils
@@ -98,6 +99,50 @@ namespace utils
       const Tp ret = boost::math::digamma(x, policy_type());
       return (std::isfinite(ret) ? ret : boost::numeric::bounds<Tp>::lowest());
     }
+
+    template <typename Tp>
+    inline
+    Tp lgamma(Tp x)
+    {
+      return boost::math::lgamma(x);
+    }
+    
+    template <typename Tp>
+    inline
+    Tp log_poisson(size_t x, const Tp& lambda) 
+    {
+      return std::log(lambda) * x - lgamma(x + 1) - lambda;
+    }
+
+    template <typename Tp>
+    inline
+    Tp log_gamma(const Tp& x) 
+    {
+      return lgamma(x);
+    }
+    
+    template <typename Tp>
+    inline
+    Tp log_beta(const Tp& x, const Tp& y) 
+    {
+      return lgamma(x) + lgamma(y) - lgamma(x + y);
+    }
+    
+    template <typename Tp>
+    inline
+    Tp log_gamma_density(const Tp& x, const Tp& shape, const Tp& rate) 
+    {
+      return (shape - Tp(1)) * std::log(x) - shape * std::log(rate) - x / rate - lgamma(shape);
+    }
+    
+    template <typename Tp>
+    inline
+    Tp log_beta_density(const Tp& x, const Tp& alpha, const Tp& beta) 
+    {
+      return (alpha - Tp(1)) * std::log(x) + (beta - Tp(1)) * std::log(Tp(1) - x) - log_beta(alpha, beta);
+    }
+
+    
   };
 };
 
