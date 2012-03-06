@@ -48,6 +48,7 @@ byte_aligned_pair_delta_vector.hpp \
 c_string_generator.hpp \
 c_string_parser.hpp \
 chart.hpp \
+chinese_restaurant_process.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \
 compact_trie_dense.hpp \
@@ -56,7 +57,6 @@ compact_trie_dense_set.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \
-crp.hpp \
 dense_hashtable.hpp \
 dense_hash_map.hpp \
 dense_hash_set.hpp \

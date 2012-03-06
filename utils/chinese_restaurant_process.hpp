@@ -10,13 +10,14 @@
 
 #include <numeric>
 #include <limits>
-#include <list>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 #include <boost/functional/hash.hpp>
 
 #include <utils/unordered_map.hpp>
+#include <utils/slice_sampler.hpp>
 
 namespace utils
 {
@@ -61,15 +62,12 @@ namespace utils
   private:
     struct Location
     {
-      // we use list to keep tables, there fore we will keep track of # of items in tables
-      // since, list will traverse again to compute size()!
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
-      typedef std::list<size_type, alloc_type> table_set_type
+      typedef std::vector<size_type, alloc_type> table_set_type
       
-      Locations() : count(0), size(0) {}
+      Locations() : count(0) {}
       
       size_type      count;
-      size_type      size;
       table_set_type tables;
     };
     typedef Location location_type;
@@ -106,13 +104,13 @@ namespace utils
       bool shared = false;
       if (loc.count) {
 	const double p_empty = (alpha + table_size * discount) * p0;
-	const double p_share = (loc.count - loc.size * discount);
+	const double p_share = (loc.count - loc.tables.size() * discount);
 	
 	shared = sampler.select(p_empty, p_share);
       }
       
       if (shared) {
-	double r = sampler.uniform() * (loc.count - loc.size * discount);
+	double r = sampler.uniform() * (loc.count - loc.tables.size() * discount);
 	
 	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -125,7 +123,6 @@ namespace utils
 	}
       } else {
 	loc.tables.push_back(1);
-	++ loc.size;
 	++ table_size;
       }
       
@@ -166,7 +163,6 @@ namespace utils
 	  if (! (*titer)) {
 	    erased = true;
 	    -- table_size;
-	    -- loc.size;
 	    loc.tables.erase(*titer);
 	  }
 	  break;
@@ -186,7 +182,7 @@ namespace utils
       if (diter == dishes.end())
 	return r * p0 / (double(customer_size) + alpha);
       else
-	return (double(diter->second.count) - discount * iter->second.size + r * p0) / (double(customer_size) + alpha);
+	return (double(diter->second.count) - discount * iter->second.tables.size() + r * p0) / (double(customer_size) + alpha);
     }
 
     double log_crp() const
