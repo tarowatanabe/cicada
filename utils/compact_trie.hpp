@@ -84,6 +84,8 @@ namespace utils
     inline       mapped_type& operator[](id_type __id)       { return __nodes[__id].__data; }
     
     void clear() { __root.clear(); __nodes.clear(); }
+
+    size_type size() const { return __nodes.size(); }
     
     bool empty() const { return __nodes.empty(); }
     bool empty(id_type __id) const

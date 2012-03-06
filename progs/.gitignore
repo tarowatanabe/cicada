@@ -96,6 +96,7 @@ cicada_mert
 cicada_mert_mpi
 cicada_mert_kbest
 cicada_mert_kbest_mpi
+cicada_ngram_learn_pyp
 cicada_oracle
 cicada_oracle_mpi
 cicada_oracle_kbest

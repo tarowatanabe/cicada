@@ -92,6 +92,7 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	cicada_mert_kbest \
 	cicada_mert_kbest_mpi \
+	cicada_ngram_learn_pyp \
 	cicada_oracle \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
@@ -360,6 +361,9 @@ cicada_maxlike_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDA
 cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp $(LBFGS_SOURCE) cicada_maxlike_impl.hpp cicada_text_impl.hpp
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+ 
+cicada_ngram_learn_pyp_SOURCES = cicada_ngram_learn_pyp.cpp 
+cicada_ngram_learn_pyp_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_unite_forest_SOURCES = cicada_unite_forest.cpp
 cicada_unite_forest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

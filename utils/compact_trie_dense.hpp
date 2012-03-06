@@ -42,8 +42,6 @@ namespace utils
     typedef size_t                     size_type;
     typedef ptrdiff_t                  difference_type;
     
-    
-    
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
@@ -86,6 +84,8 @@ namespace utils
     inline       mapped_type& operator[](id_type __id)       { return __nodes[__id].__data; }
     
     void clear() { __root.clear(); __nodes.clear(); }
+    
+    size_type size() const { return __nodes.size(); }
     
     bool empty() const { return __nodes.empty(); }
     bool empty(id_type __id) const

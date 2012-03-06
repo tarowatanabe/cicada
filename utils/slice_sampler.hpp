@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <stdecept>
+#include <stdexcept>
 
 namespace utils
 {

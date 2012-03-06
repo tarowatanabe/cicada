@@ -74,6 +74,8 @@ namespace utils
     const_iterator end(id_type __id) const { return __nodes[__id].__map.end(); }
     
     void clear() { __root.clear(); __nodes.clear(); }
+
+    size_type size() const { return __nodes.size(); }
     
     bool empty() const { return __nodes.empty(); }
     bool empty(id_type __id) const
