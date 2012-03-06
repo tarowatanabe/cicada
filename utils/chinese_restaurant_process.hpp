@@ -147,8 +147,8 @@ namespace utils
       if (shared) {
 	double r = sampler.uniform() * (loc.count - loc.tables.size() * m_discount);
 	
-	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
+	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
+	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
 	  r -= (*titer - m_discount);
 	  
 	  if (r <= 0.0) {
@@ -198,7 +198,7 @@ namespace utils
 	  if (! (*titer)) {
 	    erased = true;
 	    -- table_size;
-	    loc.tables.erase(*titer);
+	    loc.tables.erase(titer);
 	  }
 	  break;
 	}

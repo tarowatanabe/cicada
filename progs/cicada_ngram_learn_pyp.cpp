@@ -32,7 +32,9 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/chinese_restaurant_process.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/dense_hash_set.hpp"
 #include "utils/compact_trie_dense.hpp"
+#include "utils/sampler.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -131,6 +133,8 @@ struct PYPLM
   template <typename Iterator, typename Sampler>
   void decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
   {
+    typedef std::reverse_iterator<Iterator> reverse_iterator;
+    
     if (first == last) {
       if (root.table.decrement(word, sampler))
 	-- counts0;
@@ -204,8 +208,7 @@ struct PYPLM
   
   struct DiscountResampler
   {
-    DiscountResampler(const PYPLM& __pyplm,
-		      const int __order) : pyplm(__pyplm), order(__order) {}
+    DiscountResampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
     const PYPLM& pyplm;
     int order;
@@ -218,7 +221,7 @@ struct PYPLM
   
   struct StrengthResampler
   {
-    StrengthResampler(const PYPLM& __pyplm) : pyplm(__pyplm) {}
+    StrengthResampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
     const PYPLM& pyplm;
     int order;
@@ -238,7 +241,7 @@ struct PYPLM
       DiscountResampler discount_resampler(*this, order);
       StrengthResampler strength_resampler(*this, order);
       
-      for (int iter = 0; iter < num_loop; ++ iter) {
+      for (size_type iter = 0; iter < num_loop; ++ iter) {
 	strength[order] = utils::slice_sampler(strength_resampler,
 					       strength[order],
 					       sampler,
@@ -300,10 +303,16 @@ public:
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
+typedef utils::sampler<boost::mt19937> sampler_type;
+
+typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+
 path_set_type train_files;
 path_set_type test_files;
 
+int order = 3;
 int samples = 300;
+int resample_rate = 20;
 
 double discount_prior_alpha = 1.0;
 double discount_prior_beta  = 1.0;
@@ -313,6 +322,8 @@ double strength_prior_rate  = 1.0;
 int threads = 1;
 int debug = 0;
 
+void read_vocab(const path_set_type& files, word_set_type& vocab);
+
 void options(int argc, char** argv);
 
 int main(int argc, char ** argv)
@@ -320,13 +331,107 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
+    threads = utils::bithack::max(threads, 1);
     
+    if (order <= 0)
+      throw std::runtime_error("order must be positive");
+    
+    if (samples <= 0)
+      throw std::runtime_error("# of samples must be positive");
+
+    sampler_type sampler;
+    
+    word_set_type vocab;
+    vocab.set_empty_key(word_type());
+    
+    read_vocab(train_files, vocab);
+    
+    PYPLM lm(order,
+	     1.0 / vocab.size(),
+	     discount_prior_alpha,
+	     discount_prior_beta,
+	     strength_prior_shape,
+	     strength_prior_rate);
+    
+    for (int iter = 0; iter < samples; ++ iter) {
+      sentence_type sentence;
+      sentence_type ngram(order - 1, vocab_type::BOS);
+      
+      for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
+	utils::compress_istream is(*fiter, 1024 * 1024);
+	
+	while (is >> sentence) {
+	  ngram.resize(order - 1);
+	  
+	  sentence_type::const_iterator siter_end = sentence.end();
+	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	    
+	    if (iter)
+	      lm.decrement(*siter, ngram.end() - order + 1, ngram.end(), sampler);
+	    
+	    lm.increment(*siter, ngram.end() - order + 1, ngram.end(), sampler);
+	    
+	    ngram.push_back(*siter);
+	  }
+	  
+	  if (iter)
+	    lm.decrement(vocab_type::EOS, ngram.end() - order + 1, ngram.end(), sampler);
+	  
+	  lm.increment(vocab_type::EOS, ngram.end() - order + 1, ngram.end(), sampler);
+	}
+      }
+      
+      if (iter % resample_rate == resample_rate - 1)
+	lm.resample_hyperparameters(sampler);
+    }
+    
+    if (! test_files.empty()) {
+      double loglikelihood = 0.0;
+      size_t count = 0;
+      size_t oov = 0;
+      
+      sentence_type sentence;
+      sentence_type ngram(order - 1, vocab_type::BOS);
+      
+      for (path_set_type::const_iterator fiter = test_files.begin(); fiter != test_files.end(); ++ fiter) {
+	utils::compress_istream is(*fiter, 1024 * 1024);
+	
+	while (is >> sentence) {
+	  ngram.resize(order - 1);
+	  
+	  sentence_type::const_iterator siter_end = sentence.end();
+	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	    ++ count;
+	    oov += (vocab.find(*siter) == vocab.end());
+	    loglikelihood += std::log(lm.prob(*siter, ngram.end() - order + 1, ngram.end()));
+	    
+	    ngram.push_back(*siter);
+	  }
+	  
+	  ++ count;
+	  loglikelihood += std::log(lm.prob(vocab_type::EOS, ngram.end() - order + 1, ngram.end()));
+	}
+      }
+      
+      
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
     return 1;
   }
   return 0;
+}
+
+void read_vocab(const path_set_type& files, word_set_type& vocab)
+{  
+  sentence_type sentence;
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    
+    while (is >> sentence) 
+      vocab.insert(sentence.begin(), sentence.end());
+  }
 }
 
 void options(int argc, char** argv)
@@ -337,10 +442,13 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("train",   po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
-    ("test",    po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
+    ("train", po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
+    ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
 
-    ("samples", po::value<int>(&samples)->default_value(samples), "# of samples")
+    ("order", po::value<int>(&order)->default_value(order), "max ngram order")
+    
+    ("samples",  po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("resample", po::value<int>(&resample_rate)->default_value(resample_rate), "resampling rate")
 
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")

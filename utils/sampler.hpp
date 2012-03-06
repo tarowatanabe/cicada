@@ -19,18 +19,18 @@ namespace utils
 {
 
   template <typename Generator>
-  struct Sampler
+  struct sampler
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 
-    Sampler()
+    sampler()
       : dist(0,1), gen(), random(gen, dist)
     {
       gen.seed(utils::random_seed());
     }
     
-    explicit Sampler(const unsigned int seed)
+    explicit sampler(const unsigned int seed)
       : dist(0,1), gen(), random(gen, dist)
     {
       gen.seed(seed);
@@ -58,7 +58,7 @@ namespace utils
     {
       const double a = (p_cur / p_prev) * (q_prev / q_cur);
       
-      return (std::log(a) >= 0.0) || (next() < a);
+      return (std::log(a) >= 0.0) || (uniform() < a);
     }
     
     size_type select(const double& a, const double& b)
