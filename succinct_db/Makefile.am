@@ -19,10 +19,10 @@ succinct_dbinclude_HEADERS = \
 	succinct_hash_db.hpp
 
 noinst_PROGRAMS = \
-	sample_succinct_trie \
-	sample_succinct_hash \
-	sample_succinct_trie_db \
-	sample_succinct_trie_database
+	succinct_trie_main \
+	succinct_hash_main \
+	succinct_trie_db_main \
+	succinct_trie_database_main
 
 noinst_DATA = .gitignore
 
@@ -35,14 +35,14 @@ noinst_DATA = .gitignore
 	  echo $$bin >> .gitignore; \
 	done
 
-sample_succinct_trie_SOURCES = sample_succinct_trie.cpp
-sample_succinct_trie_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD)
+succinct_trie_main_SOURCES = succinct_trie_main.cpp
+succinct_trie_main_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD)
 
-sample_succinct_hash_SOURCES = sample_succinct_hash.cpp
-sample_succinct_hash_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD)
+succinct_hash_main_SOURCES = succinct_hash_main.cpp
+succinct_hash_main_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD)
 
-sample_succinct_trie_db_SOURCES = sample_succinct_trie_db.cpp
-sample_succinct_trie_db_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD) $(LIBUTILS)
+succinct_trie_db_main_SOURCES = succinct_trie_db_main.cpp
+succinct_trie_db_main_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD) $(LIBUTILS)
 
-sample_succinct_trie_database_SOURCES = sample_succinct_trie_database.cpp
-sample_succinct_trie_database_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD) $(LIBUTILS)
+succinct_trie_database_main_SOURCES = succinct_trie_database_main.cpp
+succinct_trie_database_main_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD) $(LIBUTILS)
