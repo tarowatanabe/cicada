@@ -19,6 +19,7 @@
 // }
 //
 
+#include <map>
 
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
@@ -34,10 +35,17 @@
 #include "utils/unordered_map.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
+#include "utils/repository.hpp"
+#include "utils/packed_device.hpp"
+#include "utils/packed_vector.hpp"
+#include "utils/succinct_vector.hpp"
+#include "utils/simple_vector.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/fusion/tuple.hpp>
 
 
 typedef cicada::Symbol    word_type;
@@ -49,6 +57,8 @@ struct PYPLM
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   typedef uint32_t  id_type;
+
+  typedef boost::filesystem::path path_type;
 
   struct Node
   {
@@ -181,7 +191,7 @@ struct PYPLM
   {
     double logprob = std::log(p0) * counts0;
     
-    for (size_type order = 0; order !=discount.size(); ++ order)
+    for (size_type order = 0; order != discount.size(); ++ order)
       logprob += log_likelihood(order, discount[order], strength[order]);
     
     return logprob;
@@ -281,7 +291,97 @@ struct PYPLM
     }
   }
 
-public:  
+  void write(const path_type& path)
+  {
+    typedef utils::repository repository_type;
+    typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
+    typedef utils::simple_vector<word_type, std::allocator<word_type> > prefix_type;
+    typedef std::vector<prefix_type, std::allocator<prefix_type> > prefix_set_type;
+
+    typedef uint64_t count_type;
+
+    typedef boost::fusion::tuple<id_type, count_type, count_type> data_type;
+
+    typedef std::map<word_type, data_type, std::less<word_type>, std::allocator<std::pair<const word_type, data_type> >  > word_set_type;
+    typedef utils::succinct_vector<std::allocator<int32_t> > position_set_type;
+    typedef std::vector<count_type, std::allocator<count_type> > offset_set_type;
+      
+    repository_type rep(path, repository_type::write);
+      
+    rep["order"] = boost::lexical_cast<std::string>(discount.size());
+    rep["discount-alpha"] = boost::lexical_cast<std::string>(discount_alpha);
+    rep["discount-beta"]  = boost::lexical_cast<std::string>(discount_beta);
+    rep["strength-shape"] = boost::lexical_cast<std::string>(strength_shape);
+    rep["strength-rate"]  = boost::lexical_cast<std::string>(strength_rate);
+      
+    rep["p0"]      = boost::lexical_cast<std::string>(p0);
+    rep["counts0"] = boost::lexical_cast<std::string>(counts0);
+    for (size_type order = 0; order != discount.size(); ++ order) {
+      rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(discount[order]);
+      rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(strength[order]);
+    }
+
+    // we will compute on-memory for faster indexing... (and assuming small data!)
+    
+    boost::iostreams::filtering_ostream os_index;
+    boost::iostreams::filtering_ostream os_count;
+    
+    os_index.push(utils::packed_sink<id_type, std::allocator<id_type> >(rep.path("index")));
+    os_count.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("count")));
+      
+    position_set_type positions;
+    offset_set_type   offsets(1, 0);
+    count_type        offset = 0;
+    
+    node_set_type nodes(1, trie.root());
+    node_set_type nodes_next;
+    
+    prefix_set_type prefix(trie.size() + 1);
+    
+    word_set_type words;
+    
+    for (size_type order = 0; order != discount.size(); ++ order) {
+      nodes_next.clear();
+      
+      node_set_type::const_iterator niter_end = nodes.end();
+      for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	const node_type& node = (*niter == trie.root() ? root : trie[*niter]);
+	trie_type::const_iterator iter_begin = (*niter == trie.root() ? trie.begin() : trie.begin(*niter));
+	trie_type::const_iterator iter_end   = (*niter == trie.root() ? trie.end() : trie.end(*niter));
+	
+	words.clear();
+	
+	// we have an entry in the model
+	node_type::table_type::const_iterator titer_end = node.table.end();
+	for (node_type::table_type::const_iterator titer = node.table.begin(); titer != titer_end; ++ titer)
+	  words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
+							      titer->second.size_customer(),
+							      titer->second.size_table())));
+	
+	// or, we have an entry with the longer contexts..
+	for (trie_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
+	  if (! trie[iter->second].table.empty()) {
+	    std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
+	    if (! result.second)
+	      boost::fusion::get<0>(result.first->second) = iter->second;
+	  }
+	
+	word_set_type::const_iterator witer_end = words.end();
+	for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
+	  if (boost::fusion::get<0>(witer->second) != trie_type::npos())
+	    nodes_next.push_back(boost::fusion::get<0>(witer->second));
+	  
+	}
+      }
+      
+      nodes.swap(nodes_next);
+    }
+    
+    // vocabulary...
+    word_type::write(rep.path("vocab"));
+  }
+
+private: 
   trie_type trie;
   node_type root;
   
@@ -304,6 +404,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
 path_set_type train_files;
+path_type     output_file;
 
 int order = 3;
 int samples = 300;
@@ -386,7 +487,8 @@ int main(int argc, char ** argv)
     }
     
     // we will dump LM... now, define a format!
-    
+    if (! output_file.empty())
+      lm.write(output_file);
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -465,6 +567,7 @@ void options(int argc, char** argv)
   po::options_description desc("options");
   desc.add_options()
     ("train", po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
+    ("output", po::value<path_type>(&output_file), "output file")
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
