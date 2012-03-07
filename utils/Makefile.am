@@ -142,6 +142,7 @@ bitpack_main \
 bit_vector_main \
 byte_aligned_code_main \
 byte_aligned_vector_main \
+chinese_restaurant_process_main \
 chunk_vector_main \
 compress_stream_main \
 dense_map_main \
@@ -249,6 +250,8 @@ bit_vector_main_SOURCES = bit_vector_main.cpp
 byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
+
+chinese_restaurant_process_main_SOURCES = chinese_restaurant_process_main.cpp
 
 chunk_vector_main_SOURCES = chunk_vector_main.cpp
 chunk_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

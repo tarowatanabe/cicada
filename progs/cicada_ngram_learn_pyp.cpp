@@ -32,7 +32,6 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/chinese_restaurant_process.hpp"
 #include "utils/unordered_map.hpp"
-#include "utils/dense_hash_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
 
@@ -98,7 +97,7 @@ struct PYPLM
   void increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
   {
     const double backoff = prob(word, first + 1, last);
-    
+
     if (first == last) {
       if (root.table.increment(word, backoff, sampler))
 	++ counts0;
@@ -236,7 +235,7 @@ struct PYPLM
 				const size_type num_loop = 5,
 				const size_type num_iterations = 10)
   {
-    for (int order = discount.size() - 1; order >= 0; ++ order) {
+    for (int order = discount.size() - 1; order >= 0; -- order) {
       DiscountResampler discount_resampler(*this, order);
       StrengthResampler strength_resampler(*this, order);
       
@@ -304,10 +303,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
 
-typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
-
 path_set_type train_files;
-path_set_type test_files;
 
 int order = 3;
 int samples = 300;
@@ -321,7 +317,7 @@ double strength_prior_rate  = 1.0;
 int threads = 1;
 int debug = 0;
 
-void read_vocab(const path_set_type& files, word_set_type& vocab);
+size_t vocabulary_size(const path_set_type& files);
 
 void options(int argc, char** argv);
 
@@ -338,15 +334,14 @@ int main(int argc, char ** argv)
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
 
+    if (train_files.empty())
+      throw std::runtime_error("no training data?");
+
     sampler_type sampler;
-    
-    word_set_type vocab;
-    vocab.set_empty_key(word_type());
-    
-    read_vocab(train_files, vocab);
+    const size_t num_vocab = vocabulary_size(train_files);
     
     PYPLM lm(order,
-	     1.0 / vocab.size(),
+	     1.0 / num_vocab,
 	     discount_prior_alpha,
 	     discount_prior_beta,
 	     strength_prior_shape,
@@ -361,7 +356,7 @@ int main(int argc, char ** argv)
       
       for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
 	utils::compress_istream is(*fiter, 1024 * 1024);
-	
+
 	while (is >> sentence) {
 	  ngram.resize(order - 1);
 	  
@@ -383,39 +378,12 @@ int main(int argc, char ** argv)
 	}
       }
       
+      
       if (iter % resample_rate == resample_rate - 1)
 	lm.resample_hyperparameters(sampler);
-    }
-    
-    if (! test_files.empty()) {
-      double loglikelihood = 0.0;
-      size_t count = 0;
-      size_t oov = 0;
       
-      sentence_type sentence;
-      sentence_type ngram(order - 1, vocab_type::BOS);
-      
-      for (path_set_type::const_iterator fiter = test_files.begin(); fiter != test_files.end(); ++ fiter) {
-	utils::compress_istream is(*fiter, 1024 * 1024);
-	
-	while (is >> sentence) {
-	  ngram.resize(order - 1);
-	  
-	  sentence_type::const_iterator siter_end = sentence.end();
-	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	    ++ count;
-	    oov += (vocab.find(*siter) == vocab.end());
-	    loglikelihood += std::log(lm.prob(*siter, ngram.end() - order + 1, ngram.end()));
-	    
-	    ngram.push_back(*siter);
-	  }
-	  
-	  ++ count;
-	  loglikelihood += std::log(lm.prob(vocab_type::EOS, ngram.end() - order + 1, ngram.end()));
-	}
-      }
-      
-      
+      if (debug)
+	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
   }
   catch (const std::exception& err) {
@@ -425,15 +393,65 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-void read_vocab(const path_set_type& files, word_set_type& vocab)
-{  
-  sentence_type sentence;
+struct string_hash : public utils::hashmurmur<size_t>
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  size_t operator()(const std::string& x) const
+  {
+    return hasher_type::operator()(x.begin(), x.end(), 0);
+  }
+};
+
+template <typename Tp>
+struct greater_second
+{
+  bool operator()(const Tp& x, const Tp& y) const
+  {
+    return x.second > y.second;
+  }
+  
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
+
+size_t vocabulary_size(const path_set_type& files)
+{
+  typedef uint64_t count_type;
+  typedef utils::unordered_map<std::string, count_type, string_hash, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
+
+  typedef std::vector<const vocab_type::value_type*, std::allocator<const vocab_type::value_type*> > sorted_type;
+  
+  vocab_type vocab;
+  std::string word;
+  
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter))
+      throw std::runtime_error("no file? " + fiter->string());
+    
     utils::compress_istream is(*fiter, 1024 * 1024);
     
-    while (is >> sentence) 
-      vocab.insert(sentence.begin(), sentence.end());
+    while (is >> word) 
+      ++ vocab[word];
   }
+
+  sorted_type sorted;
+  sorted.reserve(vocab.size());
+  
+  vocab_type::const_iterator viter_end = vocab.end();
+  for (vocab_type::const_iterator viter = vocab.begin(); viter != viter_end; ++ viter)
+    sorted.push_back(&(*viter));
+  
+  std::sort(sorted.begin(), sorted.end(), greater_second<vocab_type::value_type>());
+
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
+    word_type __tmptmp((*siter)->first);
+  }
+  
+  return vocab.size();
 }
 
 void options(int argc, char** argv)
@@ -445,8 +463,7 @@ void options(int argc, char** argv)
   po::options_description desc("options");
   desc.add_options()
     ("train", po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
-    ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
-
+    
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
     ("samples",  po::value<int>(&samples)->default_value(samples),             "# of samples")

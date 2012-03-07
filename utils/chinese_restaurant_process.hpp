@@ -18,6 +18,7 @@
 
 #include <utils/unordered_map.hpp>
 #include <utils/slice_sampler.hpp>
+#include <utils/mathop.hpp>
 
 namespace utils
 {
@@ -90,8 +91,16 @@ namespace utils
     {
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
       typedef std::vector<size_type, alloc_type> table_set_type;
+
+      typedef typename table_set_type::const_iterator const_iterator;
       
       Location() : count(0) {}
+      
+      const_iterator begin() const { return tables.begin(); }
+      const_iterator end() const { return tables.end(); }
+
+      size_type size_customer() const { return count; }
+      size_type size_table() const { return tables.size(); }
       
       size_type      count;
       table_set_type tables;
@@ -100,8 +109,18 @@ namespace utils
     
     typedef typename Alloc::template rebind<std::pair<const dish_type, location_type> >::other alloc_type;
     typedef typename utils::unordered_map<dish_type, location_type, Hash, Pred, alloc_type>::type dish_set_type;
+
+  public:
+    typedef typename dish_set_type::key_type       key_type;
+    typedef typename dish_set_type::mapped_type    mapped_type;
+    typedef typename dish_set_type::value_type     value_type;
+    typedef typename dish_set_type::const_iterator const_iterator;
+    typedef typename dish_set_type::const_iterator iterator;
     
   public:
+    const_iterator begin() const { return dishes.begin(); }
+    const_iterator end() const { return dishes.end(); }
+
     bool has_discount_prior() const { return ! std::isnan(discount_prior_alpha); }
     bool has_strength_prior() const { return ! std::isnan(strength_prior_shape); }
 
@@ -117,18 +136,18 @@ namespace utils
       customer_size = 0;
       dishes.clear();
     }
-    
+
     bool empty() const { return dishes.empty(); }
     
+    size_type size_customer() const { return customer_size; }
+
     size_type size_table() const { return table_size; }
     
-    size_type size_customer() const { return customer_size; }
-    
-    size_type size_customer(const dish_type& dish) const
+    size_type size_table(const dish_type& dish) const
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      return (diter == dishes.end() ? size_type(0) : diter->second.count);
+      return (diter == dishes.end() ? size_type(0) : diter->second.tables.size());
     }
     
     template <typename Sampler>

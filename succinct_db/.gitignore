@@ -28,7 +28,7 @@ libtool
 
 
 
-sample_succinct_trie
-sample_succinct_hash
-sample_succinct_trie_db
-sample_succinct_trie_database
+succinct_trie_main
+succinct_hash_main
+succinct_trie_db_main
+succinct_trie_database_main

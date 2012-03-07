@@ -18,6 +18,8 @@
 #include <limits>
 #include <stdexcept>
 
+#include <boost/lexical_cast.hpp>
+
 namespace utils
 {
   //! slice_sampler_rfc_type{} returns the value of a user-specified
@@ -39,8 +41,8 @@ namespace utils
       
       F operator() (const F& x) {
 	if (min_x < x && x < max_x) {
-	  ++ nfeval;
 	  
+	  ++ nfeval;
 	  if (nfeval > max_nfeval)
 	    throw std::runtime_error("exceed max function evaluation");
 	  
@@ -87,12 +89,12 @@ namespace utils
       throw std::runtime_error("invalid w");
     
     F logFx = logF(x);
-    for (U sample = 0; sample < nsamples; ++sample) {
-      F logY = logFx + log(u01() + 1e-100);     //! slice logFx at this value
+    for (U sample = 0; sample < nsamples; ++ sample) {
+      F logY = logFx + std::log(u01() + 1e-100);     //! slice logFx at this value
       
       if (! std::isfinite(logY))
-	throw std::runtime_error("invalid logY");
-
+	throw std::runtime_error("invalid logY=" + boost::lexical_cast<std::string>(logY) + " logFx=" + boost::lexical_cast<std::string>(logFx));
+      
       F xl = x - w * u01();                   //! lower bound on slice interval
       F logFxl = logF(xl);
       F xr = xl + w;                          //! upper bound on slice interval
@@ -113,7 +115,7 @@ namespace utils
 	  F xr2 = xr; 
 	  bool d = false;
 	  while (xr2 - xl2 > 1.1 * w) {
-	    F xm = (xl2 + xr2)/2;
+	    F xm = (xl2 + xr2) / 2;
 	    if ((x < xm && x1 >= xm) || (x >= xm && x1 < xm))
 	      d = true;
 	    if (x1 < xm)
