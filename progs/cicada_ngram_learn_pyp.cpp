@@ -323,9 +323,13 @@ struct PYPLM
     
     boost::iostreams::filtering_ostream os_index;
     boost::iostreams::filtering_ostream os_count;
+    boost::iostreams::filtering_ostream os_total;
     
     os_index.push(utils::packed_sink<word_type::id_type, std::allocator<word_type::id_type> >(rep.path("index")));
     os_count.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("count")));
+    os_total.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("total")));
+    
+    // dump total counts!!!!!!!
       
     position_set_type positions;
     offset_set_type   offsets(1, 0);
@@ -338,6 +342,12 @@ struct PYPLM
     
     // unigram!
     {
+      const count_type count_customer = root.table.size_customer();
+      const count_type count_table    = root.table.size_table();
+      
+      os_total.write((char*) &count_customer, sizeof(count_type));
+      os_total.write((char*) &count_table, sizeof(count_type));
+
       node_type::table_type::const_iterator titer_end = root.table.end();
       for (node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
 	words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
@@ -372,13 +382,25 @@ struct PYPLM
       
       node_set_type::const_iterator niter_end = nodes.end();
       for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	if (*niter == trie_type::npos())
+	if (*niter == trie_type::npos()) {
+	  const count_type count_customer = 0;
+	  const count_type count_table    = 0;
+	  
+	  os_total.write((char*) &count_customer, sizeof(count_type));
+	  os_total.write((char*) &count_table, sizeof(count_type));
+	  
 	  positions.set(positions.size(), false); // we will set bit!
-	else {
+	} else {
 	  const node_type& node = trie[*niter];
 	  trie_type::const_iterator iter_begin = trie.begin(*niter);
 	  trie_type::const_iterator iter_end   = trie.end(*niter);
 	  
+	  const count_type count_customer = node.table.size_customer();
+	  const count_type count_table    = node.table.size_table();
+	  
+	  os_total.write((char*) &count_customer, sizeof(count_type));
+	  os_total.write((char*) &count_table, sizeof(count_type));
+
 	  words.clear();
 	  
 	  // we have an entry in the model
