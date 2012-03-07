@@ -226,15 +226,16 @@ namespace utils
     }
     
     double log_likelihood(const double& discount, const double& strength) const
-    {
-      if (! customer_size)
-	throw std::runtime_error("we have no customers!");
-      
+    {      
       double logprob = 0.0;
+      
       if (has_discount_prior())
-	logprob = utils::mathop::log_beta_density(discount, discount_prior_alpha, discount_prior_beta);
+	logprob += utils::mathop::log_beta_density(discount, discount_prior_alpha, discount_prior_beta);
+      
       if (has_strength_prior())
 	logprob += utils::mathop::log_gamma_density(strength + discount, strength_prior_shape, strength_prior_rate);
+      
+      if (! customer_size) return logprob;
       
       if (discount > 0.0) {
 	const double r = utils::mathop::lgamma(1.0 - discount);
@@ -243,7 +244,7 @@ namespace utils
           logprob += utils::mathop::lgamma(strength) - utils::mathop::lgamma(strength / discount);
 	
 	logprob += (- utils::mathop::lgamma(strength + customer_size)
-		    + table_size * utils::mathop::log(discount)
+		    + table_size * std::log(discount)
 		    + utils::mathop::lgamma(strength / discount + table_size));
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
@@ -254,7 +255,14 @@ namespace utils
 	  for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
 	    logprob += utils::mathop::lgamma(*titer - discount) - r;
 	}
-      }
+      } else if (discount == 0.0) {
+	logprob += utils::mathop::lgamma(strength) + table_size * std::log(strength) - utils::mathop::lgamma(strength + table_size);
+	
+	typename dish_set_type::const_iterator diter_end = dishes.end();
+	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
+	  logprob += utils::mathop::lgamma(diter->second.tables.size());
+      } else
+	throw std::runtime_error("negative discount?");
       
       return logprob;
     }
@@ -274,34 +282,27 @@ namespace utils
 	  m_strength = slice_sampler(strength_resampler,
 				     m_strength,
 				     sampler,
-				     - m_discount,
+				     - m_discount + std::numeric_limits<double>::min(),
 				     std::numeric_limits<double>::infinity(),
 				     0.0,
 				     num_iterations,
 				     100 * num_iterations);
 	
-	if (has_discount_prior()) {
-	  double min_discount = std::numeric_limits<double>::min();
-	  
-	  if (m_strength < 0.0)
-	    min_discount = - m_strength;
-	  
+	if (has_discount_prior()) 
 	  m_discount = slice_sampler(discount_resampler,
 				     m_discount,
 				     sampler,
-				     min_discount,
+				     (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
 				     1.0,
 				     0.0,
 				     num_iterations,
 				     100 * num_iterations);
-	  
-	}
       }
       
       m_strength = slice_sampler(strength_resampler,
 				 m_strength,
 				 sampler,
-				 - m_discount,
+				 - m_discount + std::numeric_limits<double>::min(),
 				 std::numeric_limits<double>::infinity(),
 				 0.0,
 				 num_iterations,

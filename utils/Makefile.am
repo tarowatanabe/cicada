@@ -134,44 +134,44 @@ vertical_coded_device.hpp \
 vertical_coded_vector.hpp
 
 noinst_PROGRAMS = \
-sample_arc_list \
-sample_b_heap \
-sample_base64 \
-sample_bithack \
-sample_bitpack \
-sample_bit_vector \
-sample_byte_aligned_code \
-sample_byte_aligned_vector \
-sample_chunk_vector \
-sample_compress_stream \
-sample_dense_map \
-sample_double_base64 \
-sample_filesystem \
-sample_group_aligned_code \
-sample_icu_filter \
-sample_indexed_set \
-sample_istream_line_iterator \
-sample_lexical_cast \
-sample_lockfree_list_queue \
-sample_lockfree_queue \
-sample_malloc_stats \
-sample_map_file_allocator \
-sample_packed_vector \
-sample_piece \
-sample_program_options \
-sample_random_seed \
-sample_simple_vector \
-sample_small_vector \
-sample_sparse_map \
-sample_static_allocator \
-sample_subprocess \
-sample_succinct_vector \
-sample_tempfile \
-sample_json_string \
-sample_vector_map \
-sample_vector_set \
-sample_vector2 \
-sample_vertical_coded_vector
+arc_list_main \
+b_heap_main \
+base64_main \
+bithack_main \
+bitpack_main \
+bit_vector_main \
+byte_aligned_code_main \
+byte_aligned_vector_main \
+chunk_vector_main \
+compress_stream_main \
+dense_map_main \
+double_base64_main \
+filesystem_main \
+group_aligned_code_main \
+icu_filter_main \
+indexed_set_main \
+istream_line_iterator_main \
+lexical_cast_main \
+lockfree_list_queue_main \
+lockfree_queue_main \
+malloc_stats_main \
+map_file_allocator_main \
+packed_vector_main \
+piece_main \
+program_options_main \
+random_seed_main \
+simple_vector_main \
+small_vector_main \
+sparse_map_main \
+static_allocator_main \
+subprocess_main \
+succinct_vector_main \
+tempfile_main \
+json_string_main \
+vector_map_main \
+vector_set_main \
+vector2_main \
+vertical_coded_vector_main
 
 dist_noinst_SCRIPTS = \
 bitpack_gen.py \
@@ -221,129 +221,128 @@ bitpack32_impl.hpp : bitpack_gen.py
 bitpack64_impl.hpp : bitpack_gen.py
 	./bitpack_gen.py --byte-size 8 > bitpack64_impl.hpp
 
-sample_group_aligned_code.cpp : group_aligned_code.hpp group_aligned_code_offsets.hpp
+group_aligned_code_main.cpp : group_aligned_code.hpp group_aligned_code_offsets.hpp
 
 group_aligned_code.hpp : group_aligned_code_offsets.hpp
 
 group_aligned_code_offsets.hpp : group_aligned_code_offsets.py
 	./group_aligned_code_offsets.py > group_aligned_code_offsets.hpp
 
-sample_arc_list_SOURCES = sample_arc_list.cpp
-sample_arc_list_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
-sample_arc_list_LDADD = $(BOOST_THREAD_LIBS)
+arc_list_main_SOURCES = arc_list_main.cpp
+arc_list_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
+arc_list_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_b_heap_SOURCES = sample_b_heap.cpp
-sample_b_heap_LDADD = $(LIBUTILS)
+b_heap_main_SOURCES = b_heap_main.cpp
+b_heap_main_LDADD = $(LIBUTILS)
 
-sample_base64_SOURCES = sample_base64.cpp
-#sample_base64_LDADD = $(LIBUTILS)
+base64_main_SOURCES = base64_main.cpp
+#base64_main_LDADD = $(LIBUTILS)
 
-sample_bithack_SOURCES = sample_bithack.cpp
+bithack_main_SOURCES = bithack_main.cpp
 
-sample_bitpack_SOURCES = sample_bitpack.cpp
-sample_bitpack_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_bitpack_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
+bitpack_main_SOURCES = bitpack_main.cpp
+bitpack_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+bitpack_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
-sample_bit_vector_SOURCES = sample_bit_vector.cpp
+bit_vector_main_SOURCES = bit_vector_main.cpp
 
-sample_byte_aligned_code_SOURCES = sample_byte_aligned_code.cpp
+byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 
-sample_byte_aligned_vector_SOURCES = sample_byte_aligned_vector.cpp
+byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
-sample_chunk_vector_SOURCES = sample_chunk_vector.cpp
-sample_chunk_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_chunk_vector_LDADD = $(BOOST_THREAD_LIBS)
+chunk_vector_main_SOURCES = chunk_vector_main.cpp
+chunk_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+chunk_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_compress_stream_SOURCES = sample_compress_stream.cpp
-sample_compress_stream_LDADD = $(LIBUTILS)
+compress_stream_main_SOURCES = compress_stream_main.cpp
+compress_stream_main_LDADD = $(LIBUTILS)
 
-sample_dense_map_SOURCES = sample_dense_map.cpp
-sample_dense_map_LDADD = $(LIBUTILS)
+dense_map_main_SOURCES = dense_map_main.cpp
+dense_map_main_LDADD = $(LIBUTILS)
 
-sample_double_base64_SOURCES = sample_double_base64.cpp
-sample_double_base64_LDADD = $(LIBUTILS)
+double_base64_main_SOURCES = double_base64_main.cpp
+double_base64_main_LDADD = $(LIBUTILS)
 
-sample_filesystem_SOURCES = sample_filesystem.cpp
-sample_filesystem_LDADD = $(LIBUTILS)
+filesystem_main_SOURCES = filesystem_main.cpp
+filesystem_main_LDADD = $(LIBUTILS)
 
-sample_group_aligned_code_SOURCES = sample_group_aligned_code.cpp
+group_aligned_code_main_SOURCES = group_aligned_code_main.cpp
 
-sample_icu_filter_SOURCES = sample_icu_filter.cpp
-sample_icu_filter_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
+icu_filter_main_SOURCES = icu_filter_main.cpp
+icu_filter_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
 
-sample_indexed_set_SOURCES = sample_indexed_set.cpp
-sample_indexed_set_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)
+indexed_set_main_SOURCES = indexed_set_main.cpp
+indexed_set_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)
 
-sample_istream_line_iterator_SOURCES = sample_istream_line_iterator.cpp
+istream_line_iterator_main_SOURCES = istream_line_iterator_main.cpp
 
-sample_lexical_cast_SOURCES = sample_lexical_cast.cpp
-sample_lexical_cast_LDADD = $(LIBUTILS)
+lexical_cast_main_SOURCES = lexical_cast_main.cpp
+lexical_cast_main_LDADD = $(LIBUTILS)
 
-sample_lockfree_list_queue_SOURCES = sample_lockfree_list_queue.cpp
-sample_lockfree_list_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_lockfree_list_queue_LDADD = $(BOOST_THREAD_LIBS)
+lockfree_list_queue_main_SOURCES = lockfree_list_queue_main.cpp
+lockfree_list_queue_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+lockfree_list_queue_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_lockfree_queue_SOURCES = sample_lockfree_queue.cpp
-sample_lockfree_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_lockfree_queue_LDADD = $(BOOST_THREAD_LIBS)
+lockfree_queue_main_SOURCES = lockfree_queue_main.cpp
+lockfree_queue_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+lockfree_queue_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_malloc_stats_SOURCES = sample_malloc_stats.cpp
-sample_malloc_stats_LDADD = $(LIBUTILS)
+malloc_stats_main_SOURCES = malloc_stats_main.cpp
+malloc_stats_main_LDADD = $(LIBUTILS)
 
-sample_map_file_allocator_SOURCES = sample_map_file_allocator.cpp
-sample_map_file_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_map_file_allocator_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS) $(perftools_LDADD)
+map_file_allocator_main_SOURCES = map_file_allocator_main.cpp
+map_file_allocator_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+map_file_allocator_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS) $(perftools_LDADD)
 
+packed_vector_main_SOURCES = packed_vector_main.cpp
+packed_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
+packed_vector_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
-sample_packed_vector_SOURCES = sample_packed_vector.cpp
-sample_packed_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_packed_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
+piece_main_SOURCES = piece_main.cpp
+piece_main_LDADD = $(LIBUTILS)
 
-sample_piece_SOURCES = sample_piece.cpp
-sample_piece_LDADD = $(LIBUTILS)
+program_options_main_SOURCES = program_options_main.cpp
+program_options_main_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
-sample_program_options_SOURCES = sample_program_options.cpp
-sample_program_options_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LIBS)
+simple_vector_main_SOURCES = simple_vector_main.cpp
+simple_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+simple_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_simple_vector_SOURCES = sample_simple_vector.cpp
-sample_simple_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_simple_vector_LDADD = $(BOOST_THREAD_LIBS)
+small_vector_main_SOURCES = small_vector_main.cpp
+small_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+small_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_small_vector_SOURCES = sample_small_vector.cpp
-sample_small_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_small_vector_LDADD = $(BOOST_THREAD_LIBS)
+static_allocator_main_SOURCES = static_allocator_main.cpp
+static_allocator_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+static_allocator_main_LDADD = $(BOOST_THREAD_LIBS)
 
-sample_static_allocator_SOURCES = sample_static_allocator.cpp
-sample_static_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_static_allocator_LDADD = $(BOOST_THREAD_LIBS)
+sparse_map_main_SOURCES = sparse_map_main.cpp
+sparse_map_main_LDADD = $(LIBUTILS)
 
-sample_sparse_map_SOURCES = sample_sparse_map.cpp
-sample_sparse_map_LDADD = $(LIBUTILS)
+random_seed_main_SOURCES = random_seed_main.cpp
+random_seed_main_LDADD = $(LIBUTILS)
 
-sample_random_seed_SOURCES = sample_random_seed.cpp
-sample_random_seed_LDADD = $(LIBUTILS)
+subprocess_main_SOURCES = subprocess_main.cpp
+subprocess_main_LDFLAGS = $(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS)
+subprocess_main_LDADD = $(BOOST_IOSTREAMS_LIBS) $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS)
 
-sample_subprocess_SOURCES = sample_subprocess.cpp
-sample_subprocess_LDFLAGS = $(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS)
-sample_subprocess_LDADD = $(BOOST_IOSTREAMS_LIBS) $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS)
+succinct_vector_main_SOURCES = succinct_vector_main.cpp
+succinct_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
+succinct_vector_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
 
-sample_succinct_vector_SOURCES = sample_succinct_vector.cpp
-sample_succinct_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_succinct_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
+tempfile_main_SOURCES = tempfile_main.cpp
+tempfile_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+tempfile_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
-sample_tempfile_SOURCES = sample_tempfile.cpp
-sample_tempfile_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_tempfile_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
+json_string_main_SOURCES = json_string_main.cpp
 
-sample_json_string_SOURCES = sample_json_string.cpp
+vector2_main_SOURCES = vector2_main.cpp
 
-sample_vector2_SOURCES = sample_vector2.cpp
+vector_map_main_SOURCES = vector_map_main.cpp
 
-sample_vector_map_SOURCES = sample_vector_map.cpp
+vector_set_main_SOURCES = vector_set_main.cpp
 
-sample_vector_set_SOURCES = sample_vector_set.cpp
-
-sample_vertical_coded_vector_SOURCES = sample_vertical_coded_vector.cpp
-sample_vertical_coded_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_vertical_coded_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
+vertical_coded_vector_main_SOURCES = vertical_coded_vector_main.cpp
+vertical_coded_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
+vertical_coded_vector_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
 

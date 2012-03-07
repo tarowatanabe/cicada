@@ -192,9 +192,8 @@ struct PYPLM
   {
     if (strength <= - discount) return - std::numeric_limits<double>::infinity();
     
-    // is it correct??
     double logprob = (utils::mathop::log_beta_density(discount, discount_alpha, discount_beta)
-		      + utils::mathop::log_gamma_density(strength, strength_shape, strength_rate));
+		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
     
     if (order == 0)
       return logprob + root.table.log_likelihood(discount, strength);
@@ -245,7 +244,7 @@ struct PYPLM
 	strength[order] = utils::slice_sampler(strength_resampler,
 					       strength[order],
 					       sampler,
-					       0.0,
+					       - discount[order] + std::numeric_limits<double>::min(),
 					       std::numeric_limits<double>::infinity(),
 					       0.0,
 					       num_iterations,
@@ -254,7 +253,7 @@ struct PYPLM
 	discount[order] = utils::slice_sampler(discount_resampler,
 					       discount[order],
 					       sampler,
-					       std::numeric_limits<double>::min(),
+					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
 					       1.0,
 					       0.0,
 					       num_iterations,
@@ -264,7 +263,7 @@ struct PYPLM
       strength[order] = utils::slice_sampler(strength_resampler,
 					     strength[order],
 					     sampler,
-					     0.0,
+					     - discount[order] + std::numeric_limits<double>::min(),
 					     std::numeric_limits<double>::infinity(),
 					     0.0,
 					     num_iterations,
@@ -354,6 +353,9 @@ int main(int argc, char ** argv)
 	     strength_prior_rate);
     
     for (int iter = 0; iter < samples; ++ iter) {
+      if (debug)
+	std::cerr << "iteration: " << iter << std::endl;
+      
       sentence_type sentence;
       sentence_type ngram(order - 1, vocab_type::BOS);
       
