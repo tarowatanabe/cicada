@@ -378,13 +378,15 @@ int main(int argc, char ** argv)
 	}
       }
       
-      
       if (iter % resample_rate == resample_rate - 1)
 	lm.resample_hyperparameters(sampler);
       
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
+    
+    // we will dump LM... now, define a format!
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
