@@ -454,7 +454,7 @@ typedef utils::sampler<boost::mt19937> sampler_type;
 path_set_type train_files;
 path_type     output_file;
 
-int order = 3;
+int order = 4;
 int samples = 300;
 int resample_rate = 20;
 
