@@ -295,8 +295,6 @@ struct PYPLM
   {
     typedef utils::repository repository_type;
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
-    typedef utils::simple_vector<word_type, std::allocator<word_type> > prefix_type;
-    typedef std::vector<prefix_type, std::allocator<prefix_type> > prefix_set_type;
 
     typedef uint64_t count_type;
 
@@ -326,56 +324,106 @@ struct PYPLM
     boost::iostreams::filtering_ostream os_index;
     boost::iostreams::filtering_ostream os_count;
     
-    os_index.push(utils::packed_sink<id_type, std::allocator<id_type> >(rep.path("index")));
+    os_index.push(utils::packed_sink<word_type::id_type, std::allocator<word_type::id_type> >(rep.path("index")));
     os_count.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("count")));
       
     position_set_type positions;
     offset_set_type   offsets(1, 0);
     count_type        offset = 0;
     
-    node_set_type nodes(1, trie.root());
+    node_set_type nodes;
     node_set_type nodes_next;
-    
-    prefix_set_type prefix(trie.size() + 1);
     
     word_set_type words;
     
-    for (size_type order = 0; order != discount.size(); ++ order) {
+    // unigram!
+    {
+      node_type::table_type::const_iterator titer_end = root.table.end();
+      for (node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
+	words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
+							    titer->second.size_customer(),
+							    titer->second.size_table())));
+      
+      trie_type::const_iterator iter_end = trie.end();
+      for (trie_type::const_iterator iter = trie.begin(); iter != iter_end; ++ iter)
+	if (! trie[iter->second].table.empty()) {
+	  std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
+	  if (! result.second)
+	    boost::fusion::get<0>(result.first->second) = iter->second;
+	}
+      
+      word_set_type::const_iterator witer_end = words.end();
+      for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
+	nodes.push_back(boost::fusion::get<0>(witer->second));
+	
+	word_type::id_type word_id = witer->first.id();
+	os_index.write((char*) &word_id, sizeof(word_type::id_type));
+	os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
+	os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
+      }
+      
+      offset += words.size();
+      offsets.push_back(offset);
+    }
+    
+    
+    for (size_type order = 1; order < discount.size(); ++ order) {
       nodes_next.clear();
       
       node_set_type::const_iterator niter_end = nodes.end();
       for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	const node_type& node = (*niter == trie.root() ? root : trie[*niter]);
-	trie_type::const_iterator iter_begin = (*niter == trie.root() ? trie.begin() : trie.begin(*niter));
-	trie_type::const_iterator iter_end   = (*niter == trie.root() ? trie.end() : trie.end(*niter));
-	
-	words.clear();
-	
-	// we have an entry in the model
-	node_type::table_type::const_iterator titer_end = node.table.end();
-	for (node_type::table_type::const_iterator titer = node.table.begin(); titer != titer_end; ++ titer)
-	  words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
-							      titer->second.size_customer(),
-							      titer->second.size_table())));
-	
-	// or, we have an entry with the longer contexts..
-	for (trie_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
-	  if (! trie[iter->second].table.empty()) {
-	    std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
-	    if (! result.second)
-	      boost::fusion::get<0>(result.first->second) = iter->second;
-	  }
-	
-	word_set_type::const_iterator witer_end = words.end();
-	for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-	  if (boost::fusion::get<0>(witer->second) != trie_type::npos())
-	    nodes_next.push_back(boost::fusion::get<0>(witer->second));
+	if (*niter == trie_type::npos())
+	  positions.set(positions.size(), false); // we will set bit!
+	else {
+	  const node_type& node = trie[*niter];
+	  trie_type::const_iterator iter_begin = trie.begin(*niter);
+	  trie_type::const_iterator iter_end   = trie.end(*niter);
 	  
+	  words.clear();
+	  
+	  // we have an entry in the model
+	  node_type::table_type::const_iterator titer_end = node.table.end();
+	  for (node_type::table_type::const_iterator titer = node.table.begin(); titer != titer_end; ++ titer)
+	    words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
+								titer->second.size_customer(),
+								titer->second.size_table())));
+	  
+	  // or, we have an entry with the longer contexts..
+	  for (trie_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
+	    if (! trie[iter->second].table.empty()) {
+	      std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
+	      if (! result.second)
+		boost::fusion::get<0>(result.first->second) = iter->second;
+	    }
+	  
+	  word_set_type::const_iterator witer_end = words.end();
+	  for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
+	    nodes_next.push_back(boost::fusion::get<0>(witer->second));
+	    
+	    word_type::id_type word_id = witer->first.id();
+	    os_index.write((char*) &word_id, sizeof(word_type::id_type));
+	    os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
+	    os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
+	    
+	    positions.set(positions.size(), true);
+	  }
+	  positions.set(positions.size(), false);
+	  
+	  offset += words.size();
 	}
       }
       
+      offsets.push_back(offset);
+      
       nodes.swap(nodes_next);
     }
+    
+    // dump position
+    positions.write(rep.path("position"));
+    
+    // dump offsets
+    for (size_type order = 1; order != offsets.size(); ++ order)
+      rep[boost::lexical_cast<std::string>(order) + "-gram-offset"] = boost::lexical_cast<std::string>(offsets[order]);
     
     // vocabulary...
     word_type::write(rep.path("vocab"));
