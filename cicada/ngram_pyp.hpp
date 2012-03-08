@@ -102,6 +102,9 @@ namespace cicada
     static NGramPYP& create(const path_type& path);
     
   public:
+    const vocab_type& vocab() const { return vocab_; }
+    const int& order() const { return order_; }
+    
     size_type parent(size_type pos) const
     {
       return (pos < offsets_[1] ? size_type(-1) : positions_.select(pos + 1 - offsets_[1], true) + (offsets_[1] + 1) - pos - 1);
@@ -155,7 +158,7 @@ namespace cicada
 	  return __find(pos, id);
       }
     }
-
+    
     template <typename Iterator>
     logprob_type operator()(Iterator first, Iterator last) const
     {
