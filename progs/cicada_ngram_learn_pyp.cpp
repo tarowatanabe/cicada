@@ -137,30 +137,42 @@ struct PYPLM
   }
 
   template <typename Sampler>
-  void increment(const word_type& word, const id_type& node, Sampler& sampler)
+  bool increment(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
       if (root.table.increment(word, p0, sampler))
 	++ counts0;
+      else
+	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
       
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler))
 	increment(word, trie[node].parent, sampler);
+      else
+	return false;
     }
+    
+    return true;
   }
   
   template <typename Sampler>
-  void decrement(const word_type& word, const id_type& node, Sampler& sampler)
+  bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
       if (root.table.decrement(word, sampler))
 	-- counts0;
+      else
+	return false;
     } else {
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
+      else
+	return false;
     }
+    
+    return true;
   }
   
   double prob(const word_type& word, const id_type& node) const
@@ -170,7 +182,10 @@ struct PYPLM
     else {
       const double p = prob(word, trie[node].parent);
       
-      return trie[node].table.prob(word, p);
+      if (trie[node].table.empty())
+	return p;
+      else
+	return trie[node].table.prob(word, p);
     }
   }
 
@@ -193,7 +208,7 @@ struct PYPLM
     for (reverse_iterator iter = begin; iter != end; ++ iter) {
       node = trie.find(node, *iter);
       
-      if (node == trie_type::npos())
+      if (node == trie_type::npos() || trie[node].table.empty())
 	return p;
       else
 	p = trie[node].table.prob(word, p);
@@ -220,11 +235,12 @@ struct PYPLM
 		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
     
     if (order == 0)
-      return logprob + root.table.log_likelihood(discount, strength);
+      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
     else {
       node_set_type::const_iterator niter_end = nodes[order].end();
       for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	logprob += trie[*niter].table.log_likelihood(discount, strength);
+	if (! trie[*niter].table.empty())
+	  logprob += trie[*niter].table.log_likelihood(discount, strength);
       
       return logprob;
     }
