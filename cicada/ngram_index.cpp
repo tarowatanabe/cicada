@@ -40,6 +40,8 @@ namespace cicada
 	
       offsets.push_back(utils::lexical_cast<size_type>(iter->second));
     }
+
+    off_set_type(offsets).swap(offsets);
   }
   
   void NGramIndex::open(const path_type& path)

@@ -33,10 +33,12 @@ namespace cicada
     typedef Symbol                  word_type;
     typedef Vocab                   vocab_type;
 
-    typedef size_t                  size_type;
-    typedef ptrdiff_t               difference_type;
-    typedef word_type::id_type      id_type;
-    typedef uint64_t                count_type;
+    typedef size_t             size_type;
+    typedef ptrdiff_t          difference_type;
+    typedef word_type::id_type id_type;
+    typedef uint64_t           count_type;
+    typedef float              logprob_type;
+    typedef double             prob_type;
     
     typedef boost::filesystem::path   path_type;
     
@@ -46,7 +48,7 @@ namespace cicada
     typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> >       id_set_type;
     typedef utils::packed_vector_mapped<count_type, std::allocator<count_type> > count_set_type;
     typedef utils::succinct_vector_mapped<std::allocator<int32_t> >              position_set_type;
-    typedef std::vector<size_type, std::allocator<size_type> >                   off_set_type;
+    typedef std::vector<size_type, std::allocator<size_type> >                   offset_set_type;
     typedef std::vector<double, std::allocator<double> >                         parameter_set_type;
     
     struct spinlock_type
@@ -77,7 +79,7 @@ namespace cicada
     NGramPYP() {}
     NGramPYP(const path_type& path)  { open(path); }
 
-    path_type path() const { return vocab_.path().parent_path(); }
+    path_type path() const { return index_.path().parent_path(); }
     size_type size() const { return index_.size(); }
     bool empty() const { return index_.empty(); }
 
@@ -90,7 +92,7 @@ namespace cicada
       index_.clear();
       count_.clear();
       total_.clear();
-      position_.clear();
+      positions_.clear();
       offsets_.clear();
       vocab_.clear();
       caches_pos_.clear();
@@ -102,7 +104,7 @@ namespace cicada
   public:
     size_type parent(size_type pos) const
     {
-      return (pos < offsets_[1] ? size_type(-1) : positions_.select(pos + 1 - offsets[1], true) + (offsets_[1] + 1) - pos - 1);
+      return (pos < offsets_[1] ? size_type(-1) : positions_.select(pos + 1 - offsets_[1], true) + (offsets_[1] + 1) - pos - 1);
     }
     
     bool has_child(size_type pos) const
@@ -155,23 +157,29 @@ namespace cicada
     }
 
     template <typename Iterator>
-    double logprob(Iterator first, Iterator last) const
+    logprob_type operator()(Iterator first, Iterator last) const
+    {
+      return logprob(first, last);
+    }
+
+    template <typename Iterator>
+    logprob_type logprob(Iterator first, Iterator last) const
     {
       return utils::mathop::log(prob(first, last));
     }
 
     template <typename Iterator>
-    double prob(Iterator first, Iterator last) const
+    prob_type prob(Iterator first, Iterator last) const
     {
       if (first == last) return 1.0;
       
       typedef typename std::iterator_traits<Iterator>::value_type value_type;
       
-      return __prob_dispatch(std::max(first, last - order), last, value_type());
+      return __prob_dispatch(std::max(first, last - order_), last, value_type());
     }
     
     template <typename Iterator>
-    double __prob_dispatch(Iterator first, Iterator last, id_type) const
+    prob_type __prob_dispatch(Iterator first, Iterator last, id_type) const
     {
       typedef std::reverse_iterator<Iterator> reverse_iterator;
       
@@ -198,7 +206,7 @@ namespace cicada
     }
 
     template <typename Iterator, typename _Word>
-    double __prob_dispatch(Iterator first, Iterator last, _Word) const
+    prob_type __prob_dispatch(Iterator first, Iterator last, _Word) const
     {
       typedef std::reverse_iterator<Iterator> reverse_iterator;
       
@@ -224,7 +232,7 @@ namespace cicada
       return p;
     }
     
-    double __prob_dispatch(int order, size_type pos, const id_type& word, const double p0) const
+    prob_type __prob_dispatch(int order, size_type pos, const id_type& word, const double p0) const
     {
       const size_type pos_total = utils::bithack::branch(pos == size_type(-1), size_type(0), pos + 1);
       
@@ -287,7 +295,7 @@ namespace cicada
     id_set_type       index_;
     count_set_type    count_;
     count_set_type    total_;
-    position_set_type position_;
+    position_set_type positions_;
     offset_set_type   offsets_;
     
     double     p0_;

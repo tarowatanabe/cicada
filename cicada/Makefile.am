@@ -355,6 +355,7 @@ ngram.hpp \
 ngram_cache.hpp \
 ngram_index.hpp \
 ngram_count_set.hpp \
+ngram_pyp.hpp \
 operation.hpp \
 operation_set.hpp \
 optimize.hpp \
@@ -444,6 +445,7 @@ matcher.cpp \
 model.cpp \
 ngram.cpp \
 ngram_index.cpp \
+ngram_pyp.cpp \
 operation.cpp \
 operation_set.cpp \
 parameter.cpp \

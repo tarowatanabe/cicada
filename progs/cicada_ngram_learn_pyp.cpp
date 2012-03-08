@@ -331,18 +331,20 @@ struct PYPLM
     repository_type rep(path, repository_type::write);
       
     rep["order"] = boost::lexical_cast<std::string>(discount.size());
+
+    rep["p0"]      = boost::lexical_cast<std::string>(p0);
+    rep["counts0"] = boost::lexical_cast<std::string>(counts0);
+    
     rep["discount-alpha"] = boost::lexical_cast<std::string>(discount_alpha);
     rep["discount-beta"]  = boost::lexical_cast<std::string>(discount_beta);
     rep["strength-shape"] = boost::lexical_cast<std::string>(strength_shape);
     rep["strength-rate"]  = boost::lexical_cast<std::string>(strength_rate);
-      
-    rep["p0"]      = boost::lexical_cast<std::string>(p0);
-    rep["counts0"] = boost::lexical_cast<std::string>(counts0);
+          
     for (size_type order = 0; order != discount.size(); ++ order) {
       rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(discount[order]);
       rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(strength[order]);
     }
-
+    
     // we will compute on-memory for faster indexing... (and assuming small data!)
     
     boost::iostreams::filtering_ostream os_index;
