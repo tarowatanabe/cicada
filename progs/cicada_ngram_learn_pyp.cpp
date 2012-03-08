@@ -47,7 +47,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
 
-
 typedef cicada::Symbol    word_type;
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Vocab     vocab_type;
@@ -500,6 +499,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
 path_set_type train_files;
+path_set_type test_files;
 path_type     output_file;
 
 int order = 4;
@@ -552,8 +552,18 @@ int main(int argc, char ** argv)
     // we will precompute <word, node> pair...
     typedef std::pair<word_type, PYPLM::id_type> data_type;
     typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
-    
+    typedef std::vector<bool, std::allocator<bool> > non_oov_type;
+
     data_set_type training;
+    non_oov_type non_oov;
+    
+    if (vocab_type::BOS.id() >= non_oov.size())
+      non_oov.resize(vocab_type::BOS.id() + 1, false);
+    if (vocab_type::EOS.id() >= non_oov.size())
+      non_oov.resize(vocab_type::EOS.id() + 1, false);
+    
+    non_oov[vocab_type::BOS.id()] = true;
+    non_oov[vocab_type::EOS.id()] = true;
     
     for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
       utils::compress_istream is(*fiter, 1024 * 1024);
@@ -569,6 +579,10 @@ int main(int argc, char ** argv)
 	  training.push_back(data_type(*siter, lm.insert(ngram.end() - order + 1, ngram.end())));
 	  
 	  ngram.push_back(*siter);
+	  
+	  if (siter->id() >= non_oov.size())
+	    non_oov.resize(siter->id() + 1, false);
+	  non_oov[siter->id()] = true;
 	}
 	
 	training.push_back(data_type(vocab_type::EOS, lm.insert(ngram.end() - order + 1, ngram.end())));
@@ -599,6 +613,55 @@ int main(int argc, char ** argv)
     // we will dump LM... now, define a format!
     if (! output_file.empty())
       lm.write(output_file);
+    
+    // testing!
+    if (! test_files.empty()) {
+      sentence_type sentence;
+      sentence_type ngram(order - 1, vocab_type::BOS);
+
+      double logprob_total = 0.0;
+      size_t num_word = 0;
+      size_t num_oov = 0;
+      size_t num_sentence = 0;
+      
+      for (path_set_type::const_iterator fiter = test_files.begin(); fiter != test_files.end(); ++ fiter) {
+	utils::compress_istream is(*fiter, 1024 * 1024);
+	
+	while (is >> sentence) {
+	  ngram.resize(order - 1);
+	  
+	  sentence_type::const_iterator siter_end = sentence.end();
+	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	    const bool is_oov = ! (siter->id() < non_oov.size() && non_oov[siter->id()]);
+	    const double prob = lm.prob(*siter, ngram.end() - order + 1, ngram.end());
+	    
+	    if (! is_oov)
+	      logprob_total += std::log(prob);
+	    
+	    num_oov += is_oov;
+	    
+	    ngram.push_back(*siter);
+	  }
+
+	  const double prob = lm.prob(vocab_type::EOS, ngram.end() - order + 1, ngram.end());
+	  logprob_total += std::log(prob);
+	  
+	  num_word += sentence.size();
+	  ++ num_sentence;
+	}
+      }
+      
+      std::cerr << "# of sentences: " << num_sentence
+		<< " # of words: " << num_word
+		<< " # of OOV: " << num_oov
+		<< " order: " << order
+		<< std::endl;
+      
+      std::cerr << "logprob = " << logprob_total << std::endl;
+      std::cerr << "ppl     = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
+      std::cerr << "ppl1    = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
+    }
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -677,6 +740,7 @@ void options(int argc, char** argv)
   po::options_description desc("options");
   desc.add_options()
     ("train", po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
+    ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
     ("output", po::value<path_type>(&output_file), "output file")
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
