@@ -285,11 +285,38 @@ namespace utils
       
       return logprob;
     }
+
+  private:    
+    struct DiscountResampler
+    {
+      DiscountResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      
+      const chinese_restaurant_process& crp;
+      
+      double operator()(const double& proposed_discount) const
+      {
+	return crp.log_likelihood(proposed_discount, crp.strength());
+      }
+    };
+    
+    struct StrengthResampler
+    {
+      StrengthResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      
+      const chinese_restaurant_process& crp;
+      
+      double operator()(const double& proposed_strength) const
+      {
+	return crp.log_likelihood(crp.discount(), proposed_strength);
+      }
+    };
+
+  public:
     
     template <typename Sampler>
-    void resample_hyperparameters(Sampler& sampler,
-				  const size_type num_loop = 5,
-				  const size_type num_iterations = 10)
+    void sample_parameters(Sampler& sampler,
+			   const size_type num_loop = 5,
+			   const size_type num_iterations = 10)
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
       
@@ -327,31 +354,6 @@ namespace utils
 				 num_iterations,
 				 100 * num_iterations);
     }
-
-  private:    
-    struct DiscountResampler
-    {
-      DiscountResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
-      
-      const chinese_restaurant_process& crp;
-      
-      double operator()(const double& proposed_discount) const
-      {
-	return crp.log_likelihood(proposed_discount, crp.strength());
-      }
-    };
-    
-    struct StrengthResampler
-    {
-      StrengthResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
-      
-      const chinese_restaurant_process& crp;
-      
-      double operator()(const double& proposed_strength) const
-      {
-	return crp.log_likelihood(crp.discount(), proposed_strength);
-      }
-    };
     
   private:
     size_type table_size;

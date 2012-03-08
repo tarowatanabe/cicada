@@ -65,10 +65,11 @@ struct PYPLM
     typedef utils::chinese_restaurant_process<word_type, boost::hash<word_type>, std::equal_to<word_type>,
 					      std::allocator<word_type > > table_type;
   
-    Node() : table(), order(0)  {}
+    Node() : table(), parent(id_type(-1)), order(0)  {}
   
     table_type table;
-    int order;
+    id_type parent;
+    int     order;
   };
   typedef Node node_type;
   
@@ -77,15 +78,21 @@ struct PYPLM
 
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
 
+  typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
+  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+
   PYPLM(const int order,
 	const double __p0,
+	const double __discount,
+	const double __strength,
 	const double __discount_alpha,
 	const double __discount_beta,
 	const double __strength_shape,
 	const double __strength_rate)
     : trie(word_type()),
-      discount(order, 0.9),
-      strength(order, 1.0),
+      nodes(order),
+      discount(order, __discount),
+      strength(order, __strength),
       discount_alpha(__discount_alpha),
       discount_beta(__discount_beta),
       strength_shape(__strength_shape),
@@ -94,6 +101,7 @@ struct PYPLM
       counts0(0)
   {
     // unitialize root table...
+    root.parent = id_type(-1);
     root.order = 0;
     root.table = node_type::table_type(discount[0],
 				       strength[0],
@@ -103,62 +111,78 @@ struct PYPLM
 				       strength_rate);
   }
 
-  template <typename Iterator, typename Sampler>
-  void increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
-  {
-    const double backoff = prob(word, first + 1, last);
-
-    if (first == last) {
-      if (root.table.increment(word, backoff, sampler))
-	++ counts0;
-    } else {
-      typedef std::reverse_iterator<Iterator> reverse_iterator;
-      
-      reverse_iterator begin(last);
-      reverse_iterator end(first);
-      
-      int order = 1;
-      id_type node = trie.root();
-      for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
-	node = trie.insert(node, *iter);
-	
-	if (! trie[node].order) {
-	  trie[node].order = order;
-	  trie[node].table = node_type::table_type(discount[order],
-						   strength[order],
-						   discount_alpha,
-						   discount_beta,
-						   strength_shape,
-						   strength_rate);
-	}
-      }
-      
-      // we will also increment lower-order!
-      if (trie[node].table.increment(word, backoff, sampler))
-	increment(word, first + 1, last, sampler);
-    }
-  }
-  
-  template <typename Iterator, typename Sampler>
-  void decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
+  template <typename Iterator>
+  id_type insert(Iterator first, Iterator last)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
-    if (first == last) {
-      if (root.table.decrement(word, sampler))
-	-- counts0;
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+    
+    int order = 1;
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
+      const id_type node_prev = node;
+      
+      node = trie.insert(node, *iter);
+      
+      node_type& trie_node = trie[node];
+      
+      if (! trie_node.order) {
+	trie_node.parent = node_prev;
+	trie_node.order = order;
+	trie_node.table = node_type::table_type(discount[order],
+						strength[order],
+						discount_alpha,
+						discount_beta,
+						strength_shape,
+						strength_rate);
+	
+	nodes[order].push_back(node);
+      }
+    }
+    
+    return node;
+  }
+
+  template <typename Sampler>
+  void increment(const word_type& word, const id_type& node, Sampler& sampler)
+  {
+    if (node == trie.root()) {
+      if (root.table.increment(word, p0, sampler))
+	++ counts0;
     } else {
-      const id_type node = trie.find(reverse_iterator(last), reverse_iterator(first));
+      const double backoff = prob(word, trie[node].parent);
       
-      if (node == trie_type::npos())
-	throw std::runtime_error("word is not in the model...?");
-      
-      // we will also decrement lower-order!
-      if (trie[node].table.decrement(word, sampler))
-	decrement(word, first + 1, last, sampler);
+      // we will also increment lower-order when new table is created!
+      if (trie[node].table.increment(word, backoff, sampler))
+	increment(word, trie[node].parent, sampler);
     }
   }
   
+  template <typename Sampler>
+  void decrement(const word_type& word, const id_type& node, Sampler& sampler)
+  {
+    if (node == trie.root()) {
+      if (root.table.decrement(word, sampler))
+	-- counts0;
+    } else {
+      if (trie[node].table.decrement(word, sampler))
+	decrement(word, trie[node].parent, sampler);
+    }
+  }
+  
+  double prob(const word_type& word, const id_type& node) const
+  {
+    if (node == trie.root())
+      return root.table.prob(word, p0);
+    else {
+      const double p = prob(word, trie[node].parent);
+      
+      return trie[node].table.prob(word, p);
+    }
+  }
+
   template <typename Iterator>
   double prob(const word_type& word, Iterator first, Iterator last)
   {
@@ -186,7 +210,7 @@ struct PYPLM
     
     return p;
   }
-
+  
   double log_likelihood() const
   {
     double logprob = std::log(p0) * counts0;
@@ -207,9 +231,10 @@ struct PYPLM
     if (order == 0)
       return logprob + root.table.log_likelihood(discount, strength);
     else {
-      for (id_type i = 0; i != trie.size(); ++ i)
-	if (trie[i].order == order)
-	  logprob += trie[i].table.log_likelihood(discount, strength);
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	logprob += trie[*niter].table.log_likelihood(discount, strength);
+      
       return logprob;
     }
   }
@@ -241,9 +266,9 @@ struct PYPLM
   };
   
   template <typename Sampler>
-  void resample_hyperparameters(Sampler& sampler,
-				const size_type num_loop = 5,
-				const size_type num_iterations = 10)
+  void sample_parameters(Sampler& sampler,
+			 const size_type num_loop = 5,
+			 const size_type num_iterations = 10)
   {
     for (int order = discount.size() - 1; order >= 0; -- order) {
       DiscountResampler discount_resampler(*this, order);
@@ -282,11 +307,11 @@ struct PYPLM
 	root.table.discount() = discount[order];
 	root.table.strength() = strength[order];
       } else {
-	for (id_type i = 0; i != trie.size(); ++ i)
-	  if (trie[i].order == order) {
-	    trie[i].table.discount() = discount[order];
-	    trie[i].table.strength() = strength[order];
-	  }
+	node_set_type::const_iterator niter_end = nodes[order].end();
+	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	  trie[*niter].table.discount() = discount[order];
+	  trie[*niter].table.strength() = strength[order];
+	}
       }
     }
   }
@@ -454,6 +479,7 @@ struct PYPLM
 private: 
   trie_type trie;
   node_type root;
+  node_map_type nodes;
   
   parameter_set_type discount;
   parameter_set_type strength;
@@ -479,6 +505,9 @@ path_type     output_file;
 int order = 4;
 int samples = 300;
 int resample_rate = 20;
+
+double discount = 0.8;
+double strength = -0.5;
 
 double discount_prior_alpha = 1.0;
 double discount_prior_beta  = 1.0;
@@ -513,44 +542,55 @@ int main(int argc, char ** argv)
     
     PYPLM lm(order,
 	     1.0 / num_vocab,
+	     discount,
+	     strength,
 	     discount_prior_alpha,
 	     discount_prior_beta,
 	     strength_prior_shape,
 	     strength_prior_rate);
+
+    // we will precompute <word, node> pair...
+    typedef std::pair<word_type, PYPLM::id_type> data_type;
+    typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
     
-    for (int iter = 0; iter < samples; ++ iter) {
-      if (debug)
-	std::cerr << "iteration: " << iter << std::endl;
+    data_set_type training;
+    
+    for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
+      utils::compress_istream is(*fiter, 1024 * 1024);
       
       sentence_type sentence;
       sentence_type ngram(order - 1, vocab_type::BOS);
       
-      for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
-	utils::compress_istream is(*fiter, 1024 * 1024);
-
-	while (is >> sentence) {
-	  ngram.resize(order - 1);
+      while (is >> sentence) {
+	ngram.resize(order - 1);
+	
+	sentence_type::const_iterator siter_end = sentence.end();
+	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	  training.push_back(data_type(*siter, lm.insert(ngram.end() - order + 1, ngram.end())));
 	  
-	  sentence_type::const_iterator siter_end = sentence.end();
-	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	    
-	    if (iter)
-	      lm.decrement(*siter, ngram.end() - order + 1, ngram.end(), sampler);
-	    
-	    lm.increment(*siter, ngram.end() - order + 1, ngram.end(), sampler);
-	    
-	    ngram.push_back(*siter);
-	  }
-	  
-	  if (iter)
-	    lm.decrement(vocab_type::EOS, ngram.end() - order + 1, ngram.end(), sampler);
-	  
-	  lm.increment(vocab_type::EOS, ngram.end() - order + 1, ngram.end(), sampler);
+	  ngram.push_back(*siter);
 	}
+	
+	training.push_back(data_type(vocab_type::EOS, lm.insert(ngram.end() - order + 1, ngram.end())));
+      }
+    }
+    
+    data_set_type(training).swap(training);
+    
+    for (int iter = 0; iter < samples; ++ iter) {
+      if (debug)
+	std::cerr << "iteration: " << iter << std::endl;
+
+      data_set_type::const_iterator titer_end = training.end();
+      for (data_set_type::const_iterator titer = training.begin(); titer != titer_end; ++ titer) {
+	if (iter)
+	  lm.decrement(titer->first, titer->second, sampler);
+	
+	lm.increment(titer->first, titer->second, sampler);
       }
       
       if (iter % resample_rate == resample_rate - 1)
-	lm.resample_hyperparameters(sampler);
+	lm.sample_parameters(sampler);
       
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
@@ -643,6 +683,9 @@ void options(int argc, char** argv)
     
     ("samples",  po::value<int>(&samples)->default_value(samples),             "# of samples")
     ("resample", po::value<int>(&resample_rate)->default_value(resample_rate), "resampling rate")
+
+    ("discount", po::value<double>(&discount)->default_value(discount), "discount ~ Beta(alpha,beta)")
+    ("strength", po::value<double>(&strength)->default_value(strength), "strength ~ Gamma(shape,rate)")
 
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")
