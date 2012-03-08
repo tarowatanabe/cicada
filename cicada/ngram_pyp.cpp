@@ -87,50 +87,50 @@ namespace cicada
   };
 
   typedef utils::unordered_map<std::string, NGramPYP, hash_string<std::string>, std::equal_to<std::string>,
-			       std::allocator<std::pair<const std::string, NGramPYP> > >::type ngram_map_type;
+			       std::allocator<std::pair<const std::string, NGramPYP> > >::type ngram_pyp_map_type;
 
   namespace impl
   {
     typedef boost::mutex            mutex_type;
     typedef mutex_type::scoped_lock lock_type;
     
-    static mutex_type     __ngram_mutex;
-    static ngram_map_type __ngram_map;
+    static mutex_type         __ngram_pyp_mutex;
+    static ngram_pyp_map_type __ngram_pyp_map;
   };
 
 #ifdef HAVE_TLS
-  static __thread ngram_map_type* __ngrams_tls = 0;
-  static boost::thread_specific_ptr<ngram_map_type> __ngrams;
+  static __thread ngram_pyp_map_type* __ngram_pyps_tls = 0;
+  static boost::thread_specific_ptr<ngram_pyp_map_type> __ngram_pyps;
 #else
-  static utils::thread_specific_ptr<ngram_map_type> __ngrams;
+  static utils::thread_specific_ptr<ngram_pyp_map_type> __ngram_pyps;
 #endif
   
   NGramPYP& NGramPYP::create(const path_type& path)
   {
 #ifdef HAVE_TLS
-    if (! __ngrams_tls) {
-      __ngrams.reset(new ngram_map_type());
-      __ngrams_tls = __ngrams.get();
+    if (! __ngram_pyps_tls) {
+      __ngram_pyps.reset(new ngram_pyp_map_type());
+      __ngram_pyps_tls = __ngram_pyps.get();
     }
-    ngram_map_type& ngrams_map = *__ngrams_tls;
+    ngram_pyp_map_type& ngram_pyps_map = *__ngram_pyps_tls;
 #else
-    if (! __ngrams.get())
-      __ngrams.reset(new ngram_map_type());
+    if (! __ngram_pyps.get())
+      __ngram_pyps.reset(new ngram_pyp_map_type());
     
-    ngram_map_type& ngrams_map = *__ngrams;
+    ngram_pyp_map_type& ngram_pyps_map = *__ngram_pyps;
 #endif
 
     const std::string parameter = path.string();
     
-    ngram_map_type::iterator iter = ngrams_map.find(parameter);
-    if (iter == ngrams_map.end()) {
-      impl::lock_type lock(impl::__ngram_mutex);
+    ngram_pyp_map_type::iterator iter = ngram_pyps_map.find(parameter);
+    if (iter == ngram_pyps_map.end()) {
+      impl::lock_type lock(impl::__ngram_pyp_mutex);
       
-      ngram_map_type::iterator iter_global = impl::__ngram_map.find(parameter);
-      if (iter_global == impl::__ngram_map.end())
-	iter_global = impl::__ngram_map.insert(std::make_pair(parameter, NGramPYP(parameter))).first;
+      ngram_pyp_map_type::iterator iter_global = impl::__ngram_pyp_map.find(parameter);
+      if (iter_global == impl::__ngram_pyp_map.end())
+	iter_global = impl::__ngram_pyp_map.insert(std::make_pair(parameter, NGramPYP(parameter))).first;
       
-      iter = ngrams_map.insert(*iter_global).first;
+      iter = ngram_pyps_map.insert(*iter_global).first;
     }
     
     return iter->second;
