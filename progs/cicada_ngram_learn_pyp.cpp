@@ -609,6 +609,10 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
+
+    // clear training data
+    training.clear();
+    data_set_type(training).swap(training);
     
     // we will dump LM... now, define a format!
     if (! output_file.empty())
