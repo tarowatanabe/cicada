@@ -10,7 +10,6 @@
 #include "cicada/feature/ngram.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
-#include "cicada/cluster.hpp"
 
 #include "utils/vector2.hpp"
 #include "utils/array_power2.hpp"
@@ -54,13 +53,8 @@ namespace cicada
       typedef cicada::Vocab  vocab_type;
       
       typedef cicada::NGramPYP      ngram_type;
-
-      typedef ngram_type::state_type ngram_state_type;
-      typedef std::pair<ngram_state_type, double> state_score_type;
       
-      typedef cicada::NGramCache<symbol_type::id_type, state_score_type> ngram_cache_type;
-      
-      typedef cicada::Cluster cluster_type;
+      typedef cicada::NGramCache<symbol_type::id_type, double> ngram_cache_type;
       
       typedef std::vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > buffer_type;
 
@@ -84,10 +78,10 @@ namespace cicada
       struct CacheContext
       {
 	typedef utils::small_vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > phrase_type;
-
-	ngram_state_type state;
-	phrase_type      ngram;
-	state_score_type score;
+	
+	phrase_type context;
+	phrase_type ngram;
+	double      score;
 	
 	CacheContext() : state(), ngram(), score() {}
       };
@@ -107,23 +101,20 @@ namespace cicada
       
       NGramPYPImpl(const path_type& __path, const int __order)
 	: ngram(&ngram_type::create(__path)),
-	  order(__order), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
+	  order(__order), no_bos_eos(false), skip_sgml_tag(false)
       {
-	order = utils::bithack::min(order, ngram->index.order());
+	order = utils::bithack::min(order, ngram->order());
 	
 	initialize_cache();
 	
-	id_oov = ngram->index.vocab()[vocab_type::UNK];
-	id_bos = ngram->index.vocab()[vocab_type::BOS];
-	id_eos = ngram->index.vocab()[vocab_type::EOS];
+	id_oov = ngram->vocab()[vocab_type::UNK];
+	id_bos = ngram->vocab()[vocab_type::BOS];
+	id_eos = ngram->vocab()[vocab_type::EOS];
       }
 
       NGramPYPImpl(const NGramPYPImpl& x)
 	: ngram(&ngram_type::create(x.ngram->path())),
 	  order(x.order),
-	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
-	  coarse(x.coarse),
-	  approximate(x.approximate),
 	  no_bos_eos(x.no_bos_eos),
 	  skip_sgml_tag(x.skip_sgml_tag),
 	  feature_name(x.feature_name),
@@ -140,9 +131,6 @@ namespace cicada
       {
 	ngram = &ngram_type::create(x.ngram->path());
 	order = x.order;
-	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
-	coarse = x.coarse;
-	approximate = x.approximate;
 	no_bos_eos = x.no_bos_eos;
 	skip_sgml_tag = x.skip_sgml_tag;
 	
@@ -160,7 +148,7 @@ namespace cicada
       void initialize_cache()
       {
 	cache_logprob.clear();
-	cache_estimate = ngram_cache_type(ngram->index.order());
+	cache_estimate = ngram_cache_type(ngram->order());
       }
       
       template <typename Iterator>
@@ -177,109 +165,40 @@ namespace cicada
 	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
       
-      struct __ngram_score_logprob
-      {
-	const ngram_type& ngram;
-
-	__ngram_score_logprob(const ngram_type& __ngram) : ngram(__ngram) {}
-	
-	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
-	{
-	  return ngram.logprob(state, word, backoffed, max_order);
-	}
-      };
-
-      struct __ngram_score_logbound
-      {
-	const ngram_type& ngram;
-
-	__ngram_score_logbound(const ngram_type& __ngram) : ngram(__ngram) {}
-	
-	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
-	{
-	  return ngram.logbound(state, word, backoffed, max_order);
-	}
-      };
 
       template <typename Iterator>
-      state_score_type ngram_score(const ngram_state_type& state, Iterator first, Iterator last) const
+      double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
-	typedef typename std::iterator_traits<Iterator>::value_type value_type;
-
-	if (coarse)
-	  return ngram_score(state, first, last, __ngram_score_logbound(*ngram), value_type());
-	else
-	  return ngram_score(state, first, last, __ngram_score_logprob(*ngram), value_type());
-      }
-      
-      template <typename Iterator, typename Scorer>
-      state_score_type ngram_score(ngram_state_type state, Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
-      {
-	const size_type length = std::distance(first, last);
+	if (iter == last) return 0.0;
 	
-	if (length == 0)
-	  return state_score_type(state, 0.0);
-	else if (length == 1)
-	  return scorer(state, *first, ngram->index.order(state) + 1 < order, order);
+	first = std::max(first, iter - order + 1);
 	
-	const size_t cache_pos = hash_phrase(first, last, state.value()) & (cache_logprob.size() - 1);
+	const size_t cache_pos = hash_phrase(first, iter, hash_phrase(iter, last)) & (cache_logprob.size() - 1);
 	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
 	
-	if (cache.state != state || ! equal_phrase(first, last, cache.ngram)) {
-	  cache.state = state;
-	  cache.ngram.assign(first, last);
+	if (! equal_phrase(first, iter, cache.context) || ! equal_phrase(iter, last, cache.ngram)) {
+	  cache.context.assign(first, iter);
+	  cache.ngram.assign(iter, last);
+	  cache.score = 0.0;
 	  
-	  ngram_type::logprob_type score = 0.0;
-	  for (/**/; first != last; ++ first) {
-	    const state_score_type result = scorer(state, *first, ngram->index.order(state) + 1 < order, order);
+	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
+	  buffer.clear();
+	  buffer.insert(buffer.end(), first, iter);
+	  
+	  for (/**/; iter != last; ++ iter) {
+	    buffer.push_back(*iter);
 	    
-	    state = result.first;
-	    score += result.second;
+	    cache.score += ngram->logprob(std::max(buffer.begin(), buffer.end() - order), buffer.end());
 	  }
-	  
-	  cache.score = std::make_pair(state, score);
 	}
 	
 	return cache.score;
       }
       
       template <typename Iterator>
-      state_score_type ngram_estimate(Iterator first, Iterator last) const
+      double ngram_estimate(Iterator first, Iterator last) const
       {
-	typedef typename std::iterator_traits<Iterator>::value_type value_type;
-
-	if (approximate)
-	  return ngram_estimate(first, last, __ngram_score_logprob(*ngram), value_type());
-	else
-	  return ngram_estimate(first, last, __ngram_score_logbound(*ngram), value_type());
-      }
-      
-      template <typename Iterator, typename Scorer>
-      state_score_type ngram_estimate(Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
-      {
-	const size_type length = std::distance(first, last);
-	
-	if (length == 0)
-	  return state_score_type(ngram_state_type(), 0.0);
-	else if (length <= 2) {
-	  int bound_order = 0;
-	  state_score_type state_score(ngram_state_type(), 0.0);
-	  
-	  if (*first == id_bos) {
-	    state_score.first = ngram->index.next(state_score.first, id_bos);
-	    ++ first;
-	    ++ bound_order;
-	  }
-	  
-	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
-	    
-	    state_score.first   = result.first;
-	    state_score.second += result.second;
-	  }
-	  
-	  return state_score;
-	}
+	if (first == last) return 0.0;
 	
 	const size_type cache_pos = cache_estimate(first, last);
 	
@@ -287,39 +206,27 @@ namespace cicada
 	  ngram_cache_type& cache = const_cast<ngram_cache_type&>(cache_estimate);
 	  cache.assign(cache_pos, first, last);
 	  
-	  int bound_order = 0;
-	  state_score_type state_score(ngram_state_type(), 0.0);
+	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
+	  buffer.clear();
 	  
+	  // skip initial bos...
 	  if (*first == id_bos) {
-	    state_score.first = ngram->index.next(state_score.first, id_bos);
+	    buffer.push_back(*first);
 	    ++ first;
-	    ++ bound_order;
 	  }
 	  
-	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
+	  double score = 0.0;
+	  for (/**/; first != last; ++ first) {
+	    buffer.push_back(*first);
 	    
-	    state_score.first   = result.first;
-	    state_score.second += result.second;
+	    score += ngram.logprob(buffer.begin(), buffer.end());
 	  }
 	  
-	  cache.score(cache_pos) = state_score;
+	  cache.score(cache_pos) = score;
 	}
 	
 	return cache_estimate.score(cache_pos);
       }
-
-      struct extract_cluster
-      {
-	extract_cluster(const cluster_type* __cluster): cluster(__cluster) {}
-	
-	const cluster_type* cluster;
-
-	symbol_type operator()(const symbol_type& word) const
-	{
-	  return cluster->operator[](word);
-	}
-      };
 
       struct extract_word
       {
@@ -350,34 +257,19 @@ namespace cicada
 			 const edge_type& edge,
 			 int& oov) const
       {
-	if (cluster) {
-	  if (skip_sgml_tag)
-	    return ngram_score(state, states, edge, oov, extract_cluster(cluster), skipper_sgml());
-	  else
-	    return ngram_score(state, states, edge, oov, extract_cluster(cluster), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    return ngram_score(state, states, edge, oov, extract_word(), skipper_sgml());
-	  else
-	    return ngram_score(state, states, edge, oov, extract_word(), skipper_epsilon());
-	}
+	if (skip_sgml_tag)
+	  return ngram_score(state, states, edge, oov, extract_word(), skipper_sgml());
+	else
+	  return ngram_score(state, states, edge, oov, extract_word(), skipper_epsilon());
       }
 
       double ngram_estimate(const edge_type& edge, int& oov) const
       {
-	if (cluster) {
-	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_sgml());
-	  else
-	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, oov, extract_word(), skipper_sgml());
-	  else
-	    return ngram_estimate(edge, oov, extract_word(), skipper_epsilon());
-	}
+	if (skip_sgml_tag)
+	  return ngram_estimate(edge, oov, extract_word(), skipper_sgml());
+	else
+	  return ngram_estimate(edge, oov, extract_word(), skipper_epsilon());
       }
-
       
       template <typename Extract, typename Skipper>
       double ngram_score(state_ptr_type& state,
@@ -398,14 +290,9 @@ namespace cicada
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
 	
-	static const ngram_state_type state_root    = ngram_state_type();
-	static const ngram_state_type state_invalid = ngram_state_type(size_type(0), size_type(-1));
-
-	ngram_state_type*     ngram_state = reinterpret_cast<ngram_state_type*>(state);
-	symbol_type::id_type* context     = reinterpret_cast<symbol_type::id_type*>(ngram_state + 1);
-	symbol_type::id_type* context_end = context + order;
-	
 	if (states.empty()) {
+	  
+	  
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	    if (! skipper(*titer)) {
@@ -413,11 +300,18 @@ namespace cicada
 	      oov += (buffer.back() == id_oov);
 	    }
 	  
-	  buffer_type::const_iterator biter_begin = buffer.begin();
-	  buffer_type::const_iterator biter_end   = buffer.end();
-	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
+	  symbol_type* context = reinterpret_cast<symbol_type*>(state);
+	  symbol_type* context_end = context + order * 2;
 	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+	  if (static_cast<int>(buffer.size()) <= context_size) {
+	    std::fill(std::copy(buffer.begin(), buffer.end(), context), context_end, id_empty);
+	    
+	    return ngram_estimate(buffer.begin(), buffer.end());
+	  } else {
+	    
+	    
+	  }
+	  
 	  
 	  if (prefix.second == biter_end) {
 	    *ngram_state = state_invalid;
@@ -633,17 +527,10 @@ namespace cicada
 			      const int dot,
 			      int& oov)
       {
-	if (cluster) {
-	  if (skip_sgml_tag)
-	    return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_sgml());
-	  else
-	    return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_sgml());
-	  else
-	    return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_epsilon());
-	}
+	if (skip_sgml_tag)
+	  return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_sgml());
+	else
+	  return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_epsilon());
       }
       
       template <typename Extract, typename Skipper>
@@ -706,16 +593,12 @@ namespace cicada
       
       // actual buffers...
       buffer_type    buffer_impl;
+      buffer_type    buffer_score_impl;
       
       // ngrams
       ngram_type*     ngram;
       int             order;
-
-      // cluster...
-      cluster_type* cluster;
       
-      bool coarse;
-      bool approximate;
       bool no_bos_eos;
       bool skip_sgml_tag;
       
@@ -742,27 +625,19 @@ namespace cicada
 
       path_type   path;
       int         order = 3;
-      path_type   cluster_path;
-      bool        approximate = false;
       bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
       
       path_type   coarse_path;
       int         coarse_order = 0;
-      path_type   coarse_cluster_path;
-      bool        coarse_approximate = false;
       
       std::string name;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
-	else if (utils::ipiece(piter->first) == "cluster")
-	  cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
-	else if (utils::ipiece(piter->first) == "approximate")
-	  approximate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-bos-eos")
@@ -771,10 +646,6 @@ namespace cicada
 	  coarse_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-order")
 	  coarse_order = utils::lexical_cast<int>(piter->second);
-	else if (utils::ipiece(piter->first) == "coarse-cluster")
-	  coarse_cluster_path = piter->second;
-	else if (utils::ipiece(piter->first) == "coarse-approximate")
-	  coarse_approximate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -793,27 +664,19 @@ namespace cicada
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
-
-      ngram_impl->approximate = approximate;
+      
       ngram_impl->no_bos_eos = no_bos_eos;
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
       
-      if (! cluster_path.empty()) {
-	if (! boost::filesystem::exists(cluster_path))
-	  throw std::runtime_error("no cluster file: " + cluster_path.string());
-	
-	ngram_impl->cluster = &cicada::Cluster::create(cluster_path);
-      }
-      
       // two contexts (order - 1) for each edge, with two separator..
-      base_type::__state_size = sizeof(impl_type::ngram_state_type) + sizeof(symbol_type::id_type) * ngram_impl->order;
+      base_type::__state_size = sizeof(symbol_type::id_type) * ngram_impl->order * 2;
       base_type::__feature_name = (name.empty() ? std::string("ngram-pyp") : name);
       
       ngram_impl->feature_name     = base_type::__feature_name;
       ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov-penalty";
       
       pimpl = ngram_impl.release();
-
+      
       // ...
       if (coarse_order > 0 || ! coarse_path.empty()) {
 	
@@ -823,22 +686,13 @@ namespace cicada
 	if (! coarse_path.empty()) {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
 
-	  ngram_impl->approximate = coarse_approximate;
 	  ngram_impl->no_bos_eos = no_bos_eos;
 	  ngram_impl->skip_sgml_tag = skip_sgml_tag;
-	  
-	  if (! coarse_cluster_path.empty()) {
-	    if (! boost::filesystem::exists(coarse_cluster_path))
-	      throw std::runtime_error("no cluster file: " + coarse_cluster_path.string());
-	    
-	    ngram_impl->cluster = &cicada::Cluster::create(coarse_cluster_path);
-	  }
 	  
 	  pimpl_coarse = ngram_impl.release();
 	} else {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
 	  ngram_impl->order = coarse_order;
-	  ngram_impl->coarse = true;
 	  
 	  pimpl_coarse = ngram_impl.release();
 	}
@@ -893,7 +747,7 @@ namespace cicada
 	features[pimpl->feature_name] = score;
       else
 	features.erase(pimpl->feature_name);
-
+      
       if (oov)
 	features[pimpl->feature_name_oov] = - oov;
       else
@@ -979,7 +833,6 @@ namespace cicada
 				  const bool final) const
     {
       // if final, add scoring for </s>
-
       
       if (final) {
 	const double score = pimpl->ngram_complete_score(state);

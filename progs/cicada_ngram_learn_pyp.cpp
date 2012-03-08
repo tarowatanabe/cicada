@@ -103,11 +103,7 @@ struct PYPLM
     root.parent = id_type(-1);
     root.order = 0;
     root.table = node_type::table_type(discount[0],
-				       strength[0],
-				       discount_alpha,
-				       discount_beta,
-				       strength_shape,
-				       strength_rate);
+				       strength[0]);
   }
 
   template <typename Iterator>
@@ -131,11 +127,7 @@ struct PYPLM
 	trie_node.parent = node_prev;
 	trie_node.order = order;
 	trie_node.table = node_type::table_type(discount[order],
-						strength[order],
-						discount_alpha,
-						discount_beta,
-						strength_shape,
-						strength_rate);
+						strength[order]);
 	
 	nodes[order].push_back(node);
       }
@@ -305,11 +297,15 @@ struct PYPLM
       if (order == 0) {
 	root.table.discount() = discount[order];
 	root.table.strength() = strength[order];
+
+	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
 	  trie[*niter].table.discount() = discount[order];
 	  trie[*niter].table.strength() = strength[order];
+	  
+	  trie[*niter].table.verify_parameters();
 	}
       }
     }
@@ -571,14 +567,14 @@ int main(int argc, char ** argv)
       utils::compress_istream is(*fiter, 1024 * 1024);
       
       sentence_type sentence;
-      sentence_type ngram(order - 1, vocab_type::BOS);
+      sentence_type ngram(1, vocab_type::BOS);
       
       while (is >> sentence) {
-	ngram.resize(order - 1);
+	ngram.resize(1);
 	
 	sentence_type::const_iterator siter_end = sentence.end();
 	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  training.push_back(data_type(*siter, lm.insert(ngram.end() - order + 1, ngram.end())));
+	  training.push_back(data_type(*siter, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end())));
 	  
 	  ngram.push_back(*siter);
 	  
@@ -587,7 +583,7 @@ int main(int argc, char ** argv)
 	  non_oov[siter->id()] = true;
 	}
 	
-	training.push_back(data_type(vocab_type::EOS, lm.insert(ngram.end() - order + 1, ngram.end())));
+	training.push_back(data_type(vocab_type::EOS, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end())));
       }
     }
     
@@ -623,7 +619,7 @@ int main(int argc, char ** argv)
     // testing!
     if (! test_files.empty()) {
       sentence_type sentence;
-      sentence_type ngram(order - 1, vocab_type::BOS);
+      sentence_type ngram(1, vocab_type::BOS);
 
       double logprob_total = 0.0;
       size_t num_word = 0;
@@ -634,12 +630,12 @@ int main(int argc, char ** argv)
 	utils::compress_istream is(*fiter, 1024 * 1024);
 	
 	while (is >> sentence) {
-	  ngram.resize(order - 1);
+	  ngram.resize(1);
 	  
 	  sentence_type::const_iterator siter_end = sentence.end();
 	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
 	    const bool is_oov = ! (siter->id() < non_oov.size() && non_oov[siter->id()]);
-	    const double prob = lm.prob(*siter, ngram.end() - order + 1, ngram.end());
+	    const double prob = lm.prob(*siter, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
 	    
 	    if (! is_oov)
 	      logprob_total += std::log(prob);
@@ -649,7 +645,7 @@ int main(int argc, char ** argv)
 	    ngram.push_back(*siter);
 	  }
 
-	  const double prob = lm.prob(vocab_type::EOS, ngram.end() - order + 1, ngram.end());
+	  const double prob = lm.prob(vocab_type::EOS, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
 	  logprob_total += std::log(prob);
 	  
 	  num_word += sentence.size();

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <boost/functional/hash.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <utils/unordered_map.hpp>
 #include <utils/slice_sampler.hpp>
@@ -34,41 +35,47 @@ namespace utils
     
   public:
     chinese_restaurant_process()
-      : table_size(),
-	customer_size(),
+      : tables(),
+	customers(),
 	m_discount(0.9),
 	m_strength(1.0),
 	discount_prior_alpha(std::numeric_limits<double>::quiet_NaN()),
 	discount_prior_beta(std::numeric_limits<double>::quiet_NaN()),
 	strength_prior_shape(std::numeric_limits<double>::quiet_NaN()),
 	strength_prior_rate(std::numeric_limits<double>::quiet_NaN())
-    {}
+    {
+      verify_parameters();
+    }
     
     chinese_restaurant_process(const double& __discount,
 			       const double& __strength)
-      : table_size(),
-	customer_size(),
+      : tables(),
+	customers(),
 	m_discount(__discount),
 	m_strength(__strength),
 	discount_prior_alpha(std::numeric_limits<double>::quiet_NaN()),
 	discount_prior_beta(std::numeric_limits<double>::quiet_NaN()),
 	strength_prior_shape(std::numeric_limits<double>::quiet_NaN()),
 	strength_prior_rate(std::numeric_limits<double>::quiet_NaN())
-    {}
+    {
+      verify_parameters();
+    }
 
     chinese_restaurant_process(const double& __discount_prior_alpha,
 			       const double& __discount_prior_beta,
 			       const double& __strength_prior_shape,
 			       const double& __strength_prior_rate)
-      : table_size(),
-	customer_size(),
+      : tables(),
+	customers(),
 	m_discount(0.9),
 	m_strength(1.0),
 	discount_prior_alpha(__discount_prior_alpha),
 	discount_prior_beta(__discount_prior_beta),
 	strength_prior_shape(__strength_prior_shape),
 	strength_prior_rate(__strength_prior_rate)
-    {}
+    {
+      verify_parameters();
+    }
     
     chinese_restaurant_process(const double& __discount,
 			       const double& __strength,
@@ -76,15 +83,17 @@ namespace utils
 			       const double& __discount_prior_beta,
 			       const double& __strength_prior_shape,
 			       const double& __strength_prior_rate)
-      : table_size(),
-	customer_size(),
+      : tables(),
+	customers(),
 	m_discount(__discount),
 	m_strength(__strength),
 	discount_prior_alpha(__discount_prior_alpha),
 	discount_prior_beta(__discount_prior_beta),
 	strength_prior_shape(__strength_prior_shape),
 	strength_prior_rate(__strength_prior_rate)
-    {}
+    {
+      verify_parameters();
+    }
 
   private:
     struct Location
@@ -94,15 +103,15 @@ namespace utils
 
       typedef typename table_set_type::const_iterator const_iterator;
       
-      Location() : count(0) {}
+      Location() : customers(0) {}
       
       const_iterator begin() const { return tables.begin(); }
       const_iterator end() const { return tables.end(); }
 
-      size_type size_customer() const { return count; }
+      size_type size_customer() const { return customers; }
       size_type size_table() const { return tables.size(); }
       
-      size_type      count;
+      size_type      customers;
       table_set_type tables;
     };
     typedef Location location_type;
@@ -121,8 +130,8 @@ namespace utils
     const_iterator begin() const { return dishes.begin(); }
     const_iterator end() const { return dishes.end(); }
 
-    bool has_discount_prior() const { return ! std::isnan(discount_prior_alpha); }
-    bool has_strength_prior() const { return ! std::isnan(strength_prior_shape); }
+    bool has_discount_prior() const { return ! std::isnan(discount_prior_alpha) && ! std::isnan(discount_prior_beta); }
+    bool has_strength_prior() const { return ! std::isnan(strength_prior_shape) && ! std::isnan(strength_prior_rate); }
 
     double& discount() { return m_discount; }
     double& strength() { return m_strength; }
@@ -132,16 +141,16 @@ namespace utils
     
     void clear()
     {
-      table_size = 0;
-      customer_size = 0;
+      tables = 0;
+      customers = 0;
       dishes.clear();
     }
 
     bool empty() const { return dishes.empty(); }
     
-    size_type size_customer() const { return customer_size; }
+    size_type size_customer() const { return customers; }
 
-    size_type size_table() const { return table_size; }
+    size_type size_table() const { return tables; }
     
     size_type size_table(const dish_type& dish) const
     {
@@ -156,15 +165,15 @@ namespace utils
       location_type& loc = dishes[dish];
       
       bool shared = false;
-      if (loc.count) {
-	const double p_empty = (m_strength + table_size * m_discount) * p0;
-	const double p_share = (loc.count - loc.tables.size() * m_discount);
+      if (loc.customers) {
+	const double p_empty = (m_strength + tables * m_discount) * p0;
+	const double p_share = (loc.customers - loc.tables.size() * m_discount);
 	
 	shared = sampler.select(p_empty, p_share);
       }
       
       if (shared) {
-	double r = sampler.uniform() * (loc.count - loc.tables.size() * m_discount);
+	double r = sampler.uniform() * (loc.customers - loc.tables.size() * m_discount);
 	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -177,11 +186,11 @@ namespace utils
 	}
       } else {
 	loc.tables.push_back(1);
-	++ table_size;
+	++ tables;
       }
       
-      ++ loc.count;
-      ++ customer_size;
+      ++ loc.customers;
+      ++ customers;
       
       return ! shared;
     }
@@ -196,16 +205,16 @@ namespace utils
       
       location_type& loc = diter->second;
       
-      if (loc.count == 1) {
+      if (loc.customers == 1) {
 	dishes.erase(diter);
-	-- table_size;
-	-- customer_size;
+	-- tables;
+	-- customers;
 	return true;
       }
       
       bool erased = false;
-      double r = sampler.uniform() * loc.count;
-      -- loc.count;
+      double r = sampler.uniform() * loc.customers;
+      -- loc.customers;
       
       typename location_type::table_set_type::iterator titer_end = loc.tables.end();
       for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -216,14 +225,14 @@ namespace utils
 	  
 	  if (! (*titer)) {
 	    erased = true;
-	    -- table_size;
+	    -- tables;
 	    loc.tables.erase(titer);
 	  }
 	  break;
 	}
       }
       
-      -- customer_size;
+      -- customers;
       return erased;
     }
 
@@ -231,12 +240,12 @@ namespace utils
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      const double r = table_size * m_discount + m_strength;
+      const double r = tables * m_discount + m_strength;
       
       if (diter == dishes.end())
-	return r * p0 / (double(customer_size) + m_strength);
+	return r * p0 / (double(customers) + m_strength);
       else
-	return (double(diter->second.count) - m_discount * diter->second.tables.size() + r * p0) / (double(customer_size) + m_strength);
+	return (double(diter->second.customers) - m_discount * diter->second.tables.size() + r * p0) / (double(customers) + m_strength);
     }
 
     double log_likelihood() const
@@ -254,7 +263,7 @@ namespace utils
       if (has_strength_prior())
 	logprob += utils::mathop::log_gamma_density(strength + discount, strength_prior_shape, strength_prior_rate);
       
-      if (! customer_size) return logprob;
+      if (! customers) return logprob;
       
       if (discount > 0.0) {
 	const double r = utils::mathop::lgamma(1.0 - discount);
@@ -262,9 +271,9 @@ namespace utils
 	if (strength != 0.0)
           logprob += utils::mathop::lgamma(strength) - utils::mathop::lgamma(strength / discount);
 	
-	logprob += (- utils::mathop::lgamma(strength + customer_size)
-		    + table_size * std::log(discount)
-		    + utils::mathop::lgamma(strength / discount + table_size));
+	logprob += (- utils::mathop::lgamma(strength + customers)
+		    + tables * std::log(discount)
+		    + utils::mathop::lgamma(strength / discount + tables));
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
@@ -275,7 +284,7 @@ namespace utils
 	    logprob += utils::mathop::lgamma(*titer - discount) - r;
 	}
       } else if (discount == 0.0) {
-	logprob += utils::mathop::lgamma(strength) + table_size * std::log(strength) - utils::mathop::lgamma(strength + table_size);
+	logprob += utils::mathop::lgamma(strength) + tables * std::log(strength) - utils::mathop::lgamma(strength + tables);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
@@ -312,6 +321,17 @@ namespace utils
     };
 
   public:
+
+    bool verify_parameters()
+    {
+      if (m_discount < 0.0 || m_discount >= 1.0)
+	throw std::runtime_error("invalid discount: " + boost::lexical_cast<std::string>(m_discount));
+      
+      if (m_strength <= - m_discount)
+	throw std::runtime_error("invalid strength: " + boost::lexical_cast<std::string>(m_strength));
+      
+      return true;
+    }
     
     template <typename Sampler>
     void sample_parameters(Sampler& sampler,
@@ -356,8 +376,8 @@ namespace utils
     }
     
   private:
-    size_type table_size;
-    size_type customer_size;
+    size_type tables;
+    size_type customers;
     dish_set_type dishes;
     
     double m_discount;
