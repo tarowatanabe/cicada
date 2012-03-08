@@ -158,7 +158,7 @@ namespace cicada
 	  return __find(pos, id);
       }
     }
-    
+
     template <typename Iterator>
     logprob_type operator()(Iterator first, Iterator last) const
     {
@@ -179,6 +179,27 @@ namespace cicada
       typedef typename std::iterator_traits<Iterator>::value_type value_type;
       
       return __prob_dispatch(std::max(first, last - order_), last, value_type());
+    }
+    
+    template <typename Iterator>
+    bool exists(Iterator first, Iterator last) const
+    {
+      typedef std::reverse_iterator<Iterator> reverse_iterator;
+
+      if (first == last) return false;
+      
+      // we will traverse from the back!
+      reverse_iterator begin(last);
+      reverse_iterator end(first);
+      
+      size_type node = size_type(-1);
+      for (reverse_iterator iter = begin; iter != end; ++ iter) {
+	node = find(node, *iter);
+	
+	if (node == size_type(-1))
+	  return false;
+      }
+      return true;
     }
     
     template <typename Iterator>

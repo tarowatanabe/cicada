@@ -129,6 +129,7 @@ feature/lexicalized_reordering.hpp \
 feature/lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
+feature/ngram_pyp.hpp \
 feature/ngram_tree.hpp \
 feature/parent.hpp \
 feature/penalty.hpp \
