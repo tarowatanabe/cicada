@@ -351,7 +351,9 @@ namespace cicada
       for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
 	node = find(node, *iter);
 	
-	if (node == size_type(-1))
+	const size_type pos_total_customer = (node + 1) << 1;
+	
+	if (node == size_type(-1) || pos_total_customer >= total_.size() || ! total_[pos_total_customer])
 	  return p;
 	else
 	  p = __prob_dispatch(order, node, word, p);
@@ -377,8 +379,10 @@ namespace cicada
       int order = 1;
       for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
 	node = find(node, vocab_[*iter]);
+
+	const size_type pos_total_customer = (node + 1) << 1;
 	
-	if (node == size_type(-1))
+	if (node == size_type(-1) || pos_total_customer >= total_.size() || ! total_[pos_total_customer])
 	  return p;
 	else
 	  p = __prob_dispatch(order, node, word, p);
