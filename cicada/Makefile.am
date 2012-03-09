@@ -158,6 +158,7 @@ feature/lexicalized_reordering.cpp \
 feature/lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
+feature/ngram_pyp.cpp \
 feature/ngram_tree.cpp \
 feature/parent.cpp \
 feature/penalty.cpp \

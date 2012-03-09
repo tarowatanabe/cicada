@@ -41,6 +41,38 @@ namespace cicada
     typedef double             prob_type;
     
     typedef boost::filesystem::path   path_type;
+
+    struct State
+    {
+      typedef uint64_t state_type;
+
+      State() : state_(state_type(-1)) {}
+      State(const size_type& x) : state_(x) {}
+      
+      size_type node() const { return state_; }
+
+      bool is_root() const { return state_ == state_type(-1); }
+      
+      friend
+      bool operator==(const State& x, const State& y) { return x.state_ == y.state_; }
+      friend
+      bool operator!=(const State& x, const State& y) { return x.state_ != y.state_; }
+      friend
+      bool operator<(const State& x, const State& y) { return x.state_ < y.state_; }
+      friend
+      bool operator>(const State& x, const State& y) { return x.state_ > y.state_; }
+      friend
+      bool operator<=(const State& x, const State& y) { return x.state_ <= y.state_; }
+      friend
+      bool operator>=(const State& x, const State& y) { return x.state_ >= y.state_; }
+      
+      friend
+      size_t  hash_value(State const& x) { return utils::hashmurmur<size_t>()(x.state_); }
+      
+    private:      
+      state_type state_;
+    };
+    typedef State state_type;
     
   private:
     typedef utils::hashmurmur<size_t> hasher_type;
@@ -72,8 +104,18 @@ namespace cicada
       
       cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
     };
+
+    struct cache_state_type
+    {
+      state_type curr;
+      state_type next;
+      id_type    word;
+      
+      cache_state_type() : curr(), next(), word(id_type(-1)) {}
+    };
     
-    typedef utils::array_power2<cache_pos_type, 1024 * 128, std::allocator<cache_pos_type> > cache_pos_set_type;
+    typedef utils::array_power2<cache_pos_type,   1024 * 128, std::allocator<cache_pos_type> >     cache_pos_set_type;
+    typedef utils::array_power2<cache_state_type, 1024 * 128, std::allocator<cache_state_type> > cache_state_set_type;
 
   public:
     NGramPYP() {}
@@ -96,6 +138,7 @@ namespace cicada
       offsets_.clear();
       vocab_.clear();
       caches_pos_.clear();
+      caches_state_.clear();
     }
 
   public:
@@ -104,7 +147,8 @@ namespace cicada
   public:
     const vocab_type& vocab() const { return vocab_; }
     const int& order() const { return order_; }
-    
+
+  public:    
     size_type parent(size_type pos) const
     {
       return (pos < offsets_[1] ? size_type(-1) : positions_.select(pos + 1 - offsets_[1], true) + (offsets_[1] + 1) - pos - 1);
@@ -159,6 +203,62 @@ namespace cicada
       }
     }
 
+  public:
+    // state-base access...
+
+    int order(const state_type& state) const
+    {
+      if (state.is_root())
+	return 0;
+      else {
+	const size_type node = state.node();
+	
+	size_type order = 1;
+	for (/**/; order < offsets_.size(); ++ order)
+	  if (node < offsets_[order])
+	    return order;
+	
+	return order;
+      }
+    }
+    
+    state_type root() const { return state_type(); }
+    
+    template <typename _Word>
+    state_type next(const state_type& state, const _Word& word) const
+    {
+      return next(state, vocab_[word]);
+    }
+    
+    state_type next(const state_type& state, const id_type& word) const
+    {
+      if (state.is_root())
+	return state_type(find(state.node(), word));
+      else {
+	typedef std::vector<id_type, std::allocator<id_type> > buffer_type;
+	
+	buffer_type buffer(order_ + 1);
+	buffer_type::iterator biter = buffer.begin();
+	
+	size_type node = state.node();
+	for (/**/; node != size_type(-1); ++ biter) {
+	  *biter = index_[node];
+	  node = parent(node);
+	}
+	
+	*biter = word;
+	++ biter;
+	
+	buffer_type::const_reverse_iterator begin(biter);
+	buffer_type::const_reverse_iterator end(buffer.begin());
+	
+	
+	return state_type();
+      }
+    }
+    
+
+  public:
     template <typename Iterator>
     logprob_type operator()(Iterator first, Iterator last) const
     {
@@ -201,6 +301,37 @@ namespace cicada
       }
       return true;
     }
+    
+    template <typename Iterator>
+    std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
+    {
+      return std::make_pair(first, last);
+    }
+    
+    template <typename Iterator>
+    std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
+    {
+      typedef std::reverse_iterator<Iterator> reverse_iterator;
+      
+      if (first == last) return std::make_pair(first, last);
+      
+      first = std::max(first, last - order_);
+      
+      // we will traverse from the back!
+      reverse_iterator iter(last);
+      reverse_iterator end(first);
+      
+      size_type node = size_type(-1);
+      for (/**/; iter != end; ++ iter) {
+	node = find(node, *iter);
+	
+	if (node == size_type(-1))
+	  return std::make_pair(iter.base(), last);
+      }
+      
+      return std::make_pair(iter.base(), last);
+    }
+
     
     template <typename Iterator>
     prob_type __prob_dispatch(Iterator first, Iterator last, id_type) const
@@ -337,8 +468,10 @@ namespace cicada
     
     int               order_;
     
-    spinlock_type      spinlock_pos_;
-    cache_pos_set_type caches_pos_;
+    spinlock_type        spinlock_pos_;
+    spinlock_type        spinlock_state_;
+    cache_pos_set_type   caches_pos_;
+    cache_state_set_type caches_state_;
   };
   
 };
