@@ -94,11 +94,11 @@ namespace cicada
       inside_outside(source, inside, posterior, function, function);
       
       weight_type viterbi_weight;
-      typename traversal::value_type viterbi_length;
+      typename traversal::value_type viterbi_derivation;
       
-      viterbi(source, viterbi_length, viterbi_weight, traversal(posterior), function);
+      viterbi(source, viterbi_derivation, viterbi_weight, traversal(posterior), function);
       
-      const size_t prune_size = static_cast<size_t>(threshold * viterbi_length.first);
+      const size_t prune_size = static_cast<size_t>(threshold * viterbi_derivation.first);
       
       if (source.edges.size() <= prune_size) {
 	target = source;
@@ -114,7 +114,7 @@ namespace cicada
 
       removed_type removed(source.edges.size(), false);
       
-      const weight_type cutoff = std::min(sorted[prune_size].first, viterbi_length.second);
+      const weight_type cutoff = std::min(sorted[prune_size].first, viterbi_derivation.second);
       
       typename sorted_type::const_iterator siter_end = sorted.end();
       for (typename sorted_type::const_iterator siter = sorted.begin() + prune_size; siter != siter_end; ++ siter)
