@@ -511,6 +511,7 @@ hypergraph_main \
 lattice_main \
 lexicon_main \
 matcher_main \
+ngram_pyp_main \
 optimize_qp_main \
 parameter_main \
 rule_main \
@@ -577,6 +578,9 @@ lexicon_main_LDADD = libcicada.la
 
 matcher_main_SOURCES = matcher_main.cpp
 matcher_main_LDADD = libcicada.la
+
+ngram_pyp_main_SOURCES = ngram_pyp_main.cpp
+ngram_pyp_main_LDADD = libcicada.la
 
 optimize_qp_main_SOURCES = optimize_qp_main.cpp
 optimize_qp_main_LDADD = libcicada.la
