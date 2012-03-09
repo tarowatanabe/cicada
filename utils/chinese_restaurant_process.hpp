@@ -379,14 +379,15 @@ namespace utils
 				     100 * num_iterations);
       }
       
-      m_strength = slice_sampler(strength_resampler,
-				 m_strength,
-				 sampler,
-				 - m_discount + std::numeric_limits<double>::min(),
-				 std::numeric_limits<double>::infinity(),
-				 0.0,
-				 num_iterations,
-				 100 * num_iterations);
+      if (has_strength_prior())
+	m_strength = slice_sampler(strength_resampler,
+				   m_strength,
+				   sampler,
+				   - m_discount + std::numeric_limits<double>::min(),
+				   std::numeric_limits<double>::infinity(),
+				   0.0,
+				   num_iterations,
+				   100 * num_iterations);
     }
     
   private:
