@@ -274,8 +274,8 @@ struct PYPLM
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler,
-			 const size_type num_loop = 5,
-			 const size_type num_iterations = 10)
+			 const size_type num_loop = 2,
+			 const size_type num_iterations = 4)
   {
     for (int order = discount.size() - 1; order >= 0; -- order) {
       DiscountSampler discount_sampler(*this, order);

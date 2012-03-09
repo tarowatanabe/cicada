@@ -350,8 +350,8 @@ namespace utils
     
     template <typename Sampler>
     void sample_parameters(Sampler& sampler,
-			   const size_type num_loop = 5,
-			   const size_type num_iterations = 10)
+			   const size_type num_loop = 2,
+			   const size_type num_iterations = 4)
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
       
