@@ -765,14 +765,14 @@ void options(int argc, char** argv)
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
     ("samples",            po::value<int>(&samples)->default_value(samples),                       "# of samples")
-    ("resample",           po::value<int>(&resample_rate)->default_value(resample_rate),           "resampling rate")
-    ("resample-iteration", po::value<int>(&resample_iteration)->default_value(resample_iteration), "resampling iterations")
+    ("resample",           po::value<int>(&resample_rate)->default_value(resample_rate),           "hyperparameter resampling rate")
+    ("resample-iteration", po::value<int>(&resample_iteration)->default_value(resample_iteration), "hyperparameter resampling iterations")
 
-    ("discount", po::value<double>(&discount)->default_value(discount), "discount ~ Beta(alpha,beta)")
-    ("strength", po::value<double>(&strength)->default_value(strength), "strength ~ Gamma(shape,rate)")
-
+    ("discount",       po::value<double>(&discount)->default_value(discount),                          "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
     ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
