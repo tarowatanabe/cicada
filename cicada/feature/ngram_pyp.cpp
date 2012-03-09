@@ -19,26 +19,6 @@
 #include "utils/bithack.hpp"
 #include "utils/small_vector.hpp"
 
-// faster ngram state representation inspired by
-//
-// Unary Data Structures for Language Models
-// Jeffrey Sorensen, Cyril Allauzen
-// INTERSPEECH 2011
-//
-// and
-// 
-// @InProceedings{pauls-klein:2011:ACL-HLT2011,
-//  author    = {Pauls, Adam  and  Klein, Dan},
-//  title     = {Faster and Smaller N-Gram Language Models},
-//  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
-//  month     = {June},
-//  year      = {2011},
-//  address   = {Portland, Oregon, USA},
-//  publisher = {Association for Computational Linguistics},
-//  pages     = {258--267},
-//  url       = {http://www.aclweb.org/anthology/P11-1027}
-// }
-
 namespace cicada
 {
   namespace feature
