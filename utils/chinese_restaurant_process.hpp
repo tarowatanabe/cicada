@@ -249,17 +249,18 @@ namespace utils
       -- customers;
       return erased;
     }
-
-    double prob(const dish_type& dish, const double& p0) const
+    
+    template <typename F>
+    F prob(const dish_type& dish, const F& p0) const
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      const double r = tables * m_discount + m_strength;
+      const F r = tables * m_discount + m_strength;
       
       if (diter == dishes.end())
-	return r * p0 / (double(customers) + m_strength);
+	return r * p0 / F(customers + m_strength);
       else
-	return (double(diter->second.customers) - m_discount * diter->second.tables.size() + r * p0) / (double(customers) + m_strength);
+	return F(diter->second.customers - m_discount * diter->second.tables.size() + r * p0) / F(customers + m_strength);
     }
 
     double log_likelihood() const
