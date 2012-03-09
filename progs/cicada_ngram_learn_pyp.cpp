@@ -519,6 +519,7 @@ path_type     output_file;
 int order = 4;
 int samples = 300;
 int resample_rate = 20;
+int resample_iteration = 2;
 
 double discount = 0.8;
 double strength = -0.5;
@@ -618,7 +619,7 @@ int main(int argc, char ** argv)
       }
       
       if (iter % resample_rate == resample_rate - 1)
-	lm.sample_parameters(sampler);
+	lm.sample_parameters(sampler, resample_iteration);
       
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
@@ -763,8 +764,9 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",  po::value<int>(&samples)->default_value(samples),             "# of samples")
-    ("resample", po::value<int>(&resample_rate)->default_value(resample_rate), "resampling rate")
+    ("samples",            po::value<int>(&samples)->default_value(samples),                       "# of samples")
+    ("resample",           po::value<int>(&resample_rate)->default_value(resample_rate),           "resampling rate")
+    ("resample-iteration", po::value<int>(&resample_iteration)->default_value(resample_iteration), "resampling iterations")
 
     ("discount", po::value<double>(&discount)->default_value(discount), "discount ~ Beta(alpha,beta)")
     ("strength", po::value<double>(&strength)->default_value(strength), "strength ~ Gamma(shape,rate)")
