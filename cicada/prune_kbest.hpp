@@ -12,8 +12,6 @@
 #include <cicada/kbest.hpp>
 #include <cicada/inside_outside.hpp>
 
-#include <utils/dense_hash_set.hpp>
-
 namespace cicada
 {
   template <typename Function>
@@ -33,6 +31,9 @@ namespace cicada
     typedef typename function_type::value_type weight_type;
     
     typedef std::vector<bool, std::allocator<bool> > removed_type;
+
+    typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
     
     struct filter_pruned
     {
@@ -49,18 +50,19 @@ namespace cicada
 
     struct traversal
     {
-      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+      traversal(const posterior_type& __posterior) : posterior(__posterior) {}
       
-      typedef edge_set_type value_type;
+      const posterior_type& posterior;
+      
+      typedef weight_type value_type;
 
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	yield.clear();
+	yield = posterior[edge.id];
 	
-	yield.push_back(edge.id);
 	for (/**/; first != last; ++ first)
-	  yield.insert(yield.end(), first->begin(), first->end());
+	  yield = std::min(yield, posterior[*first]);
       }
     };
     
@@ -72,8 +74,6 @@ namespace cicada
 	return false;
       }
     };
-
-    typedef utils::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> >::type edge_set_type;
     
     PruneKBest(const function_type& __function,
 	       const size_type __kbest_size,
@@ -84,46 +84,36 @@ namespace cicada
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
-      typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
-
       typedef cicada::KBest<traversal, Function, kbest_filter> kbest_derivations_type;
 
       target.clear();
       if (! source.is_valid())
 	return;
       
-      kbest_derivations_type derivations(source, kbest_size, traversal(), function, kbest_filter());
+      inside_type    inside(source.nodes.size());
+      posterior_type posterior(source.edges.size());
       
-      edge_set_type edges;
-      edges.set_empty_key(hypergraph_type::invalid);
+      inside_outside(source, inside, posterior, function, function);
+
+      weight_type weight(cicada::semiring::traits<weight_type>::max());
+      
+      kbest_derivations_type derivations(source, kbest_size, traversal(posterior), function, kbest_filter());
       
       typename traversal::value_type derivation;
       size_type   k = 0;
       for (/**/; k != kbest_size; ++ k) {
-	weight_type weight;
+	weight_type weight_kbest;
 	
-	if (! derivations(k, derivation, weight))
+	if (! derivations(k, derivation, weight_kbest))
 	  break;
 	
-	edges.insert(derivation.begin(), derivation.end());
+	weight = std::min(weight, derivation);
       }
       
       if (k != kbest_size) {
 	target = source;
 	return;
       }
-      
-      inside_type    inside(source.nodes.size());
-      posterior_type posterior(source.edges.size());
-      
-      inside_outside(source, inside, posterior, function, function);
-      
-      weight_type weight(cicada::semiring::traits<weight_type>::max());
-      
-      typename edge_set_type::const_iterator eiter_end = edges.end();
-      for (typename edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter)
-	weight = std::min(weight, posterior[*eiter]);
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)
