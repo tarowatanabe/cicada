@@ -30,6 +30,9 @@ namespace cicada
     
     typedef std::vector<bool, std::allocator<bool> > removed_type;
 
+    typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
+
     struct filter_pruned
     {
       const removed_type& removed;
@@ -43,16 +46,22 @@ namespace cicada
       }
     };
 
-    struct length_traversal
+    struct traversal
     {
-      typedef int value_type;
+      typedef std::pair<int, weight_type> value_type;
+
+      traversal(const posterior_type& __posterior) : posterior(__posterior) {}
+
+      const posterior_type& posterior;
       
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	yield = 1;
-	for (/**/; first != last; ++ first)
-	  yield += *first;
+	yield = value_type(1, posterior[edge.id]);
+	for (/**/; first != last; ++ first) {
+	  yield.first += first->first;
+	  yield.second = std::min(yield.second, first->second);
+	}
       }
     };
 
@@ -63,10 +72,7 @@ namespace cicada
       : function(__function),
 	threshold(__threshold),
 	validate(__validate) {}
-
-    typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
-    typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
-
+    
     typedef std::pair<weight_type, id_type> value_type;
     typedef std::vector<value_type, std::allocator<value_type> > sorted_type;
     
@@ -82,48 +88,38 @@ namespace cicada
       if (! source.is_valid())
 	return;
       
-      weight_type viterbi_weight;
-      int         viterbi_length;
-      viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
-      
-      const size_t prune_size = static_cast<size_t>(threshold * viterbi_length);
-      
-      if (source.edges.size() <= prune_size) {
-	target = source;
-	return;
-      }
-      
       inside_type    inside(source.nodes.size());
       posterior_type posterior(source.edges.size());
       
       inside_outside(source, inside, posterior, function, function);
       
+      weight_type viterbi_weight;
+      typename traversal::value_type viterbi_length;
+      
+      viterbi(source, viterbi_length, viterbi_weight, traversal(posterior), function);
+      
+      const size_t prune_size = static_cast<size_t>(threshold * viterbi_length.first);
+      
+      if (source.edges.size() <= prune_size) {
+	target = source;
+	return;
+      }
+            
       sorted_type sorted(source.edges.size());
       
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	sorted[id] = std::make_pair(posterior[id], id);
       
       std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), greater_first<value_type>());
-      
-      const weight_type cutoff = sorted[prune_size].first;
-      
-      typename sorted_type::const_iterator siter = sorted.begin();
-      typename sorted_type::const_iterator siter_end = sorted.end();
-      typename sorted_type::const_iterator siter_last = siter + prune_size;
 
       removed_type removed(source.edges.size(), false);
       
-      bool found_equal = false;
-      for (/**/; siter != siter_last; ++ siter)
-	found_equal |= (siter->first == cutoff);
+      const weight_type cutoff = std::min(sorted[prune_size].first, viterbi_length.second);
       
-      if (found_equal) {
-	for (/**/; siter != siter_end; ++ siter)
-	  removed[siter->second] = (siter->first != cutoff);
-      } else {
-	for (/**/; siter != siter_end; ++ siter)
+      typename sorted_type::const_iterator siter_end = sorted.end();
+      for (typename sorted_type::const_iterator siter = sorted.begin() + prune_size; siter != siter_end; ++ siter)
+	if (siter->first < cutoff)
 	  removed[siter->second] = true;
-      }
       
       topologically_sort(source, target, filter_pruned(removed), validate);
       
