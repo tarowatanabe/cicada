@@ -14,6 +14,7 @@
 #include <boost/math/special_functions/log1p.hpp>
 #include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/special_functions/gamma.hpp>
+#include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
 
 namespace utils
