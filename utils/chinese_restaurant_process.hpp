@@ -310,9 +310,9 @@ namespace utils
     }
 
   private:    
-    struct DiscountResampler
+    struct DiscountSampler
     {
-      DiscountResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      DiscountSampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
       
       const chinese_restaurant_process& crp;
       
@@ -322,9 +322,9 @@ namespace utils
       }
     };
     
-    struct StrengthResampler
+    struct StrengthSampler
     {
-      StrengthResampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      StrengthSampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
       
       const chinese_restaurant_process& crp;
       
@@ -354,12 +354,12 @@ namespace utils
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
       
-      DiscountResampler discount_resampler(*this);
-      StrengthResampler strength_resampler(*this);
+      DiscountSampler discount_sampler(*this);
+      StrengthSampler strength_sampler(*this);
       
       for (size_type iter = 0; iter < num_loop; ++iter) {
 	if (has_strength_prior())
-	  m_strength = slice_sampler(strength_resampler,
+	  m_strength = slice_sampler(strength_sampler,
 				     m_strength,
 				     sampler,
 				     - m_discount + std::numeric_limits<double>::min(),
@@ -369,7 +369,7 @@ namespace utils
 				     100 * num_iterations);
 	
 	if (has_discount_prior()) 
-	  m_discount = slice_sampler(discount_resampler,
+	  m_discount = slice_sampler(discount_sampler,
 				     m_discount,
 				     sampler,
 				     (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
@@ -380,7 +380,7 @@ namespace utils
       }
       
       if (has_strength_prior())
-	m_strength = slice_sampler(strength_resampler,
+	m_strength = slice_sampler(strength_sampler,
 				   m_strength,
 				   sampler,
 				   - m_discount + std::numeric_limits<double>::min(),

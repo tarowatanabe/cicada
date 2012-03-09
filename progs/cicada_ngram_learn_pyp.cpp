@@ -246,9 +246,9 @@ struct PYPLM
     }
   }
   
-  struct DiscountResampler
+  struct DiscountSampler
   {
-    DiscountResampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    DiscountSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
     const PYPLM& pyplm;
     int order;
@@ -259,9 +259,9 @@ struct PYPLM
     }
   };
   
-  struct StrengthResampler
+  struct StrengthSampler
   {
-    StrengthResampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    StrengthSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
     const PYPLM& pyplm;
     int order;
@@ -278,11 +278,11 @@ struct PYPLM
 			 const size_type num_iterations = 10)
   {
     for (int order = discount.size() - 1; order >= 0; -- order) {
-      DiscountResampler discount_resampler(*this, order);
-      StrengthResampler strength_resampler(*this, order);
+      DiscountSampler discount_sampler(*this, order);
+      StrengthSampler strength_sampler(*this, order);
       
       for (size_type iter = 0; iter < num_loop; ++ iter) {
-	strength[order] = utils::slice_sampler(strength_resampler,
+	strength[order] = utils::slice_sampler(strength_sampler,
 					       strength[order],
 					       sampler,
 					       - discount[order] + std::numeric_limits<double>::min(),
@@ -291,7 +291,7 @@ struct PYPLM
 					       num_iterations,
 					       100 * num_iterations);
 	
-	discount[order] = utils::slice_sampler(discount_resampler,
+	discount[order] = utils::slice_sampler(discount_sampler,
 					       discount[order],
 					       sampler,
 					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
@@ -301,7 +301,7 @@ struct PYPLM
 					       100 * num_iterations);
       }
       
-      strength[order] = utils::slice_sampler(strength_resampler,
+      strength[order] = utils::slice_sampler(strength_sampler,
 					     strength[order],
 					     sampler,
 					     - discount[order] + std::numeric_limits<double>::min(),
