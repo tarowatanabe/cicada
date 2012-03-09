@@ -114,12 +114,19 @@ namespace cicada
 
       removed_type removed(source.edges.size(), false);
       
-      const weight_type cutoff = std::min(sorted[prune_size].first, viterbi_derivation.second);
+      const weight_type cutoff_nth = sorted[prune_size].first;
       
-      typename sorted_type::const_iterator siter_end = sorted.end();
-      for (typename sorted_type::const_iterator siter = sorted.begin() + prune_size; siter != siter_end; ++ siter)
-	if (siter->first < cutoff)
-	  removed[siter->second] = true;
+      typename sorted_type::const_iterator siter      = sorted.begin();
+      typename sorted_type::const_iterator siter_end  = sorted.end();
+      typename sorted_type::const_iterator siter_last = siter + prune_size;
+      
+      bool found_equal = false;
+      for (/**/; siter != siter_last; ++ siter)
+        found_equal |= (siter->first == cutoff_nth);
+      
+      const weight_type cutoff = (found_equal ? std::min(cutoff_nth, viterbi_derivation.second) : viterbi_derivation.second);
+      for (/**/; siter != siter_end; ++ siter)
+	removed[siter->second] = (siter->first < cutoff);
       
       topologically_sort(source, target, filter_pruned(removed), validate);
       
