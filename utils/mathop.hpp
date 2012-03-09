@@ -23,12 +23,18 @@ namespace utils
     
     template <typename Tp>
     inline
-    double factorial(Tp n)
+    Tp factorial(unsigned n)
     {
-      double ret = 1.0;
-      for (/**/; n > 0; -- n)
-	ret *= double(n);
-      return (std::isfinite(ret) ? ret : boost::numeric::bounds<double>::highest());
+      using namespace boost::math::policies;
+      typedef policy<domain_error<errno_on_error>,
+	pole_error<errno_on_error>,
+	overflow_error<errno_on_error>,
+	rounding_error<errno_on_error>,
+	evaluation_error<errno_on_error>
+	> policy_type;
+      
+      const Tp ret = boost::math::factorial<Tp>(n, policy_type());
+      return (std::isfinite(ret) ? ret : boost::numeric::bounds<Tp>::highest());
     }
     
     template <typename Tp>
