@@ -3,7 +3,6 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-// Chinese Restaurant Process
 
 #ifndef __UTILS__CHINESE_RESTAURANT_PROCESS__HPP__
 #define __UTILS__CHINESE_RESTAURANT_PROCESS__HPP__ 1
@@ -20,6 +19,21 @@
 #include <utils/unordered_map.hpp>
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
+
+// Chinese Restaurant Process
+//
+// inspired by restauraht.hh
+//
+
+//
+// Chinese Restaurant Process with optional customer and table tracking
+// Copyright Trevor Cohn 2009, University of Edinburgh
+// Table tracking algorithm courtesy of Mark Johnson, and is described in:
+//
+//      A Note on the Implementation of Hierarchical Dirichlet Processes
+//      Phil Blunsom, Trevor Cohn, Sharon Goldwater and Mark Johnson
+//      ACL 2009 (short paper)
+//
 
 namespace utils
 {

@@ -30,6 +30,31 @@ std::ostream& operator<<(std::ostream& os, const crp_type& crp)
 int main(int argc, char** argv)
 {
   sampler_type sampler;
+
+  {
+    const double base(1.0 / 5);
+
+    crp_type rest1(0.9, 1);
+    
+    rest1.increment("hello", base, sampler);
+    rest1.increment("world", base, sampler);
+    rest1.increment("!", base, sampler);
+    rest1.increment("world", base, sampler);
+    rest1.increment("!", base, sampler);
+    rest1.increment("!", base, sampler);
+    
+    std::cout << "Restaurant has " << rest1.size_customer() << " customers\n";
+    std::cout << rest1 << std::flush;
+    
+    std::cout << "prob(\"hello\") " << rest1.prob("hello", 1.0/5) << "\n";
+    std::cout << "prob(\"world\") " << rest1.prob("world", 1.0/5) << "\n";
+    std::cout << "prob(\"!\") " << rest1.prob("!", 1.0/5) << "\n";
+    
+
+    std::cout << "decrement(\"hello\")\n";
+    rest1.decrement("hello", sampler);
+    std::cout << "prob(\"hello\") " << rest1.prob("hello", 1.0/5) << "\n";
+  }
   
   {
     crp_type crp(0.1, 5);
