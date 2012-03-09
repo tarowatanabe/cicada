@@ -20,6 +20,7 @@
 #include "feature/lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
+#include "feature/ngram_pyp.hpp"
 #include "feature/ngram_tree.hpp"
 #include "feature/parent.hpp"
 #include "feature/penalty.hpp"
@@ -105,6 +106,14 @@ ngram: ngram language model\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
 \tcoarse-approximate=[true|false] approximated upper-bound estimates\n\
+ngram-pyp: Pitman-Yor Process ngram language model\n\
+\tfile=<file>\n\
+\torder=<order>\n\
+\tname=feature-name(default: ngram-pyp)\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tcoarse-order=<order> ngram order for coarse heuristic\n\
+\tcoarse-file=<file>   ngram for coarrse heuristic\n\
 ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -192,6 +201,8 @@ word-pair: word pair feature\n\
     
     if (param_name == "ngram")
       return feature_function_ptr_type(new feature::NGram(parameter));
+    else if (param_name == "ngram-pyp")
+      return feature_function_ptr_type(new feature::NGramPYP(parameter));
     else if (param_name == "neighbours" || param_name == "neighbors")
       return feature_function_ptr_type(new feature::Neighbours(parameter));
     else if (param_name == "ngram-tree")
