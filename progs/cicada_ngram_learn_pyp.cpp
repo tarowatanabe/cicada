@@ -678,7 +678,7 @@ int main(int argc, char ** argv)
       
       if (iter % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
-	  lm.slice_sample_parameters(sampler, 3);
+	  lm.slice_sample_parameters(sampler, 4);
 	else
 	  lm.sample_parameters(sampler);
 	
