@@ -563,6 +563,7 @@ path_type     output_file;
 
 int order = 4;
 int samples = 300;
+int resample_rate = 20;
 bool slice_sampling = false;
 
 double discount = 0.8;
@@ -592,6 +593,9 @@ int main(int argc, char ** argv)
     
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
+    
+    if (resample_rate <= 0)
+      throw std::runtime_error("resample rate must be >= 1");
 
     if (train_files.empty())
       throw std::runtime_error("no training data?");
@@ -662,14 +666,16 @@ int main(int argc, char ** argv)
 	lm.increment(titer->first, titer->second, sampler);
       }
       
-      if (slice_sampling)
-	lm.slice_sample_parameters(sampler, 3);
-      else
-	lm.sample_parameters(sampler);
-      
-      if (debug >= 2)
-	for (int n = 0; n != order; ++ n)
-	  std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+      if (iter % resample_rate == resample_rate - 1) {
+	if (slice_sampling)
+	  lm.slice_sample_parameters(sampler, 3);
+	else
+	  lm.sample_parameters(sampler);
+	
+	if (debug >= 2)
+	  for (int n = 0; n != order; ++ n)
+	    std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+      }
       
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
@@ -814,8 +820,9 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",    po::value<int>(&samples)->default_value(samples),  "# of samples")
-    ("slice",      po::bool_switch(&slice_sampling),                  "slice sampling for hyperparameters")
+    ("samples",    po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("resample",   po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
+    ("slice",      po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
