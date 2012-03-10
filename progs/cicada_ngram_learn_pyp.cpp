@@ -562,8 +562,8 @@ path_set_type test_files;
 path_type     output_file;
 
 int order = 4;
-int samples = 300;
-int resample_rate = 20;
+int samples = 30;
+int resample_rate = 1;
 bool slice_sampling = false;
 
 double discount = 0.8;

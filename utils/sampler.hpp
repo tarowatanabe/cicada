@@ -65,6 +65,9 @@ namespace utils
 
     double gamma(const double& a, const double& scale)
     {
+      return boost::gamma_distribution<double>(a, scale)(random);
+      
+#if 0
       double b, c, u, v, w, y, x, z;
       
       if (a > 1) { // Best's rejection method. Devroye (1986) p.410
@@ -93,6 +96,7 @@ namespace utils
         x = exponential(1.0) * x / (x + y);
       }
       return x / scale;
+#endif
     }
     
     double beta(const double& a, const double& b)
