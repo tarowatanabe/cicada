@@ -577,7 +577,7 @@ int resample_rate = 1;
 bool slice_sampling = false;
 
 double discount = 0.8;
-double strength = 1;
+double strength = -0.5;
 
 double discount_prior_alpha = 1.0;
 double discount_prior_beta  = 1.0;
