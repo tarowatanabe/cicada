@@ -65,6 +65,56 @@ namespace utils
     {
       return uniform() > (a / (a + b));
     }
+
+    bool bernoulli_sample(const double& p)
+    {
+      return random() < p;
+    }
+    
+    double expon_sample(const double& l)
+    {
+      return - std::log(1.0 - random()) / l;
+    }
+
+    double gamma_sample(const double& a, const double& scale)
+    {
+      double b, c, e, u, v, w, y, x, z;
+      
+      if (a > 1) { // Best's XG method
+        b = a - 1;
+        c = 3 * a - 0.75;
+	
+        bool accept = false;
+        do {
+	  u = random();
+	  v = random();
+	  w = u * (1 - u);
+	  y = std::sqrt(c / w) * (u-  0.5);
+	  x = b + y;
+	  
+	  if(x >= 0) {
+	    z = 64 * w * w * w * v * v;
+	    accept = (z <= 1 - 2 * y * y / x || std::log(z) <= 2 * (b * std::log(x / b) - y));
+	  }
+        } while (!accept);
+      } else { // Johnk's method
+        do {
+	  x = std::pow(random(), 1 / a);
+	  y = std::pow(random(), 1 / (1 - a));
+        } while (x + y > 1);
+	
+        x = expon_sample(1.0) * x / (x + y);
+      }
+      return x * scale;
+    }
+    
+    double beta_sample(const double& a, const double& b)
+    {
+      const double ga = gamma_sample(a, 1);
+      const double gb = gamma_sample(b, 1);
+      
+      return ga / (ga + gb);
+    }
     
   private:
     boost::uniform_real<> dist;
