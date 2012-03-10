@@ -103,7 +103,11 @@ struct PYPLM
     root.parent = id_type(-1);
     root.order = 0;
     root.table = node_type::table_type(discount[0],
-				       strength[0]);
+				       strength[0],
+				       discount_alpha,
+				       discount_beta,
+				       strength_shape,
+				       strength_rate);
   }
 
   template <typename Iterator>
@@ -127,7 +131,11 @@ struct PYPLM
 	trie_node.parent = node_prev;
 	trie_node.order = order;
 	trie_node.table = node_type::table_type(discount[order],
-						strength[order]);
+						strength[order],
+						discount_alpha,
+						discount_beta,
+						strength_shape,
+						strength_rate);
 	
 	nodes[order].push_back(node);
       }
@@ -235,12 +243,12 @@ struct PYPLM
 		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
     
     if (order == 0)
-      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
+      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength, false) : 0.0);
     else {
       node_set_type::const_iterator niter_end = nodes[order].end();
       for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
 	if (! trie[*niter].table.empty())
-	  logprob += trie[*niter].table.log_likelihood(discount, strength);
+	  logprob += trie[*niter].table.log_likelihood(discount, strength, false);
       
       return logprob;
     }
@@ -273,33 +281,70 @@ struct PYPLM
   };
   
   template <typename Sampler>
-  void sample_parameters(Sampler& sampler,
-			 const size_type num_loop = 2,
-			 const size_type num_iterations = 4)
+  void sample_parameters(Sampler& sampler)
   {
-    for (int order = discount.size() - 1; order >= 0; -- order) {
+    for (size_type order = 0; order != discount.size(); ++ order) {
+      discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+      strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+    }
+  }
+
+  template <typename Sampler>
+  double sample_strength(const int order, Sampler& sampler, const double& discount, const double& strength) const
+  {
+    if (order == 0)
+      return root.table.sample_strength(sampler, discount, strength);
+    else {
+      double x = 0.0;
+      double y = 0.0;
+      
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (! trie[*niter].table.empty()) {
+	  x += trie[*niter].table.sample_log_x(sampler, discount, strength);
+	  y += trie[*niter].table.sample_y(sampler, discount, strength);
+	}
+      
+      return sampler.gamma(strength_shape + y, strength_rate - x);
+    }
+  }
+  
+  template <typename Sampler>
+  double sample_discount(const int order, Sampler& sampler, const double& discount, const double& strength) const
+  {
+    if (order == 0)
+      return root.table.sample_discount(sampler, discount, strength);
+    else {
+      double y = 0.0;
+      double z = 0.0;
+      
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (! trie[*niter].table.empty()) {
+	  y += trie[*niter].table.sample_y_inv(sampler, discount, strength);
+	  z += trie[*niter].table.sample_z_inv(sampler, discount, strength);
+	}
+      
+      return sampler.beta(discount_alpha + y, discount_beta + z);
+    }
+  }
+  
+  
+  template <typename Sampler>
+  void slice_sample_parameters(Sampler& sampler, const int num_iterations = 4)
+  {
+    for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
       
-      for (size_type iter = 0; iter < num_loop; ++ iter) {
-	strength[order] = utils::slice_sampler(strength_sampler,
-					       strength[order],
-					       sampler,
-					       - discount[order] + std::numeric_limits<double>::min(),
-					       std::numeric_limits<double>::infinity(),
-					       0.0,
-					       num_iterations,
-					       100 * num_iterations);
-	
-	discount[order] = utils::slice_sampler(discount_sampler,
-					       discount[order],
-					       sampler,
-					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
-					       1.0,
-					       0.0,
-					       num_iterations,
-					       100 * num_iterations);
-      }
+      discount[order] = utils::slice_sampler(discount_sampler,
+					     discount[order],
+					     sampler,
+					     (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
+					     1.0,
+					     0.0,
+					     num_iterations,
+					     100 * num_iterations);
       
       strength[order] = utils::slice_sampler(strength_sampler,
 					     strength[order],
@@ -489,7 +534,7 @@ struct PYPLM
     word_type::write(rep.path("vocab"));
   }
 
-private: 
+public: 
   trie_type trie;
   node_type root;
   node_map_type nodes;
@@ -518,8 +563,6 @@ path_type     output_file;
 
 int order = 4;
 int samples = 300;
-int resample_rate = 20;
-int resample_iteration = 2;
 
 double discount = 0.8;
 double strength = -0.5;
@@ -618,8 +661,11 @@ int main(int argc, char ** argv)
 	lm.increment(titer->first, titer->second, sampler);
       }
       
-      if (iter % resample_rate == resample_rate - 1)
-	lm.sample_parameters(sampler, resample_iteration);
+      lm.sample_parameters(sampler);
+      
+      if (debug >= 2)
+	for (int n = 0; n != order; ++ n)
+	  std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
       
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
@@ -765,9 +811,7 @@ void options(int argc, char** argv)
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
     ("samples",            po::value<int>(&samples)->default_value(samples),                       "# of samples")
-    ("resample",           po::value<int>(&resample_rate)->default_value(resample_rate),           "hyperparameter resampling rate")
-    ("resample-iteration", po::value<int>(&resample_iteration)->default_value(resample_iteration), "hyperparameter resampling iterations")
-
+    
     ("discount",       po::value<double>(&discount)->default_value(discount),                          "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")

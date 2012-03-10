@@ -270,20 +270,22 @@ namespace utils
 	return F(diter->second.customers - m_discount * diter->second.tables.size() + r * p0) / F(customers + m_strength);
     }
 
-    double log_likelihood() const
+    double log_likelihood(const bool prior=true) const
     {
-      return log_likelihood(m_discount, m_strength);
+      return log_likelihood(m_discount, m_strength, prior);
     }
     
-    double log_likelihood(const double& discount, const double& strength) const
+    double log_likelihood(const double& discount, const double& strength, const bool prior=true) const
     {      
       double logprob = 0.0;
       
-      if (has_discount_prior())
+      if (prior) {
+	if (has_discount_prior())
 	logprob += utils::mathop::log_beta_density(discount, discount_prior_alpha, discount_prior_beta);
-      
-      if (has_strength_prior())
-	logprob += utils::mathop::log_gamma_density(strength + discount, strength_prior_shape, strength_prior_rate);
+	
+	if (has_strength_prior())
+	  logprob += utils::mathop::log_gamma_density(strength + discount, strength_prior_shape, strength_prior_rate);
+      }
       
       if (! customers) return logprob;
       
@@ -344,6 +346,12 @@ namespace utils
 
   public:
     template <typename Sampler>
+    double sample_log_x(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      return std::log(sample_x(sampler, discount, strength));
+    }
+    
+    template <typename Sampler>
     double sample_x(Sampler& sampler, const double& discount, const double& strength) const
     {
       return (customers > 1 ? sampler.beta(strength + 1, customers - 1) : 1.0);
@@ -395,10 +403,10 @@ namespace utils
       if (! has_strength_prior())
 	throw std::runtime_error("no strength prior");
       
-      const double x = sample_x(sampler, discount, strength);
+      const double x = sample_log_x(sampler, discount, strength);
       const double y = sample_y(sampler, discount, strength);
       
-      return sampler.gamma(strength_prior_shape + y, strength_prior_shape + std::log(x));
+      return sampler.gamma(strength_prior_shape + y, strength_prior_rate - x);
     }
     
     template <typename Sampler>
@@ -416,13 +424,13 @@ namespace utils
     template <typename Sampler>
     double expectation_strength(Sampler& sampler, const double& discount, const double& strength) const
     {
-      const double x = sample_x(sampler, discount, strength);
+      const double x = sample_log_x(sampler, discount, strength);
       const double y = sample_y(sampler, discount, strength);
       
       if (has_strength_prior())
-	return (strength_prior_shape + y) / (strength_prior_rate - std::log(x));
+	return (strength_prior_shape + y) / (strength_prior_rate - x);
       else
-	return - y / std::log(x);
+	return - y / x;
     }
     
     template <typename Sampler>
@@ -464,7 +472,7 @@ namespace utils
     }
     
     template <typename Sampler>
-    void slice_sample_parameters(Sampler& sampler)
+    void slice_sample_parameters(Sampler& sampler, const int num_iterations = 4)
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
       
@@ -478,8 +486,8 @@ namespace utils
 				   (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
 				   1.0,
 				   0.0,
-				   4,
-				   400);
+				   num_iterations,
+				   100 * num_iterations);
       
       if (has_strength_prior())
 	m_strength = slice_sampler(strength_sampler,
@@ -488,8 +496,8 @@ namespace utils
 				   - m_discount + std::numeric_limits<double>::min(),
 				   std::numeric_limits<double>::infinity(),
 				   0.0,
-				   4,
-				   400);
+				   num_iterations,
+				   100 * num_iterations);
     }
     
   private:
