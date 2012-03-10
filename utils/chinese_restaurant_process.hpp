@@ -463,6 +463,9 @@ namespace utils
     void sample_parameters(Sampler& sampler)
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
+
+      if (has_strength_prior())
+	m_strength = sample_strength(sampler, m_discount, m_strength);
       
       if (has_discount_prior()) 
 	m_discount = sample_discount(sampler, m_discount, m_strength);
@@ -478,6 +481,16 @@ namespace utils
       
       DiscountSampler discount_sampler(*this);
       StrengthSampler strength_sampler(*this);
+
+      if (has_strength_prior())
+	m_strength = slice_sampler(strength_sampler,
+				   m_strength,
+				   sampler,
+				   - m_discount + std::numeric_limits<double>::min(),
+				   std::numeric_limits<double>::infinity(),
+				   0.0,
+				   num_iterations,
+				   100 * num_iterations);
       
       if (has_discount_prior()) 
 	m_discount = slice_sampler(discount_sampler,
