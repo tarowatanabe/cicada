@@ -331,7 +331,7 @@ struct PYPLM
   
   
   template <typename Sampler>
-  void slice_sample_parameters(Sampler& sampler, const int num_iterations = 4)
+  void slice_sample_parameters(Sampler& sampler, const int num_iterations = 8)
   {
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
@@ -671,7 +671,7 @@ int main(int argc, char ** argv)
       
       if (iter % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
-	  lm.slice_sample_parameters(sampler, 4);
+	  lm.slice_sample_parameters(sampler);
 	else
 	  lm.sample_parameters(sampler);
 	
