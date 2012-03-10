@@ -63,9 +63,11 @@ namespace utils
       return - std::log(1.0 - uniform()) / l;
     }
 
-    double gamma(const double& a, const double& scale)
+    double gamma(const double& alpha, const double& beta)
     {
-      return boost::gamma_distribution<double>(a, scale)(random);
+      // in PRML, beta is inverse! I decided to use follow PRML style gamma distribution, not
+      // boost::math style beta...
+      return boost::gamma_distribution<double>(alpha, 1.0 / beta)(random);
       
 #if 0
       double b, c, u, v, w, y, x, z;
@@ -95,7 +97,7 @@ namespace utils
 	
         x = exponential(1.0) * x / (x + y);
       }
-      return x * scale;
+      return x / scale;
 #endif
     }
     
