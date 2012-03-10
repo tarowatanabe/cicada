@@ -391,7 +391,7 @@ namespace utils
 	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
 	  for (size_type j = 1; j < *titer; ++ j)
-	    z += (1 - sampler.bernoulli(double(j - 1) / (j - discount)));
+	    z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));
       }
       
       return z;
