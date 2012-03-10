@@ -563,6 +563,7 @@ path_type     output_file;
 
 int order = 4;
 int samples = 300;
+bool slice_sampling = false;
 
 double discount = 0.8;
 double strength = 1;
@@ -661,7 +662,10 @@ int main(int argc, char ** argv)
 	lm.increment(titer->first, titer->second, sampler);
       }
       
-      lm.sample_parameters(sampler);
+      if (slice_sampling)
+	lm.slice_sample_parameters(sampler, 3);
+      else
+	lm.sample_parameters(sampler);
       
       if (debug >= 2)
 	for (int n = 0; n != order; ++ n)
@@ -810,9 +814,10 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",            po::value<int>(&samples)->default_value(samples),                       "# of samples")
+    ("samples",    po::value<int>(&samples)->default_value(samples),  "# of samples")
+    ("slice",      po::bool_switch(&slice_sampling),                  "slice sampling for hyperparameters")
     
-    ("discount",       po::value<double>(&discount)->default_value(discount),                          "discount ~ Beta(alpha,beta)")
+    ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")
 
