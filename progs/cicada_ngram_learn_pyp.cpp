@@ -305,7 +305,7 @@ struct PYPLM
 	  y += trie[*niter].table.sample_y(sampler, discount, strength);
 	}
       
-      return sampler.gamma(strength_shape + y, 1.0 / (strength_rate - x));
+      return sampler.gamma(strength_shape + y, strength_rate - x);
     }
   }
   
