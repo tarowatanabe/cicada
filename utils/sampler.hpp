@@ -23,6 +23,8 @@ namespace utils
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
+    
+    typedef Generator generator_type;
 
     sampler()
       : dist(0,1), gen(), random(gen, dist)
@@ -37,7 +39,7 @@ namespace utils
     }
     
   public:
-    Generator& generator() { return gen; }
+    generator_type& generator() { return gen; }
     
     double operator()() { return random(); }
     

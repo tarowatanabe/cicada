@@ -657,6 +657,9 @@ int main(int argc, char ** argv)
     for (int iter = 0; iter < samples; ++ iter) {
       if (debug)
 	std::cerr << "iteration: " << iter << std::endl;
+      
+      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+      std::random_shuffle(training.begin(), training.end(), gen);
 
       data_set_type::const_iterator titer_end = training.end();
       for (data_set_type::const_iterator titer = training.begin(); titer != titer_end; ++ titer) {
