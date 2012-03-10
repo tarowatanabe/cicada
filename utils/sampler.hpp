@@ -95,7 +95,7 @@ namespace utils
 	
         x = exponential(1.0) * x / (x + y);
       }
-      return x / scale;
+      return x * scale;
 #endif
     }
     

@@ -406,7 +406,7 @@ namespace utils
       const double x = sample_log_x(sampler, discount, strength);
       const double y = sample_y(sampler, discount, strength);
       
-      return sampler.gamma(strength_prior_shape + y, strength_prior_rate - x);
+      return sampler.gamma(strength_prior_shape + y, 1.0 / (strength_prior_rate - x));
     }
     
     template <typename Sampler>
