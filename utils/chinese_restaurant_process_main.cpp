@@ -8,14 +8,36 @@
 typedef utils::chinese_restaurant_process<std::string> crp_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
-std::ostream& operator<<(std::ostream& os, const crp_type& crp)
+std::ostream& operator<<(std::ostream& os, const utils::chinese_restaurant_process<std::string>& crp)
 {
+  typedef utils::chinese_restaurant_process<std::string> crp_type;
+ 
   os << "PYP(discount=" << crp.discount() << ",strength=" << crp.strength() << ")" << '\n'
      << "customers = " << crp.size_customer() << '\n';
   
   crp_type::const_iterator citer_end = crp.end();
   for (crp_type::const_iterator citer = crp.begin(); citer != citer_end; ++ citer) {
     os << '\t' << citer->first << " customer: " << citer->second.size_customer() << " tables: " << citer->second.size_table() << '\n';
+    
+    crp_type::mapped_type::const_iterator iter_end = citer->second.end();
+    for (crp_type::mapped_type::const_iterator iter = citer->second.begin(); iter != iter_end; ++ iter) {
+      
+    }
+  }
+  
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const utils::chinese_restaurant_process<char>& crp)
+{
+  typedef utils::chinese_restaurant_process<char> crp_type;
+
+  os << "PYP(discount=" << crp.discount() << ",strength=" << crp.strength() << ")" << '\n'
+     << "customers = " << crp.size_customer() << '\n';
+  
+  crp_type::const_iterator citer_end = crp.end();
+  for (crp_type::const_iterator citer = crp.begin(); citer != citer_end; ++ citer) {
+    os << '\t' << std::string(1, citer->first) << " customer: " << citer->second.size_customer() << " tables: " << citer->second.size_table() << '\n';
     
     crp_type::mapped_type::const_iterator iter_end = citer->second.end();
     for (crp_type::mapped_type::const_iterator iter = citer->second.begin(); iter != iter_end; ++ iter) {
@@ -34,7 +56,7 @@ int main(int argc, char** argv)
   {
     const double base(1.0 / 5);
 
-    crp_type rest1(0.9, 1);
+    crp_type rest1(0.0, 1);
     
     rest1.increment("hello", base, sampler);
     rest1.increment("world", base, sampler);
@@ -54,6 +76,25 @@ int main(int argc, char** argv)
     std::cout << "decrement(\"hello\")\n";
     rest1.decrement("hello", sampler);
     std::cout << "prob(\"hello\") " << rest1.prob("hello", 1.0/5) << "\n";
+  }
+
+  {
+    typedef utils::chinese_restaurant_process<char> crp_type;
+
+    crp_type rest2(0.0, 1);
+    
+    for (int i = 0; i < 20; ++i) {
+      if (sampler.bernoulli(0.5)) rest2.increment('a', 1.0/5, sampler);
+      if (sampler.bernoulli(0.5)) rest2.increment('b', 1.0/5, sampler);
+      if (sampler.bernoulli(0.5)) rest2.increment('c', 1.0/5, sampler);
+    }
+    
+    std::cout << rest2 << std::flush;
+    
+    for (char c = 'a'; c <= 'c'; ++c)
+      std::cout << c << " prob " << rest2.prob(c, 1.0/5) 
+		<< " customers " << rest2.size_customer(c) 
+		<< " tables " << rest2.size_table(c) << "\n";
   }
   
   {

@@ -172,21 +172,28 @@ namespace utils
       
       return (diter == dishes.end() ? size_type(0) : diter->second.tables.size());
     }
+
+    size_type size_customer(const dish_type& dish) const
+    {
+      typename dish_set_type::const_iterator diter = dishes.find(dish);
+      
+      return (diter == dishes.end() ? size_type(0) : diter->second.customers);
+    }
     
     template <typename Sampler>
     bool increment(const dish_type& dish, const double& p0, Sampler& sampler)
     {
       location_type& loc = dishes[dish];
       
-      bool shared = false;
+      bool existing = false;
       if (loc.customers) {
-	const double p_empty = (m_strength + tables * m_discount) * p0;
-	const double p_share = (loc.customers - loc.tables.size() * m_discount);
+	const double p_base = (m_strength + tables * m_discount) * p0;
+	const double p_gen = (loc.customers - loc.tables.size() * m_discount);
 	
-	shared = sampler.select(p_empty, p_share);
+	existing = sampler.bernoulli(p_gen / (p_base + p_gen));
       }
       
-      if (shared) {
+      if (existing) {
 	double r = sampler.uniform() * (loc.customers - loc.tables.size() * m_discount);
 	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
@@ -206,7 +213,7 @@ namespace utils
       ++ loc.customers;
       ++ customers;
       
-      return ! shared;
+      return ! existing;
     }
     
     template <typename Sampler>
@@ -336,7 +343,62 @@ namespace utils
     };
 
   public:
+    
+    template <typename Sampler>
+    double expectation_strength(Sampler& sampler) const
+    {
+      expectation_strength(sampler, discount, strength);
+    }
+    
+    template <typename Sampler>
+    double expectation_discount(Sampler& sampler) const
+    {
+      expectation_discount(sampler, discount, strength);
+    }
 
+    template <typename Sampler>
+    double expectation_strength(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      const double x = (customers > 1 ? sampler.beta(strength + 1, customers - 1) : 1.0);
+      
+      double y = 0;
+      for (size_type i = 1; i < tables; ++ i)
+	y += sampler.bernoulli(strength / (strength + discount * i));
+      
+      if (has_strength_prior())
+	return (strength_prior_shape + y) / (strength_prior_rate - std::log(x));
+      else
+	return - y / std::log(x);
+    }
+    
+    template <typename Sampler>
+    double expectation_discount(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      double y = 0;
+      double z = 0;
+      
+      for (size_type i = 1; i < tables; ++ i)
+	y += 1.0 - sampler.bernoulli(strength / (strength + discount * i));
+      
+      typename dish_set_type::const_iterator diter_end = dishes.end();
+      for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
+	const location_type& loc = diter->second;
+	
+	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
+	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
+	  for (size_type k = 1; k < *titer; ++ k)
+	    z += (1 - sampler.bernoulli((k - 1) / (k - discount)));
+      }
+      
+      if (has_discount_prior()) {
+	const double a = discount_prior_alpha + y;
+	const double b = discount_prior_beta  + z;
+	
+	return a / (a + b);
+      } else
+	return y / (y + z);
+    }
+    
     bool verify_parameters()
     {
       if (m_discount < 0.0 || m_discount >= 1.0)

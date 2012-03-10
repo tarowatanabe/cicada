@@ -39,79 +39,66 @@ namespace utils
   public:
     Generator& generator() { return gen; }
     
-    // draw from U(0,1)
     double operator()() { return random(); }
     
-    // draw from U(0,1)
     double uniform() { return random(); }
     
-    // draw from N(mean,var)
-    double normal(const double& mean, const double& var) { return boost::normal_distribution<double>(mean, var)(random); }
-    
-    // draw from Poisson
-    double poisson(const int lambda) { return boost::poisson_distribution<int>(lambda)(random); }
-    
-    bool accept_metropolis_hasting(const double& p_cur,
-				   const double& p_prev,
-				   const double& q_cur,
-				   const double& q_prev)
+    double normal(const double& mean, const double& var)
     {
-      const double a = (p_cur / p_prev) * (q_prev / q_cur);
-      
-      return (std::log(a) >= 0.0) || (uniform() < a);
+      return boost::normal_distribution<double>(mean, var)(random);
     }
     
-    size_type select(const double& a, const double& b)
+    double poisson(const int lambda)
     {
-      return uniform() > (a / (a + b));
-    }
-
-    bool bernoulli_sample(const double& p)
-    {
-      return random() < p;
+      return boost::poisson_distribution<int>(lambda)(random);
     }
     
-    double expon_sample(const double& l)
+    bool bernoulli(const double& p)
     {
-      return - std::log(1.0 - random()) / l;
+      return uniform() < p;
+    }
+    
+    double exponential(const double& l)
+    {
+      return - std::log(1.0 - uniform()) / l;
     }
 
-    double gamma_sample(const double& a, const double& scale)
+    double gamma(const double& a, const double& scale)
     {
-      double b, c, e, u, v, w, y, x, z;
+      double b, c, u, v, w, y, x, z;
       
-      if (a > 1) { // Best's XG method
+      if (a > 1) { // Best's rejection method. Devroye (1986) p.410
         b = a - 1;
         c = 3 * a - 0.75;
 	
         bool accept = false;
-        do {
-	  u = random();
-	  v = random();
+        while (! accept) {
+	  u = uniform();
+	  v = uniform();
 	  w = u * (1 - u);
-	  y = std::sqrt(c / w) * (u-  0.5);
+	  y = std::sqrt(c / w) * (u - 0.5);
 	  x = b + y;
 	  
-	  if(x >= 0) {
-	    z = 64 * w * w * w * v * v;
-	    accept = (z <= 1 - 2 * y * y / x || std::log(z) <= 2 * (b * std::log(x / b) - y));
+	  if (x >= 0) {
+	    z = 64.0 * w * w * w * v * v;
+	    accept = (z <= 1.0 - (2.0 * y * y) / x || std::log(z) <= 2.0 * (b * std::log(x / b) - y));
 	  }
-        } while (!accept);
-      } else { // Johnk's method
+        } 
+      } else { // Johnk's method. Devroye (1986) p.418
         do {
-	  x = std::pow(random(), 1 / a);
-	  y = std::pow(random(), 1 / (1 - a));
+	  x = std::pow(uniform(), 1 / a);
+	  y = std::pow(uniform(), 1 / (1 - a));
         } while (x + y > 1);
 	
-        x = expon_sample(1.0) * x / (x + y);
+        x = exponential(1.0) * x / (x + y);
       }
       return x * scale;
     }
     
-    double beta_sample(const double& a, const double& b)
+    double beta(const double& a, const double& b)
     {
-      const double ga = gamma_sample(a, 1);
-      const double gb = gamma_sample(b, 1);
+      const double ga = gamma(a, 1);
+      const double gb = gamma(b, 1);
       
       return ga / (ga + gb);
     }
