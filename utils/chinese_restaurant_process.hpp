@@ -343,27 +343,81 @@ namespace utils
     };
 
   public:
-    
     template <typename Sampler>
-    double expectation_strength(Sampler& sampler) const
+    double sample_x(Sampler& sampler, const double& discount, const double& strength) const
     {
-      expectation_strength(sampler, discount, strength);
-    }
-    
-    template <typename Sampler>
-    double expectation_discount(Sampler& sampler) const
-    {
-      expectation_discount(sampler, discount, strength);
+      return (customers > 1 ? sampler.beta(strength + 1, customers - 1) : 1.0);
     }
 
     template <typename Sampler>
-    double expectation_strength(Sampler& sampler, const double& discount, const double& strength) const
+    double sample_y(Sampler& sampler, const double& discount, const double& strength) const
     {
-      const double x = (customers > 1 ? sampler.beta(strength + 1, customers - 1) : 1.0);
-      
       double y = 0;
+      
       for (size_type i = 1; i < tables; ++ i)
 	y += sampler.bernoulli(strength / (strength + discount * i));
+      
+      return y;
+    }
+
+    template <typename Sampler>
+    double sample_y_inv(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      double y = 0;
+      
+      for (size_type i = 1; i < tables; ++ i)
+	y += 1 - sampler.bernoulli(strength / (strength + discount * i));
+      
+      return y;
+    }
+    
+    template <typename Sampler>
+    double sample_z_inv(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      double z = 0;
+      
+      typename dish_set_type::const_iterator diter_end = dishes.end();
+      for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
+	const location_type& loc = diter->second;
+	
+	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
+	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
+	  for (size_type j = 1; j < *titer; ++ j)
+	    z += (1 - sampler.bernoulli(double(j - 1) / (j - discount)));
+      }
+      
+      return z;
+    }
+
+    template <typename Sampler>
+    double sample_strength(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      if (! has_strength_prior())
+	throw std::runtime_error("no strength prior");
+      
+      const double x = sample_x(sampler, discount, strength);
+      const double y = sample_y(sampler, discount, strength);
+      
+      return sampler.gamma(strength_prior_shape + y, strength_prior_shape + std::log(x));
+    }
+    
+    template <typename Sampler>
+    double sample_discount(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      if (! has_discount_prior())
+	throw std::runtime_error("no discount prior");
+      
+      const double y = sample_y_inv(sampler, discount, strength);
+      const double z = sample_z_inv(sampler, discount, strength);
+      
+      return sampler.beta(discount_prior_alpha + y, discount_prior_beta + z);
+    }
+    
+    template <typename Sampler>
+    double expectation_strength(Sampler& sampler, const double& discount, const double& strength) const
+    {
+      const double x = sample_x(sampler, discount, strength);
+      const double y = sample_y(sampler, discount, strength);
       
       if (has_strength_prior())
 	return (strength_prior_shape + y) / (strength_prior_rate - std::log(x));
@@ -374,21 +428,8 @@ namespace utils
     template <typename Sampler>
     double expectation_discount(Sampler& sampler, const double& discount, const double& strength) const
     {
-      double y = 0;
-      double z = 0;
-      
-      for (size_type i = 1; i < tables; ++ i)
-	y += 1.0 - sampler.bernoulli(strength / (strength + discount * i));
-      
-      typename dish_set_type::const_iterator diter_end = dishes.end();
-      for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
-	const location_type& loc = diter->second;
-	
-	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	  for (size_type k = 1; k < *titer; ++ k)
-	    z += (1 - sampler.bernoulli((k - 1) / (k - discount)));
-      }
+      const double y = sample_y_inv(sampler, discount, strength);
+      const double z = sample_z_inv(sampler, discount, strength);
       
       if (has_discount_prior()) {
 	const double a = discount_prior_alpha + y;
@@ -411,36 +452,34 @@ namespace utils
     }
     
     template <typename Sampler>
-    void sample_parameters(Sampler& sampler,
-			   const size_type num_loop = 2,
-			   const size_type num_iterations = 4)
+    void sample_parameters(Sampler& sampler)
+    {
+      if (! has_discount_prior() && ! has_strength_prior()) return;
+      
+      if (has_discount_prior()) 
+	m_discount = sample_discount(sampler, m_discount, m_strength);
+      
+      if (has_strength_prior())
+	m_strength = sample_strength(sampler, m_discount, m_strength);
+    }
+    
+    template <typename Sampler>
+    void slice_sample_parameters(Sampler& sampler)
     {
       if (! has_discount_prior() && ! has_strength_prior()) return;
       
       DiscountSampler discount_sampler(*this);
       StrengthSampler strength_sampler(*this);
       
-      for (size_type iter = 0; iter < num_loop; ++iter) {
-	if (has_strength_prior())
-	  m_strength = slice_sampler(strength_sampler,
-				     m_strength,
-				     sampler,
-				     - m_discount + std::numeric_limits<double>::min(),
-				     std::numeric_limits<double>::infinity(),
-				     0.0,
-				     num_iterations,
-				     100 * num_iterations);
-	
-	if (has_discount_prior()) 
-	  m_discount = slice_sampler(discount_sampler,
-				     m_discount,
-				     sampler,
-				     (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
-				     1.0,
-				     0.0,
-				     num_iterations,
-				     100 * num_iterations);
-      }
+      if (has_discount_prior()) 
+	m_discount = slice_sampler(discount_sampler,
+				   m_discount,
+				   sampler,
+				   (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
+				   1.0,
+				   0.0,
+				   4,
+				   400);
       
       if (has_strength_prior())
 	m_strength = slice_sampler(strength_sampler,
@@ -449,8 +488,8 @@ namespace utils
 				   - m_discount + std::numeric_limits<double>::min(),
 				   std::numeric_limits<double>::infinity(),
 				   0.0,
-				   num_iterations,
-				   100 * num_iterations);
+				   4,
+				   400);
     }
     
   private:

@@ -183,9 +183,33 @@ int main(int argc, char** argv)
   
   
   {
-    crp_type crp(0.1,50.0,1,1,1,1);
-    crp.increment("foo", 1.0, sampler);
+
+    const double base = 0.25;
+    
+    crp_type crp(0.1,5.0,1,1,1,1);
+    
+    crp.increment("hoge", base, sampler);
+    crp.increment("foo", base, sampler);
+    crp.increment("foo", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
+    crp.increment("bar", base, sampler);
     std::cout << crp.log_likelihood() << std::endl;
-  
+    
+    const double discount = crp.sample_discount(sampler, crp.discount(), crp.strength());
+    const double strength = crp.sample_strength(sampler, crp.discount(), crp.strength());
+    
+    std::cout << "sampled discount: " << discount << std::endl;
+    std::cout << "sampled strength: " << strength << std::endl;
+
+    crp.slice_sample_parameters(sampler);
+
+    std::cout << "slice sampled discount: " << crp.discount() << std::endl;
+    std::cout << "slice sampled strength: " << crp.strength() << std::endl;
   }
 }
