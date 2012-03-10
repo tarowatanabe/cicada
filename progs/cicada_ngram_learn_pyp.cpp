@@ -284,9 +284,9 @@ struct PYPLM
   void sample_parameters(Sampler& sampler)
   {
     for (size_type order = 0; order != discount.size(); ++ order) {
-      discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
       strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
       discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+      strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
     }
   }
 
@@ -337,6 +337,15 @@ struct PYPLM
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
+
+      strength[order] = utils::slice_sampler(strength_sampler,
+					     strength[order],
+					     sampler,
+					     - discount[order] + std::numeric_limits<double>::min(),
+					     std::numeric_limits<double>::infinity(),
+					     0.0,
+					     num_iterations,
+					     100 * num_iterations);
       
       discount[order] = utils::slice_sampler(discount_sampler,
 					     discount[order],
@@ -352,15 +361,6 @@ struct PYPLM
 					     sampler,
 					     - discount[order] + std::numeric_limits<double>::min(),
 					     std::numeric_limits<double>::infinity(),
-					     0.0,
-					     num_iterations,
-					     100 * num_iterations);
-      
-      discount[order] = utils::slice_sampler(discount_sampler,
-					     discount[order],
-					     sampler,
-					     (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
-					     1.0,
 					     0.0,
 					     num_iterations,
 					     100 * num_iterations);
