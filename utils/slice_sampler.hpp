@@ -105,7 +105,7 @@ namespace utils
 	  logFxl = logF(xl -= xr - xl);
 	else
 	  logFxr = logF(xr += xr - xl);
-	
+      
       F xl1 = xl;
       F xr1 = xr;
       for (;;) {                          // shrinking procedure

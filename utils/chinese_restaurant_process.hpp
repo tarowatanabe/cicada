@@ -275,6 +275,7 @@ namespace utils
       return log_likelihood(m_discount, m_strength);
     }
     
+    // http://en.wikipedia.org/wiki/Chinese_restaurant_process
     double log_likelihood(const double& discount, const double& strength) const
     {      
       double logprob = 0.0;
@@ -288,14 +289,14 @@ namespace utils
       if (! customers) return logprob;
       
       if (discount > 0.0) {
-	const double r = utils::mathop::lgamma(1.0 - discount);
+	if (strength == 0.0)
+	  logprob += tables * std::log(discount) + utils::mathop::lgamma(tables) - utils::mathop::lgamma(customers);
+	else {
+	  logprob += utils::mathop::lgamma(strength) - utils::mathop::lgamma(strength + customers);
+	  logprob += tables * std::log(discount) + utils::mathop::lgamma(strength / discount + tables) - utils::mathop::lgamma(strength / discount);
+	}
 	
-	if (strength != 0.0)
-          logprob += utils::mathop::lgamma(strength) - utils::mathop::lgamma(strength / discount);
-	
-	logprob += (- utils::mathop::lgamma(strength + customers)
-		    + tables * std::log(discount)
-		    + utils::mathop::lgamma(strength / discount + tables));
+	const double lg = utils::mathop::lgamma(1.0 - discount);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
@@ -303,7 +304,7 @@ namespace utils
 	  
 	  typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
 	  for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	    logprob += utils::mathop::lgamma(*titer - discount) - r;
+	    logprob += utils::mathop::lgamma(*titer - discount) - lg;
 	}
       } else if (discount == 0.0) {
 	logprob += utils::mathop::lgamma(strength) + tables * std::log(strength) - utils::mathop::lgamma(strength + tables);

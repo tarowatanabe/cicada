@@ -50,9 +50,9 @@ namespace utils
       return boost::normal_distribution<double>(mean, var)(gen);
     }
     
-    double poisson(const int lambda)
+    int poisson(const double& lambda)
     {
-      return boost::poisson_distribution<int>(lambda)(gen);
+      return boost::poisson_distribution<int, double>(lambda)(gen);
     }
     
     bool bernoulli(const double& p)
@@ -62,7 +62,10 @@ namespace utils
     
     double exponential(const double& lambda)
     {
-      return boost::exponential_distribution<double>(lambda)(gen);
+      // we will use PRML style
+      
+      return - std::log(1.0 - uniform()) / lambda;
+      //return boost::exponential_distribution<double>(lambda)(gen);
     }
 
     double gamma(const double& alpha, const double& beta)
