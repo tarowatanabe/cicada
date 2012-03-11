@@ -27,13 +27,13 @@ namespace utils
     typedef Generator generator_type;
 
     sampler()
-      : dist(0,1), gen(), random(gen, dist)
+      : gen()
     {
       gen.seed(utils::random_seed());
     }
     
     explicit sampler(const unsigned int seed)
-      : dist(0,1), gen(), random(gen, dist)
+      : gen()
     {
       gen.seed(seed);
     }
@@ -41,35 +41,35 @@ namespace utils
   public:
     generator_type& generator() { return gen; }
     
-    double operator()() { return random(); }
+    double operator()() { return uniform(); }
     
-    double uniform() { return random(); }
+    double uniform() { return boost::uniform_01<double>()(gen); }
     
     double normal(const double& mean, const double& var)
     {
-      return boost::normal_distribution<double>(mean, var)(random);
+      return boost::normal_distribution<double>(mean, var)(gen);
     }
     
     double poisson(const int lambda)
     {
-      return boost::poisson_distribution<int>(lambda)(random);
+      return boost::poisson_distribution<int>(lambda)(gen);
     }
     
     bool bernoulli(const double& p)
     {
-      return uniform() < p;
+      return boost::bernoulli_distribution<double>(p)(gen);
     }
     
     double exponential(const double& lambda)
     {
-      return boost::exponential_distribution<double>(lambda)(random);
+      return boost::exponential_distribution<double>(lambda)(gen);
     }
 
     double gamma(const double& alpha, const double& beta)
     {
       // in PRML, beta is inverse! I decided to use follow PRML style gamma distribution, not
       // boost::math style beta...
-      return boost::gamma_distribution<double>(alpha, 1.0 / beta)(random);
+      return boost::gamma_distribution<double>(alpha, 1.0 / beta)(gen);
       
 #if 0
       double b, c, u, v, w, y, x, z;
@@ -105,16 +105,14 @@ namespace utils
     
     double beta(const double& a, const double& b)
     {
-      const double ga = gamma(a, 1);
-      const double gb = gamma(b, 1);
+      const double x = gamma(a, 1);
+      const double y = gamma(b, 1);
       
-      return ga / (ga + gb);
+      return x / (x + y);
     }
     
   private:
-    boost::uniform_real<> dist;
     Generator gen;
-    boost::variate_generator<Generator&, boost::uniform_real<> > random;
   };
   
   
