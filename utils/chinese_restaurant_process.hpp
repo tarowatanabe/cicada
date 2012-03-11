@@ -358,7 +358,7 @@ namespace utils
     template <typename Sampler>
     double sample_y(Sampler& sampler, const double& discount, const double& strength) const
     {
-      double y = 0;
+      size_type y = 0;
       
       for (size_type i = 1; i < tables; ++ i)
 	y += sampler.bernoulli(strength / (strength + discount * i));
@@ -369,7 +369,7 @@ namespace utils
     template <typename Sampler>
     double sample_y_inv(Sampler& sampler, const double& discount, const double& strength) const
     {
-      double y = 0;
+      size_type y = 0;
       
       for (size_type i = 1; i < tables; ++ i)
 	y += 1 - sampler.bernoulli(strength / (strength + discount * i));
@@ -380,7 +380,7 @@ namespace utils
     template <typename Sampler>
     double sample_z_inv(Sampler& sampler, const double& discount, const double& strength) const
     {
-      double z = 0;
+      size_type z = 0;
       
       typename dish_set_type::const_iterator diter_end = dishes.end();
       for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
