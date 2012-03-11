@@ -578,7 +578,7 @@ int resample_rate = 1;
 bool slice_sampling = false;
 
 double discount = 0.8;
-double strength = -0.5;
+double strength = 1;
 
 double discount_prior_alpha = 1.0;
 double discount_prior_beta  = 1.0;
@@ -610,6 +610,9 @@ int main(int argc, char ** argv)
 
     if (train_files.empty())
       throw std::runtime_error("no training data?");
+    
+    if (! slice_sampling && strength < 0.0)
+      throw std::runtime_error("negative strength w/o slice sampling is not supported!");
 
     sampler_type sampler;
     const size_t num_vocab = vocabulary_size(train_files);
