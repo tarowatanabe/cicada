@@ -60,9 +60,9 @@ namespace utils
       return uniform() < p;
     }
     
-    double exponential(const double& l)
+    double exponential(const double& lambda)
     {
-      return - std::log(1.0 - uniform()) / l;
+      return boost::exponential_distribution<double>(lambda)(random);
     }
 
     double gamma(const double& alpha, const double& beta)

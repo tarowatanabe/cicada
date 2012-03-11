@@ -103,11 +103,7 @@ struct PYPLM
     root.parent = id_type(-1);
     root.order = 0;
     root.table = node_type::table_type(discount[0],
-				       strength[0],
-				       discount_alpha,
-				       discount_beta,
-				       strength_shape,
-				       strength_rate);
+				       strength[0]);
   }
 
   template <typename Iterator>
@@ -131,11 +127,7 @@ struct PYPLM
 	trie_node.parent = node_prev;
 	trie_node.order = order;
 	trie_node.table = node_type::table_type(discount[order],
-						strength[order],
-						discount_alpha,
-						discount_beta,
-						strength_shape,
-						strength_rate);
+						strength[order]);
 	
 	nodes[order].push_back(node);
       }
@@ -243,12 +235,12 @@ struct PYPLM
 		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
     
     if (order == 0)
-      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength, false) : 0.0);
+      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
     else {
       node_set_type::const_iterator niter_end = nodes[order].end();
       for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
 	if (! trie[*niter].table.empty())
-	  logprob += trie[*niter].table.log_likelihood(discount, strength, false);
+	  logprob += trie[*niter].table.log_likelihood(discount, strength);
       
       return logprob;
     }
@@ -281,10 +273,16 @@ struct PYPLM
   };
   
   template <typename Sampler>
-  void sample_parameters(Sampler& sampler)
+  void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     for (size_type order = 0; order != discount.size(); ++ order) {
-      discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+      
+      for (int iter = 0; iter != num_loop; ++ iter) {
+	strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+	
+	discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+      }
+      
       strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
     }
   }
@@ -292,59 +290,72 @@ struct PYPLM
   template <typename Sampler>
   double sample_strength(const int order, Sampler& sampler, const double& discount, const double& strength) const
   {
-    if (order == 0)
-      return root.table.sample_strength(sampler, discount, strength);
-    else {
-      double x = 0.0;
-      double y = 0.0;
-      
+    double x = 0.0;
+    double y = 0.0;
+
+    if (order == 0) {
+      x += root.table.sample_log_x(sampler, discount, strength);
+      y += root.table.sample_y(sampler, discount, strength);
+    } else {
       node_set_type::const_iterator niter_end = nodes[order].end();
       for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
 	if (! trie[*niter].table.empty()) {
 	  x += trie[*niter].table.sample_log_x(sampler, discount, strength);
 	  y += trie[*niter].table.sample_y(sampler, discount, strength);
 	}
-      
-      return sampler.gamma(strength_shape + y, strength_rate - x);
     }
+    
+    return sampler.gamma(strength_shape + y, strength_rate - x);
   }
   
   template <typename Sampler>
   double sample_discount(const int order, Sampler& sampler, const double& discount, const double& strength) const
   {
-    if (order == 0)
-      return root.table.sample_discount(sampler, discount, strength);
-    else {
-      double y = 0.0;
-      double z = 0.0;
-      
+    double y = 0.0;
+    double z = 0.0;
+    
+    if (order == 0) {
+      y += root.table.sample_y_inv(sampler, discount, strength);
+      z += root.table.sample_z_inv(sampler, discount, strength);
+    } else {
       node_set_type::const_iterator niter_end = nodes[order].end();
       for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
 	if (! trie[*niter].table.empty()) {
 	  y += trie[*niter].table.sample_y_inv(sampler, discount, strength);
 	  z += trie[*niter].table.sample_z_inv(sampler, discount, strength);
 	}
-      
-      return sampler.beta(discount_alpha + y, discount_beta + z);
     }
+    
+    return sampler.beta(discount_alpha + y, discount_beta + z);
   }
   
   
   template <typename Sampler>
-  void slice_sample_parameters(Sampler& sampler, const int num_iterations = 8)
+  void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
-      
-      discount[order] = utils::slice_sampler(discount_sampler,
-					     discount[order],
-					     sampler,
-					     (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
-					     1.0,
-					     0.0,
-					     num_iterations,
-					     100 * num_iterations);
+
+      for (int iter = 0; iter != num_loop; ++ iter) {
+	strength[order] = utils::slice_sampler(strength_sampler,
+					       strength[order],
+					       sampler,
+					       - discount[order] + std::numeric_limits<double>::min(),
+					       std::numeric_limits<double>::infinity(),
+					       0.0,
+					       num_iterations,
+					       100 * num_iterations);
+	
+	discount[order] = utils::slice_sampler(discount_sampler,
+					       discount[order],
+					       sampler,
+					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
+					       1.0,
+					       0.0,
+					       num_iterations,
+					       100 * num_iterations);
+      }
       
       strength[order] = utils::slice_sampler(strength_sampler,
 					     strength[order],
