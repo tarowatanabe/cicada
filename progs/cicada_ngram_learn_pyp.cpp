@@ -674,6 +674,11 @@ int main(int argc, char ** argv)
     else
       lm.sample_parameters(sampler);
     
+    if (debug >= 2)
+      for (int n = 0; n != order; ++ n)
+	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+    
+    // then, learn!
     for (int iter = 0; iter < samples; ++ iter) {
       if (debug)
 	std::cerr << "iteration: " << iter << std::endl;
