@@ -668,6 +668,12 @@ int main(int argc, char ** argv)
     
     data_set_type(training).swap(training);
     
+    // sample parameters, first...
+    if (slice_sampling)
+      lm.slice_sample_parameters(sampler);
+    else
+      lm.sample_parameters(sampler);
+    
     for (int iter = 0; iter < samples; ++ iter) {
       if (debug)
 	std::cerr << "iteration: " << iter << std::endl;
