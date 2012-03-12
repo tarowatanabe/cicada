@@ -33,6 +33,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/chinese_restaurant_process.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
@@ -568,6 +569,15 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
 
+template <typename Tp>
+struct less_third
+{
+  bool operator()(const Tp& x, const Tp& y) const
+  {
+    return boost::fusion::get<2>(x) < boost::fusion::get<2>(y);
+  }
+};
+
 path_set_type train_files;
 path_set_type test_files;
 path_type     output_file;
@@ -627,11 +637,18 @@ int main(int argc, char ** argv)
 	     strength_prior_rate);
 
     // we will precompute <word, node> pair...
-    typedef std::pair<word_type, PYPLM::id_type> data_type;
+    typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
     typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
     typedef std::vector<bool, std::allocator<bool> > non_oov_type;
 
-    data_set_type training;
+    typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
+    typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
+    typedef std::vector<size_t, std::allocator<size_t> > index_type;
+
+    // TODO: implement baby step: easy first learning...
+
+    data_set_type        training;
+    word_unique_set_type uniques;
     non_oov_type non_oov;
     
     if (vocab_type::BOS.id() >= non_oov.size())
@@ -653,7 +670,11 @@ int main(int argc, char ** argv)
 	
 	sentence_type::const_iterator siter_end = sentence.end();
 	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  training.push_back(data_type(*siter, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end())));
+	  training.push_back(data_type(*siter, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end()), 0));
+	  
+	  if (boost::fusion::get<1>(training.back()) >= uniques.size())
+	    uniques.resize(boost::fusion::get<1>(training.back()) + 1);
+	  uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
 	  
 	  ngram.push_back(*siter);
 	  
@@ -662,11 +683,43 @@ int main(int argc, char ** argv)
 	  non_oov[siter->id()] = true;
 	}
 	
-	training.push_back(data_type(vocab_type::EOS, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end())));
+	training.push_back(data_type(vocab_type::EOS, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end()), 0));
+	
+	if (boost::fusion::get<1>(training.back()) >= uniques.size())
+	  uniques.resize(boost::fusion::get<1>(training.back()) + 1);
+	uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
       }
     }
+
+    if (training.empty())
+      throw std::runtime_error("no training data?");
     
     data_set_type(training).swap(training);
+    
+    // assign rank...
+    {
+      data_set_type::iterator titer_end = training.end();
+      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
+	boost::fusion::get<2>(*titer) = uniques[boost::fusion::get<1>(*titer)].size();
+      
+      uniques.clear();
+    }
+    
+    // sort by rank
+    std::sort(training.begin(), training.end(), less_third<data_type>());
+    
+    // compute index
+    index_type index(1, 0);
+    
+    data_set_type::const_iterator titer_begin = training.begin();
+    data_set_type::const_iterator titer_end   = training.end();
+    for (data_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+      if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
+	index.push_back(titer - titer_begin);
+    index.push_back(training.size());
+
+    if (debug >= 2)
+      std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
     
     // sample parameters, first...
     if (slice_sampling)
@@ -684,14 +737,15 @@ int main(int argc, char ** argv)
 	std::cerr << "iteration: " << iter << std::endl;
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
-      std::random_shuffle(training.begin(), training.end(), gen);
-
+      for (size_t i = 0; i != index.size() - 1; ++ i)
+	std::random_shuffle(training.begin() + index[i], training.begin() + index[i + 1], gen);
+      
       data_set_type::const_iterator titer_end = training.end();
       for (data_set_type::const_iterator titer = training.begin(); titer != titer_end; ++ titer) {
 	if (iter)
-	  lm.decrement(titer->first, titer->second, sampler);
+	  lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
 	
-	lm.increment(titer->first, titer->second, sampler);
+	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
       }
       
       if (iter % resample_rate == resample_rate - 1) {
