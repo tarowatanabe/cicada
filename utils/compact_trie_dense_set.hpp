@@ -43,7 +43,6 @@ namespace utils
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
     typedef typename utils::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
-    typedef typename utils::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_root_type;
     
     struct Node
     {
@@ -59,9 +58,6 @@ namespace utils
   public:
     typedef typename id_map_type::const_iterator const_iterator;
     typedef typename id_map_type::const_iterator       iterator;
-
-    typedef typename id_map_root_type::const_iterator const_root_iterator;
-    typedef typename id_map_root_type::const_iterator       root_iterator;
     
   public:
     compact_trie_dense_set(const key_type& __empty) { __root.set_empty_key(__empty); }
@@ -70,11 +66,11 @@ namespace utils
     compact_trie_dense_set() {}
     
   public:
-    const_root_iterator begin() const { return __root.begin(); }
-    const_root_iterator end() const { return __root.end(); }
+    const_iterator begin() const { return __root.begin(); }
+    const_iterator end() const { return __root.end(); }
 
-    const_iterator begin(id_type __id) const { return __nodes[__id].__map.begin(); }
-    const_iterator end(id_type __id) const { return __nodes[__id].__map.end(); }
+    const_iterator begin(id_type __id) const { return (__id == npos() ? __root.begin() : __nodes[__id].__map.begin()); }
+    const_iterator end(id_type __id) const { return (__id == npos() ? __root.end() : __nodes[__id].__map.end()); }
     
     void clear() { __root.clear(); __nodes.clear(); }
 
@@ -100,31 +96,14 @@ namespace utils
     
     id_type find(id_type __id, const key_type& key) const
     {
-      if (__nodes.empty())
-	return npos();
-
-      if (__id == npos()) {
-	typename id_map_root_type::const_iterator riter = __root.find(key);
-	return (riter != __root.end() ? riter->second : npos());
-      } else {
-	typename id_map_type::const_iterator niter = __nodes[__id].__map.find(key);
-	return (niter != __nodes[__id].__map.end() ? niter->second : npos());
-      }
+      return __find_key(__id, key);
     }
     
     template <typename Iterator>
     id_type find(Iterator first, Iterator last) const
     {
-      if (__nodes.empty())
-	return npos();
-      
-      id_type __id = npos();
-      for (/**/; first != last; ++ first) {
-	__id = find(__id, *first);
-	if (__id == npos())
-	  return __id;
-      }
-      return __id;
+      typedef typename boost::is_integral<Iterator>::type __integral;
+      return __find_dispatch(first, last, __integral());
     }
     
     id_type insert(id_type __id, const key_type& key)
@@ -139,9 +118,47 @@ namespace utils
       return __insert_dispatch(first, last, __integral());
     }
     
-    
-    
   private:
+    // find...
+    template <typename Integer>
+    id_type __find_dispatch(Integer __id, Integer __key, boost::true_type)
+    {
+      return __find_key(__id, __key);
+    }
+    
+    template <typename Iterator>
+    id_type __find_dispatch(Iterator first, Iterator last, boost::false_type)
+    {
+      return __find_range(first, last);
+    }
+    
+    id_type __find_key(const id_type& __id, const key_type& key) const
+    {
+      if (__nodes.empty())
+	return npos();
+      
+      const id_map_type& mapping = (__id == npos() ? __root : __nodes[__id].__map);
+      
+      typename id_map_type::const_iterator riter = mapping.find(key);
+      return (riter != mapping.end() ? riter->second : npos());
+    }
+    
+    template <typename Iterator>
+    id_type __find_range(Iterator first, Iterator last) const
+    {
+      if (__nodes.empty())
+	return npos();
+      
+      id_type __id = npos();
+      for (/**/; first != last; ++ first) {
+	__id = find(__id, *first);
+	if (__id == npos())
+	  return __id;
+      }
+      return __id;
+    }
+    
+    // insertions...
     template <typename Integer>
     id_type __insert_dispatch(Integer __id, Integer __key, boost::true_type)
     {
@@ -154,29 +171,20 @@ namespace utils
       return __insert_range(first, last);
     }
     
-    
-    id_type __insert_key(id_type __id, const key_type& key)
+    id_type __insert_key(const id_type& __id, const key_type& key)
     {
-      if (__id == npos())  {
-	typename id_map_root_type::iterator riter = __root.find(key);
-	if (riter != __root.end())
-	  return riter->second;
-	else {
-	  __root.insert(std::make_pair(key, __nodes.size()));
-	  __id = __nodes.size();
-	  __nodes.push_back(node_type(__root.empty_key()));
-	  return __id;
-	}
-      } else {
-	typename id_map_type::iterator niter = __nodes[__id].__map.find(key);
-	if (niter != __nodes[__id].__map.end())
-	  return niter->second;
-	else {
-	  __nodes[__id].__map.insert(std::make_pair(key, __nodes.size()));
-	  __id = __nodes.size();
-	  __nodes.push_back(node_type(__root.empty_key()));
-	  return __id;
-	}
+      id_map_type& mapping = (__id == npos() ? __root : __nodes[__id].__map);
+      
+      typename id_map_type::iterator riter = mapping.find(key);
+      if (riter != mapping.end())
+	return riter->second;
+      else {
+	const id_type __id_new = __nodes.size();
+	
+	__nodes.push_back(node_type(__root.empty_key()));
+	mapping.insert(std::make_pair(key, __id_new));
+	
+	return __id_new;
       }
     }
 
@@ -186,14 +194,12 @@ namespace utils
       id_type __id = npos();
       for (/**/; first != last; ++ first)
 	__id = __insert_key(__id, *first);
-      
       return __id;
     }
     
-    
   private:
-    id_map_root_type __root;
-    node_set_type    __nodes;
+    id_map_type   __root;
+    node_set_type __nodes;
   };
 };
 
