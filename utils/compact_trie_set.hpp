@@ -116,13 +116,13 @@ namespace utils
   private:
     // find...
     template <typename Integer>
-    id_type __find_dispatch(Integer __id, Integer __key, boost::true_type)
+    id_type __find_dispatch(Integer __id, Integer __key, boost::true_type) const
     {
       return __find_key(__id, __key);
     }
     
     template <typename Iterator>
-    id_type __find_dispatch(Iterator first, Iterator last, boost::false_type)
+    id_type __find_dispatch(Iterator first, Iterator last, boost::false_type) const
     {
       return __find_range(first, last);
     }
