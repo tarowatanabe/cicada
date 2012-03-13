@@ -20,6 +20,7 @@
 //
 
 #include <map>
+#include <iterator>
 
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
@@ -584,6 +585,7 @@ path_type     output_file;
 
 int order = 4;
 int samples = 30;
+int baby_steps = 5;
 int resample_rate = 1;
 bool slice_sampling = false;
 
@@ -615,6 +617,9 @@ int main(int argc, char ** argv)
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
     
+    if (baby_steps > 0 && baby_steps > samples)
+      throw std::runtime_error("baby steps must be smaller than (or equal to) samples");
+        
     if (resample_rate <= 0)
       throw std::runtime_error("resample rate must be >= 1");
 
@@ -644,8 +649,6 @@ int main(int argc, char ** argv)
     typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
     typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
     typedef std::vector<size_t, std::allocator<size_t> > index_type;
-
-    // TODO: implement baby step: easy first learning...
 
     data_set_type        training;
     word_unique_set_type uniques;
@@ -717,9 +720,27 @@ int main(int argc, char ** argv)
       if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
 	index.push_back(titer - titer_begin);
     index.push_back(training.size());
-
+        
     if (debug >= 2)
       std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
+
+    {
+      // next, we will use the "rank" as an indicator whether it was already in the model or not...
+      data_set_type::iterator titer_end = training.end();
+      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
+	boost::fusion::get<2>(*titer) = false;
+    }
+    
+    size_t baby_iter = 0;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, index.size() - 1, size_t(0));
+    const size_t baby_size = ((index.size() - 1) + (baby_steps - 1)) / baby_steps;
+    
+    data_set_type training_samples;
+    
+    if (baby_iter == baby_last)
+      training_samples = training;
+    else
+      training_samples.reserve(training.size());
     
     // sample parameters, first...
     if (slice_sampling)
@@ -736,14 +757,26 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "iteration: " << iter << std::endl;
       
-      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
-      for (size_t i = 0; i != index.size() - 1; ++ i)
-	std::random_shuffle(training.begin() + index[i], training.begin() + index[i + 1], gen);
+      if (baby_iter != baby_last) {
+	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
+	
+	std::copy(training.begin() + index[baby_iter], training.begin() + index[baby_next], std::back_inserter(training_samples));
+	
+	baby_iter = baby_next;
+
+	if (debug >= 2)
+	  std::cerr << "baby: " << training_samples.size() << std::endl;
+      }
       
-      data_set_type::const_iterator titer_end = training.end();
-      for (data_set_type::const_iterator titer = training.begin(); titer != titer_end; ++ titer) {
-	if (iter)
+      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+      std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
+      
+      data_set_type::iterator titer_end = training_samples.end();
+      for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
+	if (boost::fusion::get<2>(*titer))
 	  lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
+	else
+	  boost::fusion::get<2>(*titer) = true;
 	
 	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
       }
@@ -903,6 +936,7 @@ void options(int argc, char** argv)
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
     ("samples",    po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("baby-steps", po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
     ("resample",   po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
     ("slice",      po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
     
