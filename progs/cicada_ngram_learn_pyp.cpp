@@ -585,7 +585,7 @@ path_type     output_file;
 
 int order = 4;
 int samples = 30;
-int baby_steps = 5;
+int burns = 5;
 int resample_rate = 1;
 bool slice_sampling = false;
 
@@ -617,7 +617,7 @@ int main(int argc, char ** argv)
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
     
-    if (baby_steps > 0 && baby_steps > samples)
+    if (burns > 0 && burns > samples)
       throw std::runtime_error("baby steps must be smaller than (or equal to) samples");
         
     if (resample_rate <= 0)
@@ -732,8 +732,8 @@ int main(int argc, char ** argv)
     }
     
     size_t baby_iter = 0;
-    const size_t baby_last = utils::bithack::branch(baby_steps > 0, index.size() - 1, size_t(0));
-    const size_t baby_size = ((index.size() - 1) + (baby_steps - 1)) / baby_steps;
+    const size_t baby_last = utils::bithack::branch(burns > 0, index.size() - 1, size_t(0));
+    const size_t baby_size = ((index.size() - 1) + (burns - 1)) / burns;
     
     data_set_type training_samples;
     
@@ -754,8 +754,12 @@ int main(int argc, char ** argv)
     
     // then, learn!
     for (int iter = 0; iter < samples; ++ iter) {
-      if (debug)
-	std::cerr << "iteration: " << iter << std::endl;
+      if (debug) {
+	if (burns > 0 && iter < burns)
+	  std::cerr << "iteration (burn-in): " << (iter + 1) << std::endl;
+	else
+	  std::cerr << "iteration: " << (iter + 1) << std::endl;
+      }
       
       if (baby_iter != baby_last) {
 	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
@@ -935,10 +939,10 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",    po::value<int>(&samples)->default_value(samples),             "# of samples")
-    ("baby-steps", po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
-    ("resample",   po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
-    ("slice",      po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
+    ("samples",   po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("burns",     po::value<int>(&burns)->default_value(burns),                 "# of burn-in")
+    ("resample",  po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
+    ("slice",     po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
