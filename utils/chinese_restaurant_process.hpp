@@ -181,16 +181,23 @@ namespace utils
     }
     
     template <typename Sampler>
-    bool increment(const dish_type& dish, const double& p0, Sampler& sampler)
+    bool increment(const dish_type& dish, const double& p0, Sampler& sampler, const double temperature=1.0)
     {
       location_type& loc = dishes[dish];
       
       bool existing = false;
       if (loc.customers) {
-	const double p_base = (m_strength + tables * m_discount) * p0;
-	const double p_gen = (loc.customers - loc.tables.size() * m_discount);
-	
-	existing = sampler.bernoulli(p_gen / (p_base + p_gen));
+	if (temperature == 1.0) {
+	  const double p_base = (m_strength + tables * m_discount) * p0;
+	  const double p_gen  = (loc.customers - loc.tables.size() * m_discount);
+	  
+	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
+	} else {
+	  const double p_base = std::pow((m_strength + tables * m_discount) * p0, 1.0 / temperature);
+	  const double p_gen  = std::pow((loc.customers - loc.tables.size() * m_discount), 1.0 / temperature);
+	  
+	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
+	}
       }
       
       if (existing) {

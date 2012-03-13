@@ -139,10 +139,10 @@ struct PYPLM
   }
 
   template <typename Sampler>
-  bool increment(const word_type& word, const id_type& node, Sampler& sampler)
+  bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
-      if (root.table.increment(word, p0, sampler))
+      if (root.table.increment(word, p0, sampler, temperature))
 	++ counts0;
       else
 	return false;
@@ -150,8 +150,8 @@ struct PYPLM
       const double backoff = prob(word, trie[node].parent);
       
       // we will also increment lower-order when new table is created!
-      if (trie[node].table.increment(word, backoff, sampler))
-	increment(word, trie[node].parent, sampler);
+      if (trie[node].table.increment(word, backoff, sampler, temperature))
+	increment(word, trie[node].parent, sampler, temperature);
       else
 	return false;
     }
@@ -585,7 +585,7 @@ path_type     output_file;
 
 int order = 4;
 int samples = 30;
-int burns = 5;
+int baby_steps = 5;
 int resample_rate = 1;
 bool slice_sampling = false;
 
@@ -617,7 +617,7 @@ int main(int argc, char ** argv)
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
     
-    if (burns > 0 && burns > samples)
+    if (baby_steps > 0 && baby_steps > samples)
       throw std::runtime_error("baby steps must be smaller than (or equal to) samples");
         
     if (resample_rate <= 0)
@@ -732,8 +732,8 @@ int main(int argc, char ** argv)
     }
     
     size_t baby_iter = 0;
-    const size_t baby_last = utils::bithack::branch(burns > 0, index.size() - 1, size_t(0));
-    const size_t baby_size = ((index.size() - 1) + (burns - 1)) / burns;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, index.size() - 1, size_t(0));
+    const size_t baby_size = ((index.size() - 1) + (baby_steps - 1)) / baby_steps;
     
     data_set_type training_samples;
     
@@ -754,12 +754,8 @@ int main(int argc, char ** argv)
     
     // then, learn!
     for (int iter = 0; iter < samples; ++ iter) {
-      if (debug) {
-	if (burns > 0 && iter < burns)
-	  std::cerr << "iteration (burn-in): " << (iter + 1) << std::endl;
-	else
-	  std::cerr << "iteration: " << (iter + 1) << std::endl;
-      }
+      if (debug)
+	std::cerr << "iteration: " << (iter + 1) << std::endl;
       
       if (baby_iter != baby_last) {
 	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
@@ -767,7 +763,7 @@ int main(int argc, char ** argv)
 	std::copy(training.begin() + index[baby_iter], training.begin() + index[baby_next], std::back_inserter(training_samples));
 	
 	baby_iter = baby_next;
-
+	
 	if (debug >= 2)
 	  std::cerr << "baby: " << training_samples.size() << std::endl;
       }
@@ -939,10 +935,10 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",   po::value<int>(&samples)->default_value(samples),             "# of samples")
-    ("burns",     po::value<int>(&burns)->default_value(burns),                 "# of burn-in")
-    ("resample",  po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
-    ("slice",     po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
+    ("samples",    po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("baby-steps", po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
+    ("resample",   po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
+    ("slice",      po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
