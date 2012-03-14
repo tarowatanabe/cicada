@@ -733,7 +733,7 @@ int main(int argc, char ** argv)
     size_t baby_index = 0;
     size_t baby_iter = utils::bithack::branch(baby_steps > 0, size_t(0), index.back());
     const size_t baby_last = index.back();
-    const size_t baby_size = (index.back() + (baby_steps - 1)) / baby_steps;
+    const size_t baby_size = (baby_steps > 0 ? (index.back() + (baby_steps - 1)) / baby_steps : size_t(0));
     
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
