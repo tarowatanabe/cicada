@@ -586,6 +586,7 @@ path_type     output_file;
 int order = 4;
 int samples = 30;
 int baby_steps = 5;
+int anneal_steps = 10;
 int resample_rate = 1;
 bool slice_sampling = false;
 
@@ -616,10 +617,7 @@ int main(int argc, char ** argv)
     
     if (samples <= 0)
       throw std::runtime_error("# of samples must be positive");
-    
-    if (baby_steps > 0 && baby_steps > samples)
-      throw std::runtime_error("baby steps must be smaller than (or equal to) samples");
-        
+            
     if (resample_rate <= 0)
       throw std::runtime_error("resample rate must be >= 1");
 
@@ -737,6 +735,9 @@ int main(int argc, char ** argv)
     const size_t baby_last = index.back();
     const size_t baby_size = (index.back() + (baby_steps - 1)) / baby_steps;
     
+    size_t anneal_iter = 0;
+    const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+    
     data_set_type training_samples;
     
     if (baby_iter == baby_last)
@@ -759,7 +760,11 @@ int main(int argc, char ** argv)
     
     // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+
+      bool baby_finished = true;
       if (baby_iter != baby_last) {
+	baby_finished = false;
+	
 	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
 	
 	while (baby_iter < baby_next) {
@@ -771,14 +776,27 @@ int main(int argc, char ** argv)
 	
 	if (debug >= 2)
 	  std::cerr << "baby: " << training_samples.size() << std::endl;
-      } else
-	sampling = true;
+      }
+
+      double temperature = 1.0;
+      bool anneal_finished = true;
+      if (anneal_iter != anneal_last) {
+	anneal_finished = false;
+	temperature = double(anneal_last - anneal_iter) + 1;
+	
+	++ anneal_iter;
+
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+      }
+      
+      sampling = baby_finished && anneal_finished;
       
       if (debug) {
 	if (sampling)
 	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
 	else
-	  std::cerr << "iteration: " << (iter + 1) << std::endl;
+	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
@@ -791,10 +809,10 @@ int main(int argc, char ** argv)
 	else
 	  boost::fusion::get<2>(*titer) = true;
 	
-	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
+	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler, temperature);
       }
       
-      if (iter % resample_rate == resample_rate - 1) {
+      if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
 	  lm.slice_sample_parameters(sampler);
 	else
@@ -948,10 +966,11 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",    po::value<int>(&samples)->default_value(samples),             "# of samples")
-    ("baby-steps", po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
-    ("resample",   po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
-    ("slice",      po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
+    ("samples",      po::value<int>(&samples)->default_value(samples),             "# of samples")
+    ("baby-steps",   po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
+    ("anneal-steps", po::value<int>(&anneal_steps)->default_value(anneal_steps),   "# of anneal steps")
+    ("resample",     po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
+    ("slice",        po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
