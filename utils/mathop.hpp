@@ -6,6 +6,10 @@
 #ifndef __UTILS__MATHOP__HPP__
 #define __UTILS__MATHOP__HPP__ 1
 
+#ifdef HAVE_TR1_CMATH
+#include <tr1/cmath>
+#endif
+
 #include <cmath>
 #include <cfloat>
 
@@ -18,10 +22,6 @@
 #include <boost/numeric/conversion/bounds.hpp>
 
 #include <utils/config.hpp>
-
-#ifdef HAVE_TR1_CMATH
-#include <tr1/cmath>
-#endif
 
 namespace utils
 {
@@ -80,6 +80,14 @@ namespace utils
     inline
     Tp logsum(Tp x, Tp y)
     {
+#ifdef HAVE_TR1_CMATH
+      if (x <= boost::numeric::bounds<Tp>::lowest())
+        return y;
+      else if (y <= boost::numeric::bounds<Tp>::lowest())
+        return x;
+      else
+	return std::max(x, y) + std::tr1::log1p(mathop::exp(std::min(x, y) - std::max(x, y)));
+#else
       using namespace boost::math::policies;
       typedef policy<domain_error<errno_on_error>,
 	pole_error<errno_on_error>,
@@ -94,6 +102,7 @@ namespace utils
         return x;
       else
 	return std::max(x, y) + boost::math::log1p(mathop::exp(std::min(x, y) - std::max(x, y)), policy_type());
+#endif
     }
     
     template <typename Tp>
