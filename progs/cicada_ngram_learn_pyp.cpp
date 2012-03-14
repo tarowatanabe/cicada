@@ -104,8 +104,7 @@ struct PYPLM
     // unitialize root table...
     root.parent = id_type(-1);
     root.order = 0;
-    root.table = node_type::table_type(discount[0],
-				       strength[0]);
+    root.table = node_type::table_type(discount[0], strength[0]);
   }
 
   template <typename Iterator>
@@ -128,8 +127,7 @@ struct PYPLM
       if (! trie_node.order) {
 	trie_node.parent = node_prev;
 	trie_node.order = order;
-	trie_node.table = node_type::table_type(discount[order],
-						strength[order]);
+	trie_node.table = node_type::table_type(discount[order], strength[order]);
 	
 	nodes[order].push_back(node);
       }
@@ -575,7 +573,11 @@ struct less_third
 {
   bool operator()(const Tp& x, const Tp& y) const
   {
-    return boost::fusion::get<2>(x) < boost::fusion::get<2>(y);
+    return (boost::fusion::get<2>(x) < boost::fusion::get<2>(y)
+	    || (!(boost::fusion::get<2>(y) < boost::fusion::get<2>(x))
+		&& (boost::fusion::get<0>(x) < boost::fusion::get<0>(y)
+		    || (!(boost::fusion::get<0>(y) < boost::fusion::get<0>(x))
+			&& boost::fusion::get<1>(x) < boost::fusion::get<1>(y)))));
   }
 };
 
@@ -588,7 +590,9 @@ int samples = 30;
 int baby_steps = 0;
 int anneal_steps = 0;
 int resample_rate = 1;
+int resample_iterations = 2;
 bool slice_sampling = false;
+bool type_sampling = false;
 
 double discount = 0.9;
 double strength = 1;
@@ -627,6 +631,9 @@ int main(int argc, char ** argv)
     if (! slice_sampling && strength < 0.0)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
 
+    if (type_sampling && baby_steps > 0)
+      throw std::runtime_error("we do not support both baby-steps and initialize with type-based sampling");
+
     sampler_type sampler;
     const size_t num_vocab = vocabulary_size(train_files);
     
@@ -638,6 +645,16 @@ int main(int argc, char ** argv)
 	     discount_prior_beta,
 	     strength_prior_shape,
 	     strength_prior_rate);
+    
+    // sample parameters, first...
+    if (slice_sampling)
+      lm.slice_sample_parameters(sampler, resample_iterations);
+    else
+      lm.sample_parameters(sampler, resample_iterations);
+    
+    if (debug >= 2)
+      for (int n = 0; n != order; ++ n)
+	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
 
     // we will precompute <word, node> pair...
     typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
@@ -696,6 +713,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no training data?");
     
     data_set_type(training).swap(training);
+
     
     // assign rank...
     {
@@ -722,9 +740,30 @@ int main(int argc, char ** argv)
     
     if (debug >= 2)
       std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
-
-    {
-      // next, we will use the "rank" as an indicator whether it was already in the model or not...
+    
+    if (type_sampling) {
+      if (debug)
+	std::cerr << "initialize by types" << std::endl;
+      
+      data_set_type::iterator titer_end = training.end();
+      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer) {
+	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
+	
+	boost::fusion::get<2>(*titer) = true;
+      }
+      
+      if (slice_sampling)
+	lm.slice_sample_parameters(sampler, resample_iterations);
+      else
+	lm.sample_parameters(sampler, resample_iterations);
+      
+      if (debug >= 2)
+	for (int n = 0; n != order; ++ n)
+	  std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+      
+      if (debug)
+	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
+    } else {
       data_set_type::iterator titer_end = training.end();
       for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
 	boost::fusion::get<2>(*titer) = false;
@@ -737,24 +776,14 @@ int main(int argc, char ** argv)
     
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
-    
+      
     data_set_type training_samples;
     
     if (baby_iter == baby_last)
       training_samples = training;
     else
       training_samples.reserve(training.size());
-    
-    // sample parameters, first...
-    if (slice_sampling)
-      lm.slice_sample_parameters(sampler);
-    else
-      lm.sample_parameters(sampler);
-    
-    if (debug >= 2)
-      for (int n = 0; n != order; ++ n)
-	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-    
+      
     bool sampling = false;
     int sample_iter = 0;
     
@@ -814,24 +843,22 @@ int main(int argc, char ** argv)
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
-	  lm.slice_sample_parameters(sampler);
+	  lm.slice_sample_parameters(sampler, resample_iterations);
 	else
-	  lm.sample_parameters(sampler);
+	  lm.sample_parameters(sampler, resample_iterations);
 	
 	if (debug >= 2)
 	  for (int n = 0; n != order; ++ n)
 	    std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
       }
-      
+	
       if (debug)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
-
+    
     // clear training data
     training.clear();
-    training_samples.clear();
     data_set_type(training).swap(training);
-    data_set_type(training_samples).swap(training_samples);
     
     // we will dump LM... now, define a format!
     if (! output_file.empty())
@@ -968,11 +995,14 @@ void options(int argc, char** argv)
     
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
-    ("samples",      po::value<int>(&samples)->default_value(samples),             "# of samples")
-    ("baby-steps",   po::value<int>(&baby_steps)->default_value(baby_steps),       "# of baby steps")
-    ("anneal-steps", po::value<int>(&anneal_steps)->default_value(anneal_steps),   "# of anneal steps")
-    ("resample",     po::value<int>(&resample_rate)->default_value(resample_rate), "hyperparameter resample rate")
-    ("slice",        po::bool_switch(&slice_sampling),                             "slice sampling for hyperparameters")
+    ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
+    ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
+    ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
+    ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")
+    ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
+    
+    ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
+    ("type",                po::bool_switch(&type_sampling),                                          "type sampling for initialization")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
