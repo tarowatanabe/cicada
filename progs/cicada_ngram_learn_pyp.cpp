@@ -719,6 +719,7 @@ int main(int argc, char ** argv)
     for (data_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
       if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
 	index.push_back(titer - titer_begin);
+    
     index.push_back(training.size());
     
     if (debug >= 2)
@@ -731,9 +732,10 @@ int main(int argc, char ** argv)
 	boost::fusion::get<2>(*titer) = false;
     }
     
-    size_t baby_iter = 0;
-    const size_t baby_last = utils::bithack::branch(baby_steps > 0, index.size() - 1, size_t(0));
-    const size_t baby_size = ((index.size() - 1) + (baby_steps - 1)) / baby_steps;
+    size_t baby_index = 0;
+    size_t baby_iter = utils::bithack::branch(baby_steps > 0, size_t(0), index.back());
+    const size_t baby_last = index.back();
+    const size_t baby_size = (index.back() + (baby_steps - 1)) / baby_steps;
     
     data_set_type training_samples;
     
@@ -757,24 +759,27 @@ int main(int argc, char ** argv)
     
     // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+      if (baby_iter != baby_last) {
+	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
+	
+	while (baby_iter < baby_next) {
+	  std::copy(training.begin() + index[baby_index], training.begin() + index[baby_index + 1], std::back_inserter(training_samples));
+	  
+	  baby_iter = index[baby_index + 1];
+	  ++ baby_index;
+	}
+	
+	if (debug >= 2)
+	  std::cerr << "baby: " << training_samples.size() << std::endl;
+      } else
+	sampling = true;
+      
       if (debug) {
 	if (sampling)
 	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
 	else
 	  std::cerr << "iteration: " << (iter + 1) << std::endl;
       }
-      
-      if (baby_iter != baby_last) {
-	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
-	
-	std::copy(training.begin() + index[baby_iter], training.begin() + index[baby_next], std::back_inserter(training_samples));
-	
-	baby_iter = baby_next;
-	
-	if (debug >= 2)
-	  std::cerr << "baby: " << training_samples.size() << std::endl;
-      } else
-	sampling = true;
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
