@@ -6,6 +6,8 @@
 #ifndef __UTILS__MATHOP__HPP__
 #define __UTILS__MATHOP__HPP__ 1
 
+#include <utils/config.hpp>
+
 #ifdef HAVE_TR1_CMATH
 #include <tr1/cmath>
 #endif
@@ -20,8 +22,6 @@
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
-
-#include <utils/config.hpp>
 
 namespace utils
 {
