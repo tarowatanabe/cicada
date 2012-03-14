@@ -658,8 +658,8 @@ struct OptimizeSGD : public Optimizer
 	const double exp_margin = utils::mathop::exp(margin);
 	const double inv_exp_margin = 1.0 / exp_margin;
 	
-	const double objective_correct   = boost::math::log1p(inv_exp_margin);
-	const double objective_incorrect = boost::math::log1p(exp_margin);
+	const double objective_correct   = utils::mathop::log1p(inv_exp_margin);
+	const double objective_incorrect = utils::mathop::log1p(exp_margin);
 	
 	const double gradient_correct   =   1.0 / (1.0 + exp_margin);
 	const double gradient_incorrect = - 1.0 / (1.0 + inv_exp_margin);
@@ -764,8 +764,8 @@ struct OptimizeSGD : public Optimizer
 	const double exp_margin = utils::mathop::exp(margin);
 	const double inv_exp_margin = 1.0 / exp_margin;
 
-	const double objective_correct   = boost::math::log1p(inv_exp_margin);
-	const double objective_incorrect = boost::math::log1p(exp_margin);
+	const double objective_correct   = utils::mathop::log1p(inv_exp_margin);
+	const double objective_incorrect = utils::mathop::log1p(exp_margin);
 	
 	const double gradient_correct   =   1.0 / (1.0 + exp_margin);
 	const double gradient_incorrect = - 1.0 / (1.0 + inv_exp_margin);
@@ -877,8 +877,8 @@ struct OptimizeLBFGS : public Optimizer
       const double exp_margin = utils::mathop::exp(margin);
       const double inv_exp_margin = 1.0 / exp_margin;
       
-      const double objective_correct   = boost::math::log1p(inv_exp_margin);
-      const double objective_incorrect = boost::math::log1p(exp_margin);
+      const double objective_correct   = utils::mathop::log1p(inv_exp_margin);
+      const double objective_incorrect = utils::mathop::log1p(exp_margin);
       
       const double gradient_correct   = - 1.0 / (1.0 + exp_margin);
       const double gradient_incorrect =   1.0 / (1.0 + inv_exp_margin);

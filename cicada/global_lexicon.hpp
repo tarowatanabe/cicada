@@ -117,7 +117,7 @@ namespace cicada
 	}
       }
       
-      return - boost::math::log1p(std::exp(- weight));
+      return - utils::mathop::log1p(std::exp(- weight));
     }
 
   private:
