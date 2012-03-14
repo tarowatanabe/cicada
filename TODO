@@ -137,3 +137,5 @@ optimized variant of SGD (and xBLEU?)
 
 PYP language model
     Probably easy... Use the parallel training from Graham.
+
+fix baby steps in pyp-lm: we will use baby-step iterations which is not counted as "samples"

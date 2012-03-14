@@ -720,7 +720,7 @@ int main(int argc, char ** argv)
       if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
 	index.push_back(titer - titer_begin);
     index.push_back(training.size());
-        
+    
     if (debug >= 2)
       std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
 
@@ -752,10 +752,17 @@ int main(int argc, char ** argv)
       for (int n = 0; n != order; ++ n)
 	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
     
+    bool sampling = false;
+    int sample_iter = 0;
+    
     // then, learn!
-    for (int iter = 0; iter < samples; ++ iter) {
-      if (debug)
-	std::cerr << "iteration: " << (iter + 1) << std::endl;
+    for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+      if (debug) {
+	if (sampling)
+	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
+	else
+	  std::cerr << "iteration: " << (iter + 1) << std::endl;
+      }
       
       if (baby_iter != baby_last) {
 	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
@@ -766,7 +773,8 @@ int main(int argc, char ** argv)
 	
 	if (debug >= 2)
 	  std::cerr << "baby: " << training_samples.size() << std::endl;
-      }
+      } else
+	sampling = true;
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
