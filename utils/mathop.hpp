@@ -17,6 +17,12 @@
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_TR1_CMATH
+#include <tr1/cmath>
+#endif
+
 namespace utils
 {
   namespace mathop
@@ -111,7 +117,11 @@ namespace utils
     inline
     Tp lgamma(Tp x)
     {
+#ifdef HAVE_TR1_CMATH
+      return std::tr1::lgamma(x);
+#else
       return boost::math::lgamma(x);
+#endif
     }
     
     template <typename Tp>

@@ -492,6 +492,9 @@ AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h time.h sys/time.h unistd.h]
 # hasn_{map,set}
 AC_CHECK_HEADERS([tr1/unordered_map tr1/unordered_set ext/hash_map ext/hash_set hash_map hash_set])
 
+# cmath, tr1/cmath
+AC_CHECK_HEADERS([cmath, tr1/cmath])
+
 ## SSE related...
 AC_CHECK_HEADERS([mm_malloc.h xmmintrin.h nmmintrin.h emmintrin.h tmmintrin.h ammintrin.h bmmintrin.h])
 
