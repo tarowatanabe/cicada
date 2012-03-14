@@ -585,8 +585,8 @@ path_type     output_file;
 
 int order = 4;
 int samples = 30;
-int baby_steps = 5;
-int anneal_steps = 10;
+int baby_steps = 0;
+int anneal_steps = 0;
 int resample_rate = 1;
 bool slice_sampling = false;
 
