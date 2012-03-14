@@ -829,7 +829,9 @@ int main(int argc, char ** argv)
 
     // clear training data
     training.clear();
+    training_samples.clear();
     data_set_type(training).swap(training);
+    data_set_type(training_samples).swap(training_samples);
     
     // we will dump LM... now, define a format!
     if (! output_file.empty())
