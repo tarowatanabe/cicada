@@ -15,10 +15,9 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <boost/math/special_functions/log1p.hpp>
-#include <boost/numeric/conversion/bounds.hpp>
-
 #include <cicada/semiring/traits.hpp>
+
+#include <utils/mathop.hpp>
 
 namespace cicada
 {
@@ -77,9 +76,9 @@ namespace cicada
 	  return *this;
 	
 	if (__value <= x.__value) 
-	  __value = x.__value + boost::math::log1p(std::exp(__value - x.__value));
+	  __value = x.__value + utils::mathop::log1p(std::exp(__value - x.__value));
 	else
-	  __value = __value + boost::math::log1p(std::exp(x.__value - __value));
+	  __value = __value + utils::mathop::log1p(std::exp(x.__value - __value));
 	
 	return *this;
       }
@@ -96,7 +95,7 @@ namespace cicada
 	  if (exp_value == 1.0)
 	    *this = zero();
 	  else
-	    __value = __value + boost::math::log1p(- exp_value);
+	    __value = __value + utils::mathop::log1p(- exp_value);
 	}
 	
 	return *this;

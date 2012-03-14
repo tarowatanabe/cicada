@@ -78,15 +78,10 @@ namespace utils
     
     template <typename Tp>
     inline
-    Tp logsum(Tp x, Tp y)
+    Tp log1p(Tp x)
     {
 #ifdef HAVE_TR1_CMATH
-      if (x <= boost::numeric::bounds<Tp>::lowest())
-        return y;
-      else if (y <= boost::numeric::bounds<Tp>::lowest())
-        return x;
-      else
-	return std::max(x, y) + std::tr1::log1p(mathop::exp(std::min(x, y) - std::max(x, y)));
+      return std::tr1::log1p(x);
 #else
       using namespace boost::math::policies;
       typedef policy<domain_error<errno_on_error>,
@@ -95,14 +90,21 @@ namespace utils
 	rounding_error<errno_on_error>,
 	evaluation_error<errno_on_error>
 	> policy_type;
+      
+      return boost::math::log1p(x, policy_type());
+#endif
+    }
     
+    template <typename Tp>
+    inline
+    Tp logsum(Tp x, Tp y)
+    {
       if (x <= boost::numeric::bounds<Tp>::lowest())
         return y;
       else if (y <= boost::numeric::bounds<Tp>::lowest())
         return x;
       else
-	return std::max(x, y) + boost::math::log1p(mathop::exp(std::min(x, y) - std::max(x, y)), policy_type());
-#endif
+	return std::max(x, y) + mathop::log1p(mathop::exp(std::min(x, y) - std::max(x, y)));
     }
     
     template <typename Tp>
