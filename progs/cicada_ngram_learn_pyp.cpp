@@ -569,15 +569,15 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
 template <typename Tp>
-struct less_third
+struct less_data
 {
   bool operator()(const Tp& x, const Tp& y) const
   {
     return (boost::fusion::get<2>(x) < boost::fusion::get<2>(y)
 	    || (!(boost::fusion::get<2>(y) < boost::fusion::get<2>(x))
-		&& (boost::fusion::get<0>(x) < boost::fusion::get<0>(y)
-		    || (!(boost::fusion::get<0>(y) < boost::fusion::get<0>(x))
-			&& boost::fusion::get<1>(x) < boost::fusion::get<1>(y)))));
+		&& (boost::fusion::get<1>(x) < boost::fusion::get<1>(y)
+		    || (!(boost::fusion::get<1>(y) < boost::fusion::get<1>(x))
+			&& boost::fusion::get<0>(x) < boost::fusion::get<0>(y)))));
   }
 };
 
@@ -619,7 +619,7 @@ int main(int argc, char ** argv)
     if (order <= 0)
       throw std::runtime_error("order must be positive");
     
-    if (samples <= 0)
+    if (samples < 0)
       throw std::runtime_error("# of samples must be positive");
             
     if (resample_rate <= 0)
@@ -725,7 +725,7 @@ int main(int argc, char ** argv)
     }
     
     // sort by rank
-    std::sort(training.begin(), training.end(), less_third<data_type>());
+    std::sort(training.begin(), training.end(), less_data<data_type>());
     
     // compute index
     index_type index(1, 0);
