@@ -646,16 +646,6 @@ int main(int argc, char ** argv)
 	     strength_prior_shape,
 	     strength_prior_rate);
     
-    // sample parameters, first...
-    if (slice_sampling)
-      lm.slice_sample_parameters(sampler, resample_iterations);
-    else
-      lm.sample_parameters(sampler, resample_iterations);
-    
-    if (debug >= 2)
-      for (int n = 0; n != order; ++ n)
-	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-
     // we will precompute <word, node> pair...
     typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
     typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
@@ -741,6 +731,16 @@ int main(int argc, char ** argv)
     if (debug >= 2)
       std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
     
+    // sample parameters, first...
+    if (slice_sampling)
+      lm.slice_sample_parameters(sampler, resample_iterations);
+    else
+      lm.sample_parameters(sampler, resample_iterations);
+    
+    if (debug >= 2)
+      for (int n = 0; n != order; ++ n)
+	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+
     if (type_sampling) {
       if (debug)
 	std::cerr << "initialize by types" << std::endl;
