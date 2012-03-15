@@ -269,12 +269,10 @@ namespace utils
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      const F r = tables * m_discount + m_strength;
-      
       if (diter == dishes.end())
-	return r * p0 / F(customers + m_strength);
+	return F(tables * m_discount + m_strength) * p0 / F(customers + m_strength);
       else
-	return F(diter->second.customers - m_discount * diter->second.tables.size() + r * p0) / F(customers + m_strength);
+	return F(diter->second.customers - m_discount * diter->second.tables.size() + F(tables * m_discount + m_strength) * p0) / F(customers + m_strength);
     }
 
     double log_likelihood() const
