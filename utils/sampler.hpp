@@ -114,6 +114,50 @@ namespace utils
       return x / (x + y);
     }
     
+    bool select(double a, double b, const double temperature=1.0)
+    {
+      if (temperature == 1.0)
+	return bernoulli(a / (a + b));
+      else {
+	a = std::pow(a, 1.0 / temperature);
+	b = std::pow(b, 1.0 / temperature);
+	return bernoulli(a / (a + b));
+      }
+    }
+
+    template <typename Iterator>
+    Iterator select(Iterator first, Iterator last, const double temperature=1.0)
+    {
+      if (std::distance(first, last) <= 1) return first;
+      
+      if (temperature == 1.0) {
+	const double draw = uniform() * std::accumulate(first, last, 0.0);
+	
+	double sum = *first;
+	++ first;
+	for (/**/; first != last && sum < draw; ++ first)
+	  sum += *first;
+	
+	return -- first;
+      } else {
+	const double anneal = 1.0 / temperature;
+	
+	double scale = 0.0;
+	for (Iterator iter = first; iter != last; ++ iter)
+	  scale += std::pow(*iter, anneal);
+	
+	const double draw = uniform() * scale;
+	
+	double sum = *first;
+	++ first;
+	for (/**/; first != last && sum < draw; ++ first)
+	  sum += std::pow(*first, anneal);
+	
+	return -- first;
+      }
+    }
+    
+    
   private:
     Generator gen;
   };
