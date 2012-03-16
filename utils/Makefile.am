@@ -124,6 +124,7 @@ json_string_generator.hpp \
 json_string_parser.hpp \
 unordered_map.hpp \
 unordered_set.hpp \
+utf8.hpp \
 vector_map.hpp \
 vector_set.hpp \
 vector2.hpp \

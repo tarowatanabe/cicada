@@ -149,7 +149,6 @@ struct PYPTranslit
     double strength_rate;
   };
   
-  
   PYPTranslit(const double __discount,
 	      const double __strength,
 	      const double __discount_alpha,
