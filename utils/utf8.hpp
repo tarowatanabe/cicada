@@ -11,19 +11,19 @@
 namespace utils
 {
   inline
-  bool utf8_start(const char c)
+  bool utf8_start(const unsigned char c)
   {
     return ((c & 0x80) == 0) || ((c & 0xC0) == 0xC0);
   }
   
   inline
-  bool utf8_other(const char c)
+  bool utf8_other(const unsigned char c)
   {
     return (c & 0xc0) == 0x80;
   }
   
   inline
-  size_t utf8_size(const char c)
+  size_t utf8_size(const unsigned char c)
   {
 #if 0
     if ((c & 0x80) == 0) 
