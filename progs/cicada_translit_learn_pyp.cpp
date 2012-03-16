@@ -567,12 +567,11 @@ int main(int argc, char ** argv)
       
       for (size_t i = 0; i != sources.size(); ++ i) 
 	if (! sources[i].empty() && ! targets[i].empty()) {
-
 	  translit.decrement(derivations[i].begin(), derivations[i].end(), sampler);
-
+	  
 	  // forward filter
 	  const PYPGraph::logprob_type logsum = graph.forward(sources[i], targets[i], translit);
-	
+	  
 	  // backward sampling
 	  const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[i]);
  
