@@ -116,11 +116,13 @@ namespace utils
     
     bool select(double a, double b, const double temperature=1.0)
     {
+      using namespace std;
+
       if (temperature == 1.0)
 	return bernoulli(a / (a + b));
       else {
-	a = std::pow(a, 1.0 / temperature);
-	b = std::pow(b, 1.0 / temperature);
+	a = pow(a, 1.0 / temperature);
+	b = pow(b, 1.0 / temperature);
 	return bernoulli(a / (a + b));
       }
     }
@@ -128,6 +130,8 @@ namespace utils
     template <typename Iterator>
     Iterator select(Iterator first, Iterator last, const double temperature=1.0)
     {
+      using namespace std;
+
       if (std::distance(first, last) <= 1) return first;
       
       if (temperature == 1.0) {
@@ -144,14 +148,14 @@ namespace utils
 	
 	double scale = 0.0;
 	for (Iterator iter = first; iter != last; ++ iter)
-	  scale += std::pow(*iter, anneal);
+	  scale += pow(*iter, anneal);
 	
 	const double draw = uniform() * scale;
 	
 	double sum = *first;
 	++ first;
 	for (/**/; first != last && sum < draw; ++ first)
-	  sum += std::pow(*first, anneal);
+	  sum += pow(*first, anneal);
 	
 	return -- first;
       }

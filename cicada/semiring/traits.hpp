@@ -46,6 +46,8 @@ namespace cicada
     {
       template <typename T>
       static inline Tp exp(const T& x)  { return std::exp(x); }
+      template <typename T>
+      static inline Tp pow(const Tp& x, const T& y)  { return std::pow(x, y); }
       static inline Tp zero() { return Tp();  }
       static inline Tp one()  { return Tp(1); }
       static inline Tp max() { return impl::traits_infinity<double>::plus(); }

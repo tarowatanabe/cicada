@@ -47,7 +47,7 @@ namespace cicada
       
     public:
       static inline self_type exp(const Tp& x) { return proxy_type(x); }
-      
+      static inline self_type pow(const self_type& x, const Tp& y) { return proxy_type(x.__value * y); }
       static inline self_type zero() { return proxy_type(impl::traits_infinity<value_type>::minus()); }
       static inline self_type one()  { return proxy_type(0); }
       static inline self_type max()  { return proxy_type(impl::traits_infinity<value_type>::plus()); }
@@ -191,6 +191,7 @@ namespace cicada
     struct traits<Logprob<Tp> >
     {
       static inline Logprob<Tp> exp(const Tp& x) { return Logprob<Tp>::exp(x); }
+      static inline Logprob<Tp> pow(const Logprob<Tp>& x, const Tp& y) { return Logprob<Tp>::pow(x, y); }
       static inline Logprob<Tp> zero() { return Logprob<Tp>::zero();  }
       static inline Logprob<Tp> one()  { return Logprob<Tp>::one(); }
       static inline Logprob<Tp> max()  { return Logprob<Tp>::max(); }
