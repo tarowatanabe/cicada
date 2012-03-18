@@ -144,6 +144,13 @@ namespace utils
 
     template <typename Tp>
     inline
+    Tp log_geometric(size_t x, const Tp& p) 
+    {
+      return std::log(1 - p) * x + std::log(p);
+    }
+
+    template <typename Tp>
+    inline
     Tp log_gamma(const Tp& x) 
     {
       return lgamma(x);

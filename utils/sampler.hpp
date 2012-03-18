@@ -59,6 +59,16 @@ namespace utils
     {
       return boost::bernoulli_distribution<double>(p)(gen);
     }
+
+    int binomial(const int t, const double& p)
+    {
+      return boost::binomial_distribution<double>(t, p)(gen);
+    }
+    
+    int geometric(const double& p)
+    {
+      return boost::geometric_distribution<int, double>(p)(gen);
+    }
     
     double exponential(const double& lambda)
     {
