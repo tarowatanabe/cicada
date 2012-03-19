@@ -95,7 +95,7 @@ struct PYPLM
 	const double __discount_beta,
 	const double __strength_shape,
 	const double __strength_rate,
-	const bool __infinity=false)
+	const bool __infinite=false)
     : trie(word_type()),
       nodes(order),
       discount(order, __discount),
@@ -109,7 +109,7 @@ struct PYPLM
       orders(order),
       order_alpha(1.0),
       order_beta(1.0),
-      infinity(__infinity)
+      infinite(__infinite)
   {
     // unitialize root table...
     root.parent = id_type(-1);
@@ -291,7 +291,7 @@ struct PYPLM
     if (! (first <= last))
       return p0;
     
-    if (infinity) {
+    if (infinite) {
       int n = 0;
       double p = root.table.prob(word, p0);
       const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
@@ -691,7 +691,7 @@ public:
   // global... should be moved to thread specific...
   history_type history;
   
-  bool infinity;
+  bool infinite;
 };
 
 
@@ -724,7 +724,7 @@ int anneal_steps = 0;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
-bool infinity = false;
+bool infinite = false;
 
 double discount = 0.9;
 double strength = 1;
@@ -774,7 +774,7 @@ int main(int argc, char ** argv)
 	     discount_prior_beta,
 	     strength_prior_shape,
 	     strength_prior_rate,
-	     infinity);
+	     infinite);
     
     // we will precompute <word, node> pair...
     typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
@@ -939,7 +939,7 @@ int main(int argc, char ** argv)
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
 
-      if (infinity)  {
+      if (infinite)  {
 	data_set_type::iterator titer_end = training_samples.end();
 	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
 	  if (boost::fusion::get<2>(*titer))
@@ -1120,7 +1120,7 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
-    ("infinity",            po::bool_switch(&infinity),                                               "infinite n-gram language model")
+    ("infinite",            po::bool_switch(&infinite),                                               "infinite n-gram language model")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
