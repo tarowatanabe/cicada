@@ -82,6 +82,11 @@ struct PYPLM
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
+  typedef std::pair<size_type, size_type> order_count_type;
+  typedef std::vector<order_count_type, std::allocator<order_count_type> > order_count_set_type;
+  
+  typedef std::vector<id_type, std::allocator<id_type> > history_type;
+  
   PYPLM(const int order,
 	const double __p0,
 	const double __discount,
@@ -89,7 +94,8 @@ struct PYPLM
 	const double __discount_alpha,
 	const double __discount_beta,
 	const double __strength_shape,
-	const double __strength_rate)
+	const double __strength_rate,
+	const bool __infinity=false)
     : trie(word_type()),
       nodes(order),
       discount(order, __discount),
@@ -99,7 +105,11 @@ struct PYPLM
       strength_shape(__strength_shape),
       strength_rate(__strength_rate),
       p0(__p0),
-      counts0(0)
+      counts0(0),
+      orders(order),
+      order_alpha(1.0),
+      order_beta(1.0),
+      infinity(__infinity)
   {
     // unitialize root table...
     root.parent = id_type(-1);
@@ -135,6 +145,60 @@ struct PYPLM
     
     return node;
   }
+  
+  template <typename Sampler>
+  bool increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
+  {    
+    if (node == trie.root()) {
+      ++ orders[0].first;
+      order = 1;
+      
+      if (root.table.increment(word, p0, sampler, temperature)) {
+	++ counts0;
+	return true;
+      } else
+	return false;
+    } else {
+      id_type parent = node;
+      history.clear();
+      
+      while (parent != trie.root()) {
+	history.push_back(parent);
+	parent = trie[parent].parent;
+      }
+      history.push_back(parent);
+      
+      double prob_ngram = p0;
+      double backoff_n = 1.0;
+      
+      order = 1;
+      history_type::const_reverse_iterator hiter_end = history.rend();
+      history_type::const_reverse_iterator hiter_last = hiter_end - 1;
+      for (history_type::const_reverse_iterator hiter = history.rbegin(); hiter != hiter_end; ++ hiter, ++ order) {
+	if (*hiter == trie.root())
+	  prob_ngram = root.table.prob(word, prob_ngram);
+	else {
+	  if (! trie[*hiter].table.empty())
+	    prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
+	}
+	
+	const double prob_n_denom = (orders[order - 1].first + orders[order - 1].second + order_alpha + order_beta);
+	const double prob_n = backoff_n * (orders[order - 1].first + order_alpha) / prob_n_denom;
+	
+	if (hiter == hiter_last || sampler.bernoulli(prob_n * prob_ngram)) {
+	  for (int n = 0; n < order - 1; ++ n)
+	    ++ orders[n].second;
+	  ++ orders[order - 1].first;
+	  
+	  return increment(word, *hiter, sampler, temperature);
+	}
+	
+	backoff_n *= double(orders[order - 1].second + order_beta) / prob_n_denom;
+      }
+    }
+    
+    return true;
+  }
 
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
@@ -146,14 +210,43 @@ struct PYPLM
 	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
-      
+	
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler, temperature))
 	increment(word, trie[node].parent, sampler, temperature);
       else
 	return false;
     }
+      
+    return true;
+  }
+
+  template <typename Sampler>
+  bool decrement(const word_type& word, id_type node, int order, Sampler& sampler)
+  {
+    // move at the right position...
+    while (node != trie.root() && trie[node].order != order - 1)
+      node = trie[node].parent;
     
+    if (node == trie.root()) {
+      // penetration count
+      -- orders[0].first;
+      
+      if (root.table.decrement(word, sampler))
+	-- counts0;
+      else
+	return false;
+    } else {
+      // penetration count
+      for (int n = 0; n < order - 1; ++ n)
+	-- orders[n].second;
+      -- orders[order - 1].first;
+      
+      if (trie[node].table.decrement(word, sampler))
+	decrement(word, trie[node].parent, sampler);
+      else
+	return false;
+    }
     return true;
   }
   
@@ -171,7 +264,7 @@ struct PYPLM
       else
 	return false;
     }
-    
+      
     return true;
   }
   
@@ -198,23 +291,53 @@ struct PYPLM
     if (! (first <= last))
       return p0;
     
-    double p = root.table.prob(word, p0);
-    
-    // we will traverse from the back!
-    reverse_iterator begin(last);
-    reverse_iterator end(first);
-    
-    id_type node = trie.root();
-    for (reverse_iterator iter = begin; iter != end; ++ iter) {
-      node = trie.find(node, *iter);
+    if (infinity) {
+      int n = 0;
+      double p = root.table.prob(word, p0);
+      const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
+      double backoff_n = (orders[n].second + order_beta) / prob_n_denom;
+      double prob = p * (orders[n].first + order_alpha) / prob_n_denom;
       
-      if (node == trie_type::npos() || trie[node].table.empty())
-	return p;
-      else
-	p = trie[node].table.prob(word, p);
+      // we will traverse from the back!
+      reverse_iterator begin(last);
+      reverse_iterator end(first);
+      
+      id_type node = trie.root();
+      for (reverse_iterator iter = begin; iter != end; ++ iter, ++ n) {
+	node = trie.find(node, *iter);
+	
+	if (node == trie_type::npos() || trie[node].table.empty())
+	  return prob;
+	else {
+	  p = trie[node].table.prob(word, p);
+	  
+	  const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
+	  
+	  prob += p * ((orders[n].first + order_alpha) / prob_n_denom) * backoff_n;
+	  backoff_n *= (orders[n].second + order_beta) / prob_n_denom;
+	}
+      }
+      
+      return prob;
+    } else {
+      double p = root.table.prob(word, p0);
+      
+      // we will traverse from the back!
+      reverse_iterator begin(last);
+      reverse_iterator end(first);
+      
+      id_type node = trie.root();
+      for (reverse_iterator iter = begin; iter != end; ++ iter) {
+	node = trie.find(node, *iter);
+	
+	if (node == trie_type::npos() || trie[node].table.empty())
+	  return p;
+	else
+	  p = trie[node].table.prob(word, p);
+      }
+      
+      return p;
     }
-    
-    return p;
   }
   
   double log_likelihood() const
@@ -560,6 +683,15 @@ public:
   
   double    p0;
   size_type counts0;
+  
+  order_count_set_type orders;
+  double order_alpha;
+  double order_beta;
+
+  // global... should be moved to thread specific...
+  history_type history;
+  
+  bool infinity;
 };
 
 
@@ -592,7 +724,7 @@ int anneal_steps = 0;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
-bool type_sampling = false;
+bool infinity = false;
 
 double discount = 0.9;
 double strength = 1;
@@ -631,9 +763,6 @@ int main(int argc, char ** argv)
     if (! slice_sampling && strength < 0.0)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
 
-    if (type_sampling && baby_steps > 0)
-      throw std::runtime_error("we do not support both baby-steps and initialize with type-based sampling");
-
     sampler_type sampler;
     const size_t num_vocab = vocabulary_size(train_files);
     
@@ -644,7 +773,8 @@ int main(int argc, char ** argv)
 	     discount_prior_alpha,
 	     discount_prior_beta,
 	     strength_prior_shape,
-	     strength_prior_rate);
+	     strength_prior_rate,
+	     infinity);
     
     // we will precompute <word, node> pair...
     typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
@@ -740,30 +870,8 @@ int main(int argc, char ** argv)
     if (debug >= 2)
       for (int n = 0; n != order; ++ n)
 	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-
-    if (type_sampling) {
-      if (debug)
-	std::cerr << "initialize by types" << std::endl;
-      
-      data_set_type::iterator titer_end = training.end();
-      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer) {
-	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
-	
-	boost::fusion::get<2>(*titer) = true;
-      }
-      
-      if (slice_sampling)
-	lm.slice_sample_parameters(sampler, resample_iterations);
-      else
-	lm.sample_parameters(sampler, resample_iterations);
-      
-      if (debug >= 2)
-	for (int n = 0; n != order; ++ n)
-	  std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-      
-      if (debug)
-	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
-    } else {
+    
+    {
       data_set_type::iterator titer_end = training.end();
       for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
 	boost::fusion::get<2>(*titer) = false;
@@ -830,15 +938,25 @@ int main(int argc, char ** argv)
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
-      
-      data_set_type::iterator titer_end = training_samples.end();
-      for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
-	if (boost::fusion::get<2>(*titer))
-	  lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
-	else
-	  boost::fusion::get<2>(*titer) = true;
-	
-	lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler, temperature);
+
+      if (infinity)  {
+	data_set_type::iterator titer_end = training_samples.end();
+	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
+	  if (boost::fusion::get<2>(*titer))
+	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler);
+	  
+	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler, temperature);
+	}
+      } else {
+	data_set_type::iterator titer_end = training_samples.end();
+	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
+	  if (boost::fusion::get<2>(*titer))
+	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
+	  else
+	    boost::fusion::get<2>(*titer) = true;
+	  
+	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler, temperature);
+	}
       }
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
@@ -1002,7 +1120,7 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
-    ("type",                po::bool_switch(&type_sampling),                                          "type sampling for initialization")
+    ("infinity",            po::bool_switch(&infinity),                                               "infinite n-gram language model")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
