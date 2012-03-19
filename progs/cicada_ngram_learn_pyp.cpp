@@ -164,45 +164,6 @@ struct PYPLM
       } else
 	return false;
     } else {
-#if 0
-      id_type parent = node;
-      history.clear();
-      
-      while (parent != trie.root()) {
-        history.push_back(parent);
-        parent = trie[parent].parent;
-      }
-      history.push_back(parent);
-      
-      double prob_ngram = p0;
-      double backoff_n = 1.0;
-      
-      order = 1;
-      history_type::const_reverse_iterator hiter_end = history.rend();
-      history_type::const_reverse_iterator hiter_last = hiter_end - 1;
-      for (history_type::const_reverse_iterator hiter = history.rbegin(); hiter != hiter_end; ++ hiter, ++ order) {
-        if (*hiter == trie.root())
-          prob_ngram = root.table.prob(word, prob_ngram);
-        else {
-          if (! trie[*hiter].table.empty())
-            prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
-        }
-        
-        const double prob_n_denom = (orders[order - 1].first + orders[order - 1].second + order_alpha + order_beta);
-        const double prob_n = backoff_n * (orders[order - 1].first + order_alpha) / prob_n_denom;
-        
-        if (hiter == hiter_last || sampler.bernoulli(prob_n * prob_ngram)) {
-          for (int n = 0; n < order - 1; ++ n)
-            ++ orders[n].second;
-          ++ orders[order - 1].first;
-          
-          return increment(word, *hiter, sampler, temperature);
-        }
-        
-        backoff_n *= double(orders[order - 1].second + order_beta) / prob_n_denom;
-      }
-#endif
-      
       id_type parent = node;
       history.clear();
       probs.clear();
