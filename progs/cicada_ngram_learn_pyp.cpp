@@ -21,6 +21,7 @@
 
 #include <map>
 #include <iterator>
+#include <numeric>
 
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
@@ -86,6 +87,8 @@ struct PYPLM
   typedef std::vector<order_count_type, std::allocator<order_count_type> > order_count_set_type;
   
   typedef std::vector<id_type, std::allocator<id_type> > history_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
   
   PYPLM(const int order,
 	const double __p0,
@@ -149,6 +152,8 @@ struct PYPLM
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
   {    
+    orders_cache.clear();
+    
     if (node == trie.root()) {
       ++ orders[0].first;
       order = 1;
@@ -159,12 +164,13 @@ struct PYPLM
       } else
 	return false;
     } else {
+#if 0
       id_type parent = node;
       history.clear();
       
       while (parent != trie.root()) {
-	history.push_back(parent);
-	parent = trie[parent].parent;
+        history.push_back(parent);
+        parent = trie[parent].parent;
       }
       history.push_back(parent);
       
@@ -175,26 +181,67 @@ struct PYPLM
       history_type::const_reverse_iterator hiter_end = history.rend();
       history_type::const_reverse_iterator hiter_last = hiter_end - 1;
       for (history_type::const_reverse_iterator hiter = history.rbegin(); hiter != hiter_end; ++ hiter, ++ order) {
+        if (*hiter == trie.root())
+          prob_ngram = root.table.prob(word, prob_ngram);
+        else {
+          if (! trie[*hiter].table.empty())
+            prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
+        }
+        
+        const double prob_n_denom = (orders[order - 1].first + orders[order - 1].second + order_alpha + order_beta);
+        const double prob_n = backoff_n * (orders[order - 1].first + order_alpha) / prob_n_denom;
+        
+        if (hiter == hiter_last || sampler.bernoulli(prob_n * prob_ngram)) {
+          for (int n = 0; n < order - 1; ++ n)
+            ++ orders[n].second;
+          ++ orders[order - 1].first;
+          
+          return increment(word, *hiter, sampler, temperature);
+        }
+        
+        backoff_n *= double(orders[order - 1].second + order_beta) / prob_n_denom;
+      }
+#endif
+      
+      id_type parent = node;
+      history.clear();
+      probs.clear();
+      
+      while (parent != trie.root()) {
+	history.push_back(parent);
+	parent = trie[parent].parent;
+      }
+      history.push_back(parent);
+      
+      double prob_ngram = p0;
+      double backoff_n = 1.0;
+      
+      int n = 0;
+      history_type::const_reverse_iterator hiter_begin = history.rbegin();
+      history_type::const_reverse_iterator hiter_end = history.rend();
+      for (history_type::const_reverse_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter, ++ n) {
 	if (*hiter == trie.root())
 	  prob_ngram = root.table.prob(word, prob_ngram);
-	else {
-	  if (! trie[*hiter].table.empty())
-	    prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
-	}
+	else if (! trie[*hiter].table.empty())
+	  prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
 	
-	const double prob_n_denom = (orders[order - 1].first + orders[order - 1].second + order_alpha + order_beta);
-	const double prob_n = backoff_n * (orders[order - 1].first + order_alpha) / prob_n_denom;
+	const double prob_n_denom = (orders[n].first + orders[n].second + order_alpha + order_beta);
+	const double prob_n = backoff_n * (orders[n].first + order_alpha) / prob_n_denom;
 	
-	if (hiter == hiter_last || sampler.bernoulli(prob_n * prob_ngram)) {
-	  for (int n = 0; n < order - 1; ++ n)
-	    ++ orders[n].second;
-	  ++ orders[order - 1].first;
-	  
-	  return increment(word, *hiter, sampler, temperature);
-	}
+	probs.push_back(prob_n * prob_ngram);
 	
-	backoff_n *= double(orders[order - 1].second + order_beta) / prob_n_denom;
+	backoff_n *= double(orders[n].second + order_beta) / prob_n_denom;
       }
+      
+      prob_set_type::const_iterator piter = sampler.select(probs.begin(), probs.end(), temperature);
+      
+      order = (piter - probs.begin()) + 1;
+      
+      for (int n = 0; n < order - 1; ++ n)
+	++ orders[n].second;
+      ++ orders[order - 1].first;
+      
+      return increment(word, *(hiter_begin + order - 1), sampler, temperature);
     }
     
     return true;
@@ -210,7 +257,7 @@ struct PYPLM
 	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
-	
+      
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler, temperature))
 	increment(word, trie[node].parent, sampler, temperature);
@@ -224,6 +271,8 @@ struct PYPLM
   template <typename Sampler>
   bool decrement(const word_type& word, id_type node, int order, Sampler& sampler)
   {
+    orders_cache.clear();
+    
     // move at the right position...
     while (node != trie.root() && trie[node].order != order - 1)
       node = trie[node].parent;
@@ -241,7 +290,7 @@ struct PYPLM
       for (int n = 0; n < order - 1; ++ n)
 	-- orders[n].second;
       -- orders[order - 1].first;
-      
+
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
       else
@@ -309,13 +358,35 @@ struct PYPLM
       }
       
       return p;
-
 #if 0
+      if (orders_cache.empty()) {
+	orders_cache.resize(orders.size());
+	orders_cache.back().resize(orders.size());
+	
+	double backoff_n = 1.0;
+	for (size_t n = 0; n != orders.size(); ++ n) {
+	  const double prob_n_denom = (orders[n].first + orders[n].second + order_alpha + order_beta);
+	  const double prob_n = backoff_n * (orders[n].first + order_alpha) / prob_n_denom;
+	  
+	  orders_cache.back()[n] = prob_n;
+	  
+	  backoff_n *= double(orders[n].second + order_beta) / prob_n_denom;
+	}
+	
+	for (size_t n = 0; n != orders.size(); ++ n) {
+	  orders_cache[n] = prob_set_type(orders_cache.back().begin(), orders_cache.back().begin() + n + 1);
+	  
+	  const double sum = std::accumulate(orders_cache[n].begin(), orders_cache[n].end(), 0.0);
+	  if (sum != 0.0)
+	    std::transform(orders_cache[n].begin(), orders_cache[n].end(), orders_cache[n].begin(), std::bind2nd(std::multiplies<double>(), 1.0 / sum));
+	}
+      }
+      
+      const int n_max = std::distance(first, last);
+      
       int n = 0;
       double p = root.table.prob(word, p0);
-      const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
-      double backoff_n = (orders[n].second + order_beta) / prob_n_denom;
-      double prob = p * (orders[n].first + order_alpha) / prob_n_denom;
+      double prob = p * orders_cache[n_max][n];
       
       // we will traverse from the back!
       reverse_iterator begin(last);
@@ -325,16 +396,10 @@ struct PYPLM
       for (reverse_iterator iter = begin; iter != end; ++ iter, ++ n) {
 	node = trie.find(node, *iter);
 	
-	if (node == trie_type::npos() || trie[node].table.empty())
-	  return prob;
-	else {
+	if (node != trie_type::npos() && ! trie[node].table.empty())
 	  p = trie[node].table.prob(word, p);
-	  
-	  const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
-	  
-	  prob += p * ((orders[n].first + order_alpha) / prob_n_denom) * backoff_n;
-	  backoff_n *= (orders[n].second + order_beta) / prob_n_denom;
-	}
+	
+	prob += p * orders_cache[n_max][n];
       }
       
       return prob;
@@ -705,11 +770,14 @@ public:
   size_type counts0;
   
   order_count_set_type orders;
+  prob_map_type        orders_cache;
   double order_alpha;
   double order_beta;
 
   // global... should be moved to thread specific...
-  history_type history;
+  history_type  history;
+  prob_set_type probs;
+  
   
   bool infinite;
 };
@@ -970,8 +1038,12 @@ int main(int argc, char ** argv)
 	
 	if (debug >= 2) {
 	  std::cerr << "penetration count" << std::endl;
-	  for (size_t n = 0; n != lm.orders.size(); ++ n)
+	  size_t total = 0;
+	  for (size_t n = 0; n != lm.orders.size(); ++ n) {
 	    std::cerr << "order=" << n << " a=" << lm.orders[n].first << " b=" << lm.orders[n].second << std::endl;
+	    total += lm.orders[n].first;
+	  }
+	  std::cerr << "total=" << total << std::endl;
 	}
 
       } else {
