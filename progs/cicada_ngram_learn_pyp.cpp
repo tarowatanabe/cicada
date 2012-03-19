@@ -292,6 +292,25 @@ struct PYPLM
       return p0;
     
     if (infinite) {
+      double p = root.table.prob(word, p0);
+      
+      // we will traverse from the back!
+      reverse_iterator begin(last);
+      reverse_iterator end(first);
+      
+      id_type node = trie.root();
+      for (reverse_iterator iter = begin; iter != end; ++ iter) {
+	node = trie.find(node, *iter);
+	
+	if (node == trie_type::npos() || trie[node].table.empty())
+	  return p;
+	else
+	  p = trie[node].table.prob(word, p);
+      }
+      
+      return p;
+
+#if 0
       int n = 0;
       double p = root.table.prob(word, p0);
       const double prob_n_denom = orders[n].first + orders[n].second + order_alpha + order_beta;
@@ -319,6 +338,7 @@ struct PYPLM
       }
       
       return prob;
+#endif
     } else {
       double p = root.table.prob(word, p0);
       
@@ -947,6 +967,13 @@ int main(int argc, char ** argv)
 	  
 	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler, temperature);
 	}
+	
+	if (debug >= 2) {
+	  std::cerr << "penetration count" << std::endl;
+	  for (size_t n = 0; n != lm.orders.size(); ++ n)
+	    std::cerr << "order=" << n << " a=" << lm.orders[n].first << " b=" << lm.orders[n].second << std::endl;
+	}
+
       } else {
 	data_set_type::iterator titer_end = training_samples.end();
 	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
