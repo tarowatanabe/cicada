@@ -5,13 +5,20 @@
 #include "stemmer/nfkc.hpp"
 
 #include <unicode/unistr.h>
-#include <unicode/normlzr.h>
+#include <unicode/normalizer2.h>
 
 namespace cicada
 {
 
   namespace stemmer
   {
+    NFKC::NFKC()
+      : handle(0)
+    {
+      UErrorCode status = U_ZERO_ERROR;
+      handle = icu::Normalizer2::getInstance(NULL, "nfkc", UNORM2_COMPOSE, status);
+    }
+
 
     Stemmer::symbol_type NFKC::operator[](const symbol_type& word) const
     {
@@ -33,7 +40,7 @@ namespace cicada
 	icu::UnicodeString uword_nfkc;
 	
 	UErrorCode status = U_ZERO_ERROR;
-	icu::Normalizer::normalize(uword, UNORM_NFKC, 0, uword_nfkc, status);
+	static_cast<const icu::Normalizer2*>(handle)->normalize(uword, uword_nfkc, status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error("normalization failed");
 	

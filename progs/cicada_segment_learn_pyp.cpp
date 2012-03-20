@@ -2,22 +2,29 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-// PYP-LM!
+// PYP-segmenter!
+//
+// @InProceedings{mochihashi-yamada-ueda:2009:ACLIJCNLP,
+//  author    = {Mochihashi, Daichi  and  Yamada, Takeshi  and  Ueda, Naonori},
+//  title     = {Bayesian Unsupervised Word Segmentation with Nested Pitman-Yor Language Modeling},
+//  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+//  month     = {August},
+//  year      = {2009},
+//  address   = {Suntec, Singapore},
+//  publisher = {Association for Computational Linguistics},
+//  pages     = {100--108},
+//  url       = {http://www.aclweb.org/anthology/P/P09/P09-1012}
+// }
 
 //
-// @InProceedings{teh:2006:COLACL,
-//   author    = {Teh, Yee Whye},
-//   title     = {A Hierarchical Bayesian Language Model Based On Pitman-Yor Processes},
-//   booktitle = {Proceedings of the 21st International Conference on Computational Linguistics and 44th Annual Meeting of the Association for Computational Linguistics},
-//   month     = {July},
-//   year      = {2006},
-//   address   = {Sydney, Australia},
-//   publisher = {Association for Computational Linguistics},
-//   pages     = {985--992},
-//   url       = {http://www.aclweb.org/anthology/P06-1124},
-//   doi       = {10.3115/1220175.1220299}
-// }
+// we will use a tabular-based DP, thus, the order must be fixed!
+// (or, do we augment extra contexts using vectors????)
 //
+// we will provide two ngram LM structure, 
+// one for character-based one (we will use utils::piece) and ngram-based one also using utils::piece as a storage...
+// For utils::piece details, seed the implementation in cicada_translit_learn_pyp.cpp
+// 
+
 
 #include <map>
 #include <iterator>
@@ -27,6 +34,8 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include "utils/utf8.hpp"
+#inlcude "utils/array_power2.hpp"
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -54,14 +63,362 @@ typedef cicada::Symbol    word_type;
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Vocab     vocab_type;
 
-struct PYPLM
+// PYP Word model.... this is basically the same as the PYPLM with additional length model...
+struct PYP
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+  
+  typedef std::string sentence_type;
+  
+  typedef utils::piece piece_type;
+  typedef utils::piece segment_type;
+};
+
+struct PYPWord
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::sentence_type sentence_type;
+  typedef PYP::piece_type    piece_type;
+  typedef PYP::segment_type  segment_type;
+  
+  typedef segment_type word_type;
+  
   typedef uint32_t  id_type;
+  
+  struct Node
+  {
+    typedef utils::chinese_restaurant_process<word_type, boost::hash<word_type>, std::equal_to<word_type>,
+					      std::allocator<word_type > > table_type;
+  
+    Node() : table(), parent(id_type(-1)), order(0)  {}
+    
+    table_type table;
+    id_type parent;
+    int     order;
+  };
+  typedef Node node_type;
+  
+  typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  
+  
+  typedef std::vector<double, std::allocator<double> > parameter_set_type;
+  
+  typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
+  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
+  typedef std::vector<segment_type, std::allocator<segment_type> > buffer_type;
+  
+  static segment_type BOS()
+  {
+    static std::string __bos = "\n";
+    return __bos;
+  }
+
+  static segment_type EOS()
+  {
+    static std::string __eos = "\n";
+    return __eos;
+  }
+  
+  struct length_base_type
+  {
+    typedef utils::array_power2<double, 64, std::allocator<double> > cache_type;
+
+    length_base_type(const double& __lambda,
+		     const double& __strength_shape,
+		     const double& __strength_rate)
+      : lambda(__lambda),
+	strength_shape(__strength_shape),
+	strength_rate(__strength_rate)
+    {
+      initialize(__lambda);
+    }
+    
+    double logprob(const size_type size) const
+    {
+      if (size < cache.size())
+	return cache[size];
+      else
+	return utis::mathop::log_poisson(size, lambda);
+    }
+    
+    void initialize(const double& __lambda)
+    {
+      cache.clear();
+      lambda = __lambda;
+      
+      cache[0] = - std::numeric_limits<double>::infinity();
+      for (size_type size = 1; size != cache.size(); ++ size)
+	cache[size] = utis::mathop::log_poisson(size, lambda);
+    }
+
+    cache_type cache;
+    
+    double lambda;
+    
+    double strength_shape;
+    double strength_rate;
+  };
+  
+  PYPWord(const int order,
+	  const double __p0,
+	  const double __discount,
+	  const double __strength,
+	  const double __discount_alpha,
+	  const double __discount_beta,
+	  const double __strength_shape,
+	  const double __strength_rate,
+	  const double __lambda,
+	  const double __lambda_strength,
+	  const double __lambda_rate)
+    : trie(word_type()),
+      nodes(order),
+      discount(order, __discount),
+      strength(order, __strength),
+      discount_alpha(__discount_alpha),
+      discount_beta(__discount_beta),
+      strength_shape(__strength_shape),
+      strength_rate(__strength_rate),
+      p0(__p0),
+      counts0(0),
+      base(__lambda, __lambda_strength, __lambda_rate)
+  {
+    // unitialize root table...
+    root.parent = id_type(-1);
+    root.order = 0;
+    root.table = node_type::table_type(discount[0], strength[0]);
+  }
+  
+  template <typename Iterator, typename Sampler>
+  bool increment(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
+  {
+    typedef std::reverse_iterator<Iterator> reverse_iterator;
+    
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+    
+    int order = 1;
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
+      const id_type node_prev = node;
+      
+      node = trie.insert(node, *iter);
+      
+      node_type& trie_node = trie[node];
+      
+      if (! trie_node.order) {
+	trie_node.parent = node_prev;
+	trie_node.order = order;
+	trie_node.table = node_type::table_type(discount[order], strength[order]);
+	
+	nodes[order].push_back(node);
+      }
+    }
+    
+    if (node == trie.root()) {
+      if (root.table.increment(segment, p0, sampler, temperature))
+	++ counts0;
+      else
+	return false;
+    } else {
+      const double backoff = prob(segment, trie[node].parent);
+      
+      // we will also increment lower-order when new table is created!
+      if (trie[node].table.increment(segment, backoff, sampler, temperature))
+	increment(segment, trie[node].parent, sampler, temperature);
+      else
+	return false;
+    }
+    
+    return true;
+  }
+
+  template <typename Iterator, typename Sampler>
+  bool decrement(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler)
+  {
+    typedef std::reverse_iterator<Iterator> reverse_iterator;
+    
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+    
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter)
+      node = trie.find(node, *iter);
+    
+    if (node == trie.root()) {
+      if (root.table.decrement(segment, sampler))
+	-- counts0;
+      else
+	return false;
+    } else {
+      if (trie[node].table.decrement(segment, sampler))
+	decrement(segment, trie[node].parent, sampler);
+      else
+	return false;
+    }
+    
+    return true;
+  }
+  
+
+  double prob(const segment_type& segment, const id_type& node) const
+  {
+    if (node == trie.root())
+      return root.table.prob(segment, p0);
+    else {
+      const double p = prob(segment, trie[node].parent);
+      
+      if (trie[node].table.empty())
+	return p;
+      else
+	return trie[node].table.prob(segment, p);
+    }
+  }
+  
+  template <typename Iterator>
+  double prob(const segment_type& segment, Iterator first, Iterator last)
+  {
+    typedef std::reverse_iterator<Iterator> reverse_iterator;
+    
+    // this may happen when accessing 0-gram!
+    if (! (first <= last))
+      return p0;
+    
+    double p = root.table.prob(word, p0);
+      
+    // we will traverse from the back!
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+      
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter) {
+      node = trie.find(node, *iter);
+	
+      if (node == trie_type::npos() || trie[node].table.empty())
+	return p;
+      else
+	p = trie[node].table.prob(word, p);
+    }
+      
+    return p;
+  }
+  
+  template <typename Sampler>
+  void increment(const segment_type& segment, Sample& sampler, const double temperature=1.0)
+  {
+    const size_type conext_size = discount.size() - 1;
+    
+    buffer.clear();
+    buffer.push_back(BOS());
+    
+    segment_type::const_iterator siter_end = segment.end();
+    for (segment_type::const_iterator siter = segment.begin(); siter != siter_end; /**/) {
+      const size_type char_size = utils::utf8_size(*siter);
+      const segment_type seg(siter, siter + char_size);
+      
+      increment(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler, temperature);
+      
+      buffer.push_back(seg);
+      siter += char_size;
+    }
+    
+    increment(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler, temperature);
+  }
+  
+  template <typename Sampler>
+  void decrement(const segment_type& segment, Sample& sampler)
+  {
+    const size_type conext_size = discount.size() - 1;
+
+    buffer.clear();
+    buffer.push_back(BOS());
+    
+    segment_type::const_iterator siter_end = segment.end();
+    for (segment_type::const_iterator siter = segment.begin(); siter != siter_end; /**/) {
+      const size_type char_size = utils::utf8_size(*siter);
+      const segment_type seg(siter, siter + char_size);
+      
+      decrement(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler);
+      
+      buffer.push_back(seg);
+      siter += char_size;
+    }
+    
+    decrement(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler);
+  }
+  
+  double prob(const segment_type& segment)
+  {
+    const size_type conext_size = discount.size() - 1;
+    
+    buffer.clear();
+    buffer.push_back(BOS());
+    
+    double loprob = 0.0;
+    
+    segment_type::const_iterator siter_end = segment.end();
+    for (segment_type::const_iterator siter = segment.begin(); siter != siter_end; /**/) {
+      const size_type char_size = utils::utf8_size(*siter);
+      const segment_type seg(siter, siter + char_size);
+      
+      logprob += std::log(prob(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size)));
+      
+      buffer.push_back(seg);
+      siter += char_size;
+    }
+    
+    logprob += std::log(prob(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size)));
+    
+    // exclude BOS/EOS
+    logprob += base.logprob(buffer.size() - 2);
+    
+    return std::exp(logprob);
+  }
+
+  // TODO: add log_likelihood
+  //     : experiment with sampled length parameters... (Do we really need this...? Is it simply a normalization constant...?)
+  //
+  
+public: 
+  trie_type trie;
+  node_type root;
+  node_map_type nodes;
+  
+  parameter_set_type discount;
+  parameter_set_type strength;
+  
+  double discount_alpha;
+  double discount_beta;
+  double strength_shape;
+  double strength_rate;
+  
+  double    p0;
+  size_type counts0;
+  
+  length_base_type base;
+  
+  buffer_type buffer;
+};
+
+struct PYPLM
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::sentence_type sentence_type;
+  typedef PYP::piece_type    piece_type;
+  typedef PYP::segment_type  segment_type;
+
+  typedef segment_type word_type;
+
+  typedef uint32_t  id_type;
+  
   typedef boost::filesystem::path path_type;
-
+  
   struct Node
   {
     typedef utils::chinese_restaurant_process<word_type, boost::hash<word_type>, std::equal_to<word_type>,
@@ -77,9 +434,9 @@ struct PYPLM
   
   typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
-
+  
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
-
+  
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
@@ -91,16 +448,12 @@ struct PYPLM
   typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
   
   PYPLM(const int order,
-	const double __p0,
 	const double __discount,
 	const double __strength,
 	const double __discount_alpha,
 	const double __discount_beta,
 	const double __strength_shape,
-	const double __strength_rate,
-	const double __order_alpha,
-	const double __order_beta,
-	const bool __infinite=false)
+	const double __strength_rate)
     : trie(word_type()),
       nodes(order),
       discount(order, __discount),
@@ -109,12 +462,7 @@ struct PYPLM
       discount_beta(__discount_beta),
       strength_shape(__strength_shape),
       strength_rate(__strength_rate),
-      p0(__p0),
-      counts0(0),
-      orders(order),
-      order_alpha(__order_alpha),
-      order_beta(__order_beta),
-      infinite(__infinite)
+      counts0(0)
   {
     // unitialize root table...
     root.parent = id_type(-1);
@@ -151,64 +499,6 @@ struct PYPLM
     return node;
   }
   
-  template <typename Sampler>
-  bool increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
-  {    
-    orders_cache.clear();
-    
-    if (node == trie.root()) {
-      ++ orders[0].first;
-      order = 1;
-      
-      if (root.table.increment(word, p0, sampler, temperature)) {
-	++ counts0;
-	return true;
-      } else
-	return false;
-    } else {
-      id_type parent = node;
-      history.clear();
-      probs.clear();
-      
-      while (parent != trie.root()) {
-	history.push_back(parent);
-	parent = trie[parent].parent;
-      }
-      history.push_back(parent);
-      
-      double prob_ngram = p0;
-      double backoff_n = 1.0;
-      
-      int n = 0;
-      history_type::const_reverse_iterator hiter_begin = history.rbegin();
-      history_type::const_reverse_iterator hiter_end = history.rend();
-      for (history_type::const_reverse_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter, ++ n) {
-	if (*hiter == trie.root())
-	  prob_ngram = root.table.prob(word, prob_ngram);
-	else if (! trie[*hiter].table.empty())
-	  prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
-	
-	const double prob_n_denom = (orders[n].first + orders[n].second + order_alpha + order_beta);
-	const double prob_n = backoff_n * (orders[n].first + order_alpha) / prob_n_denom;
-	
-	probs.push_back(prob_n * prob_ngram);
-	
-	backoff_n *= double(orders[n].second + order_beta) / prob_n_denom;
-      }
-      
-      prob_set_type::const_iterator piter = sampler.select(probs.begin(), probs.end(), temperature);
-      
-      order = (piter - probs.begin()) + 1;
-      
-      for (int n = 0; n < order - 1; ++ n)
-	++ orders[n].second;
-      ++ orders[order - 1].first;
-      
-      return increment(word, *(hiter_begin + order - 1), sampler, temperature);
-    }
-    
-    return true;
-  }
 
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
@@ -228,37 +518,6 @@ struct PYPLM
 	return false;
     }
       
-    return true;
-  }
-
-  template <typename Sampler>
-  bool decrement(const word_type& word, id_type node, int order, Sampler& sampler)
-  {
-    orders_cache.clear();
-    
-    // move at the right position...
-    while (node != trie.root() && trie[node].order != order - 1)
-      node = trie[node].parent;
-    
-    if (node == trie.root()) {
-      // penetration count
-      -- orders[0].first;
-      
-      if (root.table.decrement(word, sampler))
-	-- counts0;
-      else
-	return false;
-    } else {
-      // penetration count
-      for (int n = 0; n < order - 1; ++ n)
-	-- orders[n].second;
-      -- orders[order - 1].first;
-
-      if (trie[node].table.decrement(word, sampler))
-	decrement(word, trie[node].parent, sampler);
-      else
-	return false;
-    }
     return true;
   }
   
@@ -303,89 +562,23 @@ struct PYPLM
     if (! (first <= last))
       return p0;
     
-    if (infinite) {
-      double p = root.table.prob(word, p0);
+    double p = root.table.prob(word, p0);
+    
+    // we will traverse from the back!
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+    
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter) {
+      node = trie.find(node, *iter);
       
-      // we will traverse from the back!
-      reverse_iterator begin(last);
-      reverse_iterator end(first);
-      
-      id_type node = trie.root();
-      for (reverse_iterator iter = begin; iter != end; ++ iter) {
-	node = trie.find(node, *iter);
-	
-	if (node == trie_type::npos() || trie[node].table.empty())
-	  return p;
-	else
-	  p = trie[node].table.prob(word, p);
-      }
-      
-      return p;
-#if 0
-      if (orders_cache.empty()) {
-	orders_cache.resize(orders.size());
-	orders_cache.back().resize(orders.size());
-	
-	double backoff_n = 1.0;
-	for (size_t n = 0; n != orders.size(); ++ n) {
-	  const double prob_n_denom = (orders[n].first + orders[n].second + order_alpha + order_beta);
-	  const double prob_n = backoff_n * (orders[n].first + order_alpha) / prob_n_denom;
-	  
-	  orders_cache.back()[n] = prob_n;
-	  
-	  backoff_n *= double(orders[n].second + order_beta) / prob_n_denom;
-	}
-	
-	for (size_t n = 0; n != orders.size(); ++ n) {
-	  orders_cache[n] = prob_set_type(orders_cache.back().begin(), orders_cache.back().begin() + n + 1);
-	  
-	  const double sum = std::accumulate(orders_cache[n].begin(), orders_cache[n].end(), 0.0);
-	  if (sum != 0.0)
-	    std::transform(orders_cache[n].begin(), orders_cache[n].end(), orders_cache[n].begin(), std::bind2nd(std::multiplies<double>(), 1.0 / sum));
-	}
-      }
-      
-      const int n_max = std::distance(first, last);
-      
-      int n = 0;
-      double p = root.table.prob(word, p0);
-      double prob = p * orders_cache[n_max][n];
-      
-      // we will traverse from the back!
-      reverse_iterator begin(last);
-      reverse_iterator end(first);
-      
-      id_type node = trie.root();
-      for (reverse_iterator iter = begin; iter != end; ++ iter, ++ n) {
-	node = trie.find(node, *iter);
-	
-	if (node != trie_type::npos() && ! trie[node].table.empty())
-	  p = trie[node].table.prob(word, p);
-	
-	prob += p * orders_cache[n_max][n];
-      }
-      
-      return prob;
-#endif
-    } else {
-      double p = root.table.prob(word, p0);
-      
-      // we will traverse from the back!
-      reverse_iterator begin(last);
-      reverse_iterator end(first);
-      
-      id_type node = trie.root();
-      for (reverse_iterator iter = begin; iter != end; ++ iter) {
-	node = trie.find(node, *iter);
-	
-	if (node == trie_type::npos() || trie[node].table.empty())
-	  return p;
-	else
-	  p = trie[node].table.prob(word, p);
-      }
-      
-      return p;
+      if (node == trie_type::npos() || trie[node].table.empty())
+	return p;
+      else
+	p = trie[node].table.prob(word, p);
     }
+    
+    return p;
   }
   
   double log_likelihood() const
@@ -729,20 +922,12 @@ public:
   double strength_shape;
   double strength_rate;
   
-  double    p0;
   size_type counts0;
-  
-  order_count_set_type orders;
-  prob_map_type        orders_cache;
-  double order_alpha;
-  double order_beta;
+};
 
-  // global... should be moved to thread specific...
-  history_type  history;
-  prob_set_type probs;
-  
-  
-  bool infinite;
+struct PYPGraph
+{
+
 };
 
 
@@ -785,9 +970,6 @@ double discount_prior_beta  = 1.0;
 double strength_prior_shape = 1.0;
 double strength_prior_rate  = 1.0;
 
-double order_alpha = 4.0;
-double order_beta = 1.0;
-
 int threads = 1;
 int debug = 0;
 
@@ -828,8 +1010,6 @@ int main(int argc, char ** argv)
 	     discount_prior_beta,
 	     strength_prior_shape,
 	     strength_prior_rate,
-	     order_alpha,
-	     order_beta,
 	     infinite);
     
     // we will precompute <word, node> pair...
@@ -1196,9 +1376,6 @@ void options(int argc, char** argv)
     ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
     ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
-
-    ("order-alpha", po::value<double>(&order_alpha)->default_value(order_alpha), "order ~ Beta(alpha,beta)")
-    ("order-beta",  po::value<double>(&order_beta)->default_value(order_beta),   "order ~ Beta(alpha,beta)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     

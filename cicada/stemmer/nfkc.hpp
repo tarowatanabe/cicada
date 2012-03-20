@@ -18,12 +18,16 @@ namespace cicada
     {
     private:
       typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+
+    public:
+      NFKC();
       
     public:
       symbol_type operator[](const symbol_type& x) const;
       
     private:
       symbol_set_type cache;
+      const void* handle;
     };
   };
 };
