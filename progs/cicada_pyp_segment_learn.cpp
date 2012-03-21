@@ -37,7 +37,7 @@
 
 #include "utils/chunk_vector.hpp"
 #include "utils/utf8.hpp"
-#inlcude "utils/array_power2.hpp"
+#include "utils/array_power2.hpp"
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -47,6 +47,7 @@
 #include "utils/chinese_restaurant_process.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
+#include "utils/dense_hash_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
@@ -143,11 +144,11 @@ struct PYPWord
       if (size < cache.size())
 	return cache[size];
       else
-	return utis::mathop::log_poisson(size, lambda);
+	return utils::mathop::log_poisson(size, lambda);
     }
 
     template <typename Sampler>
-    void sample_parameters(const double& word_size, const double& table_size, Sample& sampler)
+    void sample_parameters(const double& word_size, const double& table_size, Sampler& sampler)
     {
       initialize(sampler.gamma(strength_shape + word_size, strength_rate + table_size));
     }
@@ -159,7 +160,7 @@ struct PYPWord
       
       cache[0] = - std::numeric_limits<double>::infinity();
       for (size_type size = 1; size != cache.size(); ++ size)
-	cache[size] = utis::mathop::log_poisson(size, lambda);
+	cache[size] = utils::mathop::log_poisson(size, lambda);
     }
 
     cache_type cache;
@@ -294,7 +295,7 @@ struct PYPWord
     if (! (first <= last))
       return p0;
     
-    double p = root.table.prob(word, p0);
+    double p = root.table.prob(segment, p0);
       
     // we will traverse from the back!
     reverse_iterator begin(last);
@@ -307,16 +308,16 @@ struct PYPWord
       if (node == trie_type::npos() || trie[node].table.empty())
 	return p;
       else
-	p = trie[node].table.prob(word, p);
+	p = trie[node].table.prob(segment, p);
     }
       
     return p;
   }
   
   template <typename Sampler>
-  void increment(const segment_type& segment, Sample& sampler, const double temperature=1.0)
+  void increment(const segment_type& segment, Sampler& sampler, const double temperature=1.0)
   {
-    const size_type conext_size = discount.size() - 1;
+    const size_type context_size = discount.size() - 1;
     
     buffer.clear();
     buffer.push_back(BOS());
@@ -336,9 +337,9 @@ struct PYPWord
   }
   
   template <typename Sampler>
-  void decrement(const segment_type& segment, Sample& sampler)
+  void decrement(const segment_type& segment, Sampler& sampler)
   {
-    const size_type conext_size = discount.size() - 1;
+    const size_type context_size = discount.size() - 1;
 
     buffer.clear();
     buffer.push_back(BOS());
@@ -359,12 +360,12 @@ struct PYPWord
   
   double prob(const segment_type& segment)
   {
-    const size_type conext_size = discount.size() - 1;
+    const size_type context_size = discount.size() - 1;
     
     buffer.clear();
     buffer.push_back(BOS());
     
-    double loprob = 0.0;
+    double logprob = 0.0;
     
     segment_type::const_iterator siter_end = segment.end();
     for (segment_type::const_iterator siter = segment.begin(); siter != siter_end; /**/) {
@@ -391,15 +392,12 @@ struct PYPWord
 
   double log_likelihood() const
   {
-    //double logprob = std::log(p0) * counts0;
-    
     double logprob = 0.0;
     for (size_type order = 0; order != discount.size(); ++ order)
       logprob += log_likelihood(order, discount[order], strength[order]);
     
     return logprob;
   }
-  
   
   double log_likelihood(const int order, const double& discount, const double& strength) const
   {
@@ -638,9 +636,9 @@ struct PYPLM
     root.order = 0;
     root.table = node_type::table_type(discount[0], strength[0]);
   }
-
-  template <typename Iterator>
-  id_type insert(Iterator first, Iterator last)
+  
+  template <typename Iterator, typename Sampler>
+  bool increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -665,15 +663,37 @@ struct PYPLM
       }
     }
     
-    return node;
+    // first, we will insert word...
+    base.increment(word, sampler, temperature);
+    
+    // then, ngram...
+    return increment(word, node, sampler, temperature);
   }
-  
+
+  template <typename Iterator, typename Sampler>
+  bool decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
+  {
+    typedef std::reverse_iterator<Iterator> reverse_iterator;
+    
+    reverse_iterator begin(last);
+    reverse_iterator end(first);
+    
+    id_type node = trie.root();
+    for (reverse_iterator iter = begin; iter != end; ++ iter)
+      node = trie.insert(node, *iter);
+    
+    // first, we will decrement word...
+    base.decrement(word, sampler);
+    
+    // then, ngram...
+    return decrement(word, node, sampler);
+  }
   
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
-      if (root.table.increment(word, p0, sampler, temperature))
+      if (root.table.increment(word, base.prob(word), sampler, temperature))
 	++ counts0;
       else
 	return false;
@@ -711,7 +731,7 @@ struct PYPLM
   double prob(const word_type& word, const id_type& node) const
   {
     if (node == trie.root())
-      return root.table.prob(word, p0);
+      return root.table.prob(word, base.prob(word));
     else {
       const double p = prob(word, trie[node].parent);
       
@@ -728,6 +748,8 @@ struct PYPLM
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
     // this may happen when accessing 0-gram!
+    const double p0 = base.prob(word);
+    
     if (! (first <= last))
       return p0;
     
@@ -815,8 +837,8 @@ struct PYPLM
 	if (trie.empty(*niter)) {
 	  // we will collect information from nodes without children...
 	  
-	  typename table_type::const_iterator titer_end = trie[*niter].table.end();
-	  for (typename table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
+	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
+	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
 	    word_size += titer->first.size() * titer->second.size_table();
 	  
 	  table_size += trie[*niter].table.size_table();
@@ -893,8 +915,8 @@ struct PYPLM
 	if (trie.empty(*niter)) {
 	  // we will collect information from nodes without children...
 	  
-	  typename table_type::const_iterator titer_end = trie[*niter].table.end();
-	  for (typename table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
+	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
+	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
 	    word_size += titer->first.size() * titer->second.size_table();
 	  
 	  table_size += trie[*niter].table.size_table();
@@ -957,163 +979,7 @@ struct PYPLM
 
   void write(const path_type& path)
   {
-    typedef utils::repository repository_type;
-    typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
-
-    typedef uint64_t count_type;
-
-    typedef boost::fusion::tuple<id_type, count_type, count_type> data_type;
-
-    typedef std::map<word_type, data_type, std::less<word_type>, std::allocator<std::pair<const word_type, data_type> >  > word_set_type;
-    typedef utils::succinct_vector<std::allocator<int32_t> > position_set_type;
-    typedef std::vector<count_type, std::allocator<count_type> > offset_set_type;
-      
-    repository_type rep(path, repository_type::write);
-      
-    rep["order"] = boost::lexical_cast<std::string>(discount.size());
-
-    rep["counts0"] = boost::lexical_cast<std::string>(counts0);
     
-    rep["discount-alpha"] = boost::lexical_cast<std::string>(discount_alpha);
-    rep["discount-beta"]  = boost::lexical_cast<std::string>(discount_beta);
-    rep["strength-shape"] = boost::lexical_cast<std::string>(strength_shape);
-    rep["strength-rate"]  = boost::lexical_cast<std::string>(strength_rate);
-          
-    for (size_type order = 0; order != discount.size(); ++ order) {
-      rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(discount[order]);
-      rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(strength[order]);
-    }
-    
-    // we will compute on-memory for faster indexing... (and assuming small data!)
-    
-    boost::iostreams::filtering_ostream os_index;
-    boost::iostreams::filtering_ostream os_count;
-    boost::iostreams::filtering_ostream os_total;
-    
-    os_index.push(utils::packed_sink<word_type::id_type, std::allocator<word_type::id_type> >(rep.path("index")));
-    os_count.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("count")));
-    os_total.push(utils::packed_sink<count_type, std::allocator<count_type> >(rep.path("total")));
-    
-    // dump total counts!!!!!!!
-      
-    position_set_type positions;
-    offset_set_type   offsets(1, 0);
-    count_type        offset = 0;
-    
-    node_set_type nodes;
-    node_set_type nodes_next;
-    
-    word_set_type words;
-    
-    // unigram!
-    {
-      const count_type count_customer = root.table.size_customer();
-      const count_type count_table    = root.table.size_table();
-      
-      os_total.write((char*) &count_customer, sizeof(count_type));
-      os_total.write((char*) &count_table, sizeof(count_type));
-
-      node_type::table_type::const_iterator titer_end = root.table.end();
-      for (node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
-	words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
-							    titer->second.size_customer(),
-							    titer->second.size_table())));
-      
-      trie_type::const_iterator iter_end = trie.end();
-      for (trie_type::const_iterator iter = trie.begin(); iter != iter_end; ++ iter)
-	if (! trie[iter->second].table.empty()) {
-	  std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
-	  if (! result.second)
-	    boost::fusion::get<0>(result.first->second) = iter->second;
-	}
-      
-      word_set_type::const_iterator witer_end = words.end();
-      for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-	nodes.push_back(boost::fusion::get<0>(witer->second));
-	
-	word_type::id_type word_id = witer->first.id();
-	os_index.write((char*) &word_id, sizeof(word_type::id_type));
-	os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
-	os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
-      }
-      
-      offset += words.size();
-      offsets.push_back(offset);
-    }
-    
-    
-    for (size_type order = 1; order < discount.size(); ++ order) {
-      nodes_next.clear();
-      
-      node_set_type::const_iterator niter_end = nodes.end();
-      for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	if (*niter == trie_type::npos()) {
-	  const count_type count_customer = 0;
-	  const count_type count_table    = 0;
-	  
-	  os_total.write((char*) &count_customer, sizeof(count_type));
-	  os_total.write((char*) &count_table, sizeof(count_type));
-	  
-	  positions.set(positions.size(), false); // we will set bit!
-	} else {
-	  const node_type& node = trie[*niter];
-	  trie_type::const_iterator iter_begin = trie.begin(*niter);
-	  trie_type::const_iterator iter_end   = trie.end(*niter);
-	  
-	  const count_type count_customer = node.table.size_customer();
-	  const count_type count_table    = node.table.size_table();
-	  
-	  os_total.write((char*) &count_customer, sizeof(count_type));
-	  os_total.write((char*) &count_table, sizeof(count_type));
-
-	  words.clear();
-	  
-	  // we have an entry in the model
-	  node_type::table_type::const_iterator titer_end = node.table.end();
-	  for (node_type::table_type::const_iterator titer = node.table.begin(); titer != titer_end; ++ titer)
-	    words.insert(std::make_pair(titer->first, data_type(trie_type::npos(),
-								titer->second.size_customer(),
-								titer->second.size_table())));
-	  
-	  // or, we have an entry with the longer contexts..
-	  for (trie_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
-	    if (! trie[iter->second].table.empty()) {
-	      std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(iter->second, 0, 0)));
-	      if (! result.second)
-		boost::fusion::get<0>(result.first->second) = iter->second;
-	    }
-	  
-	  word_set_type::const_iterator witer_end = words.end();
-	  for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-	    nodes_next.push_back(boost::fusion::get<0>(witer->second));
-	    
-	    word_type::id_type word_id = witer->first.id();
-	    os_index.write((char*) &word_id, sizeof(word_type::id_type));
-	    os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
-	    os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
-	    
-	    positions.set(positions.size(), true);
-	  }
-	  positions.set(positions.size(), false);
-	  
-	  offset += words.size();
-	}
-      }
-      
-      offsets.push_back(offset);
-      
-      nodes.swap(nodes_next);
-    }
-    
-    // dump position
-    positions.write(rep.path("position"));
-    
-    // dump offsets
-    for (size_type order = 1; order != offsets.size(); ++ order)
-      rep[boost::lexical_cast<std::string>(order) + "-gram-offset"] = boost::lexical_cast<std::string>(offsets[order]);
-    
-    // vocabulary...
-    word_type::write(rep.path("vocab"));
   }
 
 public: 
@@ -1141,40 +1007,16 @@ struct PYPGraph
 
   typedef PYP::sentence_type sentence_type;
   typedef PYP::piece_type    piece_type;
+  typedef PYP::segment_type  segment_type;
   typedef PYP::word_type     word_type;
-
 
   typedef uint32_t id_type;
   
-  typedef std::vectotr<word_type, std::allocator<word_type> > derivation_type;
+  typedef std::vector<word_type, std::allocator<word_type> > derivation_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
-
-  struct segment_type
-  {
-    word_type       word;
-    difference_type first;
-    difference_type last;
-    
-    segment_type() : word(), first(0), last(0) {}
-    segment_type(const word_type& __word, const difference_type& __first, const difference_type& __last)
-      : word(__word), first(__first), last(__last) {}
-
-    friend
-    bool operator==(const segment_type& x, const segment_type& y)
-    {
-      return x.first == y.first && x.last == y.last;
-    }
-    
-    friend
-    size_t hash_value(segment_type const& x)
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      return hasher_type()(first, last);
-    }
-  };
+  
   
   typedef utils::simple_vector<segment_type, std::allocator<segment_type> > segment_set_type;
   
@@ -1187,7 +1029,7 @@ struct PYPGraph
       size_t seed = 0;
       segment_set_type::const_iterator iter_end = x.end();
       for (segment_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	seed = hasher_type::operator()(first, hasher_type::operator()(last, seed));
+	seed = hasher_type::operator()(iter->begin(), iter->end(), seed);
       return seed;
     }
   };
@@ -1233,6 +1075,9 @@ struct PYPGraph
   typedef utils::chunk_vector<node_type, 4096 /sizeof(node_type), std::allocator<node_type> > node_set_type;
   typedef utils::chunk_vector<edge_type, 4096 /sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
 
+  typedef std::vector<id_type, std::allocator<id_type> > frontier_type;
+  typedef std::vector<frontier_type, std::allocator<frontier_type> > frontier_set_type;
+
   node_type& add_node()
   {
     const id_type node_id = nodes.size();
@@ -1243,14 +1088,21 @@ struct PYPGraph
     return nodes.back();
   }
 
-  edge_type& add_edge()
+  edge_type& add_edge(const id_type head, const id_type tail)
   {
     const id_type edge_id = edges.size();
     
     edges.push_back(edge_type());
-    edges.back().id = edge_id;
     
-    return edges.back();
+    edge_type& edge = edges.back();
+    
+    edge.id = edge_id;
+    edge.head = head;
+    edge.tail = tail;
+    
+    nodes[head].edges.push_back(edge_id);
+    
+    return edge;
   }
   
   void connect_edge(const id_type edge, const id_type head)
@@ -1275,36 +1127,150 @@ struct PYPGraph
     nodes.clear();
     edges.clear();
     
+    frontiers.clear();
     segments.clear();
     alpha.clear();
     states.clear();
     
-    node_type& start = nodes.add_node();
+    frontiers.resize(positions.size());
     
-    segments.push_back(segment_set_type(1, segment_type(vocab_type::BOS, -1, 0)));
+    node_type& start = add_node();
+    segments.push_back(segment_set_type());
     alpha.push_back(cicada::semiring::traits<logprob_type>::one());
+    
+    node_type& node = add_node();
+    frontiers.front().push_back(node.id);
+    segments.push_back(segment_set_type(1, static_cast<const std::string&>(vocab_type::BOS)));
+    alpha.push_back(cicada::semiring::traits<logprob_type>::one());
+    
+    edge_type& edge = add_edge(start.id, node.id);
+    edge.segment = static_cast<const std::string&>(vocab_type::BOS);
+    edge.prob = cicada::semiring::traits<logprob_type>::one();
   }
 
-  logprob_type forward(const sentence_type& sentence, PYPLM& lm)
+  logprob_type forward(const sentence_type& sentence, PYPLM& lm, const size_type length_max, const size_type order)
   {
     initialize(sentence);
-    
+   
+    const size_type context_size = order - 1;
     const size_type size = positions.size();
     
+    for (size_type last = 1; last != size; ++ last) {
+      states.clear();
+      
+      frontier_type& curr = frontiers[last];
+      
+      for (size_type first = last - utils::bithack::min(last, length_max); first != last; ++ first) {
+	const frontier_type& prevs = frontiers[first];
+	
+	const segment_type seg(sentence.begin() + positions[first], sentence.begin() + positions[last]);
+	
+	frontier_type::const_iterator piter_end = prevs.end();
+	for (frontier_type::const_iterator piter = prevs.begin(); piter != piter_end; ++ piter) {
+	  const node_type& prev = nodes[*piter];
+	  
+	  const segment_set_type& segs_prev = segments[*piter];
+	  segment_set_type segs(segs_prev);
+	  segs.push_back(seg);
+	  
+	  const segment_set_type context(std::max(segs.begin(), segs.end() - context_size), segs.end());
+	  
+	  std::pair<segment_set_unique_type::iterator, bool> result = states.insert(std::make_pair(context, 0));
+	  if (result.second) {
+	    result.first->second = add_node().id;
+	    
+	    segments.push_back(context);
+	    alpha.push_back(cicada::semiring::traits<logprob_type>::zero());
+	    curr.push_back(result.first->second);
+	  }
+	  
+	  edge_type& edge = add_edge(result.first->second, prev.id);
+	  
+	  edge.segment = seg;
+	  edge.prob = lm.prob(seg, segs_prev.begin(), segs_prev.end());
+	  
+	  alpha[result.first->second] += edge.prob * alpha[prev.id];
+	}
+      }
+      
+      states.clear();
+    }
     
+    // final EOS...
+    const segment_type seg(static_cast<const std::string&>(vocab_type::EOS));
+    const node_type& goal = add_node();
+    alpha.push_back(cicada::semiring::traits<logprob_type>::zero());
     
+    const frontier_type& prevs = frontiers[size - 1];
+    frontier_type::const_iterator piter_end = prevs.end();
+    for (frontier_type::const_iterator piter = prevs.begin(); piter != piter_end; ++ piter) {
+      const node_type& prev = nodes[*piter];
+      const segment_set_type& segs_prev = segments[*piter];
+      
+      edge_type& edge = add_edge(goal.id, prev.id);
+      
+      edge.segment = seg;
+      edge.prob = lm.prob(seg, segs_prev.begin(), segs_prev.end());
+      
+      alpha[goal.id] += edge.prob * alpha[prev.id];
+    }
     
+    return alpha[goal.id];
+  }
+  
+  // backward sampling
+  template <typename Sampler>
+  logprob_type backward(Sampler& sampler, derivation_type& derivation)
+  {
+    // we will traverse from EOS, the last node...
     
+    derivation.clear();
+    logprob_type prob_derivation = cicada::semiring::traits<logprob_type>::one();
+    
+    id_type node_id = nodes.size() - 1;
+    
+    while (! nodes[node_id].edges.empty()) {
+      const node_type::edge_set_type& prevs = nodes[node_id].edges;
+      
+      logprob_type logsum;
+      logprobs.clear();
+      node_type::edge_set_type::const_iterator piter_end = prevs.end();
+      for (node_type::edge_set_type::const_iterator piter = prevs.begin(); piter != piter_end; ++ piter) {
+	const edge_type& edge = edges[*piter];
+	
+	logprobs.push_back(alpha[edge.tail] * edge.prob);
+	logsum += logprobs.back();
+      }
+      
+      probs.clear();
+      logprob_set_type::const_iterator liter_end = logprobs.end();
+      for (logprob_set_type::const_iterator liter = logprobs.begin(); liter != liter_end; ++ liter)
+	probs.push_back(*liter / logsum);
+      
+      const size_type pos = sampler.select(probs.begin(), probs.end()) - probs.begin();
+      const edge_type& edge = edges[prevs[pos]];
+      
+      derivation.push_back(edge.segment);
+      prob_derivation *= edge.prob;
+      
+      node_id = edge.tail;
+    }
+    
+    return prob_derivation;
   }
   
   node_set_type nodes;
   edge_set_type edges;
   
+  frontier_set_type    frontiers;
   segment_set_map_type segments;
   position_set_type    positions;
   alpha_type           alpha;
   
   segment_set_unique_type states;
+
+  logprob_set_type logprobs;
+  prob_set_type    probs;
 };
 
 
@@ -1312,6 +1278,19 @@ typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
+
+typedef PYP::size_type       size_type;
+typedef PYP::difference_type difference_type;
+
+typedef PYP::sentence_type sentence_type;
+typedef PYP::piece_type    piece_type;
+typedef PYP::segment_type  segment_type;
+typedef PYP::word_type     word_type;
+
+typedef PYPGraph::derivation_type derivation_type;
+
+typedef std::vector<sentence_type, std::allocator<sentence_type> > data_set_type;
+typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 
 path_set_type train_files;
 path_set_type test_files;
@@ -1343,16 +1322,16 @@ double spell_discount_prior_beta  = 1.0;
 double spell_strength_prior_shape = 1.0;
 double spell_strength_prior_rate  = 1.0;
 
-double lambda = 4;
-double lambda_alpha = 0.2;
-double lambda_beta = 0.1;
+double spell_lambda = 4;
+double spell_lambda_shape = 0.2;
+double spell_lambda_rate = 0.1;
 
 int threads = 1;
 int debug = 0;
 
-size_t vocabulary_size(const path_set_type& files);
-
 void options(int argc, char** argv);
+void read_data(const path_set_type& paths, data_set_type& data);
+size_t vocabulary_size(const data_set_type& data);
 
 int main(int argc, char ** argv)
 {
@@ -1376,283 +1355,42 @@ int main(int argc, char ** argv)
     if (! slice_sampling && strength < 0.0)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
 
-    sampler_type sampler;
-    const size_t num_vocab = vocabulary_size(train_files);
     
-    PYPLM lm(order,
-	     1.0 / num_vocab,
+    data_set_type training;
+    read_data(train_files, training);
+    
+    if (training.empty())
+      throw std::runtime_error("no training data?");
+
+    const size_t char_vocab_size = vocabulary_size(training);
+    
+    derivation_set_type derivations(training.size());
+    
+    sampler_type sampler;
+
+    PYPWord spell(spell_order,
+		  1.0 / char_vocab_size,
+		  spell_discount,
+		  spell_strength,
+		  spell_discount_prior_alpha,
+		  spell_discount_prior_beta,
+		  spell_strength_prior_shape,
+		  spell_strength_prior_rate,
+		  spell_lambda,
+		  spell_lambda_shape,
+		  spell_lambda_rate);
+    
+    
+    PYPLM lm(spell,
+	     order,
 	     discount,
 	     strength,
 	     discount_prior_alpha,
 	     discount_prior_beta,
 	     strength_prior_shape,
-	     strength_prior_rate,
-	     infinite);
+	     strength_prior_rate);
     
-    // we will precompute <word, node> pair...
-    typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
-    typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
-    typedef std::vector<bool, std::allocator<bool> > non_oov_type;
-
-    typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
-    typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
-    typedef std::vector<size_t, std::allocator<size_t> > index_type;
-
-    data_set_type        training;
-    word_unique_set_type uniques;
-    non_oov_type non_oov;
     
-    if (vocab_type::BOS.id() >= non_oov.size())
-      non_oov.resize(vocab_type::BOS.id() + 1, false);
-    if (vocab_type::EOS.id() >= non_oov.size())
-      non_oov.resize(vocab_type::EOS.id() + 1, false);
-    
-    non_oov[vocab_type::BOS.id()] = true;
-    non_oov[vocab_type::EOS.id()] = true;
-    
-    for (path_set_type::const_iterator fiter = train_files.begin(); fiter != train_files.end(); ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      
-      sentence_type sentence;
-      sentence_type ngram(1, vocab_type::BOS);
-      
-      while (is >> sentence) {
-	ngram.resize(1);
-	
-	sentence_type::const_iterator siter_end = sentence.end();
-	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  training.push_back(data_type(*siter, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end()), 0));
-	  
-	  if (boost::fusion::get<1>(training.back()) >= uniques.size())
-	    uniques.resize(boost::fusion::get<1>(training.back()) + 1);
-	  uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
-	  
-	  ngram.push_back(*siter);
-	  
-	  if (siter->id() >= non_oov.size())
-	    non_oov.resize(siter->id() + 1, false);
-	  non_oov[siter->id()] = true;
-	}
-	
-	training.push_back(data_type(vocab_type::EOS, lm.insert(std::max(ngram.begin(), ngram.end() - order + 1), ngram.end()), 0));
-	
-	if (boost::fusion::get<1>(training.back()) >= uniques.size())
-	  uniques.resize(boost::fusion::get<1>(training.back()) + 1);
-	uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
-      }
-    }
-
-    if (training.empty())
-      throw std::runtime_error("no training data?");
-    
-    data_set_type(training).swap(training);
-
-    
-    // assign rank...
-    {
-      data_set_type::iterator titer_end = training.end();
-      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
-	boost::fusion::get<2>(*titer) = uniques[boost::fusion::get<1>(*titer)].size();
-      
-      uniques.clear();
-    }
-    
-    // sort by rank
-    std::sort(training.begin(), training.end(), less_data<data_type>());
-    
-    // compute index
-    index_type index(1, 0);
-    
-    data_set_type::const_iterator titer_begin = training.begin();
-    data_set_type::const_iterator titer_end   = training.end();
-    for (data_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-      if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
-	index.push_back(titer - titer_begin);
-    
-    index.push_back(training.size());
-    
-    if (debug >= 2)
-      std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
-    
-    // sample parameters, first...
-    if (slice_sampling)
-      lm.slice_sample_parameters(sampler, resample_iterations);
-    else
-      lm.sample_parameters(sampler, resample_iterations);
-    
-    if (debug >= 2)
-      for (int n = 0; n != order; ++ n)
-	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-    
-    {
-      data_set_type::iterator titer_end = training.end();
-      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
-	boost::fusion::get<2>(*titer) = false;
-    }
-    
-    size_t baby_index = 0;
-    size_t baby_iter = utils::bithack::branch(baby_steps > 0, size_t(0), index.back());
-    const size_t baby_last = index.back();
-    const size_t baby_size = (baby_steps > 0 ? (index.back() + (baby_steps - 1)) / baby_steps : size_t(0));
-    
-    size_t anneal_iter = 0;
-    const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
-      
-    data_set_type training_samples;
-    
-    if (baby_iter == baby_last)
-      training_samples = training;
-    else
-      training_samples.reserve(training.size());
-      
-    bool sampling = false;
-    int sample_iter = 0;
-    
-    // then, learn!
-    for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
-
-      bool baby_finished = true;
-      if (baby_iter != baby_last) {
-	baby_finished = false;
-	
-	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
-	
-	while (baby_iter < baby_next) {
-	  std::copy(training.begin() + index[baby_index], training.begin() + index[baby_index + 1], std::back_inserter(training_samples));
-	  
-	  baby_iter = index[baby_index + 1];
-	  ++ baby_index;
-	}
-	
-	if (debug >= 2)
-	  std::cerr << "baby: " << training_samples.size() << std::endl;
-      }
-
-      double temperature = 1.0;
-      bool anneal_finished = true;
-      if (anneal_iter != anneal_last) {
-	anneal_finished = false;
-	temperature = double(anneal_last - anneal_iter) + 1;
-	
-	++ anneal_iter;
-
-	if (debug >= 2)
-	  std::cerr << "temperature: " << temperature << std::endl;
-      }
-      
-      sampling = baby_finished && anneal_finished;
-      
-      if (debug) {
-	if (sampling)
-	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
-	else
-	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
-      }
-      
-      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
-      std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
-
-      if (infinite)  {
-	data_set_type::iterator titer_end = training_samples.end();
-	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
-	  if (boost::fusion::get<2>(*titer))
-	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler);
-	  
-	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler, temperature);
-	}
-	
-	if (debug >= 2) {
-	  std::cerr << "penetration count" << std::endl;
-	  size_t total = 0;
-	  for (size_t n = 0; n != lm.orders.size(); ++ n) {
-	    std::cerr << "order=" << n << " a=" << lm.orders[n].first << " b=" << lm.orders[n].second << std::endl;
-	    total += lm.orders[n].first;
-	  }
-	  std::cerr << "total=" << total << std::endl;
-	}
-
-      } else {
-	data_set_type::iterator titer_end = training_samples.end();
-	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
-	  if (boost::fusion::get<2>(*titer))
-	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
-	  else
-	    boost::fusion::get<2>(*titer) = true;
-	  
-	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler, temperature);
-	}
-      }
-      
-      if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
-	if (slice_sampling)
-	  lm.slice_sample_parameters(sampler, resample_iterations);
-	else
-	  lm.sample_parameters(sampler, resample_iterations);
-	
-	if (debug >= 2)
-	  for (int n = 0; n != order; ++ n)
-	    std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
-      }
-	
-      if (debug)
-	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
-    }
-    
-    // clear training data
-    training.clear();
-    data_set_type(training).swap(training);
-    
-    // we will dump LM... now, define a format!
-    if (! output_file.empty())
-      lm.write(output_file);
-    
-    // testing!
-    if (! test_files.empty()) {
-      sentence_type sentence;
-      sentence_type ngram(1, vocab_type::BOS);
-
-      double logprob_total = 0.0;
-      size_t num_word = 0;
-      size_t num_oov = 0;
-      size_t num_sentence = 0;
-      
-      for (path_set_type::const_iterator fiter = test_files.begin(); fiter != test_files.end(); ++ fiter) {
-	utils::compress_istream is(*fiter, 1024 * 1024);
-	
-	while (is >> sentence) {
-	  ngram.resize(1);
-	  
-	  sentence_type::const_iterator siter_end = sentence.end();
-	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	    const bool is_oov = ! (siter->id() < non_oov.size() && non_oov[siter->id()]);
-	    const double prob = lm.prob(*siter, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
-	    
-	    if (! is_oov)
-	      logprob_total += std::log(prob);
-	    
-	    num_oov += is_oov;
-	    
-	    ngram.push_back(*siter);
-	  }
-
-	  const double prob = lm.prob(vocab_type::EOS, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
-	  logprob_total += std::log(prob);
-	  
-	  num_word += sentence.size();
-	  ++ num_sentence;
-	}
-      }
-      
-      std::cerr << "# of sentences: " << num_sentence
-		<< " # of words: " << num_word
-		<< " # of OOV: " << num_oov
-		<< " order: " << order
-		<< std::endl;
-      
-      std::cerr << "logprob = " << logprob_total << std::endl;
-      std::cerr << "ppl     = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
-      std::cerr << "ppl1    = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
-    }
     
   }
   catch (const std::exception& err) {
@@ -1662,66 +1400,46 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct string_hash : public utils::hashmurmur<size_t>
+void read_data(const path_set_type& paths, data_set_type& data)
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  data.clear();
   
-  size_t operator()(const std::string& x) const
-  {
-    return hasher_type::operator()(x.begin(), x.end(), 0);
-  }
-};
-
-template <typename Tp>
-struct greater_second
-{
-  bool operator()(const Tp& x, const Tp& y) const
-  {
-    return x.second > y.second;
-  }
-  
-  bool operator()(const Tp* x, const Tp* y) const
-  {
-    return x->second > y->second;
-  }
-};
-
-size_t vocabulary_size(const path_set_type& files)
-{
-  typedef uint64_t count_type;
-  typedef utils::unordered_map<std::string, count_type, string_hash, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
-
-  typedef std::vector<const vocab_type::value_type*, std::allocator<const vocab_type::value_type*> > sorted_type;
-  
-  vocab_type vocab;
-  std::string word;
-  
-  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
-    if (! boost::filesystem::exists(*fiter))
-      throw std::runtime_error("no file? " + fiter->string());
-    
+  for (path_set_type::const_iterator fiter = paths.begin(); fiter != paths.end(); ++ fiter) { 
     utils::compress_istream is(*fiter, 1024 * 1024);
     
-    while (is >> word) 
-      ++ vocab[word];
+    std::string line;
+    while (std::getline(is, line))
+      data.push_back(line);
   }
+}
 
-  sorted_type sorted;
-  sorted.reserve(vocab.size());
+size_t vocabulary_size(const data_set_type& data)
+{
+  typedef utils::piece piece_type;
+  typedef utils::dense_hash_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> >::type vocab_type;
   
-  vocab_type::const_iterator viter_end = vocab.end();
-  for (vocab_type::const_iterator viter = vocab.begin(); viter != viter_end; ++ viter)
-    sorted.push_back(&(*viter));
+  vocab_type vocab;
+  vocab.set_empty_key(piece_type());
   
-  std::sort(sorted.begin(), sorted.end(), greater_second<vocab_type::value_type>());
-
-  sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
-    word_type __tmptmp((*siter)->first);
+  data_set_type::const_iterator diter_end = data.end();
+  for (data_set_type::const_iterator diter = data.begin(); diter != diter_end; ++ diter) {
+    const sentence_type& sentence = *diter;
+    
+    if (sentence.empty()) continue;
+    
+    sentence_type::const_iterator siter_end = sentence.end();
+    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; /**/) {
+      const size_t char_width = utils::utf8_size(*siter);
+      
+      vocab.insert(piece_type(siter, siter + char_width));
+      
+      siter += char_width;
+    }
   }
   
   return vocab.size();
 }
+
 
 void options(int argc, char** argv)
 {
@@ -1735,7 +1453,9 @@ void options(int argc, char** argv)
     ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
     ("output", po::value<path_type>(&output_file), "output file")
     
-    ("order", po::value<int>(&order)->default_value(order), "max ngram order")
+    ("order",        po::value<int>(&order)->default_value(order),               "max ngram order")
+    ("spell-order",  po::value<int>(&spell_order)->default_value(spell_order),   "max spell ngram order")
+    ("spell-length", po::value<int>(&spell_length)->default_value(spell_length), "max spell length")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
@@ -1744,7 +1464,6 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
-    ("infinite",            po::bool_switch(&infinite),                                               "infinite n-gram language model")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
@@ -1753,6 +1472,18 @@ void options(int argc, char** argv)
     ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
     ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+
+    ("spell-discount",       po::value<double>(&spell_discount)->default_value(spell_discount),                         "discount ~ Beta(alpha,beta)")
+    ("spell-discount-alpha", po::value<double>(&spell_discount_prior_alpha)->default_value(spell_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
+    ("spell-discount-beta",  po::value<double>(&spell_discount_prior_beta)->default_value(spell_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("spell-strength",       po::value<double>(&spell_strength)->default_value(spell_strength),                         "strength ~ Gamma(shape,rate)")
+    ("spell-strength-shape", po::value<double>(&spell_strength_prior_shape)->default_value(spell_strength_prior_shape), "strength ~ Gamma(shape,rate)")
+    ("spell-strength-rate",  po::value<double>(&spell_strength_prior_rate)->default_value(spell_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    
+    ("spell-lambda",       po::value<double>(&spell_lambda)->default_value(spell_lambda),             "lambda for spell")
+    ("spell-lambda-shape", po::value<double>(&spell_lambda_shape)->default_value(spell_lambda_shape), "lambda ~ Gamma(shape,rate)")
+    ("spell-lambda-rate",  po::value<double>(&spell_lambda_rate)->default_value(spell_lambda_rate),   "lambda ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
