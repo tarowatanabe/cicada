@@ -244,6 +244,27 @@ struct PYPWord
     return true;
   }
 
+  template <typename Sampler>
+  bool increment(const segment_type& segment, const id_type& node, Sampler& sampler, const double temperature=1.0)
+  {
+    if (node == trie.root()) {
+      if (root.table.increment(segment, p0, sampler, temperature))
+	++ counts0;
+      else
+	return false;
+    } else {
+      const double backoff = prob(segment, trie[node].parent);
+      
+      // we will also increment lower-order when new table is created!
+      if (trie[node].table.increment(segment, backoff, sampler, temperature))
+	increment(segment, trie[node].parent, sampler, temperature);
+      else
+	return false;
+    }
+      
+    return true;
+  }
+
   template <typename Iterator, typename Sampler>
   bool decrement(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler)
   {
@@ -268,6 +289,24 @@ struct PYPWord
 	return false;
     }
     
+    return true;
+  }
+  
+  template <typename Sampler>
+  bool decrement(const segment_type& segment, const id_type& node, Sampler& sampler)
+  {
+    if (node == trie.root()) {
+      if (root.table.decrement(segment, sampler))
+	-- counts0;
+      else
+	return false;
+    } else {
+      if (trie[node].table.decrement(segment, sampler))
+	decrement(segment, trie[node].parent, sampler);
+      else
+	return false;
+    }
+      
     return true;
   }
   
@@ -327,13 +366,13 @@ struct PYPWord
       const size_type char_size = utils::utf8_size(*siter);
       const segment_type seg(siter, siter + char_size);
       
-      increment(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler, temperature);
+      increment(seg, std::max(buffer.begin(), buffer.end() - context_size), buffer.end(), sampler, temperature);
       
       buffer.push_back(seg);
       siter += char_size;
     }
     
-    increment(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler, temperature);
+    increment(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end(), sampler, temperature);
   }
   
   template <typename Sampler>
@@ -349,13 +388,13 @@ struct PYPWord
       const size_type char_size = utils::utf8_size(*siter);
       const segment_type seg(siter, siter + char_size);
       
-      decrement(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler);
+      decrement(seg, std::max(buffer.begin(), buffer.end() - context_size), buffer.end(), sampler);
       
       buffer.push_back(seg);
       siter += char_size;
     }
     
-    decrement(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size), sampler);
+    decrement(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end(), sampler);
   }
   
   double prob(const segment_type& segment)
@@ -372,13 +411,13 @@ struct PYPWord
       const size_type char_size = utils::utf8_size(*siter);
       const segment_type seg(siter, siter + char_size);
       
-      logprob += std::log(prob(seg, buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size)));
+      logprob += std::log(prob(seg, std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
       
       buffer.push_back(seg);
       siter += char_size;
     }
     
-    logprob += std::log(prob(EOS(), buffer.begin(), std::min(buffer.begin(), buffer.end() - context_size)));
+    logprob += std::log(prob(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
     
     // exclude BOS/EOS
     logprob += base.logprob(buffer.size() - 2);
@@ -662,7 +701,7 @@ struct PYPLM
 	nodes[order].push_back(node);
       }
     }
-    
+
     // first, we will insert word...
     base.increment(word, sampler, temperature);
     
@@ -680,7 +719,7 @@ struct PYPLM
     
     id_type node = trie.root();
     for (reverse_iterator iter = begin; iter != end; ++ iter)
-      node = trie.insert(node, *iter);
+      node = trie.find(node, *iter);
     
     // first, we will decrement word...
     base.decrement(word, sampler);
@@ -1143,16 +1182,16 @@ struct PYPGraph
     segments.push_back(segment_set_type(1, static_cast<const std::string&>(vocab_type::BOS)));
     alpha.push_back(cicada::semiring::traits<logprob_type>::one());
     
-    edge_type& edge = add_edge(start.id, node.id);
+    edge_type& edge = add_edge(node.id, start.id);
     edge.segment = static_cast<const std::string&>(vocab_type::BOS);
     edge.prob = cicada::semiring::traits<logprob_type>::one();
   }
 
-  logprob_type forward(const sentence_type& sentence, PYPLM& lm, const size_type length_max, const size_type order)
+  logprob_type forward(const sentence_type& sentence, PYPLM& lm, const size_type length_max)
   {
     initialize(sentence);
-   
-    const size_type context_size = order - 1;
+    
+    const size_type context_size = lm.discount.size() - 1;
     const size_type size = positions.size();
     
     for (size_type last = 1; last != size; ++ last) {
@@ -1256,6 +1295,9 @@ struct PYPGraph
       node_id = edge.tail;
     }
     
+    std::reverse(derivation.begin(), derivation.end());
+
+    
     return prob_derivation;
   }
   
@@ -1291,6 +1333,7 @@ typedef PYPGraph::derivation_type derivation_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > data_set_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
+typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
 path_set_type train_files;
 path_set_type test_files;
@@ -1322,7 +1365,7 @@ double spell_discount_prior_beta  = 1.0;
 double spell_strength_prior_shape = 1.0;
 double spell_strength_prior_rate  = 1.0;
 
-double spell_lambda = 4;
+double spell_lambda = 8;
 double spell_lambda_shape = 0.2;
 double spell_lambda_rate = 0.1;
 
@@ -1365,6 +1408,10 @@ int main(int argc, char ** argv)
     const size_t char_vocab_size = vocabulary_size(training);
     
     derivation_set_type derivations(training.size());
+    position_set_type positions(training.size());
+    
+    for (size_t i = 0; i != training.size(); ++ i)
+      positions[i] = i;
     
     sampler_type sampler;
 
@@ -1390,7 +1437,99 @@ int main(int argc, char ** argv)
 	     strength_prior_shape,
 	     strength_prior_rate);
     
+    PYPGraph graph;
     
+    size_t anneal_iter = 0;
+    const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+    
+    bool sampling = false;
+    int sample_iter = 0;
+    
+    // then, learn!
+    for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+      
+      double temperature = 1.0;
+      bool anneal_finished = true;
+      if (anneal_iter != anneal_last) {
+	anneal_finished = false;
+	temperature = double(anneal_last - anneal_iter) + 1;
+	
+	++ anneal_iter;
+	
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+      }
+      
+      sampling = anneal_finished;
+      
+      if (debug) {
+	if (sampling)
+	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
+	else
+	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
+      }
+      
+      
+      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+      std::random_shuffle(positions.begin(), positions.end(), gen);
+      
+      for (size_t i = 0; i != positions.size(); ++ i) {
+	const size_t pos = positions[i];
+	
+	if (training[pos].empty()) continue;
+
+	const size_t context_size = order - 1;
+
+	if (debug >= 3)
+	  std::cerr << "training=" << pos << std::endl;
+	
+	if (! derivations[pos].empty()) {
+	  derivation_type::const_iterator diter_begin = derivations[pos].begin();
+	  derivation_type::const_iterator diter_end   = derivations[pos].end();
+	  
+	  for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	    lm.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+	}
+	
+	const PYPGraph::logprob_type logsum = graph.forward(training[pos], lm, spell_length);
+	
+	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
+	
+	if (debug >= 3) {
+	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
+	  
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    std::cerr << "word=\"" << *diter << "\"" << std::endl;
+	}
+	
+	derivation_type::const_iterator diter_begin = derivations[pos].begin();
+	derivation_type::const_iterator diter_end   = derivations[pos].end();
+	
+	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	  lm.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+      }
+
+      if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
+	if (slice_sampling)
+	  lm.slice_sample_parameters(sampler, resample_iterations);
+	else
+	  lm.sample_parameters(sampler, resample_iterations);
+	
+	if (debug >= 2) {
+	  for (size_t n = 0; n != lm.discount.size(); ++ n)
+	    std::cerr << "word order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+	  
+	  for (size_t n = 0; n != lm.base.discount.size(); ++ n)
+	    std::cerr << "spell order=" << n << " discount=" << lm.base.discount[n] << " strength=" << lm.base.strength[n] << std::endl;
+	  
+	  std::cerr << "spell lambda=" << lm.base.base.lambda << std::endl;
+	}
+      }
+	
+      if (debug)
+	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
+    }
     
   }
   catch (const std::exception& err) {
