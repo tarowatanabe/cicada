@@ -145,6 +145,12 @@ struct PYPWord
       else
 	return utis::mathop::log_poisson(size, lambda);
     }
+
+    template <typename Sampler>
+    void sample_parameters(const double& word_size, const double& table_size, Sample& sampler)
+    {
+      initialize(sampler.gamma(strength_shape + word_size, strength_rate + table_size));
+    }
     
     void initialize(const double& __lambda)
     {
@@ -382,6 +388,173 @@ struct PYPWord
   // TODO: add log_likelihood
   //     : experiment with sampled length parameters... (Do we really need this...? Is it simply a normalization constant...?)
   //
+
+  double log_likelihood() const
+  {
+    //double logprob = std::log(p0) * counts0;
+    
+    double logprob = 0.0;
+    for (size_type order = 0; order != discount.size(); ++ order)
+      logprob += log_likelihood(order, discount[order], strength[order]);
+    
+    return logprob;
+  }
+  
+  
+  double log_likelihood(const int order, const double& discount, const double& strength) const
+  {
+    if (strength <= - discount) return - std::numeric_limits<double>::infinity();
+    
+    double logprob = (utils::mathop::log_beta_density(discount, discount_alpha, discount_beta)
+		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
+    
+    if (order == 0)
+      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
+    else {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (! trie[*niter].table.empty())
+	  logprob += trie[*niter].table.log_likelihood(discount, strength);
+      
+      return logprob;
+    }
+  }
+
+  struct DiscountSampler
+  {
+    DiscountSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    
+    const PYPLM& pyplm;
+    int order;
+    
+    double operator()(const double& proposed_discount) const
+    {
+      return pyplm.log_likelihood(order, proposed_discount, pyplm.strength[order]);
+    }
+  };
+  
+  struct StrengthSampler
+  {
+    StrengthSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    
+    const PYPLM& pyplm;
+    int order;
+    
+    double operator()(const double& proposed_strength) const
+    {
+      return pyplm.log_likelihood(order, pyplm.discount[order], proposed_strength);
+    }
+  };
+  
+  template <typename Sampler>
+  void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    for (size_type order = 0; order != discount.size(); ++ order) {
+      for (int iter = 0; iter != num_loop; ++ iter) {
+	strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+	
+	discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+      }
+      
+      strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+    }
+  }
+
+  template <typename Sampler>
+  double sample_strength(const int order, Sampler& sampler, const double& discount, const double& strength) const
+  {
+    double x = 0.0;
+    double y = 0.0;
+
+    if (order == 0) {
+      x += root.table.sample_log_x(sampler, discount, strength);
+      y += root.table.sample_y(sampler, discount, strength);
+    } else {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (! trie[*niter].table.empty()) {
+	  x += trie[*niter].table.sample_log_x(sampler, discount, strength);
+	  y += trie[*niter].table.sample_y(sampler, discount, strength);
+	}
+    }
+    
+    return sampler.gamma(strength_shape + y, strength_rate - x);
+  }
+  
+  template <typename Sampler>
+  double sample_discount(const int order, Sampler& sampler, const double& discount, const double& strength) const
+  {
+    double y = 0.0;
+    double z = 0.0;
+    
+    if (order == 0) {
+      y += root.table.sample_y_inv(sampler, discount, strength);
+      z += root.table.sample_z_inv(sampler, discount, strength);
+    } else {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (! trie[*niter].table.empty()) {
+	  y += trie[*niter].table.sample_y_inv(sampler, discount, strength);
+	  z += trie[*niter].table.sample_z_inv(sampler, discount, strength);
+	}
+    }
+    
+    return sampler.beta(discount_alpha + y, discount_beta + z);
+  }
+  
+  
+  template <typename Sampler>
+  void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    for (size_type order = 0; order != discount.size(); ++ order) {
+      DiscountSampler discount_sampler(*this, order);
+      StrengthSampler strength_sampler(*this, order);
+
+      for (int iter = 0; iter != num_loop; ++ iter) {
+	strength[order] = utils::slice_sampler(strength_sampler,
+					       strength[order],
+					       sampler,
+					       - discount[order] + std::numeric_limits<double>::min(),
+					       std::numeric_limits<double>::infinity(),
+					       0.0,
+					       num_iterations,
+					       100 * num_iterations);
+	
+	discount[order] = utils::slice_sampler(discount_sampler,
+					       discount[order],
+					       sampler,
+					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
+					       1.0,
+					       0.0,
+					       num_iterations,
+					       100 * num_iterations);
+      }
+      
+      strength[order] = utils::slice_sampler(strength_sampler,
+					     strength[order],
+					     sampler,
+					     - discount[order] + std::numeric_limits<double>::min(),
+					     std::numeric_limits<double>::infinity(),
+					     0.0,
+					     num_iterations,
+					     100 * num_iterations);
+      
+      if (order == 0) {
+	root.table.discount() = discount[order];
+	root.table.strength() = strength[order];
+
+	root.table.verify_parameters();
+      } else {
+	node_set_type::const_iterator niter_end = nodes[order].end();
+	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	  trie[*niter].table.discount() = discount[order];
+	  trie[*niter].table.strength() = strength[order];
+	  
+	  trie[*niter].table.verify_parameters();
+	}
+      }
+    }
+  }
   
 public: 
   trie_type trie;
@@ -440,21 +613,17 @@ struct PYPLM
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
-  typedef std::pair<size_type, size_type> order_count_type;
-  typedef std::vector<order_count_type, std::allocator<order_count_type> > order_count_set_type;
   
-  typedef std::vector<id_type, std::allocator<id_type> > history_type;
-  typedef std::vector<double, std::allocator<double> > prob_set_type;
-  typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
-  
-  PYPLM(const int order,
+  PYPLM(PYPWord& __base,
+	const int order,
 	const double __discount,
 	const double __strength,
 	const double __discount_alpha,
 	const double __discount_beta,
 	const double __strength_shape,
 	const double __strength_rate)
-    : trie(word_type()),
+    : base(__base),
+      trie(word_type()),
       nodes(order),
       discount(order, __discount),
       strength(order, __strength),
@@ -583,8 +752,7 @@ struct PYPLM
   
   double log_likelihood() const
   {
-    double logprob = std::log(p0) * counts0;
-    
+    double logprob = 0.0;
     for (size_type order = 0; order != discount.size(); ++ order)
       logprob += log_likelihood(order, discount[order], strength[order]);
     
@@ -639,6 +807,26 @@ struct PYPLM
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    double word_size = 0.0;
+    double table_size = 0.0;
+    for (size_type order = 0; order != nodes.size(); ++ order) {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (trie.empty(*niter)) {
+	  // we will collect information from nodes without children...
+	  
+	  typename table_type::const_iterator titer_end = trie[*niter].table.end();
+	  for (typename table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
+	    word_size += titer->first.size() * titer->second.size_table();
+	  
+	  table_size += trie[*niter].table.size_table();
+	}
+    }
+    
+    base.base.sample_parameters(word_size, table_size, sampler);
+    
+    base.sample_parameters(sampler, num_loop, num_iterations);
+    
     for (size_type order = 0; order != discount.size(); ++ order) {
       
       for (int iter = 0; iter != num_loop; ++ iter) {
@@ -697,6 +885,26 @@ struct PYPLM
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    double word_size = 0.0;
+    double table_size = 0.0;
+    for (size_type order = 0; order != nodes.size(); ++ order) {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (trie.empty(*niter)) {
+	  // we will collect information from nodes without children...
+	  
+	  typename table_type::const_iterator titer_end = trie[*niter].table.end();
+	  for (typename table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
+	    word_size += titer->first.size() * titer->second.size_table();
+	  
+	  table_size += trie[*niter].table.size_table();
+	}
+    }
+    
+    base.base.sample_parameters(word_size, table_size, sampler);
+
+    base.slice_sample_parameters(sampler, num_loop, num_iterations);
+
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
@@ -764,7 +972,6 @@ struct PYPLM
       
     rep["order"] = boost::lexical_cast<std::string>(discount.size());
 
-    rep["p0"]      = boost::lexical_cast<std::string>(p0);
     rep["counts0"] = boost::lexical_cast<std::string>(counts0);
     
     rep["discount-alpha"] = boost::lexical_cast<std::string>(discount_alpha);
@@ -910,6 +1117,8 @@ struct PYPLM
   }
 
 public: 
+  PYPWord& base;
+
   trie_type trie;
   node_type root;
   node_map_type nodes;
@@ -927,7 +1136,9 @@ public:
 
 struct PYPGraph
 {
-
+  
+  
+  
 };
 
 
@@ -936,31 +1147,19 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
 
-template <typename Tp>
-struct less_data
-{
-  bool operator()(const Tp& x, const Tp& y) const
-  {
-    return (boost::fusion::get<2>(x) < boost::fusion::get<2>(y)
-	    || (!(boost::fusion::get<2>(y) < boost::fusion::get<2>(x))
-		&& (boost::fusion::get<1>(x) < boost::fusion::get<1>(y)
-		    || (!(boost::fusion::get<1>(y) < boost::fusion::get<1>(x))
-			&& boost::fusion::get<0>(x) < boost::fusion::get<0>(y)))));
-  }
-};
-
 path_set_type train_files;
 path_set_type test_files;
 path_type     output_file;
 
-int order = 4;
+int order = 3;
+int spell_order = 4;
+int spell_length = 10;
 int samples = 30;
 int baby_steps = 0;
 int anneal_steps = 0;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
-bool infinite = false;
 
 double discount = 0.9;
 double strength = 1;
@@ -969,6 +1168,18 @@ double discount_prior_alpha = 1.0;
 double discount_prior_beta  = 1.0;
 double strength_prior_shape = 1.0;
 double strength_prior_rate  = 1.0;
+
+double spell_discount = 0.9;
+double spell_strength = 1.0;
+
+double spell_discount_prior_alpha = 1.0;
+double spell_discount_prior_beta  = 1.0;
+double spell_strength_prior_shape = 1.0;
+double spell_strength_prior_rate  = 1.0;
+
+double lambda = 4;
+double lambda_alpha = 0.2;
+double lambda_beta = 0.1;
 
 int threads = 1;
 int debug = 0;

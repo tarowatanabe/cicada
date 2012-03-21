@@ -92,15 +92,15 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	cicada_mert_kbest \
 	cicada_mert_kbest_mpi \
-	cicada_ngram_learn_pyp \
 	cicada_oracle \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
+	cicada_pyp_ngram_learn \
+	cicada_pyp_translit_learn \
 	cicada_query_cky \
 	cicada_query_tree \
 	cicada_query_tree_cky \
-	cicada_translit_learn_pyp \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
@@ -363,11 +363,11 @@ cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp $(LBFGS_SOURCE) cicada_maxl
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
  
-cicada_ngram_learn_pyp_SOURCES = cicada_ngram_learn_pyp.cpp 
-cicada_ngram_learn_pyp_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_pyp_ngram_learn_SOURCES = cicada_pyp_ngram_learn.cpp 
+cicada_pyp_ngram_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_translit_learn_pyp_SOURCES = cicada_translit_learn_pyp.cpp 
-cicada_translit_learn_pyp_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_pyp_translit_learn_SOURCES = cicada_pyp_translit_learn.cpp 
+cicada_pyp_translit_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_unite_forest_SOURCES = cicada_unite_forest.cpp
 cicada_unite_forest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
