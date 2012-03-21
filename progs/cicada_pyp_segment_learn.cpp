@@ -33,7 +33,9 @@
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/semiring/logprob.hpp>
 
+#include "utils/chunk_vector.hpp"
 #include "utils/utf8.hpp"
 #inlcude "utils/array_power2.hpp"
 #include "utils/resource.hpp"
@@ -59,8 +61,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
 
-typedef cicada::Symbol    word_type;
-typedef cicada::Sentence  sentence_type;
 typedef cicada::Vocab     vocab_type;
 
 // PYP Word model.... this is basically the same as the PYPLM with additional length model...
@@ -73,6 +73,7 @@ struct PYP
   
   typedef utils::piece piece_type;
   typedef utils::piece segment_type;
+  typedef utils::piece word_type;
 };
 
 struct PYPWord
@@ -83,8 +84,7 @@ struct PYPWord
   typedef PYP::sentence_type sentence_type;
   typedef PYP::piece_type    piece_type;
   typedef PYP::segment_type  segment_type;
-  
-  typedef segment_type word_type;
+  typedef PYP::word_type     word_type;
   
   typedef uint32_t  id_type;
   
@@ -422,9 +422,9 @@ struct PYPWord
 
   struct DiscountSampler
   {
-    DiscountSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    DiscountSampler(const PYPWord& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
-    const PYPLM& pyplm;
+    const PYPWord& pyplm;
     int order;
     
     double operator()(const double& proposed_discount) const
@@ -435,9 +435,9 @@ struct PYPWord
   
   struct StrengthSampler
   {
-    StrengthSampler(const PYPLM& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    StrengthSampler(const PYPWord& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
     
-    const PYPLM& pyplm;
+    const PYPWord& pyplm;
     int order;
     
     double operator()(const double& proposed_strength) const
@@ -668,7 +668,7 @@ struct PYPLM
     return node;
   }
   
-
+  
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
@@ -1136,9 +1136,175 @@ public:
 
 struct PYPGraph
 {
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::sentence_type sentence_type;
+  typedef PYP::piece_type    piece_type;
+  typedef PYP::word_type     word_type;
+
+
+  typedef uint32_t id_type;
   
+  typedef std::vectotr<word_type, std::allocator<word_type> > derivation_type;
   
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+
+  struct segment_type
+  {
+    word_type       word;
+    difference_type first;
+    difference_type last;
+    
+    segment_type() : word(), first(0), last(0) {}
+    segment_type(const word_type& __word, const difference_type& __first, const difference_type& __last)
+      : word(__word), first(__first), last(__last) {}
+
+    friend
+    bool operator==(const segment_type& x, const segment_type& y)
+    {
+      return x.first == y.first && x.last == y.last;
+    }
+    
+    friend
+    size_t hash_value(segment_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(first, last);
+    }
+  };
   
+  typedef utils::simple_vector<segment_type, std::allocator<segment_type> > segment_set_type;
+  
+  struct segment_set_hash_type : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+    
+    size_t operator()(const segment_set_type& x) const
+    {
+      size_t seed = 0;
+      segment_set_type::const_iterator iter_end = x.end();
+      for (segment_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+	seed = hasher_type::operator()(first, hasher_type::operator()(last, seed));
+      return seed;
+    }
+  };
+  
+  typedef std::equal_to<segment_set_type> segment_set_equal_type;
+  
+  typedef utils::unordered_map<segment_set_type, id_type, segment_set_hash_type, segment_set_equal_type,
+			       std::allocator<std::pair<const segment_set_type, id_type> > >::type segment_set_unique_type;
+  
+  typedef utils::chunk_vector<segment_set_type, 4096/sizeof(segment_set_type), std::allocator<segment_set_type> > segment_set_map_type;
+  
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > alpha_type;
+  typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+  
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
+  typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
+  
+  struct node_type
+  {
+    typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+    
+    edge_set_type edges;
+    id_type       id;
+    
+    node_type() : edges(), id() {}
+  };
+  
+  struct edge_type
+  { 
+    segment_type  segment;
+    logprob_type  prob;
+    
+    id_type       id;
+    id_type       head;
+    id_type       tail;
+    
+    edge_type() : segment(), prob(), id(), head(), tail()  {}
+    edge_type(const segment_type& __segment,
+	      const logprob_type& __prob) 
+      : segment(__segment), prob(__prob), id(), head(), tail() {}
+  };
+  
+  typedef utils::chunk_vector<node_type, 4096 /sizeof(node_type), std::allocator<node_type> > node_set_type;
+  typedef utils::chunk_vector<edge_type, 4096 /sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
+
+  node_type& add_node()
+  {
+    const id_type node_id = nodes.size();
+    
+    nodes.push_back(node_type());
+    nodes.back().id = node_id;
+    
+    return nodes.back();
+  }
+
+  edge_type& add_edge()
+  {
+    const id_type edge_id = edges.size();
+    
+    edges.push_back(edge_type());
+    edges.back().id = edge_id;
+    
+    return edges.back();
+  }
+  
+  void connect_edge(const id_type edge, const id_type head)
+  {
+    edges[edge].head = head;
+    nodes[head].edges.push_back(edge);
+  };
+  
+  void initialize(const sentence_type& sentence)
+  {
+    positions.clear();
+    positions.push_back(0);
+    
+    sentence_type::const_iterator siter_begin = sentence.begin();
+    sentence_type::const_iterator siter_end   = sentence.end();
+    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; /**/) {
+      siter += utils::utf8_size(*siter);
+      
+      positions.push_back(siter - siter_begin);
+    }
+    
+    nodes.clear();
+    edges.clear();
+    
+    segments.clear();
+    alpha.clear();
+    states.clear();
+    
+    node_type& start = nodes.add_node();
+    
+    segments.push_back(segment_set_type(1, segment_type(vocab_type::BOS, -1, 0)));
+    alpha.push_back(cicada::semiring::traits<logprob_type>::one());
+  }
+
+  logprob_type forward(const sentence_type& sentence, PYPLM& lm)
+  {
+    initialize(sentence);
+    
+    const size_type size = positions.size();
+    
+    
+    
+    
+    
+  }
+  
+  node_set_type nodes;
+  edge_set_type edges;
+  
+  segment_set_map_type segments;
+  position_set_type    positions;
+  alpha_type           alpha;
+  
+  segment_set_unique_type states;
 };
 
 
