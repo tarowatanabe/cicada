@@ -56,6 +56,40 @@ namespace utils
     return bytes_utf8[c];
 #endif
   }
+  
+  template <typename Buf>
+  inline
+  int utf8_code(Buf buf)
+  {
+    typedef unsigned int code_type;
+    
+    switch (utf8_size(*buf)) {
+    case 1: return *buf;
+    case 2: return ((code_type(*buf & 0x1F) << 6)
+		    | (code_type(*(buf + 1) & 0x3F)));
+    case 3: return ((code_type(*buf & 0x0F) << 12)
+		    | (code_type(*(buf + 1) & 0x3F) <<  6)
+		    | (code_type(*(buf + 2) & 0x3F)));
+    case 4: return ((code_type(*buf & 0x07) << 18)
+		    | (code_type(*(buf + 1) & 0x3F) << 12)
+		    | (code_type(*(buf + 2) & 0x3F) << 6)
+		    | (code_type(*(buf + 3) & 0x3F)));
+    case 5: return ((code_type(*buf & 0x03) << 24)
+		    | (code_type(*(buf + 1) & 0x3F) << 18)
+		    | (code_type(*(buf + 2) & 0x3F) << 12)
+		    | (code_type(*(buf + 3) & 0x3F) << 6)
+		    | (code_type(*(buf + 4) & 0x3F)));
+    case 6: return ((code_type(*buf & 0x01) << 30)
+		    | (code_type(*(buf + 1) & 0x3F) << 24)
+		    | (code_type(*(buf + 2) & 0x3F) << 18)
+		    | (code_type(*(buf + 3) & 0x3F) << 12)
+		    | (code_type(*(buf + 4) & 0x3F) << 6)
+		    | (code_type(*(buf + 5) & 0x3F)));
+    default:
+      throw std::runtime_error("invlaid utf-8");
+    }
+  }
+
 };
 
 #endif

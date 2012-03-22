@@ -62,6 +62,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
 
+#include <unicode/uchar.h>
+
 typedef cicada::Vocab     vocab_type;
 
 // PYP Word model.... this is basically the same as the PYPLM with additional length model...
@@ -226,22 +228,7 @@ struct PYPWord
       }
     }
     
-    if (node == trie.root()) {
-      if (root.table.increment(segment, p0, sampler, temperature))
-	++ counts0;
-      else
-	return false;
-    } else {
-      const double backoff = prob(segment, trie[node].parent);
-      
-      // we will also increment lower-order when new table is created!
-      if (trie[node].table.increment(segment, backoff, sampler, temperature))
-	increment(segment, trie[node].parent, sampler, temperature);
-      else
-	return false;
-    }
-    
-    return true;
+    return increment(segment, node, sampler, temperature);
   }
 
   template <typename Sampler>
@@ -277,19 +264,7 @@ struct PYPWord
     for (reverse_iterator iter = begin; iter != end; ++ iter)
       node = trie.find(node, *iter);
     
-    if (node == trie.root()) {
-      if (root.table.decrement(segment, sampler))
-	-- counts0;
-      else
-	return false;
-    } else {
-      if (trie[node].table.decrement(segment, sampler))
-	decrement(segment, trie[node].parent, sampler);
-      else
-	return false;
-    }
-    
-    return true;
+    return decrement(segment, node, sampler);
   }
   
   template <typename Sampler>
@@ -419,8 +394,8 @@ struct PYPWord
     
     logprob += std::log(prob(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
     
-    // exclude BOS/EOS
-    logprob += base.logprob(buffer.size() - 2);
+    // exclude BOS...
+    logprob += base.logprob(buffer.size() - 1);
     
     return std::exp(logprob);
   }
@@ -1116,6 +1091,7 @@ struct PYPGraph
 
   typedef std::vector<id_type, std::allocator<id_type> > frontier_type;
   typedef std::vector<frontier_type, std::allocator<frontier_type> > frontier_set_type;
+  typedef std::vector<bool, std::allocator<bool> > boundary_set_type;
 
   node_type& add_node()
   {
@@ -1152,12 +1128,15 @@ struct PYPGraph
   
   void initialize(const sentence_type& sentence)
   {
+    boundaries.clear();
     positions.clear();
     positions.push_back(0);
     
     sentence_type::const_iterator siter_begin = sentence.begin();
     sentence_type::const_iterator siter_end   = sentence.end();
     for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; /**/) {
+      boundaries.push_back(u_isUWhiteSpace(utils::utf8_code(siter)));
+      
       siter += utils::utf8_size(*siter);
       
       positions.push_back(siter - siter_begin);
@@ -1187,20 +1166,29 @@ struct PYPGraph
     edge.prob = cicada::semiring::traits<logprob_type>::one();
   }
 
-  logprob_type forward(const sentence_type& sentence, PYPLM& lm, const size_type length_max)
+  logprob_type forward(const sentence_type& sentence, PYPLM& lm, const difference_type length_max, const bool ignore_boundary)
   {
     initialize(sentence);
     
-    const size_type context_size = lm.discount.size() - 1;
-    const size_type size = positions.size();
+    const difference_type context_size = lm.discount.size() - 1;
+    const difference_type size = positions.size();
     
-    for (size_type last = 1; last != size; ++ last) {
+    for (difference_type last = 1; last != size; ++ last) {
+      
+      if (! ignore_boundary && boundaries[last - 1]) {
+	frontiers[last].swap(frontiers[last - 1]);
+	
+	continue;
+      }
+
       states.clear();
       
       frontier_type& curr = frontiers[last];
       
-      for (size_type first = last - utils::bithack::min(last, length_max); first != last; ++ first) {
+      for (difference_type first = last - 1; first >= last - utils::bithack::min(last, length_max); -- first) {
 	const frontier_type& prevs = frontiers[first];
+
+	if (prevs.empty()) break;
 	
 	const segment_type seg(sentence.begin() + positions[first], sentence.begin() + positions[last]);
 	
@@ -1307,6 +1295,7 @@ struct PYPGraph
   frontier_set_type    frontiers;
   segment_set_map_type segments;
   position_set_type    positions;
+  boundary_set_type    boundaries;
   alpha_type           alpha;
   
   segment_set_unique_type states;
@@ -1341,7 +1330,8 @@ path_type     output_file;
 
 int order = 3;
 int spell_order = 4;
-int spell_length = 10;
+int spell_length = 20;
+bool ignore_boundary = false;
 int samples = 30;
 int baby_steps = 0;
 int anneal_steps = 0;
@@ -1407,6 +1397,9 @@ int main(int argc, char ** argv)
 
     const size_t char_vocab_size = vocabulary_size(training);
     
+    if (debug)
+      std::cerr << "char set size: " << char_vocab_size << std::endl;
+    
     derivation_set_type derivations(training.size());
     position_set_type positions(training.size());
     
@@ -1439,6 +1432,21 @@ int main(int argc, char ** argv)
     
     PYPGraph graph;
     
+    if (slice_sampling)
+      lm.slice_sample_parameters(sampler, resample_iterations);
+    else
+      lm.sample_parameters(sampler, resample_iterations);
+    
+    if (debug >= 2) {
+      for (size_t n = 0; n != lm.discount.size(); ++ n)
+	std::cerr << "word order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+      
+      for (size_t n = 0; n != lm.base.discount.size(); ++ n)
+	std::cerr << "spell order=" << n << " discount=" << lm.base.discount[n] << " strength=" << lm.base.strength[n] << std::endl;
+      
+      std::cerr << "spell lambda=" << lm.base.base.lambda << std::endl;
+    }
+
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
     
@@ -1491,7 +1499,7 @@ int main(int argc, char ** argv)
 	    lm.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
 	}
 	
-	const PYPGraph::logprob_type logsum = graph.forward(training[pos], lm, spell_length);
+	const PYPGraph::logprob_type logsum = graph.forward(training[pos], lm, spell_length, ignore_boundary);
 	
 	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
 	
@@ -1595,6 +1603,8 @@ void options(int argc, char** argv)
     ("order",        po::value<int>(&order)->default_value(order),               "max ngram order")
     ("spell-order",  po::value<int>(&spell_order)->default_value(spell_order),   "max spell ngram order")
     ("spell-length", po::value<int>(&spell_length)->default_value(spell_length), "max spell length")
+    
+    ("ignore-boundary", po::bool_switch(&ignore_boundary), "ignore word boundaries")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
