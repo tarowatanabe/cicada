@@ -63,6 +63,7 @@
 #include <boost/fusion/tuple.hpp>
 
 #include <unicode/uchar.h>
+#include <unicode/uscript.h>
 
 typedef cicada::Vocab     vocab_type;
 
@@ -129,51 +130,125 @@ struct PYPWord
   
   struct length_base_type
   {
-    typedef utils::array_power2<double, 64, std::allocator<double> > cache_type;
+    struct poisson_type
+    {
+      typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
 
-    length_base_type(const double& __lambda,
+      poisson_type() { initialize(1.0); }
+      poisson_type(const double& __lambda) { initialize(__lambda); }
+      
+      double logprob(const size_type size) const
+      {
+	if (size < cache.size())
+	  return cache[size];
+	else
+	  return utils::mathop::log_poisson(size, lambda);
+      }
+      
+      void initialize(const double& __lambda)
+      {
+	cache.clear();
+	lambda = __lambda;
+	
+	cache[0] = - std::numeric_limits<double>::infinity();
+	for (size_type size = 1; size != cache.size(); ++ size)
+	  cache[size] = utils::mathop::log_poisson(size, lambda);
+      }
+      
+      cache_type cache;
+      double lambda;
+    };
+    
+    typedef utils::unordered_map<id_type, poisson_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 std::allocator<std::pair<const id_type, poisson_type> > >::type poisson_set_type;
+    
+    template <typename Iterator>
+    length_base_type(Iterator first, Iterator last,
+		     const double& __lambda,
 		     const double& __strength_shape,
 		     const double& __strength_rate)
-      : lambda(__lambda),
-	strength_shape(__strength_shape),
+      : strength_shape(__strength_shape),
 	strength_rate(__strength_rate)
     {
-      initialize(__lambda);
-    }
-    
-    double logprob(const size_type size) const
-    {
-      if (size < cache.size())
-	return cache[size];
-      else
-	return utils::mathop::log_poisson(size, lambda);
-    }
-
-    template <typename Sampler>
-    void sample_parameters(const double& word_size, const double& table_size, Sampler& sampler)
-    {
-      initialize(sampler.gamma(strength_shape + word_size, strength_rate + table_size));
-    }
-    
-    void initialize(const double& __lambda)
-    {
-      cache.clear();
-      lambda = __lambda;
+      for (/**/; first != last; ++ first)
+	poissons[code_class(*first)] = poisson_type(__lambda);
       
-      cache[0] = - std::numeric_limits<double>::infinity();
-      for (size_type size = 1; size != cache.size(); ++ size)
-	cache[size] = utils::mathop::log_poisson(size, lambda);
+      poisson = poisson_type(__lambda);
     }
-
-    cache_type cache;
     
-    double lambda;
+    double logprob(const segment_type& segment, const size_type size) const
+    {
+      const id_type id = code_class(segment);
+      
+      poisson_set_type::const_iterator piter = poissons.find(id);
+      if (piter != poissons.end())
+	return piter->second.logprob(size);
+      else
+	return poisson.logprob(size);
+    }
+    
+    template <typename Iterator, typename Sampler>
+    void sample_parameters(Iterator first, Iterator last, Sampler& sampler)
+    {
+      typedef std::pair<double, double> count_type;
+      typedef utils::unordered_map<id_type, count_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				   std::allocator<std::pair<const id_type, count_type> > >::type count_set_type;
+
+    
+      count_type     total;
+      count_set_type counts;
+      for (/**/; first != last; ++ first) {
+	count_type& count = counts[code_class(first->first)];
+
+	count.first  += first->first.size() * first->second;
+	count.second += first->second;
+	total.first  += first->first.size() * first->second;
+	total.second += first->second;
+      }
+      
+      typename count_set_type::const_iterator citer_end = counts.end();
+      for (typename count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+	poissons[citer->first].initialize(sampler.gamma(citer->second.first + strength_shape,
+							citer->second.second + strength_rate));
+      
+      poisson.initialize(sampler.gamma(total.first + strength_shape,
+				       total.second + strength_rate));
+    }
+    
+    id_type code_class(const segment_type& segment) const
+    {
+      const UChar32 code = utils::utf8_code(segment.begin());
+      
+      UErrorCode status = U_ZERO_ERROR;
+      const id_type script = uscript_getScript(code, &status);
+      const id_type category = u_getIntPropertyValue(code, UCHAR_GENERAL_CATEGORY);
+      
+      return ((category & 0xffff) << 16) | (script & 0xffff);
+    }
+    
+    friend
+    std::ostream& operator<<(std::ostream& os, const length_base_type& base)
+    {
+      poisson_set_type::const_iterator piter_end = base.poissons.end();
+      for (poisson_set_type::const_iterator piter = base.poissons.begin(); piter != piter_end; ++ piter)
+        os << "script: " << ((piter->first >> 16) & 0xffff) << " cat: " << (piter->first & 0xffff) << " lambda: " << piter->second.lambda << std::endl;
+      
+      os << "lambda: " << base.poisson.lambda << std::endl;
+      
+      return os;
+    }
+    
+
+    poisson_set_type poissons;
+    poisson_type     poisson;
     
     double strength_shape;
     double strength_rate;
   };
   
-  PYPWord(const int order,
+  template <typename Iterator>
+  PYPWord(Iterator first, Iterator last,
+	  const int order,
 	  const double __p0,
 	  const double __discount,
 	  const double __strength,
@@ -194,7 +269,7 @@ struct PYPWord
       strength_rate(__strength_rate),
       p0(__p0),
       counts0(0),
-      base(__lambda, __lambda_strength, __lambda_rate)
+      base(first, last, __lambda, __lambda_strength, __lambda_rate)
   {
     // unitialize root table...
     root.parent = id_type(-1);
@@ -395,7 +470,7 @@ struct PYPWord
     logprob += std::log(prob(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
     
     // exclude BOS...
-    logprob += base.logprob(buffer.size() - 1);
+    logprob += base.logprob(segment, buffer.size() - 1);
     
     return std::exp(logprob);
   }
@@ -843,23 +918,7 @@ struct PYPLM
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    double word_size = 0.0;
-    double table_size = 0.0;
-    for (size_type order = 0; order != nodes.size(); ++ order) {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (trie.empty(*niter)) {
-	  // we will collect information from nodes without children...
-	  
-	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
-	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
-	    word_size += titer->first.size() * titer->second.size_table();
-	  
-	  table_size += trie[*niter].table.size_table();
-	}
-    }
-    
-    base.base.sample_parameters(word_size, table_size, sampler);
+    sample_length(sampler);
     
     base.sample_parameters(sampler, num_loop, num_iterations);
     
@@ -921,24 +980,8 @@ struct PYPLM
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    double word_size = 0.0;
-    double table_size = 0.0;
-    for (size_type order = 0; order != nodes.size(); ++ order) {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (trie.empty(*niter)) {
-	  // we will collect information from nodes without children...
-	  
-	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
-	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
-	    word_size += titer->first.size() * titer->second.size_table();
-	  
-	  table_size += trie[*niter].table.size_table();
-	}
-    }
+    sample_length(sampler);
     
-    base.base.sample_parameters(word_size, table_size, sampler);
-
     base.slice_sample_parameters(sampler, num_loop, num_iterations);
 
     for (size_type order = 0; order != discount.size(); ++ order) {
@@ -990,6 +1033,32 @@ struct PYPLM
       }
     }
   }
+  
+  template <typename Sampler>
+  void sample_length(Sampler& sampler)
+  {
+    typedef size_type count_type;
+    typedef utils::dense_hash_map<segment_type, count_type, boost::hash<segment_type>, std::equal_to<segment_type>,
+				  std::allocator<std::pair<const segment_type, count_type> > >::type count_set_type;
+
+    count_set_type counts;
+    counts.set_empty_key(segment_type());
+    
+    for (size_type order = 0; order != nodes.size(); ++ order) {
+      node_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+	if (trie.empty(*niter)) {
+	  // we will collect information from nodes without children...
+	  
+	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
+	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
+	    counts[titer->first] += titer->second.size_table();
+	}
+    }
+    
+    base.base.sample_parameters(counts.begin(), counts.end(), sampler);
+  }
+  
 
   void write(const path_type& path)
   {
@@ -1323,6 +1392,7 @@ typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > data_set_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+typedef std::vector<segment_type, std::allocator<segment_type> > vocabulary_type;
 
 path_set_type train_files;
 path_set_type test_files;
@@ -1364,7 +1434,7 @@ int debug = 0;
 
 void options(int argc, char** argv);
 void read_data(const path_set_type& paths, data_set_type& data);
-size_t vocabulary_size(const data_set_type& data);
+void vocabulary(const data_set_type& data, vocabulary_type& vocab);
 
 int main(int argc, char ** argv)
 {
@@ -1394,11 +1464,12 @@ int main(int argc, char ** argv)
     
     if (training.empty())
       throw std::runtime_error("no training data?");
-
-    const size_t char_vocab_size = vocabulary_size(training);
+    
+    vocabulary_type vocab;
+    vocabulary(training, vocab);
     
     if (debug)
-      std::cerr << "char set size: " << char_vocab_size << std::endl;
+      std::cerr << "char set size: " << vocab.size() << std::endl;
     
     derivation_set_type derivations(training.size());
     position_set_type positions(training.size());
@@ -1408,8 +1479,9 @@ int main(int argc, char ** argv)
     
     sampler_type sampler;
 
-    PYPWord spell(spell_order,
-		  1.0 / char_vocab_size,
+    PYPWord spell(vocab.begin(), vocab.end(),
+		  spell_order,
+		  1.0 / vocab.size(),
 		  spell_discount,
 		  spell_strength,
 		  spell_discount_prior_alpha,
@@ -1444,7 +1516,7 @@ int main(int argc, char ** argv)
       for (size_t n = 0; n != lm.base.discount.size(); ++ n)
 	std::cerr << "spell order=" << n << " discount=" << lm.base.discount[n] << " strength=" << lm.base.strength[n] << std::endl;
       
-      std::cerr << "spell lambda=" << lm.base.base.lambda << std::endl;
+      std::cerr << lm.base.base;
     }
 
     size_t anneal_iter = 0;
@@ -1531,7 +1603,7 @@ int main(int argc, char ** argv)
 	  for (size_t n = 0; n != lm.base.discount.size(); ++ n)
 	    std::cerr << "spell order=" << n << " discount=" << lm.base.discount[n] << " strength=" << lm.base.strength[n] << std::endl;
 	  
-	  std::cerr << "spell lambda=" << lm.base.base.lambda << std::endl;
+	  std::cerr << lm.base.base;
 	}
       }
 	
@@ -1560,13 +1632,13 @@ void read_data(const path_set_type& paths, data_set_type& data)
   }
 }
 
-size_t vocabulary_size(const data_set_type& data)
+void vocabulary(const data_set_type& data, vocabulary_type& vocab)
 {
   typedef utils::piece piece_type;
   typedef utils::dense_hash_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> >::type vocab_type;
   
-  vocab_type vocab;
-  vocab.set_empty_key(piece_type());
+  vocab_type voc;
+  voc.set_empty_key(piece_type());
   
   data_set_type::const_iterator diter_end = data.end();
   for (data_set_type::const_iterator diter = data.begin(); diter != diter_end; ++ diter) {
@@ -1578,13 +1650,14 @@ size_t vocabulary_size(const data_set_type& data)
     for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; /**/) {
       const size_t char_width = utils::utf8_size(*siter);
       
-      vocab.insert(piece_type(siter, siter + char_width));
+      voc.insert(piece_type(siter, siter + char_width));
       
       siter += char_width;
     }
   }
-  
-  return vocab.size();
+
+  vocab.clear();
+  vocab.insert(vocab.end(), voc.begin(), voc.end());
 }
 
 
