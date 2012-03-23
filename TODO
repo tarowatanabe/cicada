@@ -135,7 +135,5 @@ Earley composition with CFG!
 optimized variant of SGD (and xBLEU?)
   xBLEU is impossible given that the combination is already weighted!
 
-PYP language model
-    Probably easy... Use the parallel training from Graham.
-
-fix baby steps in pyp-lm: we will use baby-step iterations which is not counted as "samples"
+Parallel learning for PYP:
+   translit and segment

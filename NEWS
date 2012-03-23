@@ -7,6 +7,8 @@ New: added filter for alignment: Currently, we support inverse, permutation
 New: added xBLEU to cicada_learn_online_kbest_mpi
 New: support the latest sparse hash (moved from google to sparsehash) and gperftools (renamed from google-perftools)
 New: added PYP-LM (highly experimental) and we can use it as our feature function
+New: added PYP-translit, an unsupervised transliterator model (currently, we support training and no real transliterator exists)
+New: added PYP-segment, an unsupervised word segmenter (currently, we support training and no real segmenter exists)
 
 2012-2-15
 Added MIRA-like optimization for PRO-style learning
