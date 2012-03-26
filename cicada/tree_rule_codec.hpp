@@ -6,6 +6,25 @@
 #ifndef __CICADA__TREE_RULE_CODEC__HPP__
 #define __CICADA__TREE_RULE_CODEC__HPP__ 1
 
+//
+// a compact tree-rule encoder/decoder
+// based on the representation from:
+//
+// @InProceedings{ghodke-bird-zhang:2011:IJCNLP-2011,
+//   author    = {Ghodke, Sumukh  and  Bird, Steven  and  Zhang, Rui},
+//   title     = {A Breadth-First Representation for Tree Matching in Large Scale Forest-Based Translation},
+//   booktitle = {Proceedings of 5th International Joint Conference on Natural Language Processing},
+//   month     = {November},
+//   year      = {2011},
+//   address   = {Chiang Mai, Thailand},
+//   publisher = {Asian Federation of Natural Language Processing},
+//   pages     = {785--793},
+//   url       = {http://www.aclweb.org/anthology/I11-1088}
+// }
+//
+
+
+
 #include <cicada/tree_rule.hpp>
 
 #include <utils/bithack.hpp>
