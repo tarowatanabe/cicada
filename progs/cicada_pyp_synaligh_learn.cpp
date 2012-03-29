@@ -41,7 +41,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/chinese_restaurant_process.hpp"
+#include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"
@@ -64,13 +64,32 @@ typedef cicada::Sentence   sentence_type;
 typedef cicada::Symbol     word_type;
 typedef cicada::HyperGraph hypergraph_type;
 
-typedef cicada::TreeRule        tree_rule_type;
-typedef cicada::TreeRuleCompact tree_rule_compact_type;
+typedef cicada::Rule               rule_type;
+typedef rule_type::rule_ptr_type   rule_ptr_type;
+typedef rule_type::symbol_set_type symbol_set_type;
 
-struct PYPGHKM
+//
+// syntactic alignment
+//
+// We assume one side is syntactic, and the other is hiero-like string
+//
+// Thus, it is possible to induce a synchronous-CFG by mapping non-temrinal symbols to the string-side
+// Or, keep them separate like a synchronous-TSG.
+//
+
+struct PYPSynAlign
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+  
+  struct rule_pair_type
+  {
+    const rule_type* lhs;
+    symbol_set_type  rhs;
+    
+    rule_pair_type() : lhs(0), rhs() {}
+    rule_pair_type(const rule_ptr_type& __lhs, const symbol_set_type& __rhs) : lhs(&(*__lhs)), rhs(__rhs) {}
+  };
   
   
   

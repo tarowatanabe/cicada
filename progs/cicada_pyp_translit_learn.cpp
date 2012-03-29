@@ -41,7 +41,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/chinese_restaurant_process.hpp"
+#include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"
@@ -96,7 +96,7 @@ struct PYPTranslit
   
   typedef std::vector<segment_pair_type, std::allocator<segment_pair_type> > derivation_type;
   
-  typedef utils::chinese_restaurant_process<segment_pair_type, boost::hash<segment_pair_type>, std::equal_to<segment_pair_type>, std::allocator<segment_pair_type > > table_type;
+  typedef utils::restaurant<segment_pair_type, boost::hash<segment_pair_type>, std::equal_to<segment_pair_type>, std::allocator<segment_pair_type > > table_type;
   
   struct length_base_type
   {

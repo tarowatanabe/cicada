@@ -38,7 +38,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/chinese_restaurant_process.hpp"
+#include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"

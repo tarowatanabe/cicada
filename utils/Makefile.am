@@ -48,7 +48,6 @@ byte_aligned_pair_delta_vector.hpp \
 c_string_generator.hpp \
 c_string_parser.hpp \
 chart.hpp \
-chinese_restaurant_process.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \
 compact_trie_dense.hpp \
@@ -100,6 +99,7 @@ random_seed.hpp \
 regex_group.hpp \
 repository.hpp \
 resource.hpp \
+restaurant.hpp \
 sampler.hpp \
 simple_vector.hpp \
 slice_sampler.hpp \
@@ -143,7 +143,6 @@ bitpack_main \
 bit_vector_main \
 byte_aligned_code_main \
 byte_aligned_vector_main \
-chinese_restaurant_process_main \
 chunk_vector_main \
 compress_stream_main \
 dense_map_main \
@@ -162,6 +161,7 @@ packed_vector_main \
 piece_main \
 program_options_main \
 random_seed_main \
+restaurant_main \
 simple_vector_main \
 small_vector_main \
 sparse_map_main \
@@ -252,7 +252,7 @@ byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
-chinese_restaurant_process_main_SOURCES = chinese_restaurant_process_main.cpp
+restaurant_main_SOURCES = restaurant_main.cpp
 
 chunk_vector_main_SOURCES = chunk_vector_main.cpp
 chunk_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

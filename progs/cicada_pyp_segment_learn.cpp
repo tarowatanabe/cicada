@@ -44,7 +44,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/chinese_restaurant_process.hpp"
+#include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"
@@ -94,8 +94,8 @@ struct PYPWord
   
   struct Node
   {
-    typedef utils::chinese_restaurant_process<word_type, boost::hash<word_type>, std::equal_to<word_type>,
-					      std::allocator<word_type > > table_type;
+    typedef utils::restaurant<word_type, boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<word_type > > table_type;
   
     Node() : table(), parent(id_type(-1)), order(0)  {}
     
@@ -681,8 +681,8 @@ struct PYPLM
   
   struct Node
   {
-    typedef utils::chinese_restaurant_process<word_type, boost::hash<word_type>, std::equal_to<word_type>,
-					      std::allocator<word_type > > table_type;
+    typedef utils::restaurant<word_type, boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<word_type > > table_type;
   
     Node() : table(), parent(id_type(-1)), order(0)  {}
   

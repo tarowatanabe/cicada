@@ -2,15 +2,15 @@
 #include <vector>
 #include <string>
 
-#include "chinese_restaurant_process.hpp"
+#include "restaurant.hpp"
 #include "sampler.hpp"
 
-typedef utils::chinese_restaurant_process<std::string> crp_type;
+typedef utils::restaurant<std::string> crp_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
-std::ostream& operator<<(std::ostream& os, const utils::chinese_restaurant_process<std::string>& crp)
+std::ostream& operator<<(std::ostream& os, const utils::restaurant<std::string>& crp)
 {
-  typedef utils::chinese_restaurant_process<std::string> crp_type;
+  typedef utils::restaurant<std::string> crp_type;
  
   os << "PYP(discount=" << crp.discount() << ",strength=" << crp.strength() << ")" << '\n'
      << "customers = " << crp.size_customer() << '\n';
@@ -28,9 +28,9 @@ std::ostream& operator<<(std::ostream& os, const utils::chinese_restaurant_proce
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const utils::chinese_restaurant_process<char>& crp)
+std::ostream& operator<<(std::ostream& os, const utils::restaurant<char>& crp)
 {
-  typedef utils::chinese_restaurant_process<char> crp_type;
+  typedef utils::restaurant<char> crp_type;
 
   os << "PYP(discount=" << crp.discount() << ",strength=" << crp.strength() << ")" << '\n'
      << "customers = " << crp.size_customer() << '\n';
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
   }
 
   {
-    typedef utils::chinese_restaurant_process<char> crp_type;
+    typedef utils::restaurant<char> crp_type;
 
     crp_type rest2(0.0, 1);
     
@@ -131,7 +131,7 @@ int main(int argc, char** argv)
   }
   
   {
-    typedef utils::chinese_restaurant_process<int> crp_type;
+    typedef utils::restaurant<int> crp_type;
     
     crp_type crp(0.5, 1);
     

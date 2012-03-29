@@ -4,8 +4,8 @@
 //
 
 
-#ifndef __UTILS__CHINESE_RESTAURANT_PROCESS__HPP__
-#define __UTILS__CHINESE_RESTAURANT_PROCESS__HPP__ 1
+#ifndef __UTILS__RESTAURANT__HPP__
+#define __UTILS__RESTAURANT__HPP__ 1
 
 #include <numeric>
 #include <limits>
@@ -39,7 +39,7 @@ namespace utils
 {
 
   template <typename Tp, typename Hash=boost::hash<Tp>, typename Pred=std::equal_to<Tp>, typename Alloc=std::allocator<Tp> >
-  class chinese_restaurant_process
+  class restaurant
   {
   public:
     typedef size_t    size_type;
@@ -48,7 +48,7 @@ namespace utils
     typedef Tp dish_type;
     
   public:
-    chinese_restaurant_process()
+    restaurant()
       : tables(),
 	customers(),
 	m_discount(0.9),
@@ -61,8 +61,8 @@ namespace utils
       verify_parameters();
     }
     
-    chinese_restaurant_process(const double& __discount,
-			       const double& __strength)
+    restaurant(const double& __discount,
+	       const double& __strength)
       : tables(),
 	customers(),
 	m_discount(__discount),
@@ -75,10 +75,10 @@ namespace utils
       verify_parameters();
     }
 
-    chinese_restaurant_process(const double& __discount_prior_alpha,
-			       const double& __discount_prior_beta,
-			       const double& __strength_prior_shape,
-			       const double& __strength_prior_rate)
+    restaurant(const double& __discount_prior_alpha,
+	       const double& __discount_prior_beta,
+	       const double& __strength_prior_shape,
+	       const double& __strength_prior_rate)
       : tables(),
 	customers(),
 	m_discount(0.9),
@@ -91,12 +91,12 @@ namespace utils
       verify_parameters();
     }
     
-    chinese_restaurant_process(const double& __discount,
-			       const double& __strength,
-			       const double& __discount_prior_alpha,
-			       const double& __discount_prior_beta,
-			       const double& __strength_prior_shape,
-			       const double& __strength_prior_rate)
+    restaurant(const double& __discount,
+	       const double& __strength,
+	       const double& __discount_prior_alpha,
+	       const double& __discount_prior_beta,
+	       const double& __strength_prior_shape,
+	       const double& __strength_prior_rate)
       : tables(),
 	customers(),
 	m_discount(__discount),
@@ -280,7 +280,7 @@ namespace utils
       return log_likelihood(m_discount, m_strength);
     }
     
-    // http://en.wikipedia.org/wiki/Chinese_restaurant_process
+    // http://en.wikipedia.org/wiki/restaurant
     double log_likelihood(const double& discount, const double& strength) const
     {      
       double logprob = 0.0;
@@ -326,9 +326,9 @@ namespace utils
   private:    
     struct DiscountSampler
     {
-      DiscountSampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      DiscountSampler(const restaurant& __crp) : crp(__crp) {}
       
-      const chinese_restaurant_process& crp;
+      const restaurant& crp;
       
       double operator()(const double& proposed_discount) const
       {
@@ -338,9 +338,9 @@ namespace utils
     
     struct StrengthSampler
     {
-      StrengthSampler(const chinese_restaurant_process& __crp) : crp(__crp) {}
+      StrengthSampler(const restaurant& __crp) : crp(__crp) {}
       
-      const chinese_restaurant_process& crp;
+      const restaurant& crp;
       
       double operator()(const double& proposed_strength) const
       {
