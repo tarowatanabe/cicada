@@ -2,7 +2,7 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-// PYP-GHKM!
+// PYP-SynAlign based on GHKM work:
 
 // @InProceedings{cohn-blunsom:2009:EMNLP,
 //   author    = {Cohn, Trevor  and  Blunsom, Phil},
@@ -15,6 +15,9 @@
 //   pages     = {352--361},
 //   url       = {http://www.aclweb.org/anthology/D/D09/D09-1037}
 // }
+//
+//
+// We do not perform composition, and each node is mapped to corresponding span in the target-side.
 //
 
 #include <map>
