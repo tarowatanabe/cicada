@@ -6,7 +6,7 @@
 #ifndef __UTILS__INDEXED_MAP__HPP__
 #define __UTILS__INDEXED_MAP__HPP__ 1
 
-#include <utils/indexed_hashtable.h>
+#include <utils/indexed_hashtable.hpp>
 
 #include <boost/functional/hash/hash.hpp>
 
@@ -21,9 +21,9 @@ namespace utils
   class indexed_map 
   {
   public:
-    typedef Key                                  key_type;
-    typedef Data                                 mapped_type;
-    typedef std::pair<const key_type, mapped_type> value_type;
+    typedef Key                              key_type;
+    typedef Data                             mapped_type;
+    typedef std::pair<key_type, mapped_type> value_type;
     
   private:
     struct extract_key

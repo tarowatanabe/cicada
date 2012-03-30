@@ -272,9 +272,9 @@ namespace utils
       if (diter == dishes.end())
 	return F(tables * m_discount + m_strength) * p0 / F(customers + m_strength);
       else
-	return F(diter->second.customers - m_discount * diter->second.tables.size() + F(tables * m_discount + m_strength) * p0) / F(customers + m_strength);
+	return (F(diter->second.customers - m_discount * diter->second.tables.size()) + F(tables * m_discount + m_strength) * p0) / F(customers + m_strength);
     }
-
+    
     double log_likelihood() const
     {
       return log_likelihood(m_discount, m_strength);

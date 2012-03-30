@@ -102,6 +102,7 @@ cicada_oracle_kbest
 cicada_oracle_kbest_mpi
 cicada_pyp_ngram_learn
 cicada_pyp_segment_learn
+cicada_pyp_synalign_learn
 cicada_pyp_translit_learn
 cicada_query_cky
 cicada_query_tree
