@@ -47,6 +47,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/unordered_set.hpp"
 #include "utils/dense_hash_map.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
@@ -169,16 +170,16 @@ struct PCFGModel
   {
     bool operator()(const rule_type* x, const rule_type* y) const
     {
-      return x == y || (x && y && *x == *y);
+      return (x == y) || (x && y && *x == *y);
     }
   };
   
-  typedef utils::dense_hash_map<const rule_type*, double, rule_hash, rule_equal,
-				std::allocator<std::pair<const rule_type*, double> > >::type table_type;
+  typedef utils::unordered_map<const rule_type*, double, rule_hash, rule_equal,
+			       std::allocator<std::pair<const rule_type*, double> > >::type table_type;
   
   template <typename Iterator>
-  PCFGModel(Iterator first, Iterator last) : table(), smooth(-60) { table.set_empty_key(0); learn(first, last); }
-  PCFGModel() : table(), smooth(-60) { table.set_empty_key(0); }
+  PCFGModel(Iterator first, Iterator last) : table(), smooth(-60) { learn(first, last); }
+  PCFGModel() : table(), smooth(-60) { }
   
   template <typename Iterator>
   void learn(Iterator first, Iterator last)
@@ -226,7 +227,7 @@ struct PCFGModel
 
   double operator()(const rule_ptr_type& x) const
   {
-    return operator()(&(*x));
+    return operator()(x.get());
   }
   
   double operator()(const rule_type* x) const
@@ -319,7 +320,7 @@ struct PYPSynAlign
     friend
     bool operator==(const rule_pair_type& x, const rule_pair_type& y)
     {
-      return (x.source == y.source || (x.source && y.source && *(x.source) == *(y.source))) && x.target == y.target;
+      return ((x.source == y.source) || (x.source && y.source && *(x.source) == *(y.source))) && x.target == y.target;
     }
     
     friend
@@ -353,11 +354,23 @@ struct PYPSynAlign
   {
     return table.increment(rule_pair_type(source, target), prob_base(source, target), sampler, temperature);
   }
+
+  template <typename Sampler>
+  bool increment(const rule_pair_type& rule_pair, Sampler& sampler, const double temperature=1.0)
+  {
+    return table.increment(rule_pair, prob_base(rule_pair), sampler, temperature);
+  }
   
   template <typename Sampler>
   bool decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
   {
     return table.decrement(rule_pair_type(source, target), sampler);
+  }
+  
+  template <typename Sampler>
+  bool decrement(const rule_pair_type& rule_pair, Sampler& sampler)
+  {
+    return table.decrement(rule_pair, sampler);
   }
   
   double prob(const rule_type* source, const symbol_set_type& target, const double base) const
@@ -374,10 +387,15 @@ struct PYPSynAlign
   {
     return cicada::semiring::log(table.prob(rule_pair_type(source, target), cicada::semiring::traits<logprob_type>::exp(logbase)));
   }
-
+  
   double logprob(const rule_ptr_type& source, const symbol_set_type& target, const double logbase) const
   {
     return cicada::semiring::log(table.prob(rule_pair_type(&(*source), target), cicada::semiring::traits<logprob_type>::exp(logbase)));
+  }
+  
+  double prob_base(const rule_pair_type& rule_pair) const
+  {
+    return prob_base(rule_pair.source, rule_pair.target);
   }
   
   double prob_base(const rule_type* source, const symbol_set_type& target) const
@@ -453,7 +471,7 @@ struct PYPGraph
   typedef PYPSynAlign::prob_type    prob_type;
   
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > beta_type;
-  typedef std::vector<beta_type, std::allocator<beta_type> > beta_set_type;
+  typedef std::vector<beta_type, std::allocator<beta_type> > beta_chart_type;
 
   typedef utils::chart<double, std::allocator<double> > logprob_target_set_type;
   typedef std::vector<double, std::allocator<double> > logprob_length_set_type;
@@ -531,7 +549,7 @@ struct PYPGraph
   typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
   
   typedef utils::indexed_map<span_type, edge_set_type, boost::hash<span_type>, std::equal_to<span_type>,
-			     std::allocator<std::pair<const span_type, edge_set_type> > > span_edge_map_type;
+			     std::allocator<std::pair<span_type, edge_set_type> > > span_edge_map_type;
   typedef std::vector<span_edge_map_type, std::allocator<span_edge_map_type> > span_edge_chart_type;
 
   typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
@@ -539,26 +557,35 @@ struct PYPGraph
   
   void initialize(const hypergraph_type& source, const sentence_type& target, const PYPSynAlign& synalign)
   {
+    std::cerr << "source nodes: " << source.nodes.size() << " edges: " << source.edges.size() << std::endl
+	      << "targets: " << target.size() << std::endl;
+    
     edges.clear();
-    edges.resize(source.nodes.size());
+    edges.resize(source.nodes.size(), span_edge_map_type());
 
     beta.clear();
     beta.resize(source.nodes.size(), beta_type(target.size() + 1));
-    
+
     // phrasal log-probabilities
     logprob_targets.clear();
     logprob_targets.resize(target.size() + 1, 0.0);
     
     for (size_type first = 0; first != target.size(); ++ first)
-      for (size_type last = first + 1; last <= target.size(); ++ last)
+      for (size_type last = first + 1; last <= target.size(); ++ last) {
+	std::cerr << "phrase span: " << first << "..." << last << std::endl;
+	
 	logprob_targets(first, last) = logprob_targets(first, last - 1) + synalign.unigram_target(target[last - 1]);
+      }
     
     // length log-probabilities
     logprob_lengths.clear();
     logprob_lengths.resize(target.size() + 1);
     
-    for (size_type i = 0; i <= target.size(); ++ i)
+    for (size_type i = 0; i <= target.size(); ++ i) {
       logprob_lengths[i] = synalign.length_target(i);
+      
+      std::cerr << "length logprob: " << i << " " << logprob_lengths[i] << std::endl;
+    }
     
     // rule-string...
     rule_strings.clear();
@@ -624,12 +651,16 @@ struct PYPGraph
       const hypergraph_type::node_type& node = *niter;
       
       const size_type pos = node.id;
+
+      std::cerr << "node pos: " << pos << std::endl;
       
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = source.edges[*eiter];
 
 	const double logprob_source = synalign.pcfg_source(edge.rule);
+
+	std::cerr << "rule: " << *edge.rule << " logprob: " << logprob_source << std::endl;
 	
 	index_set_type j_ends(edge.tails.size(), 0);
 	index_set_type j(edge.tails.size(), 0);
@@ -640,6 +671,7 @@ struct PYPGraph
 	for (;;) {
 	  span_type span(target.size(), 0);
 	  size_type total_hole = 0;
+	  logprob_type prob_antecedent = cicada::semiring::traits<logprob_type>::one();
 	  double logprob_hole = 0.0;
 	  
 	  antecedent.clear();
@@ -658,34 +690,60 @@ struct PYPGraph
 	    logprob_hole += logprob_targets(span_antecedent.first, span_antecedent.last);
 	    
 	    antecedent.push_back(span_antecedent);
+	    
+	    prob_antecedent *= beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
 	  }
 	  
 	  if (valid) {
 	    
 	    if (span.first == target.size() && span.last == 0) {
-	      for (size_type span_length = 0; span_length <= terminal_max; ++ span_length) {
+	      std::cerr << "phrasal pair or empty antecedents" << std::endl;
+	      
+	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), size_type(0));
+	      const size_type span_length_max = utils::bithack::min(target.size(), terminal_max);
+	      
+	      for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
 		const size_type span_first_max = (span_length != 0) * (target.size() - span_length);
 		for (size_type span_first = 0; span_first <= span_first_max; ++ span_first) {
 		  const size_type span_last = span_first + span_length;
+
+		  
+		  std::cerr << "phrase span: " << span_first << "..." << span_last << std::endl;
+
 		  const double logprob_terminal = logprob_targets(span_first, span_last);
+
+		  std::cerr << "logprob terminals: " << logprob_terminal << std::endl;
 		  
 		  const size_type terminal_size = span_length;
 		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
+
+		  std::cerr << "logprob non-temrinals: " << logprob_non_terminal << std::endl;
+		  
+		  std::cerr << "logprob length: " << logprob_lengths[terminal_size] << std::endl;
 		  
 		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
 		  
+		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
-		  const double logprob = synalign.logprob(edge.rule, target_string, logprob_prior);
+		  const logprob_type prob = (prob_antecedent
+					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
 		  
+		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
 	      }
 	    } else {
+	      std::cerr << "antecedents pair" << std::endl;
+	      std::cerr << "span: " << span.first << "..." << span.last << std::endl;
+
 	      const size_type terminal_hole_size = span.size() - total_hole;
 	      const difference_type terminal_span_size = terminal_max - terminal_hole_size;
+
+	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), span.size());
 	      const size_type span_length_max = utils::bithack::min(target.size(), span.size() + terminal_span_size);
 	      
-	      for (size_type span_length = span.size(); span_length <= span_length_max; ++ span_length) {
+	      for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
 		const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.first) - terminal_span_size);
 		const size_type span_first_max = utils::bithack::min(target.size(), span.last + terminal_span_size) - span_length;
 		for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
@@ -694,15 +752,16 @@ struct PYPGraph
 		  
 		  const size_type terminal_size = span_length - terminal_hole_size;
 		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
-
+		  
 		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
-		  const double logprob = synalign.logprob(edge.rule, target_string, logprob_prior);
+		  const logprob_type prob = (prob_antecedent
+					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
 		  
-		  
-		  
+		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
 	      }
 	    }
@@ -779,9 +838,10 @@ struct PYPGraph
     return prob_derivation;
   }
 
+
   span_edge_chart_type edges;
   
-  beta_set_type beta;
+  beta_chart_type beta;
   logprob_target_set_type logprob_targets;
   logprob_length_set_type logprob_lengths;
   rule_string_cache_chart_type rule_strings;
@@ -791,9 +851,30 @@ struct PYPGraph
 };
 
 typedef boost::filesystem::path path_type;
+typedef utils::sampler<boost::mt19937> sampler_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+
+typedef PYPGraph::size_type size_type;
+typedef PYPGraph::derivation_type derivation_type;
+typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
+typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+
+struct less_size
+{
+  less_size(const hypergraph_set_type& __sources,
+	    const sentence_set_type& __targets)
+    : sources(__sources), targets(__targets) {}
+
+  bool operator()(const size_type& x, const size_type& y) const
+  {
+    return (sources[x].edges.size() + targets[x].size()) < (sources[y].edges.size() + targets[y].size());
+  }
+  
+  const hypergraph_set_type& sources;
+  const sentence_set_type& targets;
+};
 
 path_type train_source_file = "-";
 path_type train_target_file = "-";
@@ -801,7 +882,7 @@ path_type train_target_file = "-";
 path_type test_source_file;
 path_type test_target_file;
 
-int max_terminal = 5;
+int max_terminal = 4;
 
 int samples = 30;
 int baby_steps = 0;
@@ -871,7 +952,105 @@ int main(int argc, char ** argv)
 			  discount_prior_beta,
 			  strength_prior_shape,
 			  strength_prior_rate);
+
     
+    derivation_set_type derivations(sources.size());
+    position_set_type positions(sources.size());
+    for (size_t i = 0; i != sources.size(); ++ i)
+      positions[i] = i;
+    
+    sampler_type sampler;
+    
+    // sample parameters, first...
+    if (slice_sampling)
+      synalign.slice_sample_parameters(sampler, resample_iterations);
+    else
+      synalign.sample_parameters(sampler, resample_iterations);
+    
+    if (debug >= 2)
+      std::cerr << "discount=" << synalign.table.discount()
+		<< " strength=" << synalign.table.strength()
+		<< std::endl;
+    
+    PYPGraph graph;
+    
+    size_t anneal_iter = 0;
+    const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+
+    size_t baby_iter = 0;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
+
+    bool sampling = false;
+    int sample_iter = 0;
+
+    // then, learn!
+    for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+      
+      double temperature = 1.0;
+      bool anneal_finished = true;
+      if (anneal_iter != anneal_last) {
+	anneal_finished = false;
+	temperature = double(anneal_last - anneal_iter) + 1;
+	
+	++ anneal_iter;
+
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+      }
+      
+      
+      bool baby_finished = true;
+      if (baby_iter != baby_last) {
+	++ baby_iter;
+	baby_finished = false;
+      }
+      
+      sampling = anneal_finished && baby_finished;
+      
+      if (debug) {
+	if (sampling)
+	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
+	else
+	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
+      }
+      
+      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+      std::random_shuffle(positions.begin(), positions.end(), gen);
+      if (! baby_finished)
+	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
+      
+      for (size_t i = 0; i != positions.size(); ++ i) {
+	const size_t pos = positions[i];
+	
+	if (! sources[pos].is_valid() || targets[pos].empty()) continue;
+	
+	if (debug >= 3)
+	  std::cerr << "training=" << pos << std::endl;
+	
+	if (! derivations[pos].empty()) {
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    synalign.decrement(*diter, sampler);
+	}
+	
+	const PYPGraph::logprob_type logsum = graph.inside(sources[pos], targets[pos], synalign, max_terminal);
+	
+	const PYPGraph::logprob_type logderivation = graph.outside(sources[pos], targets[pos], sampler, derivations[pos]);
+	
+	if (debug >= 3) {
+	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
+	  
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    std::cerr << "derivation: " << *(diter->source) << " ||| " << diter->target << std::endl;
+	}
+	
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  synalign.increment(*diter, sampler, temperature);
+      }
+    }
+
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -880,16 +1059,45 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct rule_ptr_hash
+{
+  bool operator()(const rule_ptr_type& x) const
+  {
+    return hash_value(*x);
+  }
+};
+
+struct rule_ptr_equal
+{
+  bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+  {
+    return *x == *y;
+  }
+};
+
 void read_data(const path_type& path, hypergraph_set_type& graphs)
 {
+  typedef utils::unordered_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal, std::allocator<rule_ptr_type> >::type rule_set_type;
+  
   graphs.clear();
   
   utils::compress_istream is(path, 1024 * 1024);
   
+  rule_set_type rules;
   hypergraph_type graph;
-  while (is >> graph)
+  while (is >> graph) {
+#if 0
+    hypergraph_type::edge_set_type::iterator eiter_end = graph.edges.end();
+    for (hypergraph_type::edge_set_type::iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
+      eiter->rule = *(rules.insert(eiter->rule).first);
+#endif
+    
     graphs.push_back(graph);
+  }
+  
+  // uniquify rules...
 }
+
 
 void read_data(const path_type& path, sentence_set_type& sentences)
 {

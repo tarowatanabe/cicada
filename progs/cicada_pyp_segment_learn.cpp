@@ -1394,6 +1394,18 @@ typedef std::vector<derivation_type, std::allocator<derivation_type> > derivatio
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<segment_type, std::allocator<segment_type> > vocabulary_type;
 
+struct less_size
+{
+  less_size(const data_set_type& __training) : training(__training) {}
+  
+  bool operator()(const size_type& x, const size_type& y) const
+  {
+    return training[x].size() < training[y].size();
+  }
+
+  const data_set_type& training;
+};
+
 path_set_type train_files;
 path_set_type test_files;
 path_type     output_file;
@@ -1521,6 +1533,9 @@ int main(int argc, char ** argv)
 
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+
+    size_t baby_iter = 0;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
     
     bool sampling = false;
     int sample_iter = 0;
@@ -1540,7 +1555,13 @@ int main(int argc, char ** argv)
 	  std::cerr << "temperature: " << temperature << std::endl;
       }
       
-      sampling = anneal_finished;
+      bool baby_finished = true;
+      if (baby_iter != baby_last) {
+	++ baby_iter;
+	baby_finished = false;
+      }
+      
+      sampling = anneal_finished && baby_finished;
       
       if (debug) {
 	if (sampling)
@@ -1551,7 +1572,10 @@ int main(int argc, char ** argv)
       
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+
       std::random_shuffle(positions.begin(), positions.end(), gen);
+      if (! baby_finished)
+	std::sort(positions.begin(), positions.end(), less_size(training));
       
       for (size_t i = 0; i != positions.size(); ++ i) {
 	const size_t pos = positions[i];
