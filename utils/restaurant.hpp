@@ -264,15 +264,15 @@ namespace utils
       return erased;
     }
     
-    template <typename F>
-    F prob(const dish_type& dish, const F& p0) const
+    template <typename P>
+    P prob(const dish_type& dish, const P& p0) const
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
       if (diter == dishes.end())
-	return F(tables * m_discount + m_strength) * p0 / F(customers + m_strength);
+	return P(tables * m_discount + m_strength) * p0 / P(customers + m_strength);
       else
-	return (F(diter->second.customers - m_discount * diter->second.tables.size()) + F(tables * m_discount + m_strength) * p0) / F(customers + m_strength);
+	return (P(diter->second.customers - m_discount * diter->second.tables.size()) + P(tables * m_discount + m_strength) * p0) / P(customers + m_strength);
     }
     
     double log_likelihood() const

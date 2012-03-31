@@ -266,8 +266,6 @@ namespace utils
       
       if (diter == dishes.end())
 	throw std::runtime_error("dish was not inserted?");
-
-      
       
       location_type& loc = diter->second;
       
