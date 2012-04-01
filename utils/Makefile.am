@@ -100,6 +100,7 @@ regex_group.hpp \
 repository.hpp \
 resource.hpp \
 restaurant.hpp \
+restaurant_floor.hpp \
 sampler.hpp \
 simple_vector.hpp \
 slice_sampler.hpp \
