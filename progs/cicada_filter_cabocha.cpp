@@ -203,24 +203,14 @@ int main(int argc, char** argv)
 		hypergraph_type::node_type& node = graph.add_node();
 		
 		tails.push_back(node.id);
-		symbols.push_back('[' + titer->second + "*]");
+		if (pos != niter->head)
+		  symbols.push_back('[' + titer->second + ']');
+		else
+		  symbols.push_back('[' + titer->second + "*]");
 		
 		hypergraph_type::edge_type& edge = graph.add_edge();
 		edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
 		graph.connect_edge(edge.id, node.id);
-		
-		if (pos != niter->head) {
-		  hypergraph_type::node_type& node = graph.add_node();
-
-		  const symbol_type symbol_new = '[' + titer->second + ']';
-		  
-		  hypergraph_type::edge_type& edge = graph.add_edge(&tails.back(), (&tails.back()) + 1);
-		  edge.rule = rule_type::create(rule_type(symbol_new, rule_type::symbol_set_type(1, symbols.back())));
-		  graph.connect_edge(edge.id, node.id);
-		  
-		  tails.back() = node.id;
-		  symbols.back() = symbol_new;
-		}
 	      }
 	    } else {
 	      terminal_set_type::const_iterator titer_end = niter->terminals.end();
@@ -237,7 +227,10 @@ int main(int argc, char** argv)
 	      }
 	    }
 	    
-	    niter->cat = '[' + niter->terminals[niter->head].second + ']';
+	    if (pos_mode)
+	      niter->cat = '[' + niter->terminals[niter->head].second + ']';
+	    else
+	      niter->cat = __non_terminal;
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(niter->cat, symbols.begin(), symbols.end()));
@@ -265,6 +258,8 @@ int main(int argc, char** argv)
 	    const int node_id = queue.front().second;
 	    queue.pop_front();
 
+	    symbol_type symbol_head;
+	    
 	    tails.clear();
 	    symbols.clear();
 	    for (int id = 0; id < static_cast<int>(nodes.size()); ++ id) {
@@ -276,19 +271,43 @@ int main(int argc, char** argv)
 	      } else if (id == node_id) {
 		tails.push_back(nodes[id].id);
 		symbols.push_back(pos_mode ? nodes[id].cat : __non_terminal);
+		
+		if (head_mode) {
+		  hypergraph_type::edge_type& edge = graph.edges[graph.nodes[nodes[id].id].edges.front()];
+		  
+		  edge.rule = rule_type::create(rule_type(edge.rule->rhs.front(), edge.rule->rhs));
+		  
+		  symbols.back() = edge.rule->lhs;
+		}
+		
+		symbol_head = symbols.back();
 	      }
 	    }
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal
-						    ? __goal
+						    ? symbol_head
 						    : (pos_mode ? nodes[node_id].cat : __non_terminal),
 						    symbols.begin(), symbols.end()));
 	    graph.connect_edge(edge.id, parent_id);
 	  }
 	  
-	  if (! graph.nodes.empty() && graph.goal != hypergraph_type::invalid)
+	  if (! graph.nodes.empty() && graph.goal != hypergraph_type::invalid) {
+	    hypergraph_type::edge_type& edge_goal = graph.edges[graph.nodes[graph.goal].edges.front()];
+	    
+	    // add one-more...
+	    tails.clear();
+	    tails.push_back(graph.goal);
+	    
+	    graph.goal = graph.add_node().id;
+	    
+	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+	    edge.rule = rule_type::create(rule_type(__goal, rule_type::symbol_set_type(1, edge_goal.rule->lhs)));
+	    graph.connect_edge(edge.id, graph.goal);
+	    
 	    graph.topologically_sort();
+
+	  }
 
 	  os << graph << '\n';
 	}
