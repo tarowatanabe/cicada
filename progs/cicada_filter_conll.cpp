@@ -405,6 +405,7 @@ int main(int argc, char** argv)
 	hypergraph.connect_edge(edge.id, node_map[id]);
       }
       
+      
       if (! hypergraph.nodes.empty() && hypergraph.is_valid())
 	hypergraph.topologically_sort();
       
