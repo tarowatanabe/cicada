@@ -122,6 +122,18 @@ namespace utils
 
       size_type size_customer() const { return customers; }
       size_type size_table() const { return tables.size(); }
+
+      void clear()
+      {
+	customers = 0;
+	tables.clear();
+      }
+
+      void swap(Location& x)
+      {
+	std::swap(customers, x.customers);
+	tables.swap(x.tables);
+      }
       
       size_type      customers;
       table_set_type tables;
@@ -157,23 +169,35 @@ namespace utils
     }
 
     bool empty() const { return dishes.empty(); }
+    size_type size() const { return dishes.size(); }
     
     size_type size_customer() const { return customers; }
-
+    
     size_type size_table() const { return tables; }
     
-    size_type size_table(const dish_type& dish) const
+    size_type size_table(const dish_type dish) const
     {
       return (dish < dishes.size() ? dishes[dish].tables.size() : size_type(0));
     }
 
-    size_type size_customer(const dish_type& dish) const
+    size_type size_customer(const dish_type dish) const
     {
       return (dish < dishes.size() ? dishes[dish].customers : size_type(0));
     }
+
+    template <typename Mapping>
+    void permute(const Mapping& mapping)
+    {
+      dish_set_type dishes_new(dishes.size());
+      
+      for (size_type i = 0; i != dishes.size(); ++ i)
+	dishes_new[mapping[i]].swap(dishes[i]);
+      
+      dishes_new.swap(dishes);
+    }
     
     template <typename Sampler>
-    bool increment(const dish_type& dish, const double& p0, Sampler& sampler, const double temperature=1.0)
+    bool increment(const dish_type dish, const double& p0, Sampler& sampler, const double temperature=1.0)
     {
       if (dish >= dishes.size())
 	dishes.resize(dish + 1);
@@ -219,7 +243,7 @@ namespace utils
     }
     
     template <typename Sampler>
-    bool decrement(const dish_type& dish, Sampler& sampler)
+    bool decrement(const dish_type dish, Sampler& sampler)
     {
       if (dish >= dishes.size())
 	throw std::runtime_error("dish was not inserted?");
@@ -227,7 +251,7 @@ namespace utils
       location_type& loc = dishes[dish];
       
       if (loc.customers == 1) {
-	dishes.erase(diter);
+	loc.clear();
 	-- tables;
 	-- customers;
 	return true;
@@ -258,7 +282,7 @@ namespace utils
     }
     
     template <typename P>
-    P prob(const dish_type& dish, const P& p0) const
+    P prob(const dish_type dish, const P& p0) const
     {
       if (dish >= dishes.size())
 	return P(tables * m_discount + m_strength) * p0 / P(customers + m_strength);

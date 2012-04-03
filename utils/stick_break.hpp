@@ -1,0 +1,98 @@
+// -*- mode: c++ -*-
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
+//
+// a stick breaking representation of PYP
+//
+
+#ifndef __UTILS__STICK_BREAK__HPP__
+#define __UTILS__STICK_BREAK__HPP__ 1
+
+#include <vector>
+#include <numeric>
+
+namespace utils
+{
+  
+  template <typename Alloc=std::allocator<size_t> >
+  class stick_break
+  {
+  public:
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
+    typedef double stick_type;
+
+  private:
+    typedef typename Alloc::template rebind<stick_type >::other stick_alloc_type;
+    typedef std::vector<stick_type, stick_alloc_type>           stick_set_type;
+
+  public:
+    stick_break()
+      : sticks(1, 1.0),
+	m_discount(0.9),
+	m_strength(1.0) {}
+    
+    stick_break(const double& __discount,
+		const double& __strength)
+      : sticks(1, 1.0),
+	m_discount(__discount),
+	m_strength(__strength) {}
+    
+  public:    
+    double& discount() { return m_discount; }
+    double& strength() { return m_strength; }
+    
+    const double& discount() const { return m_discount; }
+    const double& strength() const { return m_strength; }
+    
+    template <typename Sampler>
+    void increment(Sampler& sampler)
+    {
+      const double stick = sticks.back();
+      const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * stick.size());
+      
+      sticks.back() = stick * beta;
+      sticks.push_back(stick * (1.0 - beta));
+    }
+    
+    template <typename Sampler>
+    void sample_parameters(size_type size, Sampler& sampler)
+    {
+      sticks.clear();
+      sticks.push_back(1.0);
+      
+      for (size_t i = 0; i != size; ++ i) {
+	const double stick = sticks.back();
+	const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * stick.size());
+	
+	sticks.back() = stick * beta;
+	sticks.push_back(stick * (1.0 - beta));
+      }
+    }
+
+    template <typename Iterator>
+    void assign(Iterator first, Iterator last)
+    {
+      sticks.clear();
+      sticks.insert(sticks.end(), first, last);
+      
+      const double sum = std::accumulate(sticks.begin(), sticks.end(), 0.0);
+      
+      if (sum >= 1.0 || sum < 0.0)
+	throw std::runtime_error("invalid sticks");
+      
+      sticks.push_back(1.0 - sum);
+    }
+    
+  private:
+    stick_set_type sticks;
+
+    double m_discount;
+    double m_strength;
+  };
+};
+
+#endif

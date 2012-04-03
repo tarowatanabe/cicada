@@ -115,6 +115,7 @@ sparse_set.hpp \
 spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
+stich_break.hpp \
 subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \
