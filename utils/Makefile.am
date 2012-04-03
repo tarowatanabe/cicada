@@ -101,6 +101,7 @@ repository.hpp \
 resource.hpp \
 restaurant.hpp \
 restaurant_floor.hpp \
+restaurant_vector.hpp \
 sampler.hpp \
 simple_vector.hpp \
 slice_sampler.hpp \
