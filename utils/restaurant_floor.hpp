@@ -322,7 +322,7 @@ namespace utils
       return log_likelihood(m_discount, m_strength);
     }
     
-    // http://en.wikipedia.org/wiki/restaurant
+    // http://en.wikipedia.org/wiki/Chinese_restaurant_process
     double log_likelihood(const double& discount, const double& strength) const
     {      
       double logprob = 0.0;

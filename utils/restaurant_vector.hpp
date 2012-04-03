@@ -13,10 +13,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include <boost/functional/hash.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <utils/unordered_map.hpp>
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
 
@@ -38,17 +36,17 @@
 namespace utils
 {
 
-  template <typename Tp, typename Hash=boost::hash<Tp>, typename Pred=std::equal_to<Tp>, typename Alloc=std::allocator<Tp> >
-  class restaurant
+  template <typename Alloc=std::allocator<size_t> >
+  class restaurant_vector
   {
   public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
-
-    typedef Tp dish_type;
+    
+    typedef size_type dish_type;
     
   public:
-    restaurant()
+    restaurant_vector()
       : tables(),
 	customers(),
 	m_discount(0.9),
@@ -61,8 +59,8 @@ namespace utils
       verify_parameters();
     }
     
-    restaurant(const double& __discount,
-	       const double& __strength)
+    restaurant_vector(const double& __discount,
+		      const double& __strength)
       : tables(),
 	customers(),
 	m_discount(__discount),
@@ -75,10 +73,10 @@ namespace utils
       verify_parameters();
     }
 
-    restaurant(const double& __discount_prior_alpha,
-	       const double& __discount_prior_beta,
-	       const double& __strength_prior_shape,
-	       const double& __strength_prior_rate)
+    restaurant_vector(const double& __discount_prior_alpha,
+		      const double& __discount_prior_beta,
+		      const double& __strength_prior_shape,
+		      const double& __strength_prior_rate)
       : tables(),
 	customers(),
 	m_discount(0.9),
@@ -91,12 +89,12 @@ namespace utils
       verify_parameters();
     }
     
-    restaurant(const double& __discount,
-	       const double& __strength,
-	       const double& __discount_prior_alpha,
-	       const double& __discount_prior_beta,
-	       const double& __strength_prior_shape,
-	       const double& __strength_prior_rate)
+    restaurant_vector(const double& __discount,
+		      const double& __strength,
+		      const double& __discount_prior_alpha,
+		      const double& __discount_prior_beta,
+		      const double& __strength_prior_shape,
+		      const double& __strength_prior_rate)
       : tables(),
 	customers(),
 	m_discount(__discount),
@@ -130,12 +128,10 @@ namespace utils
     };
     typedef Location location_type;
     
-    typedef typename Alloc::template rebind<std::pair<const dish_type, location_type> >::other alloc_type;
-    typedef typename utils::unordered_map<dish_type, location_type, Hash, Pred, alloc_type>::type dish_set_type;
+    typedef typename Alloc::template rebind<location_type >::other alloc_type;
+    typedef std::vector<location_type, alloc_type> dish_set_type;
 
   public:
-    typedef typename dish_set_type::key_type       key_type;
-    typedef typename dish_set_type::mapped_type    mapped_type;
     typedef typename dish_set_type::value_type     value_type;
     typedef typename dish_set_type::const_iterator const_iterator;
     typedef typename dish_set_type::const_iterator iterator;
@@ -168,21 +164,20 @@ namespace utils
     
     size_type size_table(const dish_type& dish) const
     {
-      typename dish_set_type::const_iterator diter = dishes.find(dish);
-      
-      return (diter == dishes.end() ? size_type(0) : diter->second.tables.size());
+      return (dish < dishes.size() ? dishes[dish].tables.size() : size_type(0));
     }
 
     size_type size_customer(const dish_type& dish) const
     {
-      typename dish_set_type::const_iterator diter = dishes.find(dish);
-      
-      return (diter == dishes.end() ? size_type(0) : diter->second.customers);
+      return (dish < dishes.size() ? dishes[dish].customers : size_type(0));
     }
     
     template <typename Sampler>
     bool increment(const dish_type& dish, const double& p0, Sampler& sampler, const double temperature=1.0)
     {
+      if (dish >= dishes.size())
+	dishes.resize(dish + 1);
+      
       location_type& loc = dishes[dish];
       
       bool existing = false;
@@ -226,12 +221,10 @@ namespace utils
     template <typename Sampler>
     bool decrement(const dish_type& dish, Sampler& sampler)
     {
-      typename dish_set_type::iterator diter = dishes.find(dish);
-      
-      if (diter == dishes.end())
+      if (dish >= dishes.size())
 	throw std::runtime_error("dish was not inserted?");
       
-      location_type& loc = diter->second;
+      location_type& loc = dishes[dish];
       
       if (loc.customers == 1) {
 	dishes.erase(diter);
@@ -267,12 +260,10 @@ namespace utils
     template <typename P>
     P prob(const dish_type& dish, const P& p0) const
     {
-      typename dish_set_type::const_iterator diter = dishes.find(dish);
-      
-      if (diter == dishes.end())
+      if (dish >= dishes.size())
 	return P(tables * m_discount + m_strength) * p0 / P(customers + m_strength);
       else
-	return (P(diter->second.customers - m_discount * diter->second.tables.size()) + P(tables * m_discount + m_strength) * p0) / P(customers + m_strength);
+	return (P(dishes[dish].customers - m_discount * dishes[dish].tables.size()) + P(tables * m_discount + m_strength) * p0) / P(customers + m_strength);
     }
     
     double log_likelihood() const
@@ -305,7 +296,7 @@ namespace utils
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
-	  const location_type& loc = diter->second;
+	  const location_type& loc = *diter;
 	  
 	  typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
 	  for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
@@ -316,7 +307,7 @@ namespace utils
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
-	  logprob += utils::mathop::lgamma(diter->second.tables.size());
+	  logprob += utils::mathop::lgamma(diter->tables.size());
       } else
 	throw std::runtime_error("negative discount?");
       
@@ -326,9 +317,9 @@ namespace utils
   private:    
     struct DiscountSampler
     {
-      DiscountSampler(const restaurant& __crp) : crp(__crp) {}
+      DiscountSampler(const restaurant_vector& __crp) : crp(__crp) {}
       
-      const restaurant& crp;
+      const restaurant_vector& crp;
       
       double operator()(const double& proposed_discount) const
       {
@@ -338,9 +329,9 @@ namespace utils
     
     struct StrengthSampler
     {
-      StrengthSampler(const restaurant& __crp) : crp(__crp) {}
+      StrengthSampler(const restaurant_vector& __crp) : crp(__crp) {}
       
-      const restaurant& crp;
+      const restaurant_vector& crp;
       
       double operator()(const double& proposed_strength) const
       {
@@ -390,7 +381,7 @@ namespace utils
       
       typename dish_set_type::const_iterator diter_end = dishes.end();
       for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
-	const location_type& loc = diter->second;
+	const location_type& loc = *diter;
 	
 	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
