@@ -59,6 +59,7 @@ simple_vector_main
 small_vector_main
 sparse_map_main
 static_allocator_main
+stick_break_main
 subprocess_main
 succinct_vector_main
 tempfile_main

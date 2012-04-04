@@ -47,6 +47,7 @@
 #include "utils/packed_vector.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/dense_hash_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -80,17 +81,37 @@ struct PYPPOS
   typedef utils::stick_break< > beta_type;
 
   typedef utils::pyp_parameter parameter_type;
+
+  PYPPOS(const double __h,
+	 const size_type classes,
+	 const parameter_type& __emission,
+	 const parameter_type& __transition)
+    : h(__h),
+      h_counts(0),
+      phi0(__emission),
+      phi(classes, table_emission_type(__emission)),
+      alpha0(1.0 / (classes + 2)), // + 1 for BOS, +1 for infinity
+      counts0(0),
+      beta(__transition.discount, __transition.strength),
+      pi0(__transition),
+      pi(classes, table_transition_type(__transition)),
+      emission0(__emission),
+      emission(__emission),
+      transition0(__transition),
+      transition(__transition) {}
   
   template <typename Sampler>
   void increment(const id_type prev, const id_type next, const word_type& word, Sampler& sampler, const double temperature=1.0)
   {
     // emission
-    if (next >= phi.size())
-      phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
-    
-    if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
-      if (phi0.increment(word, h, sampler, temperature))
-	++ h_counts;
+    if (word != vocab_type::BOS) {
+      if (next >= phi.size())
+	phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
+      
+      if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
+	if (phi0.increment(word, h, sampler, temperature))
+	  ++ h_counts;
+    }
     
     // transition
     if (prev >= pi.size())
@@ -109,9 +130,10 @@ struct PYPPOS
   void decrement(const id_type prev, const id_type next, const word_type& word, Sampler& sampler)
   {
     // emission
-    if (phi[next].decrement(word, sampler))
-      if (phi0.decrement(word, sampler))
-	-- h_counts;
+    if (word != vocab_type::BOS)
+      if (phi[next].decrement(word, sampler))
+	if (phi0.decrement(word, sampler))
+	  -- h_counts;
     
     // transition
     if (pi[prev].decrement(next, sampler))
@@ -132,7 +154,7 @@ struct PYPPOS
     
     return (prev < pi.size() ? pi[prev].prob(next, p0) : p0);
   }
-  
+
   double prob_transition(const id_type next) const
   {
     return beta[next];
@@ -281,8 +303,8 @@ struct PYPPOS
   
   double                alpha0;
   size_type             counts0;
-  table_transition_type pi0;
   beta_type             beta;
+  table_transition_type pi0;
   transition_type       pi;
   
   parameter_type emission0;
@@ -317,19 +339,20 @@ struct PYPGraph
     // first, fill-in cutoff-values
     cutoff.clear();
     cutoff.resize(sentence.size() + 2, 0.0);
+
+    const size_type T = cutoff.size();
+    const size_type K = model.beta.size();
     
     // we compute threshold based on pi
     double cutoff_min = std::numeric_limits<double>::infinity();
-    const size_type T = cutoff.size();
     for (size_type t = 1; t != T - 1; ++ t) {
-      cutoff[t] = sampler.model.uniform(0.0, model.prob_transition(derivation[t - 1], derivation[t]));
+      cutoff[t] = sampler.uniform(0.0, model.prob_transition(derivation[t - 1], derivation[t]));
       cutoff_min = std::min(cutoff_min, cutoff[t]);
     }
     cutoff.back() = 0.0;
     
     // second, check to see if we need more classes!
     // we check cutoff_min to see if we have enough sticks...
-    const size_type K = model.beta.size();
     double pi_max = - std::numeric_limits<double>::infinity();
     for (size_type prev = 0; prev != K; ++ prev) {
       double pi_min = std::numeric_limits<double>::infinity();
@@ -367,11 +390,11 @@ struct PYPGraph
     phi.clear();
     phi.resize(T, K);
     for (size_type t = 1; t != T - 1; ++ t)
-      for (id_type state = 0; state != K; ++ state)
+      for (id_type state = 1; state != K; ++ state)
 	phi(t, state) = model.prob_emission(state, sentence[t - 1]);
     
-    phi(0, 0)     = model.prob_emission(state, vocab_type::BOS);
-    phi(T - 1, 0) = phi(0, 0);
+    phi(0, 0)     = 1.0;
+    phi(T - 1, 0) = 1.0;
   }
   
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
@@ -452,6 +475,19 @@ typedef std::vector<cutoff_type, std::allocator<cutoff_type> > cutoff_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
+struct less_size
+{
+  less_size(const sentence_set_type& __training) : training(__training) {}
+  
+  bool operator()(const size_type& x, const size_type& y) const
+  {
+    return training[x].size() < training[y].size();
+  }
+
+  const sentence_set_type& training;
+};
+
+
 path_set_type train_files;
 path_set_type test_files;
 path_type     output_file;
@@ -485,7 +521,7 @@ int threads = 1;
 int debug = 0;
 
 void options(int argc, char** argv);
-void read_data(const path_set_type& paths, sentence_set_type& sentences);
+size_t read_data(const path_set_type& paths, sentence_set_type& sentences);
 
 int main(int argc, char ** argv)
 {
@@ -499,6 +535,9 @@ int main(int argc, char ** argv)
             
     if (resample_rate <= 0)
       throw std::runtime_error("resample rate must be >= 1");
+
+    if (classes <= 0)
+      throw std::runtime_error("zero/negative initial class size");
     
     if (train_files.empty())
       throw std::runtime_error("no training data?");
@@ -507,7 +546,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
     
     sentence_set_type training;
-    read_data(train_files, training);
+    const size_type vocab_size = read_data(train_files, training);
     
     if (training.empty())
       throw std::runtime_error("no training data?");
@@ -519,6 +558,118 @@ int main(int argc, char ** argv)
     for (size_t i = 0; i != training.size(); ++ i)
       positions[i] = i;
 
+    sampler_type sampler;
+
+    PYPPOS model(1.0 / vocab_size,
+		 classes, 
+		 PYPPOS::parameter_type(emission_discount,
+					emission_strength,
+					emission_discount_prior_alpha,
+					emission_discount_prior_beta,
+					emission_strength_prior_shape,
+					emission_strength_prior_rate),
+		 PYPPOS::parameter_type(transition_discount,
+					transition_strength,
+					transition_discount_prior_alpha,
+					transition_discount_prior_beta,
+					transition_strength_prior_shape,
+					transition_strength_prior_rate));
+    
+    model.sample_parameters(sampler, resample_iterations);
+
+    PYPGraph graph;
+
+    if (debug >= 2)
+      std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
+		<< "emission discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
+		<< "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
+		<< "transition discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
+    
+    size_t anneal_iter = 0;
+    const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+    
+    size_t baby_iter = 0;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
+    
+    bool sampling = false;
+    int sample_iter = 0;
+    
+        // then, learn!
+    for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
+      
+      double temperature = 1.0;
+      bool anneal_finished = true;
+      if (anneal_iter != anneal_last) {
+	anneal_finished = false;
+	temperature = double(anneal_last - anneal_iter) + 1;
+	
+	++ anneal_iter;
+	
+	if (debug >= 2)
+	  std::cerr << "temperature: " << temperature << std::endl;
+      }
+      
+      bool baby_finished = true;
+      if (baby_iter != baby_last) {
+	++ baby_iter;
+	baby_finished = false;
+      }
+      
+      sampling = anneal_finished && baby_finished;
+      
+      if (debug) {
+	if (sampling)
+	  std::cerr << "sampling iteration: " << (iter + 1) << std::endl;
+	else
+	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
+      }
+      
+      boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
+      
+      std::random_shuffle(positions.begin(), positions.end(), gen);
+      if (! baby_finished)
+	std::sort(positions.begin(), positions.end(), less_size(training));
+
+      std::vector<double, std::allocator<double> > probs;
+      
+      for (size_t i = 0; i != positions.size(); ++ i) {
+	const size_t pos = positions[i];
+	
+	if (training[pos].empty()) continue;
+	
+	if (debug >= 3)
+	  std::cerr << "training=" << pos << std::endl;
+	
+	if (derivations[pos].empty()) {
+	  // sample derivation...
+	  const size_type K = model.beta.size();
+	  
+	  derivations[pos].push_back(0);
+	  
+	  for (size_type i = 0; i != training[pos].size(); ++ i) {
+	    
+	    probs.clear();
+	    for (size_type state = 1; state != K; ++ state)
+	      probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
+	    
+	    derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+	  }
+	  
+	  derivations[pos].push_back(0);
+	  
+	} else {
+	  // remove from the model...
+	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	    model.decrement(derivations[pos][t - 1], derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1], sampler);
+	}
+	
+	// pruning...
+	graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
+	
+	
+	
+      }
+    }
     
   }
   catch (const std::exception& err) {
@@ -528,17 +679,27 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-void read_data(const path_set_type& paths, sentence_set_type& sentences)
+size_t read_data(const path_set_type& paths, sentence_set_type& sentences)
 {
-  sentences.clear();
+  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type vocab_type;
   
+  vocab_type vocab;
+  vocab.set_empty_key(word_type());
+  
+  sentences.clear();
+    
   sentence_type sentence;
   for (path_set_type::const_iterator fiter = paths.begin(); fiter != paths.end(); ++ fiter) { 
     utils::compress_istream is(*fiter, 1024 * 1024);
     
-    while (is >> sentence)
+    while (is >> sentence) {
       sentences.push_back(sentence);
+      
+      vocab.insert(sentence.begin(), sentence.end());
+    }
   }
+  
+  return vocab.size();
 }
 void options(int argc, char** argv)
 {

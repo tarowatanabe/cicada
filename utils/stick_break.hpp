@@ -10,8 +10,11 @@
 #ifndef __UTILS__STICK_BREAK__HPP__
 #define __UTILS__STICK_BREAK__HPP__ 1
 
+#include <stdexcept>
 #include <vector>
 #include <numeric>
+
+#include <boost/lexical_cast.hpp>
 
 namespace utils
 {
@@ -40,7 +43,10 @@ namespace utils
 		const double& __strength)
       : sticks(1, 1.0),
 	m_discount(__discount),
-	m_strength(__strength) {}
+	m_strength(__strength)
+    {
+      verify_parameters();
+    }
     
   public:    
     double& discount() { return m_discount; }
@@ -116,6 +122,17 @@ namespace utils
       sticks.swap(x.sticks);
       std::swap(m_discount, x.m_discount);
       std::swap(m_strength, x.m_strength);
+    }
+
+    bool verify_parameters()
+    {
+      if (m_discount < 0.0 || m_discount >= 1.0)
+	throw std::runtime_error("invalid discount: " + boost::lexical_cast<std::string>(m_discount));
+      
+      if (m_strength <= - m_discount)
+	throw std::runtime_error("invalid strength: " + boost::lexical_cast<std::string>(m_strength));
+      
+      return true;
     }
     
   private:

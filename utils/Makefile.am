@@ -170,6 +170,7 @@ simple_vector_main \
 small_vector_main \
 sparse_map_main \
 static_allocator_main \
+stick_break_main \
 subprocess_main \
 succinct_vector_main \
 tempfile_main \
@@ -329,6 +330,9 @@ sparse_map_main_LDADD = $(LIBUTILS)
 
 random_seed_main_SOURCES = random_seed_main.cpp
 random_seed_main_LDADD = $(LIBUTILS)
+
+stick_break_main_SOURCES = stick_break_main.cpp
+
 
 subprocess_main_SOURCES = subprocess_main.cpp
 subprocess_main_LDFLAGS = $(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS)
