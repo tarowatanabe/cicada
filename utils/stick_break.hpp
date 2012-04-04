@@ -28,7 +28,7 @@ namespace utils
   private:
     typedef typename Alloc::template rebind<stick_type >::other stick_alloc_type;
     typedef std::vector<stick_type, stick_alloc_type>           stick_set_type;
-    typedef stick_break<Allco> self_type;
+    typedef stick_break<Alloc> self_type;
 
   public:
     stick_break()
@@ -48,6 +48,9 @@ namespace utils
     
     const double& discount() const { return m_discount; }
     const double& strength() const { return m_strength; }
+    
+    bool empty() const { return sticks.size() == 1; }
+    size_type size() const { return sticks.sizes() - 1; }
 
     const double& operator[](size_type pos) const
     {
@@ -58,7 +61,7 @@ namespace utils
     void increment(Sampler& sampler)
     {
       const double stick = sticks.back();
-      const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * stick.size());
+      const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * sticks.size());
       
       sticks.back() = stick * beta;
       sticks.push_back(stick * (1.0 - beta));
@@ -72,7 +75,7 @@ namespace utils
       
       for (size_t i = 0; i != size; ++ i) {
 	const double stick = sticks.back();
-	const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * stick.size());
+	const double beta = sampler.beta(1.0 - m_discount, m_strength + m_discount * sticks.size());
 	
 	sticks.back() = stick * beta;
 	sticks.push_back(stick * (1.0 - beta));
@@ -84,13 +87,17 @@ namespace utils
     {
       sticks.clear();
       sticks.insert(sticks.end(), first, last);
-      
-      const double sum = std::accumulate(sticks.begin(), sticks.end(), 0.0);
-      
-      if (sum >= 1.0 || sum < 0.0)
-	throw std::runtime_error("invalid sticks");
-      
-      sticks.push_back(1.0 - sum);
+
+      if (sticks.empty()) 
+	sticks.push_back(1.0);
+      else {
+	const double sum = std::accumulate(sticks.begin(), sticks.end(), 0.0);
+	
+	if (sum >= 1.0 || sum < 0.0)
+	  throw std::runtime_error("invalid sticks");
+	
+	sticks.push_back(1.0 - sum);
+      }
     }
 
     template <typename Mapping>
@@ -99,9 +106,16 @@ namespace utils
       stick_set_type sticks_new(sticks.size());
       
       for (size_type i = 0; i != sticks.size(); ++ i)
-	sticks_new[mapping[i]] = sticks[i];
+	sticks_new[i] = sticks[mapping[i]];
       
       sticks_new.swap(sticks);
+    }
+
+    void swap(stick_break& x)
+    {
+      sticks.swap(x.sticks);
+      std::swap(m_discount, x.m_discount);
+      std::swap(m_strength, x.m_strength);
     }
     
   private:
@@ -110,6 +124,17 @@ namespace utils
     double m_discount;
     double m_strength;
   };
+};
+
+namespace std
+{
+  template <typename A>
+  inline
+  void swap(utils::stick_break<A>& x, utils::stick_break<A>& y)
+  {
+    x.swap(y);
+  }
+  
 };
 
 #endif

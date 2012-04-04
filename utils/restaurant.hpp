@@ -174,6 +174,15 @@ namespace utils
       
       return (diter == dishes.end() ? size_type(0) : diter->second.customers);
     }
+
+    void swap(restaurant& x)
+    {
+      std::swap(tables, x.tables);
+      std::swap(customers, x.customers);
+      dishes.swap(x.dishes);
+      parameter.swap(x.parameter);
+    }
+
     
     template <typename Sampler>
     bool increment(const dish_type& dish, const double& p0, Sampler& sampler, const double temperature=1.0)
@@ -511,12 +520,21 @@ namespace utils
     }
     
   private:
-    size_type tables;
-    size_type customers;
-    dish_set_type dishes;
-
+    size_type      tables;
+    size_type      customers;
+    dish_set_type  dishes;
     parameter_type parameter;
   };
+};
+
+namespace std
+{
+  template <typename T, typename H, typename P, typename A>
+  inline
+  void swap(utils::restaurant<T,H,P,A>& x, utils::restaurant<T,H,P,A>& y)
+  {
+    x.swap(y);
+  }
 };
 
 #endif

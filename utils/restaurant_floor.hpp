@@ -191,6 +191,14 @@ namespace utils
       return (diter == dishes.end() ? size_type(0) : diter->second.customers);
     }
     
+    void swap(restaurant_floor& x)
+    {
+      std::swap(tables, x.tables);
+      std::swap(customers, x.customers);
+      dishes.swap(x.dishes);
+      parameter.swap(x.parameter);
+    }
+
     template <typename PriorIterator, typename LambdaIterator, typename Sampler>
     std::pair<size_type, bool> increment(const dish_type& dish,
 					 PriorIterator first,
@@ -560,5 +568,16 @@ namespace utils
     parameter_type parameter;
   };
 };
+
+namespace std
+{
+  template <typename T, typename H, typename P, typename A>
+  inline
+  void swap(utils::restaurant_floor<T,H,P,A>& x, utils::restaurant_floor<T,H,P,A>& y)
+  {
+    x.swap(y);
+  }
+};
+
 
 #endif

@@ -99,6 +99,18 @@ namespace utils
       return logprob;
     }
 
+    void swap(pyp_parameter& x)
+    {
+      std::swap(discount, x.discount);
+      std::swap(strength, x.strength);
+      
+      std::swap(discount_alpha, x.discount_alpha);
+      std::swap(discount_beta,  x.discount_beta);
+
+      std::swap(strength_shape, x.strength_shape);
+      std::swap(strength_rate,  x.strength_rate);
+    }
+
     double discount;
     double strength;
     
@@ -108,5 +120,16 @@ namespace utils
     double strength_rate;
   };
 };
+
+namespace std
+{
+  inline
+  void swap(utils::pyp_parameter& x, utils::pyp_parameter& y)
+  {
+    x.swap(y);
+  }
+  
+};
+
 
 #endif

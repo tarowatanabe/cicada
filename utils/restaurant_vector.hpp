@@ -4,8 +4,8 @@
 //
 
 
-#ifndef __UTILS__RESTAURANT__HPP__
-#define __UTILS__RESTAURANT__HPP__ 1
+#ifndef __UTILS__RESTAURANT_VECTOR__HPP__
+#define __UTILS__RESTAURANT_VECTOR__HPP__ 1
 
 #include <numeric>
 #include <limits>
@@ -181,6 +181,14 @@ namespace utils
     size_type size_customer(const dish_type dish) const
     {
       return (dish < dishes.size() ? dishes[dish].customers : size_type(0));
+    }
+
+    void swap(restaurant_vector& x)
+    {
+      std::swap(tables, x.tables);
+      std::swap(customers, x.customers);
+      dishes.swap(x.dishes);
+      parameter.swap(x.parameter);
     }
 
     template <typename Mapping>
@@ -541,5 +549,17 @@ namespace utils
     parameter_type parameter;
   };
 };
+
+namespace std
+{
+  template <typename A>
+  inline
+  void swap(utils::restaurant_vector<A>& x, utils::restaurant_vector<A>& y)
+  {
+    x.swap(y);
+  }
+  
+};
+
 
 #endif

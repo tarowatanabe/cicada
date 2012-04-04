@@ -43,7 +43,15 @@ namespace utils
     
     double operator()() { return uniform(); }
     
-    double uniform() { return boost::uniform_01<double>()(gen); }
+    double uniform()
+    {
+      return boost::uniform_01<double>()(gen);
+    }
+
+    double uniform(const double& min, const double& max)
+    {
+      return boost::random::uniform_real_distribution<double>(min, max)(gen);
+    }
     
     double normal(const double& mean, const double& var)
     {
