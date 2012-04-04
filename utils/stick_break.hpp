@@ -50,7 +50,7 @@ namespace utils
     const double& strength() const { return m_strength; }
     
     bool empty() const { return sticks.size() == 1; }
-    size_type size() const { return sticks.sizes() - 1; }
+    size_type size() const { return sticks.size() - 1; }
 
     const double& operator[](size_type pos) const
     {

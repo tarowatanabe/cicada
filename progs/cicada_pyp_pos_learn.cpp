@@ -86,7 +86,7 @@ struct PYPPOS
   {
     // emission
     if (next >= phi.size())
-      phi.resize(next + 1);
+      phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
     
     if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
       if (phi0.increment(word, h, sampler, temperature))
@@ -94,7 +94,7 @@ struct PYPPOS
     
     // transition
     if (prev >= pi.size())
-      pi.resize(prev + 1);
+      pi.resize(prev + 1, table_transition_type(transition.discount, transition.strength));
     
     // break sticks further...
     while (next >= beta.size() || prev >= beta.size())
@@ -305,8 +305,6 @@ struct PYPGraph
   typedef double prob_type;
   
   typedef utils::vector2<double, std::allocator<double> > alpha_type;
-  typedef std::vector<double, std::allocator<double> >    scale_type;
-  
   
   typedef utils::vector2<double, std::allocator<double> >    phi_type; // emission
   typedef utils::vector2<double, std::allocator<double> >    pi_type;  // transition
@@ -340,7 +338,7 @@ struct PYPGraph
       
       pi_max = std::max(pi_max, pi_min);
     }
-
+    
     while (pi_max > cutoff_min) {
       model.beta.increment(sampler);
       
@@ -352,7 +350,28 @@ struct PYPGraph
 
   void initialize(const sentence_type& sentence, const PYPPOS& model)
   {
+    const size_type T = sentence.size() + 2;
+    const size_type K = model.beta.size();
     
+    alpha.clear();
+    alpha.reserve(T, K);
+    alpha.resize(T, K);
+    alpha(0,0) = 1.0;
+    
+    pi.clear();
+    pi.resize(K, K);
+    for (id_type prev = 0; prev != K; ++ prev)
+      for (id_type next = 0; next != K; ++ next)
+	pi(prev, next) = model.prob_transition(prev, next);
+    
+    phi.clear();
+    phi.resize(T, K);
+    for (size_type t = 1; t != T - 1; ++ t)
+      for (id_type state = 0; state != K; ++ state)
+	phi(t, state) = model.prob_emission(state, sentence[t - 1]);
+    
+    phi(0, 0)     = model.prob_emission(state, vocab_type::BOS);
+    phi(T - 1, 0) = phi(0, 0);
   }
   
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
@@ -364,17 +383,17 @@ struct PYPGraph
     
     logprob_type logsum;
     for (size_type t = 1; t != T; ++ t) {
-      for (size_type prev = 0; prev != K; ++ prev)
-	for (size_type next = 0; next != K; ++ next)
+      for (id_type prev = 0; prev != K; ++ prev)
+	for (id_type next = 0; next != K; ++ next)
 	  if (pi(prev, next) > cutoff[t])
 	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(next, t);
       
-      scale[t] = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
-      scale[t] = (scale[t] == 0.0 ? 1.0 : 1.0 / scale[t]);
-      if (scale[t] != 1.0)
-	std::transform(alpha.begin(t), alpha.end(t), alpha.begin(t), std::bind2nd(std::multiplies<double>(), scale[t]));
-
-      logsum += scale[t];
+      double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
+      scale = (scale == 0.0 ? 1.0 : 1.0 / scale);
+      if (scale != 1.0)
+	std::transform(alpha.begin(t), alpha.end(t), alpha.begin(t), std::bind2nd(std::multiplies<double>(), scale));
+      
+      logsum += scale;
     }
     
     return logsum;
@@ -391,22 +410,20 @@ struct PYPGraph
     derivation.push_back(0);
     
     id_type state = 0;
-    for (size_type t = T - 1; t > 0; -- t) {
-      const bool adjust = (t - 1 != 0);
-      
+    for (size_type t = T - 1; t > 2; -- t) {
       probs.clear();
-      for (size_type prev = adjust; prev != K; ++ prev)
+      for (id_type prev = 1; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(state, t));
-
+      
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
       
-      state = (piter - probs.begin()) + adjust;
+      state = (piter - probs.begin()) + 1;
       
       logprob += *piter / alpha(t - 1, state);
     }
     
     derivation.push_back(0);
-
+    
     std::reverse(derivation.begin(), derivation.end());
     
     return logprob;
@@ -415,7 +432,6 @@ struct PYPGraph
   phi_type    phi;
   pi_type     pi;
   alpha_type  alpha;
-  scale_type  scale;
 
   prob_set_type    probs;
 };
@@ -424,6 +440,17 @@ typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
+
+typedef PYP::size_type       size_type;
+typedef PYP::difference_type difference_type;
+
+typedef PYPGraph::derivation_type derivation_type;
+typedef PYPGraph::cutoff_type     cutoff_type;
+
+typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
+typedef std::vector<cutoff_type, std::allocator<cutoff_type> > cutoff_set_type;
+typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
 path_set_type train_files;
 path_set_type test_files;
@@ -458,6 +485,7 @@ int threads = 1;
 int debug = 0;
 
 void options(int argc, char** argv);
+void read_data(const path_set_type& paths, sentence_set_type& sentences);
 
 int main(int argc, char ** argv)
 {
@@ -477,7 +505,21 @@ int main(int argc, char ** argv)
     
     if (! slice_sampling && (emission_strength < 0.0 || transition_strength < 0.0))
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
+    
+    sentence_set_type training;
+    read_data(train_files, training);
+    
+    if (training.empty())
+      throw std::runtime_error("no training data?");
+    
+    derivation_set_type derivations(training.size());
+    cutoff_set_type     cutoffs(training.size());
+    position_set_type   positions(training.size());
+    
+    for (size_t i = 0; i != training.size(); ++ i)
+      positions[i] = i;
 
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -486,7 +528,18 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-
+void read_data(const path_set_type& paths, sentence_set_type& sentences)
+{
+  sentences.clear();
+  
+  sentence_type sentence;
+  for (path_set_type::const_iterator fiter = paths.begin(); fiter != paths.end(); ++ fiter) { 
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    
+    while (is >> sentence)
+      sentences.push_back(sentence);
+  }
+}
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
