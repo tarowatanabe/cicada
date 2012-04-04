@@ -641,7 +641,7 @@ int main(int argc, char ** argv)
 	  std::cerr << "training=" << pos << std::endl;
 	
 	if (derivations[pos].empty()) {
-	  // sample derivation...
+	  // it is our initial condition... sample derivation...
 	  const size_type K = model.beta.size();
 	  
 	  derivations[pos].push_back(0);
@@ -666,8 +666,22 @@ int main(int argc, char ** argv)
 	// pruning...
 	graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
 	
+	const PYPGraph::logprob_type logsum = graph.forward(training[pos], model, cutoffs[pos]);
 	
+	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
 	
+	if (debug >= 3) {
+	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
+	  
+	  for (size_type t = 0; t != derivations[pos].size(); ++ i)
+	    std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
+		      << " pos=" << derivations[pos][t]
+		      << std::endl;
+	}
+	
+	// insert into the model
+	for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	  model.increment(derivations[pos][t - 1], derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1], sampler, temperature);
       }
     }
     
