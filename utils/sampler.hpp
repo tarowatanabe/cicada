@@ -124,7 +124,7 @@ namespace utils
       return x / (x + y);
     }
     
-    bool select(double a, double b, const double temperature=1.0)
+    bool draw(double a, double b, const double temperature=1.0)
     {
       using namespace std;
 
@@ -138,7 +138,7 @@ namespace utils
     }
 
     template <typename Iterator>
-    Iterator select(Iterator first, Iterator last, const double temperature=1.0)
+    Iterator draw(Iterator first, Iterator last, const double temperature=1.0)
     {
       using namespace std;
 

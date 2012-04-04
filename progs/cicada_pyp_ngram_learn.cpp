@@ -196,7 +196,7 @@ struct PYPLM
 	backoff_n *= double(orders[n].second + order_beta) / prob_n_denom;
       }
       
-      prob_set_type::const_iterator piter = sampler.select(probs.begin(), probs.end(), temperature);
+      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
       order = (piter - probs.begin()) + 1;
       
@@ -455,6 +455,21 @@ struct PYPLM
       }
       
       strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+      
+      if (order == 0) {
+	root.table.discount() = discount[order];
+	root.table.strength() = strength[order];
+
+	root.table.verify_parameters();
+      } else {
+	node_set_type::const_iterator niter_end = nodes[order].end();
+	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	  trie[*niter].table.discount() = discount[order];
+	  trie[*niter].table.strength() = strength[order];
+	  
+	  trie[*niter].table.verify_parameters();
+	}
+      }
     }
   }
 

@@ -93,6 +93,7 @@ packed_device.hpp \
 packed_vector.hpp \
 piece.hpp \
 program_options.hpp \
+pyp_parameter.hpp \
 python_string_parser.hpp \
 python_string_generator.hpp \
 random_seed.hpp \
@@ -115,7 +116,7 @@ sparse_set.hpp \
 spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
-stich_break.hpp \
+stick_break.hpp \
 subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \

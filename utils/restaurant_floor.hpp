@@ -19,6 +19,7 @@
 #include <utils/unordered_map.hpp>
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
+#include <utils/pyp_parameter.hpp>
 
 // Chinese Restaurant_Floor Process
 //
@@ -57,67 +58,62 @@ namespace utils
     typedef ptrdiff_t difference_type;
 
     typedef Tp dish_type;
+    typedef pyp_parameter parameter_type;
     
   public:
     restaurant_floor()
       : tables(),
 	customers(),
-	m_discount(0.9),
-	m_strength(1.0),
-	discount_prior_alpha(std::numeric_limits<double>::quiet_NaN()),
-	discount_prior_beta(std::numeric_limits<double>::quiet_NaN()),
-	strength_prior_shape(std::numeric_limits<double>::quiet_NaN()),
-	strength_prior_rate(std::numeric_limits<double>::quiet_NaN())
-    {
-      verify_parameters();
-    }
+	parameter()
+    { }
+
+    restaurant_floor(const parameter_type& __parameter)
+      : tables(),
+	customers(),
+	parameter(__parameter)
+    { }
+    
     
     restaurant_floor(const double& __discount,
 		     const double& __strength)
       : tables(),
 	customers(),
-	m_discount(__discount),
-	m_strength(__strength),
-	discount_prior_alpha(std::numeric_limits<double>::quiet_NaN()),
-	discount_prior_beta(std::numeric_limits<double>::quiet_NaN()),
-	strength_prior_shape(std::numeric_limits<double>::quiet_NaN()),
-	strength_prior_rate(std::numeric_limits<double>::quiet_NaN())
+	parameter(__discount,
+		  __strength)
     {
-      verify_parameters();
+      parameter.verify_parameters();
     }
 
-    restaurant_floor(const double& __discount_prior_alpha,
-		     const double& __discount_prior_beta,
-		     const double& __strength_prior_shape,
-		     const double& __strength_prior_rate)
+    restaurant_floor(const double& __discount_alpha,
+		     const double& __discount_beta,
+		     const double& __strength_shape,
+		     const double& __strength_rate)
       : tables(),
 	customers(),
-	m_discount(0.9),
-	m_strength(1.0),
-	discount_prior_alpha(__discount_prior_alpha),
-	discount_prior_beta(__discount_prior_beta),
-	strength_prior_shape(__strength_prior_shape),
-	strength_prior_rate(__strength_prior_rate)
+	parameter(__discount_alpha,
+		  __discount_beta,
+		  __strength_shape,
+		  __strength_rate)
     {
-      verify_parameters();
+      parameter.verify_parameters();
     }
     
     restaurant_floor(const double& __discount,
 		     const double& __strength,
-		     const double& __discount_prior_alpha,
-		     const double& __discount_prior_beta,
-		     const double& __strength_prior_shape,
-		     const double& __strength_prior_rate)
+		     const double& __discount_alpha,
+		     const double& __discount_beta,
+		     const double& __strength_shape,
+		     const double& __strength_rate)
       : tables(),
 	customers(),
-	m_discount(__discount),
-	m_strength(__strength),
-	discount_prior_alpha(__discount_prior_alpha),
-	discount_prior_beta(__discount_prior_beta),
-	strength_prior_shape(__strength_prior_shape),
-	strength_prior_rate(__strength_prior_rate)
+	parameter(__discount,
+		  __strength,
+		  __discount_alpha,
+		  __discount_beta,
+		  __strength_shape,
+		  __strength_rate)
     {
-      verify_parameters();
+      parameter.verify_parameters();
     }
 
   private:
@@ -159,14 +155,14 @@ namespace utils
     const_iterator begin() const { return dishes.begin(); }
     const_iterator end() const { return dishes.end(); }
 
-    bool has_discount_prior() const { return ! std::isnan(discount_prior_alpha) && ! std::isnan(discount_prior_beta); }
-    bool has_strength_prior() const { return ! std::isnan(strength_prior_shape) && ! std::isnan(strength_prior_rate); }
+    bool has_discount_prior() const { return parameter.has_discount_prior(); }
+    bool has_strength_prior() const { return parameter.has_strength_prior(); }
 
-    double& discount() { return m_discount; }
-    double& strength() { return m_strength; }
+    double& discount() { return parameter.discount; }
+    double& strength() { return parameter.strength; }
 
-    const double& discount() const { return m_discount; }
-    const double& strength() const { return m_strength; }
+    const double& discount() const { return parameter.discount; }
+    const double& strength() const { return parameter.strength; }
     
     void clear()
     {
@@ -211,24 +207,24 @@ namespace utils
       bool existing = false;
       if (loc.customers) {
 	if (temperature == 1.0) {
-	  const double p_base = (m_strength + tables * m_discount) * p0;
-	  const double p_gen  = (loc.customers - loc.tables.size() * m_discount);
+	  const double p_base = (parameter.strength + tables * parameter.discount) * p0;
+	  const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	} else {
-	  const double p_base = std::pow((m_strength + tables * m_discount) * p0, 1.0 / temperature);
-	  const double p_gen  = std::pow((loc.customers - loc.tables.size() * m_discount), 1.0 / temperature);
+	  const double p_base = std::pow((parameter.strength + tables * parameter.discount) * p0, 1.0 / temperature);
+	  const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	}
       }
       
       if (existing) {
-	double r = sampler.uniform() * (loc.customers - loc.tables.size() * m_discount);
+	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
 	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	  r -= titer->first - m_discount;
+	  r -= titer->first - parameter.discount;
 	  
 	  if (r <= 0.0) {
 	    ++ titer->first;
@@ -312,14 +308,14 @@ namespace utils
       const P p0 = std::inner_product(first, last, lambda, P(0));
       
       if (diter == dishes.end())
-	return P(tables * m_discount + m_strength) * p0 / P(customers + m_strength);
+	return P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength);
       else
-	return (P(diter->second.customers - m_discount * diter->second.tables.size()) + P(tables * m_discount + m_strength) * p0) / P(customers + m_strength);
+	return (P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
     
     double log_likelihood() const
     {
-      return log_likelihood(m_discount, m_strength);
+      return log_likelihood(parameter.discount, parameter.strength);
     }
     
     // http://en.wikipedia.org/wiki/Chinese_restaurant_process
@@ -328,10 +324,10 @@ namespace utils
       double logprob = 0.0;
       
       if (has_discount_prior())
-	logprob += utils::mathop::log_beta_density(discount, discount_prior_alpha, discount_prior_beta);
+	logprob += utils::mathop::log_beta_density(discount, parameter.discount_alpha, parameter.discount_beta);
       
       if (has_strength_prior())
-	logprob += utils::mathop::log_gamma_density(strength + discount, strength_prior_shape, strength_prior_rate);
+	logprob += utils::mathop::log_gamma_density(strength + discount, parameter.strength_prior_shape, parameter.strength_prior_rate);
       
       if (! customers) return logprob;
       
@@ -452,7 +448,7 @@ namespace utils
       const double x = sample_log_x(sampler, discount, strength);
       const double y = sample_y(sampler, discount, strength);
       
-      return sampler.gamma(strength_prior_shape + y, strength_prior_rate - x);
+      return sampler.gamma(parameter.strength_prior_shape + y, parameter.strength_prior_rate - x);
     }
     
     template <typename Sampler>
@@ -464,7 +460,7 @@ namespace utils
       const double y = sample_y_inv(sampler, discount, strength);
       const double z = sample_z_inv(sampler, discount, strength);
       
-      return sampler.beta(discount_prior_alpha + y, discount_prior_beta + z);
+      return sampler.beta(parameter.discount_alpha + y, parameter.discount_beta + z);
     }
     
     template <typename Sampler>
@@ -474,7 +470,7 @@ namespace utils
       const double y = sample_y(sampler, discount, strength);
       
       if (has_strength_prior())
-	return (strength_prior_shape + y) / (strength_prior_rate - x);
+	return (parameter.strength_prior_shape + y) / (parameter.strength_prior_rate - x);
       else
 	return - y / x;
     }
@@ -486,8 +482,8 @@ namespace utils
       const double z = sample_z_inv(sampler, discount, strength);
       
       if (has_discount_prior()) {
-	const double a = discount_prior_alpha + y;
-	const double b = discount_prior_beta  + z;
+	const double a = parameter.discount_alpha + y;
+	const double b = parameter.discount_beta  + z;
 	
 	return a / (a + b);
       } else
@@ -496,13 +492,7 @@ namespace utils
     
     bool verify_parameters()
     {
-      if (m_discount < 0.0 || m_discount >= 1.0)
-	throw std::runtime_error("invalid discount: " + boost::lexical_cast<std::string>(m_discount));
-      
-      if (m_strength <= - m_discount)
-	throw std::runtime_error("invalid strength: " + boost::lexical_cast<std::string>(m_strength));
-      
-      return true;
+      return parameter.verify_parameters();
     }
     
     template <typename Sampler>
@@ -512,14 +502,14 @@ namespace utils
       
       for (int iter = 0; iter != num_loop; ++ iter) {
 	if (has_strength_prior())
-	  m_strength = sample_strength(sampler, m_discount, m_strength);
+	  parameter.strength = sample_strength(sampler, parameter.discount, parameter.strength);
 	
 	if (has_discount_prior()) 
-	  m_discount = sample_discount(sampler, m_discount, m_strength);
+	  parameter.discount = sample_discount(sampler, parameter.discount, parameter.strength);
       }
       
       if (has_strength_prior())
-	m_strength = sample_strength(sampler, m_discount, m_strength);
+	parameter.strength = sample_strength(sampler, parameter.discount, parameter.strength);
     }
     
     template <typename Sampler>
@@ -532,52 +522,42 @@ namespace utils
 
       for (int iter = 0; iter != num_loop; ++ iter) {
 	if (has_strength_prior())
-	  m_strength = slice_sampler(strength_sampler,
-				     m_strength,
-				     sampler,
-				     - m_discount + std::numeric_limits<double>::min(),
-				     std::numeric_limits<double>::infinity(),
-				     0.0,
-				     num_iterations,
-				     100 * num_iterations);
+	  parameter.strength = slice_sampler(strength_sampler,
+					     parameter.strength,
+					     sampler,
+					     - parameter.discount + std::numeric_limits<double>::min(),
+					     std::numeric_limits<double>::infinity(),
+					     0.0,
+					     num_iterations,
+					     100 * num_iterations);
 	
 	if (has_discount_prior()) 
-	  m_discount = slice_sampler(discount_sampler,
-				     m_discount,
-				     sampler,
-				     (m_strength < 0.0 ? - m_strength : 0.0) + std::numeric_limits<double>::min(),
-				     1.0,
-				     0.0,
-				     num_iterations,
-				     100 * num_iterations);
+	  parameter.discount = slice_sampler(discount_sampler,
+					     parameter.discount,
+					     sampler,
+					     (parameter.strength < 0.0 ? - parameter.strength : 0.0) + std::numeric_limits<double>::min(),
+					     1.0,
+					     0.0,
+					     num_iterations,
+					     100 * num_iterations);
       }
       
       if (has_strength_prior())
-	m_strength = slice_sampler(strength_sampler,
-				   m_strength,
-				   sampler,
-				   - m_discount + std::numeric_limits<double>::min(),
-				   std::numeric_limits<double>::infinity(),
-				   0.0,
-				   num_iterations,
-				   100 * num_iterations);
+	parameter.strength = slice_sampler(strength_sampler,
+					   parameter.strength,
+					   sampler,
+					   - parameter.discount + std::numeric_limits<double>::min(),
+					   std::numeric_limits<double>::infinity(),
+					   0.0,
+					   num_iterations,
+					   100 * num_iterations);
     }
     
   private:
-    size_type tables;
-    size_type customers;
-    dish_set_type dishes;
-    
-    double m_discount;
-    double m_strength;
-    
-    // optional beta prior on discount (NaN if no prior)
-    double discount_prior_alpha;
-    double discount_prior_beta;
-    
-    // optional gamma prior on strength (NaN if no prior)
-    double strength_prior_shape;
-    double strength_prior_rate;
+    size_type      tables;
+    size_type      customers;
+    dish_set_type  dishes;
+    parameter_type parameter;
   };
 };
 

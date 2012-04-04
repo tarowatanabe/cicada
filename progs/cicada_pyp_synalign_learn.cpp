@@ -823,7 +823,7 @@ struct PYPGraph
       for (logprob_set_type::const_iterator liter = logprobs.begin(); liter != liter_end; ++ liter)
 	probs.push_back(*liter / logsum);
       
-      prob_set_type::const_iterator piter = sampler.select(probs.begin(), probs.end());
+      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
       const size_type pos = piter - probs.begin();
       
       derivation.push_back(rule_pair_type(source.edges[edges[pos].edge].rule, edges[pos].target));

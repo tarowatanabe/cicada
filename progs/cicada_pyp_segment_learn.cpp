@@ -544,6 +544,21 @@ struct PYPWord
       }
       
       strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+      
+      if (order == 0) {
+	root.table.discount() = discount[order];
+	root.table.strength() = strength[order];
+	
+	root.table.verify_parameters();
+      } else {
+	node_set_type::const_iterator niter_end = nodes[order].end();
+	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	  trie[*niter].table.discount() = discount[order];
+	  trie[*niter].table.strength() = strength[order];
+	  
+	  trie[*niter].table.verify_parameters();
+	}
+      }
     }
   }
 
@@ -931,6 +946,21 @@ struct PYPLM
       }
       
       strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+      
+      if (order == 0) {
+	root.table.discount() = discount[order];
+	root.table.strength() = strength[order];
+	
+	root.table.verify_parameters();
+      } else {
+	node_set_type::const_iterator niter_end = nodes[order].end();
+	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	  trie[*niter].table.discount() = discount[order];
+	  trie[*niter].table.strength() = strength[order];
+	  
+	  trie[*niter].table.verify_parameters();
+	}
+      }
     }
   }
 
@@ -1343,7 +1373,7 @@ struct PYPGraph
       for (logprob_set_type::const_iterator liter = logprobs.begin(); liter != liter_end; ++ liter)
 	probs.push_back(*liter / logsum);
       
-      const size_type pos = sampler.select(probs.begin(), probs.end()) - probs.begin();
+      const size_type pos = sampler.draw(probs.begin(), probs.end()) - probs.begin();
       const edge_type& edge = edges[prevs[pos]];
       
       derivation.push_back(edge.segment);

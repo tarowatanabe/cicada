@@ -16,7 +16,7 @@
 namespace utils
 {
   
-  template <typename Alloc=std::allocator<size_t> >
+  template <typename Alloc=std::allocator<double> >
   class stick_break
   {
   public:
@@ -28,6 +28,7 @@ namespace utils
   private:
     typedef typename Alloc::template rebind<stick_type >::other stick_alloc_type;
     typedef std::vector<stick_type, stick_alloc_type>           stick_set_type;
+    typedef stick_break<Allco> self_type;
 
   public:
     stick_break()
@@ -47,6 +48,11 @@ namespace utils
     
     const double& discount() const { return m_discount; }
     const double& strength() const { return m_strength; }
+
+    const double& operator[](size_type pos) const
+    {
+      return sticks[pos];
+    }
     
     template <typename Sampler>
     void increment(Sampler& sampler)
@@ -85,6 +91,17 @@ namespace utils
 	throw std::runtime_error("invalid sticks");
       
       sticks.push_back(1.0 - sum);
+    }
+
+    template <typename Mapping>
+    void permute(const Mapping& mapping)
+    {
+      stick_set_type sticks_new(sticks.size());
+      
+      for (size_type i = 0; i != sticks.size(); ++ i)
+	sticks_new[mapping[i]] = sticks[i];
+      
+      sticks_new.swap(sticks);
     }
     
   private:
