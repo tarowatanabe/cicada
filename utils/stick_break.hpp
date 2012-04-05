@@ -13,6 +13,8 @@
 #include <stdexcept>
 #include <vector>
 #include <numeric>
+#include <algorithm>
+#include <functional>
 
 #include <boost/lexical_cast.hpp>
 
@@ -87,34 +89,25 @@ namespace utils
 	sticks.push_back(stick * (1.0 - beta));
       }
     }
-
-    template <typename Iterator>
-    void assign(Iterator first, Iterator last)
+    
+    template <typename Iterator, typename Sampler>
+    void sample_parameters(Iterator first, Iterator last, Sampler& sampler)
     {
       sticks.clear();
-      sticks.insert(sticks.end(), first, last);
-
-      if (sticks.empty()) 
+      
+      if (first == last)
 	sticks.push_back(1.0);
       else {
+	for (/**/; first != last; ++ first)
+	  sticks.push_back(sampler.gamma(*first, 1.0));
+	
 	const double sum = std::accumulate(sticks.begin(), sticks.end(), 0.0);
 	
-	if (sum >= 1.0 || sum < 0.0)
-	  throw std::runtime_error("invalid sticks");
+	if (sum <= 0.0)
+	  throw std::runtime_error("invalid draw");
 	
-	sticks.push_back(1.0 - sum);
+	std::transform(sticks.begin(), sticks.end(), sticks.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / sum));
       }
-    }
-
-    template <typename Mapping>
-    void permute(const Mapping& mapping)
-    {
-      stick_set_type sticks_new(sticks.size());
-      
-      for (size_type i = 0; i != sticks.size(); ++ i)
-	sticks_new[i] = sticks[mapping[i]];
-      
-      sticks_new.swap(sticks);
     }
 
     void swap(stick_break& x)

@@ -77,7 +77,7 @@ struct PYPPOS
 			    
   typedef utils::chunk_vector<table_transition_type, 4096/sizeof(table_transition_type), std::allocator<table_transition_type> > transition_type;
   typedef utils::chunk_vector<table_emission_type, 4096/sizeof(table_emission_type), std::allocator<table_emission_type> >       emission_type;
-
+  
   typedef utils::stick_break< > beta_type;
 
   typedef utils::pyp_parameter parameter_type;
@@ -90,7 +90,7 @@ struct PYPPOS
       h_counts(0),
       phi0(__emission),
       phi(classes, table_emission_type(__emission)),
-      alpha0(1.0 / (classes + 2)), // + 1 for BOS, +1 for infinity
+      base0(1.0 / (classes + 1)), // + 1 for BOS
       counts0(0),
       beta(__transition.discount, __transition.strength),
       pi0(__transition),
@@ -122,7 +122,7 @@ struct PYPPOS
       beta.increment(sampler);
     
     if (pi[prev].increment(next, beta[next], sampler, temperature))
-      if (pi0.increment(next, alpha0, sampler, temperature))
+      if (pi0.increment(next, base0, sampler, temperature))
 	++ counts0;
   }
   
@@ -159,10 +159,15 @@ struct PYPPOS
   {
     return beta[next];
   }
+
+  size_type classes() const
+  {
+    return beta.size();
+  }
   
   double log_likelihood() const
   {
-    double logprob = std::log(h) * h_counts + std::log(alpha0) * counts0;
+    double logprob = std::log(h) * h_counts + std::log(base0) * counts0;
     
     logprob += phi0.log_likelihood() + transition0.log_likelihood();
     logprob += pi0.log_likelihood()  + emission0.log_likelihood();
@@ -178,13 +183,13 @@ struct PYPPOS
     return logprob;
   }
 
-  struct greater_table
+  struct greater_customer
   {
-    greater_table(const table_transition_type& __pi0) : pi0(__pi0) {}
+    greater_customer(const table_transition_type& __pi0) : pi0(__pi0) {}
 
     bool operator()(const size_type& x, const size_type& y) const
     {
-      return pi0.size_table(x) > pi0.size_table(y);
+      return pi0.size_customer(x) > pi0.size_customer(y);
     }
     
     const table_transition_type& pi0;
@@ -193,40 +198,84 @@ struct PYPPOS
   template <typename Mapping>
   void permute(Mapping& mapping)
   {
+    std::cerr << "permute" << std::endl;
+    
     // we will sort id by the counts...
     mapping.clear();
-    for (size_type i = 0; i != pi0.size(); ++ i)
+    for (size_type i = 0; i != beta.size(); ++ i) {
       mapping.push_back(i);
+      
+      std::cerr << "i="<< i << " customer=" << pi0.size_customer(i) << std::endl;
+    }
     
     // we will always "fix" zero for bos/eos
-    std::sort(mapping.begin() + 1, mapping.end(), greater_table(pi0));
+    std::sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
+    
     
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
-    
-    // re-map for emission...
-    emission_type phi_new(phi.size());
-    for (size_type i = 0; i != phi.size(); ++ i)
-      phi_new[i].swap(phi[mapping[i]]);
-    phi_new.swap(phi);
-    
+        
     // re-map for transition...
     pi0.permute(mapping);
-    pi0.truncate();
+    
+    std::cerr << "truncated pi0: " << pi0.size() << std::endl;
+    
     for (size_type i = 0; i != pi.size(); ++ i) {
       pi[i].permute(mapping);
-      pi[i].truncate();
+      
+      std::cerr << "pi i=" << i << " " << pi[i].size() << std::endl;
     }
     
-    emission_type pi_new(pi.size());
-    for (size_type i = 0; i != pi.size(); ++ i)
-      pi_new[i].swap(pi[mapping[i]]);
-    pi.swap(pi);
+    {
+      transition_type pi_new(pi0.size(), table_transition_type(transition));
+      
+      for (size_type i = 0; i != pi0.size(); ++ i)
+	if (mapping[i] < pi.size())
+	  pi_new[i].swap(pi[mapping[i]]);
+      
+      pi.swap(pi_new);
+    }
+    
+    std::cerr << "truncated pi: " << pi.size() << std::endl;
+
+    // re-map for emission...
+    {
+      emission_type phi_new(pi0.size(), table_emission_type(emission));
+      
+      for (size_type i = 0; i != pi0.size(); ++ i)
+	if (mapping[i] < phi.size())
+	  phi_new[i].swap(phi[mapping[i]]);
+      phi.swap(phi_new);
+    }
+
+    std::cerr << "truncated phi: " << phi.size() << std::endl;
+  }
+
+  template <typename Sampler>
+  void initialize(Sampler& sampler, const id_type classes, const int num_loop = 2, const int num_iterations = 8)
+  {
+    // + 1 including BOS
+    sample_parameters(sampler, num_loop, num_iterations);
+    
+    base0 = 1.0 / (classes + 1);
+    
+    beta.sample_parameters(classes + 1, sampler);
+    
+#if 0
+    // sample beta from pi0 and base0
+    std::vector<double, std::allocator<double> > probs(classes);
+    for (id_type state = 0; state != classes; ++ state)
+      probs[state] = pi0.prob(state, base0);
+    
+    beta.assign(probs.begin(), probs.end());
+#endif
   }
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    std::cerr << "sample parameters" << std::endl;
+
     for (int iter = 0; iter != num_loop; ++ iter) {
       emission0.strength = sample_strength(&phi0, &phi0 + 1, sampler, emission0);
       emission0.discount = sample_discount(&phi0, &phi0 + 1, sampler, emission0);
@@ -257,15 +306,21 @@ struct PYPPOS
       pi[i].discount() = transition.discount;
     }
     
-    // the transition base... alpha0
-    alpha0 = 1.0 / (pi0.size() + 1);
-    
-    // sample beta from pi0 and alpha0
-    std::vector<double, std::allocator<double> > probs(pi0.size());
-    for (id_type state = 0; state != pi0.size(); ++ state)
-      probs[state] = pi0.prob(state, alpha0);
-    
-    beta.assign(probs.begin(), probs.end());
+    // the transition base... base0
+    if (! pi0.empty()) {
+      base0 = 1.0 / pi0.size();
+      
+      beta.strength() = pi0.strength();
+      beta.discount() = pi0.discount();
+      
+      // sample beta from pi0 and base0
+      std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
+      for (id_type state = 0; state != pi0.size(); ++ state)
+	counts[state] = pi0.size_customer(state);
+      counts.back() = counts0;
+      
+      beta.sample_parameters(counts.begin(), counts.end(), sampler);
+    }
   }
 
   template <typename Iterator, typename Sampler>
@@ -301,7 +356,7 @@ struct PYPPOS
   table_emission_type   phi0;
   emission_type         phi;
   
-  double                alpha0;
+  double                base0;
   size_type             counts0;
   beta_type             beta;
   table_transition_type pi0;
@@ -349,7 +404,6 @@ struct PYPGraph
       cutoff[t] = sampler.uniform(0.0, model.prob_transition(derivation[t - 1], derivation[t]));
       cutoff_min = std::min(cutoff_min, cutoff[t]);
     }
-    cutoff.back() = 0.0;
     
     // second, check to see if we need more classes!
     // we check cutoff_min to see if we have enough sticks...
@@ -375,11 +429,11 @@ struct PYPGraph
   {
     const size_type T = sentence.size() + 2;
     const size_type K = model.beta.size();
-    
+
     alpha.clear();
     alpha.reserve(T, K);
     alpha.resize(T, K);
-    alpha(0,0) = 1.0;
+    alpha(0, 0) = 1.0;
     
     pi.clear();
     pi.resize(K, K);
@@ -388,23 +442,23 @@ struct PYPGraph
 	pi(prev, next) = model.prob_transition(prev, next);
     
     phi.clear();
-    phi.resize(T, K);
+    phi.resize(K, T);
     for (size_type t = 1; t != T - 1; ++ t)
       for (id_type state = 1; state != K; ++ state)
-	phi(t, state) = model.prob_emission(state, sentence[t - 1]);
+	phi(state, t) = model.prob_emission(state, sentence[t - 1]);
     
     phi(0, 0)     = 1.0;
-    phi(T - 1, 0) = 1.0;
+    phi(0, T - 1) = 1.0;
   }
   
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
   {
+    initialize(sentence, model);
+
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
 
-    initialize(sentence, model);
-    
-    logprob_type logsum;
+    logprob_type logsum = cicada::semiring::traits<logprob_type>::one();
     for (size_type t = 1; t != T; ++ t) {
       for (id_type prev = 0; prev != K; ++ prev)
 	for (id_type next = 0; next != K; ++ next)
@@ -412,11 +466,11 @@ struct PYPGraph
 	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(next, t);
       
       double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
-      scale = (scale == 0.0 ? 1.0 : 1.0 / scale);
+      scale = (scale == 0.0 ? 1.0 : scale);
       if (scale != 1.0)
-	std::transform(alpha.begin(t), alpha.end(t), alpha.begin(t), std::bind2nd(std::multiplies<double>(), scale));
+	std::transform(alpha.begin(t), alpha.end(t), alpha.begin(t), std::bind2nd(std::multiplies<double>(), 1.0 / scale));
       
-      logsum += scale;
+      logsum *= scale;
     }
     
     return logsum;
@@ -429,25 +483,21 @@ struct PYPGraph
     const size_type K = alpha.size2();
     
     logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
-    derivation.clear();
-    derivation.push_back(0);
     
     id_type state = 0;
-    for (size_type t = T - 1; t > 2; -- t) {
+    for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
-      for (id_type prev = 1; prev != K; ++ prev)
+      for (id_type prev = 0; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(state, t));
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
       
-      state = (piter - probs.begin()) + 1;
+      state = (piter - probs.begin());
       
-      logprob += *piter / alpha(t - 1, state);
+      derivation[t - 1] = state;
+      
+      logprob *= *piter / alpha(t - 1, state);
     }
-    
-    derivation.push_back(0);
-    
-    std::reverse(derivation.begin(), derivation.end());
     
     return logprob;
   }
@@ -474,6 +524,7 @@ typedef std::vector<derivation_type, std::allocator<derivation_type> > derivatio
 typedef std::vector<cutoff_type, std::allocator<cutoff_type> > cutoff_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
+typedef std::vector<size_type, std::allocator<size_type> > mapping_type;
 
 struct less_size
 {
@@ -547,6 +598,8 @@ int main(int argc, char ** argv)
     
     sentence_set_type training;
     const size_type vocab_size = read_data(train_files, training);
+
+    std::cerr << "vocab: " << vocab_size << std::endl;
     
     if (training.empty())
       throw std::runtime_error("no training data?");
@@ -554,6 +607,8 @@ int main(int argc, char ** argv)
     derivation_set_type derivations(training.size());
     cutoff_set_type     cutoffs(training.size());
     position_set_type   positions(training.size());
+    mapping_type mapping;
+    mapping_type mapping_new;
     
     for (size_t i = 0; i != training.size(); ++ i)
       positions[i] = i;
@@ -575,15 +630,21 @@ int main(int argc, char ** argv)
 					transition_strength_prior_shape,
 					transition_strength_prior_rate));
     
-    model.sample_parameters(sampler, resample_iterations);
+    model.initialize(sampler, classes, resample_iterations);
 
     PYPGraph graph;
 
-    if (debug >= 2)
+    if (debug >= 2) {
       std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
-		<< "emission discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
+		<< "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
 		<< "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
-		<< "transition discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
+		<< "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
+      
+      std::cerr << "beta:";
+      for (size_t state = 0; state != model.beta.size(); ++ state)
+	std::cerr << ' ' << model.beta[state];
+      std::cerr <<  " remain: " << model.beta[model.beta.size()] << std::endl;
+    }
     
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
@@ -638,12 +699,13 @@ int main(int argc, char ** argv)
 	if (training[pos].empty()) continue;
 	
 	if (debug >= 3)
-	  std::cerr << "training=" << pos << std::endl;
+	  std::cerr << "training=" << pos << " classes: " << model.beta.size() << std::endl;
 	
 	if (derivations[pos].empty()) {
 	  // it is our initial condition... sample derivation...
 	  const size_type K = model.beta.size();
 	  
+	  derivations[pos].reserve(training[pos].size() + 2);
 	  derivations[pos].push_back(0);
 	  
 	  for (size_type i = 0; i != training[pos].size(); ++ i) {
@@ -657,6 +719,12 @@ int main(int argc, char ** argv)
 	  
 	  derivations[pos].push_back(0);
 	  
+	  if (debug >= 3)
+	    for (size_type t = 0; t != derivations[pos].size(); ++ t)
+	      std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
+			<< " pos=" << derivations[pos][t]
+			<< std::endl;
+	  
 	} else {
 	  // remove from the model...
 	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
@@ -669,11 +737,15 @@ int main(int argc, char ** argv)
 	const PYPGraph::logprob_type logsum = graph.forward(training[pos], model, cutoffs[pos]);
 	
 	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
+
+	for (size_type t = 1; t != derivations[pos].size() - 1; ++ t)
+	  if (! derivations[pos][t])
+	    std::cerr << "WARNING: empty state?" << std::endl;
 	
 	if (debug >= 3) {
 	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
 	  
-	  for (size_type t = 0; t != derivations[pos].size(); ++ i)
+	  for (size_type t = 0; t != derivations[pos].size(); ++ t)
 	    std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
 		      << " pos=" << derivations[pos][t]
 		      << std::endl;
@@ -683,6 +755,48 @@ int main(int argc, char ** argv)
 	for (size_type t = 1; t != derivations[pos].size(); ++ t)
 	  model.increment(derivations[pos][t - 1], derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1], sampler, temperature);
       }
+      
+      model.permute(mapping);
+      
+      std::cerr << "mapping: ";
+      std::copy(mapping.begin(), mapping.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+
+      // remap training data
+      mapping_new.resize(mapping.size());
+      for (size_type i = 0; i != mapping.size(); ++ i)
+	mapping_new[mapping[i]] = i;
+      
+      
+      for (size_type pos = 0; pos != derivations.size(); ++ pos)
+	for (size_type t = 0; t != derivations[pos].size(); ++ t) {
+	  
+	  if (derivations[pos][t] >= mapping_new.size())
+	    throw std::runtime_error("invalid mapping in derivation?");
+	  
+	  derivations[pos][t] = mapping_new[derivations[pos][t]];
+	  
+	  if (derivations[pos][t] >= model.classes())
+	    throw std::runtime_error("invalid new mapping in derivation?");
+	}
+      
+      model.sample_parameters(sampler, resample_iterations);
+      
+      if (debug >= 2) {
+	std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
+		  << "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
+		  << "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
+		  << "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
+	
+	std::cerr << "beta:";
+	for (size_t state = 0; state != model.beta.size(); ++ state)
+	  std::cerr << ' ' << model.beta[state];
+	std::cerr <<  " remain: " << model.beta[model.beta.size()] << std::endl;
+      }
+      
+      if (debug)
+	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl
+		  << "classes: " << model.classes() << std::endl;
     }
     
   }

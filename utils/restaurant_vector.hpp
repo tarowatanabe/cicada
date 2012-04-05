@@ -197,15 +197,13 @@ namespace utils
       dish_set_type dishes_new(dishes.size());
       
       for (size_type i = 0; i != dishes.size(); ++ i)
-	dishes_new[i].swap(dishes[mapping[i]]);
+	if (mapping[i] < dishes.size())
+	  dishes_new[i].swap(dishes[mapping[i]]);
+      
+      while (! dishes_new.empty() && dishes_new.back().empty())
+	dishes_new.pop_back();
       
       dishes_new.swap(dishes);
-    }
-
-    void truncate()
-    {
-      while (! dishes.empty() && ! dishes.back().empty())
-	dishes.pop_back();
     }
     
     template <typename Sampler>
