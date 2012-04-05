@@ -74,7 +74,7 @@ namespace utils
       sticks.back() = stick * beta;
       sticks.push_back(stick * (1.0 - beta));
     }
-    
+
     template <typename Sampler>
     void sample_parameters(size_type size, Sampler& sampler)
     {
@@ -87,6 +87,24 @@ namespace utils
 	
 	sticks.back() = stick * beta;
 	sticks.push_back(stick * (1.0 - beta));
+      }
+    }
+
+    template <typename Iterator>
+    void assign_parameters(Iterator first, Iterator last)
+    {
+      sticks.clear();
+      sticks.insert(sticks.end(), first, last);
+      
+      if (sticks.empty())
+	sticks.push_back(1.0);
+      else {
+	const double sum = std::accumulate(sticks.begin(), sticks.end(), 0.0);
+	
+	if (sum <= 0.0 || sum >= 1.0)
+	  throw std::runtime_error("invalid assignment");
+	
+	sticks.push_back(1.0 - sum);
       }
     }
     

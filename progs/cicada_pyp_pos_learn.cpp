@@ -90,7 +90,7 @@ struct PYPPOS
       h_counts(0),
       phi0(__emission),
       phi(classes, table_emission_type(__emission)),
-      base0(1.0 / (classes + 1)), // + 1 for BOS
+      base0(__h),
       counts0(0),
       beta(__transition.discount, __transition.strength),
       pi0(__transition),
@@ -241,18 +241,7 @@ struct PYPPOS
     // + 1 including BOS
     sample_parameters(sampler, num_loop, num_iterations);
     
-    base0 = 1.0 / (classes + 1);
-    
     beta.sample_parameters(classes + 1, sampler);
-    
-#if 0
-    // sample beta from pi0 and base0
-    std::vector<double, std::allocator<double> > probs(classes);
-    for (id_type state = 0; state != classes; ++ state)
-      probs[state] = pi0.prob(state, base0);
-    
-    beta.assign(probs.begin(), probs.end());
-#endif
   }
   
   template <typename Sampler>
@@ -289,19 +278,25 @@ struct PYPPOS
     }
     
     // the transition base... base0
+    // + 1 for allowing infinity...
     if (! pi0.empty()) {
-      base0 = 1.0 / pi0.size();
-      
       beta.strength() = pi0.strength();
       beta.discount() = pi0.discount();
       
+      std::vector<double, std::allocator<double> > probs(pi0.size());
+      for (id_type state = 0; state != pi0.size(); ++ state)
+	probs[state] = pi0.prob(state, base0);
+      beta.assign_parameters(probs.begin(), probs.end());
+
+#if 0
       // sample beta from pi0 and base0
-      std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
+      std::vector<size_type, std::allocator<size_type> > counts(pi0.size() + 1);
       for (id_type state = 0; state != pi0.size(); ++ state)
 	counts[state] = pi0.size_customer(state);
       counts.back() = counts0;
       
       beta.sample_parameters(counts.begin(), counts.end(), sampler);
+#endif
     }
   }
 
@@ -592,11 +587,11 @@ int main(int argc, char ** argv)
     
     for (size_t i = 0; i != training.size(); ++ i)
       positions[i] = i;
-
+    
     sampler_type sampler;
-
-    PYPPOS model(1.0 / vocab_size,
-		 classes, 
+    
+    PYPPOS model(1.0 / (vocab_size + 1), // +1 for BOS
+		 classes,
 		 PYPPOS::parameter_type(emission_discount,
 					emission_strength,
 					emission_discount_prior_alpha,
@@ -821,7 +816,7 @@ void options(int argc, char** argv)
     ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
     ("output", po::value<path_type>(&output_file), "output file")
 
-    ("classes", po::value<int>(&classes)->default_value(classes), "# of initial classes")
+    ("classes",     po::value<int>(&classes)->default_value(classes),         "# of initial classes")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
