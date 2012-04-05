@@ -111,7 +111,7 @@ namespace utils
 
       typedef typename table_set_type::const_iterator const_iterator;
       
-      Location() : customers(0) {}
+      Location() : customers(0), tables() {}
       
       const_iterator begin() const { return tables.begin(); }
       const_iterator end() const { return tables.end(); }
@@ -196,14 +196,26 @@ namespace utils
     {
       dish_set_type dishes_new(dishes.size());
       
-      for (size_type i = 0; i != dishes.size(); ++ i)
+      for (size_type i = 0; i != dishes.size(); ++ i) 
 	if (mapping[i] < dishes.size())
 	  dishes_new[i].swap(dishes[mapping[i]]);
-      
+
+      for (size_type i = 0; i != dishes.size(); ++ i) 
+	if (! dishes[i].empty()) {
+
+	  std::cerr << "mapping: ";
+	  std::copy(mapping.begin(), mapping.end(), std::ostream_iterator<int>(std::cerr, " "));
+	  std::cerr << std::endl;
+
+	  std::cerr << "table: " << dishes[i].size_table() << " customers: " << dishes[i].size_table() << std::endl;
+	  
+	  throw std::runtime_error("wrong permutation! " + boost::lexical_cast<std::string>(i));
+	}
+
       while (! dishes_new.empty() && dishes_new.back().empty())
 	dishes_new.pop_back();
       
-      dishes_new.swap(dishes);
+      dishes.swap(dishes_new);
     }
     
     template <typename Sampler>
@@ -256,7 +268,7 @@ namespace utils
     bool decrement(const dish_type dish, Sampler& sampler)
     {
       if (dish >= dishes.size())
-	throw std::runtime_error("dish was not inserted?");
+	throw std::runtime_error("restaurant_vector: dish was not inserted?");
       
       location_type& loc = dishes[dish];
       

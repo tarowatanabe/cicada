@@ -200,9 +200,16 @@ struct PYPPOS
   {
     std::cerr << "permute" << std::endl;
     
+    size_type states_size = utils::bithack::max(beta.size(), pi0.size());
+    states_size = utils::bithack::max(states_size, pi.size());
+    states_size = utils::bithack::max(states_size, phi.size());
+    for (size_type i = 0; i != pi.size(); ++ i)
+      states_size = utils::bithack::max(states_size, pi[i].size());
+    
+    
     // we will sort id by the counts...
     mapping.clear();
-    for (size_type i = 0; i != beta.size(); ++ i) {
+    for (size_type i = 0; i != states_size; ++ i) {
       mapping.push_back(i);
       
       std::cerr << "i="<< i << " customer=" << pi0.size_customer(i) << std::endl;
@@ -210,7 +217,6 @@ struct PYPPOS
     
     // we will always "fix" zero for bos/eos
     std::sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
-    
     
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
@@ -221,15 +227,17 @@ struct PYPPOS
     std::cerr << "truncated pi0: " << pi0.size() << std::endl;
     
     for (size_type i = 0; i != pi.size(); ++ i) {
+      std::cerr << "(before) pi i=" << i << " " << pi[i].size() << " table: " << pi[i].size_table() << " customer: " << pi[i].size_customer()<< std::endl;
+      
       pi[i].permute(mapping);
       
-      std::cerr << "pi i=" << i << " " << pi[i].size() << std::endl;
+      std::cerr << "pi i=" << i << " " << pi[i].size() << " table: " << pi[i].size_table() << " customer: " << pi[i].size_customer()<< std::endl;
     }
     
     {
       transition_type pi_new(pi0.size(), table_transition_type(transition));
       
-      for (size_type i = 0; i != pi0.size(); ++ i)
+      for (size_type i = 0; i != pi_new.size(); ++ i)
 	if (mapping[i] < pi.size())
 	  pi_new[i].swap(pi[mapping[i]]);
       
@@ -242,9 +250,10 @@ struct PYPPOS
     {
       emission_type phi_new(pi0.size(), table_emission_type(emission));
       
-      for (size_type i = 0; i != pi0.size(); ++ i)
+      for (size_type i = 0; i != phi_new.size(); ++ i)
 	if (mapping[i] < phi.size())
 	  phi_new[i].swap(phi[mapping[i]]);
+      
       phi.swap(phi_new);
     }
 
@@ -741,6 +750,10 @@ int main(int argc, char ** argv)
 	for (size_type t = 1; t != derivations[pos].size() - 1; ++ t)
 	  if (! derivations[pos][t])
 	    std::cerr << "WARNING: empty state?" << std::endl;
+	
+	if (derivations[pos].front() || derivations[pos].back())
+	  throw std::runtime_error("wrong BOS/EOS");
+	
 	
 	if (debug >= 3) {
 	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
