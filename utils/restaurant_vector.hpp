@@ -194,24 +194,12 @@ namespace utils
     template <typename Mapping>
     void permute(const Mapping& mapping)
     {
-      dish_set_type dishes_new(dishes.size());
+      dish_set_type dishes_new(mapping.size());
       
-      for (size_type i = 0; i != dishes.size(); ++ i) 
+      for (size_type i = 0; i != mapping.size(); ++ i) 
 	if (mapping[i] < dishes.size())
 	  dishes_new[i].swap(dishes[mapping[i]]);
-
-      for (size_type i = 0; i != dishes.size(); ++ i) 
-	if (! dishes[i].empty()) {
-
-	  std::cerr << "mapping: ";
-	  std::copy(mapping.begin(), mapping.end(), std::ostream_iterator<int>(std::cerr, " "));
-	  std::cerr << std::endl;
-
-	  std::cerr << "table: " << dishes[i].size_table() << " customers: " << dishes[i].size_table() << std::endl;
-	  
-	  throw std::runtime_error("wrong permutation! " + boost::lexical_cast<std::string>(i));
-	}
-
+      
       while (! dishes_new.empty() && dishes_new.back().empty())
 	dishes_new.pop_back();
       
@@ -244,15 +232,21 @@ namespace utils
       if (existing) {
 	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
 	
+	bool incremented = false;
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
 	  r -= (*titer - parameter.discount);
 	  
 	  if (r <= 0.0) {
 	    ++ (*titer);
+	    incremented = true;
 	    break;
 	  }
 	}
+	
+	if (! incremented)
+	  throw std::runtime_error("not incremented?");
+
       } else {
 	loc.tables.push_back(1);
 	++ tables;
@@ -282,6 +276,8 @@ namespace utils
       bool erased = false;
       double r = sampler.uniform() * loc.customers;
       -- loc.customers;
+
+      bool decremented = false;
       
       typename location_type::table_set_type::iterator titer_end = loc.tables.end();
       for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -289,6 +285,7 @@ namespace utils
 	
 	if (r <= 0.0) {
 	  -- (*titer);
+	  decremented = true;
 	  
 	  if (! (*titer)) {
 	    erased = true;
@@ -298,6 +295,9 @@ namespace utils
 	  break;
 	}
       }
+
+      if (! decremented)
+	throw std::runtime_error("not decremended?");
       
       -- customers;
       return erased;

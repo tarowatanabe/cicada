@@ -216,7 +216,7 @@ struct PYPPOS
     }
     
     // we will always "fix" zero for bos/eos
-    std::sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
+    std::stable_sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
     
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
