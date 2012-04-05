@@ -198,66 +198,41 @@ struct PYPPOS
   template <typename Mapping>
   void permute(Mapping& mapping)
   {
-    std::cerr << "permute" << std::endl;
-    
-    size_type states_size = utils::bithack::max(beta.size(), pi0.size());
-    states_size = utils::bithack::max(states_size, pi.size());
-    states_size = utils::bithack::max(states_size, phi.size());
-    for (size_type i = 0; i != pi.size(); ++ i)
-      states_size = utils::bithack::max(states_size, pi[i].size());
     
     
     // we will sort id by the counts...
     mapping.clear();
-    for (size_type i = 0; i != states_size; ++ i) {
+    for (size_type i = 0; i != beta.size(); ++ i)
       mapping.push_back(i);
-      
-      std::cerr << "i="<< i << " customer=" << pi0.size_customer(i) << std::endl;
-    }
     
     // we will always "fix" zero for bos/eos
-    std::stable_sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
+    std::sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
     
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
-        
+    
     // re-map for transition...
     pi0.permute(mapping);
     
-    std::cerr << "truncated pi0: " << pi0.size() << std::endl;
-    
-    for (size_type i = 0; i != pi.size(); ++ i) {
-      std::cerr << "(before) pi i=" << i << " " << pi[i].size() << " table: " << pi[i].size_table() << " customer: " << pi[i].size_customer()<< std::endl;
-      
+    for (size_type i = 0; i != pi.size(); ++ i)
       pi[i].permute(mapping);
-      
-      std::cerr << "pi i=" << i << " " << pi[i].size() << " table: " << pi[i].size_table() << " customer: " << pi[i].size_customer()<< std::endl;
-    }
     
-    {
-      transition_type pi_new(pi0.size(), table_transition_type(transition));
-      
-      for (size_type i = 0; i != pi_new.size(); ++ i)
-	if (mapping[i] < pi.size())
-	  pi_new[i].swap(pi[mapping[i]]);
-      
-      pi.swap(pi_new);
-    }
+    transition_type pi_new(pi0.size(), table_transition_type(transition));
     
-    std::cerr << "truncated pi: " << pi.size() << std::endl;
-
+    for (size_type i = 0; i != pi_new.size(); ++ i)
+      if (mapping[i] < pi.size())
+	pi_new[i].swap(pi[mapping[i]]);
+    
+    pi.swap(pi_new);
+    
     // re-map for emission...
-    {
-      emission_type phi_new(pi0.size(), table_emission_type(emission));
-      
-      for (size_type i = 0; i != phi_new.size(); ++ i)
-	if (mapping[i] < phi.size())
-	  phi_new[i].swap(phi[mapping[i]]);
-      
-      phi.swap(phi_new);
-    }
-
-    std::cerr << "truncated phi: " << phi.size() << std::endl;
+    emission_type phi_new(pi0.size(), table_emission_type(emission));
+    
+    for (size_type i = 0; i != phi_new.size(); ++ i)
+      if (mapping[i] < phi.size())
+	phi_new[i].swap(phi[mapping[i]]);
+    
+    phi.swap(phi_new);
   }
 
   template <typename Sampler>
@@ -283,8 +258,6 @@ struct PYPPOS
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    std::cerr << "sample parameters" << std::endl;
-
     for (int iter = 0; iter != num_loop; ++ iter) {
       emission0.strength = sample_strength(&phi0, &phi0 + 1, sampler, emission0);
       emission0.discount = sample_discount(&phi0, &phi0 + 1, sampler, emission0);
@@ -608,8 +581,6 @@ int main(int argc, char ** argv)
     sentence_set_type training;
     const size_type vocab_size = read_data(train_files, training);
 
-    std::cerr << "vocab: " << vocab_size << std::endl;
-    
     if (training.empty())
       throw std::runtime_error("no training data?");
     
@@ -771,10 +742,6 @@ int main(int argc, char ** argv)
       
       model.permute(mapping);
       
-      std::cerr << "mapping: ";
-      std::copy(mapping.begin(), mapping.end(), std::ostream_iterator<int>(std::cerr, " "));
-      std::cerr << std::endl;
-
       // remap training data
       mapping_new.resize(mapping.size());
       for (size_type i = 0; i != mapping.size(); ++ i)

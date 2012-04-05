@@ -173,6 +173,8 @@ namespace utils
 
     bool empty() const { return dishes.empty(); }
     
+    size_type size() const { return dishes.sizse(); }
+    
     size_type size_customer() const { return customers; }
 
     size_type size_table() const { return tables; }
