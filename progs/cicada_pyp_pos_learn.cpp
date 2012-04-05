@@ -534,7 +534,7 @@ int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
 
-double emission_discount = 0.9;
+double emission_discount = 0.8;
 double emission_strength = 1;
 
 double emission_discount_prior_alpha = 1.0;
@@ -542,8 +542,8 @@ double emission_discount_prior_beta  = 1.0;
 double emission_strength_prior_shape = 1.0;
 double emission_strength_prior_rate  = 1.0;
 
-double transition_discount = 0.9;
-double transition_strength = 1;
+double transition_discount = 0.8;
+double transition_strength = 16;
 
 double transition_discount_prior_alpha = 1.0;
 double transition_discount_prior_beta  = 1.0;
