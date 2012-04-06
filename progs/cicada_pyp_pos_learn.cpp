@@ -563,14 +563,16 @@ struct Task
        cutoff_set_type& __cutoffs,
        derivation_set_type& __derivations,
        const PYPPOS& __model,
-       sampler_type& __sampler)
+       sampler_type& __sampler,
+       const bool __hasting)
     : mapper(__mapper),
       reducer(__reducer),
       training(__training),
       cutoffs(__cutoffs),
       derivations(__derivations),
       model(__model),
-      sampler(__sampler) {}
+      sampler(__sampler),
+      hasting(__hasting) {}
   
   void operator()()
   {
@@ -624,34 +626,37 @@ struct Task
       graph.backward(sampler, derivations[pos], temperature);
       
       // insert into the model
-      
-      // perform MH
-      if (derivation_prev.empty())
+      if (! hasting)
 	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-      else if (derivation_prev != derivations[pos]) {
-	const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
+      else {
+	// perform MH
+	if (derivation_prev.empty())
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	else if (derivation_prev != derivations[pos]) {
+	  const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
 	
-	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
 	
-	const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
+	  const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
 	
-	double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
+	  double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
 	
-	if (temperature != 1.0)
-	  accept_rate = std::pow(accept_rate, temperature);
+	  if (temperature != 1.0)
+	    accept_rate = std::pow(accept_rate, temperature);
 	
-	if (! sampler.bernoulli(accept_rate)) {
-	  graph.decrement(training[pos], derivations[pos], model, sampler);
+	  if (! sampler.bernoulli(accept_rate)) {
+	    graph.decrement(training[pos], derivations[pos], model, sampler);
 	  
-	  graph.increment(training[pos], derivation_prev, model, sampler, temperature);
+	    graph.increment(training[pos], derivation_prev, model, sampler, temperature);
 	  
-	  derivations[pos].swap(derivation_prev);
+	    derivations[pos].swap(derivation_prev);
 	  
-	  ++ rejected;
+	    ++ rejected;
+	  }
+	} else {
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	  ++ unchanged;
 	}
-      } else {
-	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	++ unchanged;
       }
       
       reducer.push(pos);
@@ -673,6 +678,7 @@ struct Task
   
   size_type rejected;
   size_type unchanged;
+  bool hasting;
 };
 
 struct less_size
@@ -700,6 +706,8 @@ int anneal_steps = 0;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
+bool hasting = false;
+bool hasting_shard = false;
 
 double emission_discount = 0.1;
 double emission_strength = 1;
@@ -815,7 +823,8 @@ int main(int argc, char ** argv)
 								 cutoffs,
 								 derivations,
 								 model,
-								 sampler));
+								 sampler,
+								 hasting_shard));
     
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
@@ -884,63 +893,66 @@ int main(int argc, char ** argv)
 	//
 	// insert into the global model
 	//
+	if (! hasting) {
 
-#if 0
-	if (! derivations_prev[pos].empty())
-	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	
-	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-#endif
-	
-#if 1
-	// MH-steps
-	if (derivations_prev[pos].empty())
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	else if (derivations_prev[pos] != derivations[pos]) {
-	  const PYPGraph::logprob_type pi0 = graph.score(training[pos], derivations_prev[pos], model);
-	  
-	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	  
-	  const PYPGraph::logprob_type r0 = graph.score(training[pos], derivations_prev[pos], model);
-	  
-	  const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
+	  if (! derivations_prev[pos].empty())
+	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
 	  
 	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	} else {
+	
+	  // MH-steps
+	  if (derivations_prev[pos].empty())
+	    graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	  else if (derivations_prev[pos] != derivations[pos]) {
+	    const PYPGraph::logprob_type pi0 = graph.score(training[pos], derivations_prev[pos], model);
 	  
-	  const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
+	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
 	  
-	  double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
+	    const PYPGraph::logprob_type r0 = graph.score(training[pos], derivations_prev[pos], model);
 	  
-	  if (temperature != 1.0)
-	    accept_rate = std::pow(accept_rate, temperature);
+	    const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
 	  
-	  if (! sampler.bernoulli(accept_rate)) {
-	    graph.decrement(training[pos], derivations[pos], model, sampler);
+	    graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	  
+	    const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
+	  
+	    double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
+	  
+	    if (temperature != 1.0)
+	      accept_rate = std::pow(accept_rate, temperature);
+	  
+	    if (! sampler.bernoulli(accept_rate)) {
+	      graph.decrement(training[pos], derivations[pos], model, sampler);
 	    
-	    graph.increment(training[pos], derivations_prev[pos], model, sampler, temperature);
+	      graph.increment(training[pos], derivations_prev[pos], model, sampler, temperature);
 	    
-	    derivations[pos].swap(derivations_prev[pos]);
+	      derivations[pos].swap(derivations_prev[pos]);
 	    
-	    ++ rejected;
-	  }
-	} else
-	  ++ unchanged;
-#endif
+	      ++ rejected;
+	    }
+	  } else
+	    ++ unchanged;
+	}
       }
       
       if (debug) {
-	size_type shard_rejected = 0;
-	size_type shard_unchanged = 0;
-
-	for (size_type i = 0; i != tasks.size(); ++ i) {
-	  shard_rejected = tasks[i].rejected;
-	  shard_unchanged = tasks[i].unchanged;
+	if (hasting)
+	  std::cerr << "rejection rate: " << rejected << '/' << (training.size() - unchanged) << std::endl
+		    << "unchanged rate: " << unchanged << '/' << training.size() << std::endl;
+	
+	if (hasting_shard) {
+	  size_type shard_rejected = 0;
+	  size_type shard_unchanged = 0;
+	  
+	  for (size_type i = 0; i != tasks.size(); ++ i) {
+	    shard_rejected = tasks[i].rejected;
+	    shard_unchanged = tasks[i].unchanged;
+	  }
+	  
+	  std::cerr << "shard rejection rate: " << shard_rejected << '/' << (training.size() - shard_unchanged) << std::endl
+		    << "shard unchanged rate: " << shard_unchanged << '/' << training.size() << std::endl;
 	}
-
-	std::cerr << "rejection rate: " << rejected << '/' << (training.size() - unchanged) << std::endl
-		  << "unchanged rate: " << unchanged << '/' << training.size() << std::endl
-		  << "shard rejection rate: " << shard_rejected << '/' << (training.size() - shard_unchanged) << std::endl
-		  << "shard unchanged rate: " << shard_unchanged << '/' << training.size() << std::endl;
       }
       
       model.permute(mapping);
@@ -1037,6 +1049,8 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
+    ("hasting",             po::bool_switch(&hasting),                                                "hasting for rejection")
+    ("hasting-shard",       po::bool_switch(&hasting_shard),                                          "shard local hasting for rejection")
     
     ("emission-discount",       po::value<double>(&emission_discount)->default_value(emission_discount),                         "discount ~ Beta(alpha,beta)")
     ("emission-discount-alpha", po::value<double>(&emission_discount_prior_alpha)->default_value(emission_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
