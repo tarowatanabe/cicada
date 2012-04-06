@@ -94,11 +94,6 @@ struct PYPPOS
 
   typedef utils::pyp_parameter parameter_type;
 
-  typedef utils::vector2<double, std::allocator<double> > transition_cache_type;
-  typedef utils::unordered_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
-			       std::allocator<std::pair<const word_type, double> > >::type emission_cache_type;
-  typedef std::vector<emission_cache_type, std::allocator<emission_cache_type> > emission_cache_set_type;
-
   PYPPOS(const double __h,
 	 const size_type classes,
 	 const parameter_type& __emission,
@@ -117,25 +112,6 @@ struct PYPPOS
       transition0(__transition),
       transition(__transition) {}
   
-  
-  template <typename Iterator>
-  void initialize_cache(Iterator first, Iterator last)
-  {
-    cache_pi.clear();
-    cache_phi.clear();
-    
-    cache_pi.resize(beta.size(), beta.size());
-    cache_phi.resize(beta.size());
-    
-    for (size_type prev = 0; prev != beta.size(); ++ prev)
-      for (size_type next = 0; next != beta.size(); ++ next)
-	cache_pi(prev, next) = prob_transition(prev, next);
-    
-    for (/**/; first != last; ++ first)
-      for (size_type state = 0; state != beta.size(); ++ state)
-	cache_phi[state][*first] = prob_emission(state, *first);
-  }
-
   
   template <typename Sampler>
   void increment(const id_type prev, const id_type next, const word_type& word, Sampler& sampler, const double temperature=1.0)
@@ -178,19 +154,6 @@ struct PYPPOS
 	-- counts0;
   }
   
-  double cache_emission(const id_type next, const word_type& word) const
-  {
-    emission_cache_type::const_iterator iter = cache_phi[next].find(word);
-    if (iter == cache_phi[next].end())
-      throw std::runtime_error("no cache entry?");
-    
-    return iter->second;
-  }
-  
-  double cache_transition(const id_type prev, const id_type next) const
-  {
-    return cache_pi(prev, next);
-  }
   
   double prob_emission(const id_type next, const word_type& word) const
   {
@@ -392,9 +355,6 @@ struct PYPPOS
   parameter_type emission;
   parameter_type transition0;
   parameter_type transition;
-  
-  transition_cache_type   cache_pi;
-  emission_cache_set_type cache_phi;
 };
 
 
@@ -468,13 +428,13 @@ struct PYPGraph
     pi.resize(K, K);
     for (id_type prev = 0; prev != K; ++ prev)
       for (id_type next = 0; next != K; ++ next)
-	pi(prev, next) = model.cache_transition(prev, next);
+	pi(prev, next) = model.prob_transition(prev, next);
     
     phi.clear();
     phi.resize(T, K);
     for (size_type t = 1; t != T - 1; ++ t)
       for (id_type state = 1; state != K; ++ state)
-	phi(t, state) = model.cache_emission(state, sentence[t - 1]);
+	phi(t, state) = model.prob_emission(state, sentence[t - 1]);
     
     phi(0, 0)     = 1.0;
     phi(T - 1, 0) = 1.0;
@@ -506,7 +466,7 @@ struct PYPGraph
   }
   
   template <typename Sampler>
-  logprob_type backward(Sampler& sampler, derivation_type& derivation)
+  logprob_type backward(Sampler& sampler, derivation_type& derivation, const double temperature)
   {
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
@@ -519,7 +479,7 @@ struct PYPGraph
       for (id_type prev = 0; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(t, state));
       
-      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
+      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
       state = (piter - probs.begin());
       
@@ -566,7 +526,7 @@ struct Task
   Task(queue_type& __mapper,
        queue_type& __reducer,
        const sentence_set_type& __training,
-       const cutoff_set_type& __cutoffs,
+       cutoff_set_type& __cutoffs,
        derivation_set_type& __derivations,
        const PYPPOS& __model,
        sampler_type& __sampler)
@@ -580,6 +540,7 @@ struct Task
   
   void operator()()
   {
+    std::vector<double, std::allocator<double> > probs;
     size_type pos;
     
     for (;;) {
@@ -587,9 +548,47 @@ struct Task
       
       if (pos == size_type(-1)) break;
       
+      if (derivations[pos].empty()) {
+	// it is our initial condition... sample derivation...
+	const size_type K = model.beta.size();
+	
+	derivations[pos].reserve(training[pos].size() + 2);
+	derivations[pos].push_back(0);
+	
+	for (size_type i = 0; i != training[pos].size(); ++ i) {
+	  probs.clear();
+	  for (size_type state = 1; state != K; ++ state)
+	    probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
+	  
+	  derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+	}
+	
+	derivations[pos].push_back(0);
+      } else {
+	// remove from the model...
+	for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	  model.decrement(derivations[pos][t - 1],
+			  derivations[pos][t],
+			  t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			  sampler);
+      }
+      
+      // pruning
+      graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
+      
+      // forward
       graph.forward(training[pos], model, cutoffs[pos]);
       
-      graph.backward(sampler, derivations[pos]);
+      // backward
+      graph.backward(sampler, derivations[pos], temperature);
+      
+      // insert into the model
+      for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	model.increment(derivations[pos][t - 1],
+			derivations[pos][t],
+			t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			sampler,
+			temperature);
       
       reducer.push(pos);
     }
@@ -597,15 +596,17 @@ struct Task
   
   queue_type& mapper;
   queue_type& reducer;
+  
   const sentence_set_type& training;
-  const cutoff_set_type& cutoffs;
+  cutoff_set_type& cutoffs;
   derivation_set_type& derivations;
-  const PYPPOS& model;
+  
+  PYPPOS model;
   sampler_type  sampler;
+  double temperature;
+  
   PYPGraph graph;
 };
-
-
 
 struct less_size
 {
@@ -650,7 +651,6 @@ double transition_strength_prior_shape = 1.0;
 double transition_strength_prior_rate  = 1.0;
 
 int threads = 1;
-int blocks = 64;
 int debug = 0;
 
 void options(int argc, char** argv);
@@ -662,9 +662,6 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     threads = utils::bithack::max(threads, 1);
-    
-    if (blocks <= 0)
-      throw std::runtime_error("# of blocks must be positive");
     
     if (samples < 0)
       throw std::runtime_error("# of samples must be positive");
@@ -718,8 +715,6 @@ int main(int argc, char ** argv)
     
     model.initialize(sampler, classes, resample_iterations);
 
-    PYPGraph graph;
-
     if (debug >= 2) {
       std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
 		<< "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
@@ -744,15 +739,17 @@ int main(int argc, char ** argv)
     Task::queue_type queue_mapper;
     Task::queue_type queue_reducer;
     
+    std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
+								 queue_reducer,
+								 training,
+								 cutoffs,
+								 derivations,
+								 model,
+								 sampler));
+    
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
-      workers.add_thread(new boost::thread(Task(queue_mapper,
-						queue_reducer,
-						training,
-						cutoffs,
-						derivations,
-						model,
-						sampler)));
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
@@ -784,117 +781,61 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
       
+      // assign model...
+      for (size_type i = 0; i != tasks.size(); ++ i) {
+	tasks[i].model = model;
+	tasks[i].temperature = temperature;
+      }
+      
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
-      std::vector<double, std::allocator<double> > probs;
-      word_set_type emissions;
-      emissions.set_empty_key(word_type());
-      
-      position_set_type::const_iterator piter = positions.begin();
       position_set_type::const_iterator piter_end = positions.end();
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
+	const size_type& pos = *piter;
+	
+	// remove from the global model
+	if (! derivations[pos].empty())
+	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	    model.decrement(derivations[pos][t - 1],
+			    derivations[pos][t],
+			    t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			    sampler);
+	
+	queue_mapper.push(pos);
+      }
       
-      while (piter != piter_end) {
-	positions_mapped.clear();
-	positions_reduced.clear();
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
+	size_type pos = 0;
+	queue_reducer.pop(pos);
 	
-	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
-
-	emissions.clear();
-	
-	for (/**/; piter != piter_last; ++ piter) {
-	  const size_t pos = *piter;
-	  
-	  if (training[pos].empty()) continue;
-
-	  if (debug >= 4)
-	    std::cerr << "training=" << pos << " classes: " << model.beta.size() << std::endl;
-	  
-	  positions_mapped.push_back(pos);
-	  
-	  if (derivations[pos].empty()) {
-	    // it is our initial condition... sample derivation...
-	    const size_type K = model.beta.size();
+	// insert into the global model
+	if (debug >= 3) {
+	  std::cerr << "training=" << pos << std::endl;
+	  for (size_type t = 0; t != derivations[pos].size(); ++ t) {
+	    const word_type& word = (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1]);
 	    
-	    derivations[pos].reserve(training[pos].size() + 2);
-	    derivations[pos].push_back(0);
+	    std::cerr << "\tword=" << word
+		      << " pos=" << derivations[pos][t]
+		      << std::endl;
 	    
-	    for (size_type i = 0; i != training[pos].size(); ++ i) {
-	      probs.clear();
-	      for (size_type state = 1; state != K; ++ state)
-		probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
-	      
-	      derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
-	    }
-	    
-	    derivations[pos].push_back(0);
-	    
-	    if (debug >= 4)
-	      for (size_type t = 0; t != derivations[pos].size(); ++ t)
-		std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
-			  << " pos=" << derivations[pos][t]
-			  << std::endl;
-	    
-	  } else {
-	    // remove from the model...
-	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	      model.decrement(derivations[pos][t - 1],
-			      derivations[pos][t],
-			      t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			      sampler);
-	  }
-	  
-	  // insert emissions
-	  emissions.insert(training[pos].begin(), training[pos].end());
-	}
-	
-	// perform pruning...
-	position_set_type::const_iterator miter_end = positions_mapped.end();
-	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
-	  graph.prune(training[*miter], derivations[*miter], model, sampler, cutoffs[*miter]);
-	
-	// create cache
-	model.initialize_cache(emissions.begin(), emissions.end());
-	
-	// mapping!
-	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
-	  queue_mapper.push(*miter);
-	
-	// asynchronously reduce
-	while (positions_reduced.size() != positions_mapped.size()) {
-	  size_type pos = 0;
-	  queue_reducer.pop(pos);
-	  positions_reduced.push_back(pos);
-	  
-	  // insert into the model
-	  if (debug >= 3) {
-	    
-	    std::cerr << "training=" << pos << std::endl;
-	    for (size_type t = 0; t != derivations[pos].size(); ++ t) {
-	      const word_type& word = (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1]);
-	      
-	      std::cerr << "\tword=" << word
-			<< " pos=" << derivations[pos][t]
-			<< std::endl;
-	      
-	      if (t)
-		model.increment(derivations[pos][t - 1],
-				derivations[pos][t],
-				word,
-				sampler,
-				temperature);
-	    }
-	  } else {
-	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	    if (t)
 	      model.increment(derivations[pos][t - 1],
 			      derivations[pos][t],
-			      t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			      word,
 			      sampler,
 			      temperature);
 	  }
+	} else {
+	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	    model.increment(derivations[pos][t - 1],
+			    derivations[pos][t],
+			    t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			    sampler,
+			    temperature);
 	}
       }
       
@@ -1010,7 +951,6 @@ void options(int argc, char** argv)
     ("transition-strength-rate",  po::value<double>(&transition_strength_prior_rate)->default_value(transition_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
-    ("blocks",  po::value<int>(&blocks),  "# of blocks")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
