@@ -439,7 +439,7 @@ struct PYPGraph
     phi(0, 0)     = 1.0;
     phi(T - 1, 0) = 1.0;
   }
-  
+    
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
   {
     initialize(sentence, model);
@@ -490,6 +490,40 @@ struct PYPGraph
     
     return logprob;
   }
+  
+  logprob_type score(const sentence_type& sentence, const derivation_type& derivation, const PYPPOS& model)
+  {
+    logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
+    
+    for (size_type t = 1; t != derivation.size(); ++ t)
+      logprob *= (model.prob_transition(derivation[t - 1], derivation[t])
+		  * model.prob_emission(derivation[t], t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1]));
+    
+    return logprob;
+  }
+  
+  template <typename Sampler>
+  void increment(const sentence_type& sentence, const derivation_type& derivation, PYPPOS& model, Sampler& sampler, const double temperature)
+  {
+    for (size_type t = 1; t != derivation.size(); ++ t)
+      model.increment(derivation[t - 1],
+		      derivation[t],
+		      t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1],
+		      sampler,
+		      temperature);
+    
+  }
+  
+  template <typename Sampler>
+  void decrement(const sentence_type& sentence, const derivation_type& derivation, PYPPOS& model, Sampler& sampler)
+  {
+    for (size_type t = 1; t != derivation.size(); ++ t)
+      model.decrement(derivation[t - 1],
+		      derivation[t],
+		      t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1],
+		      sampler);
+  }
+
   
   phi_type    phi;
   pi_type     pi;
@@ -566,11 +600,7 @@ struct Task
 	derivations[pos].push_back(0);
       } else {
 	// remove from the model...
-	for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	  model.decrement(derivations[pos][t - 1],
-			  derivations[pos][t],
-			  t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			  sampler);
+	graph.decrement(training[pos], derivations[pos], model, sampler);
       }
       
       // pruning
@@ -583,12 +613,7 @@ struct Task
       graph.backward(sampler, derivations[pos], temperature);
       
       // insert into the model
-      for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	model.increment(derivations[pos][t - 1],
-			derivations[pos][t],
-			t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			sampler,
-			temperature);
+      graph.increment(training[pos], derivations[pos], model, sampler, temperature);
       
       reducer.push(pos);
     }
@@ -685,6 +710,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no training data?");
     
     derivation_set_type derivations(training.size());
+    derivation_set_type derivations_prev(training.size());
     cutoff_set_type     cutoffs(training.size());
     position_set_type   positions(training.size());
     mapping_type mapping;
@@ -735,6 +761,8 @@ int main(int argc, char ** argv)
     
     bool sampling = false;
     int sample_iter = 0;
+
+    PYPGraph graph;
     
     Task::queue_type queue_mapper;
     Task::queue_type queue_reducer;
@@ -796,49 +824,53 @@ int main(int argc, char ** argv)
       position_set_type::const_iterator piter_end = positions.end();
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const size_type& pos = *piter;
-	
-	// remove from the global model
-	if (! derivations[pos].empty())
-	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	    model.decrement(derivations[pos][t - 1],
-			    derivations[pos][t],
-			    t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			    sampler);
+
+	derivations_prev[pos] = derivations[pos];
 	
 	queue_mapper.push(pos);
       }
+
+      size_type rejected = 0;
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
 	
+	//
 	// insert into the global model
-	if (debug >= 3) {
-	  std::cerr << "training=" << pos << std::endl;
-	  for (size_type t = 0; t != derivations[pos].size(); ++ t) {
-	    const word_type& word = (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1]);
+	//
+	
+	// MH-steps
+	if (derivations_prev[pos].empty())
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	else {
+	  const PYPGraph::logprob_type pi0 = graph.score(training[pos], derivations_prev[pos], model);
+	  
+	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
+	  
+	  const PYPGraph::logprob_type r0 = graph.score(training[pos], derivations_prev[pos], model);
+	  
+	  const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
+	  
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	  
+	  const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
+	  
+	  if (! sampler.bernoulli(std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0))) {
+	    graph.decrement(training[pos], derivations[pos], model, sampler);
 	    
-	    std::cerr << "\tword=" << word
-		      << " pos=" << derivations[pos][t]
-		      << std::endl;
+	    graph.increment(training[pos], derivations_prev[pos], model, sampler, temperature);
 	    
-	    if (t)
-	      model.increment(derivations[pos][t - 1],
-			      derivations[pos][t],
-			      word,
-			      sampler,
-			      temperature);
+	    derivations[pos].swap(derivations_prev[pos]);
+	    
+	    ++ rejected;
 	  }
-	} else {
-	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	    model.increment(derivations[pos][t - 1],
-			    derivations[pos][t],
-			    t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			    sampler,
-			    temperature);
 	}
       }
       
+      if (debug)
+	std::cerr << "rejection rate: " << (double(rejected) / training.size()) << std::endl;
+    
       model.permute(mapping);
       
       // remap training data
