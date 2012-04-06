@@ -295,25 +295,16 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
-      beta.strength() = pi0.strength();
       beta.discount() = pi0.discount();
+      beta.strength() = pi0.strength();
       
-#if 0
-      std::vector<double, std::allocator<double> > probs(pi0.size());
-      for (id_type state = 0; state != pi0.size(); ++ state)
-	probs[state] = pi0.prob(state, base0);
-      beta.assign_parameters(probs.begin(), probs.end());
-#endif
-
-#if 1
       // sample beta from pi0 and base0
       std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
       for (id_type state = 0; state != pi0.size(); ++ state)
-	counts[state] = pi0.size_customer(state);
-      counts.back() = beta.strength();
+	counts[state] = pi0.size_customer(state) - pi0.size_table(state) * beta.discount();
+      counts.back() = beta.strength() + counts0 * beta.discount();
       
       beta.sample_parameters(counts.begin(), counts.end(), sampler);
-#endif
     }
   }
 
