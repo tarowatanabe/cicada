@@ -894,7 +894,6 @@ int main(int argc, char ** argv)
 	// insert into the global model
 	//
 	if (! hasting) {
-
 	  if (! derivations_prev[pos].empty())
 	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
 	  
