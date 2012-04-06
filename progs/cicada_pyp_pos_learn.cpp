@@ -576,11 +576,18 @@ struct Task
   {
     std::vector<double, std::allocator<double> > probs;
     size_type pos;
+
+    derivation_type derivation_prev;
     
     for (;;) {
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
+
+      derivation_prev = derivations[pos];
+      
+      PYPGraph::logprob_type pi0;
+      PYPGraph::logprob_type r0;
       
       if (derivations[pos].empty()) {
 	// it is our initial condition... sample derivation...
@@ -600,7 +607,11 @@ struct Task
 	derivations[pos].push_back(0);
       } else {
 	// remove from the model...
+	pi0 = graph.score(training[pos], derivation_prev, model);
+	
 	graph.decrement(training[pos], derivations[pos], model, sampler);
+	
+	r0 = graph.score(training[pos], derivation_prev, model);
       }
       
       // pruning
@@ -613,7 +624,24 @@ struct Task
       graph.backward(sampler, derivations[pos], temperature);
       
       // insert into the model
-      graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+      
+      if (derivation_prev.empty())
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+      else {
+	const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
+	
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	
+	const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
+	
+	if (! sampler.bernoulli(std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0))) {
+	  graph.decrement(training[pos], derivations[pos], model, sampler);
+	  
+	  graph.increment(training[pos], derivation_prev, model, sampler, temperature);
+	  
+	  derivations[pos].swap(derivation_prev);
+	}
+      }
       
       reducer.push(pos);
     }
@@ -843,7 +871,7 @@ int main(int argc, char ** argv)
 	// MH-steps
 	if (derivations_prev[pos].empty())
 	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	else {
+	else if (derivations_prev[pos] != derivations[pos]) {
 	  const PYPGraph::logprob_type pi0 = graph.score(training[pos], derivations_prev[pos], model);
 	  
 	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
