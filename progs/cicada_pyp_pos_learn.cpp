@@ -100,13 +100,15 @@ struct PYPPOS
 	 const parameter_type& __transition)
     : h(__h),
       h_counts(0),
-      phi0(__emission),
-      phi(classes, table_emission_type(__emission)),
+      phi0(__emission.discount, __emission.strength),
+      phi(classes, table_emission_type(__emission.discount,
+				       __emission.strength)),
       base0(__h),
       counts0(0),
       beta(__transition.discount, __transition.strength),
-      pi0(__transition),
-      pi(classes, table_transition_type(__transition)),
+      pi0(__transition.discount, __transition.strength),
+      pi(classes, table_transition_type(__transition.discount,
+					__transition.strength)),
       emission0(__emission),
       emission(__emission),
       transition0(__transition),
@@ -229,7 +231,7 @@ struct PYPPOS
     for (size_type i = 0; i != pi.size(); ++ i)
       pi[i].permute(mapping);
     
-    transition_type pi_new(pi0.size(), table_transition_type(transition));
+    transition_type pi_new(pi0.size(), table_transition_type(transition.discount, transition.strength));
     
     for (size_type i = 0; i != pi_new.size(); ++ i)
       if (mapping[i] < pi.size())
@@ -238,7 +240,7 @@ struct PYPPOS
     pi.swap(pi_new);
     
     // re-map for emission...
-    emission_type phi_new(pi0.size(), table_emission_type(emission));
+    emission_type phi_new(pi0.size(), table_emission_type(emission.discount, emission.strength));
     
     for (size_type i = 0; i != phi_new.size(); ++ i)
       if (mapping[i] < phi.size())
