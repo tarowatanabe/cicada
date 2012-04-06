@@ -752,7 +752,7 @@ int main(int argc, char ** argv)
 	  
 	  if (training[pos].empty()) continue;
 
-	  if (debug >= 3)
+	  if (debug >= 4)
 	    std::cerr << "training=" << pos << " classes: " << model.beta.size() << std::endl;
 	  
 	  positions_mapped.push_back(pos);
@@ -774,7 +774,7 @@ int main(int argc, char ** argv)
 	    
 	    derivations[pos].push_back(0);
 	    
-	    if (debug >= 3)
+	    if (debug >= 4)
 	      for (size_type t = 0; t != derivations[pos].size(); ++ t)
 		std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
 			  << " pos=" << derivations[pos][t]
@@ -784,7 +784,8 @@ int main(int argc, char ** argv)
 	    // remove from the model...
 	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
 	      model.decrement(derivations[pos][t - 1],
-			      derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			      derivations[pos][t],
+			      t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
 			      sampler);
 	  }
 	  
@@ -807,11 +808,32 @@ int main(int argc, char ** argv)
 	  const size_t pos = *riter;
 	  
 	  // insert into the model
-	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	    model.increment(derivations[pos][t - 1],
-			    derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
-			    sampler,
-			    temperature);
+	  if (debug >= 3) {
+	    
+	    std::cerr << "training=" << pos << std::endl;
+	    for (size_type t = 0; t != derivations[pos].size(); ++ t) {
+	      const word_type& word = (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1]);
+	      
+	      std::cerr << "\tword=" << word
+			<< " pos=" << derivations[pos][t]
+			<< std::endl;
+
+	      if (t)
+		model.increment(derivations[pos][t - 1],
+				derivations[pos][t],
+				word,
+				sampler,
+				temperature);
+	    }
+	    
+	  } else {
+	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	      model.increment(derivations[pos][t - 1],
+			      derivations[pos][t],
+			      t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			      sampler,
+			      temperature);
+	  }
 	}
       }
       
