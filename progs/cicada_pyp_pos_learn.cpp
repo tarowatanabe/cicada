@@ -48,6 +48,7 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/dense_hash_set.hpp"
+#include "utils/lockfree_list_queue.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -198,8 +199,6 @@ struct PYPPOS
   template <typename Mapping>
   void permute(Mapping& mapping)
   {
-    
-    
     // we will sort id by the counts...
     mapping.clear();
     for (size_type i = 0; i != beta.size(); ++ i)
@@ -503,6 +502,57 @@ typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > mapping_type;
 
+struct Task
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+  
+  Task(queue_type& __mapper,
+       queue_type& __reducer,
+       const sentence_set_type& __training,
+       const cutoff_set_type& __cutoffs,
+       derivation_set_type& __derivations,
+       const PYPPOS& __model,
+       sampler_type& __sampler)
+    : mapper(__mapper),
+      reducer(__reducer),
+      training(__training),
+      cutoffs(__cutoffs),
+      derivations(__derivations),
+      model(__model),
+      sampler(__sampler) {}
+  
+  void operator()()
+  {
+    size_type pos;
+    
+    for (;;) {
+      mapper.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+      
+      graph.forward(training[pos], model, cutoffs[pos]);
+      
+      graph.backward(sampler, derivations[pos]);
+      
+      reducer.push(pos);
+    }
+  }
+  
+  queue_type& mapper;
+  queue_type& reducer;
+  const sentence_set_type& training;
+  const cutoff_set_type& cutoffs;
+  derivation_set_type& derivations;
+  const PYPPOS& model;
+  sampler_type  sampler;
+  PYPGraph graph;
+};
+
+
+
 struct less_size
 {
   less_size(const sentence_set_type& __training) : training(__training) {}
@@ -529,7 +579,7 @@ int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
 
-double emission_discount = 0.8;
+double emission_discount = 0.1;
 double emission_strength = 1;
 
 double emission_discount_prior_alpha = 1.0;
@@ -537,8 +587,8 @@ double emission_discount_prior_beta  = 1.0;
 double emission_strength_prior_shape = 1.0;
 double emission_strength_prior_rate  = 1.0;
 
-double transition_discount = 0.8;
-double transition_strength = 16;
+double transition_discount = 0.1;
+double transition_strength = 10;
 
 double transition_discount_prior_alpha = 1.0;
 double transition_discount_prior_beta  = 1.0;
@@ -546,6 +596,7 @@ double transition_strength_prior_shape = 1.0;
 double transition_strength_prior_rate  = 1.0;
 
 int threads = 1;
+int blocks = 64;
 int debug = 0;
 
 void options(int argc, char** argv);
@@ -557,6 +608,9 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     threads = utils::bithack::max(threads, 1);
+    
+    if (blocks <= 0)
+      throw std::runtime_error("# of blocks must be positive");
     
     if (samples < 0)
       throw std::runtime_error("# of samples must be positive");
@@ -584,6 +638,9 @@ int main(int argc, char ** argv)
     position_set_type   positions(training.size());
     mapping_type mapping;
     mapping_type mapping_new;
+    
+    position_set_type positions_mapped;
+    position_set_type positions_reduced;
     
     for (size_t i = 0; i != training.size(); ++ i)
       positions[i] = i;
@@ -630,7 +687,20 @@ int main(int argc, char ** argv)
     bool sampling = false;
     int sample_iter = 0;
     
-        // then, learn!
+    Task::queue_type queue_mapper;
+    Task::queue_type queue_reducer;
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(Task(queue_mapper,
+						queue_reducer,
+						training,
+						cutoffs,
+						derivations,
+						model,
+						sampler)));
+    
+    // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
       
       double temperature = 1.0;
@@ -665,74 +735,84 @@ int main(int argc, char ** argv)
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(training));
-
+      
       std::vector<double, std::allocator<double> > probs;
       
-      for (size_t i = 0; i != positions.size(); ++ i) {
-	const size_t pos = positions[i];
+      position_set_type::const_iterator piter = positions.begin();
+      position_set_type::const_iterator piter_end = positions.end();
+      
+      while (piter != piter_end) {
+	positions_mapped.clear();
+	positions_reduced.clear();
 	
-	if (training[pos].empty()) continue;
+	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
 	
-	if (debug >= 3)
-	  std::cerr << "training=" << pos << " classes: " << model.beta.size() << std::endl;
-	
-	if (derivations[pos].empty()) {
-	  // it is our initial condition... sample derivation...
-	  const size_type K = model.beta.size();
+	for (/**/; piter != piter_last; ++ piter) {
+	  const size_t pos = *piter;
 	  
-	  derivations[pos].reserve(training[pos].size() + 2);
-	  derivations[pos].push_back(0);
+	  if (training[pos].empty()) continue;
+
+	  if (debug >= 3)
+	    std::cerr << "training=" << pos << " classes: " << model.beta.size() << std::endl;
 	  
-	  for (size_type i = 0; i != training[pos].size(); ++ i) {
+	  positions_mapped.push_back(pos);
+	  
+	  if (derivations[pos].empty()) {
+	    // it is our initial condition... sample derivation...
+	    const size_type K = model.beta.size();
 	    
-	    probs.clear();
-	    for (size_type state = 1; state != K; ++ state)
-	      probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
+	    derivations[pos].reserve(training[pos].size() + 2);
+	    derivations[pos].push_back(0);
 	    
-	    derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+	    for (size_type i = 0; i != training[pos].size(); ++ i) {
+	      probs.clear();
+	      for (size_type state = 1; state != K; ++ state)
+		probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
+	      
+	      derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+	    }
+	    
+	    derivations[pos].push_back(0);
+	    
+	    if (debug >= 3)
+	      for (size_type t = 0; t != derivations[pos].size(); ++ t)
+		std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
+			  << " pos=" << derivations[pos][t]
+			  << std::endl;
+	    
+	  } else {
+	    // remove from the model...
+	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
+	      model.decrement(derivations[pos][t - 1],
+			      derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			      sampler);
 	  }
 	  
-	  derivations[pos].push_back(0);
+	  // perform pruning...
+	  graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
+	}
+	
+	position_set_type::const_iterator miter_end = positions_mapped.end();
+	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
+	  queue_mapper.push(*miter);
+	
+	while (positions_reduced.size() != positions_mapped.size()) {
+	  size_type pos = 0;
+	  queue_reducer.pop(pos);
+	  positions_reduced.push_back(pos);
+	}
+	
+	position_set_type::const_iterator riter_end = positions_reduced.end();
+	for (position_set_type::const_iterator riter = positions_reduced.begin(); riter != riter_end; ++ riter) {
+	  const size_t pos = *riter;
 	  
-	  if (debug >= 3)
-	    for (size_type t = 0; t != derivations[pos].size(); ++ t)
-	      std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
-			<< " pos=" << derivations[pos][t]
-			<< std::endl;
-	  
-	} else {
-	  // remove from the model...
+	  // insert into the model
 	  for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	    model.decrement(derivations[pos][t - 1], derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1], sampler);
+	    model.increment(derivations[pos][t - 1],
+			    derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1],
+			    sampler,
+			    temperature);
 	}
-	
-	// pruning...
-	graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
-	
-	const PYPGraph::logprob_type logsum = graph.forward(training[pos], model, cutoffs[pos]);
-	
-	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
-
-	for (size_type t = 1; t != derivations[pos].size() - 1; ++ t)
-	  if (! derivations[pos][t])
-	    std::cerr << "WARNING: empty state?" << std::endl;
-	
-	if (derivations[pos].front() || derivations[pos].back())
-	  throw std::runtime_error("wrong BOS/EOS");
-	
-	
-	if (debug >= 3) {
-	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
-	  
-	  for (size_type t = 0; t != derivations[pos].size(); ++ t)
-	    std::cerr << "word=" << (t == 0 || t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1])
-		      << " pos=" << derivations[pos][t]
-		      << std::endl;
-	}
-	
-	// insert into the model
-	for (size_type t = 1; t != derivations[pos].size(); ++ t)
-	  model.increment(derivations[pos][t - 1], derivations[pos][t], t + 1 == derivations[pos].size() ? vocab_type::BOS : training[pos][t - 1], sampler, temperature);
       }
       
       model.permute(mapping);
@@ -741,7 +821,6 @@ int main(int argc, char ** argv)
       mapping_new.resize(mapping.size());
       for (size_type i = 0; i != mapping.size(); ++ i)
 	mapping_new[mapping[i]] = i;
-      
       
       for (size_type pos = 0; pos != derivations.size(); ++ pos)
 	for (size_type t = 0; t != derivations[pos].size(); ++ t) {
@@ -774,6 +853,11 @@ int main(int argc, char ** argv)
 		  << "classes: " << model.classes() << std::endl;
     }
     
+    
+    for (int i = 0; i != threads; ++ i)
+      queue_mapper.push(size_type(-1));
+    
+    workers.join_all();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -843,6 +927,7 @@ void options(int argc, char** argv)
     ("transition-strength-rate",  po::value<double>(&transition_strength_prior_rate)->default_value(transition_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
+    ("blocks",  po::value<int>(&blocks),  "# of blocks")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");

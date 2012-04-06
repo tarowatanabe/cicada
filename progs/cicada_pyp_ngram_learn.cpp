@@ -304,6 +304,7 @@ struct PYPLM
       return p0;
     
     if (infinite) {
+#if 1
       double p = root.table.prob(word, p0);
       
       // we will traverse from the back!
@@ -321,6 +322,7 @@ struct PYPLM
       }
       
       return p;
+#endif
 #if 0
       if (orders_cache.empty()) {
 	orders_cache.resize(orders.size());
@@ -788,7 +790,7 @@ int samples = 30;
 int baby_steps = 0;
 int anneal_steps = 0;
 int resample_rate = 1;
-int resample_iterations = 2;
+int resample_iterations = 1;
 bool slice_sampling = false;
 bool infinite = false;
 
@@ -800,7 +802,7 @@ double discount_prior_beta  = 1.0;
 double strength_prior_shape = 1.0;
 double strength_prior_rate  = 1.0;
 
-double order_alpha = 4.0;
+double order_alpha = 1.0;
 double order_beta = 1.0;
 
 int threads = 1;
