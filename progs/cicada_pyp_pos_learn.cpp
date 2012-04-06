@@ -628,20 +628,30 @@ struct Task
       // perform MH
       if (derivation_prev.empty())
 	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-      else {
+      else if (derivation_prev != derivations[pos]) {
 	const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
 	
 	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
 	
 	const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
 	
-	if (! sampler.bernoulli(std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0))) {
+	double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
+	
+	if (temperature != 1.0)
+	  accept_rate = std::pow(accept_rate, temperature);
+	
+	if (! sampler.bernoulli(accept_rate)) {
 	  graph.decrement(training[pos], derivations[pos], model, sampler);
 	  
 	  graph.increment(training[pos], derivation_prev, model, sampler, temperature);
 	  
 	  derivations[pos].swap(derivation_prev);
+	  
+	  ++ rejected;
 	}
+      } else {
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	++ unchanged;
       }
       
       reducer.push(pos);
@@ -660,6 +670,9 @@ struct Task
   double temperature;
   
   PYPGraph graph;
+  
+  size_type rejected;
+  size_type unchanged;
 };
 
 struct less_size
@@ -842,6 +855,8 @@ int main(int argc, char ** argv)
       for (size_type i = 0; i != tasks.size(); ++ i) {
 	tasks[i].model = model;
 	tasks[i].temperature = temperature;
+	tasks[i].rejected = 0;
+	tasks[i].unchanged = 0;
       }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
@@ -869,7 +884,15 @@ int main(int argc, char ** argv)
 	//
 	// insert into the global model
 	//
+
+#if 0
+	if (! derivations_prev[pos].empty())
+	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
 	
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+#endif
+	
+#if 1
 	// MH-steps
 	if (derivations_prev[pos].empty())
 	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
@@ -886,7 +909,12 @@ int main(int argc, char ** argv)
 	  
 	  const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
 	  
-	  if (! sampler.bernoulli(std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0))) {
+	  double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
+	  
+	  if (temperature != 1.0)
+	    accept_rate = std::pow(accept_rate, temperature);
+	  
+	  if (! sampler.bernoulli(accept_rate)) {
 	    graph.decrement(training[pos], derivations[pos], model, sampler);
 	    
 	    graph.increment(training[pos], derivations_prev[pos], model, sampler, temperature);
@@ -897,12 +925,24 @@ int main(int argc, char ** argv)
 	  }
 	} else
 	  ++ unchanged;
+#endif
       }
       
-      if (debug)
-	std::cerr << "rejection rate: " << (double(rejected) / (training.size() - unchanged)) << std::endl
-		  << "unchanged rate: " << (double(unchanged) / training.size()) << std::endl;
-    
+      if (debug) {
+	size_type shard_rejected = 0;
+	size_type shard_unchanged = 0;
+
+	for (size_type i = 0; i != tasks.size(); ++ i) {
+	  shard_rejected = tasks[i].rejected;
+	  shard_unchanged = tasks[i].unchanged;
+	}
+
+	std::cerr << "rejection rate: " << rejected << '/' << (training.size() - unchanged) << std::endl
+		  << "unchanged rate: " << unchanged << '/' << training.size() << std::endl
+		  << "shard rejection rate: " << shard_rejected << '/' << (training.size() - shard_unchanged) << std::endl
+		  << "shard unchanged rate: " << shard_unchanged << '/' << training.size() << std::endl;
+      }
+      
       model.permute(mapping);
       
       // remap training data
