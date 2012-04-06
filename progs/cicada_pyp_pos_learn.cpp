@@ -849,17 +849,21 @@ int main(int argc, char ** argv)
 	  
 	  // insert emissions
 	  emissions.insert(training[pos].begin(), training[pos].end());
-	  
-	  // perform pruning...
-	  graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
 	}
 	
+	// perform pruning...
+	position_set_type::const_iterator miter_end = positions_mapped.end();
+	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
+	  graph.prune(training[*miter], derivations[*miter], model, sampler, cutoffs[*miter]);
+	
+	// create cache
 	model.initialize_cache(emissions.begin(), emissions.end());
 	
-	position_set_type::const_iterator miter_end = positions_mapped.end();
+	// mapping!
 	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
 	  queue_mapper.push(*miter);
 	
+	// asynchronously reduce
 	while (positions_reduced.size() != positions_mapped.size()) {
 	  size_type pos = 0;
 	  queue_reducer.pop(pos);
