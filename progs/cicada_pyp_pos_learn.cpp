@@ -471,13 +471,13 @@ struct PYPGraph
 	pi(prev, next) = model.cache_transition(prev, next);
     
     phi.clear();
-    phi.resize(K, T);
+    phi.resize(T, K);
     for (size_type t = 1; t != T - 1; ++ t)
       for (id_type state = 1; state != K; ++ state)
-	phi(state, t) = model.cache_emission(state, sentence[t - 1]);
+	phi(t, state) = model.cache_emission(state, sentence[t - 1]);
     
     phi(0, 0)     = 1.0;
-    phi(0, T - 1) = 1.0;
+    phi(T - 1, 0) = 1.0;
   }
   
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
@@ -492,7 +492,7 @@ struct PYPGraph
       for (id_type prev = 0; prev != K; ++ prev)
 	for (id_type next = 0; next != K; ++ next)
 	  if (pi(prev, next) > cutoff[t])
-	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(next, t);
+	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(t, next);
       
       double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
       scale = (scale == 0.0 ? 1.0 : scale);
@@ -517,7 +517,7 @@ struct PYPGraph
     for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
       for (id_type prev = 0; prev != K; ++ prev)
-	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(state, t));
+	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(t, state));
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
       
