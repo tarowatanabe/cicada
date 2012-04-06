@@ -297,10 +297,14 @@ struct PYPPOS
       beta.strength() = pi0.strength();
       beta.discount() = pi0.discount();
       
+      beta.sample_parameters(pi0.size(), sampler);
+
+#if 0
       std::vector<double, std::allocator<double> > probs(pi0.size());
       for (id_type state = 0; state != pi0.size(); ++ state)
 	probs[state] = pi0.prob(state, base0);
       beta.assign_parameters(probs.begin(), probs.end());
+#endif
 
 #if 0
       // sample beta from pi0 and base0
