@@ -318,10 +318,10 @@ struct ExtractSCFG
 	      const int __max_span_target,
 	      const int __min_hole_source,
 	      const int __min_hole_target,
+	      const int __max_rank,
 	      const int __max_scope,
 	      const bool __exhaustive,
 	      const bool __constrained,
-	      const bool __ternary,
 	      const bool __sentential,
 	      const bool __inverse)
     : max_length(__max_length),
@@ -330,23 +330,23 @@ struct ExtractSCFG
       max_span_target(__max_span_target),
       min_hole_source(__min_hole_source),
       min_hole_target(__min_hole_target),
+      max_rank(__max_rank),
       max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
-      ternary(__ternary),
       sentential(__sentential),
       inverse(__inverse) {}
-		
+  
   int max_length;
   int max_fertility;
   int max_span_source;
   int max_span_target;
   int min_hole_source;
   int min_hole_target;
+  int max_rank;
   int max_scope;
   bool exhaustive;
   bool constrained;
-  bool ternary;
   bool sentential;
   bool inverse;
   
@@ -548,79 +548,81 @@ struct ExtractSCFG
     span_pair_set_type::const_iterator niter_end   = (exhaustive ? spans.end()   : spans_unique.end());
     
     // first non-terminal...
-    for (span_pair_set_type::const_iterator niter1 = niter_begin; niter1 != niter_end; ++ niter1) 
-      if (span != *niter1
-	  && (min_hole_source <= 1 || (niter1->source.second - niter1->source.first) >= min_hole_source)
-	  && (min_hole_target <= 1 || (niter1->target.second - niter1->target.first) >= min_hole_target)
-	  && is_parent(span.source, niter1->source)
-	  && is_parent(span.target, niter1->target)) {
+    if (max_rank >= 1)
+      for (span_pair_set_type::const_iterator niter1 = niter_begin; niter1 != niter_end; ++ niter1) 
+	if (span != *niter1
+	    && (min_hole_source <= 1 || (niter1->source.second - niter1->source.first) >= min_hole_source)
+	    && (min_hole_target <= 1 || (niter1->target.second - niter1->target.first) >= min_hole_target)
+	    && is_parent(span.source, niter1->source)
+	    && is_parent(span.target, niter1->target)) {
 	
-	const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
-	//const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
+	  const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
+	  //const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
 	
-	const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
-	const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
+	  const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
+	  const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
 	
-	if (source_count1 != source_count)
-	  if (max_length <= 0 || (source_length1 <= max_length && target_length1 <= max_length))
-	    if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
-	      extract_rule(source, target, span, *niter1, category, rule_pair, true);
-	      rule_pair_list.push_back(rule_pair);
-	    }
+	  if (source_count1 != source_count)
+	    if (max_length <= 0 || (source_length1 <= max_length && target_length1 <= max_length))
+	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
+		extract_rule(source, target, span, *niter1, category, rule_pair, true);
+		rule_pair_list.push_back(rule_pair);
+	      }
 	
-	// second non-terminal...
-	for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
-	  if (span != *niter2
-	      && (min_hole_source <= 1 || (niter2->source.second - niter2->source.first) >= min_hole_source)
-	      && (min_hole_target <= 1 || (niter2->target.second - niter2->target.first) >= min_hole_target)
-	      && is_parent(span.source, niter2->source)
-	      && is_parent(span.target, niter2->target)
-	      && is_disjoint(niter1->source, niter2->source)
-	      && is_disjoint(niter1->target, niter2->target)
-	      && ! is_adjacent(niter1->source, niter2->source)) {
+	  // second non-terminal...
+	  if (max_rank >= 2)
+	    for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
+	      if (span != *niter2
+		  && (min_hole_source <= 1 || (niter2->source.second - niter2->source.first) >= min_hole_source)
+		  && (min_hole_target <= 1 || (niter2->target.second - niter2->target.first) >= min_hole_target)
+		  && is_parent(span.source, niter2->source)
+		  && is_parent(span.target, niter2->target)
+		  && is_disjoint(niter1->source, niter2->source)
+		  && is_disjoint(niter1->target, niter2->target)
+		  && ! is_adjacent(niter1->source, niter2->source)) {
 	    
-	    const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
-	    //const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
+		const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
+		//const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
 	    
-	    const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
-	    const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
+		const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
+		const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
 	    
-	    if (source_count != source_count1 + source_count2)
-	      if (max_length <= 0 || (source_length2 <= max_length && target_length2 <= max_length))
-		if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
-		  extract_rule(source, target, span, *niter1, *niter2, category, rule_pair, true);
-		  rule_pair_list.push_back(rule_pair);
-		}
+		if (source_count != source_count1 + source_count2)
+		  if (max_length <= 0 || (source_length2 <= max_length && target_length2 <= max_length))
+		    if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
+		      extract_rule(source, target, span, *niter1, *niter2, category, rule_pair, true);
+		      rule_pair_list.push_back(rule_pair);
+		    }
 	    
-	    if (ternary)
-	      for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
-		if (span != *niter3
-		    && (min_hole_source <= 1 || (niter3->source.second - niter3->source.first) >= min_hole_source)
-		    && (min_hole_target <= 1 || (niter3->target.second - niter3->target.first) >= min_hole_target)
-		    && is_parent(span.source, niter3->source)
-		    && is_parent(span.target, niter3->target)
-		    && is_disjoint(niter1->source, niter3->source)
-		    && is_disjoint(niter1->target, niter3->target)
-		    && is_disjoint(niter2->source, niter3->source)
-		    && is_disjoint(niter2->target, niter3->target)
-		    && ! is_adjacent(niter1->source, niter3->source)
-		    && ! is_adjacent(niter2->source, niter3->source)) {
+		if (max_rank >= 3)
+		  for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
+		    if (span != *niter3
+			&& (min_hole_source <= 1 || (niter3->source.second - niter3->source.first) >= min_hole_source)
+			&& (min_hole_target <= 1 || (niter3->target.second - niter3->target.first) >= min_hole_target)
+			&& is_parent(span.source, niter3->source)
+			&& is_parent(span.target, niter3->target)
+			&& is_disjoint(niter1->source, niter3->source)
+			&& is_disjoint(niter1->target, niter3->target)
+			&& is_disjoint(niter2->source, niter3->source)
+			&& is_disjoint(niter2->target, niter3->target)
+			&& ! is_adjacent(niter1->source, niter3->source)
+			&& ! is_adjacent(niter2->source, niter3->source)) {
 		  
-		  const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
-		  //const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
+		      const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
+		      //const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
 		  
-		  const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
-		  const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
+		      const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
+		      const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
 		  
-		  if (source_count != source_count1 + source_count2 + source_count3)
-		    if (max_length <= 0 || (source_length3 <= max_length && target_length3 <= max_length))
-		      if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
-			extract_rule(source, target, span, *niter1, *niter2, *niter3, category, rule_pair, true);
-			rule_pair_list.push_back(rule_pair);
-		      }
-		}
-	  }
-      }
+		      if (source_count != source_count1 + source_count2 + source_count3)
+			if (max_length <= 0 || (source_length3 <= max_length && target_length3 <= max_length))
+			  if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
+			    extract_rule(source, target, span, *niter1, *niter2, *niter3, category, rule_pair, true);
+			    rule_pair_list.push_back(rule_pair);
+			  }
+		    }
+	      }
+	}
     
     if (! rule_pair_list.empty()) {
       const double count = 1.0 / rule_pair_list.size();
@@ -674,86 +676,88 @@ struct ExtractSCFG
       
       const int source_count = alignment_count_source[iter->source.second] - alignment_count_source[iter->source.first];
       //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
-            
+      
       rule_pair_list.clear();
       
       span_pair_set_type::const_iterator niter_begin = (exhaustive ? spans.begin() : spans_unique.begin());
       span_pair_set_type::const_iterator niter_end   = (exhaustive ? spans.end()   : spans_unique.end());
       
       // first non-terminal...
-      for (span_pair_set_type::const_iterator niter1 = niter_begin; niter1 != niter_end; ++ niter1) 
-	if (*iter != *niter1
-	    && (min_hole_source <= 1 || (niter1->source.second - niter1->source.first) >= min_hole_source)
-	    && (min_hole_target <= 1 || (niter1->target.second - niter1->target.first) >= min_hole_target)
-	    && is_parent(iter->source, niter1->source)
-	    && is_parent(iter->target, niter1->target)) {
+      if (max_rank >= 1)
+	for (span_pair_set_type::const_iterator niter1 = niter_begin; niter1 != niter_end; ++ niter1) 
+	  if (*iter != *niter1
+	      && (min_hole_source <= 1 || (niter1->source.second - niter1->source.first) >= min_hole_source)
+	      && (min_hole_target <= 1 || (niter1->target.second - niter1->target.first) >= min_hole_target)
+	      && is_parent(iter->source, niter1->source)
+	      && is_parent(iter->target, niter1->target)) {
 	  
-	  const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
-	  //const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
+	    const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
+	    //const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
 	  
-	  const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
-	  const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
+	    const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
+	    const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
 	  
-	  if (source_count1 != source_count)
-	    if (max_length <= 0 || (source_length1 <= max_length && target_length1 <= max_length))
-	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
-		extract_rule(source, target, *iter, *niter1, category, rule_pair);
-		rule_pair_list.push_back(rule_pair);
-	      }
+	    if (source_count1 != source_count)
+	      if (max_length <= 0 || (source_length1 <= max_length && target_length1 <= max_length))
+		if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
+		  extract_rule(source, target, *iter, *niter1, category, rule_pair);
+		  rule_pair_list.push_back(rule_pair);
+		}
 	  
-	  // second non-terminal...
-	  for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
-	    if (*iter != *niter2
-		&& (min_hole_source <= 1 || (niter2->source.second - niter2->source.first) >= min_hole_source)
-		&& (min_hole_target <= 1 || (niter2->target.second - niter2->target.first) >= min_hole_target)
-		&& is_parent(iter->source, niter2->source)
-		&& is_parent(iter->target, niter2->target)
-		&& is_disjoint(niter1->source, niter2->source)
-		&& is_disjoint(niter1->target, niter2->target)
-		&& ! is_adjacent(niter1->source, niter2->source)) {
+	    // second non-terminal...
+	    if (max_rank >= 2)
+	      for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
+		if (*iter != *niter2
+		    && (min_hole_source <= 1 || (niter2->source.second - niter2->source.first) >= min_hole_source)
+		    && (min_hole_target <= 1 || (niter2->target.second - niter2->target.first) >= min_hole_target)
+		    && is_parent(iter->source, niter2->source)
+		    && is_parent(iter->target, niter2->target)
+		    && is_disjoint(niter1->source, niter2->source)
+		    && is_disjoint(niter1->target, niter2->target)
+		    && ! is_adjacent(niter1->source, niter2->source)) {
 	      
-	      const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
-	      //const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
+		  const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
+		  //const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
 	      
-	      const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
-	      const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
+		  const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
+		  const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
 	      
-	      if (source_count != source_count1 + source_count2)
-		if (max_length <= 0 || (source_length2 <= max_length && target_length2 <= max_length))
-		  if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
-		    extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair);
-		    rule_pair_list.push_back(rule_pair);
-		  }
+		  if (source_count != source_count1 + source_count2)
+		    if (max_length <= 0 || (source_length2 <= max_length && target_length2 <= max_length))
+		      if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
+			extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair);
+			rule_pair_list.push_back(rule_pair);
+		      }
 	      
-	      if (ternary)
-		for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
-		  if (*iter != *niter3
-		      && (min_hole_source <= 1 || (niter3->source.second - niter3->source.first) >= min_hole_source)
-		      && (min_hole_target <= 1 || (niter3->target.second - niter3->target.first) >= min_hole_target)
-		      && is_parent(iter->source, niter3->source)
-		      && is_parent(iter->target, niter3->target)
-		      && is_disjoint(niter1->source, niter3->source)
-		      && is_disjoint(niter1->target, niter3->target)
-		      && is_disjoint(niter2->source, niter3->source)
-		      && is_disjoint(niter2->target, niter3->target)
-		      && ! is_adjacent(niter1->source, niter3->source)
-		      && ! is_adjacent(niter2->source, niter3->source)) {
+		  if (max_rank >= 3)
+		    for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
+		      if (*iter != *niter3
+			  && (min_hole_source <= 1 || (niter3->source.second - niter3->source.first) >= min_hole_source)
+			  && (min_hole_target <= 1 || (niter3->target.second - niter3->target.first) >= min_hole_target)
+			  && is_parent(iter->source, niter3->source)
+			  && is_parent(iter->target, niter3->target)
+			  && is_disjoint(niter1->source, niter3->source)
+			  && is_disjoint(niter1->target, niter3->target)
+			  && is_disjoint(niter2->source, niter3->source)
+			  && is_disjoint(niter2->target, niter3->target)
+			  && ! is_adjacent(niter1->source, niter3->source)
+			  && ! is_adjacent(niter2->source, niter3->source)) {
 		    
-		    const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
-		    //const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
+			const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
+			//const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
 		    
-		    const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
-		    const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
+			const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
+			const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
 		    
-		    if (source_count != source_count1 + source_count2 + source_count3)
-		      if (max_length <= 0 || (source_length3 <= max_length && target_length3 <= max_length))
-			if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
-			  extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
-			  rule_pair_list.push_back(rule_pair);
-			}
-		  }
-	    }
-	}
+			if (source_count != source_count1 + source_count2 + source_count3)
+			  if (max_length <= 0 || (source_length3 <= max_length && target_length3 <= max_length))
+			    if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
+			      extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
+			      rule_pair_list.push_back(rule_pair);
+			    }
+		      }
+		}
+	  }
       
       // add into rule-pairs...
       if (! rule_pair_list.empty()) {
@@ -1226,10 +1230,10 @@ struct Task
        const int max_span_target,
        const int min_hole_source,
        const int min_hole_target,
+       const int max_rank,
        const int max_scope,
        const bool exhaustive,
        const bool constrained,
-       const bool ternary,
        const bool sentential,
        const bool inverse,
        const double __max_malloc)
@@ -1238,8 +1242,8 @@ struct Task
       extractor(max_length, max_fertility,
 		max_span_source, max_span_target, 
 		min_hole_source, min_hole_target,
-		max_scope,
-		exhaustive, constrained, ternary, sentential, inverse),
+		max_rank, max_scope,
+		exhaustive, constrained, sentential, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

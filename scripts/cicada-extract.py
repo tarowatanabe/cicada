@@ -100,6 +100,8 @@ opt_parser = OptionParser(
                 metavar="HEIGHT", help="maximum rule height (default: 4)"),
     make_option("--max-compose", default=0, action="store", type="int",
                 metavar="COMPOSE", help="maximum rule composition (default: 0)"),
+    make_option("--max-rank", default=0, action="store", type="int",
+                metavar="RANK", help="maximum rule rank (default: 2)"),
     make_option("--max-scope", default=0, action="store", type="int",
                 metavar="SCOPE", help="maximum rule scope (default: 0)"),
     make_option("--collapse-source", default=None, action="store_true",
@@ -113,8 +115,6 @@ opt_parser = OptionParser(
     make_option("--project", default=None, action="store_true",
                 help="project non-terminal symbols in GHKM"),
     
-    make_option("--ternary", default=None, action="store_true",
-                help="extract ternary rule"),
     make_option("--sentential", default=None, action="store_true",
                 help="extract sentential rule"),
     
@@ -497,7 +497,8 @@ class ExtractSCFG(Extract):
                  max_length=7, max_fertility=4,
                  max_span_source=15, max_span_target=20,
                  min_hole_source=1, min_hole_target=1,
-                 exhaustive=None, constrained=None, ternary=None, sentential=None,
+                 max_rank=2,
+                 exhaustive=None, constrained=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -535,13 +536,12 @@ class ExtractSCFG(Extract):
         command += " --max-span-target %d"      %(max_span_target)
         command += " --min-hole-source %d"      %(min_hole_source)
         command += " --min-hole-target %d"      %(min_hole_target)
+        command += " --max-rank %d" %(max_rank)
         
         if exhaustive:
             command += " --exhaustive"
         if constrained:
             command += " --constrained"
-        if ternary:
-            command += " --ternary"
         if sentential:
             command += " --sentential"
         
@@ -832,9 +832,9 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_span_target=options.max_span_target,
                               min_hole_source=options.min_hole_source,
                               min_hole_target=options.min_hole_target,
+                              max_rank=options.max_rank,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
-                              ternary=options.ternary,
                               sentential=options.sentential,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
