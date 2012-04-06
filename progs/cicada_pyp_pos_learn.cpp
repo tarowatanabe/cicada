@@ -20,6 +20,16 @@
 // }
 //
 
+// TODO: modify the code so that we act almost exactly as this paper:
+//
+// First, sampling to determine the initial assignment and compute model
+// Second, iterate!
+//   1. compute cutoffs, and potentially break sticks, further
+//   2. distribute and run DP and fill-in the new assingment
+//         we can asynchronously decrement and increment, since the model is completely independent!
+//   3. compute model
+
+
 #include <map>
 #include <iterator>
 #include <numeric>
@@ -29,6 +39,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/semiring/logprob.hpp>
 
+#include "utils/unordered_map.hpp"
 #include "utils/vector2.hpp"
 #include "utils/chunk_vector.hpp"
 #include "utils/resource.hpp"
@@ -83,6 +94,11 @@ struct PYPPOS
 
   typedef utils::pyp_parameter parameter_type;
 
+  typedef utils::vector2<double, std::allocator<double> > transition_cache_type;
+  typedef utils::unordered_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, double> > >::type emission_cache_type;
+  typedef std::vector<emission_cache_type, std::allocator<emission_cache_type> > emission_cache_set_type;
+
   PYPPOS(const double __h,
 	 const size_type classes,
 	 const parameter_type& __emission,
@@ -100,6 +116,26 @@ struct PYPPOS
       emission(__emission),
       transition0(__transition),
       transition(__transition) {}
+  
+  
+  template <typename Iterator>
+  void initialize_cache(Iterator first, Iterator last)
+  {
+    cache_pi.clear();
+    cache_phi.clear();
+    
+    cache_pi.resize(beta.size(), beta.size());
+    cache_phi.resize(beta.size());
+    
+    for (size_type prev = 0; prev != beta.size(); ++ prev)
+      for (size_type next = 0; next != beta.size(); ++ next)
+	cache_pi(prev, next) = prob_transition(prev, next);
+    
+    for (/**/; first != last; ++ first)
+      for (size_type state = 0; state != beta.size(); ++ state)
+	cache_phi[state][*first] = prob_emission(state, *first);
+  }
+
   
   template <typename Sampler>
   void increment(const id_type prev, const id_type next, const word_type& word, Sampler& sampler, const double temperature=1.0)
@@ -140,6 +176,20 @@ struct PYPPOS
     if (pi[prev].decrement(next, sampler))
       if (pi0.decrement(next, sampler))
 	-- counts0;
+  }
+  
+  double cache_emission(const id_type next, const word_type& word) const
+  {
+    emission_cache_type::const_iterator iter = cache_phi[next].find(word);
+    if (iter == cache_phi[next].end())
+      throw std::runtime_error("no cache entry?");
+    
+    return iter->second;
+  }
+  
+  double cache_transition(const id_type prev, const id_type next) const
+  {
+    return cache_pi(prev, next);
   }
   
   double prob_emission(const id_type next, const word_type& word) const
@@ -342,6 +392,9 @@ struct PYPPOS
   parameter_type emission;
   parameter_type transition0;
   parameter_type transition;
+  
+  transition_cache_type   cache_pi;
+  emission_cache_set_type cache_phi;
 };
 
 
@@ -415,13 +468,13 @@ struct PYPGraph
     pi.resize(K, K);
     for (id_type prev = 0; prev != K; ++ prev)
       for (id_type next = 0; next != K; ++ next)
-	pi(prev, next) = model.prob_transition(prev, next);
+	pi(prev, next) = model.cache_transition(prev, next);
     
     phi.clear();
     phi.resize(K, T);
     for (size_type t = 1; t != T - 1; ++ t)
       for (id_type state = 1; state != K; ++ state)
-	phi(state, t) = model.prob_emission(state, sentence[t - 1]);
+	phi(state, t) = model.cache_emission(state, sentence[t - 1]);
     
     phi(0, 0)     = 1.0;
     phi(0, T - 1) = 1.0;
@@ -501,6 +554,7 @@ typedef std::vector<cutoff_type, std::allocator<cutoff_type> > cutoff_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > mapping_type;
+typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
 
 struct Task
 {
@@ -737,6 +791,8 @@ int main(int argc, char ** argv)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
       std::vector<double, std::allocator<double> > probs;
+      word_set_type emissions;
+      emissions.set_empty_key(word_type());
       
       position_set_type::const_iterator piter = positions.begin();
       position_set_type::const_iterator piter_end = positions.end();
@@ -746,6 +802,8 @@ int main(int argc, char ** argv)
 	positions_reduced.clear();
 	
 	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
+
+	emissions.clear();
 	
 	for (/**/; piter != piter_last; ++ piter) {
 	  const size_t pos = *piter;
@@ -789,9 +847,14 @@ int main(int argc, char ** argv)
 			      sampler);
 	  }
 	  
+	  // insert emissions
+	  emissions.insert(training[pos].begin(), training[pos].end());
+	  
 	  // perform pruning...
 	  graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
 	}
+	
+	model.initialize_cache(emissions.begin(), emissions.end());
 	
 	position_set_type::const_iterator miter_end = positions_mapped.end();
 	for (position_set_type::const_iterator miter = positions_mapped.begin(); miter != miter_end; ++ miter)
@@ -801,11 +864,6 @@ int main(int argc, char ** argv)
 	  size_type pos = 0;
 	  queue_reducer.pop(pos);
 	  positions_reduced.push_back(pos);
-	}
-	
-	position_set_type::const_iterator riter_end = positions_reduced.end();
-	for (position_set_type::const_iterator riter = positions_reduced.begin(); riter != riter_end; ++ riter) {
-	  const size_t pos = *riter;
 	  
 	  // insert into the model
 	  if (debug >= 3) {
@@ -817,7 +875,7 @@ int main(int argc, char ** argv)
 	      std::cerr << "\tword=" << word
 			<< " pos=" << derivations[pos][t]
 			<< std::endl;
-
+	      
 	      if (t)
 		model.increment(derivations[pos][t - 1],
 				derivations[pos][t],
@@ -825,7 +883,6 @@ int main(int argc, char ** argv)
 				sampler,
 				temperature);
 	    }
-	    
 	  } else {
 	    for (size_type t = 1; t != derivations[pos].size(); ++ t)
 	      model.increment(derivations[pos][t - 1],
