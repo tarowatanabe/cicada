@@ -103,7 +103,7 @@ struct PYPPOS
       phi0(__emission.discount, __emission.strength),
       phi(classes, table_emission_type(__emission.discount,
 				       __emission.strength)),
-      base0(__h),
+      base0(1.0 / (classes + 1)), // + 1 for BOS
       counts0(0),
       beta(__transition.discount, __transition.strength),
       pi0(__transition.discount, __transition.strength),
@@ -254,6 +254,8 @@ struct PYPPOS
   {
     // + 1 including BOS
     sample_parameters(sampler, num_loop, num_iterations);
+
+    base0 = 1.0 / (classes + 1);
     
     beta.sample_parameters(classes + 1, sampler);
   }
@@ -295,6 +297,8 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
+      base0 = 1.0 / pi0.size();
+
       beta.discount() = pi0.discount();
       beta.strength() = pi0.strength();
       
