@@ -625,6 +625,7 @@ struct Task
       
       // insert into the model
       
+      // perform MH
       if (derivation_prev.empty())
 	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
       else {
@@ -859,6 +860,7 @@ int main(int argc, char ** argv)
       }
 
       size_type rejected = 0;
+      size_type unchanged = 0;
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
@@ -893,11 +895,13 @@ int main(int argc, char ** argv)
 	    
 	    ++ rejected;
 	  }
-	}
+	} else
+	  ++ unchanged;
       }
       
       if (debug)
-	std::cerr << "rejection rate: " << (double(rejected) / training.size()) << std::endl;
+	std::cerr << "rejection rate: " << (double(rejected) / (training.size() - unchanged)) << std::endl
+		  << "unchanged rate: " << (double(unchanged) / training.size()) << std::endl;
     
       model.permute(mapping);
       
