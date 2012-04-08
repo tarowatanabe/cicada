@@ -350,6 +350,9 @@ struct PYPPOS
     
     pi0.strength() = transition0.strength;
     pi0.discount() = transition0.discount;
+
+    beta.discount() = transition0.strength;
+    beta.strength() = transition0.discount;
     
     for (size_type i = 0; i != pi.size(); ++ i) {
       pi[i].strength() = transition.strength;
@@ -360,9 +363,6 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
-      beta.discount() = pi0.discount();
-      beta.strength() = pi0.strength();
-      
       // sample beta from pi0 and base0
       std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
       for (id_type state = 0; state != pi0.size(); ++ state)
