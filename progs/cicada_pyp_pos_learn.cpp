@@ -984,6 +984,9 @@ int main(int argc, char ** argv)
       
       // sample sticks..
       model.sample_sticks(*std::min_element(cutoff_min.begin(), cutoff_min.end()), sampler);
+
+      if (debug >= 2)
+	std::cerr << "# of sticks: " << model.classes() << std::endl;
       
       // sample derivations...
       model.initialize_cache(words.begin(), words.end());
