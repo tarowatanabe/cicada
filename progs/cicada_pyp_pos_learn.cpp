@@ -360,7 +360,6 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
-      const size_type beta_size = beta.size();
       beta.discount() = pi0.discount();
       beta.strength() = pi0.strength();
       
@@ -371,11 +370,6 @@ struct PYPPOS
       counts.back() = beta.strength() + counts0 * beta.discount();
       
       beta.sample_parameters(counts.begin(), counts.end(), sampler);
-      
-      while (beta.size() < beta_size) {
-	beta.increment(sampler);
-	base0 = 1.0 / beta.size();
-      }
     }
   }
 
