@@ -360,6 +360,7 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
+      const size_type beta_size = beta.size();
       beta.discount() = pi0.discount();
       beta.strength() = pi0.strength();
       
@@ -370,6 +371,11 @@ struct PYPPOS
       counts.back() = beta.strength() + counts0 * beta.discount();
       
       beta.sample_parameters(counts.begin(), counts.end(), sampler);
+      
+      while (beta.size() < beta_size) {
+	beta.increment(sampler);
+	base0 = 1.0 / beta.size();
+      }
     }
   }
 
@@ -972,7 +978,7 @@ int main(int argc, char ** argv)
       model.sample_sticks(*std::min_element(cutoff_min.begin(), cutoff_min.end()), sampler);
 
       if (debug >= 2)
-	std::cerr << "# of sticks: " << model.classes() << std::endl;
+	std::cerr << "# of sticks: " << model.beta.size() << std::endl;
       
       // sample derivations...
       model.initialize_cache(words.begin(), words.end());
@@ -1026,7 +1032,7 @@ int main(int argc, char ** argv)
       
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl
-		  << "classes: " << model.classes() << std::endl;
+		  << "classes: " << model.pi0.size() << std::endl;
     }
     
     
