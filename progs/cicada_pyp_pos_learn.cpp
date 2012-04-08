@@ -102,8 +102,7 @@ struct PYPPOS
   PYPPOS(const double __h,
 	 const size_type classes,
 	 const parameter_type& __emission,
-	 const parameter_type& __transition,
-	 const parameter_type& __base)
+	 const parameter_type& __transition)
     : h(__h),
       h_counts(0),
       phi0(__emission.discount, __emission.strength),
@@ -111,13 +110,13 @@ struct PYPPOS
 				       __emission.strength)),
       base0(1.0 / (classes + 1)), // + 1 for BOS
       counts0(0),
-      beta(__base.discount, __base.strength),
-      pi0(__base.discount, __base.strength),
+      beta(__transition.discount, __transition.strength),
+      pi0(__transition.discount, __transition.strength),
       pi(classes, table_transition_type(__transition.discount,
 					__transition.strength)),
       emission0(__emission),
       emission(__emission),
-      transition0(__base),
+      transition0(__transition),
       transition(__transition) {}
   
   
@@ -790,13 +789,6 @@ double transition_discount_prior_beta  = 1.0;
 double transition_strength_prior_shape = 1.0;
 double transition_strength_prior_rate  = 1.0;
 
-double base_discount = 0.1;
-double base_strength = 10;
-
-double base_discount_prior_alpha = 1.0;
-double base_discount_prior_beta  = 1.0;
-double base_strength_prior_shape = 1.0;
-double base_strength_prior_rate  = 1.0;
 
 int threads = 1;
 int debug = 0;
@@ -863,13 +855,7 @@ int main(int argc, char ** argv)
 					transition_discount_prior_alpha,
 					transition_discount_prior_beta,
 					transition_strength_prior_shape,
-					transition_strength_prior_rate),
-		 PYPPOS::parameter_type(base_discount,
-					base_strength,
-					base_discount_prior_alpha,
-					base_discount_prior_beta,
-					base_strength_prior_shape,
-					base_strength_prior_rate));
+					transition_strength_prior_rate));
     
     model.initialize(sampler, classes, resample_iterations);
 
@@ -1108,14 +1094,6 @@ void options(int argc, char** argv)
     ("transition-strength",       po::value<double>(&transition_strength)->default_value(transition_strength),                         "strength ~ Gamma(shape,rate)")
     ("transition-strength-shape", po::value<double>(&transition_strength_prior_shape)->default_value(transition_strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("transition-strength-rate",  po::value<double>(&transition_strength_prior_rate)->default_value(transition_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
-    
-    ("base-discount",       po::value<double>(&base_discount)->default_value(base_discount),                         "discount ~ Beta(alpha,beta)")
-    ("base-discount-alpha", po::value<double>(&base_discount_prior_alpha)->default_value(base_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("base-discount-beta",  po::value<double>(&base_discount_prior_beta)->default_value(base_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
-    
-    ("base-strength",       po::value<double>(&base_strength)->default_value(base_strength),                         "strength ~ Gamma(shape,rate)")
-    ("base-strength-shape", po::value<double>(&base_strength_prior_shape)->default_value(base_strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("base-strength-rate",  po::value<double>(&base_strength_prior_rate)->default_value(base_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
