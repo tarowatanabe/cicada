@@ -340,23 +340,23 @@ struct PYPPOS
       transition.discount = sample_discount(pi.begin(), pi.end(), sampler, transition);      
     }
     
-    phi0.strength() = emission0.strength;
     phi0.discount() = emission0.discount;
+    phi0.strength() = emission0.strength;
     
     for (size_type i = 0; i != phi.size(); ++ i) {
-      phi[i].strength() = emission.strength;
       phi[i].discount() = emission.discount;
+      phi[i].strength() = emission.strength;
     }
     
-    pi0.strength() = transition0.strength;
     pi0.discount() = transition0.discount;
-
-    beta.discount() = transition0.strength;
-    beta.strength() = transition0.discount;
+    pi0.strength() = transition0.strength;
+    
+    beta.discount() = transition0.discount;
+    beta.strength() = transition0.strength;
     
     for (size_type i = 0; i != pi.size(); ++ i) {
-      pi[i].strength() = transition.strength;
       pi[i].discount() = transition.discount;
+      pi[i].strength() = transition.strength;
     }
     
     // the transition base... base0
