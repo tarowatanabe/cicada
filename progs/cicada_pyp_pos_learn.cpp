@@ -93,11 +93,17 @@ struct PYPPOS
   typedef utils::stick_break< > beta_type;
 
   typedef utils::pyp_parameter parameter_type;
-
+  
+  typedef utils::vector2<double, std::allocator<double > > cache_transition_type;
+  typedef utils::unordered_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, double> > >::type cache_emission_type;
+  typedef std::vector<cache_emission_type, std::allocator<cache_emission_type> > cache_emission_set_type;
+  
   PYPPOS(const double __h,
 	 const size_type classes,
 	 const parameter_type& __emission,
-	 const parameter_type& __transition)
+	 const parameter_type& __transition,
+	 const parameter_type& __base)
     : h(__h),
       h_counts(0),
       phi0(__emission.discount, __emission.strength),
@@ -105,13 +111,13 @@ struct PYPPOS
 				       __emission.strength)),
       base0(1.0 / (classes + 1)), // + 1 for BOS
       counts0(0),
-      beta(__transition.discount, __transition.strength),
-      pi0(__transition.discount, __transition.strength),
+      beta(__base.discount, __base.strength),
+      pi0(__base.discount, __base.strength),
       pi(classes, table_transition_type(__transition.discount,
 					__transition.strength)),
       emission0(__emission),
       emission(__emission),
-      transition0(__transition),
+      transition0(__base),
       transition(__transition) {}
   
   
@@ -155,7 +161,43 @@ struct PYPPOS
       if (pi0.decrement(next, sampler))
 	-- counts0;
   }
+
+  template <typename Iterator>
+  void initialize_cache(Iterator first, Iterator last)
+  {
+    caches_transition.clear();
+    caches_emission.clear();
+    
+    caches_transition.resize(beta.size(), beta.size());
+    caches_emission.resize(beta.size());
+    
+    for (id_type prev = 0; prev != beta.size(); ++ prev)
+      for (id_type next = 0; next != beta.size(); ++ next)
+	caches_transition(prev, next) = prob_transition(prev, next);
+    
+    for (/**/; first != last; ++ first)
+      for (id_type state = 0; state != beta.size(); ++ state)
+	caches_emission[state][*first] = prob_emission(state, *first);
+  }
   
+  double cache_emission(const id_type next, const word_type& word) const
+  {
+    cache_emission_type::const_iterator iter = caches_emission[next].find(word);
+    if (iter == caches_emission[next].end())
+      throw std::runtime_error("invlaid emission cache");
+    return iter->second;
+  }
+  
+  double cache_transition(const id_type prev, const id_type next) const
+  {
+    return caches_transition(prev, next);
+  }
+
+  double cache_transition(const id_type next) const
+  {
+    return beta[next];
+  }
+
   
   double prob_emission(const id_type next, const word_type& word) const
   {
@@ -175,7 +217,7 @@ struct PYPPOS
   {
     return beta[next];
   }
-
+  
   size_type classes() const
   {
     return beta.size();
@@ -254,10 +296,32 @@ struct PYPPOS
   {
     // + 1 including BOS
     sample_parameters(sampler, num_loop, num_iterations);
-
-    base0 = 1.0 / (classes + 1);
     
     beta.sample_parameters(classes + 1, sampler);
+    
+    base0 = 1.0 / beta.size();
+  }
+  
+  template <typename Sampler>
+  void sample_sticks(const double& cutoff_min, Sampler& sampler)
+  {
+    double pi_max = - std::numeric_limits<double>::infinity();
+    for (size_type prev = 0; prev != beta.size(); ++ prev) {
+      double pi_min = std::numeric_limits<double>::infinity();
+      for (size_type next = 0; next != beta.size(); ++ next)
+	pi_min = std::min(pi_min, prob_transition(prev, next));
+      
+      pi_max = std::max(pi_max, pi_min);
+    }
+    
+    while (pi_max > cutoff_min) {
+      beta.increment(sampler);
+      base0 = 1.0 / beta.size();
+      
+      const size_type K = beta.size();
+      for (size_type k = 0; k != K; ++ k)
+	pi_max = std::min(pi_max, prob_transition(k, K - 1));
+    }
   }
   
   template <typename Sampler>
@@ -297,8 +361,6 @@ struct PYPPOS
     // + 1 for allowing infinity...
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
-      base0 = 1.0 / pi0.size();
-
       beta.discount() = pi0.discount();
       beta.strength() = pi0.strength();
       
@@ -355,6 +417,9 @@ struct PYPPOS
   parameter_type emission;
   parameter_type transition0;
   parameter_type transition;
+
+  cache_transition_type   caches_transition;
+  cache_emission_set_type caches_emission;
 };
 
 
@@ -376,43 +441,6 @@ struct PYPGraph
   typedef utils::vector2<double, std::allocator<double> >    pi_type;  // transition
   
   typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;  
-  
-  template <typename Sampler>
-  void prune(const sentence_type& sentence, const derivation_type& derivation, PYPPOS& model, Sampler& sampler, cutoff_type& cutoff)
-  {
-    // first, fill-in cutoff-values
-    cutoff.clear();
-    cutoff.resize(sentence.size() + 2, 0.0);
-
-    const size_type T = cutoff.size();
-    const size_type K = model.beta.size();
-    
-    // we compute threshold based on pi
-    double cutoff_min = std::numeric_limits<double>::infinity();
-    for (size_type t = 1; t != T - 1; ++ t) {
-      cutoff[t] = sampler.uniform(0.0, model.prob_transition(derivation[t - 1], derivation[t]));
-      cutoff_min = std::min(cutoff_min, cutoff[t]);
-    }
-    
-    // second, check to see if we need more classes!
-    // we check cutoff_min to see if we have enough sticks...
-    double pi_max = - std::numeric_limits<double>::infinity();
-    for (size_type prev = 0; prev != K; ++ prev) {
-      double pi_min = std::numeric_limits<double>::infinity();
-      for (size_type next = 0; next != K; ++ next)
-	pi_min = std::min(pi_min, model.prob_transition(prev, next));
-      
-      pi_max = std::max(pi_max, pi_min);
-    }
-    
-    while (pi_max > cutoff_min) {
-      model.beta.increment(sampler);
-      
-      const size_type K = model.beta.size();
-      for (size_type k = 0; k != K; ++ k)
-	pi_max = std::min(pi_max, model.prob_transition(k, K - 1));
-    }
-  }
 
   void initialize(const sentence_type& sentence, const PYPPOS& model)
   {
@@ -428,13 +456,13 @@ struct PYPGraph
     pi.resize(K, K);
     for (id_type prev = 0; prev != K; ++ prev)
       for (id_type next = 0; next != K; ++ next)
-	pi(prev, next) = model.prob_transition(prev, next);
+	pi(prev, next) = model.cache_transition(prev, next);
     
     phi.clear();
     phi.resize(T, K);
     for (size_type t = 1; t != T - 1; ++ t)
       for (id_type state = 1; state != K; ++ state)
-	phi(t, state) = model.prob_emission(state, sentence[t - 1]);
+	phi(t, state) = model.cache_emission(state, sentence[t - 1]);
     
     phi(0, 0)     = 1.0;
     phi(T - 1, 0) = 1.0;
@@ -550,6 +578,118 @@ typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_
 typedef std::vector<size_type, std::allocator<size_type> > mapping_type;
 typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
 
+struct TaskBeam
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+
+  TaskBeam(queue_type& __queue,
+	   const sentence_set_type& __training,
+	   cutoff_set_type& __cutoffs,
+	   derivation_set_type& __derivations,
+	   const PYPPOS& __model,
+	   sampler_type& __sampler,
+	   double& __cutoff_min)
+    : queue(__queue),
+      training(__training),
+      cutoffs(__cutoffs),
+      derivations(__derivations),
+      model(__model),
+      sampler(__sampler),
+      cutoff_min(__cutoff_min)
+  {}
+  
+  void operator()()
+  {
+    std::vector<double, std::allocator<double> > probs;
+    size_type pos;
+    
+    for (;;) {
+      queue.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+
+      const sentence_type& sentence = training[pos];
+      derivation_type& derivation = derivations[pos];
+      cutoff_type& cutoff = cutoffs[pos];
+      
+      if (derivation.empty()) {
+	const size_type K = model.beta.size();
+	
+	derivation.reserve(training[pos].size() + 2);
+	derivation.push_back(0);
+	
+	for (size_type i = 0; i != sentence.size(); ++ i) {
+	  probs.clear();
+	  for (size_type state = 1; state != K; ++ state)
+	    probs.push_back(model.cache_transition(state) * model.cache_emission(state, sentence[i]));
+	  
+	  derivation.push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+	}
+	
+	derivation.push_back(0);
+      }
+      
+      cutoff.clear();
+      cutoff.resize(sentence.size() + 2, 0.0);
+      
+      const size_type T = cutoff.size();
+      
+      // we compute threshold based on pi
+      for (size_type t = 1; t != T - 1; ++ t) {
+	cutoff[t] = sampler.uniform(0.0, model.cache_transition(derivation[t - 1], derivation[t]));
+	cutoff_min = std::min(cutoff_min, cutoff[t]);
+      }
+    }
+  }
+  
+  queue_type& queue;
+  
+  const sentence_set_type& training;
+  cutoff_set_type& cutoffs;
+  derivation_set_type& derivations;
+  
+  const PYPPOS& model;
+  sampler_type  sampler;
+  double& cutoff_min;
+};
+
+struct TaskPermute
+{
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+  
+  TaskPermute(queue_type& __queue,
+	      derivation_set_type& __derivations,
+	      const mapping_type& __mapping)
+    : queue(__queue),
+      derivations(__derivations)
+  {
+    mapping.resize(__mapping.size());
+    for (size_type i = 0; i != __mapping.size(); ++ i)
+      mapping[__mapping[i]] = i;
+  }
+  
+  void operator()()
+  {
+    size_type pos;
+    
+    for (;;) {
+      queue.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+      
+      for (size_type t = 0; t != derivations[pos].size(); ++ t)
+	derivations[pos][t] = mapping[derivations[pos][t]];
+    }
+  }
+  
+  queue_type& queue;
+  derivation_set_type& derivations;
+  mapping_type mapping;
+};
+
 struct Task
 {
   typedef PYP::size_type       size_type;
@@ -560,19 +700,17 @@ struct Task
   Task(queue_type& __mapper,
        queue_type& __reducer,
        const sentence_set_type& __training,
-       cutoff_set_type& __cutoffs,
+       const cutoff_set_type& __cutoffs,
        derivation_set_type& __derivations,
        const PYPPOS& __model,
-       sampler_type& __sampler,
-       const bool __hasting)
+       sampler_type& __sampler)
     : mapper(__mapper),
       reducer(__reducer),
       training(__training),
       cutoffs(__cutoffs),
       derivations(__derivations),
       model(__model),
-      sampler(__sampler),
-      hasting(__hasting) {}
+      sampler(__sampler) {}
   
   void operator()()
   {
@@ -585,79 +723,12 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-
-      derivation_prev = derivations[pos];
-      
-      PYPGraph::logprob_type pi0;
-      PYPGraph::logprob_type r0;
-      
-      if (derivations[pos].empty()) {
-	// it is our initial condition... sample derivation...
-	const size_type K = model.beta.size();
-	
-	derivations[pos].reserve(training[pos].size() + 2);
-	derivations[pos].push_back(0);
-	
-	for (size_type i = 0; i != training[pos].size(); ++ i) {
-	  probs.clear();
-	  for (size_type state = 1; state != K; ++ state)
-	    probs.push_back(model.prob_transition(state) * model.prob_emission(state, training[pos][i]));
-	  
-	  derivations[pos].push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
-	}
-	
-	derivations[pos].push_back(0);
-      } else {
-	// remove from the model...
-	pi0 = graph.score(training[pos], derivation_prev, model);
-	
-	graph.decrement(training[pos], derivations[pos], model, sampler);
-	
-	r0 = graph.score(training[pos], derivation_prev, model);
-      }
-      
-      // pruning
-      graph.prune(training[pos], derivations[pos], model, sampler, cutoffs[pos]);
       
       // forward
       graph.forward(training[pos], model, cutoffs[pos]);
       
       // backward
       graph.backward(sampler, derivations[pos], temperature);
-      
-      // insert into the model
-      if (! hasting)
-	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-      else {
-	// perform MH
-	if (derivation_prev.empty())
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	else if (derivation_prev != derivations[pos]) {
-	  const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
-	
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	
-	  const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
-	
-	  double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
-	
-	  if (temperature != 1.0)
-	    accept_rate = std::pow(accept_rate, temperature);
-	
-	  if (! sampler.bernoulli(accept_rate)) {
-	    graph.decrement(training[pos], derivations[pos], model, sampler);
-	  
-	    graph.increment(training[pos], derivation_prev, model, sampler, temperature);
-	  
-	    derivations[pos].swap(derivation_prev);
-	  
-	    ++ rejected;
-	  }
-	} else {
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	  ++ unchanged;
-	}
-      }
       
       reducer.push(pos);
     }
@@ -667,18 +738,14 @@ struct Task
   queue_type& reducer;
   
   const sentence_set_type& training;
-  cutoff_set_type& cutoffs;
+  const cutoff_set_type& cutoffs;
   derivation_set_type& derivations;
   
-  PYPPOS model;
+  const PYPPOS& model;
   sampler_type  sampler;
   double temperature;
   
   PYPGraph graph;
-  
-  size_type rejected;
-  size_type unchanged;
-  bool hasting;
 };
 
 struct less_size
@@ -706,8 +773,6 @@ int anneal_steps = 0;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
-bool hasting = false;
-bool hasting_shard = false;
 
 double emission_discount = 0.1;
 double emission_strength = 1;
@@ -725,11 +790,19 @@ double transition_discount_prior_beta  = 1.0;
 double transition_strength_prior_shape = 1.0;
 double transition_strength_prior_rate  = 1.0;
 
+double base_discount = 0.1;
+double base_strength = 10;
+
+double base_discount_prior_alpha = 1.0;
+double base_discount_prior_beta  = 1.0;
+double base_strength_prior_shape = 1.0;
+double base_strength_prior_rate  = 1.0;
+
 int threads = 1;
 int debug = 0;
 
 void options(int argc, char** argv);
-size_t read_data(const path_set_type& paths, sentence_set_type& sentences);
+void read_data(const path_set_type& paths, sentence_set_type& sentences, word_set_type& words);
 
 int main(int argc, char ** argv)
 {
@@ -754,7 +827,10 @@ int main(int argc, char ** argv)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
     
     sentence_set_type training;
-    const size_type vocab_size = read_data(train_files, training);
+    word_set_type     words;
+    words.set_empty_key(word_type());
+    
+    read_data(train_files, training, words);
 
     if (training.empty())
       throw std::runtime_error("no training data?");
@@ -764,17 +840,16 @@ int main(int argc, char ** argv)
     cutoff_set_type     cutoffs(training.size());
     position_set_type   positions(training.size());
     mapping_type mapping;
-    mapping_type mapping_new;
     
     position_set_type positions_mapped;
     position_set_type positions_reduced;
-    
+
     for (size_t i = 0; i != training.size(); ++ i)
       positions[i] = i;
     
     sampler_type sampler;
     
-    PYPPOS model(1.0 / (vocab_size + 1), // +1 for BOS
+    PYPPOS model(1.0 / (words.size() + 1), // +1 for BOS
 		 classes,
 		 PYPPOS::parameter_type(emission_discount,
 					emission_strength,
@@ -782,12 +857,19 @@ int main(int argc, char ** argv)
 					emission_discount_prior_beta,
 					emission_strength_prior_shape,
 					emission_strength_prior_rate),
+		 
 		 PYPPOS::parameter_type(transition_discount,
 					transition_strength,
 					transition_discount_prior_alpha,
 					transition_discount_prior_beta,
 					transition_strength_prior_shape,
-					transition_strength_prior_rate));
+					transition_strength_prior_rate),
+		 PYPPOS::parameter_type(base_discount,
+					base_strength,
+					base_discount_prior_alpha,
+					base_discount_prior_beta,
+					base_strength_prior_shape,
+					base_strength_prior_rate));
     
     model.initialize(sampler, classes, resample_iterations);
 
@@ -823,8 +905,7 @@ int main(int argc, char ** argv)
 								 cutoffs,
 								 derivations,
 								 model,
-								 sampler,
-								 hasting_shard));
+								 sampler));
     
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
@@ -860,13 +941,9 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
       
-      // assign model...
-      for (size_type i = 0; i != tasks.size(); ++ i) {
-	tasks[i].model = model;
+      // assign temperature...
+      for (size_type i = 0; i != tasks.size(); ++ i)
 	tasks[i].temperature = temperature;
-	tasks[i].rejected = 0;
-	tasks[i].unchanged = 0;
-      }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       
@@ -874,105 +951,76 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
+      // sample beam...
+      
+      model.initialize_cache(words.begin(), words.end());
+      
+      cutoff_type cutoff_min(threads, std::numeric_limits<double>::infinity());
+      
+      TaskBeam::queue_type queue_beam;
+      boost::thread_group workers_beam;
+      for (int i = 0; i != threads; ++ i)
+	workers_beam.add_thread(new boost::thread(TaskBeam(queue_beam,
+							   training,
+							   cutoffs,
+							   derivations,
+							   model,
+							   sampler,
+							   cutoff_min[i])));
+      
       position_set_type::const_iterator piter_end = positions.end();
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const size_type& pos = *piter;
-
-	derivations_prev[pos] = derivations[pos];
 	
-	queue_mapper.push(pos);
-      }
+	derivations_prev[pos] = derivations[pos];
 
-      size_type rejected = 0;
-      size_type unchanged = 0;
+	queue_beam.push(pos);
+      }
+      
+      for (int i = 0; i != threads; ++ i)
+	queue_beam.push(size_type(-1));
+      
+      workers_beam.join_all();
+      
+      // sample sticks..
+      model.sample_sticks(*std::min_element(cutoff_min.begin(), cutoff_min.end()), sampler);
+      
+      // sample derivations...
+      model.initialize_cache(words.begin(), words.end());
+      
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_mapper.push(*piter);
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
 	
-	//
-	// insert into the global model
-	//
-	if (! hasting) {
-	  if (! derivations_prev[pos].empty())
-	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	  
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	} else {
+	if (! derivations_prev[pos].empty())
+	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
 	
-	  // MH-steps
-	  if (derivations_prev[pos].empty())
-	    graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	  else if (derivations_prev[pos] != derivations[pos]) {
-	    const PYPGraph::logprob_type pi0 = graph.score(training[pos], derivations_prev[pos], model);
-	  
-	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	  
-	    const PYPGraph::logprob_type r0 = graph.score(training[pos], derivations_prev[pos], model);
-	  
-	    const PYPGraph::logprob_type r1 = graph.score(training[pos], derivations[pos], model);
-	  
-	    graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	  
-	    const PYPGraph::logprob_type pi1 = graph.score(training[pos], derivations[pos], model);
-	  
-	    double accept_rate = std::min(static_cast<double>((pi1 * r0) / (pi0 * r1)), 1.0);
-	  
-	    if (temperature != 1.0)
-	      accept_rate = std::pow(accept_rate, temperature);
-	  
-	    if (! sampler.bernoulli(accept_rate)) {
-	      graph.decrement(training[pos], derivations[pos], model, sampler);
-	    
-	      graph.increment(training[pos], derivations_prev[pos], model, sampler, temperature);
-	    
-	      derivations[pos].swap(derivations_prev[pos]);
-	    
-	      ++ rejected;
-	    }
-	  } else
-	    ++ unchanged;
-	}
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
       }
-      
-      if (debug) {
-	if (hasting)
-	  std::cerr << "rejection rate: " << rejected << '/' << (training.size() - unchanged) << std::endl
-		    << "unchanged rate: " << unchanged << '/' << training.size() << std::endl;
-	
-	if (hasting_shard) {
-	  size_type shard_rejected = 0;
-	  size_type shard_unchanged = 0;
-	  
-	  for (size_type i = 0; i != tasks.size(); ++ i) {
-	    shard_rejected = tasks[i].rejected;
-	    shard_unchanged = tasks[i].unchanged;
-	  }
-	  
-	  std::cerr << "shard rejection rate: " << shard_rejected << '/' << (training.size() - shard_unchanged) << std::endl
-		    << "shard unchanged rate: " << shard_unchanged << '/' << training.size() << std::endl;
-	}
-      }
-      
+
+      // permute..
       model.permute(mapping);
       
-      // remap training data
-      mapping_new.resize(mapping.size());
-      for (size_type i = 0; i != mapping.size(); ++ i)
-	mapping_new[mapping[i]] = i;
+      TaskPermute::queue_type queue_permute;
+      boost::thread_group workers_permute;
+      for (int i = 0; i != threads; ++ i)
+	workers_permute.add_thread(new boost::thread(TaskPermute(queue_permute,
+								 derivations,
+								 mapping)));
       
-      for (size_type pos = 0; pos != derivations.size(); ++ pos)
-	for (size_type t = 0; t != derivations[pos].size(); ++ t) {
-	  
-	  if (derivations[pos][t] >= mapping_new.size())
-	    throw std::runtime_error("invalid mapping in derivation?");
-	  
-	  derivations[pos][t] = mapping_new[derivations[pos][t]];
-	  
-	  if (derivations[pos][t] >= model.classes())
-	    throw std::runtime_error("invalid new mapping in derivation?");
-	}
       
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_permute.push(*piter);
+      
+      for (int i = 0; i != threads; ++ i)
+	queue_permute.push(size_type(-1));
+      
+      workers_permute.join_all();
+      
+      // sample other parameters...
       model.sample_parameters(sampler, resample_iterations);
       
       if (debug >= 2) {
@@ -1005,13 +1053,8 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-size_t read_data(const path_set_type& paths, sentence_set_type& sentences)
+void read_data(const path_set_type& paths, sentence_set_type& sentences, word_set_type& vocab)
 {
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type vocab_type;
-  
-  vocab_type vocab;
-  vocab.set_empty_key(word_type());
-  
   sentences.clear();
     
   sentence_type sentence;
@@ -1024,8 +1067,6 @@ size_t read_data(const path_set_type& paths, sentence_set_type& sentences)
       vocab.insert(sentence.begin(), sentence.end());
     }
   }
-  
-  return vocab.size();
 }
 void options(int argc, char** argv)
 {
@@ -1048,8 +1089,6 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
-    ("hasting",             po::bool_switch(&hasting),                                                "hasting for rejection")
-    ("hasting-shard",       po::bool_switch(&hasting_shard),                                          "shard local hasting for rejection")
     
     ("emission-discount",       po::value<double>(&emission_discount)->default_value(emission_discount),                         "discount ~ Beta(alpha,beta)")
     ("emission-discount-alpha", po::value<double>(&emission_discount_prior_alpha)->default_value(emission_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
@@ -1066,6 +1105,14 @@ void options(int argc, char** argv)
     ("transition-strength",       po::value<double>(&transition_strength)->default_value(transition_strength),                         "strength ~ Gamma(shape,rate)")
     ("transition-strength-shape", po::value<double>(&transition_strength_prior_shape)->default_value(transition_strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("transition-strength-rate",  po::value<double>(&transition_strength_prior_rate)->default_value(transition_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    
+    ("base-discount",       po::value<double>(&base_discount)->default_value(base_discount),                         "discount ~ Beta(alpha,beta)")
+    ("base-discount-alpha", po::value<double>(&base_discount_prior_alpha)->default_value(base_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
+    ("base-discount-beta",  po::value<double>(&base_discount_prior_beta)->default_value(base_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    
+    ("base-strength",       po::value<double>(&base_strength)->default_value(base_strength),                         "strength ~ Gamma(shape,rate)")
+    ("base-strength-shape", po::value<double>(&base_strength_prior_shape)->default_value(base_strength_prior_shape), "strength ~ Gamma(shape,rate)")
+    ("base-strength-rate",  po::value<double>(&base_strength_prior_rate)->default_value(base_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
