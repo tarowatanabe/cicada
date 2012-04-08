@@ -141,7 +141,7 @@ struct PYPPOS
     while (next >= beta.size() || prev >= beta.size())
       beta.increment(sampler);
     
-    if (pi[prev].increment(next, beta[next], sampler, temperature))
+    if (pi[prev].increment(next, pi0.prob(next, base0), sampler, temperature))
       if (pi0.increment(next, base0, sampler, temperature))
 	++ counts0;
   }
