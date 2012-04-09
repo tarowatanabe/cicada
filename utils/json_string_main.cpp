@@ -25,6 +25,7 @@ int main(int argc, char** argv)
 
   oiterator_type diter(std::cout);
   boost::spirit::karma::generate(diter, double20 << '\n', boost::numeric::bounds<double>::lowest());
+  boost::spirit::karma::generate(diter, double20 << '\n', boost::numeric::bounds<double>::smallest());
     
   utils::json_string_parser<std::string::const_iterator> parser;
   utils::json_string_generator<oiterator_type> generator;
