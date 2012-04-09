@@ -2305,6 +2305,20 @@ struct PhrasePairScoreReducer
       for (phrase_pair_set_type::const_iterator iter = first; iter != last; ++ iter) {
 	const std::pair<double, double> lex = lexicon(iter->alignment);
 	
+	if (! std::finite(lex.first) || ! std::finite(lex.second)) {
+	  std::ostringstream os;
+	  os << "infinite lexical probabilities:"
+	     << " source: " << lexicon.source
+	     << " target: " << lexicon.target
+	     << " aligment: "  << iter->alignment
+	     << " source-target: " << lex.first
+	     << " target-source: " << lex.second;
+	  
+	  throw std::runtime_error(os.str());
+	}
+	  
+	
+	
 	lex_source_target = std::max(lex_source_target, lex.first);
 	lex_target_source = std::max(lex_target_source, lex.second);
 	
