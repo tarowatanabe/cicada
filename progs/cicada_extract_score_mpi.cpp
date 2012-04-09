@@ -311,8 +311,6 @@ int main(int argc, char** argv)
       // synchronize here...
       synchronize_mapper(comm_child);
     }
-
-    MPI::COMM_WORLD.Barrier();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
