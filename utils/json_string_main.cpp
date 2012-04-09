@@ -5,6 +5,16 @@
 #include <iostream>
 #include <iterator>
 
+struct real_precision : boost::spirit::karma::real_policies<double>
+{
+  static unsigned int precision(double) 
+  { 
+    return 20;
+  }
+};
+
+boost::spirit::karma::real_generator<double, real_precision> double20;
+
 int main(int argc, char** argv)
 {
   namespace qi = boost::spirit::qi;
@@ -12,6 +22,9 @@ int main(int argc, char** argv)
   namespace standard = boost::spirit::standard;
 
   typedef std::ostream_iterator<char> oiterator_type;
+
+  oiterator_type diter(std::cout);
+  boost::spirit::karma::generate(diter, double20 << '\n', boost::numeric::bounds<double>::lowest());
     
   utils::json_string_parser<std::string::const_iterator> parser;
   utils::json_string_generator<oiterator_type> generator;
