@@ -587,7 +587,8 @@ struct LexiconBase
 	}
       }
 
-    return std::make_pair(lex_source_target, lex_target_source);
+    return std::make_pair(std::max(lex_source_target, boost::numeric::bounds<double>::smallest()),
+			  std::max(lex_target_source, boost::numeric::bounds<double>::smallest()));
   }
 };
 
@@ -2304,23 +2305,6 @@ struct PhrasePairScoreReducer
       
       for (phrase_pair_set_type::const_iterator iter = first; iter != last; ++ iter) {
 	const std::pair<double, double> lex = lexicon(iter->alignment);
-	
-	if (! std::isfinite(lex.first)
-	    || ! std::isfinite(lex.second)
-	    || lex.first < boost::numeric::bounds<double>::smallest()
-	    || lex.second < boost::numeric::bounds<double>::smallest()) {
-	  std::ostringstream os;
-	  os << "infinite lexical probabilities:"
-	     << " source: " << lexicon.source
-	     << " target: " << lexicon.target
-	     << " aligment: "  << iter->alignment
-	     << " source-target: " << lex.first
-	     << " target-source: " << lex.second;
-	  
-	  throw std::runtime_error(os.str());
-	}
-	  
-	
 	
 	lex_source_target = std::max(lex_source_target, lex.first);
 	lex_target_source = std::max(lex_target_source, lex.second);
