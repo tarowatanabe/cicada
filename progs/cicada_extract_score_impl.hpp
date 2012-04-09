@@ -546,6 +546,15 @@ struct LexiconBase
 
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+      if (aiter->source >= source_size || aiter->target >= target_size) {
+	std::ostringstream os;
+	os << "invlaid alignemnt:"
+	   << " source: " << source 
+	   << " target: " << target
+	   << " alignment: " << alignment;
+	throw std::runtime_error(os.str());
+      }
+      
       aligns_source[aiter->source].push_back(aiter->target);
       aligns_target[aiter->target].push_back(aiter->source);
     }
