@@ -307,10 +307,12 @@ int main(int argc, char** argv)
 	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
 	  os_trg << *titer << '\n';
       }
-     
+      
       // synchronize here...
       synchronize_mapper(comm_child);
     }
+
+    MPI::COMM_WORLD.Barrier();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

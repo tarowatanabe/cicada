@@ -20,15 +20,14 @@
 // }
 //
 
-// TODO: modify the code so that we act almost exactly as this paper:
-//
-// First, sampling to determine the initial assignment and compute model
-// Second, iterate!
+// Iterate:
 //   1. compute cutoffs, and potentially break sticks, further
 //   2. distribute and run DP and fill-in the new assingment
 //         we can asynchronously decrement and increment, since the model is completely independent!
 //   3. compute model
 
+// TODO: use id_type(0) as BOS and do not stick-break for BOS!
+// make an adjustment for induced POSs
 
 #include <map>
 #include <iterator>
@@ -95,9 +94,7 @@ struct PYPPOS
   typedef utils::pyp_parameter parameter_type;
   
   typedef utils::vector2<double, std::allocator<double > > cache_transition_type;
-  typedef utils::unordered_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
-			       std::allocator<std::pair<const word_type, double> > >::type cache_emission_type;
-  typedef std::vector<cache_emission_type, std::allocator<cache_emission_type> > cache_emission_set_type;
+  typedef utils::vector2<double, std::allocator<double > > cache_emission_type;
   
   PYPPOS(const double __h,
 	 const size_type classes,
@@ -106,14 +103,14 @@ struct PYPPOS
     : h(__h),
       h_counts(0),
       phi0(__emission.discount, __emission.strength),
-      phi(classes, table_emission_type(__emission.discount,
-				       __emission.strength)),
-      base0(1.0 / (classes + 1)), // + 1 for BOS
+      phi(classes + 1, table_emission_type(__emission.discount,
+					   __emission.strength)),
+      base0(1.0 / classes),
       counts0(0),
       beta(__transition.discount, __transition.strength),
       pi0(__transition.discount, __transition.strength),
-      pi(classes, table_transition_type(__transition.discount,
-					__transition.strength)),
+      pi(classes + 1, table_transition_type(__transition.discount,
+					    __transition.strength)),
       emission0(__emission),
       emission(__emission),
       transition0(__transition),
@@ -123,41 +120,46 @@ struct PYPPOS
   template <typename Sampler>
   void increment(const id_type prev, const id_type next, const word_type& word, Sampler& sampler, const double temperature=1.0)
   {
-    // emission
-    if (word != vocab_type::BOS) {
-      if (next >= phi.size())
-	phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
-      
-      if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
-	if (phi0.increment(word, h, sampler, temperature))
-	  ++ h_counts;
-    }
+    if (! next)
+      throw std::runtime_error("invalid state");
+
+    // prev = [0, # of states]
+    // next = [1, # of states]
     
-    // transition
+    // emission
+    if (next >= phi.size())
+      phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
+    
+    if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
+      if (phi0.increment(word, h, sampler, temperature))
+	++ h_counts;
+    
+    // transition... we need to consider BOS...
     if (prev >= pi.size())
       pi.resize(prev + 1, table_transition_type(transition.discount, transition.strength));
     
-    // break sticks further...
-    while (next >= beta.size() || prev >= beta.size())
-      beta.increment(sampler);
-    
-    if (pi[prev].increment(next, pi0.prob(next, base0), sampler, temperature))
-      if (pi0.increment(next, base0, sampler, temperature))
+    if (pi[prev].increment(next, pi0.prob(next - 1, base0), sampler, temperature))
+      if (pi0.increment(next - 1, base0, sampler, temperature))
 	++ counts0;
   }
   
   template <typename Sampler>
   void decrement(const id_type prev, const id_type next, const word_type& word, Sampler& sampler)
   {
+    if (! next)
+      throw std::runtime_error("invalid state");
+
+    // prev = [0, # of states]
+    // next = [1, # of states]
+    
     // emission
-    if (word != vocab_type::BOS)
-      if (phi[next].decrement(word, sampler))
-	if (phi0.decrement(word, sampler))
-	  -- h_counts;
+    if (phi[next].decrement(word, sampler))
+      if (phi0.decrement(word, sampler))
+	-- h_counts;
     
     // transition
-    if (pi[prev].decrement(next, sampler))
-      if (pi0.decrement(next, sampler))
+    if (pi[prev].decrement(next - 1, sampler))
+      if (pi0.decrement(next - 1, sampler))
 	-- counts0;
   }
 
@@ -167,39 +169,47 @@ struct PYPPOS
     caches_transition.clear();
     caches_emission.clear();
     
-    caches_transition.resize(beta.size(), beta.size());
-    caches_emission.resize(beta.size());
+    caches_transition.resize(beta.size() + 1, beta.size() + 1);
+    caches_emission.resize(beta.size() + 1, word_type::allocated());
     
-    for (id_type prev = 0; prev != beta.size(); ++ prev)
-      for (id_type next = 0; next != beta.size(); ++ next)
+    for (id_type prev = 0; prev != beta.size() + 1; ++ prev)
+      for (id_type next = 1; next != beta.size() + 1; ++ next)
 	caches_transition(prev, next) = prob_transition(prev, next);
     
     for (/**/; first != last; ++ first)
-      for (id_type state = 0; state != beta.size(); ++ state)
-	caches_emission[state][*first] = prob_emission(state, *first);
+      for (id_type state = 1; state != beta.size() + 1; ++ state)
+	caches_emission(state, first->id()) = prob_emission(state, *first);
   }
   
   double cache_emission(const id_type next, const word_type& word) const
   {
-    cache_emission_type::const_iterator iter = caches_emission[next].find(word);
-    if (iter == caches_emission[next].end())
-      throw std::runtime_error("invlaid emission cache");
-    return iter->second;
+    if (! next)
+      throw std::runtime_error("invalid state");
+    
+    return caches_emission(next, word.id());
   }
   
   double cache_transition(const id_type prev, const id_type next) const
   {
+    if (! next)
+      throw std::runtime_error("invalid state");
+    
     return caches_transition(prev, next);
   }
-
+  
   double cache_transition(const id_type next) const
   {
-    return beta[next];
+    if (! next)
+      throw std::runtime_error("invalid state");
+	
+    return beta[next - 1];
   }
-
   
   double prob_emission(const id_type next, const word_type& word) const
   {
+    if (! next)
+      throw std::runtime_error("invalid state");
+    
     const double p0 = phi0.prob(word, h);
     
     return (next < phi.size() ? phi[next].prob(word, p0) : p0);
@@ -207,19 +217,20 @@ struct PYPPOS
   
   double prob_transition(const id_type prev, const id_type next) const
   {
-    const double p0 = beta[next];
+    if (! next)
+      throw std::runtime_error("invalid state");
     
-    return (prev < pi.size() ? pi[prev].prob(next, p0) : p0);
+    const double p0 = beta[next - 1];
+    
+    return (prev < pi.size() ? pi[prev].prob(next - 1, p0) : p0);
   }
 
   double prob_transition(const id_type next) const
   {
-    return beta[next];
-  }
-  
-  size_type classes() const
-  {
-    return beta.size();
+    if (! next)
+      throw std::runtime_error("invalid state");
+    
+    return beta[next - 1];
   }
   
   double log_likelihood() const
@@ -229,11 +240,14 @@ struct PYPPOS
     logprob += phi0.log_likelihood() + transition0.log_likelihood();
     logprob += pi0.log_likelihood()  + emission0.log_likelihood();
     
-    logprob += transition.log_likelihood();
-    for (size_type i = 0; i != phi.size(); ++ i)
-      logprob += phi[i].log_likelihood();
-    
     logprob += emission.log_likelihood();
+    logprob += transition.log_likelihood();
+    
+    // we will start from 1!
+    if (! phi.empty())
+      for (size_type i = 1; i != phi.size(); ++ i)
+	logprob += phi[i].log_likelihood();
+    
     for (size_type i = 0; i != pi.size(); ++ i)
       logprob += pi[i].log_likelihood();
     
@@ -256,36 +270,38 @@ struct PYPPOS
   void permute(Mapping& mapping)
   {
     // we will sort id by the counts...
+    // zero-based mapping
     mapping.clear();
     for (size_type i = 0; i != beta.size(); ++ i)
       mapping.push_back(i);
     
-    // we will always "fix" zero for bos/eos
-    std::sort(mapping.begin() + 1, mapping.end(), greater_customer(pi0));
+    std::sort(mapping.begin(), mapping.end(), greater_customer(pi0));
     
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
     
     // re-map for transition...
     pi0.permute(mapping);
-    
     for (size_type i = 0; i != pi.size(); ++ i)
       pi[i].permute(mapping);
     
-    transition_type pi_new(pi0.size(), table_transition_type(transition.discount, transition.strength));
+    // + 1 for BOS
+    transition_type pi_new(pi0.size() + 1, table_transition_type(transition.discount, transition.strength));
     
-    for (size_type i = 0; i != pi_new.size(); ++ i)
-      if (mapping[i] < pi.size())
-	pi_new[i].swap(pi[mapping[i]]);
+    pi_new.front().swap(pi.front()); // for BOS...
+    for (size_type i = 1; i != pi_new.size(); ++ i)
+      if (mapping[i - 1] + 1 < pi.size())
+	pi_new[i].swap(pi[mapping[i - 1] + 1]);
     
     pi.swap(pi_new);
     
     // re-map for emission...
-    emission_type phi_new(pi0.size(), table_emission_type(emission.discount, emission.strength));
+    emission_type phi_new(pi0.size() + 1, table_emission_type(emission.discount, emission.strength));
     
-    for (size_type i = 0; i != phi_new.size(); ++ i)
-      if (mapping[i] < phi.size())
-	phi_new[i].swap(phi[mapping[i]]);
+    // skip BOS...
+    for (size_type i = 1; i != phi_new.size(); ++ i)
+      if (mapping[i - 1] + 1 < phi.size())
+	phi_new[i].swap(phi[mapping[i - 1] + 1]);
     
     phi.swap(phi_new);
   }
@@ -293,10 +309,9 @@ struct PYPPOS
   template <typename Sampler>
   void initialize(Sampler& sampler, const id_type classes, const int num_loop = 2, const int num_iterations = 8)
   {
-    // + 1 including BOS
     sample_parameters(sampler, num_loop, num_iterations);
     
-    beta.sample_parameters(classes + 1, sampler);
+    beta.sample_parameters(classes, sampler);
     
     base0 = 1.0 / beta.size();
   }
@@ -305,9 +320,9 @@ struct PYPPOS
   void sample_sticks(const double& cutoff_min, Sampler& sampler)
   {
     double pi_max = - std::numeric_limits<double>::infinity();
-    for (size_type prev = 0; prev != beta.size(); ++ prev) {
+    for (id_type prev = 0; prev != beta.size() + 1; ++ prev) {
       double pi_min = std::numeric_limits<double>::infinity();
-      for (size_type next = 0; next != beta.size(); ++ next)
+      for (id_type next = 1; next != beta.size() + 1; ++ next)
 	pi_min = std::min(pi_min, prob_transition(prev, next));
       
       pi_max = std::max(pi_max, pi_min);
@@ -317,7 +332,7 @@ struct PYPPOS
       beta.increment(sampler);
       base0 = 1.0 / beta.size();
       
-      const size_type K = beta.size();
+      const size_type K = beta.size() + 1;
       for (size_type k = 0; k != K; ++ k)
 	pi_max = std::min(pi_max, prob_transition(k, K - 1));
     }
@@ -330,8 +345,11 @@ struct PYPPOS
       emission0.strength = sample_strength(&phi0, &phi0 + 1, sampler, emission0);
       emission0.discount = sample_discount(&phi0, &phi0 + 1, sampler, emission0);
       
-      emission.strength = sample_strength(phi.begin(), phi.end(), sampler, emission);
-      emission.discount = sample_discount(phi.begin(), phi.end(), sampler, emission);
+      // skip BOS part...
+      if (! phi.empty()) {
+	emission.strength = sample_strength(phi.begin() + 1, phi.end(), sampler, emission);
+	emission.discount = sample_discount(phi.begin() + 1, phi.end(), sampler, emission);
+      }
       
       transition0.strength = sample_strength(&pi0, &pi0 + 1, sampler, transition0);
       transition0.discount = sample_discount(&pi0, &pi0 + 1, sampler, transition0);
@@ -364,6 +382,8 @@ struct PYPPOS
     // correct this beta's strength/discount sampling
     if (! pi0.empty()) {
       // sample beta from pi0 and base0
+      // or, do we directly use the estimates in pi0???
+      
       std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
       for (id_type state = 0; state != pi0.size(); ++ state)
 	counts[state] = pi0.size_customer(state) - pi0.size_table(state) * beta.discount();
@@ -418,7 +438,7 @@ struct PYPPOS
   parameter_type transition;
 
   cache_transition_type   caches_transition;
-  cache_emission_set_type caches_emission;
+  cache_emission_type     caches_emission;
 };
 
 
@@ -443,9 +463,9 @@ struct PYPGraph
 
   void initialize(const sentence_type& sentence, const PYPPOS& model)
   {
-    const size_type T = sentence.size() + 2;
-    const size_type K = model.beta.size();
-
+    const size_type T = sentence.size() + 1;
+    const size_type K = model.beta.size() + 1;
+    
     alpha.clear();
     alpha.reserve(T, K);
     alpha.resize(T, K);
@@ -454,17 +474,16 @@ struct PYPGraph
     pi.clear();
     pi.resize(K, K);
     for (id_type prev = 0; prev != K; ++ prev)
-      for (id_type next = 0; next != K; ++ next)
+      for (id_type next = 1; next != K; ++ next)
 	pi(prev, next) = model.cache_transition(prev, next);
     
     phi.clear();
     phi.resize(T, K);
-    for (size_type t = 1; t != T - 1; ++ t)
+    for (size_type t = 1; t != T; ++ t)
       for (id_type state = 1; state != K; ++ state)
 	phi(t, state) = model.cache_emission(state, sentence[t - 1]);
     
-    phi(0, 0)     = 1.0;
-    phi(T - 1, 0) = 1.0;
+    phi(0, 0) = 1.0;
   }
     
   logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
@@ -477,7 +496,7 @@ struct PYPGraph
     logprob_type logsum = cicada::semiring::traits<logprob_type>::one();
     for (size_type t = 1; t != T; ++ t) {
       for (id_type prev = 0; prev != K; ++ prev)
-	for (id_type next = 0; next != K; ++ next)
+	for (id_type next = 1; next != K; ++ next)
 	  if (pi(prev, next) > cutoff[t])
 	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(t, next);
       
@@ -498,21 +517,28 @@ struct PYPGraph
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
     
-    logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
+    probs.clear();
+    for (id_type state = 1; state != K; ++ state)
+      probs.push_back(alpha(T - 1, state));
     
-    id_type state = 0;
-    for (size_type t = T - 1; t > 1; -- t) {
+    prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
+    
+    logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
+    id_type state = (piter - probs.begin()) + 1;
+    derivation[T - 1] = state;
+    
+    for (size_type t = T - 2; t > 1; -- t) {
       probs.clear();
       for (id_type prev = 0; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(t, state));
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
-      state = (piter - probs.begin());
+      logprob *= *piter / alpha(t - 1, state);
+      
+      state = piter - probs.begin();
       
       derivation[t - 1] = state;
-      
-      logprob *= *piter / alpha(t - 1, state);
     }
     
     return logprob;
@@ -523,8 +549,7 @@ struct PYPGraph
     logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
     
     for (size_type t = 1; t != derivation.size(); ++ t)
-      logprob *= (model.prob_transition(derivation[t - 1], derivation[t])
-		  * model.prob_emission(derivation[t], t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1]));
+      logprob *= model.prob_transition(derivation[t - 1], derivation[t]) * model.prob_emission(derivation[t], sentence[t - 1]);
     
     return logprob;
   }
@@ -535,7 +560,7 @@ struct PYPGraph
     for (size_type t = 1; t != derivation.size(); ++ t)
       model.increment(derivation[t - 1],
 		      derivation[t],
-		      t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1],
+		      sentence[t - 1],
 		      sampler,
 		      temperature);
     
@@ -547,15 +572,15 @@ struct PYPGraph
     for (size_type t = 1; t != derivation.size(); ++ t)
       model.decrement(derivation[t - 1],
 		      derivation[t],
-		      t + 1 == derivation.size() ? vocab_type::BOS : sentence[t - 1],
+		      sentence[t - 1],
 		      sampler);
   }
-
+  
   
   phi_type    phi;
   pi_type     pi;
   alpha_type  alpha;
-
+  
   prob_set_type    probs;
 };
 
@@ -615,9 +640,9 @@ struct TaskBeam
       cutoff_type& cutoff = cutoffs[pos];
       
       if (derivation.empty()) {
-	const size_type K = model.beta.size();
+	const size_type K = model.beta.size() + 1;
 	
-	derivation.reserve(training[pos].size() + 2);
+	derivation.reserve(training[pos].size() + 1);
 	derivation.push_back(0);
 	
 	for (size_type i = 0; i != sentence.size(); ++ i) {
@@ -627,17 +652,15 @@ struct TaskBeam
 	  
 	  derivation.push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
 	}
-	
-	derivation.push_back(0);
       }
       
       cutoff.clear();
-      cutoff.resize(sentence.size() + 2, 0.0);
+      cutoff.resize(sentence.size() + 1, 0.0);
       
       const size_type T = cutoff.size();
       
       // we compute threshold based on pi
-      for (size_type t = 1; t != T - 1; ++ t) {
+      for (size_type t = 1; t != T; ++ t) {
 	cutoff[t] = sampler.uniform(0.0, model.cache_transition(derivation[t - 1], derivation[t]));
 	cutoff_min = std::min(cutoff_min, cutoff[t]);
       }
@@ -665,9 +688,10 @@ struct TaskPermute
     : queue(__queue),
       derivations(__derivations)
   {
-    mapping.resize(__mapping.size());
+    mapping.clear();
+    mapping.resize(__mapping.size() + 1, 0);
     for (size_type i = 0; i != __mapping.size(); ++ i)
-      mapping[__mapping[i]] = i;
+      mapping[__mapping[i] + 1] = i + 1;
   }
   
   void operator()()
@@ -841,7 +865,7 @@ int main(int argc, char ** argv)
     
     sampler_type sampler;
     
-    PYPPOS model(1.0 / (words.size() + 1), // +1 for BOS
+    PYPPOS model(1.0 / words.size(),
 		 classes,
 		 PYPPOS::parameter_type(emission_discount,
 					emission_strength,
