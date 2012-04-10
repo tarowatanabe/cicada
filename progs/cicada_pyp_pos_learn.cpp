@@ -354,7 +354,6 @@ struct PYPPOS
     
     while (pi_max > cutoff_min) {
       beta.increment(sampler);
-      base0 = 1.0 / beta.size();
       
       const size_type K = beta.size() + 1;
       for (size_type k = 0; k != K; ++ k)
@@ -403,6 +402,8 @@ struct PYPPOS
       if (! pi0.empty()) {
 	// sample beta from pi0 and base0
 	// or, do we directly use the estimates in pi0???
+
+	base0 = 1.0 / pi0.size();
 	
 	std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
 	for (id_type state = 0; state != pi0.size(); ++ state)
