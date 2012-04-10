@@ -11,6 +11,7 @@
 
 #include "cicada_impl.hpp"
 
+#include "cicada/eval/score.hpp"
 #include "cicada/format.hpp"
 #include "cicada/signature.hpp"
 #include "cicada/stemmer.hpp"
@@ -61,6 +62,7 @@ bool feature_list = false;
 op_set_type ops;
 bool op_list = false;
 
+bool eval_list = false;
 bool format_list = false;
 bool signature_list = false;
 bool stemmer_list   = false;
@@ -87,9 +89,12 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
 
-    if (feature_list || op_list || grammar_list || tree_grammar_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
+    if (feature_list || op_list || grammar_list || tree_grammar_list || eval_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
       
       if (mpi_rank == 0) {
+	if (eval_list)
+	  std::cout << cicada::eval::Scorer::lists();
+	
 	if (feature_list)
 	  std::cout << cicada::FeatureFunction::lists();
 
@@ -923,11 +928,12 @@ void options(int argc, char** argv)
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")
     ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)")
     
-    ("format-list",    po::bool_switch(&format_list), "list of available formatters")
+    ("eval-list",      po::bool_switch(&eval_list),      "list of available evaluators")
+    ("format-list",    po::bool_switch(&format_list),    "list of available formatters")
     ("signature-list", po::bool_switch(&signature_list), "list of available signatures")
-    ("stemmer-list",   po::bool_switch(&stemmer_list), "list of available stemmers")
+    ("stemmer-list",   po::bool_switch(&stemmer_list),   "list of available stemmers")
     ("tokenizer-list", po::bool_switch(&tokenizer_list), "list of available tokenizers")
-    ("matcher-list",   po::bool_switch(&matcher_list), "list of available matchers")
+    ("matcher-list",   po::bool_switch(&matcher_list),   "list of available matchers")
     ;
 
   
