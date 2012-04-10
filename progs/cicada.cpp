@@ -10,6 +10,12 @@
 
 #include "cicada_impl.hpp"
 
+#include "cicada/format.hpp"
+#include "cicada/signature.hpp"
+#include "cicada/stemmer.hpp"
+#include "cicada/tokenizer.hpp"
+#include "cicada/matcher.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/lockfree_list_queue.hpp"
@@ -49,6 +55,12 @@ bool feature_list = false;
 op_set_type ops;
 bool op_list = false;
 
+bool format_list = false;
+bool signature_list = false;
+bool stemmer_list   = false;
+bool tokenizer_list = false;
+bool matcher_list = false;
+
 int threads = 1;
 
 int debug = 0;
@@ -71,24 +83,36 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
-    
-    if (feature_list) {
-      std::cout << cicada::FeatureFunction::lists();
-      return 0;
-    }
 
-    if (op_list) {
-      std::cout << operation_set_type::lists();
-      return 0;
-    }
-    
-    if (grammar_list) {
-      std::cout << grammar_type::lists();
-      return 0;
-    }
+    if (feature_list || op_list || grammar_list || tree_grammar_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
+      
+      if (feature_list)
+	std::cout << cicada::FeatureFunction::lists();
 
-    if (tree_grammar_list) {
-      std::cout << tree_grammar_type::lists();
+      if (format_list)
+	std::cout << cicada::Format::lists();
+
+      if (grammar_list)
+	std::cout << grammar_type::lists();
+
+      if (matcher_list)
+	std::cout << cicada::Matcher::lists();
+      
+      if (op_list)
+	std::cout << operation_set_type::lists();
+
+      if (signature_list)
+	std::cout << cicada::Signature::lists();
+      
+      if (stemmer_list)
+	std::cout << cicada::Stemmer::lists();
+
+      if (tokenizer_list)
+	std::cout << cicada::Tokenizer::lists();
+      
+      if (tree_grammar_list)
+	std::cout << tree_grammar_type::lists();
+      
       return 0;
     }
     
@@ -576,7 +600,14 @@ void options(int argc, char** argv)
 
     //operatins...
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")
-    ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)");
+    ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)")
+    
+    ("format-list",    po::bool_switch(&format_list), "list of available formatters")
+    ("signature-list", po::bool_switch(&signature_list), "list of available signatures")
+    ("stemmer-list",   po::bool_switch(&stemmer_list), "list of available stemmers")
+    ("tokenizer-list", po::bool_switch(&tokenizer_list), "list of available tokenizers")
+    ("matcher-list",   po::bool_switch(&matcher_list), "list of available matchers")
+    ;
 
   po::options_description opts_command("command line options");
   opts_command.add_options()
