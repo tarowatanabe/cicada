@@ -145,6 +145,44 @@ namespace utils
       }
     }
 
+    template <typename Iterator, typename Extract>
+    Iterator draw(Iterator first, Iterator last, Extract extract, const double temperature=1.0)
+    {
+      using namespace std;
+      
+      if (std::distance(first, last) <= 1) return first;
+      
+      if (temperature == 1.0) {
+	double draw = 0.0;
+	for (Iterator iter = first; iter != last; ++ iter)
+	  draw += extract(*iter);
+	draw *= uniform();
+	
+	double sum = extract(*first);
+	++ first;
+	for (/**/; first != last && sum < draw; ++ first)
+	  sum += extract(*first);
+	
+	return -- first;
+      } else {
+	const double anneal = 1.0 / temperature;
+	
+	double scale = 0.0;
+	for (Iterator iter = first; iter != last; ++ iter)
+	  scale += pow(extract(*iter), anneal);
+	
+	const double draw = uniform() * scale;
+	
+	double sum = extract(*first);
+	++ first;
+	for (/**/; first != last && sum < draw; ++ first)
+	  sum += pow(extract(*first), anneal);
+	
+	return -- first;
+      }
+    }
+    
+
     template <typename Iterator>
     Iterator draw(Iterator first, Iterator last, const double temperature=1.0)
     {
