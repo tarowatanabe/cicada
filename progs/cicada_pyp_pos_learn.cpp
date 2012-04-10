@@ -521,7 +521,7 @@ struct PYPGraph
     id_type state = (piter - probs.begin()) + 1;
     derivation[T - 1] = state;
     
-    for (size_type t = T - 1; t >= 1; -- t) {
+    for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
       for (id_type prev = 0; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
@@ -534,6 +534,8 @@ struct PYPGraph
       
       derivation[t - 1] = state;
     }
+    
+    logprob *= model.cache_transition(0, state) * model.cache_emission(state, sentence[0]);
 
 #if 1
     if (derivation.front())
