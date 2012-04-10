@@ -120,8 +120,10 @@ struct PYPPOS
   template <typename Sampler>
   void increment(const id_type prev, const id_type next, const word_type& word, Sampler& sampler, const double temperature=1.0)
   {
+#if 0
     if (! next)
       throw std::runtime_error("invalid state");
+#endif
 
     // prev = [0, # of states]
     // next = [1, # of states]
@@ -146,8 +148,10 @@ struct PYPPOS
   template <typename Sampler>
   void decrement(const id_type prev, const id_type next, const word_type& word, Sampler& sampler)
   {
+#if 0
     if (! next)
       throw std::runtime_error("invalid state");
+#endif
 
     // prev = [0, # of states]
     // next = [1, # of states]
@@ -179,8 +183,10 @@ struct PYPPOS
 	caches_transition(prev, next) = prob_transition(prev, next);
     
     for (/**/; first != last; ++ first) {
+#if 0
       if (first->id() >= caches_emission.size2())
 	throw std::runtime_error("wrong word...?");
+#endif
       
       for (id_type state = 1; state != K; ++ state)
 	caches_emission(state, first->id()) = prob_emission(state, *first);
@@ -189,32 +195,40 @@ struct PYPPOS
   
   double cache_emission(const id_type next, const word_type& word) const
   {
+#if 0
     if (! next || next >= caches_emission.size1())
       throw std::runtime_error("invalid state");
+#endif
     
     return caches_emission(next, word.id());
   }
   
   double cache_transition(const id_type prev, const id_type next) const
   {
+#if 0
     if (! next || prev >= caches_transition.size1() || next >= caches_transition.size2())
       throw std::runtime_error("invalid state");
+#endif
     
     return caches_transition(prev, next);
   }
   
   double cache_transition(const id_type next) const
   {
+#if 0
     if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
+#endif
     
     return beta[next - 1];
   }
   
   double prob_emission(const id_type next, const word_type& word) const
   {
+#if 0
     if (! next)
       throw std::runtime_error("invalid state");
+#endif
     
     const double p0 = phi0.prob(word, h);
     
@@ -223,8 +237,10 @@ struct PYPPOS
   
   double prob_transition(const id_type prev, const id_type next) const
   {
+#if 0
     if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
+#endif
     
     const double p0 = beta[next - 1];
     
@@ -233,8 +249,10 @@ struct PYPPOS
 
   double prob_transition(const id_type next) const
   {
+#if 0
     if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
+#endif
     
     return beta[next - 1];
   }
@@ -517,12 +535,14 @@ struct PYPGraph
       derivation[t - 1] = state;
     }
 
+#if 0
     if (derivation.front())
       throw std::runtime_error("wrong initial derivation");
     
     for (size_type t = 1; t != T; ++ t)
       if (! derivation[t])
 	throw std::runtime_error("wrong derivation");
+#endif
     
     return logprob;
   }
@@ -837,12 +857,11 @@ int main(int argc, char ** argv)
     
     mapping_type mapping;
     
-    position_set_type   positions;
-    position_set_type positions_mapped;
-    position_set_type positions_reduced;
+    position_set_type positions;
     
     for (size_t i = 0; i != training.size(); ++ i)
-      positions.push_back(i);
+      if (! training[i].empty())
+	positions.push_back(i);
     position_set_type(positions).swap(positions);
     
     sampler_type sampler;
@@ -1015,27 +1034,6 @@ int main(int argc, char ** argv)
 	}
       }
       
-#if 0
-      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	queue_mapper.push(*piter);
-      
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
-
-	if (derivations[pos].size() != cutoffs[pos].size())
-	  throw std::runtime_error("derivation and cutoff size differ");
-	
-	if (derivations[pos].size() != training[pos].size() + 1)
-	  throw std::runtime_error("derivation and setnence size differ");
-	
-	if (! derivations_prev[pos].empty())
-	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	
-	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-      }
-#endif
-
       // permute..
       if (debug >= 3)
 	std::cerr << "permute" << std::endl;
