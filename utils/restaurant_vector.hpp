@@ -199,6 +199,10 @@ namespace utils
       for (size_type i = 0; i != mapping.size(); ++ i) 
 	if (mapping[i] < dishes.size())
 	  dishes_new[i].swap(dishes[mapping[i]]);
+
+      for (size_type i = 0; i != dishes.size(); ++ i)
+	if (! dishes[i].empty())
+	  throw std::runtime_error("non-empty dish i=" + boost::lexical_cast<std::string>(i));
       
       while (! dishes_new.empty() && dishes_new.back().empty())
 	dishes_new.pop_back();

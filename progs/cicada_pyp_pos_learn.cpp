@@ -166,24 +166,30 @@ struct PYPPOS
   template <typename Iterator>
   void initialize_cache(Iterator first, Iterator last)
   {
+    const size_type K = beta.size() + 1;
+
     caches_transition.clear();
     caches_emission.clear();
     
-    caches_transition.resize(beta.size() + 1, beta.size() + 1);
-    caches_emission.resize(beta.size() + 1, word_type::allocated());
+    caches_transition.resize(K, K);
+    caches_emission.resize(K, word_type::allocated());
     
-    for (id_type prev = 0; prev != beta.size() + 1; ++ prev)
-      for (id_type next = 1; next != beta.size() + 1; ++ next)
+    for (id_type prev = 0; prev != K; ++ prev)
+      for (id_type next = 1; next != K; ++ next)
 	caches_transition(prev, next) = prob_transition(prev, next);
     
-    for (/**/; first != last; ++ first)
-      for (id_type state = 1; state != beta.size() + 1; ++ state)
+    for (/**/; first != last; ++ first) {
+      if (first->id() >= caches_emission.size2())
+	throw std::runtime_error("wrong word...?");
+      
+      for (id_type state = 1; state != K; ++ state)
 	caches_emission(state, first->id()) = prob_emission(state, *first);
+    }
   }
   
   double cache_emission(const id_type next, const word_type& word) const
   {
-    if (! next)
+    if (! next || next >= caches_emission.size1())
       throw std::runtime_error("invalid state");
     
     return caches_emission(next, word.id());
@@ -191,7 +197,7 @@ struct PYPPOS
   
   double cache_transition(const id_type prev, const id_type next) const
   {
-    if (! next)
+    if (! next || prev >= caches_transition.size1() || next >= caches_transition.size2())
       throw std::runtime_error("invalid state");
     
     return caches_transition(prev, next);
@@ -199,9 +205,9 @@ struct PYPPOS
   
   double cache_transition(const id_type next) const
   {
-    if (! next)
+    if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
-	
+    
     return beta[next - 1];
   }
   
@@ -217,7 +223,7 @@ struct PYPPOS
   
   double prob_transition(const id_type prev, const id_type next) const
   {
-    if (! next)
+    if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
     
     const double p0 = beta[next - 1];
@@ -227,7 +233,7 @@ struct PYPPOS
 
   double prob_transition(const id_type next) const
   {
-    if (! next)
+    if (! next || next - 1 >= beta.size())
       throw std::runtime_error("invalid state");
     
     return beta[next - 1];
@@ -277,6 +283,9 @@ struct PYPPOS
     
     std::sort(mapping.begin(), mapping.end(), greater_customer(pi0));
     
+    for (size_type i = 0; i != beta.size(); ++ i)
+      std::cerr << "i=" << i << " origin: " << mapping[i] << " customer: " << pi0.size_customer(mapping[i]) << std::endl;
+    
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
     
@@ -290,8 +299,11 @@ struct PYPPOS
     
     pi_new.front().swap(pi.front()); // for BOS...
     for (size_type i = 1; i != pi_new.size(); ++ i)
-      if (mapping[i - 1] + 1 < pi.size())
+      if (mapping[i - 1] + 1 < pi.size()) {
+	std::cerr << "pi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
 	pi_new[i].swap(pi[mapping[i - 1] + 1]);
+      } else
+	std::cerr << "exceed... pi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
     
     pi.swap(pi_new);
     
@@ -300,8 +312,11 @@ struct PYPPOS
     
     // skip BOS...
     for (size_type i = 1; i != phi_new.size(); ++ i)
-      if (mapping[i - 1] + 1 < phi.size())
+      if (mapping[i - 1] + 1 < phi.size()) {
+	std::cerr << "phi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
 	phi_new[i].swap(phi[mapping[i - 1] + 1]);
+      } else
+	std::cerr << "exceed... phi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
     
     phi.swap(phi_new);
   }
@@ -527,7 +542,7 @@ struct PYPGraph
     id_type state = (piter - probs.begin()) + 1;
     derivation[T - 1] = state;
     
-    for (size_type t = T - 2; t > 1; -- t) {
+    for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
       for (id_type prev = 0; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(t, state));
@@ -540,6 +555,13 @@ struct PYPGraph
       
       derivation[t - 1] = state;
     }
+
+    if (derivation.front())
+      throw std::runtime_error("wrong initial derivation");
+    
+    for (size_type t = 1; t != T; ++ t)
+      if (! derivation[t])
+	throw std::runtime_error("wrong derivation");
     
     return logprob;
   }
@@ -690,8 +712,8 @@ struct TaskPermute
   {
     mapping.clear();
     mapping.resize(__mapping.size() + 1, 0);
-    for (size_type i = 0; i != __mapping.size(); ++ i)
-      mapping[__mapping[i] + 1] = i + 1;
+    for (size_type i = 1; i != mapping.size(); ++ i)
+      mapping[__mapping[i - 1] + 1] = i;
   }
   
   void operator()()
@@ -962,6 +984,8 @@ int main(int argc, char ** argv)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
       // sample beam...
+      if (debug >= 3)
+	std::cerr << "sample beam" << std::endl;
       
       model.initialize_cache(words.begin(), words.end());
       
@@ -992,6 +1016,9 @@ int main(int argc, char ** argv)
       
       workers_beam.join_all();
       
+      if (debug >= 3)
+	std::cerr << "sample sticks" << std::endl;
+      
       // sample sticks..
       model.sample_sticks(*std::min_element(cutoff_min.begin(), cutoff_min.end()), sampler);
 
@@ -999,6 +1026,9 @@ int main(int argc, char ** argv)
 	std::cerr << "# of sticks: " << model.beta.size() << std::endl;
       
       // sample derivations...
+      if (debug >= 3)
+	std::cerr << "sample derivations" << std::endl;
+      
       model.initialize_cache(words.begin(), words.end());
       
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
@@ -1007,6 +1037,12 @@ int main(int argc, char ** argv)
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
+
+	if (derivations[pos].size() != cutoffs[pos].size())
+	  throw std::runtime_error("derivation and cutoff size differ");
+	
+	if (derivations[pos].size() != training[pos].size() + 1)
+	  throw std::runtime_error("derivation and setnence size differ");
 	
 	if (! derivations_prev[pos].empty())
 	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
@@ -1015,6 +1051,9 @@ int main(int argc, char ** argv)
       }
 
       // permute..
+      if (debug >= 3)
+	std::cerr << "permute" << std::endl;
+      
       model.permute(mapping);
       
       TaskPermute::queue_type queue_permute;
@@ -1034,6 +1073,9 @@ int main(int argc, char ** argv)
       workers_permute.join_all();
       
       // sample other parameters...
+      if (debug >= 3)
+	std::cerr << "sample parameters" << std::endl;
+	    
       model.sample_parameters(sampler, resample_iterations);
       
       if (debug >= 2) {
