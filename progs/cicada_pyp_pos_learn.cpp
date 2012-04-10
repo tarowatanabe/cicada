@@ -814,7 +814,7 @@ double emission_strength_prior_rate  = 1.0;
 double transition_discount = 0.1;
 double transition_strength = 10;
 
-double transition_discount_prior_alpha = 0.01;
+double transition_discount_prior_alpha = 0.1;
 double transition_discount_prior_beta  = 1.0;
 double transition_strength_prior_shape = 0.1;
 double transition_strength_prior_rate  = 1.0;
