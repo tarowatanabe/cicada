@@ -884,12 +884,13 @@ int main(int argc, char ** argv)
     
     model.initialize(sampler, classes, resample_iterations);
 
-    if (debug >= 2) {
+    if (debug >= 2)
       std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
 		<< "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
 		<< "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
 		<< "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
-      
+    
+    if (debug >= 3) {
       std::cerr << "beta:";
       for (size_t state = 0; state != model.beta.size(); ++ state)
 	std::cerr << ' ' << model.beta[state];
@@ -1062,12 +1063,13 @@ int main(int argc, char ** argv)
 	    
       model.sample_parameters(sampler, resample_iterations);
       
-      if (debug >= 2) {
+      if (debug >= 2)
 	std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
 		  << "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
 		  << "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
 		  << "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
-	
+
+      if (debug >= 3) {
 	std::cerr << "beta:";
 	for (size_t state = 0; state != model.beta.size(); ++ state)
 	  std::cerr << ' ' << model.beta[state];
