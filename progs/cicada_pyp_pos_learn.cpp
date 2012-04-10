@@ -495,8 +495,7 @@ struct PYPGraph
     for (size_type t = 1; t != T; ++ t) {
       for (id_type prev = 0; prev != K; ++ prev)
 	for (id_type next = 1; next != K; ++ next)
-	  if (model.cache_transition(prev, next) > cutoff[t])
-	    alpha(t, next) += alpha(t - 1, prev) * model.cache_transition(prev, next) * model.cache_emission(next, sentence[t - 1]);
+	  alpha(t, next) += alpha(t - 1, prev) * model.cache_transition(prev, next) * model.cache_emission(next, sentence[t - 1]);
       
       double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
       scale = (scale == 0.0 ? 1.0 : scale);
@@ -508,14 +507,6 @@ struct PYPGraph
     
     return logsum;
   }
-
-  struct extract_prob
-  {
-    double operator()(const prob_id_type& x) const
-    {
-      return x.first;
-    }
-  };
   
   template <typename Sampler>
   logprob_type backward(const PYPPOS& model, Sampler& sampler, const sentence_type& sentence, derivation_type& derivation, const double temperature)
@@ -523,29 +514,26 @@ struct PYPGraph
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
     
-    prob_ids.clear();
+    probs.clear();
     for (id_type state = 1; state != K; ++ state)
-      if (alpha(T - 1, state) > 0.0)
-	prob_ids.push_back(std::make_pair(alpha(T - 1, state), state));
+      probs.push_back(alpha(T - 1, state));
     
-    prob_id_set_type::const_iterator piter = sampler.draw(prob_ids.begin(), prob_ids.end(), extract_prob(), temperature);
+    prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
     
     logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
-    id_type state = piter->second;
+    id_type state = (piter - probs.begin()) + 1;
     derivation[T - 1] = state;
     
     for (size_type t = T - 1; t > 1; -- t) {
-      prob_ids.clear();
+      probs.clear();
       for (id_type prev = 1; prev != K; ++ prev)
-	if (alpha(t - 1, prev) > 0.0)
-	  prob_ids.push_back(std::make_pair(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]),
-					    prev));
+	probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
       
-      prob_id_set_type::const_iterator piter = sampler.draw(prob_ids.begin(), prob_ids.end(), extract_prob(), temperature);
+      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
-      logprob *= piter->first / alpha(t - 1, state);
+      logprob *= *piter / alpha(t - 1, state);
       
-      state = piter->second;
+      state = (piter - probs.begin()) + 1;
       
       derivation[t - 1] = state;
     }
@@ -599,7 +587,6 @@ struct PYPGraph
   
   alpha_type       alpha;
   prob_set_type    probs;
-  prob_id_set_type prob_ids;
 };
 
 typedef boost::filesystem::path path_type;
