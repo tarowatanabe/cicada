@@ -523,21 +523,21 @@ struct PYPGraph
     
     for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
-      for (id_type prev = 0; prev != K; ++ prev)
+      for (id_type prev = 1; prev != K; ++ prev)
 	probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
       logprob *= *piter / alpha(t - 1, state);
       
-      state = piter - probs.begin();
+      state = (piter - probs.begin()) + 1;
       
       derivation[t - 1] = state;
     }
     
     logprob *= model.cache_transition(0, state) * model.cache_emission(state, sentence[0]);
 
-#if 1
+#if 0
     if (derivation.front())
       throw std::runtime_error("wrong initial derivation");
     
