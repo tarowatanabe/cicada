@@ -615,17 +615,19 @@ struct PYPGraph
 	span_set_type::const_iterator aiter_end = antecedent.end();
 	for (span_set_type::const_iterator aiter = antecedent.begin(); aiter != aiter_end; ++ aiter)
 	  span_index.push_back(std::make_pair(*aiter, aiter - antecedent.begin()));
+
+	std::sort(span_index.begin(), span_index.end());
 	
 	size_type pos = span.first;
 	span_index_set_type::const_iterator siter_end = span_index.end();
 	for (span_index_set_type::const_iterator siter = span_index.begin(); siter != siter_end; ++ siter) {
 	  if (! siter->first.empty()) {
 	    buffer.insert(buffer.end(), sentence.begin() + pos, sentence.begin() + siter->first.first);
-	    buffer.push_back(vocab_type::X.non_terminal(siter->second));
+	    buffer.push_back(vocab_type::X.non_terminal(siter->second + 1));
 	    
 	    pos = siter->first.last;
 	  } else
-	    buffer.push_back(vocab_type::X.non_terminal(siter->second));
+	    buffer.push_back(vocab_type::X.non_terminal(siter->second + 1));
 	}
 	
 	buffer.insert(buffer.end(), sentence.begin() + pos, sentence.begin() + span.last);
@@ -723,6 +725,7 @@ struct PYPGraph
 		  
 		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
 		  
+		  std::cerr << "prior: " << logprob_prior << std::endl;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
@@ -735,27 +738,44 @@ struct PYPGraph
 	      }
 	    } else {
 	      std::cerr << "antecedents pair" << std::endl;
-	      std::cerr << "span: " << span.first << "..." << span.last << std::endl;
+	      std::cerr << "span: " << span.first << "..." << span.last << " hole: " << total_hole << std::endl;
 
 	      const size_type terminal_hole_size = span.size() - total_hole;
 	      const difference_type terminal_span_size = terminal_max - terminal_hole_size;
-
+	      
 	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), span.size());
 	      const size_type span_length_max = utils::bithack::min(target.size(), span.size() + terminal_span_size);
+
+	      //
+	      // 0 <= span_first
+	      // span_last <= target.size()
+	      // span_first <= span.first
+	      // span.last <= span_last
+	      // span_last - span_first < span_length_max
+	      //
 	      
-	      for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
-		const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.first) - terminal_span_size);
-		const size_type span_first_max = utils::bithack::min(target.size(), span.last + terminal_span_size) - span_length;
-		for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
-		  const size_type span_last = span_first + span_length;
+	      const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.last) - difference_type(span_length_max));
+	      
+	      for (size_type span_first = span_first_min; span_first <= span.first; ++ span_first) {
+		const size_type span_last_max = utils::bithack::min(target.size(), span.first + span_length_max);
+		
+		for (size_type span_last = span.last ; span_last <= span_last_max; ++ span_last) {
+		  const size_type span_length = span_last - span_first;
+		  
+		  std::cerr << "\tparent-span: " << span_first << "..." << span_last << std::endl;
+		  
 		  const double logprob_terminal = logprob_targets(span_first, span_last) - logprob_hole;
 		  
 		  const size_type terminal_size = span_length - terminal_hole_size;
 		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
 		  
 		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
+
+		  std::cerr << "\tprior: " << logprob_prior << std::endl;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
+
+		  std::cerr << "\ttarget string: " << target_string << std::endl;
 		  
 		  const logprob_type prob = (prob_antecedent
 					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
