@@ -103,8 +103,8 @@ struct PYPPOS
     : h(__h),
       h_counts(0),
       phi0(__emission.discount, __emission.strength),
-      phi(classes + 1, table_emission_type(__emission.discount,
-					   __emission.strength)),
+      phi(classes, table_emission_type(__emission.discount,
+				       __emission.strength)),
       base0(1.0 / classes),
       counts0(0),
       beta(__transition.discount, __transition.strength),
@@ -127,10 +127,10 @@ struct PYPPOS
     // next = [1, # of states]
     
     // emission
-    if (next >= phi.size())
-      phi.resize(next + 1, table_emission_type(emission.discount, emission.strength));
+    if (next - 1 >= phi.size())
+      phi.resize(next, table_emission_type(emission.discount, emission.strength));
     
-    if (phi[next].increment(word, phi0.prob(word, h), sampler, temperature))
+    if (phi[next - 1].increment(word, phi0.prob(word, h), sampler, temperature))
       if (phi0.increment(word, h, sampler, temperature))
 	++ h_counts;
     
@@ -138,7 +138,7 @@ struct PYPPOS
     if (prev >= pi.size())
       pi.resize(prev + 1, table_transition_type(transition.discount, transition.strength));
     
-    if (pi[prev].increment(next, pi0.prob(next - 1, base0), sampler, temperature))
+    if (pi[prev].increment(next - 1, pi0.prob(next - 1, base0), sampler, temperature))
       if (pi0.increment(next - 1, base0, sampler, temperature))
 	++ counts0;
   }
@@ -153,7 +153,7 @@ struct PYPPOS
     // next = [1, # of states]
     
     // emission
-    if (phi[next].decrement(word, sampler))
+    if (phi[next - 1].decrement(word, sampler))
       if (phi0.decrement(word, sampler))
 	-- h_counts;
     
@@ -218,7 +218,7 @@ struct PYPPOS
     
     const double p0 = phi0.prob(word, h);
     
-    return (next < phi.size() ? phi[next].prob(word, p0) : p0);
+    return (next - 1 < phi.size() ? phi[next - 1].prob(word, p0) : p0);
   }
   
   double prob_transition(const id_type prev, const id_type next) const
@@ -249,10 +249,8 @@ struct PYPPOS
     logprob += emission.log_likelihood();
     logprob += transition.log_likelihood();
     
-    // we will start from 1!
-    if (! phi.empty())
-      for (size_type i = 1; i != phi.size(); ++ i)
-	logprob += phi[i].log_likelihood();
+    for (size_type i = 0; i != phi.size(); ++ i)
+      logprob += phi[i].log_likelihood();
     
     for (size_type i = 0; i != pi.size(); ++ i)
       logprob += pi[i].log_likelihood();
@@ -283,9 +281,6 @@ struct PYPPOS
     
     std::sort(mapping.begin(), mapping.end(), greater_customer(pi0));
     
-    for (size_type i = 0; i != beta.size(); ++ i)
-      std::cerr << "i=" << i << " origin: " << mapping[i] << " customer: " << pi0.size_customer(mapping[i]) << std::endl;
-    
     // re-map ids....
     // actually, the mapping data will be used to re-map the training data...
     
@@ -299,24 +294,18 @@ struct PYPPOS
     
     pi_new.front().swap(pi.front()); // for BOS...
     for (size_type i = 1; i != pi_new.size(); ++ i)
-      if (mapping[i - 1] + 1 < pi.size()) {
-	std::cerr << "pi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
+      if (mapping[i - 1] + 1 < pi.size())
 	pi_new[i].swap(pi[mapping[i - 1] + 1]);
-      } else
-	std::cerr << "exceed... pi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
-    
+
     pi.swap(pi_new);
     
     // re-map for emission...
-    emission_type phi_new(pi0.size() + 1, table_emission_type(emission.discount, emission.strength));
+    emission_type phi_new(pi0.size(), table_emission_type(emission.discount, emission.strength));
     
     // skip BOS...
-    for (size_type i = 1; i != phi_new.size(); ++ i)
-      if (mapping[i - 1] + 1 < phi.size()) {
-	std::cerr << "phi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
-	phi_new[i].swap(phi[mapping[i - 1] + 1]);
-      } else
-	std::cerr << "exceed... phi i=" << i << " from: " << mapping[i - 1] + 1 << std::endl;
+    for (size_type i = 0; i != phi_new.size(); ++ i)
+      if (mapping[i] < phi.size())
+	phi_new[i].swap(phi[mapping[i]]);
     
     phi.swap(phi_new);
   }
@@ -334,10 +323,12 @@ struct PYPPOS
   template <typename Sampler>
   void sample_sticks(const double& cutoff_min, Sampler& sampler)
   {
+    const size_type K = beta.size() + 1;
+
     double pi_max = - std::numeric_limits<double>::infinity();
-    for (id_type prev = 0; prev != beta.size() + 1; ++ prev) {
+    for (id_type prev = 0; prev != K; ++ prev) {
       double pi_min = std::numeric_limits<double>::infinity();
-      for (id_type next = 1; next != beta.size() + 1; ++ next)
+      for (id_type next = 1; next != K; ++ next)
 	pi_min = std::min(pi_min, prob_transition(prev, next));
       
       pi_max = std::max(pi_max, pi_min);
@@ -360,51 +351,48 @@ struct PYPPOS
       emission0.strength = sample_strength(&phi0, &phi0 + 1, sampler, emission0);
       emission0.discount = sample_discount(&phi0, &phi0 + 1, sampler, emission0);
       
-      // skip BOS part...
-      if (! phi.empty()) {
-	emission.strength = sample_strength(phi.begin() + 1, phi.end(), sampler, emission);
-	emission.discount = sample_discount(phi.begin() + 1, phi.end(), sampler, emission);
-      }
+      emission.strength = sample_strength(phi.begin(), phi.end(), sampler, emission);
+      emission.discount = sample_discount(phi.begin(), phi.end(), sampler, emission);
       
       transition0.strength = sample_strength(&pi0, &pi0 + 1, sampler, transition0);
       transition0.discount = sample_discount(&pi0, &pi0 + 1, sampler, transition0);
       
       transition.strength = sample_strength(pi.begin(), pi.end(), sampler, transition);
       transition.discount = sample_discount(pi.begin(), pi.end(), sampler, transition);      
-    }
     
-    phi0.discount() = emission0.discount;
-    phi0.strength() = emission0.strength;
+      phi0.discount() = emission0.discount;
+      phi0.strength() = emission0.strength;
     
-    for (size_type i = 0; i != phi.size(); ++ i) {
-      phi[i].discount() = emission.discount;
-      phi[i].strength() = emission.strength;
-    }
+      for (size_type i = 0; i != phi.size(); ++ i) {
+	phi[i].discount() = emission.discount;
+	phi[i].strength() = emission.strength;
+      }
     
-    pi0.discount() = transition0.discount;
-    pi0.strength() = transition0.strength;
+      pi0.discount() = transition0.discount;
+      pi0.strength() = transition0.strength;
     
-    beta.discount() = transition0.discount;
-    beta.strength() = transition0.strength;
+      beta.discount() = transition0.discount;
+      beta.strength() = transition0.strength;
     
-    for (size_type i = 0; i != pi.size(); ++ i) {
-      pi[i].discount() = transition.discount;
-      pi[i].strength() = transition.strength;
-    }
+      for (size_type i = 0; i != pi.size(); ++ i) {
+	pi[i].discount() = transition.discount;
+	pi[i].strength() = transition.strength;
+      }
     
-    // the transition base... base0
-    // + 1 for allowing infinity...
-    // correct this beta's strength/discount sampling
-    if (! pi0.empty()) {
-      // sample beta from pi0 and base0
-      // or, do we directly use the estimates in pi0???
-      
-      std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
-      for (id_type state = 0; state != pi0.size(); ++ state)
-	counts[state] = pi0.size_customer(state) - pi0.size_table(state) * beta.discount();
-      counts.back() = beta.strength() + counts0 * beta.discount();
-      
-      beta.sample_parameters(counts.begin(), counts.end(), sampler);
+      // the transition base... base0
+      // + 1 for allowing infinity...
+      // correct this beta's strength/discount sampling
+      if (! pi0.empty()) {
+	// sample beta from pi0 and base0
+	// or, do we directly use the estimates in pi0???
+	
+	std::vector<double, std::allocator<double> > counts(pi0.size() + 1);
+	for (id_type state = 0; state != pi0.size(); ++ state)
+	  counts[state] = pi0.size_customer(state) - pi0.size_table(state) * beta.discount();
+	counts.back() = beta.strength() + counts0 * beta.discount();
+	
+	beta.sample_parameters(counts.begin(), counts.end(), sampler);
+      }
     }
   }
 
@@ -470,13 +458,9 @@ struct PYPGraph
   typedef double prob_type;
   
   typedef utils::vector2<double, std::allocator<double> > alpha_type;
-  
-  typedef utils::vector2<double, std::allocator<double> >    phi_type; // emission
-  typedef utils::vector2<double, std::allocator<double> >    pi_type;  // transition
-  
   typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;  
 
-  void initialize(const sentence_type& sentence, const PYPPOS& model)
+  logprob_type forward(const PYPPOS& model, const sentence_type& sentence, const cutoff_type& cutoff)
   {
     const size_type T = sentence.size() + 1;
     const size_type K = model.beta.size() + 1;
@@ -486,34 +470,12 @@ struct PYPGraph
     alpha.resize(T, K);
     alpha(0, 0) = 1.0;
     
-    pi.clear();
-    pi.resize(K, K);
-    for (id_type prev = 0; prev != K; ++ prev)
-      for (id_type next = 1; next != K; ++ next)
-	pi(prev, next) = model.cache_transition(prev, next);
-    
-    phi.clear();
-    phi.resize(T, K);
-    for (size_type t = 1; t != T; ++ t)
-      for (id_type state = 1; state != K; ++ state)
-	phi(t, state) = model.cache_emission(state, sentence[t - 1]);
-    
-    phi(0, 0) = 1.0;
-  }
-    
-  logprob_type forward(const sentence_type& sentence, const PYPPOS& model, const cutoff_type& cutoff)
-  {
-    initialize(sentence, model);
-
-    const size_type T = alpha.size1();
-    const size_type K = alpha.size2();
-
     logprob_type logsum = cicada::semiring::traits<logprob_type>::one();
     for (size_type t = 1; t != T; ++ t) {
       for (id_type prev = 0; prev != K; ++ prev)
 	for (id_type next = 1; next != K; ++ next)
-	  if (pi(prev, next) > cutoff[t])
-	    alpha(t, next) += alpha(t - 1, prev) * pi(prev, next) * phi(t, next);
+	  if (model.cache_transition(prev, next) > cutoff[t])
+	    alpha(t, next) += alpha(t - 1, prev) * model.cache_transition(prev, next) * model.cache_emission(next, sentence[t - 1]);
       
       double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
       scale = (scale == 0.0 ? 1.0 : scale);
@@ -527,7 +489,7 @@ struct PYPGraph
   }
   
   template <typename Sampler>
-  logprob_type backward(Sampler& sampler, derivation_type& derivation, const double temperature)
+  logprob_type backward(const PYPPOS& model, Sampler& sampler, const sentence_type& sentence, derivation_type& derivation, const double temperature)
   {
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
@@ -545,7 +507,7 @@ struct PYPGraph
     for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
       for (id_type prev = 0; prev != K; ++ prev)
-	probs.push_back(alpha(t - 1, prev) * pi(prev, state) * phi(t, state));
+	probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
@@ -599,11 +561,8 @@ struct PYPGraph
   }
   
   
-  phi_type    phi;
-  pi_type     pi;
-  alpha_type  alpha;
-  
-  prob_set_type    probs;
+  alpha_type    alpha;
+  prob_set_type probs;
 };
 
 typedef boost::filesystem::path path_type;
@@ -725,7 +684,7 @@ struct TaskPermute
       
       if (pos == size_type(-1)) break;
       
-      for (size_type t = 0; t != derivations[pos].size(); ++ t)
+      for (size_type t = 1; t != derivations[pos].size(); ++ t)
 	derivations[pos][t] = mapping[derivations[pos][t]];
     }
   }
@@ -770,10 +729,10 @@ struct Task
       if (pos == size_type(-1)) break;
       
       // forward
-      graph.forward(training[pos], model, cutoffs[pos]);
+      graph.forward(model, training[pos], cutoffs[pos]);
       
       // backward
-      graph.backward(sampler, derivations[pos], temperature);
+      graph.backward(model, sampler, training[pos], derivations[pos], temperature);
       
       reducer.push(pos);
     }

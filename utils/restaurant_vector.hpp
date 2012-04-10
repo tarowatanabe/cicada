@@ -237,6 +237,7 @@ namespace utils
 	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
 	
 	bool incremented = false;
+	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
 	  r -= (*titer - parameter.discount);
@@ -301,7 +302,7 @@ namespace utils
       }
 
       if (! decremented)
-	throw std::runtime_error("not decremended?");
+	throw std::runtime_error("not decremented?");
       
       -- customers;
       return erased;

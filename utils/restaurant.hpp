@@ -207,6 +207,8 @@ namespace utils
       
       if (existing) {
 	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
+
+	bool incremented = false;
 	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -214,9 +216,14 @@ namespace utils
 	  
 	  if (r <= 0.0) {
 	    ++ (*titer);
+	    incremented = true;
 	    break;
 	  }
 	}
+	
+	if (! incremented)
+	  throw std::runtime_error("not incremented?");
+	
       } else {
 	loc.tables.push_back(1);
 	++ tables;
@@ -248,6 +255,8 @@ namespace utils
       bool erased = false;
       double r = sampler.uniform() * loc.customers;
       -- loc.customers;
+
+      bool decremented = false;
       
       typename location_type::table_set_type::iterator titer_end = loc.tables.end();
       for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -255,6 +264,7 @@ namespace utils
 	
 	if (r <= 0.0) {
 	  -- (*titer);
+	  decremented = true;
 	  
 	  if (! (*titer)) {
 	    erased = true;
@@ -264,6 +274,9 @@ namespace utils
 	  break;
 	}
       }
+
+      if (! decremented)
+	throw std::runtime_error("not decremented?");
       
       -- customers;
       return erased;
