@@ -1086,6 +1086,13 @@ int main(int argc, char ** argv)
       queue_mapper.push(size_type(-1));
     
     workers.join_all();
+    
+    
+    //
+    // dump model...
+    //
+    
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
