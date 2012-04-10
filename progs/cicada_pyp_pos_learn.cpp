@@ -834,14 +834,16 @@ int main(int argc, char ** argv)
     derivation_set_type derivations(training.size());
     derivation_set_type derivations_prev(training.size());
     cutoff_set_type     cutoffs(training.size());
-    position_set_type   positions(training.size());
+    
     mapping_type mapping;
     
+    position_set_type   positions;
     position_set_type positions_mapped;
     position_set_type positions_reduced;
-
+    
     for (size_t i = 0; i != training.size(); ++ i)
-      positions[i] = i;
+      positions.push_back(i);
+    position_set_type(positions).swap(positions);
     
     sampler_type sampler;
     
@@ -989,6 +991,31 @@ int main(int argc, char ** argv)
       
       model.initialize_cache(words.begin(), words.end());
       
+      position_set_type::const_iterator piter = positions.begin();
+      size_type reduced = 0;
+      while (piter != piter_end || reduced != positions.size()) {
+	
+	if (piter != piter_end && queue_mapper.push(*piter, true))
+	  ++ piter;
+	
+	size_type pos = 0;
+	if (reduced != positions.size() && queue_reducer.pop(pos, true)) {
+	  ++ reduced;
+	  
+	  if (derivations[pos].size() != cutoffs[pos].size())
+	    throw std::runtime_error("derivation and cutoff size differ");
+	  
+	  if (derivations[pos].size() != training[pos].size() + 1)
+	    throw std::runtime_error("derivation and setnence size differ");
+	  
+	  if (! derivations_prev[pos].empty())
+	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
+	  
+	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
+	}
+      }
+      
+#if 0
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
 	queue_mapper.push(*piter);
       
@@ -1007,6 +1034,7 @@ int main(int argc, char ** argv)
 	
 	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
       }
+#endif
 
       // permute..
       if (debug >= 3)
