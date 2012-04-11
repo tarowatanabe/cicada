@@ -147,6 +147,7 @@ bitpack_main \
 bit_vector_main \
 byte_aligned_code_main \
 byte_aligned_vector_main \
+chart_main \
 chunk_vector_main \
 compress_stream_main \
 dense_map_main \
@@ -258,6 +259,10 @@ byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
 restaurant_main_SOURCES = restaurant_main.cpp
+
+chart_main_SOURCES = chart_main.cpp
+chart_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+chart_main_LDADD = $(BOOST_THREAD_LIBS)
 
 chunk_vector_main_SOURCES = chunk_vector_main.cpp
 chunk_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

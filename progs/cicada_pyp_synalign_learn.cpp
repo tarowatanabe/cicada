@@ -36,6 +36,7 @@
 #include <cicada/tree_rule_compact.hpp>
 #include <cicada/rule.hpp>
 
+#include "utils/alloc_vector.hpp"
 #include "utils/chart.hpp"
 #include "utils/chunk_vector.hpp"
 #include "utils/array_power2.hpp"
@@ -58,6 +59,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/alloc_vector.hpp"
 #include "utils/indexed_map.hpp"
+#include "utils/indexed_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -123,7 +125,7 @@ struct UnigramModel
     
     const double denom = total + vocab;
     
-    table_type::iterator titer = table.end();
+    table_type::iterator titer = table.begin();
     for (typename counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ titer)
       if (*citer)
 	*titer = utils::mathop::log((1.0 + *citer) / denom);
@@ -146,9 +148,52 @@ struct UnigramModel
   double operator()(const symbol_type& x) const
   {
     return (x.id() >= table.size() ? smooth : table[x.id()]);
+    //return smooth;
   }
   
   table_type table;
+  double smooth;
+};
+
+// IBM Model 1
+struct LexiconModel
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct table_type : public utils::dense_hash_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
+						   std::allocator<std::pair<const word_type, double> > >::type
+  {
+    typedef utils::dense_hash_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
+				  std::allocator<std::pair<const word_type, double> > >::type mapped_type;
+
+    table_type() { mapped_type::set_empty_key(word_type()); }
+  };
+  
+  typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
+  
+  template <typename IteratorSource, typename IteratorTarget>
+  void learn(IteratorSource source_first, IteratorSource source_last,
+	     IteratorTarget target_first, IteratorTarget target_last)
+  {
+    
+    
+    
+    
+  }
+  
+  double operator()(const word_type& source, const word_type& target) const
+  {
+    if (! tables.exists(source.id()))
+      return smooth;
+
+    const table_type& table = tables[source.id()];
+    
+    table_type::const_iterator titer = table.find(target);
+    return (titer == table.end() ? smooth : titer->second);
+  }
+  
+  table_set_type tables;
   double smooth;
 };
 
@@ -178,8 +223,10 @@ struct PCFGModel
 			       std::allocator<std::pair<const rule_type*, double> > >::type table_type;
   
   template <typename Iterator>
-  PCFGModel(Iterator first, Iterator last) : table(), smooth(-60) { learn(first, last); }
-  PCFGModel() : table(), smooth(-60) { }
+  PCFGModel(Iterator first, Iterator last) : table(), smooth(-60), lambda(0.5) { learn(first, last); }
+  PCFGModel() : table(), smooth(-60), lambda(0.5) { }
+
+  typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
   
   template <typename Iterator>
   void learn(Iterator first, Iterator last)
@@ -190,6 +237,9 @@ struct PCFGModel
 				 std::allocator<std::pair<const symbol_type, count_type> > >::type count_set_type;
     
     count_set_type counts;
+
+    size_type alpha = 0;
+    size_type beta = 0;
     
     for (/**/; first != last; ++ first) {
       const hypergraph_type& graph = *first;
@@ -197,11 +247,18 @@ struct PCFGModel
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = *eiter;
-	const rule_type* rule = &(*edge.rule);
+	const rule_type* rule = edge.rule.get();
 	
 	++ counts[rule->lhs][rule];
+
+	if (rule->rhs.size() != 1 || rule->rhs.front().is_non_terminal()) {
+	  alpha += rule->rhs.size();
+	  ++ beta;
+	}
       }
     }
+    
+    lambda = double(alpha) / (alpha + beta);
 
     table.clear();
     
@@ -223,8 +280,11 @@ struct PCFGModel
     }
     
     smooth = utils::mathop::log(1.0 / observed);
+    
+    for (size_type size = 0; size != cache.size(); ++ size)
+      cache[size] = utils::mathop::log_geometric(size, lambda);
   }
-
+  
   double operator()(const rule_ptr_type& x) const
   {
     return operator()(x.get());
@@ -232,12 +292,25 @@ struct PCFGModel
   
   double operator()(const rule_type* x) const
   {
+#if 0
+    const size_type size = x->rhs.size();
+    if (size == 1 && x->rhs.front().is_terminal())
+      return 0.0;
+    else
+      return (size < cache.size() ? cache[size] : utils::mathop::log_geometric(size, lambda));
+#endif
+    
+#if 1
     table_type::const_iterator iter = table.find(x);
     return (iter != table.end() ? iter->second : smooth);
+#endif
   }
   
   table_type table;
   double smooth;
+  
+  cache_type cache;
+  double lambda;
 };
 
 struct LengthModel
@@ -247,12 +320,21 @@ struct LengthModel
   
   typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
   
-  LengthModel(const double& __lambda)
-    : lambda(__lambda) { initialize(lambda); }
+  LengthModel(const double& __lambda, const double& __lambda_alpha, const double& __lambda_beta)
+    : lambda(__lambda),
+      lambda_alpha(__lambda_alpha),
+      lambda_beta(__lambda_beta)
+  { initialize(lambda); }
 
   double operator()(const size_type size) const
   {
     return (size < cache.size() ? cache[size] : utils::mathop::log_geometric(size, lambda));
+  }
+  
+  template <typename Sampler>
+  void sample_parameters(const double alpha, const double beta, Sampler& sampler)
+  {
+    initialize(sampler.beta(alpha + lambda_alpha, beta + lambda_beta));
   }
   
   void initialize(const double& __lambda)
@@ -267,6 +349,8 @@ struct LengthModel
   cache_type cache;
   
   double lambda;
+  double lambda_alpha;
+  double lambda_beta;
 };
 
 struct NonTerminalModel
@@ -315,7 +399,7 @@ struct PYPSynAlign
     
     rule_pair_type() : source(0), target() {}
     rule_pair_type(const rule_type* __source, const symbol_set_type& __target) : source(__source), target(__target) {}
-    rule_pair_type(const rule_ptr_type& __source, const symbol_set_type& __target) : source(&(*__source)), target(__target) {}
+    rule_pair_type(const rule_ptr_type& __source, const symbol_set_type& __target) : source(__source.get()), target(__target) {}
     
     friend
     bool operator==(const rule_pair_type& x, const rule_pair_type& y)
@@ -380,7 +464,7 @@ struct PYPSynAlign
 
   double prob(const rule_ptr_type& source, const symbol_set_type& target, const double base) const
   {
-    return table.prob(rule_pair_type(&(*source), target), base);
+    return table.prob(rule_pair_type(source.get(), target), base);
   }
 
   double logprob(const rule_type* source, const symbol_set_type& target, const double logbase) const
@@ -390,7 +474,7 @@ struct PYPSynAlign
   
   double logprob(const rule_ptr_type& source, const symbol_set_type& target, const double logbase) const
   {
-    return cicada::semiring::log(table.prob(rule_pair_type(&(*source), target), cicada::semiring::traits<logprob_type>::exp(logbase)));
+    return cicada::semiring::log(table.prob(rule_pair_type(source.get(), target), cicada::semiring::traits<logprob_type>::exp(logbase)));
   }
   
   double prob_base(const rule_pair_type& rule_pair) const
@@ -427,11 +511,28 @@ struct PYPSynAlign
     
     return table.log_likelihood(discount, strength);
   }
-
+  
   template <typename Sampler>
   void sample_length_parameters(Sampler& sampler)
   {
     // do nothing...!
+    size_type alpha = 0;
+    size_type beta = 0;
+    
+    table_type::const_iterator titer_end = table.end();
+    for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
+      const symbol_set_type& target = titer->first.target;
+      
+      size_type num_terminals = 0;
+      symbol_set_type::const_iterator iter_end = target.end();
+      for (symbol_set_type::const_iterator iter = target.begin(); iter != iter_end; ++ iter)
+	num_terminals += iter->is_terminal();
+      
+      alpha += num_terminals * titer->second.size_customer();
+      beta += titer->second.size_customer();
+    }
+    
+    length_target.sample_parameters(alpha, beta, sampler);
   }
   
   template <typename Sampler>
@@ -538,7 +639,7 @@ struct PYPGraph
     span_set_type            antecedent;
     logprob_type             prob;
     
-    edge_type() {}
+    edge_type() : edge(), target(), antecedent(), prob() {}
     edge_type(const hypergraph_type::id_type& __edge,
 	      const symbol_set_type& __target,
 	      const span_set_type& __antecedent,
@@ -548,8 +649,57 @@ struct PYPGraph
   
   typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
   
+  struct span_edge_map_type
+  {
+    typedef utils::indexed_set<span_type, boost::hash<span_type>, std::equal_to<span_type>, std::allocator<span_type> > index_type;
+    typedef utils::chunk_vector<edge_set_type, 4096/sizeof(edge_set_type), std::allocator<edge_set_type> > mapped_type;
+    
+    struct value_type
+    {
+      value_type(const span_type& __first, const edge_set_type& __second) : first(__first), second(__second) {}
+      const span_type&     first;
+      const edge_set_type& second;
+    };
+    
+    typedef index_type::const_iterator const_iterator;
+    
+    const_iterator find(const span_type& span) const
+    {
+      return index.find(span);
+    }
+
+    const_iterator begin() const { return index.begin(); }
+    const_iterator end() const { return index.end(); }
+    
+    bool empty() const { return mapped.empty(); }
+    size_type size() const { return mapped.size(); }
+    
+    edge_set_type& operator[](const span_type& span)
+    {
+      index_type::iterator iter = index.insert(span).first;
+      
+      if (index.size() > mapped.size())
+	mapped.resize(index.size());
+      
+      return mapped[iter - index.begin()];
+    }
+    
+    value_type operator[](const size_type& pos) const
+    {
+      return value_type(index[pos], mapped[pos]);
+    }
+
+    span_edge_map_type() : index(), mapped() {}
+    
+    
+    index_type  index;
+    mapped_type mapped;
+  };
+  
+#if 0
   typedef utils::indexed_map<span_type, edge_set_type, boost::hash<span_type>, std::equal_to<span_type>,
 			     std::allocator<std::pair<span_type, edge_set_type> > > span_edge_map_type;
+#endif
   typedef std::vector<span_edge_map_type, std::allocator<span_edge_map_type> > span_edge_chart_type;
 
   typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
@@ -557,38 +707,34 @@ struct PYPGraph
   
   void initialize(const hypergraph_type& source, const sentence_type& target, const PYPSynAlign& synalign)
   {
-    std::cerr << "source nodes: " << source.nodes.size() << " edges: " << source.edges.size() << std::endl
-	      << "targets: " << target.size() << std::endl;
-    
     edges.clear();
+    edges.reserve(source.nodes.size());
     edges.resize(source.nodes.size(), span_edge_map_type());
 
     beta.clear();
+    beta.reserve(source.nodes.size());
     beta.resize(source.nodes.size(), beta_type(target.size() + 1));
 
     // phrasal log-probabilities
     logprob_targets.clear();
+    logprob_targets.reserve(target.size());
     logprob_targets.resize(target.size() + 1, 0.0);
     
     for (size_type first = 0; first != target.size(); ++ first)
-      for (size_type last = first + 1; last <= target.size(); ++ last) {
-	std::cerr << "phrase span: " << first << "..." << last << std::endl;
-	
+      for (size_type last = first + 1; last <= target.size(); ++ last)
 	logprob_targets(first, last) = logprob_targets(first, last - 1) + synalign.unigram_target(target[last - 1]);
-      }
     
     // length log-probabilities
     logprob_lengths.clear();
+    logprob_lengths.reserve(target.size() + 1);
     logprob_lengths.resize(target.size() + 1);
     
-    for (size_type i = 0; i <= target.size(); ++ i) {
+    for (size_type i = 0; i <= target.size(); ++ i)
       logprob_lengths[i] = synalign.length_target(i);
-      
-      std::cerr << "length logprob: " << i << " " << logprob_lengths[i] << std::endl;
-    }
     
     // rule-string...
     rule_strings.clear();
+    rule_strings.reserve(target.size() + 1);
     rule_strings.resize(target.size() + 1);
   }
   
@@ -601,6 +747,9 @@ struct PYPGraph
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
     
+    if (span.first >= sentence.size() || span.last > sentence.size() || span.first > span.last)
+      throw std::runtime_error("invalid span");
+    
     rule_string_cache_type& cache = rule_strings(span.first, span.last);
     
     rule_string_cache_type::iterator iter = cache.find(antecedent);
@@ -612,9 +761,10 @@ struct PYPGraph
 	span_index_set_type span_index;
 	
 	span_index.reserve(antecedent.size());
-	span_set_type::const_iterator aiter_end = antecedent.end();
-	for (span_set_type::const_iterator aiter = antecedent.begin(); aiter != aiter_end; ++ aiter)
-	  span_index.push_back(std::make_pair(*aiter, aiter - antecedent.begin()));
+	span_set_type::const_iterator aiter_begin = antecedent.begin();
+	span_set_type::const_iterator aiter_end   = antecedent.end();
+	for (span_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  span_index.push_back(std::make_pair(*aiter, aiter - aiter_begin));
 
 	std::sort(span_index.begin(), span_index.end());
 	
@@ -622,6 +772,9 @@ struct PYPGraph
 	span_index_set_type::const_iterator siter_end = span_index.end();
 	for (span_index_set_type::const_iterator siter = span_index.begin(); siter != siter_end; ++ siter) {
 	  if (! siter->first.empty()) {
+	    if (siter->first.first < pos)
+	      throw std::runtime_error("ivnalid antecedent span");
+
 	    buffer.insert(buffer.end(), sentence.begin() + pos, sentence.begin() + siter->first.first);
 	    buffer.push_back(vocab_type::X.non_terminal(siter->second + 1));
 	    
@@ -629,6 +782,9 @@ struct PYPGraph
 	  } else
 	    buffer.push_back(vocab_type::X.non_terminal(siter->second + 1));
 	}
+	
+	if (span.last < pos)
+	  throw std::runtime_error("invalid antecedent span");
 	
 	buffer.insert(buffer.end(), sentence.begin() + pos, sentence.begin() + span.last);
 	
@@ -647,6 +803,8 @@ struct PYPGraph
     initialize(source, target, synalign);
 
     span_set_type antecedent;
+    index_set_type j;
+    index_set_type j_ends;
 
     hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -654,21 +812,20 @@ struct PYPGraph
       
       const size_type pos = node.id;
 
-      std::cerr << "node pos: " << pos << std::endl;
-      
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = source.edges[*eiter];
 
 	const double logprob_source = synalign.pcfg_source(edge.rule);
 
-	std::cerr << "rule: " << *edge.rule << " logprob: " << logprob_source << std::endl;
+	antecedent.resize(edge.tails.size());
+	j.resize(edge.tails.size());
+	j_ends.resize(edge.tails.size());
 	
-	index_set_type j_ends(edge.tails.size(), 0);
-	index_set_type j(edge.tails.size(), 0);
-	
-	for (size_type i = 0; i != edge.tails.size(); ++ i)
+	for (size_type i = 0; i != edge.tails.size(); ++ i) {
 	  j_ends[i] = edges[edge.tails[i]].size();
+	  j[i]= 0;
+	}
 	
 	for (;;) {
 	  span_type span(target.size(), 0);
@@ -676,31 +833,32 @@ struct PYPGraph
 	  logprob_type prob_antecedent = cicada::semiring::traits<logprob_type>::one();
 	  double logprob_hole = 0.0;
 	  
-	  antecedent.clear();
 	  bool valid = true;
 	  for (size_t i = 0; i != edge.tails.size() && valid; ++ i) {
-	    const span_type& span_antecedent = edges[edge.tails[i]][j[i]].first;
+	    antecedent[i] = edges[edge.tails[i]][j[i]].first;
 	    
-	    if (span_antecedent.empty()) continue;
+	    const span_type& span_antecedent = antecedent[i];
 	    
-	    for (size_t prev = 0; prev != i && valid; ++ prev)
-	      valid = disjoint(span_antecedent, edges[edge.tails[prev]][j[prev]].first);
-	    
-	    span.first = utils::bithack::min(span.first, span_antecedent.first);
-	    span.last  = utils::bithack::max(span.last,  span_antecedent.last);
-	    total_hole += span_antecedent.size();
-	    logprob_hole += logprob_targets(span_antecedent.first, span_antecedent.last);
-	    
-	    antecedent.push_back(span_antecedent);
-	    
-	    prob_antecedent *= beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
+	    if (span_antecedent.empty())
+	      prob_antecedent *= beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
+	    else {
+	      for (size_t prev = 0; prev != i && valid; ++ prev)
+		valid = disjoint(span_antecedent, edges[edge.tails[prev]][j[prev]].first);
+	      
+	      if (! valid) break;
+	      
+	      span.first = utils::bithack::min(span.first, span_antecedent.first);
+	      span.last  = utils::bithack::max(span.last,  span_antecedent.last);
+	      
+	      total_hole += span_antecedent.size();
+	      logprob_hole += logprob_targets(span_antecedent.first, span_antecedent.last);
+	      
+	      prob_antecedent *= beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
+	    }
 	  }
 	  
 	  if (valid) {
-	    
 	    if (span.first == target.size() && span.last == 0) {
-	      std::cerr << "phrasal pair or empty antecedents" << std::endl;
-	      
 	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), size_type(0));
 	      const size_type span_length_max = utils::bithack::min(target.size(), terminal_max);
 	      
@@ -708,38 +866,28 @@ struct PYPGraph
 		const size_type span_first_max = (span_length != 0) * (target.size() - span_length);
 		for (size_type span_first = 0; span_first <= span_first_max; ++ span_first) {
 		  const size_type span_last = span_first + span_length;
-
-		  
-		  std::cerr << "phrase span: " << span_first << "..." << span_last << std::endl;
-
-		  const double logprob_terminal = logprob_targets(span_first, span_last);
-
-		  std::cerr << "logprob terminals: " << logprob_terminal << std::endl;
-		  
 		  const size_type terminal_size = span_length;
-		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
-
-		  std::cerr << "logprob non-temrinals: " << logprob_non_terminal << std::endl;
 		  
-		  std::cerr << "logprob length: " << logprob_lengths[terminal_size] << std::endl;
-		  
-		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
-		  
-		  std::cerr << "prior: " << logprob_prior << std::endl;
+		  // ITG-lie!
+		  if (! antecedent.empty() && terminal_size) continue;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
+		  const double logprob_terminal = logprob_targets(span_first, span_last);
+		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
+		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
+		  
 		  const logprob_type prob = (prob_antecedent
 					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
+
+		  //std::cerr << "phrase: " << *edge.rule << " span: " << span_first << "..." << span_last << " target: " << target_string << " prob: " << prob << " terminal: " << terminal_size << std::endl;
 		  
 		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  
 		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
 	      }
 	    } else {
-	      std::cerr << "antecedents pair" << std::endl;
-	      std::cerr << "span: " << span.first << "..." << span.last << " hole: " << total_hole << std::endl;
-
 	      const size_type terminal_hole_size = span.size() - total_hole;
 	      const difference_type terminal_span_size = terminal_max - terminal_hole_size;
 	      
@@ -754,33 +902,30 @@ struct PYPGraph
 	      // span_last - span_first < span_length_max
 	      //
 	      
-	      const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.last) - difference_type(span_length_max));
-	      
-	      for (size_type span_first = span_first_min; span_first <= span.first; ++ span_first) {
-		const size_type span_last_max = utils::bithack::min(target.size(), span.first + span_length_max);
+	      for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
+		const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.last) - difference_type(span_length));
+		const size_type span_first_max = utils::bithack::min(span.first, target.size() - span_length);
 		
-		for (size_type span_last = span.last ; span_last <= span_last_max; ++ span_last) {
-		  const size_type span_length = span_last - span_first;
+		for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
+		  const size_type span_last = span_first + span_length;
+		  const size_type terminal_size = span_length - total_hole;
 		  
-		  std::cerr << "\tparent-span: " << span_first << "..." << span_last << std::endl;
-		  
-		  const double logprob_terminal = logprob_targets(span_first, span_last) - logprob_hole;
-		  
-		  const size_type terminal_size = span_length - terminal_hole_size;
-		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
-		  
-		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
-
-		  std::cerr << "\tprior: " << logprob_prior << std::endl;
+		  // ITG-lie!
+		  if (terminal_size) continue;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
-
-		  std::cerr << "\ttarget string: " << target_string << std::endl;
+		  
+		  const double logprob_terminal = logprob_targets(span_first, span_last) - logprob_hole;
+		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
+		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
 		  
 		  const logprob_type prob = (prob_antecedent
 					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
 		  
+		  //std::cerr << "rule: " << *edge.rule << " span: " << span_first << "..." << span_last << " target: " << target_string << " prob: " << prob << " terminal: " << terminal_size << std::endl;
+		  
 		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  
 		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
 	      }
@@ -805,7 +950,7 @@ struct PYPGraph
 
   // backward sampling
   template <typename Sampler>
-  logprob_type outside(const hypergraph_type& source, const sentence_type& target, Sampler& sampler, derivation_type& derivation)
+  logprob_type outside(const hypergraph_type& source, const sentence_type& target, Sampler& sampler, derivation_type& derivation, const double temperature)
   {
     typedef std::pair<hypergraph_type::id_type, span_type> value_type;
     typedef std::vector<value_type, std::allocator<value_type> > stack_type;
@@ -828,12 +973,13 @@ struct PYPGraph
 	return logprob_type();
       }
 
-      const edge_set_type& edges = miter->second;
+      //const edge_set_type& edges_mapped = miter->second;
+      const edge_set_type& edges_mapped = edges[value.first][miter - edges[value.first].begin()].second;
 
       logprob_type logsum;
       logprobs.clear();
-      edge_set_type::const_iterator eiter_end = edges.end();
-      for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+      edge_set_type::const_iterator eiter_end = edges_mapped.end();
+      for (edge_set_type::const_iterator eiter = edges_mapped.begin(); eiter != eiter_end; ++ eiter) {
 	logprobs.push_back(eiter->prob);
 	logsum += eiter->prob;
       }
@@ -843,16 +989,16 @@ struct PYPGraph
       for (logprob_set_type::const_iterator liter = logprobs.begin(); liter != liter_end; ++ liter)
 	probs.push_back(*liter / logsum);
       
-      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end());
+      prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       const size_type pos = piter - probs.begin();
       
-      derivation.push_back(rule_pair_type(source.edges[edges[pos].edge].rule, edges[pos].target));
-      prob_derivation *= edges[pos].prob;
+      derivation.push_back(rule_pair_type(source.edges[edges_mapped[pos].edge].rule, edges_mapped[pos].target));
+      prob_derivation *= edges_mapped[pos].prob;
       
-      if (! source.edges[edges[pos].edge].tails.empty())
-	for (difference_type i = source.edges[edges[pos].edge].tails.size() - 1; i >= 0; -- i)
-	  stack.push_back(std::make_pair(source.edges[edges[pos].edge].tails[i],
-					 edges[pos].antecedent[i]));
+      if (! source.edges[edges_mapped[pos].edge].tails.empty())
+	for (difference_type i = source.edges[edges_mapped[pos].edge].tails.size() - 1; i >= 0; -- i)
+	  stack.push_back(std::make_pair(source.edges[edges_mapped[pos].edge].tails[i],
+					 edges_mapped[pos].antecedent[i]));
     }
     
     return prob_derivation;
@@ -921,6 +1067,8 @@ double strength_prior_rate  = 1.0;
 
 // target string length...
 double lambda = 0.5;
+double lambda_alpha = 1.0;
+double lambda_beta  = 1.0;
 
 int threads = 1;
 int debug = 0;
@@ -963,7 +1111,7 @@ int main(int argc, char ** argv)
     
     PCFGModel    pcfg_source(sources.begin(), sources.end());
     UnigramModel unigram_target(targets.begin(), targets.end());
-    LengthModel  length_target(lambda);
+    LengthModel  length_target(lambda, lambda_alpha, lambda_beta);
 
     PYPSynAlign  synalign(pcfg_source, unigram_target, length_target,
 			  discount,
@@ -975,9 +1123,11 @@ int main(int argc, char ** argv)
 
     
     derivation_set_type derivations(sources.size());
-    position_set_type positions(sources.size());
+    position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
-      positions[i] = i;
+      if (sources[i].is_valid() && ! targets[i].empty())
+	positions.push_back(i);
+    position_set_type(positions).swap(positions);
     
     sampler_type sampler;
     
@@ -990,6 +1140,8 @@ int main(int argc, char ** argv)
     if (debug >= 2)
       std::cerr << "discount=" << synalign.table.discount()
 		<< " strength=" << synalign.table.strength()
+	//<< " lambda=" << synalign.pcfg_source.lambda
+		<< " lambda=" << synalign.length_target.lambda
 		<< std::endl;
     
     PYPGraph graph;
@@ -1042,8 +1194,6 @@ int main(int argc, char ** argv)
       for (size_t i = 0; i != positions.size(); ++ i) {
 	const size_t pos = positions[i];
 	
-	if (! sources[pos].is_valid() || targets[pos].empty()) continue;
-	
 	if (debug >= 3)
 	  std::cerr << "training=" << pos << std::endl;
 	
@@ -1055,7 +1205,7 @@ int main(int argc, char ** argv)
 	
 	const PYPGraph::logprob_type logsum = graph.inside(sources[pos], targets[pos], synalign, max_terminal);
 	
-	const PYPGraph::logprob_type logderivation = graph.outside(sources[pos], targets[pos], sampler, derivations[pos]);
+	const PYPGraph::logprob_type logderivation = graph.outside(sources[pos], targets[pos], sampler, derivations[pos], temperature);
 	
 	if (debug >= 3) {
 	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
@@ -1069,6 +1219,24 @@ int main(int argc, char ** argv)
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  synalign.increment(*diter, sampler, temperature);
       }
+      
+      if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
+	if (slice_sampling)
+	  synalign.slice_sample_parameters(sampler, resample_iterations);
+	else
+	  synalign.sample_parameters(sampler, resample_iterations);
+	
+	if (debug >= 2)
+	  std::cerr << "discount=" << synalign.table.discount()
+		    << " strength=" << synalign.table.strength()
+	    //<< " lambda=" << synalign.pcfg_source.lambda
+		    << " lambda=" << synalign.length_target.lambda
+		    << std::endl;
+      }
+      
+      if (debug)
+	std::cerr << "log-likelihood: " << synalign.log_likelihood() << std::endl;
+	    
     }
 
   }
@@ -1079,41 +1247,16 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct rule_ptr_hash
-{
-  bool operator()(const rule_ptr_type& x) const
-  {
-    return hash_value(*x);
-  }
-};
-
-struct rule_ptr_equal
-{
-  bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
-  {
-    return *x == *y;
-  }
-};
 
 void read_data(const path_type& path, hypergraph_set_type& graphs)
 {
-  typedef utils::unordered_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal, std::allocator<rule_ptr_type> >::type rule_set_type;
-  
   graphs.clear();
   
   utils::compress_istream is(path, 1024 * 1024);
   
-  rule_set_type rules;
   hypergraph_type graph;
-  while (is >> graph) {
-#if 0
-    hypergraph_type::edge_set_type::iterator eiter_end = graph.edges.end();
-    for (hypergraph_type::edge_set_type::iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
-      eiter->rule = *(rules.insert(eiter->rule).first);
-#endif
-    
+  while (is >> graph)
     graphs.push_back(graph);
-  }
   
   // uniquify rules...
 }

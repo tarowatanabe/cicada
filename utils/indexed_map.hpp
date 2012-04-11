@@ -56,7 +56,12 @@ namespace utils
     inline const value_type& operator[](index_type x) const { return impl[x]; }
     inline       value_type& operator[](index_type x)       { return impl[x]; }
 
-    inline       mapped_type& operator[](const key_type& x) { return const_cast<mapped_type&>(insert(std::make_pair(x, mapped_type())).first->second); }
+    inline       mapped_type& operator[](const key_type& x)
+    {
+      iterator iter = insert(std::make_pair(x, mapped_type())).first;
+      
+      return impl[iter - begin()].second;
+    }
     
     const_iterator begin() const { return impl.begin(); }
     const_iterator end() const { return impl.end(); }

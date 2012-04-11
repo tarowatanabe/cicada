@@ -36,6 +36,7 @@ bitpack_main
 bit_vector_main
 byte_aligned_code_main
 byte_aligned_vector_main
+chart_main
 chunk_vector_main
 compress_stream_main
 dense_map_main
