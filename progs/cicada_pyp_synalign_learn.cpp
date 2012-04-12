@@ -1342,10 +1342,20 @@ struct Task
       if (pos == size_type(-1)) break;
 
       derivations_prev[pos]  = derivations[pos];
+
+      if (! derivations_prev[pos].empty()) {
+	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
+	  model.decrement(*diter, sampler);
+      }
       
       graph.inside(sources[pos], targets[pos], model, max_terminal);
       
       graph.outside(sources[pos], targets[pos], sampler, derivations[pos], temperature);
+      
+      derivation_type::const_iterator diter_end = derivations[pos].end();
+      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	model.increment(*diter, sampler, temperature);
       
       reducer.push(pos);
     }
@@ -1359,8 +1369,8 @@ struct Task
   derivation_set_type& derivations;
   derivation_set_type& derivations_prev;
   
-  const PYPSynAlign& model;
-  sampler_type  sampler;
+  PYPSynAlign  model;
+  sampler_type sampler;
   int max_terminal;
   
   double temperature;
@@ -1523,7 +1533,6 @@ int main(int argc, char ** argv)
 		<< "fertility: discount=" << synalign.fertility.fallback.discount() << " strength=" << synalign.fertility.fallback.strength() << std::endl
 		<< "distortion: discount=" << synalign.distortion.fallback.discount() << " strength=" << synalign.distortion.fallback.strength() << std::endl;
     
-    PYPSynAlign synalign_cache(synalign);
     PYPGraph graph;
     
     Task::queue_type queue_mapper;
@@ -1535,7 +1544,7 @@ int main(int argc, char ** argv)
 								 targets,
 								 derivations,
 								 derivations_prev,
-								 synalign_cache,
+								 synalign,
 								 sampler,
 								 max_terminal));
     
@@ -1584,9 +1593,10 @@ int main(int argc, char ** argv)
       }
 
       // assign temperature... and current model
-      synalign_cache = synalign;
-      for (size_type i = 0; i != tasks.size(); ++ i)
+      for (size_type i = 0; i != tasks.size(); ++ i) {
+	tasks[i].model = synalign;
 	tasks[i].temperature = temperature;
+      }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
