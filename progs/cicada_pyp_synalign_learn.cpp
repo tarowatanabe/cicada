@@ -36,6 +36,7 @@
 #include <cicada/tree_rule_compact.hpp>
 #include <cicada/rule.hpp>
 
+#include "utils/pyp_parameter.hpp"
 #include "utils/alloc_vector.hpp"
 #include "utils/chart.hpp"
 #include "utils/chunk_vector.hpp"
@@ -47,9 +48,11 @@
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/restaurant.hpp"
+#include "utils/restaurant_vector.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_map.hpp"
+#include "utils/dense_hash_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
@@ -85,303 +88,500 @@ typedef rule_type::symbol_set_type symbol_set_type;
 // Thus, it is possible to induce a synchronous-CFG by mapping non-temrinal symbols to the string-side
 // Or, keep them separate like a synchronous-TSG.
 //
+// our approach: use of hierarchical structure: IBM Model 1 like probability computation when back-off
+// 
+// TODO:
+// How to handle distortion represented by the ordering in [x,3] etc.
+//
 
-// unigram model
-struct UnigramModel
+struct PYPLexicon
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  typedef std::vector<double, std::allocator<double> > table_type;
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
   
-  template <typename Iterator>
-  UnigramModel(Iterator first, Iterator last) : table(), smooth(-60) {  learn(first, last); }
-  UnigramModel() : table(), smooth(-60) { }
-  
-  template <typename Iterator>
-  void learn(Iterator first, Iterator last)
+  typedef utils::pyp_parameter parameter_type;
+
+  struct word_pair_type
   {
-    typedef std::vector<size_type, std::allocator<size_type> > counts_type;
-
-    counts_type counts;
-    for (/**/; first != last; ++ first)
-      learn(first->begin(), first->end(), counts);
+    word_type source;
+    word_type target;
     
-    double total = 0.0;
-    size_type vocab = 0;
-    typename counts_type::const_iterator citer_end = counts.end();
-    for (typename counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-      total += *citer;
-      vocab += (*citer != 0);
-    }
+    word_pair_type() : source(), target() {}
+    word_pair_type(const word_type& __source, const word_type& __target)
+      : source(__source), target(__target) {}
     
-    smooth = utils::mathop::log(1.0 / vocab);
-    
-    table.clear();
-    table.reserve(counts.size());
-    table.resize(counts.size(), smooth);
-
-    // a simple add-one smoothing
-    
-    const double denom = total + vocab;
-    
-    table_type::iterator titer = table.begin();
-    for (typename counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ titer)
-      if (*citer)
-	*titer = utils::mathop::log((1.0 + *citer) / denom);
-  }
-
-  template <typename Iterator, typename Counts>
-  void learn(Iterator first, Iterator last, Counts& counts)
-  {
-    for (/**/; first != last; ++ first) {
-      const symbol_type::id_type id = symbol_type(*first).id();
-      
-      if (id >= counts.size())
-	counts.resize(id + 1, 0);
-      
-      ++ counts[id];
-    }
-  }
-  
-  
-  double operator()(const symbol_type& x) const
-  {
-    return (x.id() >= table.size() ? smooth : table[x.id()]);
-    //return smooth;
-  }
-  
-  table_type table;
-  double smooth;
-};
-
-// IBM Model 1
-struct LexiconModel
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  struct table_type : public utils::dense_hash_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
-						   std::allocator<std::pair<const word_type, double> > >::type
-  {
-    typedef utils::dense_hash_map<word_type, double, boost::hash<word_type>, std::equal_to<word_type>,
-				  std::allocator<std::pair<const word_type, double> > >::type mapped_type;
-
-    table_type() { mapped_type::set_empty_key(word_type()); }
-  };
-  
-  typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
-  
-  template <typename IteratorSource, typename IteratorTarget>
-  void learn(IteratorSource source_first, IteratorSource source_last,
-	     IteratorTarget target_first, IteratorTarget target_last)
-  {
-    
-    
-    
-    
-  }
-  
-  double operator()(const word_type& source, const word_type& target) const
-  {
-    if (! tables.exists(source.id()))
-      return smooth;
-
-    const table_type& table = tables[source.id()];
-    
-    table_type::const_iterator titer = table.find(target);
-    return (titer == table.end() ? smooth : titer->second);
-  }
-  
-  table_set_type tables;
-  double smooth;
-};
-
-// PCFG model
-struct PCFGModel
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  struct rule_hash
-  {
-    size_t operator()(const rule_type* x) const
+    friend
+    bool operator==(const word_pair_type& x, const word_pair_type& y)
     {
-      return (x ? hash_value(*x) : size_t(0));
+      return x.source == y.source && x.target == y.target;
     }
-  };
-  
-  struct rule_equal
-  {
-    bool operator()(const rule_type* x, const rule_type* y) const
+    
+    friend
+    size_t hash_value(word_pair_type const& x)
     {
-      return (x == y) || (x && y && *x == *y);
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.source.id(), x.target.id());
     }
   };
   
-  typedef utils::unordered_map<const rule_type*, double, rule_hash, rule_equal,
-			       std::allocator<std::pair<const rule_type*, double> > >::type table_type;
-  
-  template <typename Iterator>
-  PCFGModel(Iterator first, Iterator last) : table(), smooth(-60), lambda(0.5) { learn(first, last); }
-  PCFGModel() : table(), smooth(-60), lambda(0.5) { }
+  typedef utils::restaurant<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>, std::allocator<word_pair_type > > table_type;
 
-  typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
+  PYPLexicon(const double& __p0,
+	     const parameter_type& parameter)
+    : p0(__p0),
+      counts0(0),
+      table(parameter) {}
   
-  template <typename Iterator>
-  void learn(Iterator first, Iterator last)
+  template <typename Sampler>
+  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    typedef utils::unordered_map<const rule_type*, size_type, rule_hash, rule_equal,
-				 std::allocator<std::pair<const rule_type*, size_type> > >::type count_type;
-    typedef utils::unordered_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				 std::allocator<std::pair<const symbol_type, count_type> > >::type count_set_type;
+    // TODO: we assume penntreebank-style tree...
     
-    count_set_type counts;
-
-    size_type alpha = 0;
-    size_type beta = 0;
+    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
+			   ? source->rhs.front()
+			   : vocab_type::EPSILON);
     
-    for (/**/; first != last; ++ first) {
-      const hypergraph_type& graph = *first;
-      
-      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = *eiter;
-	const rule_type* rule = edge.rule.get();
+    size_type num_terminals = 0;
+    symbol_set_type::const_iterator titer_end = target.end();
+    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      if (titer->is_terminal()) {
+	if (table.increment(word_pair_type(src, *titer), p0, sampler, temperature))
+	  ++ counts0;
 	
-	++ counts[rule->lhs][rule];
-
-	if (rule->rhs.size() != 1 || rule->rhs.front().is_non_terminal()) {
-	  alpha += rule->rhs.size();
-	  ++ beta;
-	}
+	++ num_terminals;
       }
-    }
     
-    lambda = double(alpha) / (alpha + beta);
+    if (! num_terminals)
+      if (table.increment(word_pair_type(src, vocab_type::EPSILON), p0, sampler, temperature))
+	++ counts0;
+  }
 
-    table.clear();
+  template <typename Sampler>
+  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
+  {
+    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
+			   ? source->rhs.front()
+			   : vocab_type::EPSILON);
     
-    // a simple add-one smoothing...
-    size_type observed = 0;
+    size_type num_terminals = 0;
+    symbol_set_type::const_iterator titer_end = target.end();
+    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      if (titer->is_terminal()) {
+	if (table.decrement(word_pair_type(src, *titer), sampler))
+	  -- counts0;
+	
+	++ num_terminals;
+      }
     
-    typename count_set_type::const_iterator siter_end = counts.end();
-    for (typename count_set_type::const_iterator siter = counts.begin(); siter != siter_end; ++ siter) {
-      observed += siter->second.size();
-      
-      size_type total = 0;
-      typename count_type::const_iterator citer_end = siter->second.end();
-      for (typename count_type::const_iterator citer = siter->second.begin(); citer != citer_end; ++ citer)
-	total += citer->second;
-      
-      const double denom = total + siter->second.size();
-      for (typename count_type::const_iterator citer = siter->second.begin(); citer != citer_end; ++ citer)
-	table[citer->first] = utils::mathop::log((1.0 + citer->second) / denom);
-    }
-    
-    smooth = utils::mathop::log(1.0 / observed);
-    
-    for (size_type size = 0; size != cache.size(); ++ size)
-      cache[size] = utils::mathop::log_geometric(size, lambda);
+    if (! num_terminals)
+      if (table.decrement(word_pair_type(src, vocab_type::EPSILON), sampler))
+	-- counts0;
   }
   
-  double operator()(const rule_ptr_type& x) const
+  double prob(const rule_type* source, const symbol_set_type& target) const
   {
-    return operator()(x.get());
-  }
-  
-  double operator()(const rule_type* x) const
-  {
-#if 0
-    const size_type size = x->rhs.size();
-    if (size == 1 && x->rhs.front().is_terminal())
-      return 0.0;
-    else
-      return (size < cache.size() ? cache[size] : utils::mathop::log_geometric(size, lambda));
-#endif
+    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
+			   ? source->rhs.front()
+			   : vocab_type::EPSILON);
+
+    double p = 1.0;
     
-#if 1
-    table_type::const_iterator iter = table.find(x);
-    return (iter != table.end() ? iter->second : smooth);
-#endif
+    size_type num_terminals = 0;
+    symbol_set_type::const_iterator titer_end = target.end();
+    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      if (titer->is_terminal()) {
+	p *= table.prob(word_pair_type(src, *titer), p0);
+	++ num_terminals;
+      }
+    
+    if (! num_terminals)
+      p *= table.prob(word_pair_type(src, vocab_type::EPSILON), p0);
+    
+    return p;
   }
   
-  table_type table;
-  double smooth;
-  
-  cache_type cache;
-  double lambda;
-};
-
-struct LengthModel
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
-  
-  LengthModel(const double& __lambda, const double& __lambda_alpha, const double& __lambda_beta)
-    : lambda(__lambda),
-      lambda_alpha(__lambda_alpha),
-      lambda_beta(__lambda_beta)
-  { initialize(lambda); }
-
-  double operator()(const size_type size) const
+  double log_likelihood() const
   {
-    return (size < cache.size() ? cache[size] : utils::mathop::log_geometric(size, lambda));
+    return table.log_likelihood() + std::log(p0) * counts0;
+  }
+  
+  double log_likelihood(const double& discount, const double& strength) const
+  {
+    if (strength <= - discount) return - std::numeric_limits<double>::infinity();
+    
+    return table.log_likelihood(discount, strength);
   }
   
   template <typename Sampler>
-  void sample_parameters(const double alpha, const double beta, Sampler& sampler)
+  void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    initialize(sampler.beta(alpha + lambda_alpha, beta + lambda_beta));
+    table.sample_parameters(sampler, num_loop, num_iterations);
   }
   
-  void initialize(const double& __lambda)
+  template <typename Sampler>
+  void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    cache.clear();
-    lambda = __lambda;
-    
-    for (size_type size = 0; size != cache.size(); ++ size)
-      cache[size] = utils::mathop::log_geometric(size, lambda);
+    table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
+
   
-  cache_type cache;
-  
-  double lambda;
-  double lambda_alpha;
-  double lambda_beta;
+  double p0;
+  size_type counts0;
+  table_type table;
 };
 
-struct NonTerminalModel
+struct PYPFertility
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+  
+  typedef utils::pyp_parameter parameter_type;
+  
+  typedef utils::restaurant_vector< > table_type;
+  typedef utils::unordered_map<symbol_type, table_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, table_type> > >::type table_set_type;
+  
+  PYPFertility(const parameter_type& __parameter)
+    : p0(1.0 / 10), // heuristic...
+      counts0(0),
+      fallback(__parameter),
+      tables(),
+      parameter(__parameter) {}
 
-  NonTerminalModel()
+  template <typename Sampler>
+  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    cache[0] = - std::numeric_limits<double>::infinity();
+    const size_type num_terminals = target.size() - target.arity();
     
-    for (size_type size = 1; size != cache.size(); ++ size)
-      cache[size] = utils::mathop::log(1.0 / size);
+    table_set_type::iterator titer = tables.find(source->lhs);
+    if (titer == tables.end())
+      titer = tables.insert(std::make_pair(source->lhs, table_type(parameter.discount, parameter.strength))).first;
+    
+    if (titer->second.increment(num_terminals, fallback.prob(num_terminals, p0), sampler, temperature))
+      if (fallback.increment(num_terminals, p0, sampler, temperature))
+	++ counts0;
   }
 
-  double operator()(const size_type size) const
+  template <typename Sampler>
+  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
   {
-    return (size < cache.size() ? cache[size] : utils::mathop::log(1.0 / size));
+    const size_type num_terminals = target.size() - target.arity();
+    
+    if (tables[source->lhs].decrement(num_terminals, sampler))
+      if (fallback.decrement(num_terminals, sampler))
+	-- counts0;
   }
-
-  double operator()(const size_type size, const size_type num) const
+  
+  double prob(const rule_type* source, const symbol_set_type& target) const
   {
-    double logprob = 0.0;
-    for (size_type i = size; i != size + num; ++ i)
-      logprob += operator()(i + 1);
+    const size_type num_terminals = target.size() - target.arity();
+    
+    const double p = fallback.prob(num_terminals, p0);
+    
+    table_set_type::const_iterator titer = tables.find(source->lhs);
+    
+    return (titer != tables.end() ? titer->second.prob(num_terminals, p) : p);
+  }
+  
+  double log_likelihood() const
+  {
+    double logprob = std::log(p0) * counts0;
+    
+    logprob += fallback.log_likelihood();
+    
+    logprob += parameter.log_likelihood();
+    table_set_type::const_iterator titer_end = tables.end();
+    for (table_set_type::const_iterator titer = tables.begin(); titer != titer_end; ++ titer)
+      logprob += titer->second.log_likelihood();
+    
     return logprob;
   }
   
-  cache_type cache;
+  template <typename Sampler>
+  void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    fallback.sample_parameters(sampler, num_loop, num_iterations);
+    
+    for (int iter = 0; iter != num_loop; ++ iter) {
+      parameter.discount = sample_discount(tables.begin(), tables.end(), sampler, parameter);
+      parameter.strength = sample_strength(tables.begin(), tables.end(), sampler, parameter);
+    }
+    
+    table_set_type::iterator titer_end = tables.end();
+    for (table_set_type::iterator titer = tables.begin(); titer != titer_end; ++ titer) {
+      titer->second.discount() = parameter.discount;
+      titer->second.strength() = parameter.strength;
+    }
+  }
+  
+  // we do not support slice-sample-parameters for simplicity...
+  template <typename Sampler>
+  void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    sample_parameters(sampler, num_loop, num_iterations);
+  }
+  
+
+  template <typename Iterator, typename Sampler>
+  double sample_strength(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double x = 0.0;
+    double y = 0.0;
+    
+    for (/**/; first != last; ++ first) {
+      x += first->second.sample_log_x(sampler, param.discount, param.strength);
+      y += first->second.sample_y(sampler, param.discount, param.strength);
+    }
+    
+    return sampler.gamma(param.strength_shape + y, param.strength_rate - x);
+  }
+  
+  template <typename Iterator, typename Sampler>
+  double sample_discount(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double y = 0.0;
+    double z = 0.0;
+    
+    for (/**/; first != last; ++ first) {
+      y += first->second.sample_y_inv(sampler, param.discount, param.strength);
+      z += first->second.sample_z_inv(sampler, param.discount, param.strength);
+    }
+    
+    return sampler.beta(param.discount_alpha + y, param.discount_beta + z);
+  }
+  
+  double         p0;
+  size_type      counts0;
+  table_type     fallback;
+  table_set_type tables;
+  parameter_type parameter;
+};
+
+struct PYPDistortion
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+  
+  typedef utils::pyp_parameter parameter_type;
+
+  struct distortion_type
+  {
+    symbol_type non_terminal;
+    int         distortion;
+    
+    distortion_type() : non_terminal(), distortion() {}
+    distortion_type(const symbol_type& __non_terminal, const int& __distortion)
+      : non_terminal(__non_terminal), distortion(__distortion) {}
+    
+    friend
+    bool operator==(const distortion_type& x, const distortion_type& y)
+    {
+      return x.non_terminal == y.non_terminal && x.distortion == y.distortion;
+    }
+    
+    friend
+    size_t hash_value(distortion_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.non_terminal.id(), x.distortion);
+    }
+  };
+  
+  typedef utils::restaurant<distortion_type, boost::hash<distortion_type>, std::equal_to<distortion_type>, std::allocator<distortion_type > > table_type;
+  typedef utils::unordered_map<symbol_type, table_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, table_type> > >::type table_set_type;
+  
+  PYPDistortion(const parameter_type& __parameter)
+    : p0(1.0 / 3), // heuristic...
+      counts0(0),
+      fallback(__parameter),
+      tables(),
+      parameter(__parameter) {}
+
+  template <typename Sampler>
+  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
+  {
+    if (source->rhs.size() == 1 && source->rhs.front().is_terminal()) return;
+    
+    symbol_set_type::const_iterator titer_begin = target.begin();
+    symbol_set_type::const_iterator titer_end   = target.end();
+    symbol_set_type::const_iterator titer_pos = titer_begin;
+    
+    size_type i = 0;
+    
+    symbol_set_type::const_iterator siter_end = source->rhs.end();
+    for (symbol_set_type::const_iterator siter = source->rhs.begin(); siter != siter_end; ++ siter) 
+      if (siter->is_non_terminal()) {
+	symbol_set_type::const_iterator titer = std::find(titer_begin, titer_end, vocab_type::X.non_terminal(i + 1));
+	
+	if (titer == titer_end)
+	  throw std::runtime_error("invalid distortion!");
+	
+	const distortion_type distortion(siter->non_terminal(), titer - titer_pos);
+	
+	table_set_type::iterator iter = tables.find(source->lhs);
+	if (iter == tables.end())
+	  iter = tables.insert(std::make_pair(source->lhs, table_type(parameter.discount, parameter.strength))).first;
+	
+	const double p = fallback.prob(distortion, p0);
+	
+	if (iter->second.increment(distortion, p, sampler, temperature))
+	  if (fallback.increment(distortion, p0, sampler, temperature))
+	    ++ counts0;
+	
+	titer_pos = titer + 1;
+	++ i;
+      }
+  }
+  
+  template <typename Sampler>
+  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
+  {
+    if (source->rhs.size() == 1 && source->rhs.front().is_terminal()) return;
+    
+    symbol_set_type::const_iterator titer_begin = target.begin();
+    symbol_set_type::const_iterator titer_end   = target.end();
+    symbol_set_type::const_iterator titer_pos = titer_begin;
+    
+    size_type i = 0;
+    
+    symbol_set_type::const_iterator siter_end = source->rhs.end();
+    for (symbol_set_type::const_iterator siter = source->rhs.begin(); siter != siter_end; ++ siter) 
+      if (siter->is_non_terminal()) {
+	symbol_set_type::const_iterator titer = std::find(titer_begin, titer_end, vocab_type::X.non_terminal(i + 1));
+	
+	if (titer == titer_end)
+	  throw std::runtime_error("invalid distortion!");
+	
+	const distortion_type distortion(siter->non_terminal(), titer - titer_pos);
+	
+	if (tables[source->lhs].decrement(distortion, sampler))
+	  if (fallback.decrement(distortion, sampler))
+	    -- counts0;
+	
+	titer_pos = titer + 1;
+	++ i;
+      }    
+  }
+  
+  double prob(const rule_type* source, const symbol_set_type& target) const
+  {
+    if (source->rhs.size() == 1 && source->rhs.front().is_terminal()) return 1.0;
+    
+    double p = 1.0;
+    
+    symbol_set_type::const_iterator titer_begin = target.begin();
+    symbol_set_type::const_iterator titer_end   = target.end();
+    symbol_set_type::const_iterator titer_pos = titer_begin;
+    
+    size_type i = 0;
+    symbol_set_type::const_iterator siter_end = source->rhs.end();
+    for (symbol_set_type::const_iterator siter = source->rhs.begin(); siter != siter_end; ++ siter) 
+      if (siter->is_non_terminal()) {
+	symbol_set_type::const_iterator titer = std::find(titer_begin, titer_end, vocab_type::X.non_terminal(i + 1));
+	
+	if (titer == titer_end)
+	  throw std::runtime_error("invalid distortion!");
+	
+	const distortion_type distortion(siter->non_terminal(), titer - titer_pos);
+	
+	table_set_type::const_iterator iter = tables.find(source->lhs);
+	if (iter == tables.end())
+	  p *= fallback.prob(distortion, p0);
+	else
+	  p *= iter->second.prob(distortion, fallback.prob(distortion, p0));
+	
+	titer_pos = titer + 1;
+	++ i;
+      }    
+    
+    
+    return p;
+  }
+  
+  double log_likelihood() const
+  {
+    double logprob = std::log(p0) * counts0;
+    
+    logprob += fallback.log_likelihood();
+    
+    logprob += parameter.log_likelihood();
+    table_set_type::const_iterator titer_end = tables.end();
+    for (table_set_type::const_iterator titer = tables.begin(); titer != titer_end; ++ titer)
+      logprob += titer->second.log_likelihood();
+    
+    return logprob;
+  }
+
+  template <typename Sampler>
+  void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    fallback.sample_parameters(sampler, num_loop, num_iterations);
+    
+    for (int iter = 0; iter != num_loop; ++ iter) {
+      parameter.discount = sample_discount(tables.begin(), tables.end(), sampler, parameter);
+      parameter.strength = sample_strength(tables.begin(), tables.end(), sampler, parameter);
+    }
+    
+    table_set_type::iterator titer_end = tables.end();
+    for (table_set_type::iterator titer = tables.begin(); titer != titer_end; ++ titer) {
+      titer->second.discount() = parameter.discount;
+      titer->second.strength() = parameter.strength;
+    }
+  }
+  
+  // we do not support slice-sample-parameters for simplicity...
+  template <typename Sampler>
+  void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
+  {
+    sample_parameters(sampler, num_loop, num_iterations);
+  }
+  
+
+  template <typename Iterator, typename Sampler>
+  double sample_strength(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double x = 0.0;
+    double y = 0.0;
+    
+    for (/**/; first != last; ++ first) {
+      x += first->second.sample_log_x(sampler, param.discount, param.strength);
+      y += first->second.sample_y(sampler, param.discount, param.strength);
+    }
+    
+    return sampler.gamma(param.strength_shape + y, param.strength_rate - x);
+  }
+  
+  template <typename Iterator, typename Sampler>
+  double sample_discount(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double y = 0.0;
+    double z = 0.0;
+    
+    for (/**/; first != last; ++ first) {
+      y += first->second.sample_y_inv(sampler, param.discount, param.strength);
+      z += first->second.sample_z_inv(sampler, param.discount, param.strength);
+    }
+    
+    return sampler.beta(param.discount_alpha + y, param.discount_beta + z);
+  }
+
+  double         p0;
+  size_type      counts0;
+  table_type     fallback;
+  table_set_type tables;
+  parameter_type parameter;
 };
 
 struct PYPSynAlign
@@ -391,6 +591,8 @@ struct PYPSynAlign
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
+  
+  typedef utils::pyp_parameter parameter_type;
   
   struct rule_pair_type
   {
@@ -417,92 +619,83 @@ struct PYPSynAlign
   };
   
   typedef utils::restaurant<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>, std::allocator<rule_pair_type > > table_type;
-
-  PYPSynAlign(PCFGModel&    __pcfg_source,
-	      UnigramModel& __unigram_target,
-	      LengthModel&  __length_target,
-	      const double __discount,
-	      const double __strength,
-	      const double __discount_alpha,
-	      const double __discount_beta,
-	      const double __strength_shape,
-	      const double __strength_rate)
-    : pcfg_source(__pcfg_source),
-      unigram_target(__unigram_target),
-      length_target(__length_target),
-      non_terminal_target(),
-      table(__discount, __strength, __discount_alpha, __discount_beta, __strength_shape, __strength_rate) {}
+  
+  PYPSynAlign(const PYPLexicon& __lexicon,
+	      const PYPFertility& __fertility,
+	      const PYPDistortion& __distortion,
+	      const parameter_type& parameter)
+    : lexicon(__lexicon),
+      fertility(__fertility),
+      distortion(__distortion),
+      table(parameter) {}
   
   template <typename Sampler>
-  bool increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
+  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    return table.increment(rule_pair_type(source, target), prob_base(source, target), sampler, temperature);
-  }
-
-  template <typename Sampler>
-  bool increment(const rule_pair_type& rule_pair, Sampler& sampler, const double temperature=1.0)
-  {
-    return table.increment(rule_pair, prob_base(rule_pair), sampler, temperature);
+    increment(rule_pair_type(source, target), sampler, temperature);
   }
   
   template <typename Sampler>
-  bool decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
+  void increment(const rule_pair_type& rule_pair, Sampler& sampler, const double temperature=1.0)
   {
-    return table.decrement(rule_pair_type(source, target), sampler);
-  }
-  
-  template <typename Sampler>
-  bool decrement(const rule_pair_type& rule_pair, Sampler& sampler)
-  {
-    return table.decrement(rule_pair, sampler);
-  }
-  
-  double prob(const rule_type* source, const symbol_set_type& target, const double base) const
-  {
-    return table.prob(rule_pair_type(source, target), base);
-  }
-
-  double prob(const rule_ptr_type& source, const symbol_set_type& target, const double base) const
-  {
-    return table.prob(rule_pair_type(source.get(), target), base);
-  }
-
-  double logprob(const rule_type* source, const symbol_set_type& target, const double logbase) const
-  {
-    return cicada::semiring::log(table.prob(rule_pair_type(source, target), cicada::semiring::traits<logprob_type>::exp(logbase)));
-  }
-  
-  double logprob(const rule_ptr_type& source, const symbol_set_type& target, const double logbase) const
-  {
-    return cicada::semiring::log(table.prob(rule_pair_type(source.get(), target), cicada::semiring::traits<logprob_type>::exp(logbase)));
-  }
-  
-  double prob_base(const rule_pair_type& rule_pair) const
-  {
-    return prob_base(rule_pair.source, rule_pair.target);
-  }
-  
-  double prob_base(const rule_type* source, const symbol_set_type& target) const
-  {
-    double logprob = pcfg_source(source);
+#if 0
+    const double p0 = lexicon.prob(rule_pair.source, rule_pair.target);
     
-    size_type length = 0;
-    symbol_set_type::const_iterator titer_end = target.end();
-    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) 
-      if (titer->is_terminal()) {
-	logprob += unigram_target(*titer);
-	++ length;
-      }
     
-    logprob += length_target(length);
-    logprob += non_terminal_target(length, target.size() - length);
+    if (table.increment(rule_pair, p0, sampler, temperature))
+      lexicon.increment(rule_pair.source, rule_pair.target, sampler, temperature);
+#endif
     
-    return utils::mathop::exp(logprob);
+    const double p0 = (lexicon.prob(rule_pair.source, rule_pair.target)
+		       * fertility.prob(rule_pair.source, rule_pair.target)
+		       * distortion.prob(rule_pair.source, rule_pair.target));
+    
+    
+    if (table.increment(rule_pair, p0, sampler, temperature)) {
+      lexicon.increment(rule_pair.source, rule_pair.target, sampler, temperature);
+      fertility.increment(rule_pair.source, rule_pair.target, sampler, temperature);
+      distortion.increment(rule_pair.source, rule_pair.target, sampler, temperature);
+    }
+  }
+  
+  template <typename Sampler>
+  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
+  {
+    decrement(rule_pair_type(source, target), sampler);
+  }
+  
+  template <typename Sampler>
+  void decrement(const rule_pair_type& rule_pair, Sampler& sampler)
+  {
+#if 0
+    if (table.decrement(rule_pair, sampler))
+      lexicon.decrement(rule_pair.source, rule_pair.target, sampler);
+#endif
+    if (table.decrement(rule_pair, sampler)) {
+      lexicon.decrement(rule_pair.source, rule_pair.target, sampler);
+      fertility.decrement(rule_pair.source, rule_pair.target, sampler);
+      distortion.decrement(rule_pair.source, rule_pair.target, sampler);
+    }
+  }
+  
+
+  double prob(const rule_type* source, const symbol_set_type& target) const
+  {
+    const double p0 = lexicon.prob(source, target) * fertility.prob(source, target) * distortion.prob(source, target);
+    //const double p0 = lexicon.prob(source, target);
+
+    return table.prob(rule_pair_type(source, target), p0);
+  }
+
+  double prob(const rule_ptr_type& source, const symbol_set_type& target) const
+  {
+    return prob(source.get(), target);
   }
   
   double log_likelihood() const
   {
-    return table.log_likelihood();
+    return lexicon.log_likelihood() + fertility.log_likelihood() + distortion.log_likelihood() + table.log_likelihood();
+    //return lexicon.log_likelihood() + table.log_likelihood();
   }
   
   double log_likelihood(const double& discount, const double& strength) const
@@ -512,33 +705,15 @@ struct PYPSynAlign
     return table.log_likelihood(discount, strength);
   }
   
-  template <typename Sampler>
-  void sample_length_parameters(Sampler& sampler)
-  {
-    // do nothing...!
-    size_type alpha = 0;
-    size_type beta = 0;
-    
-    table_type::const_iterator titer_end = table.end();
-    for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
-      const symbol_set_type& target = titer->first.target;
-      
-      size_type num_terminals = 0;
-      symbol_set_type::const_iterator iter_end = target.end();
-      for (symbol_set_type::const_iterator iter = target.begin(); iter != iter_end; ++ iter)
-	num_terminals += iter->is_terminal();
-      
-      alpha += num_terminals * titer->second.size_customer();
-      beta += titer->second.size_customer();
-    }
-    
-    length_target.sample_parameters(alpha, beta, sampler);
-  }
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    sample_length_parameters(sampler);
+    lexicon.sample_parameters(sampler, num_loop, num_iterations);
+
+    fertility.sample_parameters(sampler, num_loop, num_iterations);
+
+    distortion.sample_parameters(sampler, num_loop, num_iterations);
     
     table.sample_parameters(sampler, num_loop, num_iterations);
   }
@@ -546,17 +721,19 @@ struct PYPSynAlign
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    sample_length_parameters(sampler);
+    lexicon.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    fertility.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    distortion.slice_sample_parameters(sampler, num_loop, num_iterations);
     
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
   
-  PCFGModel&       pcfg_source;
-  UnigramModel&    unigram_target;
-  LengthModel&     length_target;
-  NonTerminalModel non_terminal_target;
-  
-  table_type table;
+  PYPLexicon    lexicon;
+  PYPFertility  fertility;
+  PYPDistortion distortion;
+  table_type    table;
 };
 
 struct PYPGraph
@@ -715,26 +892,7 @@ struct PYPGraph
     beta.reserve(source.nodes.size());
     beta.resize(source.nodes.size(), beta_type(target.size() + 1));
 
-    // phrasal log-probabilities
-    logprob_targets.clear();
-    logprob_targets.reserve(target.size());
-    logprob_targets.resize(target.size() + 1, 0.0);
-    
-    for (size_type first = 0; first != target.size(); ++ first)
-      for (size_type last = first + 1; last <= target.size(); ++ last)
-	logprob_targets(first, last) = logprob_targets(first, last - 1) + synalign.unigram_target(target[last - 1]);
-    
-    // length log-probabilities
-    logprob_lengths.clear();
-    logprob_lengths.reserve(target.size() + 1);
-    logprob_lengths.resize(target.size() + 1);
-    
-    for (size_type i = 0; i <= target.size(); ++ i)
-      logprob_lengths[i] = synalign.length_target(i);
-    
-    // rule-string...
     rule_strings.clear();
-    rule_strings.reserve(target.size() + 1);
     rule_strings.resize(target.size() + 1);
   }
   
@@ -795,10 +953,130 @@ struct PYPGraph
     return iter->second;
   }
   
+  struct Inside
+  {
+    Inside(PYPGraph& __graph,
+	   const hypergraph_type& __source,
+	   const sentence_type&   __target,
+	   const PYPSynAlign&     __synalign,
+	   const size_type        __terminal_max)
+      : graph(__graph), source(__source), target(__target), synalign(__synalign), terminal_max(__terminal_max) {}
+    
+    template <typename Index>
+    void operator()(const hypergraph_type::edge_type& edge, Index& j, const Index& j_ends, span_set_type& antecedent, size_type last)
+    {
+      if (last == j.size()) {
+	const size_type pos = edge.head;
+	
+	span_type span(target.size(), 0);
+	size_type total_hole = 0;
+	logprob_type prob_antecedent = cicada::semiring::traits<logprob_type>::one();
+	
+	for (size_t i = 0; i != edge.tails.size(); ++ i) {
+	  antecedent[i] = graph.edges[edge.tails[i]][j[i]].first;
+	  
+	  const span_type& span_antecedent = antecedent[i];
+	  
+	  if (! span_antecedent.empty()) {
+	    span.first = utils::bithack::min(span.first, span_antecedent.first);
+	    span.last  = utils::bithack::max(span.last,  span_antecedent.last);
+	    
+	    total_hole += span_antecedent.size();
+	  }
+	  
+	  prob_antecedent *= graph.beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
+	}
+	
+	if (span.first == target.size() && span.last == 0) {
+	  // if phrases, we will allow all the lengths..
+	  // otherwise, terminal_max!
+	      
+	  const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), size_type(0));
+	  //const size_type span_length_max = utils::bithack::branch(antecedent.empty(), target.size(), utils::bithack::min(target.size(), terminal_max));
+	  const size_type span_length_max = utils::bithack::min(target.size(), terminal_max);
+	      
+	  for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
+	    const size_type span_first_max = (span_length != 0) * (target.size() - span_length);
+	    for (size_type span_first = 0; span_first <= span_first_max; ++ span_first) {
+	      const size_type span_last = span_first + span_length;
+
+	      // ITG-like!
+	      //if (! antecedent.empty() && span_length) continue;
+	      
+	      const symbol_set_type& target_string = graph.rule_string(target, span_type(span_first, span_last), antecedent);
+		  
+	      const logprob_type prob = synalign.prob(edge.rule, target_string);
+		  
+	      graph.beta[pos](span_first, span_last) = std::max(graph.beta[pos](span_first, span_last), prob * prob_antecedent);
+		  
+	      graph.edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
+	    }
+	  }
+	} else {
+	  const size_type terminal_hole_size = span.size() - total_hole;
+	  const difference_type terminal_span_size = terminal_max - terminal_hole_size;
+	  // ITG-like
+	  //const difference_type terminal_span_size = 0;
+	  
+	  const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), span.size());
+	  const size_type span_length_max = utils::bithack::min(target.size(), span.size() + terminal_span_size);
+	  //
+	  // 0 <= span_first
+	  // span_last <= target.size()
+	  // span_first <= span.first
+	  // span.last <= span_last
+	  // span_last - span_first < span_length_max
+	  //
+	      
+	  for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
+	    const size_type span_first_min = utils::bithack::max(difference_type(0), difference_type(span.last) - difference_type(span_length));
+	    const size_type span_first_max = utils::bithack::min(span.first, target.size() - span_length);
+		
+	    for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
+	      const size_type span_last = span_first + span_length;
+		  
+	      // ITG-like!
+	      //if (span_length - total_hole) continue;
+		  
+	      const symbol_set_type& target_string = graph.rule_string(target, span_type(span_first, span_last), antecedent);
+		  
+	      const logprob_type prob = synalign.prob(edge.rule, target_string);
+	      
+	      graph.beta[pos](span_first, span_last) = std::max(graph.beta[pos](span_first, span_last), prob * prob_antecedent);
+	      
+	      graph.edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
+	    }
+	  }
+	}
+      } else {
+	for (size_type pos = 0; pos != j_ends[last]; ++ pos) {
+	  j[last] = pos;
+	  
+	  const span_type& span = graph.edges[edge.tails[last]][pos].first;
+	  
+	  // check if valid or not,..
+	  bool valid = true;
+	  for (size_type prev = 0; prev != last && valid; ++ prev)
+	    valid = disjoint(span, graph.edges[edge.tails[prev]][j[prev]].first);
+	  
+	  if (valid)
+	    operator()(edge, j, j_ends, antecedent, last + 1);
+	}
+      }
+    }
+    
+    PYPGraph& graph;
+
+    const hypergraph_type& source;
+    const sentence_type&   target;
+    const PYPSynAlign&     synalign;
+    const size_type        terminal_max;
+  };
+
 
   logprob_type inside(const hypergraph_type& source, const sentence_type& target, const PYPSynAlign& synalign, const size_type terminal_max)
   {    
-    typedef std::vector<int, std::allocator<int> > index_set_type;
+    typedef std::vector<size_type, std::allocator<size_type> > index_set_type;
 
     initialize(source, target, synalign);
 
@@ -806,17 +1084,19 @@ struct PYPGraph
     index_set_type j;
     index_set_type j_ends;
 
+    Inside insider(*this, source, target, synalign, terminal_max);
+
     hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
       const hypergraph_type::node_type& node = *niter;
       
+#if 0
       const size_type pos = node.id;
+#endif
 
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = source.edges[*eiter];
-
-	const double logprob_source = synalign.pcfg_source(edge.rule);
 
 	antecedent.resize(edge.tails.size());
 	j.resize(edge.tails.size());
@@ -827,11 +1107,13 @@ struct PYPGraph
 	  j[i]= 0;
 	}
 	
+	insider(edge, j, j_ends, antecedent, 0);
+	
+#if 0
 	for (;;) {
 	  span_type span(target.size(), 0);
 	  size_type total_hole = 0;
 	  logprob_type prob_antecedent = cicada::semiring::traits<logprob_type>::one();
-	  double logprob_hole = 0.0;
 	  
 	  bool valid = true;
 	  for (size_t i = 0; i != edge.tails.size() && valid; ++ i) {
@@ -851,7 +1133,6 @@ struct PYPGraph
 	      span.last  = utils::bithack::max(span.last,  span_antecedent.last);
 	      
 	      total_hole += span_antecedent.size();
-	      logprob_hole += logprob_targets(span_antecedent.first, span_antecedent.last);
 	      
 	      prob_antecedent *= beta[edge.tails[i]](span_antecedent.first, span_antecedent.last);
 	    }
@@ -859,30 +1140,26 @@ struct PYPGraph
 	  
 	  if (valid) {
 	    if (span.first == target.size() && span.last == 0) {
+	      // if phrases, we will allow all the lengths..
+	      // otherwise, terminal_max!
+	      
 	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), size_type(0));
+	      //const size_type span_length_max = utils::bithack::branch(antecedent.empty(), target.size(), utils::bithack::min(target.size(), terminal_max));
 	      const size_type span_length_max = utils::bithack::min(target.size(), terminal_max);
 	      
 	      for (size_type span_length = span_length_min; span_length <= span_length_max; ++ span_length) {
 		const size_type span_first_max = (span_length != 0) * (target.size() - span_length);
 		for (size_type span_first = 0; span_first <= span_first_max; ++ span_first) {
 		  const size_type span_last = span_first + span_length;
-		  const size_type terminal_size = span_length;
 		  
-		  // ITG-lie!
-		  if (! antecedent.empty() && terminal_size) continue;
+		  // ITG-like!
+		  //if (! antecedent.empty() && span_length) continue;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
-		  const double logprob_terminal = logprob_targets(span_first, span_last);
-		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
-		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
+		  const logprob_type prob = synalign.prob(edge.rule, target_string);
 		  
-		  const logprob_type prob = (prob_antecedent
-					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
-
-		  //std::cerr << "phrase: " << *edge.rule << " span: " << span_first << "..." << span_last << " target: " << target_string << " prob: " << prob << " terminal: " << terminal_size << std::endl;
-		  
-		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob * prob_antecedent);
 		  
 		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
@@ -890,6 +1167,8 @@ struct PYPGraph
 	    } else {
 	      const size_type terminal_hole_size = span.size() - total_hole;
 	      const difference_type terminal_span_size = terminal_max - terminal_hole_size;
+	      // ITG-like
+	      //const difference_type terminal_span_size = 0;
 	      
 	      const size_type span_length_min = utils::bithack::branch(pos == source.goal, target.size(), span.size());
 	      const size_type span_length_max = utils::bithack::min(target.size(), span.size() + terminal_span_size);
@@ -908,30 +1187,22 @@ struct PYPGraph
 		
 		for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
 		  const size_type span_last = span_first + span_length;
-		  const size_type terminal_size = span_length - total_hole;
 		  
-		  // ITG-lie!
-		  if (terminal_size) continue;
+		  // ITG-like!
+		  //if (span_length - total_hole) continue;
 		  
 		  const symbol_set_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
-		  const double logprob_terminal = logprob_targets(span_first, span_last) - logprob_hole;
-		  const double logprob_non_terminal = synalign.non_terminal_target(terminal_size, edge.tails.size());
-		  const double logprob_prior = logprob_source + logprob_terminal + logprob_non_terminal + logprob_lengths[terminal_size];
+		  const logprob_type prob = synalign.prob(edge.rule, target_string);
 		  
-		  const logprob_type prob = (prob_antecedent
-					     * cicada::semiring::traits<logprob_type>::exp(synalign.logprob(edge.rule, target_string, logprob_prior)));
-		  
-		  //std::cerr << "rule: " << *edge.rule << " span: " << span_first << "..." << span_last << " target: " << target_string << " prob: " << prob << " terminal: " << terminal_size << std::endl;
-		  
-		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob);
+		  beta[pos](span_first, span_last) = std::max(beta[pos](span_first, span_last), prob * prob_antecedent);
 		  
 		  edges[pos][span_type(span_first, span_last)].push_back(edge_type(edge.id, target_string, antecedent, prob));
 		}
 	      }
 	    }
 	  }
-	  
+
 	  size_type index = 0;
 	  for (/**/; index != edge.tails.size(); ++ index) {
 	    ++ j[index];
@@ -942,12 +1213,14 @@ struct PYPGraph
 	  // finished!
 	  if (index == edge.tails.size()) break;
 	}
+#endif
       }
     }
     
     return beta[source.goal](0, target.size());
   }
-
+  
+  
   // backward sampling
   template <typename Sampler>
   logprob_type outside(const hypergraph_type& source, const sentence_type& target, Sampler& sampler, derivation_type& derivation, const double temperature)
@@ -1008,8 +1281,6 @@ struct PYPGraph
   span_edge_chart_type edges;
   
   beta_chart_type beta;
-  logprob_target_set_type logprob_targets;
-  logprob_length_set_type logprob_lengths;
   rule_string_cache_chart_type rule_strings;
 
   logprob_set_type logprobs;
@@ -1048,7 +1319,7 @@ path_type train_target_file = "-";
 path_type test_source_file;
 path_type test_target_file;
 
-int max_terminal = 4;
+int max_terminal = 2;
 
 int samples = 30;
 int baby_steps = 0;
@@ -1065,18 +1336,37 @@ double discount_prior_beta  = 1.0;
 double strength_prior_shape = 1.0;
 double strength_prior_rate  = 1.0;
 
-// target string length...
-double lambda = 0.5;
-double lambda_alpha = 1.0;
-double lambda_beta  = 1.0;
+double lexicon_discount = 0.9;
+double lexicon_strength = 1;
+
+double lexicon_discount_prior_alpha = 1.0;
+double lexicon_discount_prior_beta  = 1.0;
+double lexicon_strength_prior_shape = 1.0;
+double lexicon_strength_prior_rate  = 1.0;
+
+double fertility_discount = 0.9;
+double fertility_strength = 1;
+
+double fertility_discount_prior_alpha = 1.0;
+double fertility_discount_prior_beta  = 1.0;
+double fertility_strength_prior_shape = 1.0;
+double fertility_strength_prior_rate  = 1.0;
+
+double distortion_discount = 0.9;
+double distortion_strength = 1;
+
+double distortion_discount_prior_alpha = 1.0;
+double distortion_discount_prior_beta  = 1.0;
+double distortion_strength_prior_shape = 1.0;
+double distortion_strength_prior_rate  = 1.0;
 
 int threads = 1;
 int debug = 0;
 
 void options(int argc, char** argv);
 
-void read_data(const path_type& path, hypergraph_set_type& graphs);
-void read_data(const path_type& path, sentence_set_type& sentences);
+size_t read_data(const path_type& path, hypergraph_set_type& graphs);
+size_t read_data(const path_type& path, sentence_set_type& sentences);
 
 int main(int argc, char ** argv)
 {
@@ -1095,7 +1385,7 @@ int main(int argc, char ** argv)
       throw std::runtime_error("negative strength w/o slice sampling is not supported!");
 
     sentence_set_type   targets;
-    read_data(train_target_file, targets);
+    const size_type target_vocab_size = read_data(train_target_file, targets);
 
     if (targets.empty())
       throw std::runtime_error("no target sentence data?");
@@ -1103,23 +1393,42 @@ int main(int argc, char ** argv)
     hypergraph_set_type sources;
     sources.reserve(targets.size());
     
-    read_data(train_source_file, sources);
+    const size_type source_vocab_size = read_data(train_source_file, sources);
     
     if (sources.size() != targets.size())
       throw std::runtime_error("source/target side do not match!");
     
+    PYPLexicon   lexicon((1.0 / source_vocab_size) * (1.0 / target_vocab_size),
+			 PYPLexicon::parameter_type(lexicon_discount,
+						    lexicon_strength,
+						    lexicon_discount_prior_alpha,
+						    lexicon_discount_prior_beta,
+						    lexicon_strength_prior_shape,
+						    lexicon_strength_prior_rate));
     
-    PCFGModel    pcfg_source(sources.begin(), sources.end());
-    UnigramModel unigram_target(targets.begin(), targets.end());
-    LengthModel  length_target(lambda, lambda_alpha, lambda_beta);
-
-    PYPSynAlign  synalign(pcfg_source, unigram_target, length_target,
-			  discount,
-			  strength,
-			  discount_prior_alpha,
-			  discount_prior_beta,
-			  strength_prior_shape,
-			  strength_prior_rate);
+    PYPFertility   fertility(PYPFertility::parameter_type(fertility_discount,
+							  fertility_strength,
+							  fertility_discount_prior_alpha,
+							  fertility_discount_prior_beta,
+							  fertility_strength_prior_shape,
+							  fertility_strength_prior_rate));
+    
+    PYPDistortion   distortion(PYPDistortion::parameter_type(distortion_discount,
+							     distortion_strength,
+							     distortion_discount_prior_alpha,
+							     distortion_discount_prior_beta,
+							     distortion_strength_prior_shape,
+							     distortion_strength_prior_rate));
+    
+    PYPSynAlign  synalign(lexicon,
+			  fertility,
+			  distortion,
+			  PYPSynAlign::parameter_type(discount,
+						      strength,
+						      discount_prior_alpha,
+						      discount_prior_beta,
+						      strength_prior_shape,
+						      strength_prior_rate));
 
     
     derivation_set_type derivations(sources.size());
@@ -1138,11 +1447,10 @@ int main(int argc, char ** argv)
       synalign.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
-      std::cerr << "discount=" << synalign.table.discount()
-		<< " strength=" << synalign.table.strength()
-	//<< " lambda=" << synalign.pcfg_source.lambda
-		<< " lambda=" << synalign.length_target.lambda
-		<< std::endl;
+      std::cerr << "rule: discount=" << synalign.table.discount() << " strength=" << synalign.table.strength() << std::endl
+		<< "lexicon: discount=" << synalign.lexicon.table.discount() << " strength=" << synalign.lexicon.table.strength() << std::endl
+		<< "fertility: discount=" << synalign.fertility.fallback.discount() << " strength=" << synalign.fertility.fallback.strength() << std::endl
+		<< "distortion: discount=" << synalign.distortion.fallback.discount() << " strength=" << synalign.distortion.fallback.strength() << std::endl;
     
     PYPGraph graph;
     
@@ -1227,11 +1535,11 @@ int main(int argc, char ** argv)
 	  synalign.sample_parameters(sampler, resample_iterations);
 	
 	if (debug >= 2)
-	  std::cerr << "discount=" << synalign.table.discount()
-		    << " strength=" << synalign.table.strength()
-	    //<< " lambda=" << synalign.pcfg_source.lambda
-		    << " lambda=" << synalign.length_target.lambda
-		    << std::endl;
+	  std::cerr << "rule: discount=" << synalign.table.discount() << " strength=" << synalign.table.strength() << std::endl
+		    << "lexicon: discount=" << synalign.lexicon.table.discount() << " strength=" << synalign.lexicon.table.strength() << std::endl
+		    << "fertility: discount=" << synalign.fertility.fallback.discount() << " strength=" << synalign.fertility.fallback.strength() << std::endl
+		    << "distortion: discount=" << synalign.distortion.fallback.discount() << " strength=" << synalign.distortion.fallback.strength() << std::endl;
+		    
       }
       
       if (debug)
@@ -1248,31 +1556,56 @@ int main(int argc, char ** argv)
 }
 
 
-void read_data(const path_type& path, hypergraph_set_type& graphs)
+size_t read_data(const path_type& path, hypergraph_set_type& graphs)
 {
+  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+  
+  word_set_type words;
+  words.set_empty_key(word_type());
+  
   graphs.clear();
   
   utils::compress_istream is(path, 1024 * 1024);
   
   hypergraph_type graph;
-  while (is >> graph)
+  while (is >> graph) {
     graphs.push_back(graph);
+    
+    hypergraph_type::edge_set_type::const_iterator eiter_end = graphs.back().edges.end();
+    for (hypergraph_type::edge_set_type::const_iterator eiter = graphs.back().edges.begin(); eiter != eiter_end; ++ eiter) {
+      const hypergraph_type::edge_type& edge = *eiter;
+
+      // assume penn-treeebank style
+      if (edge.rule->rhs.size() == 1 && edge.rule->rhs.front().is_terminal())
+	words.insert(edge.rule->rhs.front());
+    }
+  }
   
-  // uniquify rules...
+  return words.size();
 }
 
 
-void read_data(const path_type& path, sentence_set_type& sentences)
+size_t read_data(const path_type& path, sentence_set_type& sentences)
 {
+  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+
+  word_set_type words;
+  words.set_empty_key(word_type());
+
   sentences.clear();
   
   utils::compress_istream is(path, 1024 * 1024);
   
   sentence_type sentence;
-  while (is >> sentence)
+  while (is >> sentence) {
     sentences.push_back(sentence);
+    
+    words.insert(sentence.begin(), sentence.end());
+  }
   
   sentence_set_type(sentences).swap(sentences);
+
+  return words.size();
 }
 
 void options(int argc, char** argv)
@@ -1307,7 +1640,29 @@ void options(int argc, char** argv)
     ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
-    ("lambda",        po::value<double>(&lambda)->default_value(lambda),               "lambda for target terminals (Geometric distribution)")
+    ("lexicon-discount",       po::value<double>(&lexicon_discount)->default_value(lexicon_discount),                         "discount ~ Beta(alpha,beta)")
+    ("lexicon-discount-alpha", po::value<double>(&lexicon_discount_prior_alpha)->default_value(lexicon_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
+    ("lexicon-discount-beta",  po::value<double>(&lexicon_discount_prior_beta)->default_value(lexicon_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("lexicon-strength",       po::value<double>(&lexicon_strength)->default_value(lexicon_strength),                         "strength ~ Gamma(shape,rate)")
+    ("lexicon-strength-shape", po::value<double>(&lexicon_strength_prior_shape)->default_value(lexicon_strength_prior_shape), "strength ~ Gamma(shape,rate)")
+    ("lexicon-strength-rate",  po::value<double>(&lexicon_strength_prior_rate)->default_value(lexicon_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+
+    ("fertility-discount",       po::value<double>(&fertility_discount)->default_value(fertility_discount),                         "discount ~ Beta(alpha,beta)")
+    ("fertility-discount-alpha", po::value<double>(&fertility_discount_prior_alpha)->default_value(fertility_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
+    ("fertility-discount-beta",  po::value<double>(&fertility_discount_prior_beta)->default_value(fertility_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("fertility-strength",       po::value<double>(&fertility_strength)->default_value(fertility_strength),                         "strength ~ Gamma(shape,rate)")
+    ("fertility-strength-shape", po::value<double>(&fertility_strength_prior_shape)->default_value(fertility_strength_prior_shape), "strength ~ Gamma(shape,rate)")
+    ("fertility-strength-rate",  po::value<double>(&fertility_strength_prior_rate)->default_value(fertility_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    
+    ("distortion-discount",       po::value<double>(&distortion_discount)->default_value(distortion_discount),                         "discount ~ Beta(alpha,beta)")
+    ("distortion-discount-alpha", po::value<double>(&distortion_discount_prior_alpha)->default_value(distortion_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
+    ("distortion-discount-beta",  po::value<double>(&distortion_discount_prior_beta)->default_value(distortion_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("distortion-strength",       po::value<double>(&distortion_strength)->default_value(distortion_strength),                         "strength ~ Gamma(shape,rate)")
+    ("distortion-strength-shape", po::value<double>(&distortion_strength_prior_shape)->default_value(distortion_strength_prior_shape), "strength ~ Gamma(shape,rate)")
+    ("distortion-strength-rate",  po::value<double>(&distortion_strength_prior_rate)->default_value(distortion_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
