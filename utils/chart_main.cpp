@@ -2,7 +2,7 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 #include <cstdlib>
-
+#include <algorithm>
 #include <iostream>
 
 #include "utils/chart.hpp"
