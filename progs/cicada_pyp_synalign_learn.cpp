@@ -1386,7 +1386,10 @@ struct less_size
 
   bool operator()(const size_type& x, const size_type& y) const
   {
-    return (sources[x].edges.size() + targets[x].size()) < (sources[y].edges.size() + targets[y].size());
+    const size_t x_target = targets[x].size();
+    const size_t y_target = targets[y].size();
+    
+    return (x_target < y_target || (!(y_target < x_target) && sources[x].edges.size() < sources[y].edges.size()));
   }
   
   const hypergraph_set_type& sources;
