@@ -63,6 +63,7 @@
 #include "utils/alloc_vector.hpp"
 #include "utils/indexed_map.hpp"
 #include "utils/indexed_set.hpp"
+#include "utils/lockfree_list_queue.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -93,6 +94,12 @@ typedef rule_type::symbol_set_type symbol_set_type;
 // TODO:
 // How to handle distortion represented by the ordering in [x,3] etc.
 //
+
+struct PYP
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+};
 
 struct PYPLexicon
 {
@@ -1287,6 +1294,7 @@ struct PYPGraph
   prob_set_type    probs;
 };
 
+
 typedef boost::filesystem::path path_type;
 typedef utils::sampler<boost::mt19937> sampler_type;
 
@@ -1297,6 +1305,68 @@ typedef PYPGraph::size_type size_type;
 typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+
+struct Task
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;  
+  
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+  
+  Task(queue_type& __mapper,
+       queue_type& __reducer,
+       const hypergraph_set_type& __sources,
+       const sentence_set_type& __targets,
+       derivation_set_type& __derivations,
+       derivation_set_type& __derivations_prev,
+       const PYPSynAlign& __model,
+       sampler_type& __sampler,
+       const int& __max_terminal)
+    : mapper(__mapper),
+      reducer(__reducer),
+      sources(__sources),
+      targets(__targets),
+      derivations(__derivations),
+      derivations_prev(__derivations_prev),
+      model(__model),
+      sampler(__sampler),
+      max_terminal(__max_terminal) {}
+
+  void operator()()
+  {
+    size_type pos;
+    
+    for (;;) {
+      mapper.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+
+      derivations_prev[pos]  = derivations[pos];
+      
+      graph.inside(sources[pos], targets[pos], model, max_terminal);
+      
+      graph.outside(sources[pos], targets[pos], sampler, derivations[pos], temperature);
+      
+      reducer.push(pos);
+    }
+  }
+  
+  queue_type& mapper;
+  queue_type& reducer;
+  
+  const hypergraph_set_type& sources;
+  const sentence_set_type& targets;
+  derivation_set_type& derivations;
+  derivation_set_type& derivations_prev;
+  
+  const PYPSynAlign& model;
+  sampler_type  sampler;
+  int max_terminal;
+  
+  double temperature;
+  
+  PYPGraph graph;
+};
 
 struct less_size
 {
@@ -1432,6 +1502,7 @@ int main(int argc, char ** argv)
 
     
     derivation_set_type derivations(sources.size());
+    derivation_set_type derivations_prev(sources.size());
     position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
       if (sources[i].is_valid() && ! targets[i].empty())
@@ -1452,7 +1523,25 @@ int main(int argc, char ** argv)
 		<< "fertility: discount=" << synalign.fertility.fallback.discount() << " strength=" << synalign.fertility.fallback.strength() << std::endl
 		<< "distortion: discount=" << synalign.distortion.fallback.discount() << " strength=" << synalign.distortion.fallback.strength() << std::endl;
     
+    PYPSynAlign synalign_cache(synalign);
     PYPGraph graph;
+    
+    Task::queue_type queue_mapper;
+    Task::queue_type queue_reducer;
+    
+    std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
+								 queue_reducer,
+								 sources,
+								 targets,
+								 derivations,
+								 derivations_prev,
+								 synalign_cache,
+								 sampler,
+								 max_terminal));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
@@ -1493,12 +1582,50 @@ int main(int argc, char ** argv)
 	else
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
+
+      // assign temperature... and current model
+      synalign_cache = synalign;
+      for (size_type i = 0; i != tasks.size(); ++ i)
+	tasks[i].temperature = temperature;
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
+      position_set_type::const_iterator piter_end = positions.end();
+      position_set_type::const_iterator piter = positions.begin();
+      size_type reduced = 0;
+      while (piter != piter_end || reduced != positions.size()) {
+	
+	if (piter != piter_end && queue_mapper.push(*piter, true))
+	  ++ piter;
+	
+	size_type pos = 0;
+	if (reduced != positions.size() && queue_reducer.pop(pos, true)) {
+	  ++ reduced;
+	  
+	  if (! derivations_prev[pos].empty()) {
+	    derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	    for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
+	      synalign.decrement(*diter, sampler);
+	  }
+
+	  if (debug >= 3) {
+	    std::cerr << "nodes=" << sources[pos].nodes.size() << " edges=" << sources[pos].edges.size() << " sentence=" << targets[pos].size() << std::endl;
+	    
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	      std::cerr << "derivation: " << *(diter->source) << " ||| " << diter->target << std::endl;
+	  }
+	  
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    synalign.increment(*diter, sampler, temperature);
+	}
+      }
+
+#if 0      
       for (size_t i = 0; i != positions.size(); ++ i) {
 	const size_t pos = positions[i];
 	
@@ -1527,6 +1654,7 @@ int main(int argc, char ** argv)
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  synalign.increment(*diter, sampler, temperature);
       }
+#endif
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
@@ -1547,6 +1675,13 @@ int main(int argc, char ** argv)
 	    
     }
 
+    for (int i = 0; i != threads; ++ i)
+      queue_mapper.push(size_type(-1));
+    
+    workers.join_all();
+
+    // dump models...
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
