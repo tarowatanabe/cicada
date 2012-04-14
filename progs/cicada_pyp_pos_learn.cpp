@@ -496,7 +496,8 @@ struct PYPGraph
     for (size_type t = 1; t != T; ++ t) {
       for (id_type prev = 0; prev != K; ++ prev)
 	for (id_type next = 1; next != K; ++ next)
-	  alpha(t, next) += alpha(t - 1, prev) * model.cache_transition(prev, next) * model.cache_emission(next, sentence[t - 1]);
+	  if (model.cache_transition(prev, next) > cutoff[t])
+	    alpha(t, next) += alpha(t - 1, prev) * model.cache_transition(prev, next) * model.cache_emission(next, sentence[t - 1]);
       
       double scale = std::accumulate(alpha.begin(t), alpha.end(t), 0.0);
       scale = (scale == 0.0 ? 1.0 : scale);
