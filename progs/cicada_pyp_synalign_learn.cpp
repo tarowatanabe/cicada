@@ -64,6 +64,7 @@
 #include "utils/indexed_map.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/unique_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>

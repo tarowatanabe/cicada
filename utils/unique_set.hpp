@@ -9,14 +9,10 @@
 #include <stdint.h>
 
 #include <stdexcept>
-#include <functional>
-#include <iostream>
-#include <vector>
+#include <iterator>
 #include <algorithm>
 
 #include <utils/dense_hash_set.hpp>
-#include <utils/hashmurmur.hpp>
-#include <utils/bithack.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/functional/hash/hash.hpp>
@@ -25,7 +21,7 @@ namespace utils
 {
   
   template <typename Tp, typename Hash=boost::hash<Tp>, typename Pred=std::equal_to<Tp>, typename Alloc=std::allocator<Tp> >
-  class unique_symbol
+  class unique_set
   {
   public:
     typedef size_t    size_type;
@@ -41,7 +37,7 @@ namespace utils
     {
       size_t operator()(const inserted_type& x) const
       {
-	return (x.first ? Hash(*x.first) : (x.second ? Hash(*x.second) : 0));
+	return (x.first ? Hash::operator()(*x.first) : (x.second ? Hash::operator()(*x.second) : size_t(0)));
       }
     };
 
@@ -50,16 +46,42 @@ namespace utils
       bool operator()(const inserted_type& x, const inserted_type& y) const
       {
 	return (x == y
-		|| (x.first  && y.first  && Pred(*x.first, *y.first))
-		|| (x.first  && y.second && Pred(*x.first, *y.second))
-		|| (x.second && y.first  && Pred(*x.second, *y.first))
-		|| (x.second && y.second && Pred(*x.second, *y.second)));
+		|| (x.first  && y.first  && Pred::operator()(*x.first, *y.first))
+		|| (x.first  && y.second && Pred::operator()(*x.first, *y.second))
+		|| (x.second && y.first  && Pred::operator()(*x.second, *y.first))
+		|| (x.second && y.second && Pred::operator()(*x.second, *y.second)));
       }
     };
     
     typedef typename Alloc::template rebind<inserted_type>::other inserted_alloc;
     
-    typedef utils::dense_hash_set<inserted_type, inserted_hash, inserted_pred, inserted_alloc> inserted_value_set_type;
+    typedef typename utils::dense_hash_set<inserted_type, inserted_hash, inserted_pred, inserted_alloc>::type inserted_value_set_type;
+
+  public:
+    class const_iterator : public inserted_value_set_type::const_iterator
+    {
+    public:
+      typedef std::forward_iterator_tag iterator_category;  // very little defined!
+      typedef Tp        value_type;
+      typedef const Tp& reference;
+      typedef const Tp* pointer;
+      typedef typename inserted_value_set_type::difference_type difference_type;
+      typedef typename inserted_value_set_type::size_type size_type;
+
+    private:
+      typedef typename inserted_value_set_type::iterator iterator_type;
+      
+    public:
+      const_iterator(const iterator_type& x)  : iterator_type(x) {}
+    public:
+      reference operator*() const { return *iterator_type::operator*().first; }
+      pointer   operator->() const { return iterator_type::operator*().first.get(); }
+    };
+
+    typedef const_iterator iterator;
+
+  public:
+    unique_set() : values_() { values_.set_empty_key(inserted_type()); }
     
   public:
     const value_ptr_type operator[](const value_type& x)
@@ -76,6 +98,14 @@ namespace utils
     {
       values_.erase(inserted_type(value_ptr_type(), &x));
     }
+
+    iterator find(const value_type& x) const { return values_.find(inserted_type(value_ptr_type(), &x)); }
+
+    iterator begin() const { return values_.begin(); }
+    iterator end() const { return values_.end(); }
+    
+    size_type size() const { return values_.size(); }
+    bool empty() const { return values_.empty(); }
     
   private:
     inserted_value_set_type values_;
