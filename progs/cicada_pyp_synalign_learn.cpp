@@ -330,7 +330,7 @@ struct PYPLexicon
       }
     
     if (! num_terminals)
-      if (table.increment(word_pair_type(src, vocab_type::EPSILON), lexicon->oprator()(src, vocab_type::EPSILON), sampler, temperature))
+      if (table.increment(word_pair_type(src, vocab_type::EPSILON), lexicon->operator()(src, vocab_type::EPSILON), sampler, temperature))
 	++ counts0;
   }
 
