@@ -102,6 +102,8 @@ struct PYP
   typedef ptrdiff_t difference_type;
 };
 
+
+// a base mearure for PYPLexicon
 struct LexiconModel
 {
   typedef size_t    size_type;
@@ -110,8 +112,51 @@ struct LexiconModel
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
+  struct word_pair_type
+  {
+    word_type source;
+    word_type target;
+    
+    word_pair_type() : source(), target() {}
+    word_pair_type(const word_type& __source, const word_type& __target)
+      : source(__source), target(__target) {}
+    
+    friend
+    bool operator==(const word_pair_type& x, const word_pair_type& y)
+    {
+      return x.source == y.source && x.target == y.target;
+    }
+    
+    friend
+    size_t hash_value(word_pair_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.source.id(), x.target.id());
+    }
+  };
   
+  typedef utils::dense_hash_map<word_pair_type, double, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+				std::allocator<std::pair<const word_pair_type, double> > >::type table_type;
+
+  template <typename IteratorSource, typename IteratorTarget>
+  void learn(IteratorSource source_first, IteratorSource source_last,
+	     IteratorTarget target_first, IteratorTarget target_last)
+  {
+    
+    
+  }
+
   
+  double operator()(const word_type& source, const word_type& target) const
+  {
+    table_type::const_iterator iter = table.find(word_pair_type(source, target));
+    
+    return (iter != table.end() ? iter->second : smooth);
+  }
+  
+  table_type table;
+  double smooth;
 };
 
 struct PYPLexicon
