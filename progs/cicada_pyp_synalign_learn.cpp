@@ -22,6 +22,15 @@
 //
 // How do we handle empty...!
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <map>
 #include <deque>
 #include <iterator>
@@ -138,18 +147,117 @@ struct LexiconModel
   
   typedef utils::dense_hash_map<word_pair_type, double, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
 				std::allocator<std::pair<const word_pair_type, double> > >::type table_type;
-
-  template <typename IteratorSource, typename IteratorTarget>
-  void learn(IteratorSource source_first, IteratorSource source_last,
-	     IteratorTarget target_first, IteratorTarget target_last)
+  
+  typedef boost::filesystem::path path_type;
+  
+  LexiconModel(const double __smooth=1e-7)
+    : table(), smooth(__smooth)
   {
-    
-    
+    table.set_empty_key(word_pair_type());
   }
+  
+  LexiconModel(const path_type& path_source_target,
+	       const path_type& path_target_source)
+    : table(), smooth()
+  {
+    table.set_empty_key(word_pair_type());
+    read_lexicon(path_source_target, path_target_source);
+  }
+  
+  void read_lexicon(const path_type& path_source_target,
+		    const path_type& path_target_source)
+  {
+    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+        
+    table_type table_source_target;
+    table_type table_target_source;
+    table_source_target.set_empty_key(word_pair_type());
+    table_target_source.set_empty_key(word_pair_type());
+    
+    read_model(path_source_target, table_source_target);
+    read_model(path_target_source, table_target_source);
+    
+    word_set_type sources;
+    word_set_type targets;
+    sources.set_empty_key(word_type());
+    targets.set_empty_key(word_type());
+    
+    table.clear();
+    
+    // we will take an intersection of p(target | souce) and p(source | target),
+    // but leave "epsilon" as is.
+    
+    table_type::const_iterator siter_end = table_source_target.end();
+    for (table_type::const_iterator siter = table_source_target.begin(); siter != siter_end; ++ siter) {
+      if (siter->first.source == vocab_type::EPSILON) {
+	table.insert(*siter);
+	targets.insert(siter->first.target);
+      } else {
+	table_type::const_iterator titer = table_target_source.find(word_pair_type(siter->first.target, siter->first.source));
+	if (titer != table_target_source.end()) {
+	  sources.insert(siter->first.source);
+	  targets.insert(siter->first.target);
+	  
+	  table[siter->first] = std::sqrt(siter->second * titer->second);
+	}
+      }
+    }
+    
+    table_type::const_iterator titer_end = table_target_source.end();
+    for (table_type::const_iterator titer = table_target_source.begin(); titer != titer_end; ++ titer)
+      if (titer->first.source == vocab_type::EPSILON) {
+	table[word_pair_type(titer->first.target, titer->first.source)] = titer->second;
+	sources.insert(titer->first.target);
+      }
+    
+    smooth = (1.0 / sources.size()) * (1.0 / targets.size());
+  }
+  
+  void read_model(const path_type& path, table_type& table)
+  {
+    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
 
+    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
+    
+    table.clear();
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    lexicon_parsed_type lexicon_parsed;
+
+    iterator_type iter(is);
+    iterator_type iter_end;
+
+    while (iter != iter_end) {
+      boost::fusion::get<0>(lexicon_parsed).clear();
+      boost::fusion::get<1>(lexicon_parsed).clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+	if (iter != iter_end)
+	  throw std::runtime_error("global lexicon parsing failed");
+      
+      const word_type target(boost::fusion::get<0>(lexicon_parsed));
+      const word_type source(boost::fusion::get<1>(lexicon_parsed));
+      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
+      
+      table[word_pair_type(source, target)] = prob;
+    }
+  }
   
   double operator()(const word_type& source, const word_type& target) const
   {
+    if (source == vocab_type::EPSILON && target == vocab_type::EPSILON)
+      return 1.0;
+
     table_type::const_iterator iter = table.find(word_pair_type(source, target));
     
     return (iter != table.end() ? iter->second : smooth);
@@ -1448,6 +1556,9 @@ path_type train_target_file = "-";
 path_type test_source_file;
 path_type test_target_file;
 
+path_type lexicon_source_target_file;
+path_type lexicon_target_source_file;
+
 int max_terminal = 2;
 
 int samples = 30;
@@ -1823,6 +1934,9 @@ void options(int argc, char** argv)
     
     ("test-source", po::value<path_type>(&test_source_file), "source test file")
     ("test-target", po::value<path_type>(&test_target_file), "target test file")
+    
+    ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon file for p(target | source)")
+    ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon file for p(source | target)")
 
     ("max-terminal", po::value<int>(&max_terminal)->default_value(max_terminal), "max # of terminals in each rule")
     
