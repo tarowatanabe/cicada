@@ -93,11 +93,23 @@ namespace utils
       
       return iter->first;
     }
+
+    const value_ptr_type operator[](const value_ptr_type& x)
+    {
+      return values_.insert(inserted_type(x, 0)).first->first;
+    }
     
     void erase(const value_type& x)
     {
       values_.erase(inserted_type(value_ptr_type(), &x));
     }
+    
+    void erase(const value_ptr_type& x)
+    {
+      values_.erase(inserted_type(x, 0));
+    }
+
+    void clear() { values_.clear(); }
 
     iterator find(const value_type& x) const { return values_.find(inserted_type(value_ptr_type(), &x)); }
 
