@@ -101,6 +101,18 @@ struct PYP
   typedef ptrdiff_t difference_type;
 };
 
+struct LexiconModel
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+  
+  
+  
+};
+
 struct PYPLexicon
 {
   typedef size_t    size_type;

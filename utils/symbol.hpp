@@ -1,15 +1,13 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__SYMBOL__HPP__
 #define __UTILS__SYMBOL__HPP__ 1
 
 //
-// a thrad-unsafe implementation...
-//
-// Can we make it lock-free?
+// a thrad-safe implementation...
 //
 
 #include <stdint.h>
@@ -23,6 +21,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
+#include <utils/spinlock.hpp>
 
 #include <boost/functional/hash/hash.hpp>
 #include <boost/type_traits.hpp>
@@ -82,6 +81,11 @@ namespace utils
     typedef uint32_t counter_type;
 
   private:
+    typedef utils::spinlock             mutex_type;
+    typedef mutex_type::scoped_lock     lock_type;
+    typedef mutex_type::scoped_try_lock trylock_type;
+
+  private:
     struct Data
     {
       value_type   value;
@@ -107,25 +111,32 @@ namespace utils
   public:
     __symbol_base() : bins(8, 0), garbage(0) {}
     
-    const Tp& operator[](size_type pos) const { return data[pos].value; }
-    size_type size() const { return data.size(); }
+    const Tp& operator[](size_type pos) const { lock_type lock(mutex); return data[pos].value; }
     
     counter_type counter(size_type pos) const
     {
+      lock_type lock(mutex);
+      
       return data[pos].counter;
     }
     void increment(size_type pos)
     {
+      lock_type lock(mutex);
+      
       ++ data[pos].counter;
     }
     
     void decrement(size_type pos)
     {
+      lock_type lock(mutex);
+      
       -- data[pos].counter;
     }
     
     index_type insert(const Tp& x)
     {
+      lock_type lock(mutex);
+
       const size_t key = hash()(x);
       index_type index = bins[key & (bins.size() - 1)];
       index_type index_empty = 0;
@@ -213,7 +224,9 @@ namespace utils
     equal_type& equal() { return static_cast<equal_type&>(*this); }
     const equal_type& equal() const { return static_cast<const equal_type&>(*this); }
     
+    
   private:
+    mutex_type    mutex;
     bin_set_type  bins;
     data_set_type data;
     
