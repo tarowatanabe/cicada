@@ -177,6 +177,7 @@ subprocess_main \
 succinct_vector_main \
 tempfile_main \
 json_string_main \
+unique_set_main \
 vector_map_main \
 vector_set_main \
 vector2_main \
@@ -353,6 +354,9 @@ tempfile_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 tempfile_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
 json_string_main_SOURCES = json_string_main.cpp
+
+unique_set_main_SOURCES = unique_set_main.cpp
+unique_set_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)
 
 vector2_main_SOURCES = vector2_main.cpp
 

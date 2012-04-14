@@ -18,8 +18,6 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <utils/symbol.hpp>
-
 namespace cicada
 {
   class StateAllocator;

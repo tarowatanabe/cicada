@@ -65,6 +65,7 @@ subprocess_main
 succinct_vector_main
 tempfile_main
 json_string_main
+unique_set_main
 vector_map_main
 vector_set_main
 vector2_main

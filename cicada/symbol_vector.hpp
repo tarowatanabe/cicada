@@ -15,7 +15,6 @@
 
 #include <utils/small_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/symbol_sequence.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada

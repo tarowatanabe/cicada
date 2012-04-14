@@ -31,8 +31,8 @@ namespace utils
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef Tp                   value_type;
-    typedef boost::shard_ptr<Tp> value_ptr_type;
+    typedef Tp                    value_type;
+    typedef boost::shared_ptr<Tp> value_ptr_type;
     
   private:
     typedef std::pair<value_ptr_type, const value_type*> inserted_type;
@@ -47,7 +47,7 @@ namespace utils
 
     struct inserted_pred : public Pred
     {
-      bool operator()(const inserted_type& x, const insertd_type& y) const
+      bool operator()(const inserted_type& x, const inserted_type& y) const
       {
 	return (x == y
 		|| (x.first  && y.first  && Pred(*x.first, *y.first))
@@ -64,9 +64,9 @@ namespace utils
   public:
     const value_ptr_type operator[](const value_type& x)
     {
-      inserted_value_set_type::iterator iter = values_.find(inserted_type(value_ptr_type(), &x));
+      typename inserted_value_set_type::iterator iter = values_.find(inserted_type(value_ptr_type(), &x));
       
-      if (iter == values_end())
+      if (iter == values_.end())
 	iter = values_.insert(inserted_type(value_ptr_type(new value_type(x)), 0)).first;
       
       return iter->first;
