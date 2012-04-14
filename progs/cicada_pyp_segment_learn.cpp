@@ -742,7 +742,7 @@ struct PYPLM
   }
   
   template <typename Iterator, typename Sampler>
-  bool increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
+  void increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -766,16 +766,12 @@ struct PYPLM
 	nodes[order].push_back(node);
       }
     }
-
-    // first, we will insert word...
-    base.increment(word, sampler, temperature);
     
-    // then, ngram...
-    return increment(word, node, sampler, temperature);
+    increment(word, node, sampler, temperature);
   }
 
   template <typename Iterator, typename Sampler>
-  bool decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
+  void decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -786,20 +782,17 @@ struct PYPLM
     for (reverse_iterator iter = begin; iter != end; ++ iter)
       node = trie.find(node, *iter);
     
-    // first, we will decrement word...
-    base.decrement(word, sampler);
-    
-    // then, ngram...
-    return decrement(word, node, sampler);
+    decrement(word, node, sampler);
   }
   
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
-      if (root.table.increment(word, base.prob(word), sampler, temperature))
+      if (root.table.increment(word, base.prob(word), sampler, temperature)) {
+	base.increment(word, sampler, temperature);
 	++ counts0;
-      else
+      } else
 	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
@@ -818,9 +811,10 @@ struct PYPLM
   bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
-      if (root.table.decrement(word, sampler))
+      if (root.table.decrement(word, sampler)) {
+	base.decrement(word, sampler);
 	-- counts0;
-      else
+      } else
 	return false;
     } else {
       if (trie[node].table.decrement(word, sampler))
@@ -1074,17 +1068,9 @@ struct PYPLM
     count_set_type counts;
     counts.set_empty_key(segment_type());
     
-    for (size_type order = 0; order != nodes.size(); ++ order) {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (trie.empty(*niter)) {
-	  // we will collect information from nodes without children...
-	  
-	  typename node_type::table_type::const_iterator titer_end = trie[*niter].table.end();
-	  for (typename node_type::table_type::const_iterator titer = trie[*niter].table.begin(); titer != titer_end; ++ titer)
-	    counts[titer->first] += titer->second.size_table();
-	}
-    }
+    typename node_type::table_type::const_iterator titer_end = root.table.end();
+    for (typename node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
+      counts[titer->first] += titer->second.size_table();
     
     base.base.sample_parameters(counts.begin(), counts.end(), sampler);
   }
