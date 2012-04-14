@@ -659,29 +659,17 @@ struct PYPSynAlign
       table(parameter) {}
   
   template <typename Sampler>
-  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
-  {
-    increment(rule_pair_type(source, symbols[target]), sampler, temperature);
-  }
-  
-  template <typename Sampler>
   void increment(const rule_pair_type& rule_pair, Sampler& sampler, const double temperature=1.0)
   {
     const double p0 = (lexicon.prob(rule_pair.source, *rule_pair.target)
 		       * fertility.prob(rule_pair.source, *rule_pair.target)
 		       * distortion.prob(rule_pair.source, *rule_pair.target));
     
-    if (table.increment(rule_pair, p0, sampler, temperature)) {
+    if (table.increment(rule_pair_type(rule_pair.source, symbols[rule_pair.target]), p0, sampler, temperature)) {
       lexicon.increment(rule_pair.source, *rule_pair.target, sampler, temperature);
       fertility.increment(rule_pair.source, *rule_pair.target, sampler, temperature);
       distortion.increment(rule_pair.source, *rule_pair.target, sampler, temperature);
     }
-  }
-  
-  template <typename Sampler>
-  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
-  {
-    decrement(rule_pair_type(source, symbols[target]), sampler);
   }
   
   template <typename Sampler>
