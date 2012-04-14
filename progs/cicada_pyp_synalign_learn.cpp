@@ -161,11 +161,11 @@ struct LexiconModel
     : table(), smooth()
   {
     table.set_empty_key(word_pair_type());
-    read_lexicon(path_source_target, path_target_source);
+    open(path_source_target, path_target_source);
   }
   
-  void read_lexicon(const path_type& path_source_target,
-		    const path_type& path_target_source)
+  void open(const path_type& path_source_target,
+	    const path_type& path_target_source)
   {
     typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
         
@@ -174,8 +174,8 @@ struct LexiconModel
     table_source_target.set_empty_key(word_pair_type());
     table_target_source.set_empty_key(word_pair_type());
     
-    read_model(path_source_target, table_source_target);
-    read_model(path_target_source, table_target_source);
+    open(path_source_target, table_source_target);
+    open(path_target_source, table_target_source);
     
     word_set_type sources;
     word_set_type targets;
@@ -213,7 +213,7 @@ struct LexiconModel
     smooth = (1.0 / sources.size()) * (1.0 / targets.size());
   }
   
-  void read_model(const path_type& path, table_type& table)
+  void open(const path_type& path, table_type& table)
   {
     typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
     typedef boost::spirit::istream_iterator iterator_type;
@@ -303,11 +303,12 @@ struct PYPLexicon
   
   typedef utils::restaurant<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>, std::allocator<word_pair_type > > table_type;
 
-  PYPLexicon(const double& __p0,
+  PYPLexicon(const LexiconModel& __lexicon,
 	     const parameter_type& parameter)
-    : p0(__p0),
+    : lexicon(&__lexicon),
       counts0(0),
       table(parameter) {}
+  
   
   template <typename Sampler>
   void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
@@ -322,14 +323,14 @@ struct PYPLexicon
     symbol_set_type::const_iterator titer_end = target.end();
     for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
       if (titer->is_terminal()) {
-	if (table.increment(word_pair_type(src, *titer), p0, sampler, temperature))
+	if (table.increment(word_pair_type(src, *titer), lexicon->operator()(src, *titer), sampler, temperature))
 	  ++ counts0;
 	
 	++ num_terminals;
       }
     
     if (! num_terminals)
-      if (table.increment(word_pair_type(src, vocab_type::EPSILON), p0, sampler, temperature))
+      if (table.increment(word_pair_type(src, vocab_type::EPSILON), lexicon->oprator()(src, vocab_type::EPSILON), sampler, temperature))
 	++ counts0;
   }
 
@@ -367,19 +368,19 @@ struct PYPLexicon
     symbol_set_type::const_iterator titer_end = target.end();
     for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
       if (titer->is_terminal()) {
-	p *= table.prob(word_pair_type(src, *titer), p0);
+	p *= table.prob(word_pair_type(src, *titer), lexicon->operator()(src, *titer));
 	++ num_terminals;
       }
     
     if (! num_terminals)
-      p *= table.prob(word_pair_type(src, vocab_type::EPSILON), p0);
+      p *= table.prob(word_pair_type(src, vocab_type::EPSILON), lexicon->operator()(src, vocab_type::EPSILON));
     
     return p;
   }
   
   double log_likelihood() const
   {
-    return table.log_likelihood() + std::log(p0) * counts0;
+    return table.log_likelihood();
   }
   
   double log_likelihood(const double& discount, const double& strength) const
@@ -400,9 +401,8 @@ struct PYPLexicon
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
-
   
-  double p0;
+  const LexiconModel* lexicon;
   size_type counts0;
   table_type table;
 };
@@ -1637,8 +1637,14 @@ int main(int argc, char ** argv)
     
     if (sources.size() != targets.size())
       throw std::runtime_error("source/target side do not match!");
+
+    LexiconModel lexicon_model((1.0 / source_vocab_size) * (1.0 / target_vocab_size));
+
+    if (! lexicon_source_target_file.empty() && lexicon_target_source_file.empty())
+      lexicon_model.open(lexicon_source_target_file,
+			 lexicon_target_source_file);
     
-    PYPLexicon   lexicon((1.0 / source_vocab_size) * (1.0 / target_vocab_size),
+    PYPLexicon   lexicon(lexicon_model,
 			 PYPLexicon::parameter_type(lexicon_discount,
 						    lexicon_strength,
 						    lexicon_discount_prior_alpha,
