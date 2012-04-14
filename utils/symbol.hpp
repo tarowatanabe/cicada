@@ -111,7 +111,11 @@ namespace utils
   public:
     __symbol_base() : bins(8, 0), garbage(0) {}
     
-    const Tp& operator[](size_type pos) const { lock_type lock(mutex); return data[pos].value; }
+    const Tp& operator[](size_type pos) const
+    {
+      lock_type lock(mutex);
+      return data[pos].value;
+    }
     
     counter_type counter(size_type pos) const
     {

@@ -126,6 +126,7 @@ tempfile.hpp \
 thread_specific_ptr.hpp \
 json_string_generator.hpp \
 json_string_parser.hpp \
+unique_set.hpp \
 unordered_map.hpp \
 unordered_set.hpp \
 utf8.hpp \
