@@ -478,9 +478,8 @@ struct PYPGraph
   
   typedef utils::vector2<double, std::allocator<double> > alpha_type;
   typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;  
+  typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
   
-  typedef std::pair<prob_type, id_type> prob_id_type;
-  typedef std::vector<prob_id_type, std::allocator<prob_id_type> > prob_id_set_type;
 
   logprob_type forward(const PYPPOS& model, const sentence_type& sentence, const cutoff_type& cutoff)
   {
@@ -511,31 +510,39 @@ struct PYPGraph
   }
   
   template <typename Sampler>
-  logprob_type backward(const PYPPOS& model, Sampler& sampler, const sentence_type& sentence, derivation_type& derivation, const double temperature)
+  logprob_type backward(const PYPPOS& model, Sampler& sampler, const sentence_type& sentence, const cutoff_type& cutoff, derivation_type& derivation, const double temperature)
   {
     const size_type T = alpha.size1();
     const size_type K = alpha.size2();
     
     probs.clear();
-    for (id_type state = 1; state != K; ++ state)
-      probs.push_back(alpha(T - 1, state));
+    positions.clear();
+    for (id_type state = 1; state != K; ++ state) 
+      if (alpha(T - 1, state) != 0.0) {
+	probs.push_back(alpha(T - 1, state));
+	positions.push_back(state);
+      }
     
     prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
     
     logprob_type logprob = cicada::semiring::traits<logprob_type>::one();
-    id_type state = (piter - probs.begin()) + 1;
+    id_type state = positions[piter - probs.begin()];
     derivation[T - 1] = state;
     
     for (size_type t = T - 1; t > 1; -- t) {
       probs.clear();
-      for (id_type prev = 1; prev != K; ++ prev)
-	probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
+      positions.clear();
+      for (id_type prev = 1; prev != K; ++ prev) 
+	if (alpha(t - 1, prev) != 0.0 && model.cache_transition(prev, state) > cutoff[t]) {
+	  probs.push_back(alpha(t - 1, prev) * model.cache_transition(prev, state) * model.cache_emission(state, sentence[t - 1]));
+	  positions.push_back(prev);
+	}
       
       prob_set_type::const_iterator piter = sampler.draw(probs.begin(), probs.end(), temperature);
       
-      logprob *= *piter / alpha(t - 1, state);
+      state = positions[piter - probs.begin()];
       
-      state = (piter - probs.begin()) + 1;
+      logprob *= *piter / alpha(t - 1, state);
       
       derivation[t - 1] = state;
     }
@@ -587,8 +594,9 @@ struct PYPGraph
   }
   
   
-  alpha_type       alpha;
-  prob_set_type    probs;
+  alpha_type        alpha;
+  prob_set_type     probs;
+  position_set_type positions;
 };
 
 typedef boost::filesystem::path path_type;
@@ -758,7 +766,7 @@ struct Task
       graph.forward(model, training[pos], cutoffs[pos]);
       
       // backward
-      graph.backward(model, sampler, training[pos], derivations[pos], temperature);
+      graph.backward(model, sampler, training[pos], cutoffs[pos], derivations[pos], temperature);
       
       reducer.push(pos);
     }
