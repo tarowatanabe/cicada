@@ -31,6 +31,7 @@ libtool
 arc_list_main
 b_heap_main
 base64_main
+bichart_main
 bithack_main
 bitpack_main
 bit_vector_main

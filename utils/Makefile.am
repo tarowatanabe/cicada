@@ -37,6 +37,7 @@ async_device.hpp \
 atomicop.hpp \
 b_heap.hpp \
 base64.hpp \
+bichart.hpp \
 bithack.hpp \
 bitpack.hpp \
 bit_vector.hpp \
@@ -143,6 +144,7 @@ noinst_PROGRAMS = \
 arc_list_main \
 b_heap_main \
 base64_main \
+bichart_main \
 bithack_main \
 bitpack_main \
 bit_vector_main \
@@ -247,6 +249,10 @@ b_heap_main_LDADD = $(LIBUTILS)
 
 base64_main_SOURCES = base64_main.cpp
 #base64_main_LDADD = $(LIBUTILS)
+
+bichart_main_SOURCES = bichart_main.cpp
+bichart_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+bichart_main_LDADD = $(BOOST_THREAD_LIBS)
 
 bithack_main_SOURCES = bithack_main.cpp
 
