@@ -1119,8 +1119,9 @@ struct PYPGraph
 	   const hypergraph_type& __source,
 	   const sentence_type&   __target,
 	   const PYPSynAlign&     __synalign,
-	   const size_type        __terminal_max)
-      : graph(__graph), source(__source), target(__target), synalign(__synalign), terminal_max(__terminal_max) {}
+	   const size_type        __terminal_max,
+	   const bool             __transduction)
+      : graph(__graph), source(__source), target(__target), synalign(__synalign), terminal_max(__terminal_max), transduction(__transduction) {}
     
     template <typename Index>
     void operator()(const hypergraph_type::edge_type& edge, Index& j, const Index& j_ends, span_set_type& antecedent, size_type last)
@@ -1161,7 +1162,7 @@ struct PYPGraph
 	      const size_type span_last = span_first + span_length;
 	      
 	      // ITG-like!
-	      //if (! antecedent.empty() && span_length) continue;
+	      if (transduction && ! antecedent.empty() && span_length) continue;
 	      
 	      const symbol_set_ptr_type& target_string = graph.rule_string(target, span_type(span_first, span_last), antecedent);
 	      
@@ -1194,9 +1195,9 @@ struct PYPGraph
 		
 	    for (size_type span_first = span_first_min; span_first <= span_first_max; ++ span_first) {
 	      const size_type span_last = span_first + span_length;
-		  
+	      
 	      // ITG-like!
-	      //if (span_length - total_hole) continue;
+	      if (transduction && span_length - total_hole) continue;
 		  
 	      const symbol_set_ptr_type& target_string = graph.rule_string(target, span_type(span_first, span_last), antecedent);
 		  
@@ -1231,10 +1232,11 @@ struct PYPGraph
     const sentence_type&   target;
     const PYPSynAlign&     synalign;
     const size_type        terminal_max;
+    const bool             transduction;
   };
 
 
-  logprob_type inside(const hypergraph_type& source, const sentence_type& target, const PYPSynAlign& synalign, const size_type terminal_max)
+  logprob_type inside(const hypergraph_type& source, const sentence_type& target, const PYPSynAlign& synalign, const size_type terminal_max, const bool transduction)
   {    
     typedef std::vector<size_type, std::allocator<size_type> > index_set_type;
 
@@ -1244,7 +1246,7 @@ struct PYPGraph
     index_set_type j;
     index_set_type j_ends;
 
-    Inside insider(*this, source, target, synalign, terminal_max);
+    Inside insider(*this, source, target, synalign, terminal_max, transduction);
 
     hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -1313,7 +1315,7 @@ struct PYPGraph
 		  const size_type span_last = span_first + span_length;
 		  
 		  // ITG-like!
-		  //if (! antecedent.empty() && span_length) continue;
+		  if (transduction && ! antecedent.empty() && span_length) continue;
 		  
 		  const symbol_set_ptr_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
@@ -1349,7 +1351,7 @@ struct PYPGraph
 		  const size_type span_last = span_first + span_length;
 		  
 		  // ITG-like!
-		  //if (span_length - total_hole) continue;
+		  if (transduction && span_length - total_hole) continue;
 		  
 		  const symbol_set_ptr_type& target_string = rule_string(target, span_type(span_first, span_last), antecedent);
 		  
@@ -1475,7 +1477,8 @@ struct Task
        derivation_set_type& __derivations_prev,
        const PYPSynAlign& __model,
        sampler_type& __sampler,
-       const int& __max_terminal)
+       const int& __max_terminal,
+       const bool __transduction)
     : mapper(__mapper),
       reducer(__reducer),
       sources(__sources),
@@ -1484,7 +1487,8 @@ struct Task
       derivations_prev(__derivations_prev),
       model(__model),
       sampler(__sampler),
-      max_terminal(__max_terminal) {}
+      max_terminal(__max_terminal),
+      transduction(__transduction) {}
 
   void operator()()
   {
@@ -1503,7 +1507,7 @@ struct Task
 	  model.decrement(*diter, sampler);
       }
       
-      graph.inside(sources[pos], targets[pos], model, max_terminal);
+      graph.inside(sources[pos], targets[pos], model, max_terminal, transduction);
       
       graph.outside(sources[pos], targets[pos], sampler, derivations[pos], temperature);
       
@@ -1526,6 +1530,7 @@ struct Task
   PYPSynAlign  model;
   sampler_type sampler;
   int max_terminal;
+  bool transduction;
   
   double temperature;
   
@@ -1560,6 +1565,7 @@ path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
 int max_terminal = 2;
+bool transduction = false;
 
 int samples = 30;
 int baby_steps = 0;
@@ -1712,7 +1718,8 @@ int main(int argc, char ** argv)
 								 derivations_prev,
 								 synalign,
 								 sampler,
-								 max_terminal));
+								 max_terminal,
+								 transduction));
     
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
@@ -1945,6 +1952,7 @@ void options(int argc, char** argv)
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon file for p(source | target)")
 
     ("max-terminal", po::value<int>(&max_terminal)->default_value(max_terminal), "max # of terminals in each rule")
+    ("transduction", po::bool_switch(&transduction),                             "transduction grammar")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
