@@ -354,6 +354,7 @@ struct PYPPOS
     
     while (pi_max > cutoff_min) {
       beta.increment(sampler);
+      base0 = 1.0 / beta.size();
       
       const size_type K = beta.size() + 1;
       for (size_type k = 0; k != K; ++ k)
