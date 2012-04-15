@@ -663,11 +663,14 @@ struct TaskBeam
 	derivation.push_back(0);
 	
 	for (size_type i = 0; i != sentence.size(); ++ i) {
+	  derivation.push_back(boost::random::uniform_int_distribution<int>(1, K-1)(sampler.generator()));
+#if 0
 	  probs.clear();
 	  for (size_type state = 1; state != K; ++ state)
 	    probs.push_back(model.cache_transition(state) * model.cache_emission(state, sentence[i]));
 	  
 	  derivation.push_back((sampler.draw(probs.begin(), probs.end()) - probs.begin()) + 1);
+#endif
 	}
       }
       
