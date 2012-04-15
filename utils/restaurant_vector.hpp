@@ -317,6 +317,15 @@ namespace utils
       else
 	return (P(dishes[dish].customers - parameter.discount * dishes[dish].tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
+
+    template <typename P>
+    std::pair<P, bool> model_prob(const dish_type dish, const P& p0) const
+    {
+      if (dish >= dishes.size() || dishes[dish].empty())
+	return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);
+      else
+	return std::make_pair((P(dishes[dish].customers - parameter.discount * dishes[dish].tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
+    }
     
     double log_likelihood() const
     {

@@ -293,6 +293,17 @@ namespace utils
       else
 	return (P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
+
+    template <typename P>
+    std::pair<P, bool> model_prob(const dish_type& dish, const P& p0) const
+    {
+      typename dish_set_type::const_iterator diter = dishes.find(dish);
+      
+      if (diter == dishes.end())
+	return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);
+      else
+	return std::make_pair((P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
+    }
     
     double log_likelihood() const
     {
