@@ -117,7 +117,11 @@ struct PYP
     
     span_type() : first(0), last(0) {}
     span_type(const size_type& __first, const size_type& __last)
-      : first(__first), last(__last) {}
+      : first(__first), last(__last)
+    {
+      if (first > last)
+	throw std::runtime_error("invalid span");
+    }
     
     bool empty() const { return first == last; }
     size_type size() const { return last - first; }
@@ -1162,11 +1166,11 @@ struct PYPGraph
 
     base_source.clear();
     base_source.reserve(source.size() + 1, target.size() + 1);
-    base_source.resize(source.size() + 1, target.size() + 1);
+    base_source.resize(source.size() + 1, target.size() + 1, logprob_type(1));
 
     base_target.clear();
     base_target.reserve(source.size() + 1, target.size() + 1);
-    base_target.resize(source.size() + 1, target.size() + 1);
+    base_target.resize(source.size() + 1, target.size() + 1, logprob_type(1));
             
     model1_source.clear();
     model1_target.clear();
@@ -1181,29 +1185,28 @@ struct PYPGraph
     // initialize model1 probabilities...
     //std::cerr << "model1 probabilities" << std::endl;
     
-    for (size_type trg = 0; trg != target.size(); ++ trg) {
-      for (size_type first = 0; first != source.size(); ++ first) {
-	
+    for (size_type target_pos = 0; target_pos != target.size(); ++ target_pos) {
+      for (size_type source_first = 0; source_first != source.size(); ++ source_first) {
 	double sum = 0.0;
-	for (size_type last = first + 1; last <= utils::bithack::min(first + max_length, source.size()); ++ last) {
-	  sum += model.phrase.lexicon.prob_source_target(source[last - 1], target[trg]);
-	  model1_source[trg](first, last) = sum;
+	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
+	  sum += model.phrase.lexicon.prob_source_target(source[source_last - 1], target[target_pos]);
+	  model1_source[target_pos](source_first, source_last) = sum;
 	}
       }
       
-      epsilon_source[trg] = model.phrase.lexicon.prob_source_target(vocab_type::EPSILON, target[trg]);
+      epsilon_source[target_pos] = model.phrase.lexicon.prob_source_target(vocab_type::EPSILON, target[target_pos]);
     }
     
-    for (size_type src = 0; src != source.size(); ++ src) {
-      for (size_type first = 0; first != target.size(); ++ first) {
+    for (size_type source_pos = 0; source_pos != source.size(); ++ source_pos) {
+      for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
 	double sum = 0.0;
-	for (size_type last = first + 1; last <= utils::bithack::min(first + max_length, target.size()); ++ last) {
-	  sum += model.phrase.lexicon.prob_target_source(target[last - 1], source[src]);
-	  model1_target[src](first, last) = sum;
+	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	  sum += model.phrase.lexicon.prob_target_source(target[target_last - 1], source[source_pos]);
+	  model1_target[source_pos](target_first, target_last) = sum;
 	}
       }
       
-      epsilon_target[src] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[src]);
+      epsilon_target[source_pos] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[source_pos]);
     }
 
     //std::cerr << "initialize chart" << std::endl;
@@ -1218,8 +1221,6 @@ struct PYPGraph
 	
 	// temporary...
 	base(source_first, source_first, target_first, target_first) = 1.0;
-	base_source(source_first, source_first + 1, target_first, target_first) = 1.0;
-	base_target(source_first, source_first, target_first, target_first + 1) = 1.0;
 	
 	// epsilons.. 
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
@@ -1277,6 +1278,7 @@ struct PYPGraph
 	// phrases... is it correct?
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last)
 	  for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	    
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 	    const span_pair_type span_pair(span_type(source_first, source_last), span_type(target_first, target_last));
@@ -1740,8 +1742,8 @@ double lexicon_strength_prior_rate  = 1.0;
 
 double lambda_source = 2.0;
 double lambda_target = 2.0;
-double lambda_shape = 3;
-double lambda_rate  = 1;
+double lambda_shape = 0.2;
+double lambda_rate  = 0.1;
 
 int threads = 1;
 int debug = 0;
@@ -1784,18 +1786,28 @@ int main(int argc, char ** argv)
     LexiconModel lexicon_source_target(1.0 / target_vocab_size);
     LexiconModel lexicon_target_source(1.0 / source_vocab_size);
 
-    boost::thread_group workers_open;
-    
+    {
+      boost::thread_group workers_open;
+      
+      if (! lexicon_source_target_file.empty())
+	workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
+							      boost::ref(lexicon_source_target),
+							      boost::cref(lexicon_source_target_file))));
+      if (! lexicon_target_source_file.empty())
+	workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
+							      boost::ref(lexicon_target_source),
+							      boost::cref(lexicon_target_source_file))));    
+      
+      workers_open.join_all();
+    }
+
+#if 0
     if (! lexicon_source_target_file.empty())
-      workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
-							    boost::ref(lexicon_source_target),
-							    boost::cref(lexicon_source_target_file))));
-    if (! lexicon_target_source_file.empty())
-      workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
-							    boost::ref(lexicon_target_source),
-							    boost::cref(lexicon_target_source_file))));    
+      lexicon_source_target.open(lexicon_source_target_file);
     
-    workers_open.join_all();
+    if (! lexicon_target_source_file.empty())
+      lexicon_target_source.open(lexicon_target_source_file);
+#endif
     
     PYPPiAlign model(PYPRule(PYPRule::parameter_type(rule_discount,
 						     rule_strength,
@@ -1962,9 +1974,9 @@ int main(int argc, char ** argv)
 	      
 	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE) {
 		std::cerr << " pair: ";
-		std::copy(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last,std::ostream_iterator<word_type>(std::cerr, " "));
+		std::copy(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last, std::ostream_iterator<word_type>(std::cerr, " "));
 		std::cerr << "||| ";
-		std::copy(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last,std::ostream_iterator<word_type>(std::cerr, " "));
+		std::copy(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last, std::ostream_iterator<word_type>(std::cerr, " "));
 	      }
 	      
 	      std::cerr << std::endl;
@@ -1975,8 +1987,7 @@ int main(int argc, char ** argv)
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-
-
+	  
 	  if (debug) {
 	    if ((reduced + 1) % 10000 == 0)
 	      std::cerr << '.';
