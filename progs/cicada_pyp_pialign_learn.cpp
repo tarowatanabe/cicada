@@ -1784,41 +1784,49 @@ int main(int argc, char ** argv)
     LexiconModel lexicon_source_target(1.0 / target_vocab_size);
     LexiconModel lexicon_target_source(1.0 / source_vocab_size);
 
-    if (! lexicon_source_target_file.empty())
-      lexicon_source_target.open(lexicon_source_target_file);
-
-    if (! lexicon_target_source_file.empty())
-      lexicon_target_source.open(lexicon_target_source_file);
+    boost::thread_group workers_open;
     
-    PYPPiAlign  model(PYPRule(PYPRule::parameter_type(rule_discount,
-						      rule_strength,
-						      rule_discount_prior_alpha,
-						      rule_discount_prior_beta,
-						      rule_strength_prior_shape,
-						      rule_strength_prior_rate)),
-		      PYPPhrase(PYPLexicon(lexicon_source_target,
-					   lexicon_target_source,
-					   PYPLexicon::parameter_type(lexicon_discount,
-								      lexicon_strength,
-								      lexicon_discount_prior_alpha,
-								      lexicon_discount_prior_beta,
-								      lexicon_strength_prior_shape,
-								      lexicon_strength_prior_rate)),
-				PYPLength(LengthModel(lambda_source, lambda_shape, lambda_rate),
-					  LengthModel(lambda_target, lambda_shape, lambda_rate)),
-				PYPPhrase::parameter_type(phrase_discount,
-							  phrase_strength,
-							  phrase_discount_prior_alpha,
-							  phrase_discount_prior_beta,
-							  phrase_strength_prior_shape,
-							  phrase_strength_prior_rate)));
+    if (! lexicon_source_target_file.empty())
+      workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
+							    boost::ref(lexicon_source_target),
+							    boost::cref(lexicon_source_target_file))));
+    if (! lexicon_target_source_file.empty())
+      workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
+							    boost::ref(lexicon_target_source),
+							    boost::cref(lexicon_target_source_file))));    
+    
+    workers_open.join_all();
+    
+    PYPPiAlign model(PYPRule(PYPRule::parameter_type(rule_discount,
+						     rule_strength,
+						     rule_discount_prior_alpha,
+						     rule_discount_prior_beta,
+						     rule_strength_prior_shape,
+						     rule_strength_prior_rate)),
+		     PYPPhrase(PYPLexicon(lexicon_source_target,
+					  lexicon_target_source,
+					  PYPLexicon::parameter_type(lexicon_discount,
+								     lexicon_strength,
+								     lexicon_discount_prior_alpha,
+								     lexicon_discount_prior_beta,
+								     lexicon_strength_prior_shape,
+								     lexicon_strength_prior_rate)),
+			       PYPLength(LengthModel(lambda_source, lambda_shape, lambda_rate),
+					 LengthModel(lambda_target, lambda_shape, lambda_rate)),
+			       PYPPhrase::parameter_type(phrase_discount,
+							 phrase_strength,
+							 phrase_discount_prior_alpha,
+							 phrase_discount_prior_beta,
+							 phrase_strength_prior_shape,
+							 phrase_strength_prior_rate)));
     
     derivation_set_type derivations(sources.size());
     derivation_set_type derivations_prev(sources.size());
     position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
       if (! sources[i].empty() && ! targets[i].empty()
-	  && (max_sentence_length <= 0 || (sources[i].size() <= max_sentence_length && targets[i].size() <= max_sentence_length)))
+	  && (max_sentence_length <= 0 || (static_cast<int>(sources[i].size()) <= max_sentence_length
+					   && static_cast<int>(targets[i].size()) <= max_sentence_length)))
 	positions.push_back(i);
     position_set_type(positions).swap(positions);
     
