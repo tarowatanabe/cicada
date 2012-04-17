@@ -447,13 +447,12 @@ struct PYPLexicon
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	table.increment(*titer, lexicon_source_target->operator()(vocab_type::EPSILON, *titer), sampler, temperature);
-      
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	if (! tables_source_target.exists(siter->id()))
 	  tables_source_target[siter->id()] = table_type(parameter_source_target.discount,
-						    parameter_source_target.strength);
+							 parameter_source_target.strength);
 	
 	table_type& table = tables_source_target[siter->id()];
 	
@@ -478,7 +477,7 @@ struct PYPLexicon
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
 	if (! tables_target_source.exists(titer->id()))
 	  tables_target_source[titer->id()] = table_type(parameter_target_source.discount,
-						    parameter_target_source.strength);
+							 parameter_target_source.strength);
 	
 	table_type& table = tables_target_source[titer->id()];
 	
@@ -761,12 +760,33 @@ struct PYPLength
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
+  
+  typedef std::vector<size_type, std::allocator<size_type> > count_set_type;
 
   PYPLength(const LengthModel& __length_source,
 	    const LengthModel& __length_target)
     : length_source(__length_source),
       length_target(__length_target)
   {}
+
+  template <typename Sampler>
+  void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
+  {
+    if (source.size() >= counts_source.size())
+      counts_source.resize(source.size() + 1, 0);
+    if (target.size() >= counts_target.size())
+      counts_target.resize(target.size() + 1, 0);
+    
+    ++ counts_source[source.size()];
+    ++ counts_target[target.size()];
+  }
+
+  template <typename Sampler>
+  void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
+  {
+    -- counts_source[source.size()];
+    -- counts_target[target.size()];    
+  }
   
   double prob(const phrase_type& source, const phrase_type& target) const
   {
@@ -785,16 +805,32 @@ struct PYPLength
   }
   
   template <typename Sampler>
-  void sample_parameters(const double& alpha_source, const double& beta_source,
-			 const double& alpha_target, const double& beta_target,
-			 Sampler& sampler)
+  void sample_parameters(Sampler& sampler)
   {
-    length_source.sample_parameters(alpha_source, beta_source, sampler);
-    length_target.sample_parameters(alpha_target, beta_target, sampler);
+    double source_alpha = 0.0;
+    double source_beta = 0.0;
+    double target_alpha = 0.0;
+    double target_beta = 0.0;
+    
+    for (size_type source = 0; source != counts_source.size(); ++ source) {
+      source_alpha += source * counts_source[source];
+      source_beta += counts_source[source];
+    }
+
+    for (size_type target = 0; target != counts_target.size(); ++ target) {
+      target_alpha += target * counts_target[target];
+      target_beta += counts_target[target];
+    }
+
+    length_source.sample_parameters(source_alpha, source_beta, sampler);
+    length_target.sample_parameters(target_alpha, target_beta, sampler);
   }
   
   LengthModel length_source;
   LengthModel length_target;
+
+  count_set_type counts_source;
+  count_set_type counts_target;
 };
 
 struct PYPRule
@@ -863,7 +899,7 @@ struct PYPRule
   
   double log_likelihood() const
   {
-    return table.log_likelihood();
+    return table.log_likelihood() + std::log(p0) * counts0;
   }
   
   template <typename Sampler>
@@ -871,8 +907,7 @@ struct PYPRule
   {
     table.sample_parameters(sampler, num_loop, num_iterations);
   }
-
-
+  
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
@@ -918,6 +953,8 @@ struct PYPPhrase
   {
     table.increment_new(phrase_pair, sampler);
     
+    length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+
     lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
   
@@ -927,15 +964,21 @@ struct PYPPhrase
     const double p0 = (lexicon.prob(phrase_pair.source, phrase_pair.target)
 		       * length.prob(phrase_pair.source, phrase_pair.target));
     
-    if (table.increment(phrase_pair, p0, sampler, temperature))
+    if (table.increment(phrase_pair, p0, sampler, temperature)) {
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    }
   }
   
   template <typename Sampler>
   void decrement(const phrase_pair_type& phrase_pair, Sampler& sampler)
   {
-    if (table.decrement(phrase_pair, sampler))
+    if (table.decrement(phrase_pair, sampler)) {
+      length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+      
       lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    }
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -976,8 +1019,8 @@ struct PYPPhrase
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    sample_length_parameters(sampler);
-
+    length.sample_parameters(sampler);
+    
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
     
     table.sample_parameters(sampler, num_loop, num_iterations);
@@ -986,39 +1029,11 @@ struct PYPPhrase
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    sample_length_parameters(sampler);
+    length.sample_parameters(sampler);
     
     lexicon.slice_sample_parameters(sampler, num_loop, num_iterations);
     
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
-  }
-  
-  template <typename Sampler>
-  void sample_length_parameters(Sampler& sampler)
-  {
-    // compute lengths from table...
-    double source_alpha = 0.0;
-    double source_beta = 0.0;
-    double target_alpha = 0.0;
-    double target_beta = 0.0;
-    
-    table_type::const_iterator titer_end = table.end();
-    for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
-      if (titer->first.source.empty()) {
-	target_alpha += titer->first.target.size() * titer->second.size_table();
-	target_beta  += titer->second.size_table();
-      } else if (titer->first.target.empty()) {
-	source_alpha += titer->first.source.size() * titer->second.size_table();
-	source_beta  += titer->second.size_table();
-      } else {
-	source_alpha += titer->first.source.size() * titer->second.size_table();
-	source_beta  += titer->second.size_table();
-	target_alpha += titer->first.target.size() * titer->second.size_table();
-	target_beta  += titer->second.size_table();
-      }
-    }
-    
-    length.sample_parameters(source_alpha, source_beta, target_alpha, target_beta, sampler);
   }
   
   PYPLexicon lexicon;
@@ -1162,7 +1177,7 @@ struct PYPGraph
     
     base.clear();
     base.reserve(source.size() + 1, target.size() + 1);
-    base.resize(source.size() + 1, target.size() + 1);
+    base.resize(source.size() + 1, target.size() + 1, logprob_type(1));
 
     base_source.clear();
     base_source.reserve(source.size() + 1, target.size() + 1);
@@ -1171,7 +1186,7 @@ struct PYPGraph
     base_target.clear();
     base_target.reserve(source.size() + 1, target.size() + 1);
     base_target.resize(source.size() + 1, target.size() + 1, logprob_type(1));
-            
+    
     model1_source.clear();
     model1_target.clear();
     model1_source.resize(target.size(), model1_type(source.size() + 1));
@@ -1218,13 +1233,10 @@ struct PYPGraph
     // actually, we should be carefull with the beta assignment, since we need to consult the base of phrase-model + rule-model
     for (size_type source_first = 0; source_first != source.size(); ++ source_first)
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
-	
-	// temporary...
-	base(source_first, source_first, target_first, target_first) = 1.0;
-	
+		
 	// epsilons.. 
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
-	  const span_pair_type span_pair(span_type(source_first, source_last), span_type(target_first, target_first));
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_first);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_first);
 
@@ -1250,10 +1262,10 @@ struct PYPGraph
 	}
 	
 	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	  const span_pair_type span_pair(source_first, source_first, target_first, target_last);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_first);
 	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
-	  const span_pair_type span_pair(span_type(source_first, source_first), span_type(target_first, target_last));
-
+	  
 	  const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
 	  
 	  logprob_type& logbase = base(source_first, source_first, target_first, target_last);
@@ -1278,10 +1290,9 @@ struct PYPGraph
 	// phrases... is it correct?
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last)
 	  for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
-	    
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
-	    const span_pair_type span_pair(span_type(source_first, source_last), span_type(target_first, target_last));
 	    
 	    logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
 	    logprob_type& logbase_target = base_target(source_first, source_last, target_first, target_last);
@@ -1323,7 +1334,7 @@ struct PYPGraph
     
     bool operator()(const span_pair_type& x, const span_pair_type& y) const
     {
-      return beta(x.source.first, x.source.last, x.target.first, x.target.last) < beta(y.source.first, y.source.last, x.target.first, x.target.last);
+      return beta(x.source.first, x.source.last, x.target.first, x.target.last) < beta(y.source.first, y.source.last, y.target.first, y.target.last);
     }
     
     const beta_type& beta;
@@ -1800,14 +1811,6 @@ int main(int argc, char ** argv)
       
       workers_open.join_all();
     }
-
-#if 0
-    if (! lexicon_source_target_file.empty())
-      lexicon_source_target.open(lexicon_source_target_file);
-    
-    if (! lexicon_target_source_file.empty())
-      lexicon_target_source.open(lexicon_target_source_file);
-#endif
     
     PYPPiAlign model(PYPRule(PYPRule::parameter_type(rule_discount,
 						     rule_strength,
