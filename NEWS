@@ -1,12 +1,17 @@
-2012-3-x
+2012-5-x
+New: added PYP-pos, an unsupervised pos induction (currently, we support training, and no pos assinger exists)
+new: added PYP-pialign, an unsupervised phrasal ITG aligner! (currently, we support training, and no phrasal aligner exists)
+
+2012-4-9
 INCOMPATIBLE CHANGE: renamed cicada_learn_block_mpi to cicada_learn_online_kbest_mpi and use the block-wise algorithms for cicada_learn_online_mpi
 Bugfix: Adde brevity penalty for RIBES
 Bugfix: Do not read oracles when learning by xBLEU
+New: added # of non-terminals in cicada-extract.py with "scfg" (currently, we support 0, 1, 2, 3)
 New: added permute-deterministic which deterministically permute hyperedges wrt the category of the head.
 New: added filter for alignment: Currently, we support inverse, permutation
 New: added xBLEU to cicada_learn_online_kbest_mpi
 New: support the latest sparse hash (moved from google to sparsehash) and gperftools (renamed from google-perftools)
-New: added PYP-LM (highly experimental) and we can use it as our feature function
+New: added PYP-LM (highly experimental) and we can use it as our feature function!
 New: added PYP-translit, an unsupervised transliterator model (currently, we support training and no real transliterator exists)
 New: added PYP-segment, an unsupervised word segmenter (currently, we support training and no real segmenter exists)
 

@@ -20,6 +20,7 @@ README.ling \
 README.mpi \
 README.operation \
 README.parameter \
+README.pyp \
 README.requirements \
 README.theory \
 README.tree-grammar
