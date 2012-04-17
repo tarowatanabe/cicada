@@ -179,13 +179,13 @@ struct PYP
 
     rule_type()
       : span(), left(), right(), itg() {}
-    rule_type(const span_type& __span, const itg_type& __itg)
+    rule_type(const span_pair_type& __span, const itg_type& __itg)
       : span(__span), left(), right(), itg(__itg) {}
-    rule_type(const span_type& __span, const span_type& __left, const span_type& __right, const itg_type& __itg)
+    rule_type(const span_pair_type& __span, const span_pair_type& __left, const span_pair_type& __right, const itg_type& __itg)
       : span(__span), left(__left), right(__right) {}
     
     bool is_terminal() const { return left.empty() && right.empty(); }
-    bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.right; }
+    bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.first; }
     bool is_inverted() const { return ! is_terminal() && left.target.first == right.target.last; }
     
     size_type size() const { return span.size(); }
@@ -197,6 +197,7 @@ struct PYP
     typedef ptrdiff_t difference_type;
     
     typedef const word_type* iterator;
+    typedef const word_type* const_iterator;
     
     phrase_type() : first(0), last(0) {}
     phrase_type(iterator __first, iterator __last)
@@ -213,7 +214,7 @@ struct PYP
     iterator end() const { return last; }
     
     friend
-    bool operator==(const word_pair_type& x, const word_pair_type& y)
+    bool operator==(const phrase_type& x, const phrase_type& y)
     {
       return (x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin()));
     }
@@ -253,7 +254,9 @@ struct PYP
     friend
     size_t hash_value(phrase_pair_type const& x)
     {
-      return hash_value(x.source, hash_value(x.target));
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.source.begin(), x.source.end(), hash_value(x.target));
     }
   };
 
@@ -356,7 +359,7 @@ struct LexiconModel
       
       table[word_pair_type(source, target)] = prob;
       
-      words.inset(target);
+      words.insert(target);
     }
     
     smooth = 1.0 / words.size();
@@ -405,11 +408,11 @@ struct PYPLexicon
       throw std::runtime_error("invalid phrase pair");
     
     if (source.empty()) {
-      if (! tables_source_target.exists(vocab_type::EPSILON))
-	tables_source_target[vocab_type::EPSILON] = table_type(parameter_source_target.discount,
-							       parameter_source_target.strength);
+      if (! tables_source_target.exists(vocab_type::EPSILON.id()))
+	tables_source_target[vocab_type::EPSILON.id()] = table_type(parameter_source_target.discount,
+								    parameter_source_target.strength);
 
-      table_type& table = tables_source_target[vocab_type::EPSILON];
+      table_type& table = tables_source_target[vocab_type::EPSILON.id()];
       
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
@@ -418,11 +421,11 @@ struct PYPLexicon
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	if (! tables_source_target.exists(*siter))
-	  tables_source_target[*siter] = table_type(parameter_source_target.discount,
+	if (! tables_source_target.exists(siter->id()))
+	  tables_source_target[siter->id()] = table_type(parameter_source_target.discount,
 						    parameter_source_target.strength);
 	
-	table_type& table = tables_source_target[*siter];
+	table_type& table = tables_source_target[siter->id()];
 	
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
@@ -431,11 +434,11 @@ struct PYPLexicon
     }
     
     if (target.empty()) {
-      if (! tables_target_source.exists(vocab_type::EPSILON))
-	tables_target_source[vocab_type::EPSILON] = table_type(parameter_target_source.discount,
-							       parameter_target_source.strength);
+      if (! tables_target_source.exists(vocab_type::EPSILON.id()))
+	tables_target_source[vocab_type::EPSILON.id()] = table_type(parameter_target_source.discount,
+								    parameter_target_source.strength);
       
-      table_type& table = tables_target_source[vocab_type::EPSILON];
+      table_type& table = tables_target_source[vocab_type::EPSILON.id()];
       
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -443,11 +446,11 @@ struct PYPLexicon
     } else {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	if (! tables_target_source.exists(*titer))
-	  tables_target_source[*titer] = table_type(parameter_target_source.discount,
+	if (! tables_target_source.exists(titer->id()))
+	  tables_target_source[titer->id()] = table_type(parameter_target_source.discount,
 						    parameter_target_source.strength);
 	
-	table_type& table = tables_target_source[*titer];
+	table_type& table = tables_target_source[titer->id()];
 	
 	phrase_type::const_iterator siter_end = source.end();
 	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -463,7 +466,7 @@ struct PYPLexicon
       throw std::runtime_error("invalid phrase pair");
     
     if (source.empty()) {
-      table_type& table = tables_source_target[vocab_type::EPSILON];
+      table_type& table = tables_source_target[vocab_type::EPSILON.id()];
       
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
@@ -472,7 +475,7 @@ struct PYPLexicon
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	table_type& table = tables_source_target[*siter];
+	table_type& table = tables_source_target[siter->id()];
 	
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
@@ -481,7 +484,7 @@ struct PYPLexicon
     }
     
     if (target.empty()) {
-      table_type& table = tables_target_source[vocab_type::EPSILON];
+      table_type& table = tables_target_source[vocab_type::EPSILON.id()];
       
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -489,7 +492,7 @@ struct PYPLexicon
     } else {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	table_type& table = tables_target_source[*titer];
+	table_type& table = tables_target_source[titer->id()];
 	
 	phrase_type::const_iterator siter_end = source.end();
 	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -500,18 +503,18 @@ struct PYPLexicon
 
   double prob_source_target(const word_type& source, const word_type& target) const
   {
-    if (! tables_source_target.exists(source))
+    if (! tables_source_target.exists(source.id()))
       return lexicon_source_target->operator()(source, target);
     else
-      return tables_source_target[source].prob(target, lexicon_source_target->operator()(source, target));
+      return tables_source_target[source.id()].prob(target, lexicon_source_target->operator()(source, target));
   }
   
   double prob_target_source(const word_type& target, const word_type& source) const
   {
-    if (! tables_target_source.exists(target))
+    if (! tables_target_source.exists(target.id()))
       return lexicon_target_source->operator()(target, source);
     else
-      return tables_target_source[target].prob(source, lexicon_target_source->operator()(target, source));
+      return tables_target_source[target.id()].prob(source, lexicon_target_source->operator()(target, source));
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -528,12 +531,12 @@ struct PYPLexicon
     if (source.empty()) {
       factor_source_target = 1.0;
 
-      if (! tables_source_target.exists(vocab_type::EPSILON)) {
+      if (! tables_source_target.exists(vocab_type::EPSILON.id())) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	  logprob_source_target += std::log(lexicon_source_target->operator()(vocab_type::EPSILON, *titer));
       } else {
-	const table_type& table = tables_source_target[vocab_type::EPSILON];
+	const table_type& table = tables_source_target[vocab_type::EPSILON.id()];
 	
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
@@ -545,10 +548,10 @@ struct PYPLexicon
 	double sum = 0.0;
 	phrase_type::const_iterator siter_end = source.end();
 	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	  if (! tables_source_target.exists(*siter))
+	  if (! tables_source_target.exists(siter->id()))
 	    sum += lexicon_source_target->operator()(*siter, *titer);
 	  else
-	    sum += tables_source_target[*siter].prob(*titer, lexicon_source_target->operator()(*siter, *titer));
+	    sum += tables_source_target[siter->id()].prob(*titer, lexicon_source_target->operator()(*siter, *titer));
 	}
 	
 	logprob_source_target += std::log(sum);
@@ -558,12 +561,12 @@ struct PYPLexicon
     if (target.empty()) {
       factor_target_source = 1.0;
 
-      if (! tables_target_source.exists(vocab_type::EPSILON)) {
+      if (! tables_target_source.exists(vocab_type::EPSILON.id())) {
 	phrase_type::const_iterator siter_end = source.end();
 	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
 	  logprob_target_source += std::log(lexicon_target_source->operator()(vocab_type::EPSILON, *siter));
       } else {
-	table_type& table = tables_target_source[vocab_type::EPSILON];
+	const table_type& table = tables_target_source[vocab_type::EPSILON.id()];
 	
 	phrase_type::const_iterator siter_end = source.end();
 	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -576,10 +579,10 @@ struct PYPLexicon
 	double sum = 0.0;
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	  if (! tables_target_source.exists(*titer))
+	  if (! tables_target_source.exists(titer->id()))
 	    sum += lexicon_target_source->operator()(*titer, *siter);
 	  else
-	    sum += tables_target_source[*titer].prob(*siter, lexicon_target_source->operator()(*titer, *siter));
+	    sum += tables_target_source[titer->id()].prob(*siter, lexicon_target_source->operator()(*titer, *siter));
 	}
 	
 	logprob_target_source += std::log(sum);
@@ -593,13 +596,13 @@ struct PYPLexicon
   {
     double logprob = parameter_source_target.log_likelihood() + parameter_target_source.log_likelihood();
     
-    table_set_tyep::const_iterator siter_end = tables_source_target.end();
-    for (table_set_tyep::const_iterator siter = tables_source_target.begin(); siter != siter_end; ++ siter)
+    table_set_type::const_iterator siter_end = tables_source_target.end();
+    for (table_set_type::const_iterator siter = tables_source_target.begin(); siter != siter_end; ++ siter)
       if (*siter)
 	logprob += (*siter)->log_likelihood();
     
-    table_set_tyep::const_iterator titer_end = tables_target_source.end();
-    for (table_set_tyep::const_iterator titer = tables_target_source.begin(); titer != titer_end; ++ titer)
+    table_set_type::const_iterator titer_end = tables_target_source.end();
+    for (table_set_type::const_iterator titer = tables_target_source.begin(); titer != titer_end; ++ titer)
       if (*titer)
 	logprob += (*titer)->log_likelihood();
     
@@ -714,6 +717,8 @@ struct LengthModel
   double lambda;
   double strength_shape;
   double strength_rate;
+
+  cache_type cache;
 };
 
 // length prior...
@@ -733,7 +738,7 @@ struct PYPLength
       length_target(__length_target)
   {}
   
-  double prob(const phrase_type& source, const phrase_type& target)
+  double prob(const phrase_type& source, const phrase_type& target) const
   {
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
@@ -741,7 +746,7 @@ struct PYPLength
     return std::exp(length_source.logprob(source.size()) + length_target.logprob(target.size()));
   }
   
-  logprob_type logprob(const phrase_type& source, const phrase_type& target)
+  logprob_type logprob(const phrase_type& source, const phrase_type& target) const
   {
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
@@ -791,7 +796,7 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
 			  
-    if (table.increment(itg, p0, sampler, templerature))
+    if (table.increment(itg, p0, sampler, temperature))
       ++ counts0;
   }
 
@@ -873,13 +878,13 @@ struct PYPPhrase
       table(parameter) {}
   
   template <typename Sampler>
-  void increment_existing(const phrase_pir_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_existing(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
   {
     table.increment_existing(phrase_pair, sampler);
   }
 
   template <typename Sampler>
-  void increment_new(const phrase_pir_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_new(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
   {
     table.increment_new(phrase_pair, sampler);
     
@@ -887,10 +892,10 @@ struct PYPPhrase
   }
   
   template <typename Sampler>
-  void increment(const phrase_pir_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
   {
-    const double p0 = (lexicon.prob(phrase_pair.source, *phrase_pair.target)
-		       * length.prob(phrase_pair.source, *phrase_pair.target));
+    const double p0 = (lexicon.prob(phrase_pair.source, phrase_pair.target)
+		       * length.prob(phrase_pair.source, phrase_pair.target));
     
     if (table.increment(phrase_pair, p0, sampler, temperature))
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
@@ -983,7 +988,7 @@ struct PYPPhrase
       }
     }
     
-    length.sample_parameters(alpha_source, beta_source, alpha_target, beta_target, sampler);
+    length.sample_parameters(source_alpha, source_beta, target_alpha, target_beta, sampler);
   }
   
   PYPLexicon lexicon;
@@ -1011,26 +1016,26 @@ struct PYPPiAlign
     : rule(__rule), phrase(__phrase) {}
   
   template <typename Sampler>
-  void increment(const sentence_type& source, const sentence_type& target, const rule_type& rule, Sampler& sampler, const double temperature=1.0)
+  void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature=1.0)
   {
-    rule.increment(rule, sampler, temperature);
+    rule.increment(r, sampler, temperature);
     
-    const phrase_pair_type phrase_pair(source.begin() + rule.span.source.first, source.begin() + rule.span.source.last,
-				       target.begin() + rule.span.target.first, target.begin() + rule.span.target.last);
+    const phrase_pair_type phrase_pair(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
+				       target.begin() + r.span.target.first, target.begin() + r.span.target.last);
     
-    if (rule.itg == GENERATIVE)
+    if (r.itg == PYP::GENERATIVE)
       phrase.increment_existing(phrase_pair, sampler);
     else
       phrase.increment_new(phrase_pair, sampler);
   }
 
   template <typename Sampler>
-  void decrement(const sentence_type& source, const sentence_type& target, const rule_type& rule, Sampler& sampler)
+  void decrement(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler)
   {
-    rule.decrement(rule, sampler, temperature);
+    rule.decrement(r, sampler);
     
-    phrase.decrement(phrase_pair_type(source.begin() + rule.span.source.first, source.begin() + rule.span.source.last,
-				      target.begin() + rule.span.target.first, target.begin() + rule.span.target.last),
+    phrase.decrement(phrase_pair_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
+				      target.begin() + r.span.target.first, target.begin() + r.span.target.last),
 		     sampler);
   }
 
@@ -1061,8 +1066,8 @@ struct PYPPiAlign
 
 struct PYPGraph
 {
-  typedef PYP::size_t    size_type;
-  typedef PYP::ptrdiff_t difference_type;
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
 
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
@@ -1103,14 +1108,17 @@ struct PYPGraph
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
   typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
 				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+
+  typedef utils::chart<logprob_type, std::allocator<logprob_type> > model1_type;
+  typedef std::vector<model1_type, std::allocator<model1_type> > model1_chart_type;
   
   void initialize(const sentence_type& source,
 		  const sentence_type& target,
-		  const PYPPiAlin& model,
+		  const PYPPiAlign& model,
 		  const size_type max_length)
   {
     beta.clear();
-    beta.reservev(source.size() + 1, target.size() + 1);
+    beta.reserve(source.size() + 1, target.size() + 1);
     beta.resize(source.size() + 1, target.size() + 1);
 
     edges.clear();
@@ -1121,21 +1129,21 @@ struct PYPGraph
     agenda.resize(source.size() + target.size() + 1);
     
     base.clear();
-    base.reservev(source.size() + 1, target.size() + 1);
+    base.reserve(source.size() + 1, target.size() + 1);
     base.resize(source.size() + 1, target.size() + 1);
 
     base_source.clear();
-    base_source.reservev(source.size() + 1, target.size() + 1);
+    base_source.reserve(source.size() + 1, target.size() + 1);
     base_source.resize(source.size() + 1, target.size() + 1);
 
     base_target.clear();
-    base_target.reservev(source.size() + 1, target.size() + 1);
+    base_target.reserve(source.size() + 1, target.size() + 1);
     base_target.resize(source.size() + 1, target.size() + 1);
             
     model1_source.clear();
     model1_target.clear();
-    model1_source.resize(target.size(), model1_chart_type(source.size() + 1));
-    model1_target.resize(source.size(), model1_chart_type(target.size() + 1));
+    model1_source.resize(target.size(), model1_type(source.size() + 1));
+    model1_target.resize(source.size(), model1_type(target.size() + 1));
     
     epsilon_source.clear();
     epsilon_target.clear();
@@ -1185,7 +1193,7 @@ struct PYPGraph
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
 	  const span_pair_type span_pair(span_type(source_first, source_last), span_type(target_first, target_first));
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
-	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_first);
 
 	  const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
 	  
@@ -1205,11 +1213,11 @@ struct PYPGraph
 	  edges(source_first, source_last, target_first, target_first).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	  logprob_beta += logprob_base;
 	  
-	  agenda[span_pair.size()].push_bak(span_pair);
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
-	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
+	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_first);
 	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 	  const span_pair_type span_pair(span_type(source_first, source_first), span_type(target_first, target_last));
 
@@ -1231,7 +1239,7 @@ struct PYPGraph
 	  edges(source_first, source_first, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	  logprob_beta += logprob_base;
 	  
-	  agenda[span_pair.size()].push_bak(span_pair);
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// phrases... is it correct?
@@ -1295,7 +1303,7 @@ struct PYPGraph
 		       const size_type max_length)
   {
     
-    initialize(source, target, model, beam, max_length);
+    initialize(source, target, model, max_length);
 
     span_pairs_unique_type spans_unique;
     spans_unique.set_empty_key(span_pairs_type(span_pair_type(), span_pair_type()));
@@ -1311,8 +1319,8 @@ struct PYPGraph
 	
 	std::make_heap(spans.begin(), spans.end(), heap_span_pair(beta));
 	
-	span_pair_type::iterator siter_begin = spans.begin();
-	span_pair_type::iterator siter_end   = spans.end();
+	span_pair_set_type::iterator siter_begin = spans.begin();
+	span_pair_set_type::iterator siter_end   = spans.end();
 	
 	const logprob_type logprob_max = beta(spans.front().source.first, spans.front().source.last, spans.front().target.first, spans.front().target.last);
 	
@@ -1350,7 +1358,7 @@ struct PYPGraph
 	      if (edges(S, s, U, u).empty()) continue;
 	      
 	      const span_pair_type  span1(S, s, U, u);
-	      const span_pait_type& span2(span_pair);
+	      const span_pair_type& span2(span_pair);
 	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
@@ -1376,7 +1384,7 @@ struct PYPGraph
 	      if (edges(S, s, v, U).empty()) continue;
 	      
 	      const span_pair_type  span1(S, s, v, U);
-	      const span_pait_type& span2(span_pair);
+	      const span_pair_type& span2(span_pair);
 	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
@@ -1403,9 +1411,9 @@ struct PYPGraph
 	      // span1: stuv
 	      // span2: tSUu
 	      
-	      if (edges(span2, t, S, U, u).empty()) continue;
+	      if (edges(t, S, U, u).empty()) continue;
 	      
-	      const span_pait_type& span1(span_pair);
+	      const span_pair_type& span1(span_pair);
 	      const span_pair_type  span2(t, S, U, u);
 	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
@@ -1431,7 +1439,7 @@ struct PYPGraph
 	      
 	      if (edges(t, S, v, U).empty()) continue;
 	      
-	      const span_pait_type& span1(span_pair);
+	      const span_pair_type& span1(span_pair);
 	      const span_pair_type  span2(t, S, v, U);
 	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
@@ -1483,7 +1491,7 @@ struct PYPGraph
       
       if (edges_span.empty()) {
 	// no derivation???
-	derivatin.clear();
+	derivation.clear();
 	return logprob_type();
       }
       
@@ -1498,11 +1506,11 @@ struct PYPGraph
       
       const size_type pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
 
-      const rule_type& rule = edges_span[pos_sampled];
-      
+
       // we will push in a right first manner, so that when popped, we will derive left-to-right traversal.
       
-      logprob_type prob = rule.prob;
+      const rule_type& rule = edges_span[pos_sampled].rule;
+      logprob_type prob = edges_span[pos_sampled].prob;
       
       if (! rule.right.empty()) {
 	prob /= beta(rule.right.source.first, rule.right.source.last, rule.right.target.first, rule.right.target.last);
@@ -1519,7 +1527,6 @@ struct PYPGraph
       prob_derivation *= prob;
       
       derivation.push_back(rule);
-      derivation.back().prob = prob;
     }
     
     return prob_derivation;
@@ -1529,12 +1536,19 @@ struct PYPGraph
   base_type base;
   base_type base_source;
   base_type base_target;
+
+  edge_chart_type edges;
   
-  prob_set_type model1_source;
-  prob_set_type model1_target;
+  model1_chart_type model1_source;
+  model1_chart_type model1_target;
+
+  prob_set_type epsilon_source;
+  prob_set_type epsilon_target;
   
   logprob_set_type logprobs;
   prob_set_type    probs;
+
+  agenda_type agenda;
 };
 
 
@@ -1555,6 +1569,9 @@ struct Task
   
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
   
+  typedef PYPPiAlign::logprob_type logprob_type;
+  typedef PYPPiAlign::prob_type    prob_type;
+
   Task(queue_type& __mapper,
        queue_type& __reducer,
        const sentence_set_type& __sources,
@@ -1591,7 +1608,7 @@ struct Task
       if (! derivations_prev[pos].empty()) {
 	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
 	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter);w
+	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
       
       graph.forward(sources[pos], targets[pos], model, beam, max_length);
@@ -1601,7 +1618,7 @@ struct Task
       // increment model...
       derivation_type::const_iterator diter_end = derivations[pos].end();
       for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	model.increment(sources[pos], targets[pos], *diter, temperature);
+	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
       
       reducer.push(pos);
     }
@@ -1712,9 +1729,6 @@ int main(int argc, char ** argv)
     if (resample_rate <= 0)
       throw std::runtime_error("resample rate must be >= 1");
     
-    if (! slice_sampling && strength < 0.0)
-      throw std::runtime_error("negative strength w/o slice sampling is not supported!");
-    
     if (beam < 0.0 || beam > 1.0)
       throw std::runtime_error("invalid beam width");
     
@@ -1786,10 +1800,10 @@ int main(int argc, char ** argv)
 		<< " strength=" << model.rule.table.strength() << std::endl
 		<< "phrase: discount=" << model.phrase.table.discount()
 		<< " strength=" << model.phrase.table.strength() << std::endl
-		<< "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount()
-		<< " strength=" << model.phrase.lexicon.parameter_source_target.strength() << std::endl
-		<< "lexicon p(source|target): discount=" << model.phrase.lexicon.parameter_target_source.discount()
-		<< " strength=" << model.phrase.lexicon.parameter_target_source.strength() << std::endl
+		<< "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount
+		<< " strength=" << model.phrase.lexicon.parameter_source_target.strength << std::endl
+		<< "lexicon p(source|target): discount=" << model.phrase.lexicon.parameter_target_source.discount
+		<< " strength=" << model.phrase.lexicon.parameter_target_source.strength << std::endl
 		<< "length source: lambda=" << model.phrase.length.length_source.lambda << std::endl
 		<< "length target: lambda=" << model.phrase.length.length_target.lambda << std::endl;
     
@@ -1878,7 +1892,7 @@ int main(int argc, char ** argv)
 	  if (! derivations_prev[pos].empty()) {
 	    derivation_type::const_iterator diter_end = derivations[pos].end();
 	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	      model.increment(*diter, sampler, temperature);
+	      model.decrement(sources[pos], targets[pos], *diter, sampler);
 	  }
 
 	  if (debug >= 3) {
@@ -1892,10 +1906,11 @@ int main(int argc, char ** argv)
 	      
 	      std::cerr << "derivation: ";
 	      switch (diter->itg) {
+	      case PYP::TERMINAL:   std::cerr << "term"; break;
+	      case PYP::STRAIGHT:   std::cerr << "str"; break;
+	      case PYP::INVERTED:   std::cerr << "inv"; break;
 	      case PYP::GENERATIVE: std::cerr << "gen"; break;
 	      case PYP::BASE:       std::cerr << "base"; break;
-	      case PYP::STRIGHT:    std::cerr << "str"; break;
-	      case PYP::INVERTED:   std::cerr << "inv"; break;
 	      }
 	      
 	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
@@ -1907,7 +1922,7 @@ int main(int argc, char ** argv)
 	  // increment model...
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    model.increment(sources[pos], targets[pos], *diter, temperature);
+	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
 	}
       }
 
@@ -1923,10 +1938,10 @@ int main(int argc, char ** argv)
 		    << " strength=" << model.rule.table.strength() << std::endl
 		    << "phrase: discount=" << model.phrase.table.discount()
 		    << " strength=" << model.phrase.table.strength() << std::endl
-		    << "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount()
-		    << " strength=" << model.phrase.lexicon.parameter_source_target.strength() << std::endl
-		    << "lexicon p(source|target): discount=" << model.phrase.lexicon.parameter_target_source.discount()
-		    << " strength=" << model.phrase.lexicon.parameter_target_source.strength() << std::endl
+		    << "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount
+		    << " strength=" << model.phrase.lexicon.parameter_source_target.strength << std::endl
+		    << "lexicon p(source|target): discount=" << model.phrase.lexicon.parameter_target_source.discount
+		    << " strength=" << model.phrase.lexicon.parameter_target_source.strength << std::endl
 		    << "length source: lambda=" << model.phrase.length.length_source.lambda << std::endl
 		    << "length target: lambda=" << model.phrase.length.length_target.lambda << std::endl;
       }

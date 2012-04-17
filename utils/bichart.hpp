@@ -3,8 +3,8 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__CHART__HPP__
-#define __UTILS__CHART__HPP__ 1
+#ifndef __UTILS__BICHART__HPP__
+#define __UTILS__BICHART__HPP__ 1
 
 //
 // a compact implementation of bi-chart structure...
