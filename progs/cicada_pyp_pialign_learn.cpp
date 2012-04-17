@@ -135,6 +135,19 @@ struct PYP
       
       return hasher_type()(x.first, x.last);
     }
+
+    friend
+    bool disjoint(const span_type& x, const span_type& y)
+    {
+      return x.last <= y.first || y.last <= x.first;
+    }
+
+    friend
+    bool adjacent(const span_type& x, const span_type& y)
+    {
+      return x.last == y.first || y.last == x.first;
+    }
+    
   };
 
   struct span_pair_type
@@ -167,6 +180,19 @@ struct PYP
       
       return hasher_type()(x);
     }
+    
+    friend
+    bool disjoint(const span_pair_type& x, const span_pair_type& y)
+    {
+      return disjoint(x.source, y.source) && disjoint(x.target, y.target);
+    }
+
+    friend
+    bool adjacent(const span_pair_type& x, const span_pair_type& y)
+    {
+      return adjacent(x.source, y.source) && adjacent(x.target, y.target);
+    }
+    
   };
 
   // How to differentiate base or generative?
@@ -182,7 +208,7 @@ struct PYP
     rule_type(const span_pair_type& __span, const itg_type& __itg)
       : span(__span), left(), right(), itg(__itg) {}
     rule_type(const span_pair_type& __span, const span_pair_type& __left, const span_pair_type& __right, const itg_type& __itg)
-      : span(__span), left(__left), right(__right) {}
+      : span(__span), left(__left), right(__right), itg(__itg) {}
     
     bool is_terminal() const { return left.empty() && right.empty(); }
     bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.first; }
@@ -1105,6 +1131,8 @@ struct PYPGraph
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
   
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
+
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
   typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
 				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
@@ -1149,8 +1177,10 @@ struct PYPGraph
     epsilon_target.clear();
     epsilon_source.resize(target.size());
     epsilon_target.resize(source.size());
-    
+
     // initialize model1 probabilities...
+    //std::cerr << "model1 probabilities" << std::endl;
+    
     for (size_type trg = 0; trg != target.size(); ++ trg) {
       for (size_type first = 0; first != source.size(); ++ first) {
 	
@@ -1175,6 +1205,8 @@ struct PYPGraph
       
       epsilon_target[src] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[src]);
     }
+
+    //std::cerr << "initialize chart" << std::endl;
     
     const logprob_type logprob_fallback = model.phrase.prob(logprob_type(1.0));
     const logprob_type logprob_term = model.rule.prob_terminal();
@@ -1302,8 +1334,11 @@ struct PYPGraph
 		       const logprob_type beam,
 		       const size_type max_length)
   {
+    //std::cerr << "initialize" << std::endl;
     
     initialize(source, target, model, max_length);
+
+    //std::cerr << "forward" << std::endl;
 
     span_pairs_unique_type spans_unique;
     spans_unique.set_empty_key(span_pairs_type(span_pair_type(), span_pair_type()));
@@ -1323,7 +1358,7 @@ struct PYPGraph
 	span_pair_set_type::iterator siter_end   = spans.end();
 	
 	const logprob_type logprob_max = beta(spans.front().source.first, spans.front().source.last, spans.front().target.first, spans.front().target.last);
-	
+
 	spans_unique.clear();
 
 	for (/**/; siter_begin != siter_end; -- siter_end) {
@@ -1331,7 +1366,7 @@ struct PYPGraph
 	  const logprob_type& logprob = beta(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last);
 	  
 	  if (logprob <= logprob_max * beam) break;
-	  
+
 	  // we borrow the notation...
 	  
 	  const difference_type l = length;
@@ -1346,7 +1381,7 @@ struct PYPGraph
 	  // remember, we have processed only upto length l. thus, do not try to combine with spans greather than l!
 	  // also, keep used pair of spans in order to remove duplicates.
 	  
-	  for (difference_type S = utils::bithack::min(s - l, difference_type(0)); S <= s; ++ S) {
+	  for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
 	    const difference_type l2 = l - (s - S);
 	    
 	    // straight
@@ -1376,7 +1411,7 @@ struct PYPGraph
 	    }
 	    
 	    // inversion
-	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + l2, T); ++ U) {
+	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + l2, V); ++ U) {
 	      // parent span: StuU
 	      // span1: SsvU
 	      // span2: stuv
@@ -1396,7 +1431,7 @@ struct PYPGraph
 
 	      beta(S, t, u, U) += logprob;
 	      edges(S, t, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
-	      
+
 	      if (edges(S, t, u, U).size() == 1)
 		agenda[span_head.size()].push_back(span_head);
 	    }
@@ -1426,7 +1461,7 @@ struct PYPGraph
 	      
 	      beta(s, S, U, v) += logprob;
 	      edges(s, S, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
-	      
+
 	      if (edges(s, S, U, v).size() == 1)
 		agenda[span_head.size()].push_back(span_head);
 	    }
@@ -1461,7 +1496,7 @@ struct PYPGraph
 	  std::pop_heap(siter_begin, siter_end, heap_span_pair(beta));
 	}
       }
-    
+
     return beta(0, source.size(), 0, target.size());
   }
   
@@ -1473,14 +1508,14 @@ struct PYPGraph
 			derivation_type& derivation,
 			const double temperature)
   {
-    typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
+    //std::cerr << "backward" << std::endl;
 
     derivation.clear();
     logprob_type prob_derivation = cicada::semiring::traits<logprob_type>::one(); 
     
     // top-down sampling of the hypergraph...
     
-    stack_type stack;
+    stack.clear();
     stack.push_back(span_pair_type(0, source.size(), 0, target.size()));
     
     while (! stack.empty()) {
@@ -1528,16 +1563,19 @@ struct PYPGraph
       
       derivation.push_back(rule);
     }
-    
+
     return prob_derivation;
   }
-  
+
   beta_type beta;
+  edge_chart_type edges;
+  
+  agenda_type agenda;
+  stack_type stack;
+  
   base_type base;
   base_type base_source;
   base_type base_target;
-
-  edge_chart_type edges;
   
   model1_chart_type model1_source;
   model1_chart_type model1_target;
@@ -1547,8 +1585,6 @@ struct PYPGraph
   
   logprob_set_type logprobs;
   prob_set_type    probs;
-
-  agenda_type agenda;
 };
 
 
@@ -1651,10 +1687,7 @@ struct less_size
 
   bool operator()(const size_type& x, const size_type& y) const
   {
-    const size_t x_target = targets[x].size();
-    const size_t y_target = targets[y].size();
-    
-    return (x_target < y_target || (!(y_target < x_target) && sources[x].size() < sources[y].size()));
+    return (sources[x].size() + targets[x].size()) < (sources[y].size() + targets[y].size());
   }
   
   const sentence_set_type& sources;
@@ -1670,7 +1703,8 @@ path_type test_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
-int max_length = 7;
+int max_phrase_length = 7;
+int max_sentence_length = 40;
 double beam = 1e-10;
 
 int samples = 30;
@@ -1783,7 +1817,8 @@ int main(int argc, char ** argv)
     derivation_set_type derivations_prev(sources.size());
     position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
-      if (! sources[i].empty() && ! targets[i].empty())
+      if (! sources[i].empty() && ! targets[i].empty()
+	  && (max_sentence_length <= 0 || (sources[i].size() <= max_sentence_length && targets[i].size() <= max_sentence_length)))
 	positions.push_back(i);
     position_set_type(positions).swap(positions);
     
@@ -1821,7 +1856,7 @@ int main(int argc, char ** argv)
 								 model,
 								 sampler,
 								 beam, 
-								 max_length));
+								 max_phrase_length));
     
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
@@ -1890,8 +1925,8 @@ int main(int argc, char ** argv)
 	  ++ reduced;
 	  
 	  if (! derivations_prev[pos].empty()) {
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	    for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
 	      model.decrement(sources[pos], targets[pos], *diter, sampler);
 	  }
 
@@ -1906,16 +1941,25 @@ int main(int argc, char ** argv)
 	      
 	      std::cerr << "derivation: ";
 	      switch (diter->itg) {
-	      case PYP::TERMINAL:   std::cerr << "term"; break;
+	      case PYP::TERMINAL:   std::cerr << "ter"; break;
 	      case PYP::STRAIGHT:   std::cerr << "str"; break;
 	      case PYP::INVERTED:   std::cerr << "inv"; break;
 	      case PYP::GENERATIVE: std::cerr << "gen"; break;
-	      case PYP::BASE:       std::cerr << "base"; break;
+	      case PYP::BASE:       std::cerr << "bas"; break;
+	      default: std::cerr << "UNK";
 	      }
 	      
 	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-			<< " target: " << diter->span.target.first << "..." << diter->span.target.last
-			<< std::endl;
+			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
+	      
+	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE) {
+		std::cerr << " pair: ";
+		std::copy(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last,std::ostream_iterator<word_type>(std::cerr, " "));
+		std::cerr << "||| ";
+		std::copy(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last,std::ostream_iterator<word_type>(std::cerr, " "));
+	      }
+	      
+	      std::cerr << std::endl;
 	    }
 	  }
 	  
@@ -1923,9 +1967,19 @@ int main(int argc, char ** argv)
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+
+
+	  if (debug) {
+	    if ((reduced + 1) % 10000 == 0)
+	      std::cerr << '.';
+	    if ((reduced + 1) % 1000000 == 0)
+	      std::cerr << '\n';
+	  }
 	}
       }
 
+      if (debug && (reduced + 1) % 1000000 != 0)
+	std::cerr << std::endl;
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
@@ -2009,8 +2063,9 @@ void options(int argc, char** argv)
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon file for p(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon file for p(source | target)")
 
-    ("max-length", po::value<int>(&max_length)->default_value(max_length), "max # of lengths in each phrase")
-    ("beam",       po::value<double>(&beam)->default_value(beam),          "beam threshold")
+    ("max-phrase-length",   po::value<int>(&max_phrase_length)->default_value(max_phrase_length),     "max phrase length")
+    ("max-sentence-length", po::value<int>(&max_sentence_length)->default_value(max_sentence_length), "max sentence length")
+    ("beam",                po::value<double>(&beam)->default_value(beam),                            "beam threshold")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
