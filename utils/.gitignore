@@ -28,6 +28,7 @@ libtool
 
 
 
+alloc_vector_main
 arc_list_main
 b_heap_main
 base64_main

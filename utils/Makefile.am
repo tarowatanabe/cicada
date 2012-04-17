@@ -141,6 +141,7 @@ vertical_coded_device.hpp \
 vertical_coded_vector.hpp
 
 noinst_PROGRAMS = \
+alloc_vector_main \
 arc_list_main \
 b_heap_main \
 base64_main \
@@ -239,6 +240,8 @@ group_aligned_code.hpp : group_aligned_code_offsets.hpp
 
 group_aligned_code_offsets.hpp : group_aligned_code_offsets.py
 	./group_aligned_code_offsets.py > group_aligned_code_offsets.hpp
+
+alloc_vector_main_SOURCES = alloc_vector_main.cpp
 
 arc_list_main_SOURCES = arc_list_main.cpp
 arc_list_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
