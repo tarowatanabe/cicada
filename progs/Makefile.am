@@ -97,6 +97,7 @@ bin_PROGRAMS = \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
 	cicada_pyp_ngram_learn \
+	cicada_pyp_pialign_learn \
 	cicada_pyp_pos_learn \
 	cicada_pyp_segment_learn \
 	cicada_pyp_synalign_learn \
@@ -365,9 +366,12 @@ cicada_maxlike_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDA
 cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp $(LBFGS_SOURCE) cicada_maxlike_impl.hpp cicada_text_impl.hpp
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
- 
+
 cicada_pyp_ngram_learn_SOURCES = cicada_pyp_ngram_learn.cpp 
 cicada_pyp_ngram_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_pyp_pialign_learn_SOURCES = cicada_pyp_pialign_learn.cpp 
+cicada_pyp_pialign_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_pyp_pos_learn_SOURCES = cicada_pyp_pos_learn.cpp 
 cicada_pyp_pos_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

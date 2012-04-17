@@ -210,6 +210,55 @@ namespace utils
       
       dishes.swap(dishes_new);
     }
+
+    template <typename Sampler>
+    bool increment_existing(const dish_type& dish, Sampler& sampler)
+    {
+      if (dish >= dishes.size())
+	dishes.resize(dish + 1);
+      
+      location_type& loc = dishes[dish];
+
+      double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
+	
+      bool incremented = false;
+	
+      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
+      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
+	r -= (*titer - parameter.discount);
+	  
+	if (r <= 0.0) {
+	  ++ (*titer);
+	  incremented = true;
+	  break;
+	}
+      }
+	
+      if (! incremented)
+	throw std::runtime_error("not incremented?");
+
+      ++ loc.customers;
+      ++ customers;
+      
+      return false;
+    }
+    
+    template <typename Sampler>
+    bool increment_new(const dish_type& dish, Sampler& sampler)
+    {
+      if (dish >= dishes.size())
+	dishes.resize(dish + 1);
+      
+      location_type& loc = dishes[dish];
+      
+      loc.tables.push_back(1);
+      ++ tables;
+      
+      ++ loc.customers;
+      ++ customers;
+      
+      return true;
+    }
     
     template <typename Sampler>
     bool increment(const dish_type dish, const double& p0, Sampler& sampler, const double temperature=1.0)
@@ -317,9 +366,15 @@ namespace utils
       else
 	return (P(dishes[dish].customers - parameter.discount * dishes[dish].tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
-
+    
     template <typename P>
-    std::pair<P, bool> model_prob(const dish_type dish, const P& p0) const
+    P prob(const P& p0) const
+    {
+      return P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength);
+    }
+    
+    template <typename P>
+    std::pair<P, bool> prob_model(const dish_type dish, const P& p0) const
     {
       if (dish >= dishes.size() || dishes[dish].empty())
 	return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);

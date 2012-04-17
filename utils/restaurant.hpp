@@ -184,7 +184,49 @@ namespace utils
       dishes.swap(x.dishes);
       parameter.swap(x.parameter);
     }
+    
+    template <typename Sampler>
+    bool increment_existing(const dish_type& dish, Sampler& sampler)
+    {
+      location_type& loc = dishes[dish];
+      
+      double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
+      
+      bool incremented = false;
+      
+      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
+      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
+	r -= (*titer - parameter.discount);
+	
+	if (r <= 0.0) {
+	  ++ (*titer);
+	  incremented = true;
+	  break;
+	}
+      }
+      
+      if (! incremented)
+	throw std::runtime_error("not incremented?");
+      
+      ++ loc.customers;
+      ++ customers;
 
+      return false;
+    }
+
+    template <typename Sampler>
+    bool increment_new(const dish_type& dish, Sampler& sampler)
+    {
+      location_type& loc = dishes[dish];
+      
+      loc.tables.push_back(1);
+      ++ tables;
+      
+      ++ loc.customers;
+      ++ customers;
+
+      return true;
+    }
     
     template <typename Sampler>
     bool increment(const dish_type& dish, const double& p0, Sampler& sampler, const double temperature=1.0)
@@ -293,9 +335,15 @@ namespace utils
       else
 	return (P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
-
+    
     template <typename P>
-    std::pair<P, bool> model_prob(const dish_type& dish, const P& p0) const
+    P prob(const P& p0) const
+    {
+      return P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength);
+    }
+    
+    template <typename P>
+    std::pair<P, bool> prob_model(const dish_type& dish, const P& p0) const
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
