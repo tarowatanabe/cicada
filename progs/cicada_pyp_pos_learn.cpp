@@ -1039,7 +1039,7 @@ int main(int argc, char ** argv)
 	  ++ piter;
 	
 	size_type pos = 0;
-	if (reduced != positions.size() && queue_reducer.pop(pos, true)) {
+	if (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
 	  ++ reduced;
 	  
 	  if (derivations[pos].size() != cutoffs[pos].size())

@@ -799,6 +799,19 @@ struct PYPLength
     
     return cicada::semiring::traits<logprob_type>::exp(length_source.logprob(source.size()) + length_target.logprob(target.size()));
   }
+
+  double log_likelihood() const
+  {
+    double logprob = 0.0;
+    
+    for (size_type source = 1; source < counts_source.size(); ++ source)
+      logprob += length_source.logprob(source) * counts_source[source];
+    
+    for (size_type target = 1; target < counts_target.size(); ++ target)
+      logprob += length_target.logprob(target) * counts_target[target];
+    
+    return logprob;
+  }
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler)
@@ -1001,7 +1014,8 @@ struct PYPPhrase
   
   double log_likelihood() const
   {
-    return lexicon.log_likelihood() + table.log_likelihood();
+    //return lexicon.log_likelihood() + length.log_likelihood() + table.log_likelihood();
+    return table.log_likelihood();
   }
   
   double log_likelihood(const double& discount, const double& strength) const
@@ -1133,8 +1147,7 @@ struct PYPGraph
     logprob_type prob;
     
     edge_type() : rule(), prob() {}
-    edge_type(const rule_type& __rule,
-	      const logprob_type& __prob)
+    edge_type(const rule_type& __rule, const logprob_type& __prob)
       : rule(__rule), prob(__prob) {}
   };
   
@@ -1167,6 +1180,7 @@ struct PYPGraph
     edges.resize(source.size() + 1, target.size() + 1);
     
     agenda.clear();
+    agenda.reserve(source.size() + target.size() + 1);
     agenda.resize(source.size() + target.size() + 1);
     
     base.clear();
@@ -1183,11 +1197,15 @@ struct PYPGraph
     
     model1_source.clear();
     model1_target.clear();
+    model1_source.reserve(target.size());
+    model1_target.reserve(source.size());
     model1_source.resize(target.size(), model1_type(source.size() + 1));
     model1_target.resize(source.size(), model1_type(target.size() + 1));
     
     epsilon_source.clear();
     epsilon_target.clear();
+    epsilon_source.reserve(target.size());
+    epsilon_target.reserve(source.size());
     epsilon_source.resize(target.size());
     epsilon_target.resize(source.size());
 
@@ -1221,7 +1239,7 @@ struct PYPGraph
     //std::cerr << "initialize chart" << std::endl;
     
     const logprob_type logprob_fallback = model.phrase.prob(logprob_type(1.0));
-    const logprob_type logprob_term = model.rule.prob_terminal();
+    const logprob_type logprob_term = model.rule.prob_terminal() * logprob_fallback;
     
     // initialize base...
     // actually, we should be carefull with the beta assignment, since we need to consult the base of phrase-model + rule-model
@@ -1241,7 +1259,7 @@ struct PYPGraph
 	  logbase = base(source_first, source_last - 1, target_first, target_last) * epsilon_target[source_last - 1];
 	  
 	  const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
-	  const logprob_type logprob_base = logprob_fallback * logprob_term * logbase * loglength;
+	  const logprob_type logprob_base = logprob_term * logbase * loglength;
 
 	  logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
 	  
@@ -1252,9 +1270,6 @@ struct PYPGraph
 	  
 	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	  logprob_beta += logprob_base;
-	  
-	  if (span_pair.size() >= agenda.size())
-	    throw std::runtime_error("span is out of agenda");
 
 	  agenda[span_pair.size()].push_back(span_pair);
 	}
@@ -1271,7 +1286,7 @@ struct PYPGraph
 	  logbase = base(source_first, source_last, target_first, target_last - 1) * epsilon_source[target_last - 1];
 	  
 	  const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
-	  const logprob_type logprob_base = logprob_fallback * logprob_term * logbase * loglength;
+	  const logprob_type logprob_base = logprob_term * logbase * loglength;
 
 	  logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
 	  
@@ -1282,9 +1297,6 @@ struct PYPGraph
 	  
 	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	  logprob_beta += logprob_base;
-	  
-	  if (span_pair.size() >= agenda.size())
-	    throw std::runtime_error("span is out of agenda");
 	  
 	  agenda[span_pair.size()].push_back(span_pair);
 	}
@@ -1312,7 +1324,7 @@ struct PYPGraph
 	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
 	    
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
-	    const logprob_type logprob_base = logprob_fallback * logprob_term * logbase * loglength;
+	    const logprob_type logprob_base = logprob_term * logbase * loglength;
 
 	    logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
 	    
@@ -1324,9 +1336,6 @@ struct PYPGraph
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	    logprob_beta += logprob_base;
 	    
-	    if (span_pair.size() >= agenda.size())
-	      throw std::runtime_error("span is out of agenda");
-
 	    agenda[span_pair.size()].push_back(span_pair);
 	  }
       }
@@ -1368,9 +1377,6 @@ struct PYPGraph
     
     // traverse agenda, smallest first...
     const size_type length_max = source.size() + target.size();
-
-    if (length_max >= agenda.size())
-      throw std::runtime_error("invalid agenda size");
 
     for (size_type length = 1; length != length_max; ++ length) 
       if (! agenda[length].empty()) {
@@ -1567,9 +1573,6 @@ struct PYPGraph
 	probs.push_back(eiter->prob / logsum);
       
       const size_type pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
-
-      if (pos_sampled >= edges_span.size())
-	throw std::runtime_error("invalid sampled position");
       
       // we will push in a right first manner, so that when popped, we will derive left-to-right traversal.
       
@@ -1612,7 +1615,7 @@ struct PYPGraph
   prob_set_type epsilon_source;
   prob_set_type epsilon_target;
   
-  prob_set_type    probs;
+  prob_set_type probs;
 };
 
 
@@ -1643,7 +1646,7 @@ struct Task
        derivation_set_type& __derivations,
        derivation_set_type& __derivations_prev,
        const PYPPiAlign& __model,
-       sampler_type& __sampler,
+       const sampler_type& __sampler,
        const logprob_type& __beam,
        const int& __max_length)
     : mapper(__mapper),
@@ -1659,38 +1662,32 @@ struct Task
 
   void operator()()
   {
-    try {
-      size_type pos;
+    size_type pos;
     
-      for (;;) {
-	mapper.pop(pos);
+    for (;;) {
+      mapper.pop(pos);
       
-	if (pos == size_type(-1)) break;
+      if (pos == size_type(-1)) break;
 	
-	derivations_prev[pos] = derivations[pos];
+      derivations_prev[pos] = derivations[pos];
 
-	// decrement model...
-	if (! derivations_prev[pos].empty()) {
-	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	    model.decrement(sources[pos], targets[pos], *diter, sampler);
-	}
-      
-	graph.forward(sources[pos], targets[pos], model, beam, max_length);
-      
-	graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
-      
-	// increment model...
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-      
-	reducer.push(pos);
+      // decrement model...
+      if (! derivations_prev[pos].empty()) {
+	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
+	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
-    }
-    catch (std::exception& err) {
-      std::cerr << "error: " << err.what() << std::endl;
-      throw err;
+      
+      graph.forward(sources[pos], targets[pos], model, beam, max_length);
+      
+      graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
+      
+      // increment model...
+      derivation_type::const_iterator diter_end = derivations[pos].end();
+      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      
+      reducer.push(pos);
     }
   }
   
@@ -1868,8 +1865,9 @@ int main(int argc, char ** argv)
     position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
       if (! sources[i].empty() && ! targets[i].empty()
-	  && (max_sentence_length <= 0 || (static_cast<int>(sources[i].size()) <= max_sentence_length
-					   && static_cast<int>(targets[i].size()) <= max_sentence_length)))
+	  && (max_sentence_length <= 0
+	      || (static_cast<int>(sources[i].size()) <= max_sentence_length
+		  && static_cast<int>(targets[i].size()) <= max_sentence_length)))
 	positions.push_back(i);
     position_set_type(positions).swap(positions);
     
@@ -1971,7 +1969,7 @@ int main(int argc, char ** argv)
 	  ++ piter;
 	
 	size_type pos = 0;
-	if (reduced != positions.size() && queue_reducer.pop(pos, true)) {
+	if (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
 	  ++ reduced;
 	  
 	  if (! derivations_prev[pos].empty()) {
