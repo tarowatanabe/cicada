@@ -31,8 +31,11 @@ int main(int argc, char** argv)
     for (int first1 = 0; first1 != dim1; ++ first1)
       for (int last1 = first1; last1 != dim1; ++ last1)
 	for (int first2 = 0; first2 != dim2; ++ first2)
-	  for (int last2 = first2; last2 != dim2; ++ last2)
+	  for (int last2 = first2; last2 != dim2; ++ last2) {
+	    chart(first1, last1, first2, last2) = random();
+	    
 	    pointers.push_back(&chart(first1, last1, first2, last2));
+	  }
     
     std::sort(pointers.begin(), pointers.end());
     for (size_t pos = 1; pos != pointers.size(); ++ pos)

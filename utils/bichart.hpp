@@ -10,6 +10,7 @@
 // a compact implementation of bi-chart structure...
 //
 
+#include <stdexcept>
 #include <vector>
 
 namespace utils

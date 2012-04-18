@@ -121,6 +121,20 @@ namespace utils
       size_type size_customer() const { return customers; }
       size_type size_table() const { return tables.size(); }
       
+       bool empty() const { return tables.empty(); }
+
+      void clear()
+      {
+	customers = 0;
+	tables.clear();
+      }
+
+      void swap(Location& x)
+      {
+	std::swap(customers, x.customers);
+	tables.swap(x.tables);
+      }
+
       size_type      customers;
       table_set_type tables;
     };
@@ -189,6 +203,9 @@ namespace utils
     bool increment_existing(const dish_type& dish, Sampler& sampler)
     {
       location_type& loc = dishes[dish];
+
+      if (loc.empty())
+	throw std::runtime_error("invalid incrementation at an existing table");
       
       double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
       

@@ -117,10 +117,11 @@ struct PYP
     
     span_type() : first(0), last(0) {}
     span_type(const size_type& __first, const size_type& __last)
-      : first(__first), last(__last)
+      : first(__first), last(__last) {}
+
+    bool valid_span() const
     {
-      if (first > last)
-	throw std::runtime_error("invalid span");
+      return ! (difference_type(first) < 0 || difference_type(last) < 0 || first > last);
     }
 
     bool empty() const { return first == last; }
@@ -217,8 +218,6 @@ struct PYP
     bool is_terminal() const { return left.empty() && right.empty(); }
     bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.first; }
     bool is_inverted() const { return ! is_terminal() && left.target.first == right.target.last; }
-    
-    size_type size() const { return span.size(); }
   };
 
   struct phrase_type
@@ -230,18 +229,17 @@ struct PYP
     typedef const word_type* const_iterator;
     
     phrase_type() : first(0), last(0) {}
-    phrase_type(iterator __first, iterator __last)
-      : first(__first), last(__last) {}
-    
+    phrase_type(const_iterator __first, const_iterator __last)
+      : first(__first), last(__last) { }
     template <typename Iterator>
     phrase_type(Iterator __first, Iterator __last)
-      : first(&(*__first)), last(&(*__last)) {}
+      : first(&(*__first)), last(&(*__last)) { }
     
     bool empty() const { return first == last; }
     size_type size() const { return last - first; }
     
-    iterator begin() const { return first; }
-    iterator end() const { return last; }
+    const_iterator begin() const { return first; }
+    const_iterator end() const { return last; }
     
     friend
     bool operator==(const phrase_type& x, const phrase_type& y)
@@ -254,11 +252,22 @@ struct PYP
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
-      return hasher_type()(x.first, x.last, 0);
+      return hasher_type()(x.begin(), x.end(), 0);
     }
     
-    iterator first;
-    iterator last;
+    friend
+    std::ostream& operator<<(std::ostream& os, const phrase_type& x)
+    {
+      if (! x.empty()) {
+	std::copy(x.begin(), x.end() - 1, std::ostream_iterator<word_type>(os, " "));
+	os << *(x.end() - 1);
+      }
+      return os;
+    }
+
+    
+    const_iterator first;
+    const_iterator last;
   };
 
   struct phrase_pair_type
@@ -269,7 +278,6 @@ struct PYP
     phrase_pair_type() : source(), target() {}
     phrase_pair_type(const phrase_type& __source, const phrase_type& __target)
       : source(__source), target(__target) {}
-    
     template <typename IteratorSource, typename IteratorTarget>
     phrase_pair_type(IteratorSource source_first, IteratorSource source_last,
 		     IteratorTarget target_first, IteratorTarget target_last)
@@ -510,18 +518,20 @@ struct PYPLexicon
   
   double prob_source_target(const word_type& source, const word_type& target) const
   {
-    if (! tables_source_target.exists(source.id()))
-      return lexicon_source_target->operator()(source, target);
-    else
-      return tables_source_target[source.id()].prob(target, lexicon_source_target->operator()(source, target));
+    return prob(source, target, tables_source_target, *lexicon_source_target);
   }
   
   double prob_target_source(const word_type& target, const word_type& source) const
   {
-    if (! tables_target_source.exists(target.id()))
-      return lexicon_target_source->operator()(target, source);
+    return prob(target, source, tables_target_source, *lexicon_target_source);
+  }
+  
+  double prob(const word_type& source, const word_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
+  {
+    if (! tables.exists(source.id()))
+      return lexicon(source, target);
     else
-      return tables_target_source[target.id()].prob(source, lexicon_target_source->operator()(target, source));
+      return tables[source.id()].prob(target, lexicon(source, target));
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -733,31 +743,45 @@ struct PYPLength
   PYPLength(const LengthModel& __length_source,
 	    const LengthModel& __length_target)
     : length_source(__length_source),
-      length_target(__length_target)
+      length_target(__length_target),
+      counts_source(),
+      counts_target()
   {}
 
   template <typename Sampler>
   void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    if (source.size() >= counts_source.size())
-      counts_source.resize(source.size() + 1, 0);
-    if (target.size() >= counts_target.size())
-      counts_target.resize(target.size() + 1, 0);
-    
-    ++ counts_source[source.size()];
-    ++ counts_target[target.size()];
+    if (! source.empty()) {
+      if (source.size() >= counts_source.size())
+	counts_source.resize(source.size() + 1, 0);
+      
+      ++ counts_source[source.size()];
+    }
+
+    if (! target.empty()) {
+      if (target.size() >= counts_target.size())
+	counts_target.resize(target.size() + 1, 0);
+      
+      ++ counts_target[target.size()];
+    }
   }
 
   template <typename Sampler>
   void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
-    if (source.size() >= counts_source.size() || ! counts_source[source.size()])
-      throw std::runtime_error("invalid decrment");
-    if (target.size() >= counts_target.size() || ! counts_target[target.size()])
-      throw std::runtime_error("invalid decrment");
-    
-    -- counts_source[source.size()];
-    -- counts_target[target.size()];    
+    if (! source.empty()) {
+      if (source.size() >= counts_source.size() || ! counts_source[source.size()])
+	throw std::runtime_error("invalid decrment");
+      
+      -- counts_source[source.size()];
+    }
+
+    if (! target.empty()) {
+      if (target.size() >= counts_target.size() || ! counts_target[target.size()])
+	throw std::runtime_error("invalid decrment");
+      
+      -- counts_target[target.size()];
+    }
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -784,12 +808,12 @@ struct PYPLength
     double target_alpha = 0.0;
     double target_beta = 0.0;
     
-    for (size_type source = 0; source != counts_source.size(); ++ source) {
+    for (size_type source = 1; source < counts_source.size(); ++ source) {
       source_alpha += source * counts_source[source];
       source_beta += counts_source[source];
     }
 
-    for (size_type target = 0; target != counts_target.size(); ++ target) {
+    for (size_type target = 1; target < counts_target.size(); ++ target) {
       target_alpha += target * counts_target[target];
       target_beta += counts_target[target];
     }
@@ -834,7 +858,7 @@ struct PYPRule
     
   PYPRule(const parameter_type& parameter)
     : p0(1.0 / 3), counts0(0), table(parameter) {}
-  
+
   template <typename Sampler>
   void increment(const rule_type& rule, Sampler& sampler, const double temperature=1.0)
   {
@@ -910,7 +934,6 @@ struct PYPPhrase
   
   typedef utils::pyp_parameter parameter_type;
   
-  
   typedef utils::restaurant<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>, std::allocator<phrase_pair_type > > table_type;
   
   PYPPhrase(const PYPLexicon& __lexicon,
@@ -919,7 +942,7 @@ struct PYPPhrase
     : lexicon(__lexicon),
       length(__length),
       table(parameter) {}
-  
+
   template <typename Sampler>
   void increment_existing(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
   {
@@ -1031,7 +1054,7 @@ struct PYPPiAlign
   PYPPiAlign(const PYPRule&   __rule,
 	     const PYPPhrase& __phrase)
     : rule(__rule), phrase(__phrase) {}
-  
+
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature=1.0)
   {
@@ -1207,8 +1230,8 @@ struct PYPGraph
 		
 	// epsilons.. 
 	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
-	  const size_type& target_last = target_first;
-	  const span_pair_type span_pair(source_first, source_last, target_first, target_first);
+	  const size_type target_last = target_first;
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 
@@ -1237,7 +1260,7 @@ struct PYPGraph
 	}
 	
 	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
-	  const size_type& source_last = source_first;
+	  const size_type source_last = source_first;
 	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	  const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
@@ -1336,22 +1359,28 @@ struct PYPGraph
     //std::cerr << "forward" << std::endl;
 
     span_pairs_unique_type spans_unique;
-    spans_unique.set_empty_key(span_pairs_type(span_pair_type(), span_pair_type()));
+    spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
+					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
 
     const logprob_type logprob_fallback = model.phrase.prob(logprob_type(1.0));
     const logprob_type logprob_str = model.rule.prob_straight() * logprob_fallback;
     const logprob_type logprob_inv = model.rule.prob_inverted() * logprob_fallback;
     
     // traverse agenda, smallest first...
-    for (size_type length = 1; length != agenda.size(); ++ length) 
+    const size_type length_max = source.size() + target.size();
+
+    if (length_max >= agenda.size())
+      throw std::runtime_error("invalid agenda size");
+
+    for (size_type length = 1; length != length_max; ++ length) 
       if (! agenda[length].empty()) {
 	span_pair_set_type& spans = agenda[length];
-	
-	std::make_heap(spans.begin(), spans.end(), heap_span_pair(beta));
 	
 	span_pair_set_type::iterator siter_begin = spans.begin();
 	span_pair_set_type::iterator siter_end   = spans.end();
 	
+	std::make_heap(siter_begin, siter_end, heap_span_pair(beta));
+		
 	const logprob_type logprob_max = beta(spans.front().source.first, spans.front().source.last, spans.front().target.first, spans.front().target.last);
 
 	spans_unique.clear();
@@ -1380,28 +1409,19 @@ struct PYPGraph
 	  // also, keep used pair of spans in order to remove duplicates.
 	  
 	  for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
-	    const difference_type l2 = l - (s - S);
-	    
-	    if (S < 0)
-	      throw std::runtime_error("invlaid S");
+	    const difference_type L = l - (s - S);
 	    
 	    // straight
-	    for (difference_type U = utils::bithack::max(u - l2, difference_type(0)); U <= u - (S == s); ++ U) {
+	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == s); ++ U) {
 	      // parent span: StUv
 	      // span1: SsUu
 	      // span2: stuv
 
-	      if (U < 0)
-		throw std::runtime_error("invlaid U");
-	      
 	      if (edges(S, s, U, u).empty()) continue;
 	      
 	      const span_pair_type  span1(S, s, U, u);
 	      const span_pair_type& span2(span_pair);
 
-	      if (span1.size() > l)
-		throw std::runtime_error("invalid subspan");
-	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_str
@@ -1409,11 +1429,6 @@ struct PYPGraph
 					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 
 	      const span_pair_type span_head(S, t, U, v);
-
-	      if (span_head.size() <= l)
-		throw std::runtime_error("invalid span");
-	      if (span_head.size() >= agenda.size())
-		throw std::runtime_error("span is out of agenda");
 	      
 	      beta(S, t, U, v) += logprob;
 	      edges(S, t, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
@@ -1423,22 +1438,16 @@ struct PYPGraph
 	    }
 	    
 	    // inversion
-	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + l2, V); ++ U) {
+	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + L, V); ++ U) {
 	      // parent span: StuU
 	      // span1: SsvU
 	      // span2: stuv
-
-	      if (U < 0)
-		throw std::runtime_error("invlaid U");
 
 	      if (edges(S, s, v, U).empty()) continue;
 	      
 	      const span_pair_type  span1(S, s, v, U);
 	      const span_pair_type& span2(span_pair);
 
-	      if (span1.size() > l)
-		throw std::runtime_error("invalid subspan");
-	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_inv
@@ -1446,11 +1455,6 @@ struct PYPGraph
 					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 	      
 	      const span_pair_type span_head(S, t, u, U);
-
-	      if (span_head.size() <= l)
-		throw std::runtime_error("invalid span");
-	      if (span_head.size() >= agenda.size())
-		throw std::runtime_error("span is out of agenda");
 
 	      beta(S, t, u, U) += logprob;
 	      edges(S, t, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
@@ -1461,27 +1465,18 @@ struct PYPGraph
 	  }
 	  
 	  for (difference_type S = t; S <= utils::bithack::min(t + l, T); ++ S) {
-	    const difference_type l2 = l - (S - t);
-
-	    if (S < 0)
-	      throw std::runtime_error("invlaid S");
+	    const difference_type L = l - (S - t);
 	    
 	    // inversion
-	    for (difference_type U = utils::bithack::max(u - l2, difference_type(0)); U <= u - (S == t); ++ U) {
+	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == t); ++ U) {
 	      // parent span: sSUv
 	      // span1: stuv
 	      // span2: tSUu
-
-	      if (U < 0)
-		throw std::runtime_error("invlaid U");
 	      
 	      if (edges(t, S, U, u).empty()) continue;
 	      
 	      const span_pair_type& span1(span_pair);
 	      const span_pair_type  span2(t, S, U, u);
-	      
-	      if (span2.size() > l)
-		throw std::runtime_error("invalid subspan");
 
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
@@ -1491,11 +1486,6 @@ struct PYPGraph
 
 	      const span_pair_type span_head(s, S, U, v);
 	      
-	      if (span_head.size() <= l)
-		throw std::runtime_error("invalid span");
-	      if (span_head.size() >= agenda.size())
-		throw std::runtime_error("span is out of agenda");
-	      
 	      beta(s, S, U, v) += logprob;
 	      edges(s, S, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
 
@@ -1504,21 +1494,15 @@ struct PYPGraph
 	    }
 	    
 	    // straight
-	    for (difference_type U = v + (S == t); U <= utils::bithack::min(v + l2, V); ++ U) {
+	    for (difference_type U = v + (S == t); U <= utils::bithack::min(v + L, V); ++ U) {
 	      // parent span: sSuU
 	      // span1: stuv
 	      // span2: tSvU
-	      
-	      if (U < 0)
-		throw std::runtime_error("invlaid U");
 	      
 	      if (edges(t, S, v, U).empty()) continue;
 	      
 	      const span_pair_type& span1(span_pair);
 	      const span_pair_type  span2(t, S, v, U);
-	      
-	      if (span2.size() > l)
-		throw std::runtime_error("invalid subspan");
 	      
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
@@ -1527,11 +1511,6 @@ struct PYPGraph
 					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 	      
 	      const span_pair_type span_head(s, S, u, U);
-
-	      if (span_head.size() <= l)
-		throw std::runtime_error("invalid span");
-	      if (span_head.size() >= agenda.size())
-		throw std::runtime_error("span is out of agenda");
 	      
 	      beta(s, S, u, U) += logprob;
 	      edges(s, S, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
@@ -1552,8 +1531,8 @@ struct PYPGraph
   template <typename Sampler>
   logprob_type backward(const sentence_type& source,
 			const sentence_type& target,
-			Sampler& sampler,
 			derivation_type& derivation,
+			Sampler& sampler,
 			const double temperature)
   {
     //std::cerr << "backward" << std::endl;
@@ -1589,7 +1568,9 @@ struct PYPGraph
       
       const size_type pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
 
-
+      if (pos_sampled >= edges_span.size())
+	throw std::runtime_error("invalid sampled position");
+      
       // we will push in a right first manner, so that when popped, we will derive left-to-right traversal.
       
       const rule_type& rule = edges_span[pos_sampled].rule;
@@ -1678,32 +1659,38 @@ struct Task
 
   void operator()()
   {
-    size_type pos;
+    try {
+      size_type pos;
     
-    for (;;) {
-      mapper.pop(pos);
+      for (;;) {
+	mapper.pop(pos);
       
-      if (pos == size_type(-1)) break;
+	if (pos == size_type(-1)) break;
+	
+	derivations_prev[pos] = derivations[pos];
 
-      derivations_prev[pos]  = derivations[pos];
-
-      // decrement model...
-      if (! derivations_prev[pos].empty()) {
-	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter, sampler);
+	// decrement model...
+	if (! derivations_prev[pos].empty()) {
+	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
+	    model.decrement(sources[pos], targets[pos], *diter, sampler);
+	}
+      
+	graph.forward(sources[pos], targets[pos], model, beam, max_length);
+      
+	graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
+      
+	// increment model...
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      
+	reducer.push(pos);
       }
-      
-      graph.forward(sources[pos], targets[pos], model, beam, max_length);
-      
-      graph.backward(sources[pos], targets[pos], sampler, derivations[pos], temperature);
-      
-      // increment model...
-      derivation_type::const_iterator diter_end = derivations[pos].end();
-      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-      
-      reducer.push(pos);
+    }
+    catch (std::exception& err) {
+      std::cerr << "error: " << err.what() << std::endl;
+      throw err;
     }
   }
   
@@ -1845,29 +1832,36 @@ int main(int argc, char ** argv)
       
       workers_open.join_all();
     }
+
+    PYPRule model_rule(PYPRule::parameter_type(rule_discount,
+					       rule_strength,
+					       rule_discount_prior_alpha,
+					       rule_discount_prior_beta,
+					       rule_strength_prior_shape,
+					       rule_strength_prior_rate));
+
+    PYPLexicon model_lexicon(lexicon_source_target,
+			     lexicon_target_source,
+			     PYPLexicon::parameter_type(lexicon_discount,
+							lexicon_strength,
+							lexicon_discount_prior_alpha,
+							lexicon_discount_prior_beta,
+							lexicon_strength_prior_shape,
+							lexicon_strength_prior_rate));
+
+    PYPLength model_length(LengthModel(lambda_source, lambda_shape, lambda_rate),
+			   LengthModel(lambda_target, lambda_shape, lambda_rate));
     
-    PYPPiAlign model(PYPRule(PYPRule::parameter_type(rule_discount,
-						     rule_strength,
-						     rule_discount_prior_alpha,
-						     rule_discount_prior_beta,
-						     rule_strength_prior_shape,
-						     rule_strength_prior_rate)),
-		     PYPPhrase(PYPLexicon(lexicon_source_target,
-					  lexicon_target_source,
-					  PYPLexicon::parameter_type(lexicon_discount,
-								     lexicon_strength,
-								     lexicon_discount_prior_alpha,
-								     lexicon_discount_prior_beta,
-								     lexicon_strength_prior_shape,
-								     lexicon_strength_prior_rate)),
-			       PYPLength(LengthModel(lambda_source, lambda_shape, lambda_rate),
-					 LengthModel(lambda_target, lambda_shape, lambda_rate)),
-			       PYPPhrase::parameter_type(phrase_discount,
-							 phrase_strength,
-							 phrase_discount_prior_alpha,
-							 phrase_discount_prior_beta,
-							 phrase_strength_prior_shape,
-							 phrase_strength_prior_rate)));
+    PYPPhrase model_phrase(model_lexicon,
+			   model_length,
+			   PYPPhrase::parameter_type(phrase_discount,
+						     phrase_strength,
+						     phrase_discount_prior_alpha,
+						     phrase_discount_prior_beta,
+						     phrase_strength_prior_shape,
+						     phrase_strength_prior_rate));
+    
+    PYPPiAlign model(model_rule, model_phrase);
     
     derivation_set_type derivations(sources.size());
     derivation_set_type derivations_prev(sources.size());
@@ -1899,8 +1893,6 @@ int main(int argc, char ** argv)
 		<< " strength=" << model.phrase.lexicon.parameter_target_source.strength << std::endl
 		<< "length source: lambda=" << model.phrase.length.length_source.lambda << std::endl
 		<< "length target: lambda=" << model.phrase.length.length_target.lambda << std::endl;
-    
-    PYPGraph graph;
     
     Task::queue_type queue_mapper;
     Task::queue_type queue_reducer;
@@ -1959,7 +1951,7 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
 
-      // assign temperature... and current model
+      // assign temperature and model...
       for (size_type i = 0; i != tasks.size(); ++ i) {
 	tasks[i].model = model;
 	tasks[i].temperature = temperature;
@@ -2010,12 +2002,11 @@ int main(int argc, char ** argv)
 	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
 			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
 	      
-	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE) {
-		std::cerr << " pair: ";
-		std::copy(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last, std::ostream_iterator<word_type>(std::cerr, " "));
-		std::cerr << "||| ";
-		std::copy(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last, std::ostream_iterator<word_type>(std::cerr, " "));
-	      }
+	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
+		std::cerr << " pair: "
+			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+			  << " ||| "
+			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
 	      
 	      std::cerr << std::endl;
 	    }
@@ -2060,7 +2051,6 @@ int main(int argc, char ** argv)
       
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
-	    
     }
 
     for (int i = 0; i != threads; ++ i)

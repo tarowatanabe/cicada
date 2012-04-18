@@ -219,6 +219,9 @@ namespace utils
       
       location_type& loc = dishes[dish];
 
+      if (loc.empty())
+	throw std::runtime_error("invalid incrementation at an existing table");
+      
       double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
 	
       bool incremented = false;
