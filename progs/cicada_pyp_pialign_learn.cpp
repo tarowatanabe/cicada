@@ -80,7 +80,6 @@
 #include "utils/simple_vector.hpp"
 #include "utils/indexed_map.hpp"
 #include "utils/indexed_set.hpp"
-#include "utils/lockfree_list_queue.hpp"
 #include "utils/unique_set.hpp"
 
 #include <boost/program_options.hpp>
@@ -117,12 +116,7 @@ struct PYP
     
     span_type() : first(0), last(0) {}
     span_type(const size_type& __first, const size_type& __last)
-      : first(__first), last(__last) {}
-
-    bool valid_span() const
-    {
-      return ! (difference_type(first) < 0 || difference_type(last) < 0 || first > last);
-    }
+      : first(__first), last(__last) { }
 
     bool empty() const { return first == last; }
     size_type size() const { return last - first; }
@@ -2023,7 +2017,7 @@ int main(int argc, char ** argv)
 	  }
 	}
       }
-
+      
       if (debug && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
       
