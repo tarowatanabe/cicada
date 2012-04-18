@@ -469,7 +469,7 @@ struct PYPLexicon
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	table.increment(*titer, lexicon(vocab_type::EPSILON, *titer), sampler, temperature);
-    } else {
+    } else if (! target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	if (! tables.exists(siter->id()))
@@ -504,7 +504,7 @@ struct PYPLexicon
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	table.decrement(*titer, sampler);
-    } else {
+    } else if (! target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	table_type& table = tables[siter->id()];
