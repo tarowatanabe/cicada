@@ -1067,7 +1067,12 @@ struct PYPPiAlign
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature=1.0)
   {
     rule.increment(r, sampler, temperature);
-    
+ 
+    phrase.increment(phrase_pair_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
+				      target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+		     sampler,
+		     temperature);   
+#if 0
     const phrase_pair_type phrase_pair(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
 				       target.begin() + r.span.target.first, target.begin() + r.span.target.last);
     
@@ -1075,6 +1080,7 @@ struct PYPPiAlign
       phrase.increment_existing(phrase_pair, sampler, temperature);
     else
       phrase.increment_new(phrase_pair, sampler, temperature);
+#endif
   }
 
   template <typename Sampler>
@@ -1618,7 +1624,7 @@ typedef utils::sampler<boost::mt19937> sampler_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
-typedef PYPGraph::size_type size_type;
+typedef PYP::size_type size_type;
 typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
@@ -1656,6 +1662,8 @@ struct Task
 
   void operator()()
   {
+    PYPGraph graph;
+    
     size_type pos;
     
     for (;;) {
@@ -1700,8 +1708,6 @@ struct Task
   int max_length;
   
   double temperature;
-  
-  PYPGraph graph;
 };
 
 struct less_size
