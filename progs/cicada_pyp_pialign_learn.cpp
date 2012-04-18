@@ -1064,23 +1064,21 @@ struct PYPPiAlign
     : rule(__rule), phrase(__phrase) {}
 
   template <typename Sampler>
-  void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature=1.0)
+  void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature, bool approximated=false)
   {
     rule.increment(r, sampler, temperature);
- 
-    phrase.increment(phrase_pair_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
-				      target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-		     sampler,
-		     temperature);   
-#if 0
+
     const phrase_pair_type phrase_pair(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
 				       target.begin() + r.span.target.first, target.begin() + r.span.target.last);
-    
-    if (r.itg == PYP::GENERATIVE)
-      phrase.increment_existing(phrase_pair, sampler, temperature);
-    else
-      phrase.increment_new(phrase_pair, sampler, temperature);
-#endif
+ 
+    if (approximated)
+      phrase.increment(phrase_pair, sampler, temperature);
+    else {
+      if (r.itg == PYP::GENERATIVE)
+	phrase.increment_existing(phrase_pair, sampler, temperature);
+      else
+	phrase.increment_new(phrase_pair, sampler, temperature);
+    }
   }
 
   template <typename Sampler>
@@ -1687,7 +1685,7 @@ struct Task
       // increment model...
       derivation_type::const_iterator diter_end = derivations[pos].end();
       for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	model.increment(sources[pos], targets[pos], *diter, sampler, temperature, false);
       
       reducer.push(pos);
     }
@@ -2013,7 +2011,7 @@ int main(int argc, char ** argv)
 	  // increment model...
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature, true);
 	  
 	  if (debug) {
 	    if ((reduced + 1) % 10000 == 0)
