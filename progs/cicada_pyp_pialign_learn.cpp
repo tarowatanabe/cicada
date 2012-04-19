@@ -1441,8 +1441,8 @@ struct PYPGraph
 	span_pair_set_type::const_iterator siter_end = spans.end();
 	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
 	  const logprob_type score = (chart(siter->source.first, siter->source.last, siter->target.first, siter->target.last)
-				      * alpha_source[siter->source.first] * beta_source[siter->source.last]
-				      * alpha_target[siter->target.first] * beta_target[siter->target.last]);
+				      * std::min(alpha_source[siter->source.first] * beta_source[siter->source.last],
+						 alpha_target[siter->target.first] * beta_target[siter->target.last]));
 	  
 	  heap.push_back(score_span_pair_type(score, *siter));
 	  std::push_heap(heap.begin(), heap.end(), heap_compare());
