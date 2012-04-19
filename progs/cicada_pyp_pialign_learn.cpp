@@ -2033,10 +2033,12 @@ int main(int argc, char ** argv)
       
       position_set_type::const_iterator piter_end = positions.end();
       position_set_type::const_iterator piter = positions.begin();
+      
       size_type reduced = 0;
       while (piter != piter_end || reduced != positions.size()) {
 	
-	if (piter != piter_end && queue_mapper.push(*piter, true))
+	// push # of threads...
+	for (int i = 0; i != threads && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
 	  ++ piter;
 	
 	size_type pos = 0;
