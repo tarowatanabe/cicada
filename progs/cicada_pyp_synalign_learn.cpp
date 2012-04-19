@@ -1567,7 +1567,8 @@ path_type lexicon_target_source_file;
 int max_terminal = 2;
 bool transduction = false;
 
-int samples = 30;
+int samples = 1;
+int burns = 10;
 int baby_steps = 0;
 int anneal_steps = 0;
 int resample_rate = 1;
@@ -1731,6 +1732,9 @@ int main(int argc, char ** argv)
     size_t baby_iter = 0;
     const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
 
+    size_t burn_iter = 0;
+    const size_t burn_last = utils::bithack::branch(burns > 0, burns, 0);
+
     bool sampling = false;
     int sample_iter = 0;
 
@@ -1756,7 +1760,13 @@ int main(int argc, char ** argv)
 	baby_finished = false;
       }
       
-      sampling = anneal_finished && baby_finished;
+      bool burn_finished = true;
+      if (burn_iter != burn_last) {
+	++ burn_iter;
+	burn_finished = false;
+      }
+
+      sampling = anneal_finished && baby_finished && burn_finished;
       
       if (debug) {
 	if (sampling)
@@ -1955,6 +1965,7 @@ void options(int argc, char** argv)
     ("transduction", po::bool_switch(&transduction),                             "transduction grammar")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
+    ("burns",               po::value<int>(&burns)->default_value(burns),                             "# of burn-ins")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
     ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
     ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")

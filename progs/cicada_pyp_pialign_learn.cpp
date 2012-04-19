@@ -53,6 +53,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/semiring/logprob.hpp>
 
+#include "utils/lexical_cast.hpp"
 #include "utils/pyp_parameter.hpp"
 #include "utils/alloc_vector.hpp"
 #include "utils/chart.hpp"
@@ -1804,22 +1805,49 @@ struct less_size
   const sentence_set_type& targets;
 };
 
+inline
+path_type add_suffix(const path_type& path, const std::string& suffix)
+{
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path_added = path;
+  
+  if (path.extension() == ".gz") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_gz = true;
+  } else if (path.extension() == ".bz2") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path_added = path_added.string() + suffix;
+  
+  if (has_suffix_gz)
+    path_added = path_added.string() + ".gz";
+  else if (has_suffix_bz2)
+    path_added = path_added.string() + ".bz2";
+  
+  return path_added;
+}
+
 path_type train_source_file = "-";
 path_type train_target_file = "-";
 
-path_type test_source_file;
-path_type test_target_file;
+path_type output_sample_file;
+path_type output_model_file;
 
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-10;
+double beam = 1e-3;
 
-int samples = 30;
-int baby_steps = 0;
-int anneal_steps = 0;
+int samples = 1;
+int burns = 10;
+int baby_steps = 1;
+int anneal_steps = 1;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
@@ -1991,13 +2019,16 @@ int main(int argc, char ** argv)
     
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
-
+    
     size_t baby_iter = 0;
     const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
-
+    
+    size_t burn_iter = 0;
+    const size_t burn_last = utils::bithack::branch(burns > 0, burns, 0);
+    
     bool sampling = false;
     int sample_iter = 0;
-
+    
     // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
       
@@ -2019,7 +2050,13 @@ int main(int argc, char ** argv)
 	baby_finished = false;
       }
       
-      sampling = anneal_finished && baby_finished;
+      bool burn_finished = true;
+      if (burn_iter != burn_last) {
+	++ burn_iter;
+	burn_finished = false;
+      }
+      
+      sampling = anneal_finished && baby_finished && burn_finished;
       
       if (debug) {
 	if (sampling)
@@ -2104,7 +2141,7 @@ int main(int argc, char ** argv)
 	}
       }
       
-      if (debug && (reduced + 1) % 1000000 != 0)
+      if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
@@ -2129,16 +2166,74 @@ int main(int argc, char ** argv)
       
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
+      
+      if (sampling && ! output_sample_file.empty()) {
+	typedef std::vector<std::string, std::allocator<std::string> > stack_type;
+	
+	// dump derivations..!
+	
+	const path_type path = add_suffix(output_sample_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
+	
+	utils::compress_ostream os(path, 1024 * 1024);
+	
+	stack_type stack;
+	  
+	for (size_type pos = 0; pos != derivations.size(); ++ pos) {
+	  if (! derivations[pos].empty()) {
+	    // we need to transform the stack-structure into tree-struct... HOW?
+	    
+	    stack.clear();
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	      if (diter->is_terminal()) {
+		os << "((( "
+		   << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+		   << " ||| "
+		   << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
+		   << " )))";
+		
+		while (! stack.empty() && stack.back() != " ") {
+		  os << stack.back();
+		  stack.pop_back();
+		}
+		
+		if (! stack.empty() && stack.back() == " ") {
+		  os << stack.back();
+		  stack.pop_back();
+		}
+		
+	      } else if (diter->is_straight()) {
+		os << "[ ";
+		stack.push_back(" ]");
+		stack.push_back(" ");
+	      } else {
+		os << "< ";
+		stack.push_back(" >");
+		stack.push_back(" ");
+	      }
+	    }
+	  }
+	  os << '\n';
+	}
+      }
+      
+      if (sampling && ! output_model_file.empty()) {
+	// output phrase-table...
+	// How to generate lexicalized-reordering table...?
+	
+	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
+	
+	utils::compress_ostream os(path, 1024 * 1024);
+	
+	
+	
+      }
     }
-
+    
     for (int i = 0; i != threads; ++ i)
       queue_mapper.push(size_type(-1));
     
     workers.join_all();
-
-    // dump models...
-    // perform testing...?
-    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -2183,9 +2278,9 @@ void options(int argc, char** argv)
     ("train-source", po::value<path_type>(&train_source_file), "source train file")
     ("train-target", po::value<path_type>(&train_target_file), "target train file")
     
-    ("test-source", po::value<path_type>(&test_source_file), "source test file")
-    ("test-target", po::value<path_type>(&test_target_file), "target test file")
-    
+    ("output-sample", po::value<path_type>(&output_sample_file), "output sample file")
+    ("output-model",  po::value<path_type>(&output_model_file),  "output model file (or phrase table)")
+
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon file for p(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon file for p(source | target)")
 
@@ -2194,13 +2289,13 @@ void options(int argc, char** argv)
     ("beam",                po::value<double>(&beam)->default_value(beam),                            "beam threshold")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
+    ("burns",               po::value<int>(&burns)->default_value(burns),                             "# of burn-ins")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
     ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
     ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
-    
     
     ("rule-discount",       po::value<double>(&rule_discount)->default_value(rule_discount),                         "discount ~ Beta(alpha,beta)")
     ("rule-discount-alpha", po::value<double>(&rule_discount_prior_alpha)->default_value(rule_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
