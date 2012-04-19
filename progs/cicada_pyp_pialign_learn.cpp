@@ -2210,7 +2210,7 @@ int main(int argc, char ** argv)
 	      
 	    }
 	    
-	    os << grpah_source << " ||| " << graph_target << '\n';
+	    os << graph_source << " ||| " << graph_target << '\n';
 	  }
 	} else {
 	  stack_type stack;
