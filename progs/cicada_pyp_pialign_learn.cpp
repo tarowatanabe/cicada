@@ -1416,7 +1416,8 @@ struct PYPGraph
   {
     //std::cerr << "initialize" << std::endl;
     
-    initialize(source, target, model, max_length);
+    //initialize(source, target, model, max_length);
+    initialize(source, target, model, utils::bithack::max(source.size(), target.size()));
 
     //std::cerr << "forward" << std::endl;
 
