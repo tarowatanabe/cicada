@@ -1136,7 +1136,7 @@ struct PYPGraph
   
   typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
   
-  typedef utils::bichart<logprob_type, std::allocator<logprob_type> > beta_type;
+  typedef utils::bichart<logprob_type, std::allocator<logprob_type> > chart_type;
   typedef utils::bichart<logprob_type, std::allocator<logprob_type> > base_type;
   
   struct edge_type
@@ -1160,19 +1160,26 @@ struct PYPGraph
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
   typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
 				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
-
+  
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > model1_type;
   typedef std::vector<model1_type, std::allocator<model1_type> > model1_chart_type;
+  
+  typedef utils::chart<logprob_type, std::allocator<logprob_type> > chart_mono_type;
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > alpha_type;
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > beta_type;
+
+  typedef std::pair<logprob_type, span_pair_type> score_span_pair_type;
+  typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
   
   void initialize(const sentence_type& source,
 		  const sentence_type& target,
 		  const PYPPiAlign& model,
 		  const size_type max_length)
   {
-    beta.clear();
-    beta.reserve(source.size() + 1, target.size() + 1);
-    beta.resize(source.size() + 1, target.size() + 1);
-
+    chart.clear();
+    chart.reserve(source.size() + 1, target.size() + 1);
+    chart.resize(source.size() + 1, target.size() + 1);
+    
     edges.clear();
     edges.reserve(source.size() + 1, target.size() + 1);
     edges.resize(source.size() + 1, target.size() + 1);
@@ -1180,6 +1187,24 @@ struct PYPGraph
     agenda.clear();
     agenda.reserve(source.size() + target.size() + 1);
     agenda.resize(source.size() + target.size() + 1);
+
+    chart_source.clear();
+    chart_source.reserve(source.size() + 1);
+    chart_source.resize(source.size() + 1);
+
+    chart_target.clear();
+    chart_target.reserve(target.size() + 1);
+    chart_target.resize(target.size() + 1);
+
+    alpha_source.clear();
+    alpha_target.clear();
+    beta_source.clear();
+    beta_target.clear();
+    
+    alpha_source.resize(source.size() + 1);
+    alpha_target.resize(target.size() + 1);
+    beta_source.resize(source.size() + 1);
+    beta_target.resize(target.size() + 1);
     
     base.clear();
     base.reserve(source.size() + 1, target.size() + 1);
@@ -1240,7 +1265,7 @@ struct PYPGraph
     const logprob_type logprob_term = model.rule.prob_terminal() * logprob_fallback;
     
     // initialize base...
-    // actually, we should be carefull with the beta assignment, since we need to consult the base of phrase-model + rule-model
+    // actually, we should be carefull with the chart assignment, since we need to consult the base of phrase-model + rule-model
     for (size_type source_first = 0; source_first != source.size(); ++ source_first)
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
 		
@@ -1259,15 +1284,19 @@ struct PYPGraph
 	  const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
 	  const logprob_type logprob_base = logprob_term * logbase * loglength;
 
-	  logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
+	  logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
 	  
 	  if (logprob_gen.second) {
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	    logprob_beta += logprob_gen.first;
+	    logprob_chart += logprob_gen.first;
+
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
 	  }
 	  
 	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	  logprob_beta += logprob_base;
+	  logprob_chart += logprob_base;
+	  
+	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
 
 	  agenda[span_pair.size()].push_back(span_pair);
 	}
@@ -1286,15 +1315,19 @@ struct PYPGraph
 	  const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
 	  const logprob_type logprob_base = logprob_term * logbase * loglength;
 
-	  logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
+	  logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
 	  
 	  if (logprob_gen.second) {
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	    logprob_beta += logprob_gen.first;
+	    logprob_chart += logprob_gen.first;
+	    
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	  }
 	  
 	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	  logprob_beta += logprob_base;
+	  logprob_chart += logprob_base;
+
+	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
 	  
 	  agenda[span_pair.size()].push_back(span_pair);
 	}
@@ -1324,32 +1357,54 @@ struct PYPGraph
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
 	    const logprob_type logprob_base = logprob_term * logbase * loglength;
 
-	    logprob_type& logprob_beta = beta(source_first, source_last, target_first, target_last);
+	    logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
 	    
 	    if (logprob_gen.second) {
 	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	      logprob_beta += logprob_gen.first;
+	      logprob_chart += logprob_gen.first;
+	      
+	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
+	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	    }
 	    
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	    logprob_beta += logprob_base;
+	    logprob_chart += logprob_base;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
 	    
 	    agenda[span_pair.size()].push_back(span_pair);
 	  }
       }
+    
+    // forward/backward to compute alpha_{source,target} and beta_{source,target}
+    forward_backward(source, chart_source, alpha_source, beta_source);
+    forward_backward(target, chart_target, alpha_target, beta_target);
   }
   
-  // sort by less so that we can pop from a greater item
-  struct heap_span_pair
+  void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
   {
-    heap_span_pair(const beta_type& __beta) : beta(__beta) {}
+    // forward...
+    alpha[0] = 1.0;
+    for (size_type last = 1; last <= sentence.size(); ++ last)
+      for (size_type first = 0; first != last; ++ first)
+	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last));
     
-    bool operator()(const span_pair_type& x, const span_pair_type& y) const
+    // backward...
+    beta[sentence.size()] = 1.0;
+    for (difference_type first = sentence.size() - 1; first >= 0; -- first)
+      for (size_type last = first + 1; last <= sentence.size(); ++ last)
+	beta[first] = std::max(beta[first], chart(first, last) * beta[last]);
+  }
+
+  
+  // sort by less so that we can pop from a greater item
+  struct heap_compare
+  {
+    bool operator()(const score_span_pair_type& x, const score_span_pair_type& y) const
     {
-      return beta(x.source.first, x.source.last, x.target.first, x.target.last) < beta(y.source.first, y.source.last, y.target.first, y.target.last);
+      return x.first < y.first;
     }
-    
-    const beta_type& beta;
   };
   
   // forward filtering
@@ -1379,22 +1434,30 @@ struct PYPGraph
     for (size_type length = 1; length != length_max; ++ length) 
       if (! agenda[length].empty()) {
 	span_pair_set_type& spans = agenda[length];
+
+	// construct heap...
+	heap.clear();
+	heap.reserve(spans.size());
+	span_pair_set_type::const_iterator siter_end = spans.end();
+	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
+	  const logprob_type score = (chart(siter->source.first, siter->source.last, siter->target.first, siter->target.last)
+				      * alpha_source[siter->source.first] * beta_source[siter->source.last]
+				      * alpha_target[siter->target.first] * beta_target[siter->target.last]);
+	  
+	  heap.push_back(score_span_pair_type(score, *siter));
+	  std::push_heap(heap.begin(), heap.end(), heap_compare());
+	}
+
+	heap_type::iterator hiter_begin = heap.begin();
+	heap_type::iterator hiter_end   = heap.end();
 	
-	span_pair_set_type::iterator siter_begin = spans.begin();
-	span_pair_set_type::iterator siter_end   = spans.end();
-	
-	std::make_heap(siter_begin, siter_end, heap_span_pair(beta));
-		
-	const logprob_type logprob_max = beta(spans.front().source.first, spans.front().source.last, spans.front().target.first, spans.front().target.last);
+	const logprob_type logprob_max = hiter_begin->first;
 
 	spans_unique.clear();
 
-	for (/**/; siter_begin != siter_end; -- siter_end) {
-	  const span_pair_type span_pair = spans.front();
-	  const logprob_type logprob = beta(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last);
-
-	  if (span_pair.size() != length)
-	    throw std::runtime_error("invalid span-pair item in the agenda");
+	for (/**/; hiter_begin != hiter_end; -- hiter_end) {
+	  const logprob_type   logprob = hiter_begin->first;
+	  const span_pair_type span_pair = hiter_begin->second;
 	  
 	  if (logprob <= logprob_max * beam) break;
 	  
@@ -1429,12 +1492,12 @@ struct PYPGraph
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_str
-					    * beta(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
-					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 
 	      const span_pair_type span_head(S, t, U, v);
 	      
-	      beta(S, t, U, v) += logprob;
+	      chart(S, t, U, v) += logprob;
 	      edges(S, t, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
 	      
 	      if (edges(S, t, U, v).size() == 1)
@@ -1455,12 +1518,12 @@ struct PYPGraph
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_inv
-					    * beta(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
-					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 	      
 	      const span_pair_type span_head(S, t, u, U);
 
-	      beta(S, t, u, U) += logprob;
+	      chart(S, t, u, U) += logprob;
 	      edges(S, t, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
 
 	      if (edges(S, t, u, U).size() == 1)
@@ -1485,12 +1548,12 @@ struct PYPGraph
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_inv
-					    * beta(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
-					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 
 	      const span_pair_type span_head(s, S, U, v);
 	      
-	      beta(s, S, U, v) += logprob;
+	      chart(s, S, U, v) += logprob;
 	      edges(s, S, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
 
 	      if (edges(s, S, U, v).size() == 1)
@@ -1511,12 +1574,12 @@ struct PYPGraph
 	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
 	      
 	      const logprob_type logprob = (logprob_str
-					    * beta(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
-					    * beta(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
 	      
 	      const span_pair_type span_head(s, S, u, U);
 	      
-	      beta(s, S, u, U) += logprob;
+	      chart(s, S, u, U) += logprob;
 	      edges(s, S, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
 	      
 	      if (edges(s, S, u, U).size() == 1)
@@ -1524,11 +1587,11 @@ struct PYPGraph
 	    }
 	  }
 	  
-	  std::pop_heap(siter_begin, siter_end, heap_span_pair(beta));
+	  std::pop_heap(hiter_begin, hiter_end, heap_compare());
 	}
       }
 
-    return beta(0, source.size(), 0, target.size());
+    return chart(0, source.size(), 0, target.size());
   }
   
   // backward sampling
@@ -1578,13 +1641,13 @@ struct PYPGraph
       logprob_type prob = edges_span[pos_sampled].prob;
       
       if (! rule.right.empty()) {
-	prob /= beta(rule.right.source.first, rule.right.source.last, rule.right.target.first, rule.right.target.last);
+	prob /= chart(rule.right.source.first, rule.right.source.last, rule.right.target.first, rule.right.target.last);
 	
 	stack.push_back(rule.right);
       }
       
       if (! rule.left.empty()) {
-	prob /= beta(rule.left.source.first, rule.left.source.last, rule.left.target.first, rule.left.target.last);
+	prob /= chart(rule.left.source.first, rule.left.source.last, rule.left.target.first, rule.left.target.last);
 	
 	stack.push_back(rule.left);
       }
@@ -1597,11 +1660,20 @@ struct PYPGraph
     return prob_derivation;
   }
 
-  beta_type beta;
+  chart_type chart;
   edge_chart_type edges;
   
   agenda_type agenda;
   stack_type stack;
+  heap_type  heap;
+
+  chart_mono_type chart_source;
+  chart_mono_type chart_target;
+  
+  alpha_type alpha_source;
+  alpha_type alpha_target;
+  beta_type  beta_source;
+  beta_type  beta_target;
   
   base_type base;
   base_type base_source;
