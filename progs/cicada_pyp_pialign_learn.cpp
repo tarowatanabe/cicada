@@ -965,9 +965,9 @@ struct PYPPhrase
       table(parameter) {}
 
   template <typename Sampler>
-  void increment_existing(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    if (table.increment_existing(phrase_pair, sampler)) {
+    if (table.increment_existing(phrase_pair, sampler) && leaf) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
 
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
@@ -975,22 +975,11 @@ struct PYPPhrase
   }
 
   template <typename Sampler>
-  void increment_new(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_new(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
     table.increment_new(phrase_pair, sampler);
     
-    length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-
-    lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-  }
-  
-  template <typename Sampler>
-  void increment(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
-  {
-    const double p0 = (lexicon.prob(phrase_pair.source, phrase_pair.target)
-		       * length.prob(phrase_pair.source, phrase_pair.target));
-    
-    if (table.increment(phrase_pair, p0, sampler, temperature)) {
+    if (leaf) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
@@ -998,9 +987,22 @@ struct PYPPhrase
   }
   
   template <typename Sampler>
-  void decrement(const phrase_pair_type& phrase_pair, Sampler& sampler)
+  void increment(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    if (table.decrement(phrase_pair, sampler)) {
+    const double p0 = (lexicon.prob(phrase_pair.source, phrase_pair.target)
+		       * length.prob(phrase_pair.source, phrase_pair.target));
+    
+    if (table.increment(phrase_pair, p0, sampler, temperature) && leaf) {
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      
+      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    }
+  }
+  
+  template <typename Sampler>
+  void decrement(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler)
+  {
+    if (table.decrement(phrase_pair, sampler) && leaf) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
       
       lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
@@ -1090,9 +1092,9 @@ struct PYPPiAlign
 				       target.begin() + r.span.target.first, target.begin() + r.span.target.last);
     
     if (r.itg == PYP::GENERATIVE)
-      phrase.increment_existing(phrase_pair, sampler, temperature);
+      phrase.increment_existing(phrase_pair, r.is_terminal(), sampler, temperature);
     else
-      phrase.increment_new(phrase_pair, sampler, temperature);
+      phrase.increment_new(phrase_pair, r.is_terminal(), sampler, temperature);
   }
 
   template <typename Sampler>
@@ -1102,6 +1104,7 @@ struct PYPPiAlign
     
     phrase.decrement(phrase_pair_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
 				      target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+		     r.is_terminal(), 
 		     sampler);
   }
 
@@ -1893,7 +1896,7 @@ double lexicon_strength_prior_rate  = 1.0;
 double lambda_source = 2.0;
 double lambda_target = 2.0;
 double lambda_shape = 1e-2;
-double lambda_rate  = 1e+6;
+double lambda_rate  = 10;
 
 int threads = 1;
 int debug = 0;
