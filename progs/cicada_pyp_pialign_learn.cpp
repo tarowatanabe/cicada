@@ -53,6 +53,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/semiring/logprob.hpp>
 
+#include "utils/vector2.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/pyp_parameter.hpp"
 #include "utils/alloc_vector.hpp"
@@ -88,6 +89,7 @@
 #include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
+#include <boost/array.hpp>
 
 typedef cicada::Vocab      vocab_type;
 typedef cicada::Sentence   sentence_type;
@@ -479,7 +481,6 @@ struct PYPLexicon
     }
   }
 
-
   template <typename Sampler>
   void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
@@ -541,6 +542,16 @@ struct PYPLexicon
       return std::exp(logprob_source_target + logprob_target_source);
     else
       return std::exp((logprob_source_target + logprob_target_source) * 0.5);
+  }
+
+  double prob_source_target(const phrase_type& source, const phrase_type& target) const
+  {
+    return std::exp(logprob(source, target, tables_source_target, *lexicon_source_target));
+  }
+  
+  double prob_target_source(const phrase_type& target, const phrase_type& source) const
+  {
+    return std::exp(logprob(target, source, tables_target_source, *lexicon_target_source));
   }
 
   double logprob(const phrase_type& source, const phrase_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
@@ -2220,13 +2231,118 @@ int main(int argc, char ** argv)
       if (sampling && ! output_model_file.empty()) {
 	// output phrase-table...
 	// How to generate lexicalized-reordering table...?
+	//
+	
+	//
+	// we will use the derivations to compute "alignment point", then extract lexicalized reordering score...
+	//
+	
+	typedef PYP::phrase_type      phrase_type;
+	typedef PYP::phrase_pair_type phrase_pair_type;
+	typedef utils::dense_hash_map<phrase_pair_type, double, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+				      std::allocator<std::pair<const phrase_pair_type, double> > >::type phrase_pair_set_type;
+	
+	typedef utils::dense_hash_map<phrase_type, double, boost::hash<phrase_type>, std::equal_to<phrase_type>,
+				      std::allocator<std::pair<const phrase_type, double> > >::type phrase_set_type;
+	
+	typedef boost::array<size_type, 5> reordering_type;
+	typedef utils::dense_hash_map<phrase_pair_type, reordering_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+				      std::allocator<std::pair<const phrase_pair_type, reordering_type> > >::type reordering_set_type;
+	
+	typedef utils::vector2<bool, std::allocator<bool> > matrix_type;
+	
+	matrix_type matrix;
+	reordering_set_type reorderings;
+	reorderings.set_empty_key(phrase_pair_type());
+	
+	for (size_type pos = 0; pos != derivations.size(); ++ pos)
+	  if (! derivations[pos].empty()) {
+	    const size_type source_size = sources[pos].size();
+	    const size_type target_size = targets[pos].size();
+	    
+	    matrix.clear();
+	    matrix.resize(source_size + 2, target_size + 2);
+	    
+	    matrix(0, 0) = true;  // BOS
+	    matrix(source_size + 1, target_size + 1) = true; // EOS
+	    
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	      if (! diter->span.source.empty() && ! diter->span.target.empty()) {
+		matrix(diter->span.source.first + 1, diter->span.target.first + 1) = true;
+		matrix(diter->span.source.first + 1, diter->span.target.last) = true;
+		matrix(diter->span.source.last, diter->span.target.first + 1) = true;
+		matrix(diter->span.source.last, diter->span.target.last) = true;
+	      }
+	    
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	      if (! diter->span.source.empty() && ! diter->span.target.empty()) {
+		const PYP::span_pair_type& span = diter->span;
+
+		const bool connected_left_top     = matrix(span.source.first,    span.target.first);
+		const bool connected_right_top    = matrix(span.source.last + 1, span.target.first);
+		const bool connected_left_bottom  = matrix(span.source.first,    span.target.last + 1);
+		const bool connected_right_bottom = matrix(span.source.last + 1, span.target.last + 1);
+		
+		const phrase_pair_type phrase_pair(sources[pos].begin() + span.source.first, sources[pos].begin() + span.source.last,
+						   targets[pos].begin() + span.target.first, targets[pos].begin() + span.target.last);
+		
+		reordering_type& reorder = reorderings[phrase_pair];
+		
+		reorder[0] += 1;
+		reorder[1] += (  connected_left_top && ! connected_right_top);
+		reorder[2] += (! connected_left_top &&   connected_right_top);
+		reorder[3] += (  connected_left_bottom && ! connected_right_bottom);
+		reorder[4] += (! connected_left_bottom &&   connected_right_bottom);
+	      }
+	  }
+	  
+	
+	phrase_pair_set_type phrases;
+	phrase_set_type      phrases_source;
+	phrase_set_type      phrases_target;
+
+	phrases.set_empty_key(phrase_pair_type());
+	phrases_source.set_empty_key(phrase_type());
+	phrases_target.set_empty_key(phrase_type());
+	
+	PYPPhrase::table_type::const_iterator titer_end = model.phrase.table.end();
+	for (PYPPhrase::table_type::const_iterator titer = model.phrase.table.begin(); titer != titer_end; ++ titer) 
+	  if (! titer->first.source.empty() && ! titer->first.target.empty()) {
+	    const double prob = model.phrase.table.prob(titer->first, 0.0);
+	    
+	    phrases[titer->first] = prob;
+	    phrases_source[titer->first.source] += prob;
+	    phrases_target[titer->first.target] += prob;
+	  }
 	
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
 	utils::compress_ostream os(path, 1024 * 1024);
+
+	const double penalty = std::exp(1);
 	
-	
-	
+	phrase_pair_set_type::const_iterator piter_end = phrases.end();
+	for (phrase_pair_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	  const reordering_type& reorder = reorderings[piter->first];
+	  
+	  os << piter->first.source << " ||| " << piter->first.target
+	     << " |||"
+	     << " " << (piter->second / phrases_source[piter->first.source])
+	     << " " << (piter->second / phrases_target[piter->first.target])
+	     << " " << piter->second
+	     << " " << model.phrase.lexicon.prob_source_target(piter->first.source, piter->first.target)
+	     << " " << model.phrase.lexicon.prob_target_source(piter->first.target, piter->first.source)
+	     << " " << penalty
+	     << " |||"
+	     << " " << reorder[0]
+	     << " " << reorder[1]
+	     << " " << reorder[2]
+	     << " " << reorder[3]
+	     << " " << reorder[4]
+	     << '\n';
+	  
+	}
       }
     }
     
