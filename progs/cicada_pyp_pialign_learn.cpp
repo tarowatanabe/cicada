@@ -2037,8 +2037,7 @@ int main(int argc, char ** argv)
       size_type reduced = 0;
       while (piter != piter_end || reduced != positions.size()) {
 	
-	// push # of threads...
-	for (int i = 0; i != threads && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
+	if (piter != piter_end && queue_mapper.push(*piter, true))
 	  ++ piter;
 	
 	size_type pos = 0;
