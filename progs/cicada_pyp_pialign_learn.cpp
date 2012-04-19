@@ -967,7 +967,7 @@ struct PYPPhrase
   template <typename Sampler>
   void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    if (table.increment_existing(phrase_pair, sampler) && leaf) {
+    if (table.increment_existing(phrase_pair, sampler)) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
 
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
@@ -977,41 +977,22 @@ struct PYPPhrase
   template <typename Sampler>
   void increment_new(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    table.increment_new(phrase_pair, sampler);
-    
-    if (leaf) {
+    if (table.increment_new(phrase_pair, sampler)) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
   }
   
-  template <typename Sampler>
-  void increment(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
-  {
-    const double p0 = (lexicon.prob(phrase_pair.source, phrase_pair.target)
-		       * length.prob(phrase_pair.source, phrase_pair.target));
-    
-    if (table.increment(phrase_pair, p0, sampler, temperature) && leaf) {
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-      
-      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-    }
-  }
   
   template <typename Sampler>
   void decrement(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler)
   {
-    if (table.decrement(phrase_pair, sampler) && leaf) {
+    if (table.decrement(phrase_pair, sampler)) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
       
       lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
     }
-  }
-  
-  double prob(const phrase_type& source, const phrase_type& target) const
-  {
-    return table.prob(phrase_pair_type(source, target), lexicon.prob(source, target) * length.prob(source, target));
   }
   
   template <typename LogProb>
@@ -1896,7 +1877,7 @@ double lexicon_strength_prior_rate  = 1.0;
 double lambda_source = 2.0;
 double lambda_target = 2.0;
 double lambda_shape = 1e-2;
-double lambda_rate  = 10;
+double lambda_rate  = 1e+7;
 
 int threads = 1;
 int debug = 0;
