@@ -51,6 +51,7 @@
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/hypergraph.hpp>
 #include <cicada/semiring/logprob.hpp>
 
 #include "utils/vector2.hpp"
@@ -95,6 +96,7 @@ typedef cicada::Vocab      vocab_type;
 typedef cicada::Sentence   sentence_type;
 typedef cicada::Symbol     symbol_type;
 typedef cicada::Symbol     word_type;
+typedef cicada::HyperGraph hypergraph_type;
 
 struct PYP
 {
@@ -1862,6 +1864,7 @@ int anneal_steps = 1;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
+bool sample_hypergraph = false;
 
 double rule_discount = 0.9;
 double rule_strength = 1;
@@ -2186,45 +2189,69 @@ int main(int argc, char ** argv)
 	const path_type path = add_suffix(output_sample_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
 	utils::compress_ostream os(path, 1024 * 1024);
-	
-	stack_type stack;
+
+	if (sample_hypergraph) {
+	  typedef hypergraph_type::rule_type     rule_type;
+	  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 	  
-	for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	  if (! derivations[pos].empty()) {
-	    // we need to transform the stack-structure into tree-struct... HOW?
+	  hypergraph_type graph_source;
+	  hypergraph_type graph_target;
+	  
+	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
+	    graph_source.clear();
+	    graph_target.clear();
 	    
-	    stack.clear();
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      if (diter->is_terminal()) {
-		os << "((( "
-		   << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-		   << " ||| "
-		   << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
-		   << " )))";
+	    if (! derivations[pos].empty()) {
+	      // construct pair of hypergrpahs
+	      
+	      
+	      
+	      
+	      
+	    }
+	    
+	    os << grpah_source << " ||| " << graph_target << '\n';
+	  }
+	} else {
+	  stack_type stack;
+	  
+	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
+	    if (! derivations[pos].empty()) {
+	      // we need to transform the stack-structure into tree-struct... HOW?
+	    
+	      stack.clear();
+	      derivation_type::const_iterator diter_end = derivations[pos].end();
+	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+		if (diter->is_terminal()) {
+		  os << "((( "
+		     << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+		     << " ||| "
+		     << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
+		     << " )))";
 		
-		while (! stack.empty() && stack.back() != " ") {
-		  os << stack.back();
-		  stack.pop_back();
+		  while (! stack.empty() && stack.back() != " ") {
+		    os << stack.back();
+		    stack.pop_back();
+		  }
+		
+		  if (! stack.empty() && stack.back() == " ") {
+		    os << stack.back();
+		    stack.pop_back();
+		  }
+		
+		} else if (diter->is_straight()) {
+		  os << "[ ";
+		  stack.push_back(" ]");
+		  stack.push_back(" ");
+		} else {
+		  os << "< ";
+		  stack.push_back(" >");
+		  stack.push_back(" ");
 		}
-		
-		if (! stack.empty() && stack.back() == " ") {
-		  os << stack.back();
-		  stack.pop_back();
-		}
-		
-	      } else if (diter->is_straight()) {
-		os << "[ ";
-		stack.push_back(" ]");
-		stack.push_back(" ");
-	      } else {
-		os << "< ";
-		stack.push_back(" >");
-		stack.push_back(" ");
 	      }
 	    }
+	    os << '\n';
 	  }
-	  os << '\n';
 	}
       }
       
@@ -2412,6 +2439,7 @@ void options(int argc, char** argv)
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
+    ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
     
     ("rule-discount",       po::value<double>(&rule_discount)->default_value(rule_discount),                         "discount ~ Beta(alpha,beta)")
     ("rule-discount-alpha", po::value<double>(&rule_discount_prior_alpha)->default_value(rule_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
