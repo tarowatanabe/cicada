@@ -1240,7 +1240,7 @@ struct PYPGraph
       
       for (size_type source_first = 0; source_first != source.size(); ++ source_first) {
 	double sum = 0.0;
-	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
+	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	  sum += model.phrase.lexicon.prob_source_target(source[source_last - 1], target[target_pos]);
 	  model1_source[target_pos](source_first, source_last) = sum;
 	}
@@ -1252,7 +1252,7 @@ struct PYPGraph
       
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
 	double sum = 0.0;
-	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	  sum += model.phrase.lexicon.prob_target_source(target[target_last - 1], source[source_pos]);
 	  model1_target[source_pos](target_first, target_last) = sum;
 	}
@@ -1270,7 +1270,7 @@ struct PYPGraph
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
 		
 	// epsilons.. 
-	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last) {
+	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	  const size_type target_last = target_first;
 	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
@@ -1293,15 +1293,18 @@ struct PYPGraph
 	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
 	  }
 	  
-	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	  logprob_chart += logprob_base;
+	  if (source_last - source_first <= max_length) {
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	    logprob_chart += logprob_base;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+	  }
 	  
-	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
-
-	  agenda[span_pair.size()].push_back(span_pair);
+	  if (! edges(source_first, source_last, target_first, target_last).empty())
+	    agenda[span_pair.size()].push_back(span_pair);
 	}
 	
-	for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	  const size_type source_last = source_first;
 	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
@@ -1324,17 +1327,20 @@ struct PYPGraph
 	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	  }
 	  
-	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	  logprob_chart += logprob_base;
-
-	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	  if (target_last - target_first <= max_length) {
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	    logprob_chart += logprob_base;
+	    
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	  }
 	  
-	  agenda[span_pair.size()].push_back(span_pair);
+	  if (! edges(source_first, source_last, target_first, target_last).empty())
+	    agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// phrases... is it correct?
-	for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source_first + max_length, source.size()); ++ source_last)
-	  for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target_first + max_length, target.size()); ++ target_last) {
+	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last)
+	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
@@ -1367,13 +1373,16 @@ struct PYPGraph
 	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	    }
 	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	    logprob_chart += logprob_base;
+	    if (source_last - source_first <= max_length && target_last - target_first <= max_length) {
+	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	      logprob_chart += logprob_base;
+	      
+	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	    }
 	    
-	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
-	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
+	    if (! edges(source_first, source_last, target_first, target_last).empty())
+	      agenda[span_pair.size()].push_back(span_pair);
 	  }
       }
     
@@ -1416,9 +1425,8 @@ struct PYPGraph
   {
     //std::cerr << "initialize" << std::endl;
     
-    //initialize(source, target, model, max_length);
-    initialize(source, target, model, utils::bithack::max(source.size(), target.size()));
-
+    initialize(source, target, model, max_length);
+    
     //std::cerr << "forward" << std::endl;
 
     span_pairs_unique_type spans_unique;
