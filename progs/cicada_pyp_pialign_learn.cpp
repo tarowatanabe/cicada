@@ -1854,7 +1854,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-2;
+double beam = 1e-4;
 
 int samples = 1;
 int burns = 10;
@@ -1892,7 +1892,7 @@ double lexicon_strength_prior_rate  = 1.0;
 double lambda_source = 1e-2;
 double lambda_target = 1e-2;
 double lambda_shape = 1e-2;
-double lambda_rate  = 1e+7;
+double lambda_rate  = 1e+4;
 
 int threads = 1;
 int debug = 0;
@@ -2159,8 +2159,8 @@ int main(int argc, char ** argv)
       
       if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
-
-      if (debug)
+      
+      if (invalid && debug)
 	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
@@ -2357,12 +2357,12 @@ int main(int argc, char ** argv)
 	
 	typedef boost::array<size_type, 5> reordering_type;
 	typedef utils::dense_hash_map<phrase_pair_type, reordering_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-				      std::allocator<std::pair<const phrase_pair_type, reordering_type> > >::type reordering_set_type;
+				      std::allocator<std::pair<const phrase_pair_type, reordering_type> > >::type reordering_pair_set_type;
 	
 	typedef utils::vector2<bool, std::allocator<bool> > matrix_type;
 	
 	matrix_type matrix;
-	reordering_set_type reorderings;
+	reordering_pair_set_type reorderings;
 	reorderings.set_empty_key(phrase_pair_type());
 	
 	for (size_type pos = 0; pos != derivations.size(); ++ pos)
@@ -2406,7 +2406,6 @@ int main(int argc, char ** argv)
 		reorder[4] += (! connected_left_bottom &&   connected_right_bottom);
 	      }
 	  }
-	  
 	
 	phrase_pair_set_type phrases;
 	phrase_set_type      phrases_source;
@@ -2429,12 +2428,29 @@ int main(int argc, char ** argv)
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
 	utils::compress_ostream os(path, 1024 * 1024);
+	os.precision(10);
 
 	const double penalty = std::exp(1);
 	
 	phrase_pair_set_type::const_iterator piter_end = phrases.end();
 	for (phrase_pair_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
 	  const reordering_type& reorder = reorderings[piter->first];
+	  
+	  const double count = reorder[0];
+	  const double count_prev_mono   = reorder[1];
+	  const double count_prev_swap   = reorder[2];
+	  const double count_prev_others = count - (count_prev_mono + count_prev_swap);
+	  const double count_next_mono   = reorder[3];
+	  const double count_next_swap   = reorder[4];
+	  const double count_next_others = count - (count_next_mono + count_next_swap);
+	  
+	  const double prob_prev_mono   = (0.5 + count_prev_mono)   / (0.5 * 3 + count);
+	  const double prob_prev_swap   = (0.5 + count_prev_swap)   / (0.5 * 3 + count);
+	  const double prob_prev_others = (0.5 + count_prev_others) / (0.5 * 3 + count);
+	  
+	  const double prob_next_mono   = (0.5 + count_next_mono)   / (0.5 * 3 + count);
+	  const double prob_next_swap   = (0.5 + count_next_swap)   / (0.5 * 3 + count);
+	  const double prob_next_others = (0.5 + count_next_others) / (0.5 * 3 + count);
 	  
 	  os << piter->first.source << " ||| " << piter->first.target
 	     << " |||"
@@ -2445,11 +2461,12 @@ int main(int argc, char ** argv)
 	     << " " << model.phrase.lexicon.prob_target_source(piter->first.target, piter->first.source)
 	     << " " << penalty
 	     << " |||"
-	     << " " << reorder[0]
-	     << " " << reorder[1]
-	     << " " << reorder[2]
-	     << " " << reorder[3]
-	     << " " << reorder[4]
+	     << " " << prob_prev_mono
+	     << " " << prob_prev_swap
+	     << " " << prob_prev_others
+	     << " " << prob_next_mono
+	     << " " << prob_next_swap
+	     << " " << prob_next_others
 	     << '\n';
 	  
 	}
