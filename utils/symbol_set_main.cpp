@@ -68,9 +68,16 @@ int main (int argc, char** argv)
       
 	if (symbol_set.find(i) == symbol_set.end())
 	  std::cerr << "NOT INSERTED?" << std::endl;
+	else {
+	  if (symbol_set.find(i) - symbol_set.begin() != i)
+	    std::cerr << "different position?" << std::endl;
+	}
       
 	if (symbol_set.insert(i).second)
 	  std::cerr << "NEW INSERTION?" << std::endl;
+	
+	if (symbol_set.insert(i).first - symbol_set.begin() != i)
+	  std::cerr << "different position?" << std::endl;	  
       }
     
       for (int j = 0; j < 1024 * 4; ++ j) {
@@ -96,6 +103,20 @@ int main (int argc, char** argv)
 	
 	if (symbol_set.find(i) == symbol_set.end())
 	  if (set.find(i) != set.end())
+	    std::cerr << "erased but exists?" << std::endl;
+      }
+
+      {
+	set_type::const_iterator siter_end = set.end();
+	for (set_type::const_iterator siter = set.begin(); siter != siter_end; ++ siter)
+	  if (symbol_set.find(*siter) == symbol_set.end())
+	    std::cerr << "erased but exists?" << std::endl;
+      }
+
+      {
+	symbol_set_type::const_iterator siter_end = symbol_set.end();
+	for (symbol_set_type::const_iterator siter = symbol_set.begin(); siter != siter_end; ++ siter)
+	  if (set.find(*siter) == set.end())
 	    std::cerr << "erased but exists?" << std::endl;
       }
       

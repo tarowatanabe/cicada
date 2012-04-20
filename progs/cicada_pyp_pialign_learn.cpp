@@ -83,6 +83,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/indexed_map.hpp"
 #include "utils/indexed_set.hpp"
+#include "utils/symbol_set.hpp"
 #include "utils/unique_set.hpp"
 
 #include <boost/program_options.hpp>
@@ -955,21 +956,36 @@ struct PYPPhrase
   
   typedef utils::pyp_parameter parameter_type;
   
-  typedef utils::restaurant<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>, std::allocator<phrase_pair_type > > table_type;
+  typedef utils::symbol_set<phrase_type, boost::hash<phrase_type>, std::equal_to<phrase_type>, std::allocator<phrase_type > > phrase_set_type;
+  
+  typedef phrase_set_type::index_type id_type;
+  typedef std::pair<id_type, id_type> id_pair_type;
+  
+  typedef utils::restaurant<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type > > table_type;
   
   PYPPhrase(const PYPLexicon& __lexicon,
 	    const PYPLength&  __length,
 	    const parameter_type& parameter)
     : lexicon(__lexicon),
       length(__length),
-      table(parameter) {}
+      table(parameter),
+      phrases() {}
+  
+  id_type phrase_id(const phrase_type& phrase)
+  {
+    phrase_set_type::iterator iter = phrases.insert(phrase).first;
+    return iter - phrases.begin();
+  }
 
   template <typename Sampler>
   void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    if (table.increment_existing(phrase_pair, sampler)) {
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    const id_type id_source = phrase_id(phrase_pair.source);
+    const id_type id_target = phrase_id(phrase_pair.target);
 
+    if (table.increment_existing(id_pair_type(id_source, id_target), sampler)) {
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
   }
@@ -977,7 +993,10 @@ struct PYPPhrase
   template <typename Sampler>
   void increment_new(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
-    if (table.increment_new(phrase_pair, sampler)) {
+    const id_type id_source = phrase_id(phrase_pair.source);
+    const id_type id_target = phrase_id(phrase_pair.target);
+    
+    if (table.increment_new(id_pair_type(id_source, id_target), sampler)) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
       lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
@@ -988,7 +1007,10 @@ struct PYPPhrase
   template <typename Sampler>
   void decrement(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler)
   {
-    if (table.decrement(phrase_pair, sampler)) {
+    const id_type id_source = phrase_id(phrase_pair.source);
+    const id_type id_target = phrase_id(phrase_pair.target);
+    
+    if (table.decrement(id_pair_type(id_source, id_target), sampler)) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
       
       lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
@@ -1004,7 +1026,13 @@ struct PYPPhrase
   template <typename LogProb>
   std::pair<LogProb, bool> prob(const phrase_type& source, const phrase_type& target, const LogProb& base) const
   {
-    return table.prob_model(phrase_pair_type(source, target), base);
+    phrase_set_type::const_iterator siter = phrases.find(source);
+    phrase_set_type::const_iterator titer = phrases.find(target);
+
+    if (siter == phrases.end() || titer == phrases.end())
+      return std::make_pair(table.prob(base), false);
+    else
+      return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.end()), base);
   }
   
   double log_likelihood() const
@@ -1039,11 +1067,39 @@ struct PYPPhrase
     
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
+
+  void prune()
+  {
+    // erase unused phrase entry in phrases...
+    std::vector<bool, std::allocator<bool> > inserted;
+    
+    table_type::const_iterator titer_end = table.end();
+    for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
+      if (titer->first.first >= inserted.size())
+	inserted.resize(titer->first.first + 1, false);
+      if (titer->first.second >= inserted.size())
+	inserted.resize(titer->first.second + 1, false);
+      
+
+      inserted[titer->first.first] = true;
+      inserted[titer->first.second] = true;
+    }
+    
+    id_type id = 0;
+    for (/**/; id != inserted.size(); ++ id)
+      if (! inserted[id])
+	phrases.erase(id);
+    
+    for (/**/; id != phrases.size(); ++ id)
+      phrases.erase(id);
+      
+  }
   
   PYPLexicon lexicon;
   PYPLength  length;
   
   table_type table;
+  phrase_set_type phrases;
 };
 
 struct PYPPiAlign
@@ -1337,51 +1393,65 @@ struct PYPGraph
 	}
 	
 	// phrases... is it correct?
-	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last)
-	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
-	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
-	    
-	    logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
-	    logprob_type& logbase_target = base_target(source_first, source_last, target_first, target_last);
-	    
-	    logbase_source = (base_source(source_first, source_last, target_first, target_last - 1)
-			      * model1_source[target_last - 1](source_first, source_last));
-	    
-	    logbase_target = (base_target(source_first, source_last - 1, target_first, target_last)
-			      * model1_target[source_last - 1](target_first, target_last));
-	    
-	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
-	    logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source) * 0.5
-								  + cicada::semiring::log(logbase_target) * 0.5);
-	    
-	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
-	    
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
-	    const logprob_type logprob_base = logprob_term * logbase * loglength;
+	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
+	  const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 
-	    logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
+	  PYPPhrase::phrase_set_type::const_iterator siter = model.phrase.phrases.find(phrase_source);
+	  const PYPPhrase::id_type source_id = siter - model.phrase.phrases.begin();
+	  const bool has_source = (siter != model.phrase.phrases.end());
+	  
+	  if (has_source || source_last - source_first <= max_length)
+	    for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
+	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    
-	    if (logprob_gen.second) {
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	      logprob_chart += logprob_gen.first;
+	      const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+	    
+	      PYPPhrase::phrase_set_type::const_iterator titer = model.phrase.phrases.find(phrase_target);
+	      const PYPPhrase::id_type target_id = titer - model.phrase.phrases.begin();
+	      const bool has_target = (titer != model.phrase.phrases.end());
+	    
+	      logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
+	      logprob_type& logbase_target = base_target(source_first, source_last, target_first, target_last);
+	    
+	      logbase_source = (base_source(source_first, source_last, target_first, target_last - 1)
+				* model1_source[target_last - 1](source_first, source_last));
+	    
+	      logbase_target = (base_target(source_first, source_last - 1, target_first, target_last)
+				* model1_target[source_last - 1](target_first, target_last));
+	    
+	      logprob_type& logbase = base(source_first, source_last, target_first, target_last);
+	      logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source) * 0.5
+								    + cicada::semiring::log(logbase_target) * 0.5);
+	    
+	      const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	      const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    
+	      logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
+	    
+	      if (source_last - source_first <= max_length && target_last - target_first <= max_length) {
+		edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+		logprob_chart += logprob_base;
 	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
-	    }
+		chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+		chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	      }
 	    
-	    if (source_last - source_first <= max_length && target_last - target_first <= max_length) {
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	      logprob_chart += logprob_base;
+	      if (has_source && has_target) {
+		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, target_id), logprob_type(0.0));
 	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+		if (logprob_gen.second) {
+		  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
+		  logprob_chart += logprob_gen.first;
+		
+		  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
+		  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
+		}
+	      }
+	    	    
+	      if (! edges(source_first, source_last, target_first, target_last).empty())
+		agenda[span_pair.size()].push_back(span_pair);
 	    }
-	    
-	    if (! edges(source_first, source_last, target_first, target_last).empty())
-	      agenda[span_pair.size()].push_back(span_pair);
-	  }
+	}
       }
     
     // forward/backward to compute alpha_{source,target} and beta_{source,target}
@@ -2416,14 +2486,18 @@ int main(int argc, char ** argv)
 	phrases_target.set_empty_key(phrase_type());
 	
 	PYPPhrase::table_type::const_iterator titer_end = model.phrase.table.end();
-	for (PYPPhrase::table_type::const_iterator titer = model.phrase.table.begin(); titer != titer_end; ++ titer) 
-	  if (! titer->first.source.empty() && ! titer->first.target.empty()) {
+	for (PYPPhrase::table_type::const_iterator titer = model.phrase.table.begin(); titer != titer_end; ++ titer) {
+	  const phrase_type& phrase_source = model.phrase.phrases[titer->first.first];
+	  const phrase_type& phrase_target = model.phrase.phrases[titer->first.second];
+
+	  if (! phrase_source.empty() && ! phrase_target.empty()) {
 	    const double prob = model.phrase.table.prob(titer->first, 0.0);
 	    
-	    phrases[titer->first] = prob;
-	    phrases_source[titer->first.source] += prob;
-	    phrases_target[titer->first.target] += prob;
+	    phrases[phrase_pair_type(phrase_source, phrase_target)] = prob;
+	    phrases_source[phrase_source] += prob;
+	    phrases_target[phrase_target] += prob;
 	  }
+	}
 	
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
@@ -2471,6 +2545,8 @@ int main(int argc, char ** argv)
 	  
 	}
       }
+      
+      model.phrase.prune();
     }
     
     for (int i = 0; i != threads; ++ i)

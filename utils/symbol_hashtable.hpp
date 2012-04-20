@@ -306,23 +306,15 @@ namespace utils
       typedef typename node_set_type::const_iterator iter_type;
 
     public:
-      typedef std::forward_iterator_tag iterator_category;
+      const_iterator() : iter_type(), end() {}
+      const_iterator(iter_type __iter, iter_type __end) : iter_type(__iter), end(__end) { __move(); }
       
-      typedef Value        value_type;
-      typedef Value*       pointer;
-      typedef const Value& reference;
-      typedef size_t       size_type;
-      typedef ptrdiff_t    difference_type;
-      
-      const_iterator() : iter(), end() {}
-      const_iterator(iter_type __iter, iter_type __end) : iter(__iter), end(__end) { __move(); }
-      
-      const value_type& operator*() const { return iter->data(); }
-      const value_type* operator->() const { return &(iter->data()); }
+      const value_type& operator*() const { return iter_type::operator*().data(); }
+      const value_type* operator->() const { return &(iter_type::operator*().data()); }
       
       const_iterator& operator++()
       {
-	++ iter;
+	iter_type::operator++();
 	__move();
 	return *this;
       }
@@ -330,30 +322,18 @@ namespace utils
       const_iterator operator++(int)
       {
 	const_iterator __tmp(*this);
-	++ iter;
+	iter_type::operator++();
 	__move();
 	return __tmp;
       }
-
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.iter == y.iter && x.end == y.end;
-      }
       
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.iter != y.iter || x.end != y.end;
-      }
-      
+    private:
       void __move()
       {
-	while (iter != end && iter->erased)
-	  ++ iter;
+	while (iter_type(*this) != end && iter_type::operator*().erased)
+	  iter_type::operator++();
       }
       
-      iter_type iter;
       iter_type end;
     };
     typedef const_iterator iterator;
@@ -519,11 +499,6 @@ namespace utils
       }
     }
 
-    void erase(iterator x)
-    {
-      x.iter->erased = true;
-    }
-    
     void erase(const index_type x)
     {
       nodes[x].erased = true;
