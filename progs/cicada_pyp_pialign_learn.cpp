@@ -1456,17 +1456,29 @@ struct PYPGraph
 	}
 
 	heap_type::iterator hiter_begin = heap.begin();
+	heap_type::iterator hiter       = heap.end();
 	heap_type::iterator hiter_end   = heap.end();
 	
 	const logprob_type logprob_max = hiter_begin->first;
-
-	spans_unique.clear();
-
-	for (/**/; hiter_begin != hiter_end; -- hiter_end) {
-	  const logprob_type   logprob = hiter_begin->first;
-	  const span_pair_type span_pair = hiter_begin->second;
+	for (/**/; hiter_begin != hiter; -- hiter) {
+	  if (hiter_begin->first <= logprob_max * beam) break;
 	  
-	  if (logprob <= logprob_max * beam) break;
+	  std::pop_heap(hiter_begin, hiter, heap_compare());
+	}
+
+	// erase spans in hiter_begin to hiter
+	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
+	  const span_pair_type& span_pair = iter->second;
+	  
+	  edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last).clear();
+	}
+	
+	// we will process from hiter to hiter_end...
+	
+	spans_unique.clear();
+	
+	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
+	  const span_pair_type& span_pair = iter->second;
 	  
 	  // we borrow the notation...
 	  
@@ -1593,8 +1605,6 @@ struct PYPGraph
 		agenda[span_head.size()].push_back(span_head);
 	    }
 	  }
-	  
-	  std::pop_heap(hiter_begin, hiter_end, heap_compare());
 	}
       }
 
