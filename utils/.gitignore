@@ -65,6 +65,7 @@ static_allocator_main
 stick_break_main
 subprocess_main
 succinct_vector_main
+symbol_set_main
 tempfile_main
 json_string_main
 unique_set_main

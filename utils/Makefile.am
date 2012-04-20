@@ -121,6 +121,9 @@ stick_break.hpp \
 subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \
+symbol_map.hpp \
+symbol_set.hpp \
+symbol_hashtable.hpp \
 symbol_sequence.hpp \
 symbol_tree.hpp \
 tempfile.hpp \
@@ -178,6 +181,7 @@ static_allocator_main \
 stick_break_main \
 subprocess_main \
 succinct_vector_main \
+symbol_set_main \
 tempfile_main \
 json_string_main \
 unique_set_main \
@@ -343,6 +347,9 @@ static_allocator_main_LDADD = $(BOOST_THREAD_LIBS)
 
 sparse_map_main_SOURCES = sparse_map_main.cpp
 sparse_map_main_LDADD = $(LIBUTILS)
+
+symbol_set_main_SOURCES = symbol_set_main.cpp
+symbol_set_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)
 
 random_seed_main_SOURCES = random_seed_main.cpp
 random_seed_main_LDADD = $(LIBUTILS)
