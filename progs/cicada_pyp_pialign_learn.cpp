@@ -1459,13 +1459,10 @@ struct PYPGraph
 	heap_type::iterator hiter       = heap.end();
 	heap_type::iterator hiter_end   = heap.end();
 	
-	const logprob_type logprob_max = hiter_begin->first;
-	for (/**/; hiter_begin != hiter; -- hiter) {
-	  if (hiter_begin->first <= logprob_max * beam) break;
-	  
+	const logprob_type logprob_threshold = hiter_begin->first * beam;
+	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
-	}
-
+	
 	// erase spans in hiter_begin to hiter
 	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
 	  const span_pair_type& span_pair = iter->second;
@@ -1474,7 +1471,6 @@ struct PYPGraph
 	}
 	
 	// we will process from hiter to hiter_end...
-	
 	spans_unique.clear();
 	
 	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
@@ -2087,6 +2083,7 @@ int main(int argc, char ** argv)
       position_set_type::const_iterator piter_end = positions.end();
       position_set_type::const_iterator piter = positions.begin();
       
+      size_type invalid = 0;
       size_type reduced = 0;
       while (piter != piter_end || reduced != positions.size()) {
 	
@@ -2135,6 +2132,8 @@ int main(int argc, char ** argv)
 	    }
 	  }
 	  
+	  invalid += derivations[pos].empty();
+
 	  // increment model...
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
@@ -2148,6 +2147,10 @@ int main(int argc, char ** argv)
 	  }
 	}
       }
+
+      if (debug)
+	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
+      
       
       if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
