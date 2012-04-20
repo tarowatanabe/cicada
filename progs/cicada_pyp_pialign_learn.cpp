@@ -1847,7 +1847,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-2;
+double beam = 1e-1;
 
 int samples = 1;
 int burns = 10;
@@ -2180,8 +2180,6 @@ int main(int argc, char ** argv)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
       
       if (sampling && ! output_sample_file.empty()) {
-	typedef std::vector<std::string, std::allocator<std::string> > stack_type;
-	
 	// dump derivations..!
 	
 	const path_type path = add_suffix(output_sample_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
@@ -2189,11 +2187,28 @@ int main(int argc, char ** argv)
 	utils::compress_ostream os(path, 1024 * 1024);
 
 	if (sample_hypergraph) {
+	  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > stack_type;
 	  typedef hypergraph_type::rule_type     rule_type;
 	  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+	  stack_type stack;
 	  
 	  hypergraph_type graph_source;
 	  hypergraph_type graph_target;
+	  
+	  rule_type::symbol_set_type straight(2);
+	  rule_type::symbol_set_type inverted(2);
+	  
+	  straight[0] = vocab_type::X1;
+	  straight[1] = vocab_type::X2;
+	  
+	  inverted[0] = vocab_type::X2;
+	  inverted[1] = vocab_type::X1;
+
+	  hypergraph_type::edge_type::node_set_type tails(2);
+	  
+	  const rule_ptr_type rule_straight(rule_type::create(rule_type(vocab_type::X, straight)));
+	  const rule_ptr_type rule_inverted(rule_type::create(rule_type(vocab_type::X, inverted)));
 	  
 	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
 	    graph_source.clear();
@@ -2202,15 +2217,78 @@ int main(int argc, char ** argv)
 	    if (! derivations[pos].empty()) {
 	      // construct pair of hypergrpahs
 	      
+	      graph_source.goal = graph_source.add_node().id;
+	      graph_target.goal = graph_target.add_node().id;
 	      
+	      stack.clear();
+	      stack.push_back(0);
 	      
+	      derivation_type::const_iterator diter_end = derivations[pos].end();
+	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+		const hypergraph_type::id_type head = stack.back();
+		stack.pop_back();
+		
+		if (diter->is_terminal()) {
+		  hypergraph_type::edge_type& edge_source = graph_source.add_edge();
+		  hypergraph_type::edge_type& edge_target = graph_target.add_edge();
+		  
+
+		  if (diter->span.source.empty())
+		    edge_source.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
+		  else
+		    edge_source.rule = rule_type::create(rule_type(vocab_type::X,
+								   sources[pos].begin() + diter->span.source.first,
+								   sources[pos].begin() + diter->span.source.last));
+
+		  if (diter->span.target.empty())
+		    edge_target.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
+		  else
+		    edge_target.rule = rule_type::create(rule_type(vocab_type::X,
+								   targets[pos].begin() + diter->span.target.first,
+								   targets[pos].begin() + diter->span.target.last));
+		  
+		  graph_source.connect_edge(edge_source.id, head);
+		  graph_target.connect_edge(edge_target.id, head);
+		  
+		} else {
+		  hypergraph_type::node_type& node_source1 = graph_source.add_node();
+		  hypergraph_type::node_type& node_source2 = graph_source.add_node();
+
+		  hypergraph_type::node_type& node_target1 = graph_target.add_node();
+		  hypergraph_type::node_type& node_target2 = graph_target.add_node();
+		  
+		  // push in reverse order!
+		  stack.push_back(node_source2.id);
+		  stack.push_back(node_source1.id);
+		  
+		  tails[0] = node_source1.id;
+		  tails[1] = node_source2.id;
+		  
+		  hypergraph_type::edge_type& edge_source = graph_source.add_edge(tails.begin(), tails.end());
+		  hypergraph_type::edge_type& edge_target = graph_target.add_edge(tails.begin(), tails.end());
+
+		  if (diter->is_straight()) {
+		    edge_source.rule = rule_straight;
+		    edge_target.rule = rule_straight;
+		  } else {
+		    edge_source.rule = rule_inverted;
+		    edge_target.rule = rule_inverted;
+		  }
+		  
+		  graph_source.connect_edge(edge_source.id, head);
+		  graph_target.connect_edge(edge_target.id, head);
+		}
+	      }
 	      
-	      
+	      graph_source.topologically_sort();
+	      graph_target.topologically_sort();
 	    }
 	    
 	    os << graph_source << " ||| " << graph_target << '\n';
 	  }
 	} else {
+	  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
+	  
 	  stack_type stack;
 	  
 	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
