@@ -1463,12 +1463,14 @@ struct PYPGraph
 	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
 	
+#if 0
 	// erase spans in hiter_begin to hiter
 	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
 	  const span_pair_type& span_pair = iter->second;
 	  
 	  edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last).clear();
 	}
+#endif
 	
 	// we will process from hiter to hiter_end...
 	spans_unique.clear();
@@ -1845,7 +1847,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-7;
+double beam = 1e-2;
 
 int samples = 1;
 int burns = 10;
@@ -1880,8 +1882,8 @@ double lexicon_discount_prior_beta  = 1.0;
 double lexicon_strength_prior_shape = 1.0;
 double lexicon_strength_prior_rate  = 1.0;
 
-double lambda_source = 2.0;
-double lambda_target = 2.0;
+double lambda_source = 1e-2;
+double lambda_target = 1e-2;
 double lambda_shape = 1e-2;
 double lambda_rate  = 1e+7;
 
