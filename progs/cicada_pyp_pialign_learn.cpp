@@ -1415,11 +1415,11 @@ struct PYPGraph
   };
   
   // forward filtering
-  logprob_type forward(const sentence_type& source,
-		       const sentence_type& target,
-		       const PYPPiAlign& model,
-		       const logprob_type beam,
-		       const size_type max_length)
+  std::pair<logprob_type, bool> forward(const sentence_type& source,
+					const sentence_type& target,
+					const PYPPiAlign& model,
+					const logprob_type beam,
+					const size_type max_length)
   {
     //std::cerr << "initialize" << std::endl;
     
@@ -1463,14 +1463,12 @@ struct PYPGraph
 	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
 	
-#if 0
 	// erase spans in hiter_begin to hiter
 	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
 	  const span_pair_type& span_pair = iter->second;
 	  
 	  edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last).clear();
 	}
-#endif
 	
 	// we will process from hiter to hiter_end...
 	spans_unique.clear();
@@ -1605,8 +1603,8 @@ struct PYPGraph
 	  }
 	}
       }
-
-    return chart(0, source.size(), 0, target.size());
+    
+    return std::make_pair(chart(0, source.size(), 0, target.size()), ! edges(0, source.size(), 0, target.size()).empty());
   }
   
   // backward sampling
@@ -1765,7 +1763,14 @@ struct Task
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
       
-      graph.forward(sources[pos], targets[pos], model, beam, max_length);
+      logprob_type beam_local = beam;
+      for (;;) {
+	const std::pair<logprob_type, bool> result = graph.forward(sources[pos], targets[pos], model, beam_local, max_length);
+	
+	if (result.second) break;
+	
+	beam_local *= 1e-2;
+      }
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
@@ -1847,7 +1852,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-1;
+double beam = 1e-7;
 
 int samples = 1;
 int burns = 10;
