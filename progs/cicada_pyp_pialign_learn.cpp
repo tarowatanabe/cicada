@@ -1463,14 +1463,12 @@ struct PYPGraph
 	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
 	
-#if 0
 	// erase spans in hiter_begin to hiter
 	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
 	  const span_pair_type& span_pair = iter->second;
 	  
 	  edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last).clear();
 	}
-#endif
 	
 	// we will process from hiter to hiter_end...
 	spans_unique.clear();
@@ -1526,7 +1524,7 @@ struct PYPGraph
 	      // parent span: StuU
 	      // span1: SsvU
 	      // span2: stuv
-
+	      
 	      if (edges(S, s, v, U).empty()) continue;
 	      
 	      const span_pair_type  span1(S, s, v, U);
@@ -1847,7 +1845,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-3;
+double beam = 1e-7;
 
 int samples = 1;
 int burns = 10;
@@ -2149,13 +2147,12 @@ int main(int argc, char ** argv)
 	  }
 	}
       }
-
-      if (debug)
-	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
-      
       
       if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
+
+      if (debug)
+	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
