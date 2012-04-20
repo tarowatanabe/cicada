@@ -1852,7 +1852,7 @@ path_type lexicon_target_source_file;
 
 int max_phrase_length = 7;
 int max_sentence_length = 40;
-double beam = 1e-1;
+double beam = 1e-4;
 
 int samples = 1;
 int burns = 10;
