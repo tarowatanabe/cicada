@@ -1068,31 +1068,28 @@ struct PYPPhrase
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
 
-  void prune()
+  void prune(bool debug)
   {
     // erase unused phrase entry in phrases...
-    std::vector<bool, std::allocator<bool> > inserted;
+    std::vector<bool, std::allocator<bool> > inserted(phrases.size());
     
     table_type::const_iterator titer_end = table.end();
     for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
-      if (titer->first.first >= inserted.size())
-	inserted.resize(titer->first.first + 1, false);
-      if (titer->first.second >= inserted.size())
-	inserted.resize(titer->first.second + 1, false);
-      
-
       inserted[titer->first.first] = true;
       inserted[titer->first.second] = true;
     }
     
-    id_type id = 0;
-    for (/**/; id != inserted.size(); ++ id)
-      if (! inserted[id])
+    size_type phrase = 0;
+    size_type erased = 0;
+    for (id_type id = 0; id != inserted.size(); ++ id)
+      if (! inserted[id]) {
 	phrases.erase(id);
+	++ erased;
+      } else
+	++ phrase;
     
-    for (/**/; id != phrases.size(); ++ id)
-      phrases.erase(id);
-      
+    if (debug)
+      std::cerr << "# of phrases: " << phrase << " erased: " << erased << std::endl;
   }
   
   PYPLexicon lexicon;
@@ -1942,17 +1939,17 @@ bool sample_hypergraph = false;
 double rule_discount = 0.9;
 double rule_strength = 1;
 
-double rule_discount_prior_alpha = 1.0;
+double rule_discount_prior_alpha = 10.0;
 double rule_discount_prior_beta  = 1.0;
-double rule_strength_prior_shape = 1.0;
+double rule_strength_prior_shape = 4.0;
 double rule_strength_prior_rate  = 1.0;
 
 double phrase_discount = 0.9;
 double phrase_strength = 1;
 
-double phrase_discount_prior_alpha = 1.0;
+double phrase_discount_prior_alpha = 10.0;
 double phrase_discount_prior_beta  = 1.0;
-double phrase_strength_prior_shape = 1.0;
+double phrase_strength_prior_shape = 4.0;
 double phrase_strength_prior_rate  = 1.0;
 
 double lexicon_discount = 0.9;
@@ -2546,11 +2543,10 @@ int main(int argc, char ** argv)
 	     << " " << prob_next_swap
 	     << " " << prob_next_others
 	     << '\n';
-	  
 	}
       }
       
-      model.phrase.prune();
+      model.phrase.prune(debug >= 2);
     }
     
     for (int i = 0; i != threads; ++ i)
