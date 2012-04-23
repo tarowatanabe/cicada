@@ -738,14 +738,14 @@ struct PYPLength
 {
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
-
+  
   typedef PYP::phrase_type phrase_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
   typedef std::vector<size_type, std::allocator<size_type> > count_set_type;
-
+  
   PYPLength(const LengthModel& __length_source,
 	    const LengthModel& __length_target)
     : length_source(__length_source),
