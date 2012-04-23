@@ -137,3 +137,6 @@ optimized variant of SGD (and xBLEU?)
 
 Parallel learning for PYP:
    translit and segment
+
+Add a shallow hiero rule by limiting the "depth" of rule instantiation...
+    level one is easier, but how to handle arbitrary depth? (or, at least, depth of 2?)

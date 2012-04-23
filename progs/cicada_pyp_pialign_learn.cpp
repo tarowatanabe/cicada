@@ -1827,14 +1827,18 @@ struct Task
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
       
+if 0
       logprob_type beam_local = beam;
       for (;;) {
-	const std::pair<logprob_type, bool> result = graph.forward(sources[pos], targets[pos], model, beam_local, max_length);
+	const std::pair<logprob_type, bool> result = 
 	
 	if (result.second) break;
 	
 	beam_local *= 1e-2;
       }
+#endif
+
+      graph.forward(sources[pos], targets[pos], model, beam, max_length);
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
