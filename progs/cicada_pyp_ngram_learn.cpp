@@ -807,7 +807,7 @@ double discount_prior_beta  = 1.0;
 double strength_prior_shape = 1.0;
 double strength_prior_rate  = 1.0;
 
-double order_alpha = 1.0;
+double order_alpha = 10.0;
 double order_beta = 1.0;
 
 int threads = 1;

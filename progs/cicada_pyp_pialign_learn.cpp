@@ -32,6 +32,10 @@
 //   url       = {http://www.aclweb.org/anthology/W09-3804}
 // }
 
+// an extension: we employ infinite-ITG by memorizing the permutation
+//
+// we use std::string (or, symbol?) as an indiction of "permutation" flag
+//
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -81,8 +85,6 @@
 #include "utils/packed_vector.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
-#include "utils/indexed_map.hpp"
-#include "utils/indexed_set.hpp"
 #include "utils/symbol_set.hpp"
 #include "utils/unique_set.hpp"
 
@@ -297,7 +299,8 @@ struct PYP
       return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
     }
   };
-
+  
+  
 };
 
 // a base mearure for PYPLexicon
@@ -862,19 +865,36 @@ struct PYPRule
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
   
+  
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
 
   typedef PYP::rule_type rule_type;
   
   typedef PYP::itg_type itg_type;
+
+  typedef uint32_t id_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
   typedef utils::pyp_parameter parameter_type;
   typedef utils::restaurant_vector<> table_type;
+
+  struct node_type
+  {
+    node_type() : table(), parent(id_type(-1)), order(0) {}
     
+    table_type table;
+    id_type    parent;
+    int        order;
+  };
+  
+  typedef utils::compact_trie_dense<char, node_type, boost::hash<char>, std::equal_to<char>,
+				    std::allocator<std::pair<const char, node_type> > > trie_type;
+
+  typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
+
   PYPRule(const parameter_type& parameter)
     : p0(1.0 / 3), counts0(0), table(parameter) {}
 
@@ -1918,6 +1938,9 @@ path_type lexicon_target_source_file;
 int max_phrase_length = 7;
 int max_sentence_length = 40;
 double beam = 1e-4;
+
+bool infinite = false;
+int order = 3;
 
 int samples = 1;
 int burns = 10;
