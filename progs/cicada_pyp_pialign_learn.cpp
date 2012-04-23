@@ -1827,7 +1827,7 @@ struct Task
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
       
-if 0
+#if 0
       logprob_type beam_local = beam;
       for (;;) {
 	const std::pair<logprob_type, bool> result = 
