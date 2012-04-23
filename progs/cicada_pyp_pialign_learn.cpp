@@ -1830,7 +1830,7 @@ struct Task
 #if 0
       logprob_type beam_local = beam;
       for (;;) {
-	const std::pair<logprob_type, bool> result = 
+	const std::pair<logprob_type, bool> result = graph.forward(sources[pos], targets[pos], model, beam_local, max_length);
 	
 	if (result.second) break;
 	
