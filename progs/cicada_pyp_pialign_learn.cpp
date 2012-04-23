@@ -576,14 +576,11 @@ struct PYPLexicon
     } else if (! target.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	
 	double sum = 0.0;
 	phrase_type::const_iterator siter_end = source.end();
-	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	  if (! tables.exists(siter->id()))
-	    sum += lexicon(*siter, *titer);
-	  else
-	    sum += tables[siter->id()].prob(*titer, lexicon(*siter, *titer));
-	}
+	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	  sum += (! tables.exists(siter->id()) ? lexicon(*siter, *titer) : tables[siter->id()].prob(*titer, lexicon(*siter, *titer)));
 	
 	lp += std::log(sum);
       }
@@ -976,7 +973,7 @@ struct PYPPhrase
     phrase_set_type::iterator iter = phrases.insert(phrase).first;
     return iter - phrases.begin();
   }
-
+  
   template <typename Sampler>
   void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
@@ -1032,7 +1029,7 @@ struct PYPPhrase
     if (siter == phrases.end() || titer == phrases.end())
       return std::make_pair(table.prob(base), false);
     else
-      return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.end()), base);
+      return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.begin()), base);
   }
   
   double log_likelihood() const
