@@ -1448,7 +1448,7 @@ struct PYPGraph
 		  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 		}
 	      }
-	    	    
+	      
 	      if (! edges(source_first, source_last, target_first, target_last).empty())
 		agenda[span_pair.size()].push_back(span_pair);
 	    }
@@ -1533,15 +1533,6 @@ struct PYPGraph
 	const logprob_type logprob_threshold = hiter_begin->first * beam;
 	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
-	
-#if 0
-	// erase spans in hiter_begin to hiter
-	for (heap_type::iterator iter = hiter_begin; iter != hiter; ++ iter) {
-	  const span_pair_type& span_pair = iter->second;
-	  
-	  edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last).clear();
-	}
-#endif
 	
 	// we will process from hiter to hiter_end...
 	spans_unique.clear();

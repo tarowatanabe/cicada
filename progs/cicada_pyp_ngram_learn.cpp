@@ -29,6 +29,7 @@
 
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
+#include "utils/pyp_parameter.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
@@ -89,6 +90,9 @@ struct PYPLM
   typedef std::vector<id_type, std::allocator<id_type> > history_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
   typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
+
+  //typedef utils::pyp_parameter parameter_type;
+  //typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
   
   PYPLM(const int order,
 	const double __p0,
@@ -768,17 +772,17 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
 
-template <typename Tp>
-struct less_data
+template <typename Training>
+struct less_rank
 {
-  bool operator()(const Tp& x, const Tp& y) const
+  less_rank(const Training& __training) : training(__training) {}
+
+  bool operator()(const size_t& x, const size_t& y) const
   {
-    return (boost::fusion::get<2>(x) < boost::fusion::get<2>(y)
-	    || (!(boost::fusion::get<2>(y) < boost::fusion::get<2>(x))
-		&& (boost::fusion::get<1>(x) < boost::fusion::get<1>(y)
-		    || (!(boost::fusion::get<1>(y) < boost::fusion::get<1>(x))
-			&& boost::fusion::get<0>(x) < boost::fusion::get<0>(y)))));
+    return boost::fusion::get<2>(training[x]) < boost::fusion::get<2>(training[y]);
   }
+
+  const Training& training;
 };
 
 path_set_type train_files;
@@ -786,7 +790,8 @@ path_set_type test_files;
 path_type     output_file;
 
 int order = 4;
-int samples = 30;
+int samples = 1;
+int burns = 10;
 int baby_steps = 0;
 int anneal_steps = 0;
 int resample_rate = 1;
@@ -857,6 +862,10 @@ int main(int argc, char ** argv)
     typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
     typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
     typedef std::vector<size_t, std::allocator<size_t> > index_type;
+    
+    typedef PYPLM::size_type size_type;
+    typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+    typedef std::vector<int, std::allocator<int> > derivation_set_type;
 
     data_set_type        training;
     word_unique_set_type uniques;
@@ -901,12 +910,11 @@ int main(int argc, char ** argv)
 	uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
       }
     }
-
+    
     if (training.empty())
       throw std::runtime_error("no training data?");
     
     data_set_type(training).swap(training);
-
     
     // assign rank...
     {
@@ -917,22 +925,11 @@ int main(int argc, char ** argv)
       uniques.clear();
     }
     
-    // sort by rank
-    std::sort(training.begin(), training.end(), less_data<data_type>());
-    
-    // compute index
-    index_type index(1, 0);
-    
-    data_set_type::const_iterator titer_begin = training.begin();
-    data_set_type::const_iterator titer_end   = training.end();
-    for (data_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-      if (boost::fusion::get<2>(*titer) != boost::fusion::get<2>(training[index.back()]))
-	index.push_back(titer - titer_begin);
-    
-    index.push_back(training.size());
-    
-    if (debug >= 2)
-      std::cerr << "# of baby step levels: " << (index.size() - 1) << std::endl;
+    // assign positons and orders
+    position_set_type   positions(training.size());
+    derivation_set_type derivations(training.size(), 0);
+    for (size_type pos = 0; pos != positions.size(); ++ pos)
+      positions[pos]= pos;
     
     // sample parameters, first...
     if (slice_sampling)
@@ -944,50 +941,21 @@ int main(int argc, char ** argv)
       for (int n = 0; n != order; ++ n)
 	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
     
-    {
-      data_set_type::iterator titer_end = training.end();
-      for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
-	boost::fusion::get<2>(*titer) = false;
-    }
-    
-    size_t baby_index = 0;
-    size_t baby_iter = utils::bithack::branch(baby_steps > 0, size_t(0), index.back());
-    const size_t baby_last = index.back();
-    const size_t baby_size = (baby_steps > 0 ? (index.back() + (baby_steps - 1)) / baby_steps : size_t(0));
-    
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
-      
-    data_set_type training_samples;
     
-    if (baby_iter == baby_last)
-      training_samples = training;
-    else
-      training_samples.reserve(training.size());
-      
+    size_t baby_iter = 0;
+    const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
+    
+    size_t burn_iter = 0;
+    const size_t burn_last = utils::bithack::branch(burns > 0, burns, 0);
+    
     bool sampling = false;
     int sample_iter = 0;
     
     // then, learn!
     for (size_t iter = 0; sample_iter != samples; ++ iter, sample_iter += sampling) {
-
-      bool baby_finished = true;
-      if (baby_iter != baby_last) {
-	baby_finished = false;
-	
-	const size_t baby_next = utils::bithack::min(baby_iter + baby_size, baby_last);
-	
-	while (baby_iter < baby_next) {
-	  std::copy(training.begin() + index[baby_index], training.begin() + index[baby_index + 1], std::back_inserter(training_samples));
-	  
-	  baby_iter = index[baby_index + 1];
-	  ++ baby_index;
-	}
-	
-	if (debug >= 2)
-	  std::cerr << "baby: " << training_samples.size() << std::endl;
-      }
-
+      
       double temperature = 1.0;
       bool anneal_finished = true;
       if (anneal_iter != anneal_last) {
@@ -1000,7 +968,19 @@ int main(int argc, char ** argv)
 	  std::cerr << "temperature: " << temperature << std::endl;
       }
       
-      sampling = baby_finished && anneal_finished;
+      bool baby_finished = true;
+      if (baby_iter != baby_last) {
+	++ baby_iter;
+	baby_finished = false;
+      }
+      
+      bool burn_finished = true;
+      if (burn_iter != burn_last) {
+	++ burn_iter;
+	burn_finished = false;
+      }
+      
+      sampling = anneal_finished && baby_finished && burn_finished;
       
       if (debug) {
 	if (sampling)
@@ -1010,15 +990,19 @@ int main(int argc, char ** argv)
       }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
-      std::random_shuffle(training_samples.begin(), training_samples.end(), gen);
-
+      std::random_shuffle(positions.begin(), positions.end(), gen);
+      if (! baby_finished)
+	std::sort(positions.begin(), positions.end(), less_rank<data_set_type>(training));
+      
       if (infinite)  {
-	data_set_type::iterator titer_end = training_samples.end();
-	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
-	  if (boost::fusion::get<2>(*titer))
-	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler);
+	position_set_type::const_iterator piter_end = positions.end();
+	for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
+	  const size_type& pos = *piter;
 	  
-	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), boost::fusion::get<2>(*titer), sampler, temperature);
+	  if (derivations[pos])
+	    lm.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler);
+	  
+	  lm.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler, temperature);
 	}
 	
 	if (debug >= 2) {
@@ -1032,14 +1016,16 @@ int main(int argc, char ** argv)
 	}
 
       } else {
-	data_set_type::iterator titer_end = training_samples.end();
-	for (data_set_type::iterator titer = training_samples.begin(); titer != titer_end; ++ titer) {
-	  if (boost::fusion::get<2>(*titer))
-	    lm.decrement(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler);
-	  else
-	    boost::fusion::get<2>(*titer) = true;
+	position_set_type::const_iterator piter_end = positions.end();
+	for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
+	  const size_type& pos = *piter;
 	  
-	  lm.increment(boost::fusion::get<0>(*titer), boost::fusion::get<1>(*titer), sampler, temperature);
+	  if (derivations[pos])
+	    lm.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler);
+	  else
+	    derivations[pos] = true;
+	  
+	  lm.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler, temperature);
 	}
       }
       
@@ -1061,6 +1047,12 @@ int main(int argc, char ** argv)
     // clear training data
     training.clear();
     data_set_type(training).swap(training);
+
+    positions.clear();
+    position_set_type(positions).swap(positions);
+
+    derivations.clear();
+    derivation_set_type(derivations).swap(derivations);
     
     // we will dump LM... now, define a format!
     if (! output_file.empty())
@@ -1198,6 +1190,7 @@ void options(int argc, char** argv)
     ("order", po::value<int>(&order)->default_value(order), "max ngram order")
     
     ("samples",             po::value<int>(&samples)->default_value(samples),                         "# of samples")
+    ("burns",               po::value<int>(&burns)->default_value(burns),                             "# of burn-ins")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
     ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
     ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")
