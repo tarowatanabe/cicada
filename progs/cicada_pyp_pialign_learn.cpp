@@ -1924,6 +1924,23 @@ struct Task
   double temperature;
 };
 
+struct TaskPush
+{
+  TaskPush(Task::queue_type& __queue,
+	   const position_set_type& __positions)
+    : queue(__queue), positions(__positions) {}
+  
+  void operator()()
+  {
+    position_set_type::const_iterator piter_end = positions.end();
+    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+      queue.push(*piter);
+  }
+
+  Task::queue_type& queue;
+  const position_set_type& positions;
+};
+
 struct less_size
 {
   less_size(const sentence_set_type& __sources,
@@ -2214,77 +2231,73 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
-      position_set_type::const_iterator piter_end = positions.end();
-      position_set_type::const_iterator piter = positions.begin();
+      std::auto_ptr<boost::thread> pusher(new boost::thread(TaskPush(queue_mapper, positions)));
       
       size_type invalid = 0;
       size_type reduced = 0;
-      while (piter != piter_end || reduced != positions.size()) {
-	
-	for (int i = 0; i != (threads * 16) && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
-	  ++ piter;
-	
+      while (reduced != positions.size()) {
 	size_type pos = 0;
-	while (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
-	  ++ reduced;
+	queue_reducer.pop(pos);
+	++ reduced;
 	  
-	  if (! derivations_prev[pos].empty()) {
-	    derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	    for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	      model.decrement(sources[pos], targets[pos], *diter, sampler);
-	  }
+	if (! derivations_prev[pos].empty()) {
+	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
+	    model.decrement(sources[pos], targets[pos], *diter, sampler);
+	}
 
-	  if (debug >= 3) {
-	    std::cerr << "training=" << pos << std::endl
-		      << "source=" << sources[pos] << std::endl
-		      << "target=" << targets[pos] << std::endl;
+	if (debug >= 3) {
+	  std::cerr << "training=" << pos << std::endl
+		    << "source=" << sources[pos] << std::endl
+		    << "target=" << targets[pos] << std::endl;
 	    
 	    
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      
-	      std::cerr << "derivation: ";
-	      switch (diter->itg) {
-	      case PYP::TERMINAL:   std::cerr << "ter"; break;
-	      case PYP::STRAIGHT:   std::cerr << "str"; break;
-	      case PYP::INVERTED:   std::cerr << "inv"; break;
-	      case PYP::GENERATIVE: std::cerr << "gen"; break;
-	      case PYP::BASE:       std::cerr << "bas"; break;
-	      default: std::cerr << "UNK";
-	      }
-	      
-	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
-		std::cerr << " pair: "
-			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			  << " ||| "
-			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	      std::cerr << std::endl;
-	    }
-	  }
-	  
-	  invalid += derivations[pos].empty();
-
-	  // increment model...
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-	  
-	  if (debug) {
-	    if ((reduced + 1) % 10000 == 0)
-	      std::cerr << '.';
-	    if ((reduced + 1) % 1000000 == 0)
-	      std::cerr << '\n';
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	      
+	    std::cerr << "derivation: ";
+	    switch (diter->itg) {
+	    case PYP::TERMINAL:   std::cerr << "ter"; break;
+	    case PYP::STRAIGHT:   std::cerr << "str"; break;
+	    case PYP::INVERTED:   std::cerr << "inv"; break;
+	    case PYP::GENERATIVE: std::cerr << "gen"; break;
+	    case PYP::BASE:       std::cerr << "bas"; break;
+	    default: std::cerr << "UNK";
+	    }
+	      
+	    std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
+		      << " target: " << diter->span.target.first << "..." << diter->span.target.last;
+	      
+	    if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
+	      std::cerr << " pair: "
+			<< PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+			<< " ||| "
+			<< PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
+	      
+	    std::cerr << std::endl;
 	  }
+	}
+	  
+	invalid += derivations[pos].empty();
+
+	// increment model...
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	
+	if (debug) {
+	  if ((reduced + 1) % 10000 == 0)
+	    std::cerr << '.';
+	  if ((reduced + 1) % 1000000 == 0)
+	    std::cerr << '\n';
 	}
       }
       
+      pusher->join();
+      
       if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
-      
+            
       if (invalid && debug)
 	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
       
