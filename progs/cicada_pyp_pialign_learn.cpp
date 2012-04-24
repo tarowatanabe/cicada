@@ -778,7 +778,7 @@ struct LengthModel
   template <typename Sampler>
   void sample_parameters(const double& alpha, const double& beta, Sampler& sampler)
   {
-    //assign(sampler.gamma(alpha + strength_shape, beta + strength_rate));
+    assign(sampler.gamma(alpha + strength_shape, beta + strength_rate));
   }
   
   double lambda;
@@ -2051,7 +2051,7 @@ double lexicon_strength_prior_rate  = 1.0;
 double lambda_source = 1e-2;
 double lambda_target = 1e-2;
 double lambda_shape = 1e-2;
-double lambda_rate  = 1e+4;
+double lambda_rate  = 1e+10;
 
 int threads = 1;
 int debug = 0;
