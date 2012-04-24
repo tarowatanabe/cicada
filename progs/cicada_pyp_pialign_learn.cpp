@@ -743,11 +743,11 @@ struct LengthModel
   typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
   
   LengthModel(const double& __lambda,
-	      const double& __null,
+	      const double& __lambda_null,
 	      const double& __strength_shape,
 	      const double& __strength_rate)
     : lambda(__lambda),
-      null(__null),
+      lambda_null(__lambda_null),
       strength_shape(__strength_shape),
       strength_rate(__strength_rate),
       cache()
@@ -772,7 +772,7 @@ struct LengthModel
   {
     lambda = __lambda;
     
-    cache[0] = std::log(null); // this is wrong... but counter the epsilon problem.
+    cache[0] = std::log(lambda_null); // this is wrong... but counter the epsilon problem.
     for (size_type size = 1; size != cache.size(); ++ size)
       cache[size] = utils::mathop::log_poisson(size, lambda);
   }
@@ -784,7 +784,7 @@ struct LengthModel
   }
   
   double lambda;
-  double null;
+  double lambda_null;
   double strength_shape;
   double strength_rate;
 
