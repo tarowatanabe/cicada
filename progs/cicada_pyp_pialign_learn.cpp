@@ -1867,7 +1867,6 @@ struct Task
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
-       derivation_set_type& __derivations_prev,
        const PYPPiAlign& __model,
        const sampler_type& __sampler,
        const logprob_type& __beam,
@@ -1877,7 +1876,6 @@ struct Task
       sources(__sources),
       targets(__targets),
       derivations(__derivations),
-      derivations_prev(__derivations_prev),
       model(__model),
       sampler(__sampler),
       beam(__beam),
@@ -1893,17 +1891,6 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-
-#if 0
-      derivations_prev[pos] = derivations[pos];
-      
-      // decrement model...
-      if (! derivations_prev[pos].empty()) {
-	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter, sampler);
-      }
-#endif
       
       logprob_type beam_local = beam;
       for (;;) {
@@ -1916,13 +1903,6 @@ struct Task
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
-#if 0
-      // increment model...
-      derivation_type::const_iterator diter_end = derivations[pos].end();
-      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-#endif
-      
       reducer.push(pos);
     }
   }
@@ -1933,7 +1913,6 @@ struct Task
   const sentence_set_type& sources;
   const sentence_set_type& targets;
   derivation_set_type& derivations;
-  derivation_set_type& derivations_prev;
   
   const PYPPiAlign&  model;
   sampler_type sampler;
@@ -1944,22 +1923,6 @@ struct Task
   double temperature;
 };
 
-struct TaskMapper
-{
-  TaskMapper(Task::queue_type& __queue,
-	   const position_set_type& __positions)
-    : queue(__queue), positions(__positions) {}
-  
-  void operator()()
-  {
-    position_set_type::const_iterator piter_end = positions.end();
-    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-      queue.push(*piter);
-  }
-
-  Task::queue_type& queue;
-  const position_set_type& positions;
-};
 
 struct less_size
 {
@@ -2145,7 +2108,6 @@ int main(int argc, char ** argv)
     PYPPiAlign model(model_rule, model_phrase);
     
     derivation_set_type derivations(sources.size());
-    derivation_set_type derivations_prev(sources.size());
     position_set_type positions;
     for (size_t i = 0; i != sources.size(); ++ i)
       if (! sources[i].empty() && ! targets[i].empty()
@@ -2184,7 +2146,6 @@ int main(int argc, char ** argv)
 								 sources,
 								 targets,
 								 derivations,
-								 derivations_prev,
 								 model,
 								 sampler,
 								 beam, 
@@ -2243,10 +2204,8 @@ int main(int argc, char ** argv)
       }
 
       // assign temperature and model...
-      for (size_type i = 0; i != tasks.size(); ++ i) {
-	//tasks[i].model = model;
+      for (size_type i = 0; i != tasks.size(); ++ i)
 	tasks[i].temperature = temperature;
-      }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
@@ -2260,8 +2219,9 @@ int main(int argc, char ** argv)
       position_set_type mapped;
       
       while (piter != piter_end) {
+
+	// mapping
 	mapped.clear();
-	
 	for (int i = 0; i != blocks && piter != piter_end; ++ i, ++ piter) {
 	  const size_type pos = *piter;
 	  
@@ -2272,15 +2232,19 @@ int main(int argc, char ** argv)
 	  }
 	  
 	  mapped.push_back(pos);
-	  queue_mapper.push(pos);
 	}
+	
+	position_set_type::const_iterator miter_end = mapped.end();
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
+	  queue_mapper.push(*miter);
+	
 	
 	// reduce...
 	size_type pos;
 	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced)
 	  queue_reducer.pop(pos);
 	
-	position_set_type::const_iterator miter_end = mapped.end();
+	// model...
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter, ++ processed) {
 	  const size_type pos = *miter;
 	  
@@ -2330,69 +2294,6 @@ int main(int argc, char ** argv)
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
-	    
-#if 0
-      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
-      
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
-	
-	if (! derivations_prev[pos].empty()) {
-	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	    model.decrement(sources[pos], targets[pos], *diter, sampler);
-	}
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-
-	if (debug >= 3) {
-	  std::cerr << "training=" << pos << std::endl
-		    << "source=" << sources[pos] << std::endl
-		    << "target=" << targets[pos] << std::endl;
-	  
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      
-	    std::cerr << "derivation: ";
-	    switch (diter->itg) {
-	    case PYP::TERMINAL:   std::cerr << "ter"; break;
-	    case PYP::STRAIGHT:   std::cerr << "str"; break;
-	    case PYP::INVERTED:   std::cerr << "inv"; break;
-	    case PYP::GENERATIVE: std::cerr << "gen"; break;
-	    case PYP::BASE:       std::cerr << "bas"; break;
-	    default: std::cerr << "UNK";
-	    }
-	      
-	    std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-		      << " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	    if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
-	      std::cerr << " pair: "
-			<< PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			<< " ||| "
-			<< PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	    std::cerr << std::endl;
-	  }
-	}
-	  	
-	if (debug) {
-	  if ((reduced + 1) % 10000 == 0)
-	    std::cerr << '.';
-	  if ((reduced + 1) % 1000000 == 0)
-	    std::cerr << '\n';
-	}
-      }
-      
-      mapper->join();
-      
-      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
-	std::cerr << std::endl;
-#endif
-      
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
