@@ -1893,17 +1893,18 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-	
-      derivations_prev[pos] = derivations[pos];
 
+#if 0
+      derivations_prev[pos] = derivations[pos];
+      
       // decrement model...
       if (! derivations_prev[pos].empty()) {
 	derivation_type::const_iterator diter_end = derivations_prev[pos].end();
 	for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
+#endif
       
-#if 1
       logprob_type beam_local = beam;
       for (;;) {
 	const std::pair<logprob_type, bool> result = graph.forward(sources[pos], targets[pos], model, beam_local, max_length);
@@ -1912,16 +1913,15 @@ struct Task
 	
 	beam_local *= 1e-2;
       }
-#endif
-      
-      //graph.forward(sources[pos], targets[pos], model, beam, max_length);
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
+#if 0
       // increment model...
       derivation_type::const_iterator diter_end = derivations[pos].end();
       for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+#endif
       
       reducer.push(pos);
     }
@@ -1935,7 +1935,7 @@ struct Task
   derivation_set_type& derivations;
   derivation_set_type& derivations_prev;
   
-  PYPPiAlign  model;
+  const PYPPiAlign&  model;
   sampler_type sampler;
   
   logprob_type beam;
@@ -2022,6 +2022,7 @@ int samples = 1;
 int burns = 10;
 int baby_steps = 1;
 int anneal_steps = 1;
+int blocks = 256;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
@@ -2243,7 +2244,7 @@ int main(int argc, char ** argv)
 
       // assign temperature and model...
       for (size_type i = 0; i != tasks.size(); ++ i) {
-	tasks[i].model = model;
+	//tasks[i].model = model;
 	tasks[i].temperature = temperature;
       }
       
@@ -2252,9 +2253,87 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
+      position_set_type::const_iterator piter     = positions.begin();
+      position_set_type::const_iterator piter_end = positions.end();
+
+      size_type processed = 0;
+      position_set_type mapped;
+      
+      while (piter != piter_end) {
+	mapped.clear();
+	
+	for (int i = 0; i != blocks && piter != piter_end; ++ i, ++ piter) {
+	  const size_type pos = *piter;
+	  
+	  if (! derivations[pos].empty()) {
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	      model.decrement(sources[pos], targets[pos], *diter, sampler);
+	  }
+	  
+	  mapped.push_back(pos);
+	  queue_mapper.push(pos);
+	}
+	
+	// reduce...
+	size_type pos;
+	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced)
+	  queue_reducer.pop(pos);
+	
+	position_set_type::const_iterator miter_end = mapped.end();
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter, ++ processed) {
+	  const size_type pos = *miter;
+	  
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	  
+	  if (debug >= 3) {
+	    std::cerr << "training=" << pos << std::endl
+		      << "source=" << sources[pos] << std::endl
+		      << "target=" << targets[pos] << std::endl;
+	  
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	      
+	      std::cerr << "derivation: ";
+	      switch (diter->itg) {
+	      case PYP::TERMINAL:   std::cerr << "ter"; break;
+	      case PYP::STRAIGHT:   std::cerr << "str"; break;
+	      case PYP::INVERTED:   std::cerr << "inv"; break;
+	      case PYP::GENERATIVE: std::cerr << "gen"; break;
+	      case PYP::BASE:       std::cerr << "bas"; break;
+	      default: std::cerr << "UNK";
+	      }
+	      
+	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
+			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
+	      
+	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
+		std::cerr << " pair: "
+			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+			  << " ||| "
+			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
+	      
+	      std::cerr << std::endl;
+	    }
+	  }
+	  
+	  if (debug) {
+	    if ((processed + 1) % 10000 == 0)
+	      std::cerr << '.';
+	    if ((processed + 1) % 1000000 == 0)
+	      std::cerr << '\n';
+	  }
+	}
+      }
+      
+      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
+	std::cerr << std::endl;
+	    
+#if 0
       std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
-      size_type invalid = 0;
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
@@ -2268,8 +2347,6 @@ int main(int argc, char ** argv)
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-	
-	invalid += derivations[pos].empty();
 
 	if (debug >= 3) {
 	  std::cerr << "training=" << pos << std::endl
@@ -2314,9 +2391,8 @@ int main(int argc, char ** argv)
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
-            
-      if (invalid && debug)
-	std::cerr << "training: " << positions.size() << " empty derivations: " << invalid << std::endl;
+#endif
+      
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
@@ -2696,6 +2772,7 @@ void options(int argc, char** argv)
     ("burns",               po::value<int>(&burns)->default_value(burns),                             "# of burn-ins")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
     ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
+    ("blocks",              po::value<int>(&blocks)->default_value(blocks),                           "# of blocks")
     ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
