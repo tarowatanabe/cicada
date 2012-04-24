@@ -743,9 +743,11 @@ struct LengthModel
   typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
   
   LengthModel(const double& __lambda,
+	      const double& __null,
 	      const double& __strength_shape,
 	      const double& __strength_rate)
     : lambda(__lambda),
+      null(__null),
       strength_shape(__strength_shape),
       strength_rate(__strength_rate),
       cache()
@@ -770,7 +772,7 @@ struct LengthModel
   {
     lambda = __lambda;
     
-    cache[0] = 0.0; // this is wrong... but counter the epsilon problem.
+    cache[0] = std::log(null); // this is wrong... but counter the epsilon problem.
     for (size_type size = 1; size != cache.size(); ++ size)
       cache[size] = utils::mathop::log_poisson(size, lambda);
   }
@@ -782,6 +784,7 @@ struct LengthModel
   }
   
   double lambda;
+  double null;
   double strength_shape;
   double strength_rate;
 
@@ -2050,6 +2053,7 @@ double lexicon_strength_prior_rate  = 1.0;
 
 double lambda_source = 1e-2;
 double lambda_target = 1e-2;
+double lambda_null = 1e-10;
 double lambda_shape = 1e-3;
 double lambda_rate  = 1e+10;
 
@@ -2125,8 +2129,8 @@ int main(int argc, char ** argv)
 							lexicon_strength_prior_shape,
 							lexicon_strength_prior_rate));
 
-    PYPLength model_length(LengthModel(lambda_source, lambda_shape, lambda_rate),
-			   LengthModel(lambda_target, lambda_shape, lambda_rate));
+    PYPLength model_length(LengthModel(lambda_source, lambda_null, lambda_shape, lambda_rate),
+			   LengthModel(lambda_target, lambda_null, lambda_shape, lambda_rate));
     
     PYPPhrase model_phrase(model_lexicon,
 			   model_length,
@@ -2724,6 +2728,7 @@ void options(int argc, char** argv)
 
     ("lambda-source", po::value<double>(&lambda_source)->default_value(lambda_source), "lambda for source")
     ("lambda-target", po::value<double>(&lambda_target)->default_value(lambda_target), "lambda for target")
+    ("lambda-null",   po::value<double>(&lambda_null)->default_value(lambda_null),     "lambda for NULL")
     ("lambda-shape",  po::value<double>(&lambda_shape)->default_value(lambda_shape),   "lambda ~ Gamma(shape,rate)")
     ("lambda-rate",   po::value<double>(&lambda_rate)->default_value(lambda_rate),     "lambda ~ Gamma(shape,rate)")
         
