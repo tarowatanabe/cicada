@@ -300,7 +300,46 @@ struct PYP
     }
   };
   
-  
+  struct non_terminal_trie_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    typedef uint32_t  id_type;
+    
+    typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
+    
+    //
+    // multiple of 4: L, R, l, r
+    //
+    
+    void initialize(const size_type depth)
+    {
+      parent_.clear();
+      child_.clear();
+      last_.clear();
+      
+      // 4, 16, 64, 256, 1024 ...
+      
+      // compute parent_ and last_
+      parent_.resize(4, id_type(-1));
+      last_.push_back(parent_.size());
+      id_type prev = 0;
+      for (size_type order = 0; order != depth; ++ order) {
+	id_type last = parent_.size();
+	for (id_type id = prev; id != last; ++ id) {
+	  child_.push_back(parent_.size());
+	  parent_.resize(parent_.size() + 4, id);
+	}
+	
+	prev = last;
+	last_.push_back(parent_.size());
+      }
+    }
+    
+    id_set_type parent_;
+    id_set_type child_;
+    id_set_type last_;
+  };
 };
 
 // a base mearure for PYPLexicon
@@ -2186,7 +2225,7 @@ int main(int argc, char ** argv)
 	  ++ piter;
 	
 	size_type pos = 0;
-	if (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
+	while (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
 	  ++ reduced;
 	  
 	  if (! derivations_prev[pos].empty()) {
