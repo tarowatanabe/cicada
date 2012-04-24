@@ -2050,7 +2050,7 @@ double lexicon_strength_prior_rate  = 1.0;
 
 double lambda_source = 1e-2;
 double lambda_target = 1e-2;
-double lambda_shape = 1e-2;
+double lambda_shape = 1e-3;
 double lambda_rate  = 1e+10;
 
 int threads = 1;
