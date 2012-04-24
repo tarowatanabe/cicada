@@ -709,6 +709,19 @@ struct PYPLexicon
 	(*first)->strength() = param.strength;
       }
   }
+
+  void prune()
+  {
+    table_set_type::iterator siter_end = tables_source_target.end();
+    for (table_set_type::iterator siter = tables_source_target.begin(); siter != siter_end; ++ siter)
+      if (*siter)
+	(*siter)->prune();
+    
+    table_set_type::iterator titer_end = tables_target_source.end();
+    for (table_set_type::iterator titer = tables_target_source.begin(); titer != titer_end; ++ titer)
+      if (*titer)
+	(*titer)->prune();
+  }
   
   const lexicon_type* lexicon_source_target;
   const lexicon_type* lexicon_target_source;
@@ -1126,6 +1139,10 @@ struct PYPPhrase
 
   void prune(bool debug)
   {
+    // first, prune empty restaurants...
+    lexicon.prune();
+    table.prune();
+    
     // erase unused phrase entry in phrases...
     std::vector<bool, std::allocator<bool> > inserted(phrases.size());
     
@@ -1143,7 +1160,7 @@ struct PYPPhrase
 	++ erased;
       } else
 	++ phrase;
-    
+        
     if (debug)
       std::cerr << "# of phrases: " << phrase << " erased: " << erased << std::endl;
   }
@@ -2320,6 +2337,9 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
       
+      // perform model pruning..
+      model.phrase.prune(debug >= 2);
+      
       if (sampling && ! output_sample_file.empty()) {
 	// dump derivations..!
 	
@@ -2608,8 +2628,6 @@ int main(int argc, char ** argv)
 	     << '\n';
 	}
       }
-      
-      model.phrase.prune(debug >= 2);
     }
     
     for (int i = 0; i != threads; ++ i)

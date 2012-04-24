@@ -422,7 +422,7 @@ namespace utils
       typename dish_set_type::iterator diter_end = dishes.end();
       for (typename dish_set_type::iterator diter = dishes.begin(); diter != diter_end; /**/) {
 	if (diter->second.empty())
-	  dishes.eraes(diter ++);
+	  dishes.erase(diter ++);
 	else
 	  ++ diter;
       }
