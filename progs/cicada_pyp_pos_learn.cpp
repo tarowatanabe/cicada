@@ -792,6 +792,23 @@ struct Task
   PYPGraph graph;
 };
 
+struct TaskMapper
+{
+  TaskMapper(Task::queue_type& __queue,
+	   const position_set_type& __positions)
+    : queue(__queue), positions(__positions) {}
+  
+  void operator()()
+  {
+    position_set_type::const_iterator piter_end = positions.end();
+    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+      queue.push(*piter);
+  }
+
+  Task::queue_type& queue;
+  const position_set_type& positions;
+};
+
 struct less_size
 {
   less_size(const sentence_set_type& __training) : training(__training) {}
@@ -1042,29 +1059,25 @@ int main(int argc, char ** argv)
       
       model.initialize_cache(words.begin(), words.end());
       
-      position_set_type::const_iterator piter = positions.begin();
-      size_type reduced = 0;
-      while (piter != piter_end || reduced != positions.size()) {
-	
-	for (int i = 0; i != (threads * 16) && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
-	  ++ piter;
-	
+      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
+      
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
-	while (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
-	  ++ reduced;
+	queue_reducer.pop(pos);
 	  
-	  if (derivations[pos].size() != cutoffs[pos].size())
-	    throw std::runtime_error("derivation and cutoff size differ");
-	  
-	  if (derivations[pos].size() != training[pos].size() + 1)
-	    throw std::runtime_error("derivation and setnence size differ");
-	  
-	  if (! derivations_prev[pos].empty())
-	    graph.decrement(training[pos], derivations_prev[pos], model, sampler);
-	  
-	  graph.increment(training[pos], derivations[pos], model, sampler, temperature);
-	}
+	if (derivations[pos].size() != cutoffs[pos].size())
+	  throw std::runtime_error("derivation and cutoff size differ");
+	
+	if (derivations[pos].size() != training[pos].size() + 1)
+	  throw std::runtime_error("derivation and setnence size differ");
+	
+	if (! derivations_prev[pos].empty())
+	  graph.decrement(training[pos], derivations_prev[pos], model, sampler);
+	
+	graph.increment(training[pos], derivations[pos], model, sampler, temperature);
       }
+
+      mapper->join();
       
       // permute..
       if (debug >= 3)

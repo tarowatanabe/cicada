@@ -2234,11 +2234,9 @@ int main(int argc, char ** argv)
       std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
       size_type invalid = 0;
-      size_type reduced = 0;
-      while (reduced != positions.size()) {
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
-	++ reduced;
 	  
 	if (! derivations_prev[pos].empty()) {
 	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
@@ -2295,7 +2293,7 @@ int main(int argc, char ** argv)
       
       mapper->join();
       
-      if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
+      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
             
       if (invalid && debug)

@@ -1537,6 +1537,23 @@ struct Task
   PYPGraph graph;
 };
 
+struct TaskMapper
+{
+  TaskMapper(Task::queue_type& __queue,
+	   const position_set_type& __positions)
+    : queue(__queue), positions(__positions) {}
+  
+  void operator()()
+  {
+    position_set_type::const_iterator piter_end = positions.end();
+    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+      queue.push(*piter);
+  }
+
+  Task::queue_type& queue;
+  const position_set_type& positions;
+};
+
 struct less_size
 {
   less_size(const hypergraph_set_type& __sources,
@@ -1785,61 +1802,24 @@ int main(int argc, char ** argv)
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
+
+      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
-      position_set_type::const_iterator piter_end = positions.end();
-      position_set_type::const_iterator piter = positions.begin();
-      size_type reduced = 0;
-      while (piter != piter_end || reduced != positions.size()) {
-	
-	for (int i = 0; i != (threads * 16) && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
-	  ++ piter;
-	
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
-	while (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
-	  ++ reduced;
+	queue_reducer.pop(pos);
 	  
-	  if (! derivations_prev[pos].empty()) {
-	    derivation_type::const_iterator diter_end = derivations_prev[pos].end();
-	    for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
-	      synalign.decrement(*diter, sampler);
-	  }
-
-	  if (debug >= 3) {
-	    std::cerr << "training=" << pos
-		      << " nodes=" << sources[pos].nodes.size()
-		      << " edges=" << sources[pos].edges.size()
-		      << " sentence=" << targets[pos].size() << std::endl;
-	    
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	      std::cerr << "derivation: " << *(diter->source) << " ||| " << *(diter->target) << std::endl;
-	  }
-	  
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    synalign.increment(*diter, sampler, temperature);
-	}
-      }
-
-#if 0      
-      for (size_t i = 0; i != positions.size(); ++ i) {
-	const size_t pos = positions[i];
-	
-	if (debug >= 3)
-	  std::cerr << "training=" << pos << std::endl;
-	
-	if (! derivations[pos].empty()) {
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	if (! derivations_prev[pos].empty()) {
+	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
+	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
 	    synalign.decrement(*diter, sampler);
 	}
 	
-	const PYPGraph::logprob_type logsum = graph.inside(sources[pos], targets[pos], synalign, max_terminal);
-	
-	const PYPGraph::logprob_type logderivation = graph.outside(sources[pos], targets[pos], sampler, derivations[pos], temperature);
-	
 	if (debug >= 3) {
-	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
+	  std::cerr << "training=" << pos
+		    << " nodes=" << sources[pos].nodes.size()
+		    << " edges=" << sources[pos].edges.size()
+		    << " sentence=" << targets[pos].size() << std::endl;
 	  
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
@@ -1849,8 +1829,19 @@ int main(int argc, char ** argv)
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  synalign.increment(*diter, sampler, temperature);
+
+	if (debug) {
+	  if ((reduced + 1) % 10000 == 0)
+	    std::cerr << '.';
+	  if ((reduced + 1) % 1000000 == 0)
+	    std::cerr << '\n';
+	}
       }
-#endif
+
+      mapper->join();
+
+      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
+	std::cerr << std::endl;
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
