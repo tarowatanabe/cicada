@@ -2055,7 +2055,7 @@ double lambda_source = 1e-2;
 double lambda_target = 1e-2;
 double lambda_null = 1e-10;
 double lambda_shape = 1e-2;
-double lambda_rate  = 1e+4;
+double lambda_rate  = 1e+8;
 
 int threads = 1;
 int debug = 0;
