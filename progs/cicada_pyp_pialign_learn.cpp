@@ -1924,9 +1924,9 @@ struct Task
   double temperature;
 };
 
-struct TaskPush
+struct TaskMapper
 {
-  TaskPush(Task::queue_type& __queue,
+  TaskMapper(Task::queue_type& __queue,
 	   const position_set_type& __positions)
     : queue(__queue), positions(__positions) {}
   
@@ -2231,7 +2231,7 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
-      std::auto_ptr<boost::thread> pusher(new boost::thread(TaskPush(queue_mapper, positions)));
+      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
       size_type invalid = 0;
       size_type reduced = 0;
@@ -2293,7 +2293,7 @@ int main(int argc, char ** argv)
 	}
       }
       
-      pusher->join();
+      mapper->join();
       
       if (debug && (reduced + 1) >= 10000 && (reduced + 1) % 1000000 != 0)
 	std::cerr << std::endl;
