@@ -1639,8 +1639,6 @@ int main(int argc, char ** argv)
 	     strength_prior_shape,
 	     strength_prior_rate);
     
-    PYPGraph graph;
-    
     if (slice_sampling)
       lm.slice_sample_parameters(sampler, resample_iterations);
     else
