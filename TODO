@@ -143,5 +143,6 @@ Add a shallow hiero rule by limiting the "depth" of rule instantiation...
 
 Revise syntactic alignment:
   Binarize before processing
+  Use of pialign style bi-parsing algorithm
   Allow arbitrary sub-tree alignment by a CFG-style sub-tree transformation
   Paired with "phrases" in the target side.

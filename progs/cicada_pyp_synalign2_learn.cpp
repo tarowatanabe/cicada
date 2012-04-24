@@ -21,6 +21,12 @@
 // We do not perform composition, and each node is mapped to corresponding span in the target-side.
 //
 // How do we handle empty...!
+//
+
+// 
+// Induce pairs by span, then, compute "rules"
+//
+//
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -109,18 +115,152 @@ struct PYP
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  struct span_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    
+    size_type first;
+    size_type last;
+    
+    span_type() : first(0), last(0) {}
+    span_type(const size_type& __first, const size_type& __last)
+      : first(__first), last(__last) { }
+
+    bool empty() const { return first == last; }
+    size_type size() const { return last - first; }
+    
+    friend
+    bool operator==(const span_type& x, const span_type& y)
+    {
+      return x.first == y.first && x.last == y.last;
+    }
+    
+    friend
+    size_t hash_value(span_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.first, x.last);
+    }
+
+    friend
+    bool disjoint(const span_type& x, const span_type& y)
+    {
+      return x.last <= y.first || y.last <= x.first;
+    }
+
+    friend
+    bool adjacent(const span_type& x, const span_type& y)
+    {
+      return x.last == y.first || y.last == x.first;
+    }
+    
+  };
+
+  struct span_pair_type
+  {
+    typedef span_type::size_type      size_type;
+    typedef span_type::difference_type difference_type;
+
+    span_type source;
+    span_type target;
+    
+    span_pair_type() : source(), target() {}
+    span_pair_type(const span_type& __source, const span_type& __target)
+      : source(__source), target(__target) {}
+    span_pair_type(size_type s1, size_type s2, size_type t1, size_type t2)
+      : source(s1, s2), target(t1, t2) {}
+    
+    bool empty() const { return source.empty() && target.empty(); }
+    size_type size() const { return source.size() + target.size(); }
+    
+    friend
+    bool operator==(const span_pair_type& x, const span_pair_type& y)
+    {
+      return x.source == y.source && x.target == y.target;
+    }
+    
+    friend
+    size_t hash_value(span_pair_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x);
+    }
+    
+    friend
+    bool disjoint(const span_pair_type& x, const span_pair_type& y)
+    {
+      return disjoint(x.source, y.source) && disjoint(x.target, y.target);
+    }
+
+    friend
+    bool adjacent(const span_pair_type& x, const span_pair_type& y)
+    {
+      return adjacent(x.source, y.source) && adjacent(x.target, y.target);
+    }
+  };
+
+  struct phrase_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    
+    typedef const word_type* iterator;
+    typedef const word_type* const_iterator;
+    
+    phrase_type() : first(0), last(0) {}
+    phrase_type(const_iterator __first, const_iterator __last)
+      : first(__first), last(__last) { }
+    template <typename Iterator>
+    phrase_type(Iterator __first, Iterator __last)
+      : first(&(*__first)), last(&(*__last)) { }
+    
+    bool empty() const { return first == last; }
+    size_type size() const { return last - first; }
+    
+    const_iterator begin() const { return first; }
+    const_iterator end() const { return last; }
+    
+    friend
+    bool operator==(const phrase_type& x, const phrase_type& y)
+    {
+      return (x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin()));
+    }
+    
+    friend
+    size_t hash_value(phrase_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+    
+    friend
+    std::ostream& operator<<(std::ostream& os, const phrase_type& x)
+    {
+      if (! x.empty()) {
+	std::copy(x.begin(), x.end() - 1, std::ostream_iterator<word_type>(os, " "));
+	os << *(x.end() - 1);
+      }
+      return os;
+    }
+    
+    const_iterator first;
+    const_iterator last;
+  };
 };
 
-
-// a base mearure for PYPLexicon
 struct LexiconModel
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
-  
+
   struct word_pair_type
   {
     word_type source;
@@ -156,65 +296,18 @@ struct LexiconModel
     table.set_empty_key(word_pair_type());
   }
   
-  LexiconModel(const path_type& path_source_target,
-	       const path_type& path_target_source)
+  LexiconModel(const path_type& path)
     : table(), smooth()
   {
     table.set_empty_key(word_pair_type());
-    open(path_source_target, path_target_source);
+    
+    open(path);
   }
   
-  void open(const path_type& path_source_target,
-	    const path_type& path_target_source)
+  void open(const path_type& path)
   {
     typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
         
-    table_type table_source_target;
-    table_type table_target_source;
-    table_source_target.set_empty_key(word_pair_type());
-    table_target_source.set_empty_key(word_pair_type());
-    
-    open(path_source_target, table_source_target);
-    open(path_target_source, table_target_source);
-    
-    word_set_type sources;
-    word_set_type targets;
-    sources.set_empty_key(word_type());
-    targets.set_empty_key(word_type());
-    
-    table.clear();
-    
-    // we will take an intersection of p(target | souce) and p(source | target),
-    // but leave "epsilon" as is.
-    
-    table_type::const_iterator siter_end = table_source_target.end();
-    for (table_type::const_iterator siter = table_source_target.begin(); siter != siter_end; ++ siter) {
-      if (siter->first.source == vocab_type::EPSILON) {
-	table.insert(*siter);
-	targets.insert(siter->first.target);
-      } else {
-	table_type::const_iterator titer = table_target_source.find(word_pair_type(siter->first.target, siter->first.source));
-	if (titer != table_target_source.end()) {
-	  sources.insert(siter->first.source);
-	  targets.insert(siter->first.target);
-	  
-	  table[siter->first] = std::sqrt(siter->second * titer->second);
-	}
-      }
-    }
-    
-    table_type::const_iterator titer_end = table_target_source.end();
-    for (table_type::const_iterator titer = table_target_source.begin(); titer != titer_end; ++ titer)
-      if (titer->first.source == vocab_type::EPSILON) {
-	table[word_pair_type(titer->first.target, titer->first.source)] = titer->second;
-	sources.insert(titer->first.target);
-      }
-    
-    smooth = (1.0 / sources.size()) * (1.0 / targets.size());
-  }
-  
-  void open(const path_type& path, table_type& table)
-  {
     typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
     typedef boost::spirit::istream_iterator iterator_type;
     
@@ -227,6 +320,8 @@ struct LexiconModel
     word   %= qi::lexeme[+(standard::char_ - standard::space)];
     parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
     
+    word_set_type words;
+    words.set_empty_key(word_type());
     table.clear();
     
     utils::compress_istream is(path, 1024 * 1024);
@@ -250,14 +345,15 @@ struct LexiconModel
       const double&   prob(boost::fusion::get<2>(lexicon_parsed));
       
       table[word_pair_type(source, target)] = prob;
+      
+      words.insert(target);
     }
+    
+    smooth = 1.0 / words.size();
   }
   
   double operator()(const word_type& source, const word_type& target) const
   {
-    if (source == vocab_type::EPSILON && target == vocab_type::EPSILON)
-      return 1.0;
-
     table_type::const_iterator iter = table.find(word_pair_type(source, target));
     
     return (iter != table.end() ? iter->second : smooth);
@@ -269,143 +365,280 @@ struct LexiconModel
 
 struct PYPLexicon
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::phrase_type phrase_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
   typedef utils::pyp_parameter parameter_type;
+  
+  typedef utils::restaurant<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type > > table_type;
+  typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
 
-  struct word_pair_type
+  typedef LexiconModel lexicon_type;
+  
+  PYPLexicon(const lexicon_type& __lexicon_source_target,
+	     const lexicon_type& __lexicon_target_source,
+	     const parameter_type& __parameter)
+    : lexicon_source_target(&__lexicon_source_target),
+      lexicon_target_source(&__lexicon_target_source),
+      tables_source_target(),
+      tables_target_source(),
+      parameter_source_target(__parameter),
+      parameter_target_source(__parameter) {}
+  
+  template <typename Sampler>
+  void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    word_type source;
-    word_type target;
-    
-    word_pair_type() : source(), target() {}
-    word_pair_type(const word_type& __source, const word_type& __target)
-      : source(__source), target(__target) {}
-    
-    friend
-    bool operator==(const word_pair_type& x, const word_pair_type& y)
-    {
-      return x.source == y.source && x.target == y.target;
-    }
-    
-    friend
-    size_t hash_value(word_pair_type const& x)
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
+    if (source.empty() && target.empty())
+      throw std::runtime_error("invalid phrase pair");
+
+    increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
+    increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
+  }
+  
+  template <typename Sampler>
+  void increment(const phrase_type& source,
+		 const phrase_type& target,
+		 table_set_type& tables,
+		 const lexicon_type& lexicon,
+		 const parameter_type& parameter,
+		 Sampler& sampler,
+		 const double temperature=1.0)
+  {
+    if (source.empty()) {
+      if (! tables.exists(vocab_type::EPSILON.id()))
+	tables[vocab_type::EPSILON.id()] = table_type(parameter.discount, parameter.strength);
       
-      return hasher_type()(x.source.id(), x.target.id());
+      table_type& table = tables[vocab_type::EPSILON.id()];
+      
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	table.increment(*titer, lexicon(vocab_type::EPSILON, *titer), sampler, temperature);
+    } else if (! target.empty()) {
+      phrase_type::const_iterator siter_end = source.end();
+      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
+	if (! tables.exists(siter->id()))
+	  tables[siter->id()] = table_type(parameter.discount, parameter.strength);
+	
+	table_type& table = tables[siter->id()];
+	
+	phrase_type::const_iterator titer_end = target.end();
+	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	  table.increment(*titer, lexicon(*siter, *titer), sampler, temperature);
+      }
     }
-  };
-  
-  typedef utils::restaurant<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>, std::allocator<word_pair_type > > table_type;
-
-  PYPLexicon(const LexiconModel& __lexicon,
-	     const parameter_type& parameter)
-    : lexicon(&__lexicon),
-      counts0(0),
-      table(parameter) {}
-  
-  
-  template <typename Sampler>
-  void increment(const rule_type* source, const symbol_set_type& target, Sampler& sampler, const double temperature=1.0)
-  {
-    // TODO: we assume penntreebank-style tree...
-    
-    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
-			   ? source->rhs.front()
-			   : vocab_type::EPSILON);
-    
-    size_type num_terminals = 0;
-    symbol_set_type::const_iterator titer_end = target.end();
-    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-      if (titer->is_terminal()) {
-	if (table.increment(word_pair_type(src, *titer), lexicon->operator()(src, *titer), sampler, temperature))
-	  ++ counts0;
-	
-	++ num_terminals;
-      }
-    
-    if (! num_terminals)
-      if (table.increment(word_pair_type(src, vocab_type::EPSILON), lexicon->operator()(src, vocab_type::EPSILON), sampler, temperature))
-	++ counts0;
   }
 
   template <typename Sampler>
-  void decrement(const rule_type* source, const symbol_set_type& target, Sampler& sampler)
+  void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
-    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
-			   ? source->rhs.front()
-			   : vocab_type::EPSILON);
+    if (source.empty() && target.empty())
+      throw std::runtime_error("invalid phrase pair");
     
-    size_type num_terminals = 0;
-    symbol_set_type::const_iterator titer_end = target.end();
-    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-      if (titer->is_terminal()) {
-	if (table.decrement(word_pair_type(src, *titer), sampler))
-	  -- counts0;
-	
-	++ num_terminals;
-      }
-    
-    if (! num_terminals)
-      if (table.decrement(word_pair_type(src, vocab_type::EPSILON), sampler))
-	-- counts0;
+    decrement(source, target, tables_source_target, sampler);
+    decrement(target, source, tables_target_source, sampler);
   }
   
-  double prob(const rule_type* source, const symbol_set_type& target) const
+  template <typename Sampler>
+  void decrement(const phrase_type& source, const phrase_type& target, table_set_type& tables, Sampler& sampler)
   {
-    const word_type src = (source->rhs.size() == 1 && source->rhs.front().is_terminal()
-			   ? source->rhs.front()
-			   : vocab_type::EPSILON);
-
-    double p = 1.0;
-    
-    size_type num_terminals = 0;
-    symbol_set_type::const_iterator titer_end = target.end();
-    for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-      if (titer->is_terminal()) {
-	p *= table.prob(word_pair_type(src, *titer), lexicon->operator()(src, *titer));
-	++ num_terminals;
+    if (source.empty()) {
+      table_type& table = tables[vocab_type::EPSILON.id()];
+      
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	table.decrement(*titer, sampler);
+    } else if (! target.empty()) {
+      phrase_type::const_iterator siter_end = source.end();
+      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
+	table_type& table = tables[siter->id()];
+	
+	phrase_type::const_iterator titer_end = target.end();
+	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	  table.decrement(*titer, sampler);
       }
+    }
+  }
+  
+  double prob_source_target(const word_type& source, const word_type& target) const
+  {
+    return prob(source, target, tables_source_target, *lexicon_source_target);
+  }
+  
+  double prob_target_source(const word_type& target, const word_type& source) const
+  {
+    return prob(target, source, tables_target_source, *lexicon_target_source);
+  }
+  
+  double prob(const word_type& source, const word_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
+  {
+    if (! tables.exists(source.id()))
+      return lexicon(source, target);
+    else
+      return tables[source.id()].prob(target, lexicon(source, target));
+  }
+  
+  double prob(const phrase_type& source, const phrase_type& target) const
+  {
+    if (source.empty() && target.empty())
+      throw std::runtime_error("invalid phrase pair");
     
-    if (! num_terminals)
-      p *= table.prob(word_pair_type(src, vocab_type::EPSILON), lexicon->operator()(src, vocab_type::EPSILON));
+    const double logprob_source_target = logprob(source, target, tables_source_target, *lexicon_source_target);
+    const double logprob_target_source = logprob(target, source, tables_target_source, *lexicon_target_source);
     
-    return p;
+    if (source.empty() || target.empty())
+      return std::exp(logprob_source_target + logprob_target_source);
+    else
+      return std::exp((logprob_source_target + logprob_target_source) * 0.5);
+  }
+
+  double prob_source_target(const phrase_type& source, const phrase_type& target) const
+  {
+    return std::exp(logprob(source, target, tables_source_target, *lexicon_source_target));
+  }
+  
+  double prob_target_source(const phrase_type& target, const phrase_type& source) const
+  {
+    return std::exp(logprob(target, source, tables_target_source, *lexicon_target_source));
+  }
+
+  double logprob(const phrase_type& source, const phrase_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
+  {
+    double lp = 0.0;
+
+    if (source.empty()) {
+      if (! tables.exists(vocab_type::EPSILON.id())) {
+	phrase_type::const_iterator titer_end = target.end();
+	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	  lp += std::log(lexicon(vocab_type::EPSILON, *titer));
+      } else {
+	const table_type& table = tables[vocab_type::EPSILON.id()];
+	
+	phrase_type::const_iterator titer_end = target.end();
+	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	  lp += std::log(table.prob(*titer, lexicon(vocab_type::EPSILON, *titer)));
+      }
+    } else if (! target.empty()) {
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	
+	double sum = 0.0;
+	phrase_type::const_iterator siter_end = source.end();
+	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	  sum += (! tables.exists(siter->id()) ? lexicon(*siter, *titer) : tables[siter->id()].prob(*titer, lexicon(*siter, *titer)));
+	
+	lp += std::log(sum);
+      }
+    }
+
+    return lp;
   }
   
   double log_likelihood() const
   {
-    return table.log_likelihood();
-  }
-  
-  double log_likelihood(const double& discount, const double& strength) const
-  {
-    if (strength <= - discount) return - std::numeric_limits<double>::infinity();
+    double logprob = parameter_source_target.log_likelihood() + parameter_target_source.log_likelihood();
     
-    return table.log_likelihood(discount, strength);
+    table_set_type::const_iterator siter_end = tables_source_target.end();
+    for (table_set_type::const_iterator siter = tables_source_target.begin(); siter != siter_end; ++ siter)
+      if (*siter)
+	logprob += (*siter)->log_likelihood();
+    
+    table_set_type::const_iterator titer_end = tables_target_source.end();
+    for (table_set_type::const_iterator titer = tables_target_source.begin(); titer != titer_end; ++ titer)
+      if (*titer)
+	logprob += (*titer)->log_likelihood();
+    
+    return logprob;
   }
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    table.sample_parameters(sampler, num_loop, num_iterations);
+    for (int iter = 0; iter != num_loop; ++ iter) {
+      parameter_source_target.discount = sample_discount(tables_source_target.begin(), tables_source_target.end(), sampler, parameter_source_target);
+      parameter_source_target.strength = sample_strength(tables_source_target.begin(), tables_source_target.end(), sampler, parameter_source_target);
+
+      parameter_target_source.discount = sample_discount(tables_target_source.begin(), tables_target_source.end(), sampler, parameter_target_source);
+      parameter_target_source.strength = sample_strength(tables_target_source.begin(), tables_target_source.end(), sampler, parameter_target_source);
+    }
+    
+    assign_parameters(tables_source_target.begin(), tables_source_target.end(), parameter_source_target);
+    assign_parameters(tables_target_source.begin(), tables_target_source.end(), parameter_target_source);
   }
   
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    table.slice_sample_parameters(sampler, num_loop, num_iterations);
+    // currently, we do not support slice sampling...
+    sample_parameters(sampler, num_loop, num_iterations);
+  }
+
+  template <typename Iterator, typename Sampler>
+  double sample_strength(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double x = 0.0;
+    double y = 0.0;
+    
+    for (/**/; first != last; ++ first) 
+      if (*first) {
+	x += (*first)->sample_log_x(sampler, param.discount, param.strength);
+	y += (*first)->sample_y(sampler, param.discount, param.strength);
+      }
+    
+    return sampler.gamma(param.strength_shape + y, param.strength_rate - x);
   }
   
-  const LexiconModel* lexicon;
-  size_type counts0;
-  table_type table;
+  template <typename Iterator, typename Sampler>
+  double sample_discount(Iterator first, Iterator last, Sampler& sampler, const parameter_type& param) const
+  {
+    double y = 0.0;
+    double z = 0.0;
+    
+    for (/**/; first != last; ++ first) 
+      if (*first) {
+	y += (*first)->sample_y_inv(sampler, param.discount, param.strength);
+	z += (*first)->sample_z_inv(sampler, param.discount, param.strength);
+      }
+    
+    return sampler.beta(param.discount_alpha + y, param.discount_beta + z);
+  }
+
+  template <typename Iterator>
+  void assign_parameters(Iterator first, Iterator last, const parameter_type& param)
+  {
+    for (/**/; first != last; ++ first)
+      if (*first) {
+	(*first)->discount() = param.discount;
+	(*first)->strength() = param.strength;
+      }
+  }
+
+  void prune()
+  {
+    table_set_type::iterator siter_end = tables_source_target.end();
+    for (table_set_type::iterator siter = tables_source_target.begin(); siter != siter_end; ++ siter)
+      if (*siter)
+	(*siter)->prune();
+    
+    table_set_type::iterator titer_end = tables_target_source.end();
+    for (table_set_type::iterator titer = tables_target_source.begin(); titer != titer_end; ++ titer)
+      if (*titer)
+	(*titer)->prune();
+  }
+  
+  const lexicon_type* lexicon_source_target;
+  const lexicon_type* lexicon_target_source;
+  
+  table_set_type tables_source_target;
+  table_set_type tables_target_source;
+  parameter_type parameter_source_target;
+  parameter_type parameter_target_source;
 };
+
 
 struct PYPFertility
 {
