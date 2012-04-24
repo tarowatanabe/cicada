@@ -1432,6 +1432,7 @@ struct Task
        derivation_set_type& __derivations_prev,
        PYPLM        __model,
        sampler_type __sampler,
+       int __order,
        int  __spell_length,
        bool __ignore_boundary)
     : mapper(__mapper),
@@ -1441,12 +1442,44 @@ struct Task
       derivations_prev(__derivations_prev),
       model(__model),
       sampler(__sampler),
+      order(__order),
       spell_length(__spell_length),
       ignore_boundary(__ignore_boundary) {}
   
   void operator()()
   {
+    const size_t context_size = order - 1;
     
+    PYPGraph graph;
+    
+    size_type pos;
+    
+    for (;;) {
+      mapper.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+	
+      derivations_prev[pos] = derivations[pos];
+      
+      if (! derivations[pos].empty()) {
+	derivation_type::const_iterator diter_begin = derivations_prev[pos].begin();
+	derivation_type::const_iterator diter_end   = derivations_prev[pos].end();
+	
+	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	  model.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+      }
+      
+      graph.forward(training[pos], model, spell_length, ignore_boundary);
+	
+      graph.backward(sampler, derivations[pos]);
+      
+      derivation_type::const_iterator diter_begin = derivations[pos].begin();
+      derivation_type::const_iterator diter_end   = derivations[pos].end();
+      for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	model.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+      
+      reducer.push(pos);
+    }
   }
   
   queue_type& mapper;
@@ -1459,11 +1492,29 @@ struct Task
   
   PYPLM        model;
   sampler_type sampler;
-
+  
+  int  order;
   int  spell_length;
   bool ignore_boundary;
   
   double temperature;
+};
+
+struct TaskMapper
+{
+  TaskMapper(Task::queue_type& __queue,
+	   const position_set_type& __positions)
+    : queue(__queue), positions(__positions) {}
+  
+  void operator()()
+  {
+    position_set_type::const_iterator piter_end = positions.end();
+    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+      queue.push(*piter);
+  }
+
+  Task::queue_type& queue;
+  const position_set_type& positions;
 };
 
 struct less_size
@@ -1557,10 +1608,13 @@ int main(int argc, char ** argv)
       std::cerr << "char set size: " << vocab.size() << std::endl;
     
     derivation_set_type derivations(training.size());
-    position_set_type positions(training.size());
+    derivation_set_type derivations_prev(training.size());
+    position_set_type positions;
     
     for (size_t i = 0; i != training.size(); ++ i)
-      positions[i] = i;
+      if (! training[i].empty())
+	positions.push_back(i);
+    position_set_type(positions).swap(positions);
     
     sampler_type sampler;
     
@@ -1601,6 +1655,24 @@ int main(int argc, char ** argv)
       
       std::cerr << lm.base.base;
     }
+
+    Task::queue_type queue_mapper;
+    Task::queue_type queue_reducer;
+    
+    std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
+								 queue_reducer,
+								 training,
+								 derivations,
+								 derivations_prev,
+								 lm,
+								 sampler,
+								 order,
+								 spell_length,
+								 ignore_boundary));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
 
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
@@ -1650,34 +1722,35 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
       
+      // assign temperature and model...
+      for (size_type i = 0; i != tasks.size(); ++ i) {
+	tasks[i].model = lm;
+	tasks[i].temperature = temperature;
+      }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
-
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
-      for (size_t i = 0; i != positions.size(); ++ i) {
-	const size_t pos = positions[i];
-	
-	if (training[pos].empty()) continue;
+      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
+      
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
+	size_type pos = 0;
+	queue_reducer.pop(pos);
 	
 	const size_t context_size = order - 1;
 	
 	if (debug >= 3)
 	  std::cerr << "training=" << pos << std::endl;
 	
-	if (! derivations[pos].empty()) {
-	  derivation_type::const_iterator diter_begin = derivations[pos].begin();
-	  derivation_type::const_iterator diter_end   = derivations[pos].end();
+	if (! derivations_prev[pos].empty()) {
+	  derivation_type::const_iterator diter_begin = derivations_prev[pos].begin();
+	  derivation_type::const_iterator diter_end   = derivations_prev[pos].end();
 	  
 	  for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
 	    lm.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
 	}
-	
-	const PYPGraph::logprob_type logsum = graph.forward(training[pos], lm, spell_length, ignore_boundary);
-	
-	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
 	
 	derivation_type::const_iterator diter_begin = derivations[pos].begin();
 	derivation_type::const_iterator diter_end   = derivations[pos].end();
@@ -1686,13 +1759,24 @@ int main(int argc, char ** argv)
 	  lm.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
 	
 	if (debug >= 3) {
-	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
-	  
+	  std::cerr << "training=" << pos << std::endl;
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    std::cerr << "word=\"" << *diter << "\"" << std::endl;
 	}
+	
+	if (debug) {
+	  if ((reduced + 1) % 10000 == 0)
+	    std::cerr << '.';
+	  if ((reduced + 1) % 1000000 == 0)
+	    std::cerr << '\n';
+	}
       }
+      
+      mapper->join();
+      
+      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
+	std::cerr << std::endl;
 
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
@@ -1715,6 +1799,11 @@ int main(int argc, char ** argv)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
     
+    for (int i = 0; i != threads; ++ i)
+      queue_mapper.push(size_type(-1));
+    
+    workers.join_all();
+
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
