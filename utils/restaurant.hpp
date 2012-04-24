@@ -416,6 +416,17 @@ namespace utils
       
       return logprob;
     }
+    
+    void prune()
+    {
+      typename dish_set_type::iterator diter_end = dishes.end();
+      for (typename dish_set_type::iterator diter = dishes.begin(); diter != diter_end; /**/) {
+	if (diter->second.empty())
+	  dishes.eraes(diter ++);
+	else
+	  ++ diter;
+      }
+    }
 
   private:    
     struct DiscountSampler

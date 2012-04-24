@@ -1815,6 +1815,10 @@ int main(int argc, char ** argv)
 	    synalign.decrement(*diter, sampler);
 	}
 	
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  synalign.increment(*diter, sampler, temperature);
+
 	if (debug >= 3) {
 	  std::cerr << "training=" << pos
 		    << " nodes=" << sources[pos].nodes.size()
@@ -1825,10 +1829,6 @@ int main(int argc, char ** argv)
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    std::cerr << "derivation: " << *(diter->source) << " ||| " << *(diter->target) << std::endl;
 	}
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  synalign.increment(*diter, sampler, temperature);
 
 	if (debug) {
 	  if ((reduced + 1) % 10000 == 0)

@@ -376,7 +376,7 @@ struct PYPWord
   }
   
   template <typename Iterator>
-  double prob(const segment_type& segment, Iterator first, Iterator last)
+  double prob(const segment_type& segment, Iterator first, Iterator last) const
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -447,12 +447,14 @@ struct PYPWord
     decrement(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end(), sampler);
   }
   
-  double prob(const segment_type& segment)
+  double prob(const segment_type& segment) const
   {
     const size_type context_size = discount.size() - 1;
+
+    buffer_type& buffer_ = const_cast<buffer_type&>(buffer);
     
-    buffer.clear();
-    buffer.push_back(BOS());
+    buffer_.clear();
+    buffer_.push_back(BOS());
     
     double logprob = 0.0;
     
@@ -461,16 +463,16 @@ struct PYPWord
       const size_type char_size = utils::utf8_size(*siter);
       const segment_type seg(siter, siter + char_size);
       
-      logprob += std::log(prob(seg, std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
+      logprob += std::log(prob(seg, std::max(buffer_.begin(), buffer_.end() - context_size), buffer_.end()));
       
-      buffer.push_back(seg);
+      buffer_.push_back(seg);
       siter += char_size;
     }
     
-    logprob += std::log(prob(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
+    logprob += std::log(prob(EOS(), std::max(buffer_.begin(), buffer_.end() - context_size), buffer_.end()));
     
     // exclude BOS...
-    logprob += base.logprob(segment, buffer.size() - 1);
+    logprob += base.logprob(segment, buffer_.size() - 1);
     
     return std::exp(logprob);
   }
@@ -716,7 +718,7 @@ struct PYPLM
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
   
-  PYPLM(PYPWord& __base,
+  PYPLM(const PYPWord& __base,
 	const int order,
 	const double __discount,
 	const double __strength,
@@ -1082,7 +1084,7 @@ struct PYPLM
   }
 
 public: 
-  PYPWord& base;
+  PYPWord base;
 
   trie_type trie;
   node_type root;
@@ -1410,6 +1412,60 @@ typedef std::vector<derivation_type, std::allocator<derivation_type> > derivatio
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<segment_type, std::allocator<segment_type> > vocabulary_type;
 
+struct Task
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;  
+
+  typedef PYP::sentence_type sentence_type;
+  typedef PYP::piece_type    piece_type;
+  typedef PYP::segment_type  segment_type;
+  typedef PYP::word_type     word_type;
+  
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+
+  
+  Task(queue_type& __mapper,
+       queue_type& __reducer,
+       const data_set_type& __training,
+       derivation_set_type& __derivations,
+       derivation_set_type& __derivations_prev,
+       PYPLM        __model,
+       sampler_type __sampler,
+       int  __spell_length,
+       bool __ignore_boundary)
+    : mapper(__mapper),
+      reducer(__reducer),
+      training(__training),
+      derivations(__derivations),
+      derivations_prev(__derivations_prev),
+      model(__model),
+      sampler(__sampler),
+      spell_length(__spell_length),
+      ignore_boundary(__ignore_boundary) {}
+  
+  void operator()()
+  {
+    
+  }
+  
+  queue_type& mapper;
+  queue_type& reducer;
+
+  const data_set_type& training;
+  
+  derivation_set_type& derivations;
+  derivation_set_type& derivations_prev;
+  
+  PYPLM        model;
+  sampler_type sampler;
+
+  int  spell_length;
+  bool ignore_boundary;
+  
+  double temperature;
+};
+
 struct less_size
 {
   less_size(const data_set_type& __training) : training(__training) {}
@@ -1507,22 +1563,20 @@ int main(int argc, char ** argv)
       positions[i] = i;
     
     sampler_type sampler;
-
-    PYPWord spell(vocab.begin(), vocab.end(),
-		  spell_order,
-		  1.0 / vocab.size(),
-		  spell_discount,
-		  spell_strength,
-		  spell_discount_prior_alpha,
-		  spell_discount_prior_beta,
-		  spell_strength_prior_shape,
-		  spell_strength_prior_rate,
-		  spell_lambda,
-		  spell_lambda_shape,
-		  spell_lambda_rate);
     
     
-    PYPLM lm(spell,
+    PYPLM lm(PYPWord(vocab.begin(), vocab.end(),
+		     spell_order,
+		     1.0 / vocab.size(),
+		     spell_discount,
+		     spell_strength,
+		     spell_discount_prior_alpha,
+		     spell_discount_prior_beta,
+		     spell_strength_prior_shape,
+		     spell_strength_prior_rate,
+		     spell_lambda,
+		     spell_lambda_shape,
+		     spell_lambda_rate),
 	     order,
 	     discount,
 	     strength,
@@ -1607,9 +1661,9 @@ int main(int argc, char ** argv)
 	const size_t pos = positions[i];
 	
 	if (training[pos].empty()) continue;
-
+	
 	const size_t context_size = order - 1;
-
+	
 	if (debug >= 3)
 	  std::cerr << "training=" << pos << std::endl;
 	
@@ -1625,6 +1679,12 @@ int main(int argc, char ** argv)
 	
 	const PYPGraph::logprob_type logderivation = graph.backward(sampler, derivations[pos]);
 	
+	derivation_type::const_iterator diter_begin = derivations[pos].begin();
+	derivation_type::const_iterator diter_end   = derivations[pos].end();
+	
+	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	  lm.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+	
 	if (debug >= 3) {
 	  std::cerr << "sum=" << logsum << " derivation=" << logderivation << std::endl;
 	  
@@ -1632,12 +1692,6 @@ int main(int argc, char ** argv)
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    std::cerr << "word=\"" << *diter << "\"" << std::endl;
 	}
-	
-	derivation_type::const_iterator diter_begin = derivations[pos].begin();
-	derivation_type::const_iterator diter_end   = derivations[pos].end();
-	
-	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
-	  lm.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
       }
 
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {

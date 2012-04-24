@@ -1064,7 +1064,7 @@ int main(int argc, char ** argv)
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
-	  
+	
 	if (derivations[pos].size() != cutoffs[pos].size())
 	  throw std::runtime_error("derivation and cutoff size differ");
 	

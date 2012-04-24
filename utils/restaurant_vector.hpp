@@ -431,6 +431,11 @@ namespace utils
       
       return logprob;
     }
+    
+    void prune()
+    {
+      dish_set_type(dishes).swap(dishes);
+    }
 
   private:    
     struct DiscountSampler

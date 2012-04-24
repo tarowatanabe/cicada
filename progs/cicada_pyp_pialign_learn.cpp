@@ -2237,19 +2237,24 @@ int main(int argc, char ** argv)
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
-	  
+	
 	if (! derivations_prev[pos].empty()) {
 	  derivation_type::const_iterator diter_end = derivations_prev[pos].end();
 	  for (derivation_type::const_iterator diter = derivations_prev[pos].begin(); diter != diter_end; ++ diter)
 	    model.decrement(sources[pos], targets[pos], *diter, sampler);
 	}
+	
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	
+	invalid += derivations[pos].empty();
 
 	if (debug >= 3) {
 	  std::cerr << "training=" << pos << std::endl
 		    << "source=" << sources[pos] << std::endl
 		    << "target=" << targets[pos] << std::endl;
-	    
-	    
+	  
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	      
@@ -2275,14 +2280,7 @@ int main(int argc, char ** argv)
 	    std::cerr << std::endl;
 	  }
 	}
-	  
-	invalid += derivations[pos].empty();
-
-	// increment model...
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-	
+	  	
 	if (debug) {
 	  if ((reduced + 1) % 10000 == 0)
 	    std::cerr << '.';
