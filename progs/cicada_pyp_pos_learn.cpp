@@ -1046,11 +1046,11 @@ int main(int argc, char ** argv)
       size_type reduced = 0;
       while (piter != piter_end || reduced != positions.size()) {
 	
-	if (piter != piter_end && queue_mapper.push(*piter, true))
+	for (int i = 0; i != threads && piter != piter_end && queue_mapper.push(*piter, true); ++ i)
 	  ++ piter;
 	
 	size_type pos = 0;
-	if (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
+	while (reduced != positions.size() && queue_reducer.pop(pos, piter != piter_end)) {
 	  ++ reduced;
 	  
 	  if (derivations[pos].size() != cutoffs[pos].size())
