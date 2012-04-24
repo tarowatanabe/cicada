@@ -109,7 +109,7 @@ namespace utils
     struct Location
     {
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
-      typedef utils::simple_vector<size_type, alloc_type> table_set_type;
+      typedef std::vector<size_type, alloc_type> table_set_type;
 
       typedef typename table_set_type::const_iterator const_iterator;
       

@@ -486,13 +486,11 @@ struct PYPLexicon
   template <typename Sampler>
   void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
   {
-#if 0
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
     increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
     increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
-#endif
   }
   
   template <typename Sampler>
@@ -531,13 +529,11 @@ struct PYPLexicon
   template <typename Sampler>
   void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
-#if 0
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
     
     decrement(source, target, tables_source_target, sampler);
     decrement(target, source, tables_target_source, sampler);
-#endif
   }
   
   template <typename Sampler>
@@ -573,14 +569,10 @@ struct PYPLexicon
   
   double prob(const word_type& source, const word_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
   {
-    return lexicon(source, target);
-    
-#if 0
     if (! tables.exists(source.id()))
       return lexicon(source, target);
     else
       return tables[source.id()].prob(target, lexicon(source, target));
-#endif
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -610,27 +602,6 @@ struct PYPLexicon
   double logprob(const phrase_type& source, const phrase_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
   {
     double lp = 0.0;
-    if (source.empty()) {
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	lp += std::log(lexicon(vocab_type::EPSILON, *titer));
-    } else if (! target.empty()) {
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	
-	double sum = 0.0;
-	phrase_type::const_iterator siter_end = source.end();
-	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	  sum += lexicon(*siter, *titer);
-	
-	lp += std::log(sum);
-      }
-    }
-    
-    return lp;
-
-#if 0
-    double lp = 0.0;
 
     if (source.empty()) {
       if (! tables.exists(vocab_type::EPSILON.id())) {
@@ -658,14 +629,10 @@ struct PYPLexicon
     }
 
     return lp;
-#endif
   }
   
   double log_likelihood() const
   {
-    return 0.0;
-    
-#if 0
     double logprob = parameter_source_target.log_likelihood() + parameter_target_source.log_likelihood();
     
     table_set_type::const_iterator siter_end = tables_source_target.end();
@@ -679,7 +646,6 @@ struct PYPLexicon
 	logprob += (*titer)->log_likelihood();
     
     return logprob;
-#endif
   }
   
   template <typename Sampler>
