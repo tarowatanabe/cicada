@@ -2027,17 +2027,17 @@ bool sample_hypergraph = false;
 double rule_discount = 0.9;
 double rule_strength = 1;
 
-double rule_discount_prior_alpha = 10.0;
+double rule_discount_prior_alpha = 1.0;
 double rule_discount_prior_beta  = 1.0;
-double rule_strength_prior_shape = 4.0;
+double rule_strength_prior_shape = 1.0;
 double rule_strength_prior_rate  = 1.0;
 
 double phrase_discount = 0.9;
 double phrase_strength = 1;
 
-double phrase_discount_prior_alpha = 10.0;
-double phrase_discount_prior_beta  = 1.0;
-double phrase_strength_prior_shape = 4.0;
+double phrase_discount_prior_alpha = 2.0;
+double phrase_discount_prior_beta  = 2.0;
+double phrase_strength_prior_shape = 2.0;
 double phrase_strength_prior_rate  = 1.0;
 
 double lexicon_discount = 0.9;
