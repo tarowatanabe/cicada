@@ -104,6 +104,7 @@ resource.hpp \
 restaurant.hpp \
 restaurant_floor.hpp \
 restaurant_vector.hpp \
+rwticket.hpp \
 sampler.hpp \
 simple_vector.hpp \
 slice_sampler.hpp \
@@ -174,6 +175,7 @@ piece_main \
 program_options_main \
 random_seed_main \
 restaurant_main \
+rwticket_main \
 simple_vector_main \
 small_vector_main \
 sparse_map_main \
@@ -274,6 +276,10 @@ byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
 restaurant_main_SOURCES = restaurant_main.cpp
+
+rwticket_main_SOURCES = rwticket_main.cpp
+rwticket_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+rwticket_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
 chart_main_SOURCES = chart_main.cpp
 chart_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

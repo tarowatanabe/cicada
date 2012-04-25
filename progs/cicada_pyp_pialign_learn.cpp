@@ -266,7 +266,6 @@ struct PYP
       }
       return os;
     }
-
     
     const_iterator first;
     const_iterator last;
@@ -742,17 +741,15 @@ struct LengthModel
   
   typedef utils::array_power2<double, 32, std::allocator<double> > cache_type;
   
-  LengthModel(const double& __lambda,
-	      const double& __lambda_null,
+  LengthModel(const double& __lambda_null,
 	      const double& __strength_shape,
 	      const double& __strength_rate)
-    : lambda(__lambda),
-      lambda_null(__lambda_null),
+    : lambda_null(__lambda_null),
       strength_shape(__strength_shape),
       strength_rate(__strength_rate),
       cache()
   {
-    assign(__lambda);
+    assign(0.01);
   }
 
   double prob(const size_type size) const
@@ -1991,35 +1988,24 @@ int resample_iterations = 2;
 bool slice_sampling = false;
 bool sample_hypergraph = false;
 
-double rule_discount = 0.9;
-double rule_strength = 1;
-
-double rule_discount_prior_alpha = 1.0;
-double rule_discount_prior_beta  = 1.0;
-double rule_strength_prior_shape = 1.0;
+double rule_discount_prior_alpha = 2.0;
+double rule_discount_prior_beta  = 2.0;
+double rule_strength_prior_shape = 2.0;
 double rule_strength_prior_rate  = 1.0;
-
-double phrase_discount = 0.9;
-double phrase_strength = 1;
 
 double phrase_discount_prior_alpha = 2.0;
 double phrase_discount_prior_beta  = 2.0;
 double phrase_strength_prior_shape = 2.0;
 double phrase_strength_prior_rate  = 1.0;
 
-double lexicon_discount = 0.9;
-double lexicon_strength = 1;
-
-double lexicon_discount_prior_alpha = 1.0;
-double lexicon_discount_prior_beta  = 1.0;
-double lexicon_strength_prior_shape = 1.0;
+double lexicon_discount_prior_alpha = 2.0;
+double lexicon_discount_prior_beta  = 2.0;
+double lexicon_strength_prior_shape = 2.0;
 double lexicon_strength_prior_rate  = 1.0;
 
-double lambda_source = 1e-2;
-double lambda_target = 1e-2;
 double lambda_null = 1e-10;
 double lambda_shape = 1e-2;
-double lambda_rate  = 1e+8;
+double lambda_rate  = 1e+7;
 
 int threads = 1;
 int debug = 0;
@@ -2072,35 +2058,29 @@ int main(int argc, char ** argv)
       if (! lexicon_target_source_file.empty())
 	workers_open.add_thread(new boost::thread(boost::bind(&LexiconModel::open,
 							      boost::ref(lexicon_target_source),
-							      boost::cref(lexicon_target_source_file))));    
+							      boost::cref(lexicon_target_source_file))));
       
       workers_open.join_all();
     }
 
-    PYPRule model_rule(PYPRule::parameter_type(rule_discount,
-					       rule_strength,
-					       rule_discount_prior_alpha,
+    PYPRule model_rule(PYPRule::parameter_type(rule_discount_prior_alpha,
 					       rule_discount_prior_beta,
 					       rule_strength_prior_shape,
 					       rule_strength_prior_rate));
 
     PYPLexicon model_lexicon(lexicon_source_target,
 			     lexicon_target_source,
-			     PYPLexicon::parameter_type(lexicon_discount,
-							lexicon_strength,
-							lexicon_discount_prior_alpha,
+			     PYPLexicon::parameter_type(lexicon_discount_prior_alpha,
 							lexicon_discount_prior_beta,
 							lexicon_strength_prior_shape,
 							lexicon_strength_prior_rate));
 
-    PYPLength model_length(LengthModel(lambda_source, lambda_null, lambda_shape, lambda_rate),
-			   LengthModel(lambda_target, lambda_null, lambda_shape, lambda_rate));
+    PYPLength model_length(LengthModel(lambda_null, lambda_shape, lambda_rate),
+			   LengthModel(lambda_null, lambda_shape, lambda_rate));
     
     PYPPhrase model_phrase(model_lexicon,
 			   model_length,
-			   PYPPhrase::parameter_type(phrase_discount,
-						     phrase_strength,
-						     phrase_discount_prior_alpha,
+			   PYPPhrase::parameter_type(phrase_discount_prior_alpha,
 						     phrase_discount_prior_beta,
 						     phrase_strength_prior_shape,
 						     phrase_strength_prior_rate));
@@ -2203,12 +2183,14 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
 
-      // assign temperature and model...
+      // assign temperature...
       for (size_type i = 0; i != tasks.size(); ++ i)
 	tasks[i].temperature = temperature;
       
+      // shuffle
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
+      
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
@@ -2220,7 +2202,7 @@ int main(int argc, char ** argv)
       
       while (piter != piter_end) {
 
-	// mapping
+	// split...
 	mapped.clear();
 	for (int i = 0; i != blocks && piter != piter_end; ++ i, ++ piter) {
 	  const size_type pos = *piter;
@@ -2234,13 +2216,13 @@ int main(int argc, char ** argv)
 	  mapped.push_back(pos);
 	}
 	
+	// map...
 	position_set_type::const_iterator miter_end = mapped.end();
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
 	  queue_mapper.push(*miter);
 	
-	
 	// reduce...
-	size_type pos;
+	size_type pos = 0;
 	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced)
 	  queue_reducer.pop(pos);
 	
@@ -2680,32 +2662,24 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
     
-    ("rule-discount",       po::value<double>(&rule_discount)->default_value(rule_discount),                         "discount ~ Beta(alpha,beta)")
     ("rule-discount-alpha", po::value<double>(&rule_discount_prior_alpha)->default_value(rule_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("rule-discount-beta",  po::value<double>(&rule_discount_prior_beta)->default_value(rule_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
 
-    ("rule-strength",       po::value<double>(&rule_strength)->default_value(rule_strength),                         "strength ~ Gamma(shape,rate)")
     ("rule-strength-shape", po::value<double>(&rule_strength_prior_shape)->default_value(rule_strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("rule-strength-rate",  po::value<double>(&rule_strength_prior_rate)->default_value(rule_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
 
-    ("phrase-discount",       po::value<double>(&phrase_discount)->default_value(phrase_discount),                         "discount ~ Beta(alpha,beta)")
     ("phrase-discount-alpha", po::value<double>(&phrase_discount_prior_alpha)->default_value(phrase_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("phrase-discount-beta",  po::value<double>(&phrase_discount_prior_beta)->default_value(phrase_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
 
-    ("phrase-strength",       po::value<double>(&phrase_strength)->default_value(phrase_strength),                         "strength ~ Gamma(shape,rate)")
     ("phrase-strength-shape", po::value<double>(&phrase_strength_prior_shape)->default_value(phrase_strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("phrase-strength-rate",  po::value<double>(&phrase_strength_prior_rate)->default_value(phrase_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
     
-    ("lexicon-discount",       po::value<double>(&lexicon_discount)->default_value(lexicon_discount),                         "discount ~ Beta(alpha,beta)")
     ("lexicon-discount-alpha", po::value<double>(&lexicon_discount_prior_alpha)->default_value(lexicon_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
     ("lexicon-discount-beta",  po::value<double>(&lexicon_discount_prior_beta)->default_value(lexicon_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
 
-    ("lexicon-strength",       po::value<double>(&lexicon_strength)->default_value(lexicon_strength),                         "strength ~ Gamma(shape,rate)")
     ("lexicon-strength-shape", po::value<double>(&lexicon_strength_prior_shape)->default_value(lexicon_strength_prior_shape), "strength ~ Gamma(shape,rate)")
     ("lexicon-strength-rate",  po::value<double>(&lexicon_strength_prior_rate)->default_value(lexicon_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
 
-    ("lambda-source", po::value<double>(&lambda_source)->default_value(lambda_source), "lambda for source")
-    ("lambda-target", po::value<double>(&lambda_target)->default_value(lambda_target), "lambda for target")
     ("lambda-null",   po::value<double>(&lambda_null)->default_value(lambda_null),     "lambda for NULL")
     ("lambda-shape",  po::value<double>(&lambda_shape)->default_value(lambda_shape),   "lambda ~ Gamma(shape,rate)")
     ("lambda-rate",   po::value<double>(&lambda_rate)->default_value(lambda_rate),     "lambda ~ Gamma(shape,rate)")

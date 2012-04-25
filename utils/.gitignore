@@ -58,6 +58,7 @@ piece_main
 program_options_main
 random_seed_main
 restaurant_main
+rwticket_main
 simple_vector_main
 small_vector_main
 sparse_map_main
