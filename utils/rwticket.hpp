@@ -54,7 +54,6 @@ namespace utils
     {
       ticket_.u = 0;
     }
-
     
   public:
     void lock_writer()

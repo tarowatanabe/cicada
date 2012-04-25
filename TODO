@@ -146,3 +146,6 @@ Revise syntactic alignment:
   Use of pialign style bi-parsing algorithm
   Allow arbitrary sub-tree alignment by a CFG-style sub-tree transformation
   Paired with "phrases" in the target side.
+
+
+BUGFIX for atomicop: use of fetch_and_add for Mac OSX...
