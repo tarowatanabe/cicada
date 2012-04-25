@@ -302,7 +302,11 @@ struct TaskOracle
     for (size_t id = 0; id != hypotheses.size(); ++ id)
       if (! hypotheses[id].empty())
 	ids.push_back(id);
+
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
     
+#if 0
     if (shuffle) {
       boost::random_number_generator<Generator> gen(generator);
       std::random_shuffle(ids.begin(), ids.end(), gen);
@@ -325,6 +329,7 @@ struct TaskOracle
       // sort ids by the scores so that we can process form the less-errored hypotheses
       std::sort(ids.begin(), ids.end(), greater_score<score_set_type>(scores));
     }
+#endif
     
     id_set_type::const_iterator iiter_end = ids.end();
     for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {

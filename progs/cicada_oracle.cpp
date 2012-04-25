@@ -462,6 +462,7 @@ double compute_oracles(const hypergraph_set_type& graphs,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
 
+#if 0
   {
     typedef TaskSingle task_type;
     
@@ -485,11 +486,12 @@ double compute_oracles(const hypergraph_set_type& graphs,
     // sort ids by the scores so that we can process form the less-errored hypotheses
     std::sort(ids.begin(), ids.end(), greater_score<task_type::score_set_type>(scores));
   }
+#endif
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
-
+    
     queue_type queue;
     
     task_set_type tasks(threads);
@@ -500,16 +502,16 @@ double compute_oracles(const hypergraph_set_type& graphs,
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
     
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
+    
     id_set_type::const_iterator iiter_end = ids.end();
     for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
       queue.push(*iiter);
     
     for (int i = 0; i < threads; ++ i)
       queue.push(-1);
-    
-    boost::random_number_generator<Generator> gen(generator);
-    std::random_shuffle(ids.begin(), ids.end(), gen);
-    
+        
     workers.join_all();
     
     score_optimum.reset();
