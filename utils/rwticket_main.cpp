@@ -50,6 +50,30 @@ struct reader_type
 
 int main(int argc, char** argv)
 {
+  utils::rwticket test;
+  
+  if (! test.trylock_reader())
+    std::cerr << "try read failed?" << std::endl;
+
+  if (test.trylock_writer())
+    std::cerr << "try write succeed?" << std::endl;
+
+  if (! test.trylock_reader())
+    std::cerr << "try read failed?" << std::endl;
+
+  test.unlock_reader();
+  test.unlock_reader();
+  
+  test.lock_writer();
+  
+  if (test.trylock_reader())
+    std::cerr << "try read succeed?" << std::endl;
+
+  if (test.trylock_writer())
+    std::cerr << "try writer succeed?" << std::endl;
+  
+  test.unlock_writer();
+
   boost::thread_group workers;
   
   utils::rwticket mutex;

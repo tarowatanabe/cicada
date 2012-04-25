@@ -3,6 +3,8 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+// an implementation from: 
+
 #ifndef __UTILS__RWTICKET__HPP__
 #define __UTILS__RWTICKET__HPP__ 1
 
@@ -63,6 +65,17 @@ namespace utils
       while (val != ticket_.s.write)
 	boost::thread::yield();
     }
+
+    bool trylock_writer()
+    {
+      const uint64_t me = ticket_.s.users;
+      const uint16_t menew = me + 1;
+      const uint64_t read = ticket_.s.read << 16;
+      const uint64_t cmp    = (me << 16) + read + me;
+      const uint64_t cmpnew = (uint64_t(menew) << 16) + read + me;
+      
+      return utils::atomicop::compare_and_swap(ticket_.u, cmp, cmpnew);
+    }
     
     void unlock_writer()
     {
@@ -85,6 +98,17 @@ namespace utils
 	boost::thread::yield();
       
       __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
+    }
+
+    bool trylock_reader()
+    {
+      const uint64_t me    = ticket_.s.users;
+      const uint16_t menew = me + 1;
+      const uint64_t write = ticket_.s.write;
+      const uint64_t cmp    = (me << 32) + (me << 16) + write;
+      const uint64_t cmpnew = (uint64_t(menew) << 32) + (menew << 16) + write;
+      
+      return utils::atomicop::compare_and_swap(ticket_.u, cmp, cmpnew);
     }
 
     void unlock_reader()
