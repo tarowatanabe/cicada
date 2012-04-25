@@ -220,6 +220,74 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct TaskSingle
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+
+  typedef std::vector<double, std::allocator<double> > score_set_type;
+
+  TaskSingle(queue_type&                          __queue,
+	     const hypergraph_set_type&           __graphs,
+	     const feature_function_ptr_set_type& __features,
+	     const scorer_document_type&          __scorers,
+	     score_set_type&                      __scores)
+    : queue(__queue),
+      graphs(__graphs),
+      features(__features),
+      scorers(__scorers),
+      scores(__scores)
+  {
+  }
+  
+  void operator()()
+  {
+    // we will try maximize    
+    const bool error_metric = scorers.error_metric();
+    const double score_factor = (error_metric ? - 1.0 : 1.0);
+    
+    weight_set_type::feature_type feature_scorer;
+    for (size_t i = 0; i != features.size(); ++ i)
+      if (features[i]) {
+	feature_scorer = features[i]->feature_name();
+	break;
+      }
+    
+    hypergraph_type graph_oracle;
+    
+    int id = 0;
+    while (1) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      if (! graphs[id].is_valid()) continue;
+
+      typedef cicada::semiring::Logprob<double> weight_type;
+      
+      model_type model;
+      model.push_back(features[id]);
+      
+      if (apply_exact)
+	cicada::apply_exact(model, graphs[id], graph_oracle);
+      else
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), cube_size);
+      
+      // compute viterbi...
+      weight_type weight;
+      sentence_type sentence;
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor));
+      
+      // compute objective
+      scores[id] = scorers[id]->score(sentence)->score() * score_factor;
+    }
+    
+  }
+  
+  queue_type&                          queue;
+  const hypergraph_set_type&           graphs;
+  const feature_function_ptr_set_type& features;
+  const scorer_document_type&          scorers;
+  score_set_type&                      scores;
+};
 
 struct TaskOracle
 {
@@ -347,6 +415,19 @@ struct TaskOracle
   score_ptr_set_type&                  scores;
 };
 
+template <typename Scores>
+struct greater_score
+{
+  greater_score(const Scores& __scores) : scores(__scores) {}
+
+  bool operator()(const int& x, const int& y) const
+  {
+    return scores[x] > scores[y];
+  }
+  
+  const Scores& scores;
+};
+
 template <typename Generator>
 double compute_oracles(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
@@ -380,6 +461,30 @@ double compute_oracles(const hypergraph_set_type& graphs,
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
+
+  {
+    typedef TaskSingle task_type;
+    
+    task_type::queue_type queue;
+
+    task_type::score_set_type scores(graphs.size());
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(task_type(queue, graphs, features, scorers, scores)));
+    
+    id_set_type::const_iterator iiter_end = ids.end();
+    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
+      queue.push(*iiter);
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    workers.join_all();
+    
+    // sort ids by the scores so that we can process form the less-errored hypotheses
+    std::sort(ids.begin(), ids.end(), greater_score<task_type::score_set_type>(scores));
+  }
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug)

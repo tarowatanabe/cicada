@@ -272,6 +272,7 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
+
 template <typename Generator>
 struct TaskOracle
 {
@@ -426,6 +427,9 @@ double compute_oracles(const hypergraph_set_type& graphs,
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
+  
+  
+  
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)

@@ -254,11 +254,13 @@ struct TaskOracle
   TaskOracle(const scorer_document_type& __scorers,
 	     const hypothesis_map_type&  __hypotheses,
 	     hypothesis_map_type&        __oracles,
-	     Generator&                  __generator)
+	     Generator&                  __generator,
+	     const bool __shuffle)
     : scorers(__scorers),
       hypotheses(__hypotheses),
       oracles(__oracles),
-      generator(__generator)
+      generator(__generator),
+      shuffle(__shuffle)
   {
     score.reset();
     
@@ -270,6 +272,19 @@ struct TaskOracle
 	  *score += *(oracles[id].front().score);
       }
   }
+  
+  template <typename Scores>
+  struct greater_score
+  {
+    greater_score(const Scores& __scores) : scores(__scores) {}
+    
+    bool operator()(const int& x, const int& y) const
+    {
+      return scores[x] > scores[y];
+    }
+    
+    const Scores& scores;
+  };
   
   void operator()()
   {
@@ -288,8 +303,28 @@ struct TaskOracle
       if (! hypotheses[id].empty())
 	ids.push_back(id);
     
-    boost::random_number_generator<Generator> gen(generator);
-    std::random_shuffle(ids.begin(), ids.end(), gen);
+    if (shuffle) {
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
+    } else {
+      typedef std::vector<double, std::allocator<double> > score_set_type;
+
+      score_set_type scores(hypotheses.size());
+
+      for (size_t id = 0; id != hypotheses.size(); ++ id)
+	if (! hypotheses[id].empty()) {
+	  double objective_best = - std::numeric_limits<double>::infinity();
+	  
+	  hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	  for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	    objective_best = std::max(objective_best, hiter->score->score() * score_factor);
+	  
+	  scores[id] = objective_best;
+	}
+      
+      // sort ids by the scores so that we can process form the less-errored hypotheses
+      std::sort(ids.begin(), ids.end(), greater_score<score_set_type>(scores));
+    }
     
     id_set_type::const_iterator iiter_end = ids.end();
     for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
@@ -333,6 +368,8 @@ struct TaskOracle
   const hypothesis_map_type&  hypotheses;
   hypothesis_map_type&        oracles;
   Generator&                  generator;
+  
+  const bool                  shuffle;
 };
 
 template <typename Generator>
@@ -405,7 +442,7 @@ double compute_oracles(const scorer_document_type& scorers,
       }
     }
     
-    task_type(scorers, hypotheses, oracles, generator)();
+    task_type(scorers, hypotheses, oracles, generator, iter)();
     
     reduce_kbest(oracles);
     
@@ -421,7 +458,7 @@ double compute_oracles(const scorer_document_type& scorers,
     
       boost::random_number_generator<Generator> gen(generator);
       std::random_shuffle(ids.begin(), ids.end(), gen);
-    
+      
       id_set_type::const_iterator iiter_end = ids.end();
       for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
 	const size_t id = *iiter;
@@ -466,6 +503,9 @@ double compute_oracles(const scorer_document_type& scorers,
 	    *score_optimum += *oracles[id].front().score;
 	}
       }
+
+      
+      
       
       objective = score_optimum->score() * score_factor;
       if (debug)

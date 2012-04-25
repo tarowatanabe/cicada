@@ -244,6 +244,20 @@ struct TaskOracle
   score_ptr_type score;
 };
 
+template <typename Scores>
+struct greater_score
+{
+  greater_score(const Scores& __scores) : scores(__scores) {}
+
+  bool operator()(const int& x, const int& y) const
+  {
+    return scores[x] > scores[y];
+  }
+  
+  const Scores& scores;
+};
+
+
 template <typename Generator>
 double compute_oracles(const scorer_document_type& scorers,
 		       const hypothesis_map_type& hypotheses,
@@ -255,6 +269,8 @@ double compute_oracles(const scorer_document_type& scorers,
   
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef std::vector<int, std::allocator<int> > id_set_type;
+
+  typedef std::vector<double, std::allocator<double> > score_set_type;
   
   id_set_type ids;
   for (size_t id = 0; id != scorers.size(); ++ id)
@@ -268,6 +284,24 @@ double compute_oracles(const scorer_document_type& scorers,
 
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
+  
+  // sort ids wrt the segment-wise score...
+  score_set_type scores(hypotheses.size());
+  
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      double objective_best = - std::numeric_limits<double>::infinity();
+      
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	objective_best = std::max(objective_best, hiter->score->score() * score_factor);
+      
+      scores[id] = objective_best;
+    }
+  
+  // sort ids by the scores so that we can process form the less-errored hypotheses
+  std::sort(ids.begin(), ids.end(), greater_score<score_set_type>(scores));
+  
 
   if (initialize_segment) {
     // initialize...

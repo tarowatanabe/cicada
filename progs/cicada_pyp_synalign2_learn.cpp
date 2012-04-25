@@ -217,6 +217,8 @@ struct PYP
     template <typename Iterator>
     phrase_type(Iterator __first, Iterator __last)
       : first(&(*__first)), last(&(*__last)) { }
+    phrase_type(const symbol_set_type& x)
+      : first(&(*x.begin())), last(&(*x.end())) {}
     
     bool empty() const { return first == last; }
     size_type size() const { return last - first; }
