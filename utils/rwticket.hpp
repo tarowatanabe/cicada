@@ -57,10 +57,9 @@ namespace utils
   public:
     void lock_writer()
     {
-      const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
+      //const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
+      const uint32_t me = __sync_fetch_and_add(&ticket_.u, uint32_t(1 << 16));
       const uint8_t  val = me >> 16;
-
-      std::cerr << "writer: " << int(val) << std::endl;
       
       while (val != ticket_.s.write)
 	boost::thread::yield();
@@ -80,11 +79,10 @@ namespace utils
     
     void lock_reader()
     {
-      const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
+      //const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
+      const uint32_t me = __sync_fetch_and_add(&ticket_.u, uint32_t(1 << 16));
       const uint8_t  val = me >> 16;
 
-      std::cerr << "reader: " << int(val) << std::endl;
-      
       while (val != ticket_.s.read)
 	boost::thread::yield();
       

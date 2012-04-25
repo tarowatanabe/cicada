@@ -31,13 +31,17 @@ struct reader_type
   
   void operator()()
   {
+    size_t accessed = 0;
     while (value != 1024) {
       utils::rwticket::scoped_reader_lock lock(mutex);
-      
-      std::cerr << "value = " << value << std::endl;
 
       boost::thread::yield();
+
+      ++ accessed;
     }
+    
+    utils::rwticket::scoped_writer_lock lock(mutex);
+    std::cerr << "accessed: " << accessed << std::endl;
   }
   
   utils::rwticket& mutex;
