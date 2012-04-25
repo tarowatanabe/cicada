@@ -282,14 +282,16 @@ struct TaskOracle
 	     score_ptr_set_type&                  __scores,
 	     sentence_set_type&                   __sentences,
 	     hypergraph_set_type&                 __forests,
-	     Generator&                           __generator)
+	     Generator&                           __generator,
+	     const bool                           __shuffle)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
       scores(__scores),
       sentences(__sentences),
       forests(__forests),
-      generator(__generator)
+      generator(__generator),
+      shuffle(__shuffle)
   {
     score_optimum.reset();
     
@@ -302,6 +304,19 @@ struct TaskOracle
 	  *score_optimum += *(*siter);
       } 
   }
+
+  template <typename Scores>
+  struct greater_score
+  {
+    greater_score(const Scores& __scores) : scores(__scores) {}
+
+    bool operator()(const int& x, const int& y) const
+    {
+      return scores[x] > scores[y];
+    }
+  
+    const Scores& scores;
+  };
   
   void operator()()
   {
@@ -329,11 +344,44 @@ struct TaskOracle
       if (graphs[id].is_valid())
 	ids.push_back(id);
     
-    boost::random_number_generator<Generator> gen(generator);
-    std::random_shuffle(ids.begin(), ids.end(), gen);
+    if (shuffle) {
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
+    } else {
+      typedef std::vector<double, std::allocator<double> > score_set_type;
+
+      score_set_type scores(graphs.size());
+      
+      id_set_type::const_iterator iiter_end = ids.end();
+      for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+	typedef cicada::semiring::Logprob<double> weight_type;
+	
+	const size_t id = *iiter;
+	
+	model_type model;
+	model.push_back(features[id]);
+	
+	if (apply_exact)
+	  cicada::apply_exact(model, graphs[id], graph_oracle);
+	else
+	  cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), cube_size);
+	
+	// compute viterbi...
+	weight_type weight;
+	sentence_type sentence;
+	cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor));
+	
+	scores[id] = scorers[id]->score(sentence)->score() * score_factor;
+      }
+      
+      // sort ids by the scores so that we can process form the less-errored hypotheses
+      std::sort(ids.begin(), ids.end(), greater_score<score_set_type>(scores));
+    }
     
     id_set_type::const_iterator iiter_end = ids.end();
     for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+      typedef cicada::semiring::Logprob<double> weight_type;
+      
       const size_t id = *iiter;
       
       score_ptr_type score_curr;
@@ -346,8 +394,6 @@ struct TaskOracle
       cicada::feature::Scorer* __scorer = dynamic_cast<cicada::feature::Scorer*>(features[id].get());
       
       __scorer->assign(score_curr);
-
-      typedef cicada::semiring::Logprob<double> weight_type;
       
       model_type model;
       model.push_back(features[id]);
@@ -400,6 +446,7 @@ struct TaskOracle
   sentence_set_type&                   sentences;
   hypergraph_set_type&                 forests;
   Generator&                           generator;
+  const bool                           shuffle;
 };
 
 template <typename Generator>
@@ -435,7 +482,7 @@ double compute_oracles(const hypergraph_set_type& graphs,
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
     
-    task_type(graphs, features, scorers, scores, sentences, forests, generator)();
+    task_type(graphs, features, scorers, scores, sentences, forests, generator, iter)();
 
     bcast_sentences(sentences, forests);
     
