@@ -111,7 +111,6 @@ struct PYPPOS
       pi0(__transition.discount, __transition.strength),
       pi(classes + 1, table_transition_type(__transition.discount,
 					    __transition.strength)),
-      emission0(__emission),
       emission(__emission),
       transition0(__transition),
       transition(__transition) {}
@@ -257,7 +256,7 @@ struct PYPPOS
   {
     double logprob = std::log(h) * h_counts + std::log(base0) * counts0;
     
-    logprob += pi0.log_likelihood()  + emission0.log_likelihood();
+    logprob += pi0.log_likelihood();
     
     logprob += emission.log_likelihood();
     logprob += transition.log_likelihood();
@@ -444,7 +443,6 @@ struct PYPPOS
   table_transition_type pi0;
   transition_type       pi;
   
-  parameter_type emission0;
   parameter_type emission;
   parameter_type transition0;
   parameter_type transition;
@@ -911,8 +909,7 @@ int main(int argc, char ** argv)
     model.initialize(sampler, classes, resample_iterations);
 
     if (debug >= 2)
-      std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
-		<< "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
+      std::cerr << "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
 		<< "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
 		<< "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
     
@@ -1095,8 +1092,7 @@ int main(int argc, char ** argv)
       model.sample_parameters(sampler, resample_iterations);
       
       if (debug >= 2)
-	std::cerr << "emission-base discount=" << model.emission0.discount << " strength=" << model.emission0.strength << std::endl
-		  << "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
+	std::cerr << "emission      discount=" << model.emission.discount << " strength=" << model.emission.strength << std::endl
 		  << "transition-base discount=" << model.transition0.discount << " strength=" << model.transition0.strength << std::endl
 		  << "transition      discount=" << model.transition.discount << " strength=" << model.transition.strength << std::endl;
 
