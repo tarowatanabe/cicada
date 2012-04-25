@@ -102,7 +102,6 @@ struct PYPPOS
 	 const parameter_type& __transition)
     : h(__h),
       h_counts(0),
-      phi0(__emission.discount, __emission.strength),
       phi(classes, table_emission_type(__emission.discount,
 				       __emission.strength)),
       //base0(1.0 / classes),
@@ -133,9 +132,8 @@ struct PYPPOS
     if (next - 1 >= phi.size())
       phi.resize(next, table_emission_type(emission.discount, emission.strength));
     
-    if (phi[next - 1].increment(word, phi0.prob(word, h), sampler, temperature))
-      if (phi0.increment(word, h, sampler, temperature))
-	++ h_counts;
+    if (phi[next - 1].increment(word, h, sampler, temperature))
+      ++ h_counts;
     
     // transition... we need to consider BOS...
     if (prev >= pi.size())
@@ -159,8 +157,7 @@ struct PYPPOS
     
     // emission
     if (phi[next - 1].decrement(word, sampler))
-      if (phi0.decrement(word, sampler))
-	-- h_counts;
+      -- h_counts;
     
     // transition
     if (pi[prev].decrement(next - 1, sampler))
@@ -231,9 +228,7 @@ struct PYPPOS
       throw std::runtime_error("invalid state");
 #endif
     
-    const double p0 = phi0.prob(word, h);
-    
-    return (next - 1 < phi.size() ? phi[next - 1].prob(word, p0) : p0);
+    return (next - 1 < phi.size() ? phi[next - 1].prob(word, h) : h);
   }
   
   double prob_transition(const id_type prev, const id_type next) const
@@ -262,7 +257,6 @@ struct PYPPOS
   {
     double logprob = std::log(h) * h_counts + std::log(base0) * counts0;
     
-    logprob += phi0.log_likelihood() + transition0.log_likelihood();
     logprob += pi0.log_likelihood()  + emission0.log_likelihood();
     
     logprob += emission.log_likelihood();
@@ -367,9 +361,6 @@ struct PYPPOS
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     for (int iter = 0; iter != num_loop; ++ iter) {
-      emission0.strength = sample_strength(&phi0, &phi0 + 1, sampler, emission0);
-      emission0.discount = sample_discount(&phi0, &phi0 + 1, sampler, emission0);
-      
       emission.strength = sample_strength(phi.begin(), phi.end(), sampler, emission);
       emission.discount = sample_discount(phi.begin(), phi.end(), sampler, emission);
       
@@ -379,9 +370,6 @@ struct PYPPOS
       transition.strength = sample_strength(pi.begin(), pi.end(), sampler, transition);
       transition.discount = sample_discount(pi.begin(), pi.end(), sampler, transition);      
     
-      phi0.discount() = emission0.discount;
-      phi0.strength() = emission0.strength;
-      
       for (size_type i = 0; i != phi.size(); ++ i) {
 	phi[i].discount() = emission.discount;
 	phi[i].strength() = emission.strength;
@@ -448,7 +436,6 @@ struct PYPPOS
   
   double                h;
   size_type             h_counts;
-  table_emission_type   phi0;
   emission_type         phi;
   
   double                base0;
