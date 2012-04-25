@@ -3,7 +3,7 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-// an implementation from: 
+// an implementation from: http://locklessinc.com/articles/locks/
 
 #ifndef __UTILS__RWTICKET__HPP__
 #define __UTILS__RWTICKET__HPP__ 1
