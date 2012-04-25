@@ -19,12 +19,12 @@ namespace utils
   private:
     typedef union 
     {
-      uint32_t u;
-      uint16_t us;
+      uint64_t u;
+      uint32_t us;
       struct {
-	uint8_t write;
-	uint8_t read;
-	uint8_t users;
+	uint16_t write;
+	uint16_t read;
+	uint16_t users;
       } s;
     } ticket_type;
     
@@ -57,9 +57,8 @@ namespace utils
   public:
     void lock_writer()
     {
-      //const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
-      const uint32_t me = __sync_fetch_and_add(&ticket_.u, uint32_t(1 << 16));
-      const uint8_t  val = me >> 16;
+      const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
+      const uint16_t val = me >> 32;
       
       while (val != ticket_.s.write)
 	boost::thread::yield();
@@ -79,21 +78,18 @@ namespace utils
     
     void lock_reader()
     {
-      //const uint32_t me = utils::atomicop::fetch_and_add(ticket_.u, uint32_t(1 << 16));
-      const uint32_t me = __sync_fetch_and_add(&ticket_.u, uint32_t(1 << 16));
-      const uint8_t  val = me >> 16;
+      const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
+      const uint16_t val = me >> 32;
 
       while (val != ticket_.s.read)
 	boost::thread::yield();
       
-      __sync_add_and_fetch(&ticket_.s.read, uint8_t(1));
-      //utils::atomicop::fetch_and_add(ticket_.s.read, uint8_t(1));
+      __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
     }
 
     void unlock_reader()
     {
-      __sync_add_and_fetch(&ticket_.s.write, uint8_t(1));
-      //utils::atomicop::fetch_and_add(ticket_.s.write, uint8_t(1));
+      __sync_add_and_fetch(&ticket_.s.write, uint16_t(1));
     }
     
     
