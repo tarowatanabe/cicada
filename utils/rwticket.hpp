@@ -92,7 +92,6 @@ namespace utils
       __sync_add_and_fetch(&ticket_.s.write, uint16_t(1));
     }
     
-    
   private:
     ticket_type ticket_;
   };
