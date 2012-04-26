@@ -1294,9 +1294,11 @@ namespace cicada
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size()); 
     }
     
+    source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
     source_map.reset();
     
+    target_map->prune(static_cast<const hasher_type&>(*this));
     target_map->write(path_target);
     target_map.reset();
 

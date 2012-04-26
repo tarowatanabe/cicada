@@ -1277,10 +1277,11 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
     
-    
+    source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
     source_map.reset();
     
+    target_map->prune(static_cast<const hasher_type&>(*this));
     target_map->write(path_target);
     target_map.reset();
 
