@@ -349,6 +349,12 @@ namespace utils
     {
       return __dynamic_hashmurmur<sizeof(_Value)>::hash((const uint8_t*) &(*first), (const uint8_t*) &(*last), seed);
     }
+    
+    _Value operator()(void* ptr, size_t size, _Value seed=0) const
+    {
+      return __dynamic_hashmurmur<sizeof(_Value)>::hash((const uint8_t*) ptr, ((const uint8_t*) ptr) + size, seed);
+    }
+
   };
   
 };

@@ -538,7 +538,7 @@ namespace succinctdb
     {
       return offs.size_cache();
     }
-    
+        
     pos_type insert(const key_type* buf, size_type size, hash_value_type hash)
     {
       const size_type hash_mask = bins.size() - 1;
@@ -566,6 +566,35 @@ namespace succinctdb
       for (/**/; i && ! equal_to(i - 1, buf, size); i = nexts[i - 1]) {}
       return i - 1;
     }
+    
+    template <typename Hasher>
+    void prune(Hasher hasher)
+    {
+      if (bins.size() < nexts.size()) {
+	if (empty())
+	  bins.resize(4);
+	return;
+      }
+      
+      const size_type nexts_size = nexts.size();
+      
+      bins.resize(utils::bithack::branch(utils::bithack::is_power2(nexts_size),
+					 nexts_size,
+					 static_cast<size_type>(utils::bithack::next_largest_power2(nexts_size))));
+      std::fill(bins.begin(), bins.end(), 0);
+
+      const size_type hash_mask = bins.size() - 1;
+
+      pos_type pos = 0;
+      const_iterator iter_end = end();
+      for (const_iterator iter = begin(); iter != iter_end; ++ iter, ++ pos) {
+	const size_type key =  hash_value_type(hasher((void*) &(*iter.begin()), iter.size() * sizeof(key_type))) & hash_mask;
+	
+	nexts[pos] = bins[key];
+	bins[key] = pos + 1;
+      }
+    }
+    
   
     void write(const path_type& path) const
     {
@@ -580,6 +609,7 @@ namespace succinctdb
     }
     
   private:
+    
     template <typename _Path, typename _Data>
     inline
     void dump_file(const _Path& file, const _Data& data, const bool packed=false) const

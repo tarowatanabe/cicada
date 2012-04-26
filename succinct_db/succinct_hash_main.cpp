@@ -66,4 +66,25 @@ int main(int argc, char** argv)
   for (int i = 0; i < strings.size(); ++ i)
     if (succinct_hash_mapped_stream.find(strings[i].c_str(), strings[i].size(), hasher(strings[i].begin(), strings[i].end(), 0)) == uint32_t(-1))
       std::cerr << "NOT FOUND? mapped: " << strings[i] << std::endl;
+  
+  // pruning!
+  succinct_hash.prune(hasher);
+
+  for (int i = 0; i < succinct_hash.size(); ++ i) {
+    if (succinct_hash[i].size() != succinct_hash_mapped[i].size())
+      std::cerr << "size differ!" << std::endl;
+    if (! std::equal(succinct_hash[i].begin(), succinct_hash[i].end(), succinct_hash_mapped[i].begin()))
+      std::cerr << "key differ!" << std::endl;
+    
+    if (succinct_hash[i].size() != succinct_hash_mapped_stream[i].size())
+      std::cerr << "size differ!" << std::endl;
+    if (! std::equal(succinct_hash[i].begin(), succinct_hash[i].end(), succinct_hash_mapped_stream[i].begin()))
+      std::cerr << "key differ!" << std::endl;
+  }
+
+  for (int i = 0; i < strings.size(); ++ i)
+    if (succinct_hash.find(strings[i].c_str(), strings[i].size(), hasher(strings[i].begin(), strings[i].end(), 0)) == uint32_t(-1))
+      std::cerr << "NOT FOUND? mapped: " << strings[i] << std::endl;
+  
+  
 }

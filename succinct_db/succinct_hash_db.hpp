@@ -138,6 +138,13 @@ namespace succinctdb
       if (! data_set_mapped_type::exists(path / "data")) return false;
       return true;
     }
+
+    template <typename Hasher>
+    void prune(Hasher hasher)
+    {
+      if (__succinct_hash)
+	__succinct_hash->prune(hasher);
+    }
     
     void open(const path_type& path, size_type bin_size=0)
     {
