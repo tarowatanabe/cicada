@@ -1027,7 +1027,7 @@ struct GHKMGrammar : public Grammar
 	
 	height = utils::bithack::max(height, result.first + 1);
 	num_tails += result.second;
-      } else if (i != tails.size()) {
+      } else if (i != static_cast<int>(tails.size())) {
 	if (j[aligns[i]] >= 0) {
 	  const derivation_pair_type& edge = derivations[nodes_map_target[tails[i]]][j[aligns[i]]];
 	  edges_new.insert(edges_new.end(), edge.target.edges.begin(), edge.target.edges.end());
@@ -1068,7 +1068,7 @@ struct GHKMGrammar : public Grammar
 	
 	height = utils::bithack::max(height, result.first + 1);
 	num_tails += result.second;
-      } else if (i != tails.size()) {
+      } else if (i != static_cast<int>(tails.size())) {
 	if (j[i] >= 0) {
 	  const derivation_pair_type& edge = derivations[nodes_map_source[tails[i]]][j[i]];
 	  edges_new.insert(edges_new.end(), edge.source.edges.begin(), edge.source.edges.end());

@@ -560,7 +560,7 @@ struct ExtractGHKM
 		  rule_pair_set_type& rules,
 		  const Dumper& dumper)
   {
-    if (max_sentence_length > 0 && sentence.size() > max_sentence_length) return;
+    if (max_sentence_length > 0 && static_cast<int>(sentence.size()) > max_sentence_length) return;
     
 #if 0
     std::cerr << "hypergraph: " << graph << std::endl
@@ -591,8 +591,8 @@ struct ExtractGHKM
     admissible_nodes(graph, sentence, alignment);
     
     if (max_sentence_length > 0
-	&& (alignment_source_target.size() > max_sentence_length
-	    || alignment_target_source.size() > max_sentence_length)) return;
+	&& (static_cast<int>(alignment_source_target.size()) > max_sentence_length
+	    || static_cast<int>(alignment_target_source.size()) > max_sentence_length)) return;
     
     //std::cerr << "construct derivations" << std::endl;
     construct_derivations(graph, sentence);

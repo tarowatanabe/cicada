@@ -296,9 +296,9 @@ struct ExtractPhrase
     if (inverse) {
       alignment_type::const_iterator aiter_end = alignment.end();
       for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-	if (aiter->target >= alignment_source_target.size())
+	if (aiter->target >= static_cast<int>(alignment_source_target.size()))
 	  throw std::runtime_error("invalid alignment");
-	if (aiter->source >= alignment_target_source.size())
+	if (aiter->source >= static_cast<int>(alignment_target_source.size()))
 	  throw std::runtime_error("invalid alignment");
 	
 	alignment_source_target[aiter->target].push_back(aiter->source);
@@ -307,9 +307,9 @@ struct ExtractPhrase
     } else {
       alignment_type::const_iterator aiter_end = alignment.end();
       for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-	if (aiter->source >= alignment_source_target.size())
+	if (aiter->source >= static_cast<int>(alignment_source_target.size()))
 	  throw std::runtime_error("invalid alignment");
-	if (aiter->target >= alignment_target_source.size())
+	if (aiter->target >= static_cast<int>(alignment_target_source.size()))
 	  throw std::runtime_error("invalid alignment");
 
 	alignment_source_target[aiter->source].push_back(aiter->target);

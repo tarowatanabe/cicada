@@ -183,7 +183,7 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("sentence size do not match with permutation size");
 	  
 	  if (sentence.size() == 0) continue;
-	  if (max_length > 0 && sentence.size() > max_length) continue;
+	  if (max_length > 0 && static_cast<int>(sentence.size()) > max_length) continue;
 	  
 	  // perform permutation
 	  sentence_permuted.resize(sentence.size());
@@ -192,7 +192,7 @@ int main(int argc, char** argv)
 	  assigned.resize(sentence.size(), false);
 	  
 	  for (size_t pos = 0; pos != sentence.size(); ++ pos) {
-	    if (permutation[pos] >= sentence.size())
+	    if (permutation[pos] >= static_cast<int>(sentence.size()))
 	      throw std::runtime_error("invalid permutation: out of range");
 	    
 	    if (assigned[permutation[pos]])
@@ -240,7 +240,7 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	
 	  if (sentence.size() == 0) continue;
-	  if (max_length > 0 && sentence.size() > max_length) continue;
+	  if (max_length > 0 && static_cast<int>(sentence.size()) > max_length) continue;
 	
 	  if (stemmer) {
 	    sentence_type::iterator siter_end = sentence.end();

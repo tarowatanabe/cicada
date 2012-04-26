@@ -546,7 +546,7 @@ struct LexiconBase
 
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      if (aiter->source >= source_size || aiter->target >= target_size) {
+      if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
 	std::ostringstream os;
 	os << "invlaid alignemnt:"
 	   << " source: " << source 
