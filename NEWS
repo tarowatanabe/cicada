@@ -1,4 +1,5 @@
 2012-5-x
+Better indexing: prune away unused space for indexed (tree-)grammar(s)
 New: added PYP-pos, an unsupervised pos induction (currently, we support training, and no pos assinger exists)
 new: added PYP-pialign, an unsupervised phrasal ITG aligner! (currently, we support training, and no phrasal aligner exists)
 
