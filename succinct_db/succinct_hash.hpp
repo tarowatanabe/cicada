@@ -570,17 +570,20 @@ namespace succinctdb
     template <typename Hasher>
     void prune(Hasher hasher)
     {
-      if (bins.size() < nexts.size()) {
-	if (empty())
-	  bins.resize(4);
+      if (empty()) {
+	bins.resize(4);
 	return;
       }
       
       const size_type nexts_size = nexts.size();
+      const size_type bins_new_size = utils::bithack::branch(utils::bithack::is_power2(nexts_size),
+							     nexts_size,
+							     static_cast<size_type>(utils::bithack::next_largest_power2(nexts_size)));
       
-      bins.resize(utils::bithack::branch(utils::bithack::is_power2(nexts_size),
-					 nexts_size,
-					 static_cast<size_type>(utils::bithack::next_largest_power2(nexts_size))));
+      if (bins.size() <= bins_new_size)
+	return;
+      
+      bins.resize(bins_new_size);
       std::fill(bins.begin(), bins.end(), 0);
 
       const size_type hash_mask = bins.size() - 1;
