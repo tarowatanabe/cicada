@@ -27,13 +27,15 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency permutation_type;
 
-
-path_set_type input_files;
+path_set_type source_files;
+path_set_type target_files;
+path_set_type alignment_files;
 path_set_type permutation_source_files;
 path_set_type permutation_target_files;
 path_type output_file = "-";
 
 bool inverse_mode = false;
+bool visualize_mode = false;
 
 void options(int argc, char** argv);
 
@@ -42,16 +44,28 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
         
-    if (input_files.empty())
-      input_files.push_back("-");
+    if (alignment_files.empty())
+      alignment_files.push_back("-");
     
     if (! permutation_source_files.empty())
-      if (permutation_source_files.size() != input_files.size())
+      if (permutation_source_files.size() != alignment_files.size())
 	throw std::runtime_error("# of permutation files does not match");
     
     if (! permutation_target_files.empty())
-      if (permutation_target_files.size() != input_files.size())
+      if (permutation_target_files.size() != alignment_files.size())
 	throw std::runtime_error("# of permutation files does not match");
+
+    if (visualize_mode) {
+      if (source_files.empty())
+	throw std::runtime_error("no source data?");
+      if (target_files.empty())
+	throw std::runtime_error("no target data?");
+      
+      if (source_files.size() != alignment_files.size())
+	throw std::runtime_error("# of source files does not match");
+      if (target_files.size() != alignment_files.size())
+	throw std::runtime_error("# of target files does not match");
+    }
     
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
@@ -67,11 +81,11 @@ int main(int argc, char** argv)
       const bool has_permutation_source = ! permutation_source_files.empty();
       const bool has_permutation_target = ! permutation_target_files.empty();
       
-      for (size_t i = 0; i != input_files.size(); ++ i) {
+      for (size_t i = 0; i != alignment_files.size(); ++ i) {
 	std::auto_ptr<std::istream> ps_source(has_permutation_source ? new utils::compress_istream(permutation_source_files[i], 1024 * 1024) : 0);
 	std::auto_ptr<std::istream> ps_target(has_permutation_target ? new utils::compress_istream(permutation_target_files[i], 1024 * 1024) : 0);
 	
-	utils::compress_istream is(input_files[i], 1024 * 1024);
+	utils::compress_istream is(alignment_files[i], 1024 * 1024);
 	
 	for (;;) {
 	  is >> alignment;
@@ -112,7 +126,7 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("# of samples do not match");
       }
     } else {
-      for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
+      for (path_set_type::const_iterator fiter = alignment_files.begin(); fiter != alignment_files.end(); ++ fiter) {
 	utils::compress_istream is(*fiter, 1024 * 1024);
 	
 	alignment_type alignment;
@@ -143,12 +157,15 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",              po::value<path_set_type>(&input_files)->multitoken(),              "input file(s)")
+    ("source",             po::value<path_set_type>(&source_files)->multitoken(),             "source file(s)")
+    ("target",             po::value<path_set_type>(&target_files)->multitoken(),             "target file(s)")
+    ("alignment",          po::value<path_set_type>(&alignment_files)->multitoken(),          "alignment file(s)")
     ("permutation-source", po::value<path_set_type>(&permutation_source_files)->multitoken(), "source side permutation file(s)")
     ("permutation-target", po::value<path_set_type>(&permutation_target_files)->multitoken(), "target side permutation file(s)")
     ("output",             po::value<path_type>(&output_file)->default_value(output_file),    "output file")
     
     ("inverse",   po::bool_switch(&inverse_mode), "inverse alignment")
+    ("visualize", po::bool_switch(&visualize_mode), "visualization")
         
     ("help", "help message");
   

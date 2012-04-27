@@ -55,6 +55,7 @@
 #include "utils/packed_vector.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/rwticket.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -408,7 +409,8 @@ struct PYPWord
   {
     const size_type context_size = discount.size() - 1;
     
-    buffer.clear();
+    buffer_type buffer;
+    buffer.reserve(segment.size() + 1);
     buffer.push_back(BOS());
     
     segment_type::const_iterator siter_end = segment.end();
@@ -430,7 +432,8 @@ struct PYPWord
   {
     const size_type context_size = discount.size() - 1;
 
-    buffer.clear();
+    buffer_type buffer;
+    buffer.reserve(segment.size() + 1);
     buffer.push_back(BOS());
     
     segment_type::const_iterator siter_end = segment.end();
@@ -451,10 +454,9 @@ struct PYPWord
   {
     const size_type context_size = discount.size() - 1;
 
-    buffer_type& buffer_ = const_cast<buffer_type&>(buffer);
-    
-    buffer_.clear();
-    buffer_.push_back(BOS());
+    buffer_type buffer;
+    buffer.reserve(segment.size() + 1);
+    buffer.push_back(BOS());
     
     double logprob = 0.0;
     
@@ -463,16 +465,16 @@ struct PYPWord
       const size_type char_size = utils::utf8_size(*siter);
       const segment_type seg(siter, siter + char_size);
       
-      logprob += std::log(prob(seg, std::max(buffer_.begin(), buffer_.end() - context_size), buffer_.end()));
+      logprob += std::log(prob(seg, std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
       
-      buffer_.push_back(seg);
+      buffer.push_back(seg);
       siter += char_size;
     }
     
-    logprob += std::log(prob(EOS(), std::max(buffer_.begin(), buffer_.end() - context_size), buffer_.end()));
+    logprob += std::log(prob(EOS(), std::max(buffer.begin(), buffer.end() - context_size), buffer.end()));
     
     // exclude BOS...
-    logprob += base.logprob(segment, buffer_.size() - 1);
+    logprob += base.logprob(segment, buffer.size() - 1);
     
     return std::exp(logprob);
   }
@@ -677,8 +679,6 @@ public:
   size_type counts0;
   
   length_base_type base;
-  
-  buffer_type buffer;
 };
 
 struct PYPLM
@@ -717,6 +717,7 @@ struct PYPLM
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
+  typedef utils::rwticket mutex_type;
   
   PYPLM(const PYPWord& __base,
 	const int order,
@@ -1099,6 +1100,8 @@ public:
   double strength_rate;
   
   size_type counts0;
+
+  mutex_type mutex;
 };
 
 struct PYPGraph
@@ -1371,7 +1374,6 @@ struct PYPGraph
     }
     
     std::reverse(derivation.begin(), derivation.end());
-
     
     return prob_derivation;
   }
@@ -1423,14 +1425,12 @@ struct Task
   typedef PYP::word_type     word_type;
   
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
-
   
   Task(queue_type& __mapper,
        queue_type& __reducer,
        const data_set_type& __training,
        derivation_set_type& __derivations,
-       derivation_set_type& __derivations_prev,
-       PYPLM        __model,
+       PYPLM&        __model,
        sampler_type __sampler,
        int __order,
        int  __spell_length,
@@ -1439,7 +1439,6 @@ struct Task
       reducer(__reducer),
       training(__training),
       derivations(__derivations),
-      derivations_prev(__derivations_prev),
       model(__model),
       sampler(__sampler),
       order(__order),
@@ -1459,24 +1458,32 @@ struct Task
       
       if (pos == size_type(-1)) break;
 	
-      derivations_prev[pos] = derivations[pos];
-      
       if (! derivations[pos].empty()) {
-	derivation_type::const_iterator diter_begin = derivations_prev[pos].begin();
-	derivation_type::const_iterator diter_end   = derivations_prev[pos].end();
+	PYPLM::mutex_type::scoped_writer_lock lock(model.mutex);
+
+	derivation_type::const_iterator diter_begin = derivations[pos].begin();
+	derivation_type::const_iterator diter_end   = derivations[pos].end();
 	
 	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
 	  model.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
       }
       
-      graph.forward(training[pos], model, spell_length, ignore_boundary);
+      {
+	PYPLM::mutex_type::scoped_reader_lock lock(model.mutex);
+	
+	graph.forward(training[pos], model, spell_length, ignore_boundary);
+      }
 	
       graph.backward(sampler, derivations[pos]);
       
-      derivation_type::const_iterator diter_begin = derivations[pos].begin();
-      derivation_type::const_iterator diter_end   = derivations[pos].end();
-      for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
-	model.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+      {
+	PYPLM::mutex_type::scoped_writer_lock lock(model.mutex);
+	
+	derivation_type::const_iterator diter_begin = derivations[pos].begin();
+	derivation_type::const_iterator diter_end   = derivations[pos].end();
+	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
+	  model.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
+      }
       
       reducer.push(pos);
     }
@@ -1488,9 +1495,8 @@ struct Task
   const data_set_type& training;
   
   derivation_set_type& derivations;
-  derivation_set_type& derivations_prev;
   
-  PYPLM        model;
+  PYPLM&       model;
   sampler_type sampler;
   
   int  order;
@@ -1500,22 +1506,6 @@ struct Task
   double temperature;
 };
 
-struct TaskMapper
-{
-  TaskMapper(Task::queue_type& __queue,
-	   const position_set_type& __positions)
-    : queue(__queue), positions(__positions) {}
-  
-  void operator()()
-  {
-    position_set_type::const_iterator piter_end = positions.end();
-    for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-      queue.push(*piter);
-  }
-
-  Task::queue_type& queue;
-  const position_set_type& positions;
-};
 
 struct less_size
 {
@@ -1608,7 +1598,6 @@ int main(int argc, char ** argv)
       std::cerr << "char set size: " << vocab.size() << std::endl;
     
     derivation_set_type derivations(training.size());
-    derivation_set_type derivations_prev(training.size());
     position_set_type positions;
     
     for (size_t i = 0; i != training.size(); ++ i)
@@ -1661,7 +1650,6 @@ int main(int argc, char ** argv)
 								 queue_reducer,
 								 training,
 								 derivations,
-								 derivations_prev,
 								 lm,
 								 sampler,
 								 order,
@@ -1721,40 +1709,21 @@ int main(int argc, char ** argv)
       }
       
       // assign temperature and model...
-      for (size_type i = 0; i != tasks.size(); ++ i) {
-	tasks[i].model = lm;
+      for (size_type i = 0; i != tasks.size(); ++ i)
 	tasks[i].temperature = temperature;
-      }
       
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(training));
       
-      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
+      position_set_type::const_iterator piter_end = positions.end();
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_mapper.push(*piter);
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
-	
-	const size_t context_size = order - 1;
-	
-	if (debug >= 3)
-	  std::cerr << "training=" << pos << std::endl;
-	
-	if (! derivations_prev[pos].empty()) {
-	  derivation_type::const_iterator diter_begin = derivations_prev[pos].begin();
-	  derivation_type::const_iterator diter_end   = derivations_prev[pos].end();
-	  
-	  for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
-	    lm.decrement(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
-	}
-	
-	derivation_type::const_iterator diter_begin = derivations[pos].begin();
-	derivation_type::const_iterator diter_end   = derivations[pos].end();
-	
-	for (derivation_type::const_iterator diter = diter_begin + 1; diter != diter_end; ++ diter)
-	  lm.increment(*diter, std::max(diter_begin, diter - context_size), diter, sampler);
 	
 	if (debug >= 3) {
 	  std::cerr << "training=" << pos << std::endl;
@@ -1770,8 +1739,6 @@ int main(int argc, char ** argv)
 	    std::cerr << '\n';
 	}
       }
-      
-      mapper->join();
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;

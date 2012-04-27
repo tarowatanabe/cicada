@@ -87,6 +87,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/symbol_set.hpp"
 #include "utils/unique_set.hpp"
+#include "utils/rwticket.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -1185,6 +1186,8 @@ struct PYPPiAlign
 
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
+
+  typedef utils::rwticket mutex_type;
   
   PYPPiAlign(const PYPRule&   __rule,
 	     const PYPPhrase& __phrase)
@@ -1238,6 +1241,8 @@ struct PYPPiAlign
   
   PYPRule   rule;
   PYPPhrase phrase;
+  
+  mutex_type mutex;
 };
 
 struct PYPGraph
@@ -1300,6 +1305,8 @@ struct PYPGraph
 		  const PYPPiAlign& model,
 		  const size_type max_length)
   {
+    //std::cerr << "initialize" << std::endl;
+
     chart.clear();
     chart.reserve(source.size() + 1, target.size() + 1);
     chart.resize(source.size() + 1, target.size() + 1);
@@ -1385,8 +1392,10 @@ struct PYPGraph
 
     //std::cerr << "initialize chart" << std::endl;
     
-    const logprob_type logprob_fallback = model.phrase.prob(logprob_type(1.0));
-    const logprob_type logprob_term = model.rule.prob_terminal() * logprob_fallback;
+    logprob_fallback = model.phrase.prob(logprob_type(1.0));
+    logprob_term = model.rule.prob_terminal() * logprob_fallback;
+    logprob_str  = model.rule.prob_straight() * logprob_fallback;
+    logprob_inv  = model.rule.prob_inverted() * logprob_fallback;
     
     // initialize base...
     // actually, we should be carefull with the chart assignment, since we need to consult the base of phrase-model + rule-model
@@ -1561,23 +1570,13 @@ struct PYPGraph
   // forward filtering
   std::pair<logprob_type, bool> forward(const sentence_type& source,
 					const sentence_type& target,
-					const PYPPiAlign& model,
-					const logprob_type beam,
-					const size_type max_length)
+					const logprob_type beam)
   {
-    //std::cerr << "initialize" << std::endl;
-    
-    initialize(source, target, model, max_length);
-    
     //std::cerr << "forward" << std::endl;
 
     span_pairs_unique_type spans_unique;
     spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
 					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
-
-    const logprob_type logprob_fallback = model.phrase.prob(logprob_type(1.0));
-    const logprob_type logprob_str = model.rule.prob_straight() * logprob_fallback;
-    const logprob_type logprob_inv = model.rule.prob_inverted() * logprob_fallback;
     
     // traverse agenda, smallest first...
     const size_type length_max = source.size() + target.size();
@@ -1810,6 +1809,11 @@ struct PYPGraph
     return prob_derivation;
   }
 
+  logprob_type logprob_fallback;
+  logprob_type logprob_term;
+  logprob_type logprob_str;
+  logprob_type logprob_inv;
+
   chart_type chart;
   edge_chart_type edges;
   
@@ -1864,7 +1868,7 @@ struct Task
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
-       const PYPPiAlign& __model,
+       PYPPiAlign& __model,
        const sampler_type& __sampler,
        const logprob_type& __beam,
        const int& __max_length)
@@ -1888,17 +1892,32 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-      
-      logprob_type beam_local = beam;
-      for (;;) {
-	const std::pair<logprob_type, bool> result = graph.forward(sources[pos], targets[pos], model, beam_local, max_length);
+
+      if (! derivations[pos].empty()) {
+	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
 	
-	if (result.second) break;
-	
-	beam_local *= 1e-2;
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
       
+      {
+	PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
+	
+	graph.initialize(sources[pos], targets[pos], model, max_length);
+      }
+      
+      graph.forward(sources[pos], targets[pos], beam);
+      
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
+      
+      {
+	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      }
       
       reducer.push(pos);
     }
@@ -1911,7 +1930,7 @@ struct Task
   const sentence_set_type& targets;
   derivation_set_type& derivations;
   
-  const PYPPiAlign&  model;
+  PYPPiAlign&  model;
   sampler_type sampler;
   
   logprob_type beam;
@@ -1982,7 +2001,6 @@ int samples = 1;
 int burns = 10;
 int baby_steps = 1;
 int anneal_steps = 1;
-int blocks = 256;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
@@ -2194,83 +2212,50 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
-      position_set_type::const_iterator piter     = positions.begin();
       position_set_type::const_iterator piter_end = positions.end();
-
-      size_type processed = 0;
-      position_set_type mapped;
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_mapper.push(*piter);
       
-      while (piter != piter_end) {
-
-	// split...
-	mapped.clear();
-	for (int i = 0; i != blocks && piter != piter_end; ++ i, ++ piter) {
-	  const size_type pos = *piter;
-	  
-	  if (! derivations[pos].empty()) {
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	      model.decrement(sources[pos], targets[pos], *diter, sampler);
-	  }
-	  
-	  mapped.push_back(pos);
-	}
-	
-	// map...
-	position_set_type::const_iterator miter_end = mapped.end();
-	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
-	  queue_mapper.push(*miter);
-	
-	// reduce...
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
-	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced)
-	  queue_reducer.pop(pos);
+	queue_reducer.pop(pos);
 	
-	// model...
-	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter, ++ processed) {
-	  const size_type pos = *miter;
+	if (debug >= 3) {
+	  std::cerr << "training=" << pos << std::endl
+		    << "source=" << sources[pos] << std::endl
+		    << "target=" << targets[pos] << std::endl;
 	  
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-	  
-	  if (debug >= 3) {
-	    std::cerr << "training=" << pos << std::endl
-		      << "source=" << sources[pos] << std::endl
-		      << "target=" << targets[pos] << std::endl;
-	  
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	      
-	      std::cerr << "derivation: ";
-	      switch (diter->itg) {
-	      case PYP::TERMINAL:   std::cerr << "ter"; break;
-	      case PYP::STRAIGHT:   std::cerr << "str"; break;
-	      case PYP::INVERTED:   std::cerr << "inv"; break;
-	      case PYP::GENERATIVE: std::cerr << "gen"; break;
-	      case PYP::BASE:       std::cerr << "bas"; break;
-	      default: std::cerr << "UNK";
-	      }
-	      
-	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
-		std::cerr << " pair: "
-			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			  << " ||| "
-			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	      std::cerr << std::endl;
+	    std::cerr << "derivation: ";
+	    switch (diter->itg) {
+	    case PYP::TERMINAL:   std::cerr << "ter"; break;
+	    case PYP::STRAIGHT:   std::cerr << "str"; break;
+	    case PYP::INVERTED:   std::cerr << "inv"; break;
+	    case PYP::GENERATIVE: std::cerr << "gen"; break;
+	    case PYP::BASE:       std::cerr << "bas"; break;
+	    default: std::cerr << "UNK";
 	    }
+	      
+	    std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
+		      << " target: " << diter->span.target.first << "..." << diter->span.target.last;
+	      
+	    if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
+	      std::cerr << " pair: "
+			<< PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+			<< " ||| "
+			<< PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
+	      
+	    std::cerr << std::endl;
 	  }
+	}
 	  
-	  if (debug) {
-	    if ((processed + 1) % 10000 == 0)
-	      std::cerr << '.';
-	    if ((processed + 1) % 1000000 == 0)
-	      std::cerr << '\n';
-	  }
+	if (debug) {
+	  if ((reduced + 1) % 10000 == 0)
+	    std::cerr << '.';
+	  if ((reduced + 1) % 1000000 == 0)
+	    std::cerr << '\n';
 	}
       }
       
@@ -2655,7 +2640,6 @@ void options(int argc, char** argv)
     ("burns",               po::value<int>(&burns)->default_value(burns),                             "# of burn-ins")
     ("baby-steps",          po::value<int>(&baby_steps)->default_value(baby_steps),                   "# of baby steps")
     ("anneal-steps",        po::value<int>(&anneal_steps)->default_value(anneal_steps),               "# of anneal steps")
-    ("blocks",              po::value<int>(&blocks)->default_value(blocks),                           "# of blocks")
     ("resample",            po::value<int>(&resample_rate)->default_value(resample_rate),             "hyperparameter resample rate")
     ("resample-iterations", po::value<int>(&resample_iterations)->default_value(resample_iterations), "hyperparameter resample iterations")
     
