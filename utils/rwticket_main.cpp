@@ -14,6 +14,8 @@ struct writer_type
     for (int i = 0; i != 1024; ++ i) {
       utils::rwticket::scoped_writer_lock lock(mutex);
       
+      if (value == 1024) break;
+      
       ++ value;
       
       std::cerr << "writer: " << value << std::endl;
@@ -79,9 +81,10 @@ int main(int argc, char** argv)
   utils::rwticket mutex;
   int value = 0;
   
-  for (int i = 0; i != 3; ++ i)
+  for (int i = 0; i != 4; ++ i)
     workers.add_thread(new boost::thread(reader_type(mutex, value)));
   
+  workers.add_thread(new boost::thread(writer_type(mutex, value)));
   workers.add_thread(new boost::thread(writer_type(mutex, value)));
 
   workers.join_all();
