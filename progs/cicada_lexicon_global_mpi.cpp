@@ -189,9 +189,9 @@ void learn(const path_type& path,
     case  5: mapper.reset(new thread_type(Mapper<OptimizerLinear<5> >(bitexts, queue, path_lexicon))); break;
     case  6: mapper.reset(new thread_type(Mapper<OptimizerLinear<6> >(bitexts, queue, path_lexicon))); break;
     case  7: mapper.reset(new thread_type(Mapper<OptimizerLinear<7> >(bitexts, queue, path_lexicon))); break;
-    case 11: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<11> >(bitexts, queue, path_lexicon))); break;
-    case 12: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<12> >(bitexts, queue, path_lexicon))); break;
-    case 13: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<13> >(bitexts, queue, path_lexicon))); break;
+    case 11: mapper.reset(new thread_type(Mapper<OptimizerLinear<11> >(bitexts, queue, path_lexicon))); break;
+    case 12: mapper.reset(new thread_type(Mapper<OptimizerLinear<12> >(bitexts, queue, path_lexicon))); break;
+    case 13: mapper.reset(new thread_type(Mapper<OptimizerLinear<13> >(bitexts, queue, path_lexicon))); break;
     default:
       throw std::runtime_error("unsupported liblinear-solver");
     }
