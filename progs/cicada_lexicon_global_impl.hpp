@@ -153,7 +153,7 @@ struct OptimizerLinearBase
 
   typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
-  typedef std::vector<int, std::allocator<int> > label_set_type;
+  typedef std::vector<double, std::allocator<double> > label_set_type;
 
   typedef size_t size_type;
   typedef size_t offset_type;
@@ -243,6 +243,7 @@ struct OptimizerLinear : public OptimizerLinearBase
     parameter_type parameter;
     parameter.solver_type = Solver;
     parameter.eps = std::numeric_limits<double>::infinity();
+    parameter.p = 0.1;
     parameter.C = 1.0 / (C * labels.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;

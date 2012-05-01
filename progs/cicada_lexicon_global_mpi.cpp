@@ -182,14 +182,16 @@ void learn(const path_type& path,
     mapper.reset(new thread_type(Mapper<OptimizeAROW>(bitexts, queue, path_lexicon)));
   else if (learn_linear) {
     switch (linear_solver) {
-    case 0: mapper.reset(new thread_type(Mapper<OptimizerLinear<0> >(bitexts, queue, path_lexicon))); break;
-    case 1: mapper.reset(new thread_type(Mapper<OptimizerLinear<1> >(bitexts, queue, path_lexicon))); break;
-    case 2: mapper.reset(new thread_type(Mapper<OptimizerLinear<2> >(bitexts, queue, path_lexicon))); break;
-    case 3: mapper.reset(new thread_type(Mapper<OptimizerLinear<3> >(bitexts, queue, path_lexicon))); break;
-    case 4: mapper.reset(new thread_type(Mapper<OptimizerLinear<4> >(bitexts, queue, path_lexicon))); break;
-    case 5: mapper.reset(new thread_type(Mapper<OptimizerLinear<5> >(bitexts, queue, path_lexicon))); break;
-    case 6: mapper.reset(new thread_type(Mapper<OptimizerLinear<6> >(bitexts, queue, path_lexicon))); break;
-    case 7: mapper.reset(new thread_type(Mapper<OptimizerLinear<7> >(bitexts, queue, path_lexicon))); break;
+    case  0: mapper.reset(new thread_type(Mapper<OptimizerLinear<0> >(bitexts, queue, path_lexicon))); break;
+    case  1: mapper.reset(new thread_type(Mapper<OptimizerLinear<1> >(bitexts, queue, path_lexicon))); break;
+    case  2: mapper.reset(new thread_type(Mapper<OptimizerLinear<2> >(bitexts, queue, path_lexicon))); break;
+    case  3: mapper.reset(new thread_type(Mapper<OptimizerLinear<3> >(bitexts, queue, path_lexicon))); break;
+    case  5: mapper.reset(new thread_type(Mapper<OptimizerLinear<5> >(bitexts, queue, path_lexicon))); break;
+    case  6: mapper.reset(new thread_type(Mapper<OptimizerLinear<6> >(bitexts, queue, path_lexicon))); break;
+    case  7: mapper.reset(new thread_type(Mapper<OptimizerLinear<7> >(bitexts, queue, path_lexicon))); break;
+    case 11: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<11> >(bitexts, queue, path_lexicon))); break;
+    case 12: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<12> >(bitexts, queue, path_lexicon))); break;
+    case 13: mapper[i].reset(new thread_type(Mapper<OptimizerLinear<13> >(bitexts, queue, path_lexicon))); break;
     default:
       throw std::runtime_error("unsupported liblinear-solver");
     }
@@ -311,7 +313,11 @@ int getoptions(int argc, char** argv)
      " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
      " 5: \tL1-regularized L2-loss support vector classification\n"
      " 6: \tL1-regularized logistic regression\n"
-     " 7: \tL2-regularized logistic regression (dual)")
+     " 7: \tL2-regularized logistic regression (dual)"
+     "11: \tL2-regularized L2-loss epsilon support vector regression (primal)\n"
+     "12: \tL2-regularized L2-loss epsilon support vector regression (dual)\n"
+     "13: \tL2-regularized L1-loss epsilon support vector regression (dual)\n"
+     )
     
     ("max-iteration", po::value<int>(&max_iteration),  "maximum iteration")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-norm (only for logistic-loss, maxent/SGD)")

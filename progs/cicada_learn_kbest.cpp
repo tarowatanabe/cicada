@@ -338,7 +338,7 @@ struct OptimizeLinear
 
   typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
-  typedef std::vector<int, std::allocator<int> > label_set_type;
+  typedef std::vector<double, std::allocator<double> > label_set_type;
   
   typedef std::vector<offset_type, std::allocator<offset_type> > offset_set_type;
 
@@ -771,18 +771,37 @@ struct OptimizeLinear
     parameter_type parameter;
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
+    parameter.p = 0.1;
     parameter.C = 1.0 / (C * labels.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
 
     if (parameter.eps == std::numeric_limits<double>::infinity()) {
-      if (parameter.solver_type == L2R_LR || parameter.solver_type == L2R_L2LOSS_SVC)
-	parameter.eps = 0.01;
-      else if (parameter.solver_type == L2R_L2LOSS_SVC_DUAL || parameter.solver_type == L2R_L1LOSS_SVC_DUAL || parameter.solver_type == MCSVM_CS || parameter.solver_type == L2R_LR_DUAL)
-	parameter.eps = 0.1;
-      else if (parameter.solver_type == L1R_L2LOSS_SVC || parameter.solver_type == L1R_LR)
-	parameter.eps = 0.01;
+      switch(parameter.solver_type)
+	{
+	case L2R_LR: 
+	case L2R_L2LOSS_SVC:
+	  parameter.eps = 0.01;
+	  break;
+	case L2R_L2LOSS_SVR:
+	  parameter.eps = 0.001;
+	  break;
+	case L2R_L2LOSS_SVC_DUAL: 
+	case L2R_L1LOSS_SVC_DUAL: 
+	case MCSVM_CS: 
+	case L2R_LR_DUAL: 
+	  parameter.eps = 0.1;
+	  break;
+	case L1R_L2LOSS_SVC: 
+	case L1R_LR:
+	  parameter.eps = 0.01;
+	  break;
+	case L2R_L1LOSS_SVR_DUAL:
+	case L2R_L2LOSS_SVR_DUAL:
+	  parameter.eps = 0.1;
+	  break;
+	}
     }
 
     if (debug >= 2)
@@ -794,8 +813,12 @@ struct OptimizeLinear
     if (error_message)
       throw std::runtime_error(std::string("error: ") + error_message);
     
-    static const char* names[] = {"L2R_LR", "L2R_L2LOSS_SVC_DUAL", "L2R_L2LOSS_SVC", "L2R_L1LOSS_SVC_DUAL", "MCSVM_CS",
-				  "L1R_L2LOSS_SVC", "L1R_LR", "L2R_LR_DUAL"};
+    static const char* names[] = {
+      "L2R_LR", "L2R_L2LOSS_SVC_DUAL", "L2R_L2LOSS_SVC", "L2R_L1LOSS_SVC_DUAL", "MCSVM_CS",
+      "L1R_L2LOSS_SVC", "L1R_LR", "L2R_LR_DUAL",
+      "", "", "",
+      "L2R_L2LOSS_SVR", "L2R_L2LOSS_SVR_DUAL", "L2R_L1LOSS_SVR_DUAL", NULL
+    };
     
     if (debug)
       std::cerr << "solver: " << names[parameter.solver_type] << std::endl;
@@ -3310,7 +3333,11 @@ void options(int argc, char** argv)
      " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
      " 5: \tL1-regularized L2-loss support vector classification\n"
      " 6: \tL1-regularized logistic regression\n"
-     " 7: \tL2-regularized logistic regression (dual)")
+     " 7: \tL2-regularized logistic regression (dual)"
+     "11: \tL2-regularized L2-loss epsilon support vector regression (primal)\n"
+     "12: \tL2-regularized L2-loss epsilon support vector regression (dual)\n"
+     "13: \tL2-regularized L1-loss epsilon support vector regression (dual)\n"
+     )
     
     ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
     ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
