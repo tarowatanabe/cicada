@@ -136,6 +136,20 @@ namespace utils
       size_type size_customer() const { return customers; }
       size_type size_table() const { return tables.size(); }
       
+       bool empty() const { return tables.empty(); }
+
+      void clear()
+      {
+	customers = 0;
+	tables.clear();
+      }
+
+      void swap(Location& x)
+      {
+	std::swap(customers, x.customers);
+	tables.swap(x.tables);
+      }
+
       size_type      customers;
       table_set_type tables;
     };
@@ -323,6 +337,20 @@ namespace utils
 	return (P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
     
+    template <typename PriorIterator, typename LambdaIterator>
+    std::pair<typename std::iterator_traits<PriorIterator>::value_type, bool> prob_model(const dish_type& dish, PriorIterator first, PriorIterator last, LambdaIterator lambda) const
+    {
+      typedef typename std::iterator_traits<PriorIterator>::value_type P;
+      typename dish_set_type::const_iterator diter = dishes.find(dish);
+      
+      const P p0 = std::inner_product(first, last, lambda, P(0));
+      
+      if (diter == dishes.end())
+	return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);
+      else
+	return std::make_pair((P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
+    }
+
     double log_likelihood() const
     {
       return log_likelihood(parameter.discount, parameter.strength);
@@ -369,6 +397,17 @@ namespace utils
 	throw std::runtime_error("negative discount?");
       
       return logprob;
+    }
+
+    void prune()
+    {
+      typename dish_set_type::iterator diter_end = dishes.end();
+      for (typename dish_set_type::iterator diter = dishes.begin(); diter != diter_end; /**/) {
+	if (diter->second.empty())
+	  dishes.erase(diter ++);
+	else
+	  ++ diter;
+      }
     }
 
   private:    
