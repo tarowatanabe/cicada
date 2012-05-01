@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
-#include "linear.h"
+#include "../linear.h"
 
 #include "mex.h"
 
+#ifdef MX_API_VER
 #if MX_API_VER < 0x07030000
 typedef int mwIndex;
+#endif
 #endif
 
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
@@ -152,10 +154,14 @@ const char *matlab_matrix_to_model(struct model *model_, const mxArray *matlab_s
 		n=model_->nr_feature;
 	w_size = n;
 
-	ptr = mxGetPr(rhs[id]);
-	model_->label=Malloc(int, model_->nr_class);
-	for(i=0; i<model_->nr_class; i++)
-		model_->label[i]=(int)ptr[i];
+	// Label
+	if(mxIsEmpty(rhs[id]) == 0)
+	{
+		model_->label = Malloc(int, model_->nr_class);
+		ptr = mxGetPr(rhs[id]);
+		for(i=0;i<model_->nr_class;i++)
+			model_->label[i] = (int)ptr[i];
+	}
 	id++;
 
 	ptr = mxGetPr(rhs[id]);
