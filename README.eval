@@ -6,6 +6,7 @@ BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?) [3]
 BLEUS: smoothed BLEU metric[8]
 CDER: CDer (wer + shift in one side) [9]
 WER: word error rate [4]
+InvWER: Inversion word error rate [10]
 PER: position independent word error rate [5]
 TER: translation error rate [6]
 RIBES: RIBES [7]
@@ -97,7 +98,7 @@ References:
 }
 
 [4]
-Sonja Nießen, Franz Josef Och, Gregor Leusch, Hermann Ney
+Sonja Nieﾃ歹n, Franz Josef Och, Gregor Leusch, Hermann Ney
 "An Evaluation Tool for Machine Translation: Fast Evaluation for MT Research".
 In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 39-45, Athens, Greece, May-June 2000
 
@@ -152,4 +153,13 @@ In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 
     booktitle = {In Proceedings of EACL},
     year = {2006},
     pages = {241--248}
+}
+
+[10]
+@INPROCEEDINGS{Evaluation03anovel,
+    author = {Machine Translation Evaluation and Gregor Leusch and Nicola Ueffing and Hermann Ney and Lehrstuhl Für Informatik},
+    title = {A Novel String-to-String Distance Measure With Applications to},
+    booktitle = {In Proceedings of MT Summit IX},
+    year = {2003},
+    pages = {240--247}
 }
