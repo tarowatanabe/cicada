@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "eval/decode.hpp"
@@ -7,6 +7,7 @@
 #include "eval/score.hpp"
 #include "eval/per.hpp"
 #include "eval/wer.hpp"
+#include "eval/cder.hpp"
 #include "eval/sb.hpp"
 #include "eval/sk.hpp"
 #include "eval/ter.hpp"
@@ -64,6 +65,8 @@ namespace cicada
 	return Ribes::decode(iter, end);
       else if (scorer.second == "wer")
 	return WER::decode(iter, end);
+      else if (scorer.second == "cder")
+	return CDER::decode(iter, end);
       else if (scorer.second == "per")
 	return PER::decode(iter, end);
       else if (scorer.second == "ter")
@@ -117,6 +120,14 @@ per: position indenendent error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 wer: word error rate\n\
+\ttokenizer=[tokenizer spec]\n\
+\tmatcher=[matcher spec] approximate matching\n\
+\tmatch=approximated match cost (default 0.2)\n\
+\tsubstitution=substitution cost (default 1)\n\
+\tinsertion=insertion cost (default 1)\n\
+\tdeletion=deletion cost (default 1)\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+cder: CD error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tmatcher=[matcher spec] approximate matching\n\
 \tmatch=approximated match cost (default 0.2)\n\
@@ -368,6 +379,35 @@ depeval: dependency parse evaluation\n\
 	}
 	
 	scorer = scorer_ptr_type(new WERScorer(weights, matcher));
+	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
+      } else if (utils::ipiece(param.name()) == "cder") {
+	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
+	const Matcher* matcher = 0;
+	
+	CDERScorer::weights_type weights;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "tokenizer")
+	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	  else if (utils::ipiece(piter->first) == "matcher")
+	    matcher = &Matcher::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "match")
+	    weights.match = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "substitution")
+	    weights.substitution = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "insertion")
+	    weights.insertion = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "deletion")
+	    weights.deletion = utils::lexical_cast<double>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for cder: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new CDERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "ter") {

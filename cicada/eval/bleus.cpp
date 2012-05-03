@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "decode.hpp"
@@ -85,12 +85,12 @@ namespace cicada
 	double_values %= double_value % ',';
 	
 	bleus_parsed %= (qi::lit('{')
-			>> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"bleus\"") >> qi::lit(',')
-			>> qi::lit("\"reference\"") >> qi::lit(':')
-			>> qi::lit('[') >> double_values >> qi::lit(']') >> qi::lit(',')
-			>> qi::lit("\"hypothesis\"") >> qi::lit(':')
-			>> qi::lit('[') >> double_values >> qi::lit(']')
-			>> qi::lit('}'));
+			 >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"bleus\"") >> qi::lit(',')
+			 >> qi::lit("\"reference\"") >> qi::lit(':')
+			 >> qi::lit('[') >> double_values >> qi::lit(']') >> qi::lit(',')
+			 >> qi::lit("\"hypothesis\"") >> qi::lit(':')
+			 >> qi::lit('[') >> double_values >> qi::lit(']')
+			 >> qi::lit('}'));
 	  
       }
       
@@ -230,7 +230,7 @@ namespace cicada
       
       for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
 	const double diff = ::fabs(*siter - length);
-
+	
 	if (diff < min_diff) {
 	  min_diff = diff;
 	  reference_size = *siter;
@@ -255,6 +255,6 @@ namespace cicada
       
       return (ngrams.is_root(id) ? 0.0 : ngrams[id]);
     }
-
+    
   };
 };

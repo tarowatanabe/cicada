@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <map>
@@ -130,9 +130,9 @@ namespace cicada
 
     public:
       BleuSImpl(const int __order,
-	       const bool __exact,
-	       const bool __skip_sgml_tag,
-	       const tokenizer_type* __tokenizer)
+		const bool __exact,
+		const bool __skip_sgml_tag,
+		const tokenizer_type* __tokenizer)
 	: ngrams(word_type()), nodes(), sizes(),
 	  order(__order), exact(__exact), skip_sgml_tag(__skip_sgml_tag), tokenizer(__tokenizer)
       {
@@ -156,9 +156,9 @@ namespace cicada
       };
       
       double bleus_score(state_ptr_type& state,
-			const state_ptr_set_type& states,
-			const edge_type& edge,
-			const bool final=false) const
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 const bool final=false) const
       {
 	if (skip_sgml_tag)
 	  return bleus_score(state, states, edge, final, skipper_sgml());
@@ -168,10 +168,10 @@ namespace cicada
       
       template <typename Skipper>
       double bleus_score(state_ptr_type& state,
-			const state_ptr_set_type& states,
-			const edge_type& edge,
-			const bool final,
-			Skipper skipper) const
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 const bool final,
+			 Skipper skipper) const
       {
 	if (ngrams.empty()) {
 	  char* buf = reinterpret_cast<char*>(state);
@@ -730,10 +730,10 @@ namespace cicada
     }
     
     void BleuS::apply(state_ptr_type& state,
-		     const state_ptr_set_type& states,
-		     const edge_type& edge,
-		     feature_set_type& features,
-		     const bool final) const
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      feature_set_type& features,
+		      const bool final) const
     {
       double score = pimpl->bleus_score(state, states, edge, final);
       
@@ -744,31 +744,31 @@ namespace cicada
     }
 
     void BleuS::apply_coarse(state_ptr_type& state,
-			    const state_ptr_set_type& states,
-			    const edge_type& edge,
-			    feature_set_type& features,
-			    const bool final) const
-    {
-      
-    }
-    void BleuS::apply_predict(state_ptr_type& state,
 			     const state_ptr_set_type& states,
 			     const edge_type& edge,
 			     feature_set_type& features,
 			     const bool final) const
-    {}
-    void BleuS::apply_scan(state_ptr_type& state,
-			  const state_ptr_set_type& states,
-			  const edge_type& edge,
-			  const int dot,
-			  feature_set_type& features,
-			  const bool final) const
-    {}
-    void BleuS::apply_complete(state_ptr_type& state,
+    {
+      
+    }
+    void BleuS::apply_predict(state_ptr_type& state,
 			      const state_ptr_set_type& states,
 			      const edge_type& edge,
 			      feature_set_type& features,
 			      const bool final) const
+    {}
+    void BleuS::apply_scan(state_ptr_type& state,
+			   const state_ptr_set_type& states,
+			   const edge_type& edge,
+			   const int dot,
+			   feature_set_type& features,
+			   const bool final) const
+    {}
+    void BleuS::apply_complete(state_ptr_type& state,
+			       const state_ptr_set_type& states,
+			       const edge_type& edge,
+			       feature_set_type& features,
+			       const bool final) const
     {
       apply(state, states, edge, features, final);
     }
@@ -780,11 +780,11 @@ namespace cicada
     }
     
     void BleuS::assign(const size_type& id,
-		      const hypergraph_type& hypergraph,
-		      const lattice_type& lattice,
-		      const span_set_type& spans,
-		      const sentence_set_type& targets,
-		      const ngram_count_set_type& ngram_counts)
+		       const hypergraph_type& hypergraph,
+		       const lattice_type& lattice,
+		       const span_set_type& spans,
+		       const sentence_set_type& targets,
+		       const ngram_count_set_type& ngram_counts)
     {
       pimpl->clear();
       

@@ -49,6 +49,7 @@ eval/combined.hpp \
 eval/f.hpp \
 eval/bleu.hpp \
 eval/bleus.hpp \
+eval/cder.hpp \
 eval/depeval.hpp \
 eval/parseval.hpp \
 eval/per.hpp \
@@ -63,6 +64,7 @@ eval/wlcs.hpp
 libcicada_eval_la_SOURCES = \
 eval/bleu.cpp \
 eval/bleus.cpp \
+eval/cder.cpp \
 eval/combined.cpp \
 eval/decode.hpp \
 eval/depeval.cpp \
