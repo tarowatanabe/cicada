@@ -37,6 +37,7 @@ int main(int argc, char** argv)
   
   process("bleu", refset, tstset);
   process("bleus", refset, tstset);
+  process("cder", refset, tstset);
   process("ter", refset, tstset);
   process("wer", refset, tstset);
   process("per", refset, tstset);

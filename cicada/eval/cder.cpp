@@ -21,7 +21,7 @@ namespace cicada
     {
       std::ostringstream stream;
       stream << "cder: " << score()
-	     << ' ' << insertion << '|' << deletion << '|' << substitution
+	     << ' ' << insertion << '|' << deletion << '|' << substitution << '|' << jump
 	     << " length: " << references;
       
       return stream.str();
@@ -35,12 +35,13 @@ namespace cicada
       stream << escaper(insertion)
 	     << ',' << escaper(deletion)
 	     << ',' << escaper(substitution)
+	     << ',' << escaper(jump)
 	     << ',' << escaper(references);
       stream << "]}";
       return stream.str();
     }
 
-    typedef boost::fusion::tuple<double, double, double, double> cder_parsed_type;
+    typedef boost::fusion::tuple<double, double, double, double, double> cder_parsed_type;
     
     template <typename Iterator>
     struct cder_parser : boost::spirit::qi::grammar<Iterator, cder_parsed_type(), boost::spirit::standard::space_type>
@@ -54,6 +55,7 @@ namespace cicada
 			>> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"cder\"") >> qi::lit(',')
 			>> qi::lit("\"edits\"") >> qi::lit(':')
 			>> qi::lit('[')
+			>> double_value >> qi::lit(',')
 			>> double_value >> qi::lit(',')
 			>> double_value >> qi::lit(',')
 			>> double_value >> qi::lit(',')
@@ -86,7 +88,8 @@ namespace cicada
       cder->insertion    = boost::fusion::get<0>(parsed);
       cder->deletion     = boost::fusion::get<1>(parsed);
       cder->substitution = boost::fusion::get<2>(parsed);
-      cder->references   = boost::fusion::get<3>(parsed);
+      cder->jump         = boost::fusion::get<3>(parsed);
+      cder->references   = boost::fusion::get<4>(parsed);
       
       return score_ptr_type(cder.release());
     }
@@ -119,14 +122,16 @@ namespace cicada
 	double insertion;
 	double deletion;
 	double substitution;
+	double jump;
 	
-	Score() : score(0), insertion(0), deletion(0), substitution(0) {}
+	Score() : score(0), insertion(0), deletion(0), substitution(0), jump(0) {}
 	
 	Score(const double& __score,
 	      const double& __insertion,
 	      const double& __deletion,
-	      const double& __substitution)
-	  : score(__score), insertion(__insertion), deletion(__deletion), substitution(__substitution) {}
+	      const double& __substitution,
+	      const double& __jump)
+	  : score(__score), insertion(__insertion), deletion(__deletion), substitution(__substitution), jump(__jump) {}
       };
 
       typedef Score value_type;
@@ -142,8 +147,8 @@ namespace cicada
 	const size_t a_size = a.size();
 	const size_t b_size = b.size();
 	
-	if (a_size == 0) return value_type(b_size * weights.insertion, b_size * weights.insertion, 0, 0);
-	if (b_size == 0) return value_type(a_size * weights.deletion, 0, a_size * weights.deletion, 0);
+	if (a_size == 0) return value_type(b_size * weights.insertion, b_size * weights.insertion, 0, 0, 0);
+	if (b_size == 0) return value_type(a_size * weights.deletion, 0, a_size * weights.deletion, 0, 0);
 	
 	std::vector<value_type, std::allocator<value_type> > curr(b_size + 1, value_type());
 	std::vector<value_type, std::allocator<value_type> > prev(b_size + 1, value_type());
@@ -156,6 +161,9 @@ namespace cicada
 	for (size_t i = 1; i <= a_size; ++ i) {
 	  curr[0].score    = prev[0].score + weights.deletion;
 	  curr[0].deletion = prev[0].deletion + weights.deletion;
+	  
+	  size_t pos_min = 0;
+	  double score_min = curr[0].score;
 	  
 	  for (size_t j = 1; j <= b_size; ++ j) {
 	    const double subst = (a[i - 1] == b[j - 1] ? 0.0 : (matcher && matcher->operator()(a[i - 1], b[j - 1])
@@ -181,9 +189,25 @@ namespace cicada
 	      curr[j].score    += weights.deletion;
 	      curr[j].deletion += weights.deletion;
 	    }
+	    
+	    if (curr[j].score < score_min) {
+	      pos_min = j;
+	      score_min = curr[j].score;
+	    }
 	  }
+	  
+	  const double score_jump = score_min + weights.jump;
+	  
+	  for (size_t j = 0; j <= b_size; ++ j)
+	    if (score_jump < curr[j].score) {
+	      curr[j] = curr[pos_min];
+	      curr[j].score += weights.jump;
+	      curr[j].jump  += weights.jump;
+	    }
+	  
 	  std::swap(prev, curr);
 	}
+	
 	return prev[b_size];
       }
       
@@ -261,6 +285,7 @@ namespace cicada
 	  cder->insertion    = value.insertion;
 	  cder->deletion     = value.deletion;
 	  cder->substitution = value.substitution;
+	  cder->jump         = value.jump;
 	}
 	
 	cder->references += evaluator.ref.size();

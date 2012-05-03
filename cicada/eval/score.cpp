@@ -134,6 +134,7 @@ cder: CD error rate\n\
 \tsubstitution=substitution cost (default 1)\n\
 \tinsertion=insertion cost (default 1)\n\
 \tdeletion=deletion cost (default 1)\n\
+\tjump=jump cost (default 1)\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 ter: translation error rate\n\
 \ttokenizer=[tokenizer spec]\n\
@@ -403,6 +404,8 @@ depeval: dependency parse evaluation\n\
 	    weights.insertion = utils::lexical_cast<double>(piter->second);
 	  else if (utils::ipiece(piter->first) == "deletion")
 	    weights.deletion = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "jump")
+	    weights.jump = utils::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for cder: " << piter->first << "=" << piter->second << std::endl;
 	}

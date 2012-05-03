@@ -27,11 +27,11 @@ namespace cicada
       
       
     public:
-      CDER() : insertion(0), deletion(0), substitution(0), references(0) {}
+      CDER() : insertion(0), deletion(0), substitution(0), jump(0), references(0) {}
       
       double score() const
       {
-	const count_type edits = insertion + deletion + substitution;
+	const count_type edits = insertion + deletion + substitution + jump;
 	return edits / references;
       }
 
@@ -44,6 +44,7 @@ namespace cicada
 	return (insertion == rhs->insertion
 		&& deletion == rhs->deletion
 		&& substitution == rhs->substitution
+		&& jump == rhs->jump
 		&& references == rhs->references);
       }
 
@@ -56,6 +57,7 @@ namespace cicada
 	insertion    = rhs->insertion;
 	deletion     = rhs->deletion;
 	substitution = rhs->substitution;
+	jump         = rhs->jump;
 	references   = rhs->references;
       }
 
@@ -68,6 +70,7 @@ namespace cicada
 	insertion    += rhs->insertion;
 	deletion     += rhs->deletion;
 	substitution += rhs->substitution;
+	jump         += rhs->jump;
 	references   += rhs->references;
       }
       
@@ -80,6 +83,7 @@ namespace cicada
 	insertion    -= rhs->insertion;
 	deletion     -= rhs->deletion;
 	substitution -= rhs->substitution;
+	jump         -= rhs->jump;
 	references   -= rhs->references;
       }
 
@@ -88,6 +92,7 @@ namespace cicada
 	insertion    *= scale;
 	deletion     *= scale;
 	substitution *= scale;
+	jump         *= scale;
 	references   *= scale;
       }
       
@@ -96,6 +101,7 @@ namespace cicada
 	insertion    /= scale;
 	deletion     /= scale;
 	substitution /= scale;
+	jump         /= scale;
 	references   /= scale;
       }
 
@@ -119,6 +125,7 @@ namespace cicada
       count_type insertion;
       count_type deletion;
       count_type substitution;
+      count_type jump;
       count_type references;
     };
 
@@ -137,8 +144,9 @@ namespace cicada
 	weight_type substitution;
 	weight_type insertion;
 	weight_type deletion;
+	weight_type jump;
 	
-	weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0) {}
+	weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), jump(1.0) {}
       };
 
     private:
