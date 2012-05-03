@@ -7,10 +7,16 @@
 
 #include <sstream>
 #include <iterator>
+#include <queue>
 
 #include "inv_wer.hpp"
 
 #include <boost/functional/hash.hpp>
+
+#include "utils/hashmurmur.hpp"
+#include "utils/bichart.hpp"
+#include "utils/chart.hpp"
+#include "utils/dense_hash_set.hpp"
 
 namespace cicada
 {
@@ -110,6 +116,9 @@ namespace cicada
     public:
       typedef InvWERScorer inv_wer_scorer_type;
       typedef inv_wer_scorer_type::weights_type weights_type;
+
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
       
       typedef cicada::Sentence sentence_type;
       typedef cicada::Symbol   word_type;
@@ -124,7 +133,7 @@ namespace cicada
 	double substitution;
 	double inversion;
 	
-	Score() : score(0), insertion(0), deletion(0), substitution(0), inversion(0) {}
+	Score() : score(std::numeric_limits<double>::infinity()), insertion(0), deletion(0), substitution(0), inversion(0) {}
 	
 	Score(const double& __score,
 	      const double& __insertion,
@@ -136,60 +145,202 @@ namespace cicada
 
       typedef Score value_type;
       
+      struct span_type
+      {
+	typedef size_t    size_type;
+	typedef ptrdiff_t difference_type;
+    
+	size_type first;
+	size_type last;
+    
+	span_type() : first(0), last(0) {}
+	span_type(const size_type& __first, const size_type& __last)
+	  : first(__first), last(__last) { }
+
+	bool empty() const { return first == last; }
+	size_type size() const { return last - first; }
+    
+	friend
+	bool operator==(const span_type& x, const span_type& y)
+	{
+	  return x.first == y.first && x.last == y.last;
+	}
+    
+	friend
+	size_t hash_value(span_type const& x)
+	{
+	  typedef utils::hashmurmur<size_t> hasher_type;
+      
+	  return hasher_type()(x.first, x.last);
+	}
+      };
+
+      struct span_pair_type
+      {
+	typedef span_type::size_type      size_type;
+	typedef span_type::difference_type difference_type;
+
+	span_type source;
+	span_type target;
+    
+	span_pair_type() : source(), target() {}
+	span_pair_type(const span_type& __source, const span_type& __target)
+	  : source(__source), target(__target) {}
+	span_pair_type(size_type s1, size_type s2, size_type t1, size_type t2)
+	  : source(s1, s2), target(t1, t2) {}
+    
+	bool empty() const { return source.empty() && target.empty(); }
+	size_type size() const { return source.size() + target.size(); }
+    
+	friend
+	bool operator==(const span_pair_type& x, const span_pair_type& y)
+	{
+	  return x.source == y.source && x.target == y.target;
+	}
+    
+	friend
+	size_t hash_value(span_pair_type const& x)
+	{
+	  typedef utils::hashmurmur<size_t> hasher_type;
+	  
+	  return hasher_type()(x);
+	}
+      };
+
+      typedef utils::bichart<value_type, std::allocator<value_type> > chart_type;
+      
+      typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
+      typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
+      
+      typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
+      typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+				    std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+      
+      typedef utils::chart<double, std::allocator<double> > chart_mono_type;
+      
+      typedef std::pair<double, span_pair_type> score_span_pair_type;
+      typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
+
+      typedef std::vector<double, std::allocator<double> > alpha_type;
+      typedef std::vector<double, std::allocator<double> > beta_type;
+
+      // sort by greater so that we can pop from a small-cost item.
+      struct heap_compare
+      {
+	bool operator()(const score_span_pair_type& x, const score_span_pair_type& y) const
+	{
+	  return x.first > y.first;
+	}
+      };
+      
       InvWERScorerImpl() { }
       InvWERScorerImpl(const sentence_type& __ref) : ref(__ref) {}
       
       value_type operator()(const sentence_type& sentence, const weights_type& weights, const matcher_type* matcher)
       {
-	const sentence_type& a = ref;
-	const sentence_type& b = sentence;
+	const sentence_type& source = ref;
+	const sentence_type& target = sentence;
+	
+	const difference_type T = source.size();
+	const difference_type V = target.size();
+	const difference_type L = T + V;
+	
+	if (T == 0) return value_type(V * weights.insertion, V * weights.insertion, 0, 0, 0);
+	if (V == 0) return value_type(T * weights.deletion, 0, T * weights.deletion, 0, 0);
+	
+	const double infinity = std::numeric_limits<double>::infinity();
+	
+	// initialization...
+	chart_type      chart(T + 1, V + 1, value_type());
+	agenda_type     agenda(L + 1);
+	chart_mono_type chart_source(T + 1, infinity);
+	chart_mono_type chart_target(V + 1, infinity);
+	
+	alpha_type alpha_source(T + 1, infinity);
+	alpha_type alpha_target(V + 1, infinity);
+	beta_type  beta_source(T + 1, infinity);
+	beta_type  beta_target(V + 1, infinity);
 
-	const size_t a_size = a.size();
-	const size_t b_size = b.size();
-	
-	if (a_size == 0) return value_type(b_size * weights.insertion, b_size * weights.insertion, 0, 0, 0);
-	if (b_size == 0) return value_type(a_size * weights.deletion, 0, a_size * weights.deletion, 0, 0);
-	
-	std::vector<value_type, std::allocator<value_type> > curr(b_size + 1, value_type());
-	std::vector<value_type, std::allocator<value_type> > prev(b_size + 1, value_type());
-	
-	for (size_t j = 1; j <= b_size; ++ j) {
-	  prev[j].score     = prev[j - 1].score + weights.insertion;
-	  prev[j].insertion = prev[j - 1].insertion + weights.insertion;
-	}
-	
-	for (size_t i = 1; i <= a_size; ++ i) {
-	  curr[0].score    = prev[0].score + weights.deletion;
-	  curr[0].deletion = prev[0].deletion + weights.deletion;
-	  
-	  for (size_t j = 1; j <= b_size; ++ j) {
-	    const double subst = (a[i - 1] == b[j - 1] ? 0.0 : (matcher && matcher->operator()(a[i - 1], b[j - 1])
-								? weights.match
-								: weights.substitution));
+	// insertion...
+	for (difference_type t = 0; t <= T; ++ t) {
+	  double score = 0.0;
+	  for (difference_type v = 1; v <= V; ++ v) {
+	    score += weights.insertion;
 	    
-	    const double score_del = prev[j].score     + weights.deletion;
-	    const double score_ins = curr[j - 1].score + weights.insertion;
-	    //const double score_sub = prev[j - 1].score + subst;
-	    
-	    curr[j] = prev[j - 1];
-	    curr[j].score        += subst;
-	    curr[j].substitution += subst;
-	    
-	    if (score_ins < curr[j].score) {
-	      curr[j] = curr[j - 1];
-	      curr[j].score     += weights.insertion;
-	      curr[j].insertion += weights.insertion;
-	    }
-	    
-	    if (score_del < curr[j].score) {
-	      curr[j] = prev[j];
-	      curr[j].score    += weights.deletion;
-	      curr[j].deletion += weights.deletion;
-	    }
+	    chart(t, t, 0, v).score     = score;
+	    chart(t, t, 0, v).insertion = score;
+
+	    chart_target(0, v) = std::min(chart_target(0, v), score);
+
+	    agenda[v].push_back(span_pair_type(t, t, 0, v));
 	  }
-	  std::swap(prev, curr);
 	}
-	return prev[b_size];
+	
+	// deletion...
+	for (difference_type v = 0; v <= V; ++ v) {
+	  double score = 0.0;
+	  for (difference_type t = 0; t <= T; ++ t) {
+	    score += weights.deletion;
+	    
+	    chart(0, t, v, v).score    = score;
+	    chart(0, t, v, v).deletion = score;
+	    
+	    chart_source(0, t) = std::min(chart_source(0, t), score);
+	    
+	    agenda[t].push_back(span_pair_type(0, t, v, v));
+	  }
+	}
+	
+	// one-to-one...
+	for (difference_type t = 0; t != T; ++ t)
+	  for (difference_type v = 0; v != V; ++ v) {
+	    const double score = (source[t] == target[v] ? 0.0
+				  : (matcher && matcher->operator()(source[t], target[v])
+				     ? weights.match
+				     : weights.substitution));
+	    
+	    chart(t, t + 1, v, v + 1).substitution = score;
+	    chart(t, t + 1, v, v + 1).score        = score;
+	    
+	    chart_source(t, t + 1) = std::min(chart_source(t, t + 1), score);
+	    chart_target(v, v + 1) = std::min(chart_target(v, v + 1), score);
+	    
+	    agenda[2].push_back(span_pair_type(t, t + 1, v, v + 1));
+	  }
+	
+	// forward-backward to compute estiamtes...
+	forward_backward(chart_source, alpha_source, beta_source);
+	forward_backward(chart_target, alpha_target, beta_target);
+	
+	// forward...
+	heap_type heap;
+
+	for (difference_type l = 1; l != L; ++ l) {
+	  
+	  
+	}
+	
+	
+	
+	
+	return value_type();
+      }
+      
+      void forward_backward(const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
+      {
+	const size_type sentence_size = chart.size() - 1;
+
+	// forward...
+	alpha[0] = 0;
+	for (size_type last = 1; last <= sentence_size; ++ last)
+	  for (size_type first = 0; first != last; ++ first)
+	    alpha[last] = std::min(alpha[last], alpha[first] + chart(first, last));
+	
+	// backward...
+	beta[sentence_size] = 0;
+	for (difference_type first = sentence_size - 1; first >= 0; -- first)
+	  for (size_type last = first + 1; last <= sentence_size; ++ last)
+	    beta[first] = std::min(beta[first], chart(first, last) + beta[last]);
       }
       
     private:
