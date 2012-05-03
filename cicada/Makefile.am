@@ -48,6 +48,7 @@ dist_eval_HEADERS = \
 eval/combined.hpp \
 eval/f.hpp \
 eval/bleu.hpp \
+eval/bleus.hpp \
 eval/depeval.hpp \
 eval/parseval.hpp \
 eval/per.hpp \
@@ -61,6 +62,7 @@ eval/wlcs.hpp
 
 libcicada_eval_la_SOURCES = \
 eval/bleu.cpp \
+eval/bleus.cpp \
 eval/combined.cpp \
 eval/decode.hpp \
 eval/depeval.cpp \
@@ -118,6 +120,7 @@ dist_feature_HEADERS = \
 feature/alignment.hpp \
 feature/antecedent.hpp \
 feature/bleu.hpp \
+feature/bleus.hpp \
 feature/bleu_expected.hpp \
 feature/bleu_linear.hpp \
 feature/bleu_multi.hpp \
@@ -147,6 +150,7 @@ libcicada_feature_la_SOURCES = \
 feature/alignment.cpp \
 feature/antecedent.cpp \
 feature/bleu.cpp \
+feature/bleus.cpp \
 feature/bleu_expected.cpp \
 feature/bleu_linear.cpp \
 feature/bleu_multi.cpp \

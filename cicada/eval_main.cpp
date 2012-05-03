@@ -36,6 +36,7 @@ int main(int argc, char** argv)
   sentence_type     tstset("one guangdong province will next export us $ 3.76 high-tech product two months first this year 3.76 billion us dollars");
   
   process("bleu", refset, tstset);
+  process("bleus", refset, tstset);
   process("ter", refset, tstset);
   process("wer", refset, tstset);
   process("per", refset, tstset);

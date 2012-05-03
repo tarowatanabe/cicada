@@ -9,6 +9,7 @@
 #include "feature/alignment.hpp"
 #include "feature/antecedent.hpp"
 #include "feature/bleu.hpp"
+#include "feature/bleus.hpp"
 #include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
 #include "feature/bleu_multi.hpp"
@@ -53,6 +54,13 @@ bleu: BLEU\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu)\n\
+\trefset=reference set file\n\
+bleus: BLEUS\n\
+\torder=<order>\n\
+\texact=[true|false] clipped ngram computation\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\ttokenizer=[tokenizer spec]\n\
+\tname=feature-name(default: bleus)\n\
 \trefset=reference set file\n\
 bleu-expected: expected-BLEU\n\
 \torder=<order>\n\
@@ -215,6 +223,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Permute(parameter));
     else if (param_name == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
+    else if (param_name == "bleus")
+      return feature_function_ptr_type(new feature::BleuS(parameter));
     else if (param_name == "bleu-expected")
       return feature_function_ptr_type(new feature::BleuExpected(parameter));
     else if (param_name == "bleu-linear")

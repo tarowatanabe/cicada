@@ -11,6 +11,7 @@
 #include "eval/sk.hpp"
 #include "eval/ter.hpp"
 #include "eval/bleu.hpp"
+#include "eval/bleus.hpp"
 #include "eval/wlcs.hpp"
 #include "eval/combined.hpp"
 #include "eval/parseval.hpp"
@@ -57,6 +58,8 @@ namespace cicada
       
       if (scorer.second == "bleu")
 	return Bleu::decode(iter, end);
+      else if (scorer.second == "bleus")
+	return BleuS::decode(iter, end);
       else if (scorer.second == "ribes")
 	return Ribes::decode(iter, end);
       else if (scorer.second == "wer")
@@ -98,6 +101,10 @@ combined: combined scorer\n\
 \tmetric=[scorer spec] i.e. metric=\"bleu:order=4\"\n\
 \tweight=[weight for the scorer]\n\
 bleu:\n\
+\torder=<order, default=4> ngram order\n\
+\ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+bleus:\n\
 \torder=<order, default=4> ngram order\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
@@ -240,6 +247,49 @@ depeval: dependency parse evaluation\n\
 	}
 	
 	scorer = scorer_ptr_type(new BleuScorer(order));
+	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
+
+      } else if (utils::ipiece(param.name()) == "bleus") {
+	int  order = 4;
+	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
+	bool exact = false;
+	
+	bool yield_source = false;
+	bool yield_target = false;
+	
+	std::string name;
+	path_type   refset_file;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "order")
+	    order = utils::lexical_cast<int>(piter->second);
+	  else if (utils::ipiece(piter->first) == "exact")
+	    exact = utils::lexical_cast<bool>(piter->second);
+	  else if (utils::ipiece(piter->first) == "tokenizer")
+	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	  else if (utils::ipiece(piter->first) == "name")
+	    name = piter->second;
+	  else if (utils::ipiece(piter->first) == "refset")
+	    refset_file = piter->second;
+	  else if (utils::ipiece(piter->first) == "yield") {
+	    const utils::ipiece yield = piter->second;
+	    
+	    if (yield == "source")
+	      yield_source = true;
+	    else if (yield == "target")
+	      yield_target = true;
+	    else
+	      throw std::runtime_error("unknown parameter: " + parameter);
+	    
+	  } else
+	    std::cerr << "WARNING: unsupported parameter for bleus: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new BleuSScorer(order));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "ribes") {
