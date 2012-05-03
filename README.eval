@@ -98,7 +98,7 @@ References:
 }
 
 [4]
-Sonja Nieﾃ歹n, Franz Josef Och, Gregor Leusch, Hermann Ney
+Sonja Nießn, Franz Josef Och, Gregor Leusch, Hermann Ney
 "An Evaluation Tool for Machine Translation: Fast Evaluation for MT Research".
 In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 39-45, Athens, Greece, May-June 2000
 
@@ -157,7 +157,7 @@ In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 
 
 [10]
 @INPROCEEDINGS{Evaluation03anovel,
-    author = {Machine Translation Evaluation and Gregor Leusch and Nicola Ueffing and Hermann Ney and Lehrstuhl Für Informatik},
+    author = {Machine Translation Evaluation and Gregor Leusch and Nicola Ueffing and Hermann Ney and Lehrstuhl Fﾃｼr Informatik},
     title = {A Novel String-to-String Distance Measure With Applications to},
     booktitle = {In Proceedings of MT Summit IX},
     year = {2003},
