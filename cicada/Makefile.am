@@ -51,6 +51,7 @@ eval/bleu.hpp \
 eval/bleus.hpp \
 eval/cder.hpp \
 eval/depeval.hpp \
+eval/inv_wer.hpp \
 eval/parseval.hpp \
 eval/per.hpp \
 eval/ribes.hpp \
@@ -70,6 +71,7 @@ eval/decode.hpp \
 eval/depeval.cpp \
 eval/encode.hpp \
 eval/f.cpp \
+eval/inv_wer.cpp \
 eval/parseval.cpp \
 eval/per.cpp \
 eval/ribes.cpp \
