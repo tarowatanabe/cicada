@@ -40,6 +40,7 @@ int main(int argc, char** argv)
   process("cder", refset, tstset);
   process("ter", refset, tstset);
   process("wer", refset, tstset);
+  process("inv-wer", refset, tstset);
   process("per", refset, tstset);
   process("sk", refset, tstset);
   process("sb", refset, tstset);

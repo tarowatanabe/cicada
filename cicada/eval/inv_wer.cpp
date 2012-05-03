@@ -141,8 +141,27 @@ namespace cicada
 	      const double& __substitution,
 	      const double& __inversion)
 	  : score(__score), insertion(__insertion), deletion(__deletion), substitution(__substitution), inversion(__inversion) {}
-      };
 
+	Score& operator+=(const Score& x)
+	{
+	  score        += x.score;
+	  insertion    += x.insertion;
+	  deletion     += x.deletion;
+	  substitution += x.substitution;
+	  inversion    += x.inversion;
+	  
+	  return *this;
+	}
+	
+	friend
+	Score operator+(const Score& x, const Score& y)
+	{
+	  Score tmp(x);
+	  tmp += y;
+	  return tmp;
+	}
+      };
+      
       typedef Score value_type;
       
       struct span_type
@@ -211,10 +230,6 @@ namespace cicada
       
       typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
       typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
-      
-      typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
-      typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
-				    std::allocator<span_pairs_type> >::type span_pairs_unique_type;
       
       typedef utils::chart<double, std::allocator<double> > chart_mono_type;
       
@@ -314,16 +329,178 @@ namespace cicada
 	
 	// forward...
 	heap_type heap;
+	double beam = 2.0;
+	
+	do {
+	  for (difference_type l = 1; l != L; ++ l) {
+	    span_pair_set_type& spans = agenda[l];
+	    
+	    heap.clear();
+	    heap.reserve(spans.size());
+	    
+	    span_pair_set_type::const_iterator siter_end = spans.end();
+	    for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
+	      const double cost = (chart(siter->source.first, siter->source.last, siter->target.first, siter->target.last).score
+				   + std::max(alpha_source[siter->source.first] + beta_source[siter->source.last],
+					      alpha_target[siter->target.first] + beta_target[siter->target.last]));
+	      
+	      heap.push_back(score_span_pair_type(cost, *siter));
+	      std::push_heap(heap.begin(), heap.end(), heap_compare());
+	    }
+	    
+	    heap_type::iterator hiter_begin = heap.begin();
+	    heap_type::iterator hiter       = heap.end();
+	    heap_type::iterator hiter_end   = heap.end();
 
-	for (difference_type l = 1; l != L; ++ l) {
-	  
-	  
-	}
-	
-	
-	
-	
-	return value_type();
+	    const double cost_threshold = hiter_begin->first + beam;
+	    for (/**/; hiter_begin != hiter && hiter_begin->first < cost_threshold; -- hiter)
+	      std::pop_heap(hiter_begin, hiter, heap_compare());
+
+	    const double cost_str = 0.0;
+	    const double cost_inv = weights.inversion;
+	    
+	    for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
+	      const span_pair_type& span_pair = iter->second;
+	      
+	      const difference_type s = span_pair.source.first;
+	      const difference_type t = span_pair.source.last;
+	      const difference_type u = span_pair.target.first;
+	      const difference_type v = span_pair.target.last;
+	      
+	      for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
+		const difference_type L = l - (s - S);
+		
+		// straight
+		for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == s); ++ U) {
+		  // parent span: StUv
+		  // span1: SsUu
+		  // span2: stuv
+		  
+		  if (chart(S, s, U, u).score == infinity) continue;
+		  
+		  const span_pair_type  span1(S, s, U, u);
+		  const span_pair_type& span2(span_pair);
+		  const span_pair_type  span_head(S, t, U, v);
+
+		  value_type& value = chart(S, t, U, v);
+		  
+		  if (value.score == infinity)
+		    agenda[span_head.size()].push_back(span_head);
+		  
+		  const double cost = (cost_str
+				       + chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last).score
+				       + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last).score);
+		  
+		  if (cost < value.score) {
+		    value  = (chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+			      + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+		    
+		    value.score     += cost_str;
+		    value.inversion += cost_str;
+		  }
+		}
+		
+		// inversion
+		for (difference_type U = v + (S == s); U <= utils::bithack::min(v + L, V); ++ U) {
+		  // parent span: StuU
+		  // span1: SsvU
+		  // span2: stuv
+
+		  if (chart(S, s, v, U).score == infinity) continue;
+		  
+		  const span_pair_type  span1(S, s, v, U);
+		  const span_pair_type& span2(span_pair);
+		  const span_pair_type  span_head(S, t, u, U);
+		  
+		  value_type& value = chart(S, t, u, U);
+		  
+		  if (value.score == infinity)
+		    agenda[span_head.size()].push_back(span_head);
+		  
+		  const double cost = (cost_inv
+				       + chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last).score
+				       + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last).score);
+		  
+		  if (cost < value.score) {
+		    value  = (chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+			      + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+		    
+		    value.score     += cost_inv;
+		    value.inversion += cost_inv;
+		  }
+		}
+	      }
+	      
+	      for (difference_type S = t; S <= utils::bithack::min(t + l, T); ++ S) {
+		const difference_type L = l - (S - t);
+		
+		// inversion
+		for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == t); ++ U) {
+		  // parent span: sSUv
+		  // span1: stuv
+		  // span2: tSUu
+		  
+		  if (chart(t, S, U, u).score == infinity) continue;
+	      
+		  const span_pair_type& span1(span_pair);
+		  const span_pair_type  span2(t, S, U, u);
+		  const span_pair_type  span_head(s, S, U, v);
+		  
+		  value_type& value = chart(s, S, U, v);
+		  
+		  if (value.score == infinity)
+		    agenda[span_head.size()].push_back(span_head);
+		  
+		  const double cost = (cost_inv
+				       + chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last).score
+				       + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last).score);
+		  
+		  if (cost < value.score) {
+		    value  = (chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+			      + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+		    
+		    value.score     += cost_inv;
+		    value.inversion += cost_inv;
+		  }
+		}
+		
+		// straight
+		for (difference_type U = v + (S == t); U <= utils::bithack::min(v + L, V); ++ U) {
+		  // parent span: sSuU
+		  // span1: stuv
+		  // span2: tSvU
+		  
+		  if (chart(t, S, v, U).score == infinity) continue;
+		  
+		  const span_pair_type& span1(span_pair);
+		  const span_pair_type  span2(t, S, v, U);
+		  const span_pair_type  span_head(s, S, u, U);
+		  
+		  value_type& value = chart(s, S, u, U);
+		  
+		  if (value.score == infinity)
+		    agenda[span_head.size()].push_back(span_head);
+		  
+		  const double cost = (cost_str
+				       + chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last).score
+				       + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last).score);
+		  
+		  if (cost < value.score) {
+		    value  = (chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+			      + chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+		    
+		    value.score     += cost_str;
+		    value.inversion += cost_str;
+		  }
+		}
+	      }
+	    }
+	  }
+	  	  
+	  beam *= 2;
+	} while (chart(0, T, 0, V).score == infinity);
+
+	return chart(0, T, 0, V);
       }
       
       void forward_backward(const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
