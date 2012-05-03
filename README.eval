@@ -3,6 +3,8 @@ MT evaluations especially for MERT purpose
 Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
 
 BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?) [3]
+BLEUS: smoothed BLEU metric[8]
+CDER: CDer (wer + shift in one side) [9]
 WER: word error rate [4]
 PER: position independent word error rate [5]
 TER: translation error rate [6]
@@ -141,4 +143,13 @@ In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 
   pages     = {605--612},
   url       = {http://www.aclweb.org/anthology/P04-1077},
   doi       = {10.3115/1218955.1219032}
+}
+
+[9]
+@INPROCEEDINGS{Leusch06cder:efficient,
+    author = {Gregor Leusch and Nicola Ueffing and Hermann Ney},
+    title = {CDER: Efficient MT Evaluation Using Block Movements},
+    booktitle = {In Proceedings of EACL},
+    year = {2006},
+    pages = {241--248}
 }
