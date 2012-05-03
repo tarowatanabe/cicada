@@ -2,6 +2,7 @@
 //
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+// BleuS scorer
 
 #ifndef __CICADA__EVAL__BLEUS__HPP__
 #define __CICADA__EVAL__BLEUS__HPP__ 1

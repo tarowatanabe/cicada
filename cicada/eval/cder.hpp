@@ -2,6 +2,8 @@
 //
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+// CDER: http://www.aclweb.org/anthology/E/E06/E06-1031.pdf
+//
 
 #ifndef __CICADA__EVAL__CDER__HPP__
 #define __CICADA__EVAL__CDER__HPP__ 1
