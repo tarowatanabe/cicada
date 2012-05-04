@@ -583,10 +583,14 @@ struct PYPLexicon
     const double logprob_source_target = logprob(source, target, tables_source_target, *lexicon_source_target);
     const double logprob_target_source = logprob(target, source, tables_target_source, *lexicon_target_source);
     
+    return std::exp(logprob_source_target + logprob_target_source);
+
+#if 0
     if (source.empty() || target.empty())
       return std::exp(logprob_source_target + logprob_target_source);
     else
       return std::exp((logprob_source_target + logprob_target_source) * 0.5);
+#endif
   }
 
   double prob_source_target(const phrase_type& source, const phrase_type& target) const
@@ -1501,8 +1505,12 @@ struct PYPGraph
 				  * model1_target[source_last - 1](target_first, target_last));
 		
 		logprob_type& logbase = base(source_first, source_last, target_first, target_last);
+#if 0
 		logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source) * 0.5
 								      + cicada::semiring::log(logbase_target) * 0.5);
+#endif
+		logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source)
+								      + cicada::semiring::log(logbase_target));
 		
 		const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
 		const logprob_type logprob_base = logprob_term * logbase * loglength;
