@@ -182,30 +182,38 @@ namespace detail
 	    agenda[2].push_back(span_pair_type(src, src + 1, trg, trg + 1));
 	    
 	    // one-to-many alignment...
-	    for (int src_last = src + 2; src_last <= source_size; ++ src_last) {
-	      const int trg_last = trg + 1;
+	    {
+	      logprob_type score = costs(src + 1, trg + 1);
 	      
-	      const logprob_type score = chart(src, src_last - 1, trg, trg_last) + costs(src_last, trg_last);
-	      
-	      chart(src, src_last, trg, trg_last) = score;
-	      
-	      chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
-	      chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
-	      
-	      agenda[src_last - src + 1].push_back(span_pair_type(src, src_last, trg, trg_last));
+	      for (int src_last = src + 2; src_last <= source_size; ++ src_last) {
+		const int trg_last = trg + 1;
+		
+		score += costs(src_last, trg_last);
+		
+		chart(src, src_last, trg, trg_last) = score;
+		
+		chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
+		chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
+		
+		agenda[src_last - src + 1].push_back(span_pair_type(src, src_last, trg, trg_last));
+	      }
 	    }
 	    
-	    for (int trg_last = trg + 2; trg_last <= target_size; ++ trg_last) {
-	      const int src_last = src + 1;
+	    {
+	      logprob_type score = costs(src + 1, trg + 1);
 	      
-	      const logprob_type score = chart(src, src_last, trg, trg_last - 1) + costs(src_last, trg_last);
-	      
-	      chart(src, src_last, trg, trg_last) = score;
-	      
-	      chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
-	      chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
-	      
-	      agenda[1 + trg_last - trg].push_back(span_pair_type(src, src_last, trg, trg_last));
+	      for (int trg_last = trg + 2; trg_last <= target_size; ++ trg_last) {
+		const int src_last = src + 1;
+		
+		score += costs(src_last, trg_last);
+		
+		chart(src, src_last, trg, trg_last) = score;
+		
+		chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
+		chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
+		
+		agenda[1 + trg_last - trg].push_back(span_pair_type(src, src_last, trg, trg_last));
+	      }
 	    }
 	  }
 	  
