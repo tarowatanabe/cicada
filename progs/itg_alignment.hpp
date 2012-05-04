@@ -18,10 +18,9 @@
 
 namespace detail
 {
-#if 0  
+#if 1
   struct ITGAlignment
   {
-    static const int max_fertility = 8;
     static const double threshold = 1e-2;
     
     
@@ -38,6 +37,9 @@ namespace detail
       span_pair_type(const int source_first, const int source_last,
 		     const int target_first, const int target_last)
 	: source(source_first, source_last), target(target_first, target_last) {}
+
+      size_t size() const { return source.size() + target.size(); }
+      bool empty() const { return source.empty() && target.empty(); }
       
       friend
       bool operator==(const span_pair_type& x, const span_pair_type& y)
@@ -88,7 +90,8 @@ namespace detail
     {
       typedef utils::chart<bool, std::allocator<bool> > span_prune_type;
 
-      PruneSpan(const span_set_type& spans_source, const span_set_type& spans_target)
+      template <typename Costs>
+      PruneSpan(const Costs& costs, const span_set_type& spans_source, const span_set_type& spans_target)
       {
 	const int source_size = costs.size1() - 1;
 	const int target_size = costs.size2() - 1;
@@ -131,9 +134,6 @@ namespace detail
       const int source_size = costs.size1() - 1;
       const int target_size = costs.size2() - 1;
       
-      const int sent_fert = utils::bithack::max(source_size, target_size) / utils::bithack::min(source_size, target_size);
-      const int max_fert  = utils::bithack::max(max_fertility, sent_fert);
-      
       const double infinity = - std::numeric_limits<double>::infinity();
       
       const backptr_type backptr_invalid(span_pair_type(span_type(-1, -1), span_type(-1, -1)),
@@ -151,22 +151,22 @@ namespace detail
       backptr.resize(source_size + 1, target_size + 1, backptr_invalid);
       
       chart_source.clear();
-      chart_source.reserve(source.size() + 1);
-      chart_source.resize(source.size() + 1, infinity);
+      chart_source.reserve(source_size + 1);
+      chart_source.resize(source_size + 1, infinity);
       
       chart_target.clear();
-      chart_target.reserve(target.size() + 1);
-      chart_target.resize(target.size() + 1, infinity);
+      chart_target.reserve(target_size + 1);
+      chart_target.resize(target_size + 1, infinity);
       
       alpha_source.clear();
       alpha_target.clear();
       beta_source.clear();
       beta_target.clear();
       
-      alpha_source.resize(source.size() + 1, infinity);
-      alpha_target.resize(target.size() + 1, infinity);
-      beta_source.resize(source.size() + 1, infinity);
-      beta_target.resize(target.size() + 1, infinity);
+      alpha_source.resize(source_size + 1, infinity);
+      alpha_target.resize(target_size + 1, infinity);
+      beta_source.resize(source_size + 1, infinity);
+      beta_target.resize(target_size + 1, infinity);
       
       for (int src = 0; src <= source_size; ++ src)
 	for (int trg = 0; trg <= target_size; ++ trg) {
@@ -203,7 +203,7 @@ namespace detail
 	      chart(src, src_last, trg, trg_last) = score;
 	      
 	      chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
-	      chaet_target(trg, trg_last) = std::max(chaet_target(trg, trg_last), score);
+	      chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
 	      
 	      agenda[1 + trg_last - trg].push_back(span_pair_type(src, src_last, trg, trg_last));
 	    }
@@ -226,7 +226,7 @@ namespace detail
 	  }
 	  
 	  if (trg < target_size) {
-	    const logprob_type score = 0.0;
+	    logprob_type score = 0.0;
 	    
 	    const int trg_first = trg;
 	    for (int trg_last = trg_first + 1; trg_last <= target_size; ++ trg_last) {
@@ -236,7 +236,7 @@ namespace detail
 	      
 	      chart_target(trg_first, trg_last) = std::max(chart_target(trg_first, trg_last), score);
 	      
-	      agenda[trg_last - src_first].push_back(span_pair_type(src, src, trg_first, trg_last));
+	      agenda[trg_last - trg_first].push_back(span_pair_type(src, src, trg_first, trg_last));
 	    }
 	  }
 	}
@@ -248,18 +248,18 @@ namespace detail
 
     void forward_backward(const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
     {
-      const size_type sentence_size = chart.size() - 1;
+      const size_t sentence_size = chart.size() - 1;
       
       // forward...
       alpha[0] = 0;
-      for (size_type last = 1; last <= sentence_size; ++ last)
-	for (size_type first = 0; first != last; ++ first)
+      for (size_t last = 1; last <= sentence_size; ++ last)
+	for (size_t first = 0; first != last; ++ first)
 	  alpha[last] = std::max(alpha[last], alpha[first] + chart(first, last));
       
       // backward...
       beta[sentence_size] = 0;
-      for (difference_type first = sentence_size - 1; first >= 0; -- first)
-	for (size_type last = first + 1; last <= sentence_size; ++ last)
+      for (ptrdiff_t first = sentence_size - 1; first >= 0; -- first)
+	for (size_t last = first + 1; last <= sentence_size; ++ last)
 	  beta[first] = std::max(beta[first], chart(first, last) + beta[last]);
     }
     
@@ -292,9 +292,13 @@ namespace detail
 				  + std::min(alpha_source[siter->source.first] + beta_source[siter->source.last],
 					     alpha_target[siter->target.first] + beta_target[siter->target.last]));
 	    
-	    heap.push_back(score_span_pair_type(cost, *siter));
+	    heap.push_back(score_span_pair_type(score, *siter));
 	    std::push_heap(heap.begin(), heap.end(), heap_compare());
 	  }
+
+	  heap_type::iterator hiter_begin = heap.begin();
+	  heap_type::iterator hiter       = heap.end();
+	  heap_type::iterator hiter_end   = heap.end();
 	  
 	  const double score_threshold = hiter_begin->first + beam;
 	  for (/**/; hiter_begin != hiter && hiter_begin->first > score_threshold; -- hiter)
@@ -490,7 +494,7 @@ namespace detail
     {
       initialize(costs);
       
-      construct(costs, PruneSpan(spans_source, spans_target));
+      construct(costs, PruneSpan(costs, spans_source, spans_target));
       
       viterbi(costs, result);
     }
@@ -520,6 +524,7 @@ namespace detail
   
 #endif
   
+#if 0
   struct ITGAlignment
   {
     static const int max_fertility = 8;
@@ -950,7 +955,8 @@ namespace detail
     chart_set_type     inside;
     backptr_chart_type backptr;
   };
-  
+
+#endif  
 };
 
 #endif
