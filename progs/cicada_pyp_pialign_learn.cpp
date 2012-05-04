@@ -502,6 +502,30 @@ struct PYPLexicon
 		 Sampler& sampler,
 		 const double temperature=1.0)
   {
+    if (target.empty()) return;
+
+    if (! tables.exists(vocab_type::EPSILON.id()))
+      tables[vocab_type::EPSILON.id()] = table_type(parameter.discount, parameter.strength);
+    
+    table_type& table = tables[vocab_type::EPSILON.id()];
+    
+    phrase_type::const_iterator titer_end = target.end();
+    for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      table.increment(*titer, lexicon(vocab_type::EPSILON, *titer), sampler, temperature);
+    
+    phrase_type::const_iterator siter_end = source.end();
+    for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
+      if (! tables.exists(siter->id()))
+	tables[siter->id()] = table_type(parameter.discount, parameter.strength);
+      
+      table_type& table = tables[siter->id()];
+      
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	table.increment(*titer, lexicon(*siter, *titer), sampler, temperature);
+    }
+    
+#if 0
     if (source.empty()) {
       if (! tables.exists(vocab_type::EPSILON.id()))
 	tables[vocab_type::EPSILON.id()] = table_type(parameter.discount, parameter.strength);
@@ -524,6 +548,7 @@ struct PYPLexicon
 	  table.increment(*titer, lexicon(*siter, *titer), sampler, temperature);
       }
     }
+#endif
   }
 
   template <typename Sampler>
@@ -539,6 +564,24 @@ struct PYPLexicon
   template <typename Sampler>
   void decrement(const phrase_type& source, const phrase_type& target, table_set_type& tables, Sampler& sampler)
   {
+    if (target.empty()) return;
+    
+    table_type& table = tables[vocab_type::EPSILON.id()];
+      
+    phrase_type::const_iterator titer_end = target.end();
+    for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      table.decrement(*titer, sampler);
+    
+    phrase_type::const_iterator siter_end = source.end();
+    for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
+      table_type& table = tables[siter->id()];
+      
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	table.decrement(*titer, sampler);
+    }
+    
+#if 0
     if (source.empty()) {
       table_type& table = tables[vocab_type::EPSILON.id()];
       
@@ -555,6 +598,7 @@ struct PYPLexicon
 	  table.decrement(*titer, sampler);
       }
     }
+#endif
   }
   
   double prob_source_target(const word_type& source, const word_type& target) const
@@ -606,7 +650,27 @@ struct PYPLexicon
   double logprob(const phrase_type& source, const phrase_type& target, const table_set_type& tables, const lexicon_type& lexicon) const
   {
     double lp = 0.0;
+    
+    if (! target.empty()) {
+      phrase_type::const_iterator titer_end = target.end();
+      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	
+	double sum = (! tables.exists(vocab_type::EPSILON.id())
+		      ? lexicon(vocab_type::EPSILON, *titer)
+		      : tables[vocab_type::EPSILON.id()].prob(*titer, lexicon(vocab_type::EPSILON, *titer)));
+	phrase_type::const_iterator siter_end = source.end();
+	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	  sum += (! tables.exists(siter->id())
+		  ? lexicon(*siter, *titer)
+		  : tables[siter->id()].prob(*titer, lexicon(*siter, *titer)));
+	
+	lp += std::log(sum);
+      }
+    }
+    
+    return lp;
 
+#if 0
     if (source.empty()) {
       if (! tables.exists(vocab_type::EPSILON.id())) {
 	phrase_type::const_iterator titer_end = target.end();
@@ -631,6 +695,7 @@ struct PYPLexicon
 	lp += std::log(sum);
       }
     }
+#endif
 
     return lp;
   }
@@ -1374,7 +1439,8 @@ struct PYPGraph
       epsilon_source[target_pos] = model.phrase.lexicon.prob_source_target(vocab_type::EPSILON, target[target_pos]);
       
       for (size_type source_first = 0; source_first != source.size(); ++ source_first) {
-	double sum = 0.0;
+	//double sum = 0.0;
+	double sum = epsilon_source[target_pos];
 	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	  sum += model.phrase.lexicon.prob_source_target(source[source_last - 1], target[target_pos]);
 	  model1_source[target_pos](source_first, source_last) = sum;
@@ -1386,7 +1452,8 @@ struct PYPGraph
       epsilon_target[source_pos] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[source_pos]);
       
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
-	double sum = 0.0;
+	//double sum = 0.0;
+	double sum = epsilon_target[source_pos];
 	for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	  sum += model.phrase.lexicon.prob_target_source(target[target_last - 1], source[source_pos]);
 	  model1_target[source_pos](target_first, target_last) = sum;
