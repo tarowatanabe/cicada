@@ -14,6 +14,7 @@ suffix: taking suffix of letters
 digit: digits normalized to @
 latin: romanization
 lower: lower casing
+nfkc:  NFKC
 
 * tokenizer: text tokenizer (used by evaluation component)
 

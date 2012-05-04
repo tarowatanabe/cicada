@@ -191,15 +191,15 @@ struct LearnHMM : public LearnBase
       
       // compute transition table...
       // we start from 1, since there exists no previously aligned word before BOS...
-      for (int trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
-	for (int next = 1; next < source_size + 2; ++ next) {
+	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
 	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
-	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
+	  for (int prev = 0; prev < static_cast<int>(source_size + 2 - 1); ++ prev, ++ titer1, ++ titer2) {
 	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
 						       source_size, target_size,
 						       prev - 1, next - 1);
@@ -211,10 +211,10 @@ struct LearnHMM : public LearnBase
 	
 	// null transition
 	// we will exclude EOS
-	for (int next = 0; next < (source_size + 2) - 1; ++ next) {
-	  const int next_none = next + (source_size + 2);
-	  const int prev1_none = next;
-	  const int prev2_none = next + (source_size + 2);
+	for (size_type next = 0; next < (source_size + 2) - 1; ++ next) {
+	  const size_type next_none = next + (source_size + 2);
+	  const size_type prev1_none = next;
+	  const size_type prev2_none = next + (source_size + 2);
 	  
 	  transition(trg, next_none, prev1_none) = prob_null;
 	  transition(trg, next_none, prev2_none) = prob_null;
@@ -297,15 +297,15 @@ struct LearnHMM : public LearnBase
       
       // compute transition table...
       // we start from 1, since there exists no previously aligned word before BOS...
-      for (int trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
-	for (int next = 1; next < source_size + 2; ++ next) {
+	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
 	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
-	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
+	  for (int prev = 0; prev < static_cast<int>(source_size + 2 - 1); ++ prev, ++ titer1, ++ titer2) {
 	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
 						       source_size, target_size,
 						       prev - 1, next - 1);
@@ -317,10 +317,10 @@ struct LearnHMM : public LearnBase
 	
 	// null transition
 	// we will exclude EOS
-	for (int next = 0; next < (source_size + 2) - 1; ++ next) {
-	  const int next_none = next + (source_size + 2);
-	  const int prev1_none = next;
-	  const int prev2_none = next + (source_size + 2);
+	for (size_type next = 0; next < (source_size + 2) - 1; ++ next) {
+	  const size_type next_none = next + (source_size + 2);
+	  const size_type prev1_none = next;
+	  const size_type prev2_none = next + (source_size + 2);
 	  
 	  transition(trg, next_none, prev1_none) = prob_null;
 	  transition(trg, next_none, prev2_none) = prob_null;
@@ -347,12 +347,12 @@ struct LearnHMM : public LearnBase
       scale.resize(target_size + 2, 1.0);
       
       forward(0, 0) = 1.0;
-      for (int trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
 	// +1 to exclude BOS
 	prob_type*       niter = &(*forward.begin(trg)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
-	for (int next = 1; next < source_size + 2; ++ next, ++ niter, ++ eiter) {
+	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter, ++ eiter) {
 	  const prob_type* piter = &(*forward.begin(trg - 1));
 	  const prob_type* titer = &(*transition.begin(trg, next));
 	  
@@ -386,10 +386,10 @@ struct LearnHMM : public LearnBase
 	const prob_type* piter_none1 = &(*forward.begin(trg - 1));
 	const prob_type* piter_none2 = piter_none1 + (source_size + 2);
 	
-	for (int next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
-	  const int next_none = next + source_size + 2;
-	  const int prev_none1 = next;
-	  const int prev_none2 = next + source_size + 2;
+	for (size_type next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
+	  const size_type next_none = next + source_size + 2;
+	  const size_type prev_none1 = next;
+	  const size_type prev_none2 = next + source_size + 2;
 	  
 	  *niter_none += (*piter_none1) * (*eiter_none) * transition(trg, next_none, prev_none1);
 	  *niter_none += (*piter_none2) * (*eiter_none) * transition(trg, next_none, prev_none2);
@@ -410,7 +410,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* niter = &(*backward.begin(trg + 1)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg + 1)) + 1;
 	
-	for (int next = 1; next < source_size + 2; ++ next, ++ niter, ++ eiter) {
+	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter, ++ eiter) {
 	  prob_type*       piter = &(*backward.begin(trg));
 	  const prob_type* titer = &(*transition.begin(trg + 1, next));
 	  
@@ -441,10 +441,10 @@ struct LearnHMM : public LearnBase
 	prob_type*       piter_none1 = &(*backward.begin(trg));
 	prob_type*       piter_none2 = piter_none1 + (source_size + 2);
 
-	for (int next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
-	  const int next_none = next + source_size + 2;
-	  const int prev_none1 = next;
-	  const int prev_none2 = next + source_size + 2;
+	for (size_type next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
+	  const size_type next_none = next + source_size + 2;
+	  const size_type prev_none1 = next;
+	  const size_type prev_none2 = next + source_size + 2;
 	  
 	  *piter_none1 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none1) * factor_scale;
 	  *piter_none2 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none2) * factor_scale;
@@ -598,16 +598,16 @@ struct LearnHMM : public LearnBase
 
       mapped_type mapped((source_size + 2) - 1);
 
-      for (int trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
 	
-	for (int prev = 0; prev < (source_size + 2) - 1; ++ prev)
+	for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev)
 	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
 	
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
 	// + 1, we will exclude <s>, since we will never aligned to <s>
-	for (int next = 1; next < source_size + 2; ++ next, ++ biter, ++ eiter) {
+	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ biter, ++ eiter) {
 	  const prob_type factor_backward = (*biter) * (*eiter);
 
 	  if (factor_backward > 0.0) {
@@ -617,7 +617,7 @@ struct LearnHMM : public LearnBase
 	    const prob_type* titer_none = &(*transition.begin(trg, next)) + (source_size + 2);
 	    
 	    // - 1 to exlude EOS
-	    for (int prev = 0; prev < (source_size + 2) - 1; ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
+	    for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
 	      const double count_word = (*fiter_word) * factor_backward * (*titer_word) * factor;
 	      const double count_none = (*fiter_none) * factor_backward * (*titer_none) * factor;
 	      
@@ -786,9 +786,9 @@ struct LearnHMMPosterior : public LearnBase
       exp_phi.resize(source_size + 1, 1.0);
       
       size_type count_zero = 0;
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	double sum_posterior = 0.0;
-	for (int trg = 1; trg <= target_size; ++ trg)
+	for (size_type trg = 1; trg <= target_size; ++ trg)
 	  sum_posterior += hmm.posterior(trg, src);
 	
 	phi[src] += 1.0 - sum_posterior;
@@ -802,10 +802,10 @@ struct LearnHMMPosterior : public LearnBase
       if (count_zero == source_size) break;
       
       // rescale emission table...
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	// translation into non-NULL word
 	prob_type* eiter = &(*hmm.emission.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) *= exp_phi[src] / exp_phi_old[src];
       }
       // swap...
@@ -856,9 +856,9 @@ struct LearnHMMPosterior : public LearnBase
       exp_phi.resize(source_size + 1, 1.0);
       
       size_type count_zero = 0;
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	double sum_posterior = 0.0;
-	for (int trg = 1; trg <= target_size; ++ trg)
+	for (size_type trg = 1; trg <= target_size; ++ trg)
 	  sum_posterior += hmm.posterior(trg, src);
 	
 	phi[src] += 1.0 - sum_posterior;
@@ -872,10 +872,10 @@ struct LearnHMMPosterior : public LearnBase
       if (count_zero == source_size) break;
       
       // rescale emission table...
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	// translation into non-NULL word
 	prob_type* eiter = &(*hmm.emission.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) *= exp_phi[src] / exp_phi_old[src];
       }
       // swap...
@@ -974,19 +974,19 @@ struct LearnHMMSymmetric : public LearnBase
     hmm_target_source.estimate_posterior(target, source);
     
     // combine!
-    for (int src = 0; src <= source_size; ++ src)
-      for (int trg = 0; trg <= target_size; ++ trg) {
-	double count = (trg == 0 ? 1.0 : hmm_source_target.posterior(trg, src)) * (src == 0 ? 1.0 : hmm_target_source.posterior(src, trg));
+    for (size_type src = 0; src <= source_size; ++ src)
+      for (size_type trg = 0; trg <= target_size; ++ trg) {
+	double count = (! trg ? 1.0 : hmm_source_target.posterior(trg, src)) * (! src ? 1.0 : hmm_target_source.posterior(src, trg));
 	if (src && trg)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	const word_type word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+	const word_type word_source = (! src ? vocab_type::EPSILON : source[src - 1]);
+	const word_type word_target = (! trg ? vocab_type::EPSILON : target[trg - 1]);
 	
-	if (trg != 0)
+	if (trg)
 	  ttable_counts_source_target[word_source][word_target] += count;
 	
-	if (src != 0)
+	if (src)
 	  ttable_counts_target_source[word_target][word_source] += count;
       }
     
@@ -1013,19 +1013,19 @@ struct LearnHMMSymmetric : public LearnBase
     hmm_target_source.estimate_posterior(target, source);
     
     // combine!
-    for (int src = 0; src <= source_size; ++ src)
-      for (int trg = 0; trg <= target_size; ++ trg) {
-	double count = (trg == 0 ? 1.0 : hmm_source_target.posterior(trg, src)) * (src == 0 ? 1.0 : hmm_target_source.posterior(src, trg));
+    for (size_type src = 0; src <= source_size; ++ src)
+      for (size_type trg = 0; trg <= target_size; ++ trg) {
+	double count = (! trg ? 1.0 : hmm_source_target.posterior(trg, src)) * (! src ? 1.0 : hmm_target_source.posterior(src, trg));
 	if (src && trg)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	const word_type word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+	const word_type word_source = (! src ? vocab_type::EPSILON : source[src - 1]);
+	const word_type word_target = (! trg ? vocab_type::EPSILON : target[trg - 1]);
 	
-	if (trg != 0)
+	if (trg)
 	  ttable_counts_source_target[word_source][word_target] += count;
 	
-	if (src != 0)
+	if (src)
 	  ttable_counts_target_source[word_target][word_source] += count;
       }
     
@@ -1078,8 +1078,8 @@ struct LearnHMMSymmetricPosterior : public LearnBase
       bool updated = false;
       
       // update phi...
-      for (int src = 1; src <= source_size; ++ src)
-	for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type src = 1; src <= source_size; ++ src)
+	for (size_type trg = 1; trg <= target_size; ++ trg) {
 	  const double epsi = hmm_source_target.posterior(trg, src) - hmm_target_source.posterior(src, trg);
 	  const double update = - epsi;
 	  
@@ -1092,15 +1092,15 @@ struct LearnHMMSymmetricPosterior : public LearnBase
       if (! updated) break;
       
       // rescale emission table...
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	prob_type* eiter = &(*hmm_source_target.emission.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) *= exp_phi(trg, src) / exp_phi_old(trg, src);
       }
       
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	prob_type* eiter = &(*hmm_target_source.emission.begin(src)) + 1;
-	for (int trg = 1; trg <= target_size; ++ trg, ++ eiter)
+	for (size_type trg = 1; trg <= target_size; ++ trg, ++ eiter)
 	  (*eiter) *= exp_phi_old(trg, src) / exp_phi(trg, src);
       }
       
@@ -1153,8 +1153,8 @@ struct LearnHMMSymmetricPosterior : public LearnBase
       bool updated = false;
       
       // update phi...
-      for (int src = 1; src <= source_size; ++ src)
-	for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type src = 1; src <= source_size; ++ src)
+	for (size_type trg = 1; trg <= target_size; ++ trg) {
 	  const double epsi = hmm_source_target.posterior(trg, src) - hmm_target_source.posterior(src, trg);
 	  const double update = - epsi;
 	  
@@ -1167,15 +1167,15 @@ struct LearnHMMSymmetricPosterior : public LearnBase
       if (! updated) break;
       
       // rescale emission table...
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	prob_type* eiter = &(*hmm_source_target.emission.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) *= exp_phi(trg, src) / exp_phi_old(trg, src);
       }
       
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	prob_type* eiter = &(*hmm_target_source.emission.begin(src)) + 1;
-	for (int trg = 1; trg <= target_size; ++ trg, ++ eiter)
+	for (size_type trg = 1; trg <= target_size; ++ trg, ++ eiter)
 	  (*eiter) *= exp_phi_old(trg, src) / exp_phi(trg, src);
       }
       
@@ -1270,7 +1270,7 @@ struct ViterbiHMM : public ViterbiBase
     forward_sum(0, 0) = 1.0;
     
     double scale_accumulated = 0.0;
-    for (int trg = 1; trg < target_size + 2; ++ trg) {
+    for (size_type trg = 1; trg < target_size + 2; ++ trg) {
       const word_type target_word = (trg == target_size + 1 ? vocab_type::EOS : target[trg - 1]);
       const double emission_none = ttable(vocab_type::EPSILON, target_word);
       
@@ -1279,15 +1279,15 @@ struct ViterbiHMM : public ViterbiBase
       prob_type* niter_max = &(*forward_max.begin(trg)) + 1;
       index_type* biter_max = &(*backptr.begin(trg)) + 1;
       
-      for (int next = 1; next < source_size + 2; ++ next, ++ niter_sum, ++ niter_max, ++ biter_max) {
-	const word_type source_word = (next == source_size + 1 ? vocab_type::EOS : source[next - 1]);
+      for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter_sum, ++ niter_max, ++ biter_max) {
+	const word_type source_word = (next == static_cast<int>(source_size + 1) ? vocab_type::EOS : source[next - 1]);
 	const double emission = ttable(source_word, target_word);
 	
 	if (emission > 0.0) {
 	  const prob_type* piter_sum = &(*forward_sum.begin(trg - 1));
 	  const prob_type* piter_max = &(*forward_max.begin(trg - 1));
 	  
-	  for (int prev = 0; prev < (source_size + 2) - 1; ++ prev) {
+	  for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev) {
 	    const prob_type transition_word = prob_align * atable(source_class[prev], target_class[trg],
 								  source_size, target_size,
 								  prev - 1, next - 1);
@@ -1314,7 +1314,7 @@ struct ViterbiHMM : public ViterbiBase
       prob_type* niter_max_none = &(*forward_max.begin(trg)) + source_size + 2;
       index_type* biter_max_none = &(*backptr.begin(trg)) + source_size + 2;
       
-      for (int next = 0; next < (source_size + 2) - 1; ++ next, ++ niter_sum_none, ++ niter_max_none, ++ biter_max_none) {
+      for (int next = 0; next < static_cast<int>((source_size + 2) - 1); ++ next, ++ niter_sum_none, ++ niter_max_none, ++ biter_max_none) {
 	// alignment into none...
 	const int next_none = next + source_size + 2;
 	const int prev_none1 = next;
@@ -1345,14 +1345,14 @@ struct ViterbiHMM : public ViterbiBase
       if (scale[trg] != 1.0) {
 	std::transform(forward_sum.begin(trg), forward_sum.end(trg), forward_sum.begin(trg), std::bind2nd(std::multiplies<double>(), scale[trg]));
 	std::transform(forward_max.begin(trg), forward_max.end(trg), forward_max.begin(trg), std::bind2nd(std::multiplies<double>(), scale[trg]));
-      }
+      } 
     }
     
     // traverse-back...
     alignment.clear();
     index_type position = backptr(target_size + 2 - 1 , source_size + 2 - 1);
     for (int trg = target_size; trg >= 1; -- trg) {
-      if (position < source_size + 2)
+      if (position < static_cast<int>(source_size + 2))
 	alignment.push_back(std::make_pair(position - 1, trg - 1));
       position = backptr(trg, position);
     }
@@ -2199,8 +2199,8 @@ struct PermutationHMM : public ViterbiBase
 	for (size_type i = 1; i <= target_size; ++ i)
 	  for (size_type j = 0; j <= target_size; ++ j) 
 	    if (i != j) {
-	      const int y = (dependency_mst[i - 1] == j);
-	      const int z = (dependency_per[i - 1] == j);
+	      const int y = (dependency_mst[i - 1] == static_cast<int>(j));
+	      const int z = (dependency_per[i - 1] == static_cast<int>(j));
 	      
 	      const double update = - alpha * (y - z);
 	      
@@ -2256,7 +2256,7 @@ struct PermutationHMM : public ViterbiBase
     size_type leaf = size_type(-1);
 
     for (size_type pos = 0; pos != size; ++ pos) {
-      if (permutation[pos] >= size)
+      if (permutation[pos] >= static_cast<int>(size))
 	throw std::runtime_error("invalid permutation: out of range");
       
       if (assigned[permutation[pos]])
@@ -2264,7 +2264,7 @@ struct PermutationHMM : public ViterbiBase
       
       assigned[permutation[pos]] = true;
       
-      if (permutation[pos] == size - 1)
+      if (permutation[pos] == static_cast<int>(size - 1))
 	leaf = pos + 1;
       
       if (! permutation[pos]) continue;

@@ -88,8 +88,8 @@ namespace cicada
 
 	const double logprob_zero = boost::numeric::bounds<typename Matrix::value_type>::lowest();
       
-	for (int src = 0; src < matrix_size; ++ src)
-	  for (int trg = 0; trg < matrix_size; ++ trg)  {
+	for (size_type src = 0; src != matrix_size; ++ src)
+	  for (size_type trg = 0; trg != matrix_size; ++ trg)  {
 	    const int edge_source = (src != trg ? src + 1 : 0);
 	    const int edge_target = trg + 1;
 
@@ -134,8 +134,8 @@ namespace cicada
 
 	logprob_type sum_weights = 1e5;
       
-	for (int src = 0; src < matrix_size; ++ src)
-	  for (int trg = 0; trg < matrix_size; ++ trg) 
+	for (size_type src = 0; src != matrix_size; ++ src)
+	  for (size_type trg = 0; trg != matrix_size; ++ trg) 
 	    if (src != trg) {
 	      const int edge_source = src + 1;
 	      const int edge_target = trg + 1;
@@ -148,12 +148,12 @@ namespace cicada
 	    }
       
 	// diagonal... first compute sum...
-	for (int i = 0; i < matrix_size; ++ i)
+	for (size_type i = 0; i != matrix_size; ++ i)
 	  if (matrix(i, i) > logprob_zero)
 	    sum_weights += std::fabs(matrix(i, i));
 	
 	// then, subtract...
-	for (int i = 0; i < matrix_size; ++ i)
+	for (size_type i = 0; i != matrix_size; ++ i)
 	  if (matrix(i, i) > logprob_zero)
 	    boost::add_edge(vertices[0], vertices[i + 1], matrix(i, i) - sum_weights, graph);
       

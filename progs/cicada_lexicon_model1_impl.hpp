@@ -2152,7 +2152,7 @@ struct PermutationModel1 : public ViterbiBase
       assigned.resize(source_size, false);
       
       for (size_type src = 0; src != dependency_source.size(); ++ src) {
-	if (dependency_source[src] >= source_size)
+	if (dependency_source[src] >= static_cast<int>(source_size))
 	  throw std::runtime_error("invalid permutation: out of range");
 	
 	if (assigned[dependency_source[src]])
@@ -2206,7 +2206,7 @@ struct PermutationModel1 : public ViterbiBase
       assigned.resize(target_size, false);
       
       for (size_type trg = 0; trg != dependency_target.size(); ++ trg) {
-	if (dependency_target[trg] >= target_size)
+	if (dependency_target[trg] >= static_cast<int>(target_size))
 	  throw std::runtime_error("invalid permutation: out of range");
 	
 	if (assigned[dependency_target[trg]])

@@ -23,7 +23,6 @@ namespace detail
   {
     static const double threshold = 1e-2;
     
-    
     typedef cicada::SpanVector       span_set_type;
     typedef span_set_type::span_type span_type;
     
