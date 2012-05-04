@@ -353,7 +353,7 @@ namespace cicada
 	    heap_type::iterator hiter_end   = heap.end();
 
 	    const double cost_threshold = hiter_begin->first + beam;
-	    for (/**/; hiter_begin != hiter && hiter_begin->first < cost_threshold; -- hiter)
+	    for (/**/; hiter_begin != hiter && hiter_begin->first <= cost_threshold; -- hiter)
 	      std::pop_heap(hiter_begin, hiter, heap_compare());
 
 	    const double cost_str = 0.0;

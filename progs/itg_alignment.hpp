@@ -142,9 +142,9 @@ namespace detail
       agenda.clear();
       agenda.resize(source_size + target_size + 1);
       
-      inside.clear();
-      inside.reserve(source_size + 1, target_size + 1);
-      inside.resize(source_size + 1, target_size + 1, infinity);
+      chart.clear();
+      chart.reserve(source_size + 1, target_size + 1);
+      chart.resize(source_size + 1, target_size + 1, infinity);
       
       backptr.clear();
       backptr.reserve(source_size + 1, target_size + 1);
@@ -171,12 +171,11 @@ namespace detail
       for (int src = 0; src <= source_size; ++ src)
 	for (int trg = 0; trg <= target_size; ++ trg) {
 	  
-	  
 	  if (src < source_size && trg < target_size) {
 	    // one-to-one alignment
 	    const logprob_type score = costs(src + 1, trg + 1);
 	    
-	    inside(src, src + 1, trg, trg + 1) = score;
+	    chart(src, src + 1, trg, trg + 1) = score;
 	    chart_source(src, src + 1) = std::max(chart_source(src, src + 1), score);
 	    chart_target(trg, trg + 1) = std::max(chart_target(trg, trg + 1), score);
 	    
@@ -186,9 +185,9 @@ namespace detail
 	    for (int src_last = src + 2; src_last <= source_size; ++ src_last) {
 	      const int trg_last = trg + 1;
 	      
-	      const logprob_type score = inside(src, src_last - 1, trg, trg_last) + costs(src_last, trg_last);
+	      const logprob_type score = chart(src, src_last - 1, trg, trg_last) + costs(src_last, trg_last);
 	      
-	      inside(src, src_last, trg, trg_last) = score;
+	      chart(src, src_last, trg, trg_last) = score;
 	      
 	      chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
 	      chart_target(trg, trg_last) = std::max(chart_target(trg, trg_last), score);
@@ -199,9 +198,9 @@ namespace detail
 	    for (int trg_last = trg + 2; trg_last <= target_size; ++ trg_last) {
 	      const int src_last = src + 1;
 	      
-	      const logprob_type score = inside(src, src_last, trg, trg_last - 1) + costs(src_last, trg_last);
+	      const logprob_type score = chart(src, src_last, trg, trg_last - 1) + costs(src_last, trg_last);
 	      
-	      inside(src, src_last, trg, trg_last) = score;
+	      chart(src, src_last, trg, trg_last) = score;
 	      
 	      chart_source(src, src_last) = std::max(chart_source(src, src_last), score);
 	      chaet_target(trg, trg_last) = std::max(chaet_target(trg, trg_last), score);
@@ -218,7 +217,7 @@ namespace detail
 	    for (int src_last = src_first + 1; src_last <= source_size; ++ src_last) {
 	      score += costs(src_last, 0);
 	      
-	      inside(src_first, src_last, trg, trg) = score;
+	      chart(src_first, src_last, trg, trg) = score;
 	      
 	      chart_source(src_first, src_last) = std::max(chart_source(src_first, src_last), score);
 	      
@@ -233,7 +232,7 @@ namespace detail
 	    for (int trg_last = trg_first + 1; trg_last <= target_size; ++ trg_last) {
 	      score += costs(0, trg_last);
 	      
-	      inside(src, src, trg_first, trg_last) = score;
+	      chart(src, src, trg_first, trg_last) = score;
 	      
 	      chart_target(trg_first, trg_last) = std::max(chart_target(trg_first, trg_last), score);
 	      
@@ -498,10 +497,10 @@ namespace detail
 
     void shrink()
     {
-      inside.clear();
+      chart.clear();
       backptr.clear();
       
-      chart_type(inside).swap(inside);
+      chart_type(chart).swap(chart);
       backptr_chart_type(backptr).swap(backptr);
     }
     
@@ -515,7 +514,7 @@ namespace detail
     beta_type  beta_source;
     beta_type  beta_target;
 
-    chart_type         inside;
+    chart_type         chart;
     backptr_chart_type backptr;
   };
   
