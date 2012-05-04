@@ -570,7 +570,7 @@ namespace cicada
 	  
 	  return (count0 == 0.0 ? 0.0 : std::exp(bleus));
 	} else {
-	  if (hypothesis_size == 0 || counts.empty() || counts[0]) return 0.0;
+	  if (hypothesis_size == 0 || counts.empty() || counts[0] == 0.0) return 0.0;
 	  
 	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
