@@ -554,6 +554,7 @@ namespace cicada
 	  
 	  const size_t ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
 	  
+	  double count0 = 0.0;
 	  const double factor = 1.0 / order;
 	  for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
@@ -561,12 +562,15 @@ namespace cicada
 	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
 				  + (n <= __bleus->ngrams_reference.size() ? double(__bleus->ngrams_reference[n - 1]) : 0.0));
 	    
-	    bleus += (std::log(count + 1.0) - std::log(norm + 1.0)) * factor;
+	    bleus += (std::log(count + (n != 1)) - std::log(norm + (n != 1))) * factor;
+	    
+	    if (n == 1)
+	      count0 == count;
 	  }
 	  
-	  return std::exp(bleus);
+	  return (count0 == 0.0 ? 0.0 : std::exp(bleus));
 	} else {
-	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
+	  if (hypothesis_size == 0 || counts.empty() || counts[0]) return 0.0;
 	  
 	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
@@ -575,10 +579,12 @@ namespace cicada
 	  
 	  const double factor = 1.0 / order;
 	  for (int n = 1; n <= order; ++ n) {
+	    const double smooth = double(n != 1);
+	    
 	    if (n <= static_cast<int>(counts.size()))
-	      bleus += (std::log(counts[n - 1] + 1.0) - std::log(hypothesis_size + 1 - n + 1.0)) * factor;
+	      bleus += (std::log(counts[n - 1] + smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
 	    else
-	      bleus += (std::log(1.0) - std::log(hypothesis_size + 1 - n + 1.0)) * factor;
+	      bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth) * factor;
 	  }
 	  
 	  return std::exp(bleus);

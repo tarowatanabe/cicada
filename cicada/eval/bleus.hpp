@@ -41,12 +41,14 @@ namespace cicada
       
       double score() const
       {
+	if (ngrams_hypothesis.empty() || ngrams_hypothesis[0] == 0.0) return 0.0;
+	
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
 	double score = 0.0;
 	
 	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n)
-	  score += std::log(ngrams_hypothesis[n] + 1.0) - std::log(ngrams_reference[n] + 1.0);
+	  score += std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
 	
 	score /= ngrams_hypothesis.size();
 	score += penalty;

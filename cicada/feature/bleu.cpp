@@ -557,6 +557,7 @@ namespace cicada
 	  const size_t ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
 	  const size_t bleu_order = utils::bithack::max(counts.size(), __bleu->ngrams_hypothesis.size());
 	  
+	  double count0 = 0.0;
 	  const double factor = 1.0 / order;
 	  for (size_t n = 1; n <= bleu_order; ++ n) {
 	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
@@ -567,11 +568,14 @@ namespace cicada
 	    
 	    bleu += (p > 0.0 ? std::log(p) : 0.0) * factor;
 	    smooth *= 0.5;
+
+	    if (n == 1)
+	      count0 = count;
 	  }
 	  
-	  return std::exp(bleu);
+	  return (count0 == 0.0 ? 0.0 : std::exp(bleu));
 	} else {
-	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
+	  if (hypothesis_size == 0 || counts.empty() || counts[0] == 0) return 0.0;
 	  
 	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);

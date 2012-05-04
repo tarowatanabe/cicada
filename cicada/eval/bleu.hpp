@@ -40,6 +40,8 @@ namespace cicada
       
       double score() const
       {
+	if (ngrams_hypothesis.empty() || ngrams_hypothesis[0] == 0.0) return 0.0;
+	
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
 	double smooth = 0.5;
