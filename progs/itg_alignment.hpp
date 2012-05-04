@@ -317,7 +317,7 @@ namespace detail
 		// span1: SsUu
 		// span2: stuv
 		
-		if (chart(S, s, U, u) == infinity) continue;
+		if (chart(S, s, U, u) == infinity || prune(S, t, U, v)) continue;
 		
 		const span_pair_type  span1(S, s, U, u);
 		const span_pair_type& span2(span_pair);
@@ -346,7 +346,7 @@ namespace detail
 		// span1: SsvU
 		// span2: stuv
 		
-		if (chart(S, s, v, U) == infinity) continue;
+		if (chart(S, s, v, U) == infinity || prune(S, t, u, U)) continue;
 		
 		const span_pair_type  span1(S, s, v, U);
 		const span_pair_type& span2(span_pair);
@@ -379,7 +379,7 @@ namespace detail
 		// span1: stuv
 		// span2: tSUu
 		
-		if (chart(t, S, U, u) == infinity) continue;
+		if (chart(t, S, U, u) == infinity || prune(s, S, U, v)) continue;
 	      
 		const span_pair_type& span1(span_pair);
 		const span_pair_type  span2(t, S, U, u);
@@ -407,8 +407,8 @@ namespace detail
 		// parent span: sSuU
 		// span1: stuv
 		// span2: tSvU
-
-		if (chart(t, S, v, U) == infinity) continue;
+		
+		if (chart(t, S, v, U) == infinity || prune(s, S, u, U)) continue;
 		  
 		const span_pair_type& span1(span_pair);
 		const span_pair_type  span2(t, S, v, U);
