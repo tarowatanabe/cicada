@@ -565,7 +565,7 @@ namespace cicada
 	    bleus += (std::log(count + (n != 1)) - std::log(norm + (n != 1))) * factor;
 	    
 	    if (n == 1)
-	      count0 == count;
+	      count0 = count;
 	  }
 	  
 	  return (count0 == 0.0 ? 0.0 : std::exp(bleus));
@@ -584,7 +584,7 @@ namespace cicada
 	    if (n <= static_cast<int>(counts.size()))
 	      bleus += (std::log(counts[n - 1] + smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
 	    else
-	      bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth) * factor;
+	      bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
 	  }
 	  
 	  return std::exp(bleus);
