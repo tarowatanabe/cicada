@@ -12,11 +12,13 @@
 
 #include <cicada/alignment.hpp>
 #include <cicada/dependency.hpp>
+#include <cicada/sentence.hpp>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/bithack.hpp"
 #include "utils/mathop.hpp"
+#include "utils/vector2.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -26,6 +28,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency permutation_type;
+typedef cicada::Sentence   sentence_type;
 
 path_set_type source_files;
 path_set_type target_files;
@@ -38,6 +41,11 @@ bool inverse_mode = false;
 bool visualize_mode = false;
 
 void options(int argc, char** argv);
+
+std::ostream& visualize(std::ostream& os,
+			const sentence_type& source,
+			const sentence_type& target,
+			const alignment_type& alignment);
 
 int main(int argc, char** argv)
 {
@@ -55,16 +63,19 @@ int main(int argc, char** argv)
       if (permutation_target_files.size() != alignment_files.size())
 	throw std::runtime_error("# of permutation files does not match");
 
+    if (! source_files.empty())
+      if (source_files.size() != alignment_files.size())
+	throw std::runtime_error("# of source files does not match");
+
+    if (! target_files.empty())
+      if (target_files.size() != alignment_files.size())
+	throw std::runtime_error("# of target files does not match");
+    
     if (visualize_mode) {
       if (source_files.empty())
 	throw std::runtime_error("no source data?");
       if (target_files.empty())
 	throw std::runtime_error("no target data?");
-      
-      if (source_files.size() != alignment_files.size())
-	throw std::runtime_error("# of source files does not match");
-      if (target_files.size() != alignment_files.size())
-	throw std::runtime_error("# of target files does not match");
     }
     
     const bool flush_output = (output_file == "-"
@@ -74,14 +85,22 @@ int main(int argc, char** argv)
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
     if (! permutation_source_files.empty() || ! permutation_target_files.empty()) {
+      sentence_type    sentence_source;
+      sentence_type    sentence_target;
       permutation_type permutation_source;
       permutation_type permutation_target;
       alignment_type   alignment;
+
+      const bool has_source = ! source_files.empty();
+      const bool has_target = ! target_files.empty();
       
       const bool has_permutation_source = ! permutation_source_files.empty();
       const bool has_permutation_target = ! permutation_target_files.empty();
       
       for (size_t i = 0; i != alignment_files.size(); ++ i) {
+	std::auto_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
+	std::auto_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
+	
 	std::auto_ptr<std::istream> ps_source(has_permutation_source ? new utils::compress_istream(permutation_source_files[i], 1024 * 1024) : 0);
 	std::auto_ptr<std::istream> ps_target(has_permutation_target ? new utils::compress_istream(permutation_target_files[i], 1024 * 1024) : 0);
 	
@@ -89,13 +108,22 @@ int main(int argc, char** argv)
 	
 	for (;;) {
 	  is >> alignment;
+
+	  if (has_source)
+	    *is_source >> sentence_source;
+	  if (has_target)
+	    *is_target >> sentence_target;
 	  
 	  if (has_permutation_source)
 	    *ps_source >> permutation_source;
 	  if (has_permutation_target)
 	    *ps_target >> permutation_target;
 	  
-	  if (! is || (ps_source.get() && ! *ps_source) || (ps_target.get() && ! *ps_target)) break;
+	  if (! is
+	      || (ps_source.get() && ! *ps_source)
+	      || (ps_target.get() && ! *ps_target)
+	      || (is_source.get() && ! *is_source)
+	      || (is_target.get() && ! *is_target)) break;
 	  
 	  alignment_type::iterator aiter_end = alignment.end();
 	  for (alignment_type::iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
@@ -119,27 +147,60 @@ int main(int argc, char** argv)
 	  
 	  std::sort(alignment.begin(), alignment.end());
 	  
-	  os << alignment << '\n';
+	  if (visualize_mode)
+	    visualize(os, sentence_source, sentence_target, alignment);
+	  else
+	    os << alignment << '\n';
 	}
 	
-	if (is || (ps_source.get() && *ps_source) || (ps_target.get() && *ps_target))
+	if (is
+	    || (ps_source.get() && *ps_source)
+	    || (ps_target.get() && *ps_target)
+	    || (is_source.get() && *is_source)
+	    || (is_target.get() && *is_target))
 	  throw std::runtime_error("# of samples do not match");
       }
     } else {
-      for (path_set_type::const_iterator fiter = alignment_files.begin(); fiter != alignment_files.end(); ++ fiter) {
-	utils::compress_istream is(*fiter, 1024 * 1024);
+      sentence_type  sentence_source;
+      sentence_type  sentence_target;
+      alignment_type alignment;
+
+      const bool has_source = ! source_files.empty();
+      const bool has_target = ! target_files.empty();
+      
+      for (size_t i = 0; i != alignment_files.size(); ++ i) {
+	std::auto_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
+	std::auto_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
 	
-	alignment_type alignment;
+	utils::compress_istream is(alignment_files[i], 1024 * 1024);
 	
-	while (is >> alignment) {
+	for (;;) {
+	  is >> alignment;
+	  
+	  if (has_source)
+	    *is_source >> sentence_source;
+	  if (has_target)
+	    *is_target >> sentence_target;
+	  
+	  if (! is
+	      || (is_source.get() && ! *is_source)
+	      || (is_target.get() && ! *is_target)) break;
 	  
 	  if (inverse_mode) {
 	    alignment.inverse();
 	    std::sort(alignment.begin(), alignment.end());
 	  }
 	  
-	  os << alignment << '\n';
+	  if (visualize_mode)
+	    visualize(os, sentence_source, sentence_target, alignment);
+	  else
+	    os << alignment << '\n';
 	}
+	
+	if (is
+	    || (is_source.get() && *is_source)
+	    || (is_target.get() && *is_target))
+	  throw std::runtime_error("# of samples do not match");
       }
     }
   }
@@ -150,6 +211,50 @@ int main(int argc, char** argv)
   return 0;
 }
 
+std::ostream& visualize(std::ostream& os,
+			const sentence_type& source,
+			const sentence_type& target,
+			const alignment_type& alignment)
+{
+  typedef utils::vector2<bool, std::allocator<bool> > matrix_type;
+
+  matrix_type matrix(source.size(), target.size(), false);
+  
+  alignment_type::const_iterator aiter_end = alignment.end();
+  for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+    if (aiter->source >= static_cast<int>(source.size()))
+      throw std::runtime_error("invalid alignment");
+    if (aiter->target >= static_cast<int>(target.size()))
+      throw std::runtime_error("invalid alignment");
+    
+    matrix(aiter->source, aiter->target) = true;
+  }
+  
+  for (size_t trg = 0; trg != target.size(); ++ trg) {
+    for (size_t i = 0; i != trg; ++ i)
+      os << ((i + 1) % 5 ? ' ' : '|') << ' ';
+    os << target[trg] << '\n';
+  }
+  for (size_t trg = 0; trg != target.size(); ++ trg)
+    os << '_' << '_';
+  os << '\n';
+  
+  for (size_t src = 0; src != source.size(); ++ src) {
+    for (size_t trg = 0; trg != target.size(); ++ trg) {
+      // blue background: \u001b[44m\u0020\u001b[0m
+      if (matrix(src, trg))
+	os << char(0x1b) << "[44m" << ' ' << char(0x1b) << "[0m";
+      else
+	os << ((trg + 1) % 5 ? ((src + 1) % 5 ? '.' : '-') : ':');
+      os << ' ';
+    }
+    
+    os << '|' << source[src] << '\n';
+  }
+  os << '\n';
+  
+  return os;
+}
 
 void options(int argc, char** argv)
 {
