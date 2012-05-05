@@ -2206,7 +2206,7 @@ int main(int argc, char ** argv)
     if (debug >= 2)
       std::cerr << "rule: discount=" << model.rule.table.discount()
 		<< " strength=" << model.rule.table.strength() << std::endl
-		<< "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
+		<< "fallback=" << model.phrase.prob(1.0) << " terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
 		<< "phrase: discount=" << model.phrase.table.discount()
 		<< " strength=" << model.phrase.table.strength() << std::endl
 		<< "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount
@@ -2351,7 +2351,7 @@ int main(int argc, char ** argv)
 	if (debug >= 2)
 	  std::cerr << "rule: discount=" << model.rule.table.discount()
 		    << " strength=" << model.rule.table.strength() << std::endl
-		    << "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
+		    << "fallback=" << model.phrase.prob(1.0) << " terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
 		    << "phrase: discount=" << model.phrase.table.discount()
 		    << " strength=" << model.phrase.table.strength() << std::endl
 		    << "lexicon p(target|source): discount=" << model.phrase.lexicon.parameter_source_target.discount
