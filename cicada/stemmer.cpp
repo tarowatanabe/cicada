@@ -11,6 +11,8 @@
 #include "stemmer/lower.hpp"
 #include "stemmer/halfwidth.hpp"
 #include "stemmer/fullwidth.hpp"
+#include "stemmer/simplified.hpp"
+#include "stemmer/traditional.hpp"
 #include "stemmer/nfkc.hpp"
 #include "stemmer/snowball.hpp"
 
@@ -42,6 +44,8 @@ latin: romanization\n\
 lower: lower casing\n\
 halfwidth: Fullwidth-Halfwidth\n\
 fullwidth: Halfwidth-Fullwidth\n\
+traditional: Simplified-Traditional\n\
+simplified: Traditioanl-Simplified\n\
 nfkc: NFKC\n\
 ";
     return desc;
@@ -156,6 +160,26 @@ nfkc: NFKC\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "simplified") {
+      const std::string name("simplified");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Simplified()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "traditional") {
+      const std::string name("traditional");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Traditional()))).first;
 	iter->second->__algorithm = parameter;
       }
       
