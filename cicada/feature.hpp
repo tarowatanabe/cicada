@@ -17,7 +17,7 @@
 
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/spinlock.hpp>
+#include <utils/rwticket.hpp>
 #include <utils/piece.hpp>
 #include <utils/chunk_vector.hpp>
 
@@ -43,8 +43,7 @@ namespace cicada
     typedef feature_type::const_reference        const_reference;
     
   private:
-    typedef utils::spinlock              mutex_type;
-    typedef utils::spinlock::scoped_lock lock_type;
+    typedef utils::rwticket ticket_type;
     
   public:
     Feature() : __id(__allocate_empty()) { }
@@ -75,7 +74,8 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex_data);
+	ticket_type::scoped_reader_lock lock(__mutex_data);
+	
 	maps[__id] = &(__features()[__id]);
       }
       
@@ -126,7 +126,7 @@ namespace cicada
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      ticket_type::scoped_reader_lock lock(__mutex_index);
       
       const feature_index_type& index = __index();
       
@@ -135,13 +135,14 @@ namespace cicada
     
     static size_t allocated()
     {
-      lock_type lock(__mutex_data);
+      ticket_type::scoped_reader_lock lock(__mutex_data);
+      
       return __features().size();
     }
     
   private:
-    static mutex_type    __mutex_index;
-    static mutex_type    __mutex_data;
+    static ticket_type    __mutex_index;
+    static ticket_type    __mutex_data;
     
     static feature_map_type& __feature_maps();
     
@@ -165,15 +166,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      ticket_type::scoped_writer_lock lock(__mutex_index);
       
       feature_index_type& index = __index();
       
       std::pair<feature_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
-	lock_type lock(__mutex_data);
-
+	ticket_type::scoped_writer_lock lock(__mutex_data);
+	
 	feature_set_type& features = __features();
 	features.push_back(x);
 	const_cast<piece_type&>(*result.first) = features.back();

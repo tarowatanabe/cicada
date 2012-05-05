@@ -17,7 +17,7 @@
 
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/spinlock.hpp>
+#include <utils/rwticket.hpp>
 #include <utils/piece.hpp>
 #include <utils/chunk_vector.hpp>
 
@@ -43,8 +43,7 @@ namespace cicada
     typedef attribute_type::const_reference        const_reference;
 
   private:
-    typedef utils::spinlock              mutex_type;
-    typedef utils::spinlock::scoped_lock lock_type;
+    typedef utils::rwticket ticket_type;
     
   public:
     Attribute() : __id(__allocate_empty()) { }
@@ -75,7 +74,8 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex_data);
+	ticket_type::scoped_reader_lock lock(__mutex_data);
+	
 	maps[__id] = &(__attributes()[__id]);
       }
       
@@ -126,7 +126,7 @@ namespace cicada
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      ticket_type::scoped_reader_lock lock(__mutex_index);
       
       const attribute_index_type& index = __index();
       
@@ -135,13 +135,14 @@ namespace cicada
     
     static size_t allocated()
     {
-      lock_type lock(__mutex_data);
+      ticket_type::scoped_reader_lock lock(__mutex_data);
+      
       return __attributes().size();
     }
     
   private:
-    static mutex_type    __mutex_index;
-    static mutex_type    __mutex_data;
+    static ticket_type    __mutex_index;
+    static ticket_type    __mutex_data;
     
     static attribute_map_type& __attribute_maps();
     
@@ -165,14 +166,14 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      ticket_type::scoped_writer_lock lock(__mutex_index);
       
       attribute_index_type& index = __index();
       
       std::pair<attribute_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
-	lock_type lock(__mutex_data);
+	ticket_type::scoped_writer_lock lock(__mutex_data);
 
 	attribute_set_type& attributes = __attributes();
 	attributes.push_back(x);

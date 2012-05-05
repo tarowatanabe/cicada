@@ -44,8 +44,8 @@ namespace cicada
     typedef std::vector<id_set_type, std::allocator<id_set_type> >  coarser_symbol_map_type;
   };
   
-  Symbol::mutex_type    Symbol::__mutex_index;
-  Symbol::mutex_type    Symbol::__mutex_data;
+  Symbol::ticket_type    Symbol::__mutex_index;
+  Symbol::ticket_type    Symbol::__mutex_data;
 
   static SymbolImpl::mutex_type            __non_terminal_mutex;
   static SymbolImpl::non_terminal_set_type __non_terminal_map;
@@ -222,7 +222,7 @@ namespace cicada
       maps.resize(__id + 1, id_type(-1));
     
     if (maps[__id] == id_type(-1)) {
-      lock_type lock(__non_terminal_mutex);
+      mutex_type::scoled_lock lock(__non_terminal_mutex);
       
       SymbolImpl::non_terminal_set_type::iterator iter = __non_terminal_map.insert(__id).first;
       
@@ -578,7 +578,7 @@ namespace cicada
   
   void Symbol::write(const path_type& path)
   {
-    lock_type lock(__mutex_data);
+    ticket_type::scoped_reader_lock lock(__mutex_data);
     
     Vocab vocab(path, std::max(size_type(__symbols().size() / 2), size_type(1024)));
     symbol_set_type::const_iterator siter_end = __symbols().end();
