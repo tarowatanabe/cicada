@@ -23,6 +23,11 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
+#include <unicode/schriter.h>
+#include <unicode/bytestream.h>
+
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -211,15 +216,76 @@ int main(int argc, char** argv)
   return 0;
 }
 
+struct CharacterString
+{
+  typedef std::vector<UChar32, std::allocator<UChar32> > string_type;
+  typedef std::vector<bool, std::allocator<bool> > wide_type;
+
+  CharacterString() : string(), wide() {};
+  CharacterString(const std::string& __string)
+  {
+    icu::UnicodeString ustring = icu::UnicodeString::fromUTF8(__string);
+    
+    icu::StringCharacterIterator iter(ustring);
+    for (iter.setToStart(); iter.hasNext(); /**/) {
+      const UChar32 c = iter.next32PostInc();
+      const UEastAsianWidth width = static_cast<UEastAsianWidth>(u_getIntPropertyValue(c, UCHAR_EAST_ASIAN_WIDTH));
+      
+      string.push_back(c);
+      wide.push_back(width == U_EA_FULLWIDTH || width == U_EA_WIDE);
+    }
+  }
+
+  bool empty() const { return string.empty(); }
+  size_t size() const { return string.size(); }
+
+  void padding(size_t pad)
+  {
+    if (pad <= size()) return;
+
+    string_type string_new(pad - size(), ' ');
+    wide_type   wide_new(pad - size(), false);
+
+    string_new.insert(string_new.end(), string.begin(), string.end());
+    wide_new.insert(wide_new.end(), wide.begin(), wide.end());
+    
+    string.swap(string_new);
+    wide.swap(wide_new);
+  }
+  
+  string_type string;
+  wide_type   wide;
+};
+
+struct ostream_sink : public ByteSink
+{
+  
+  ostream_sink(std::ostream& _os) : os(_os) {}
+  
+  virtual void Append(const char* data, int32_t n) 
+  {
+    os.write((char*) data, n);
+  }
+  
+  void write(char c)
+  {
+    os.write((char*) & c, sizeof(c));
+  }
+  
+  std::ostream& os;
+};
+
 std::ostream& visualize(std::ostream& os,
 			const sentence_type& source,
 			const sentence_type& target,
 			const alignment_type& alignment)
 {
   typedef utils::vector2<bool, std::allocator<bool> > matrix_type;
-
-  matrix_type matrix(source.size(), target.size(), false);
+  typedef CharacterString wide_string_type;
+  typedef std::vector<wide_string_type, std::allocator<wide_string_type> > wide_string_set_type;
   
+  matrix_type matrix(source.size(), target.size(), false);
+
   alignment_type::const_iterator aiter_end = alignment.end();
   for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
     if (aiter->source >= static_cast<int>(source.size()))
@@ -230,11 +296,40 @@ std::ostream& visualize(std::ostream& os,
     matrix(aiter->source, aiter->target) = true;
   }
   
+  wide_string_set_type wides(target.size());
+  
+  size_t size_max = 0;
+  for (size_t trg = 0; trg != target.size(); ++ trg) {
+    wides[trg] = wide_string_type(target[trg]);
+    
+    size_max = utils::bithack::max(size_max, wides[trg].size());
+  }
+  
+  for (size_t trg = 0; trg != target.size(); ++ trg)
+    wides[trg].padding(size_max);
+  
+  // start!
+  os << '\n';
+
+  ostream_sink sink(os);
+
+  for (size_t i = 0; i != size_max; ++ i) {
+    for (size_t trg = 0; trg != target.size(); ++ trg) {
+      icu::UnicodeString(wides[trg].string[i]).toUTF8(sink);
+      
+      if (! wides[trg].wide[i])
+	os << ' ';
+    }
+    os << '\n';
+  }
+
+#if 0  
   for (size_t trg = 0; trg != target.size(); ++ trg) {
     for (size_t i = 0; i != trg; ++ i)
       os << ((i + 1) % 5 ? ' ' : '|') << ' ';
     os << target[trg] << '\n';
   }
+#endif
   for (size_t trg = 0; trg != target.size(); ++ trg)
     os << '_' << '_';
   os << '\n';
@@ -251,7 +346,6 @@ std::ostream& visualize(std::ostream& os,
     
     os << '|' << source[src] << '\n';
   }
-  os << '\n';
   
   return os;
 }
