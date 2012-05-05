@@ -311,8 +311,8 @@ std::ostream& visualize(std::ostream& os,
   // start!
   os << '\n';
 
+  // target-side
   ostream_sink sink(os);
-
   for (size_t i = 0; i != size_max; ++ i) {
     for (size_t trg = 0; trg != target.size(); ++ trg) {
       icu::UnicodeString(wides[trg].string[i]).toUTF8(sink);
@@ -322,18 +322,13 @@ std::ostream& visualize(std::ostream& os,
     }
     os << '\n';
   }
-
-#if 0  
-  for (size_t trg = 0; trg != target.size(); ++ trg) {
-    for (size_t i = 0; i != trg; ++ i)
-      os << ((i + 1) % 5 ? ' ' : '|') << ' ';
-    os << target[trg] << '\n';
-  }
-#endif
+  
+  // separator...
   for (size_t trg = 0; trg != target.size(); ++ trg)
     os << '_' << '_';
   os << '\n';
   
+  // matrix + source-side
   for (size_t src = 0; src != source.size(); ++ src) {
     for (size_t trg = 0; trg != target.size(); ++ trg) {
       // blue background: \u001b[44m\u0020\u001b[0m
