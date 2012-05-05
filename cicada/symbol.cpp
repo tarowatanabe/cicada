@@ -222,7 +222,7 @@ namespace cicada
       maps.resize(__id + 1, id_type(-1));
     
     if (maps[__id] == id_type(-1)) {
-      mutex_type::scoled_lock lock(__non_terminal_mutex);
+      mutex_type::scoped_lock lock(__non_terminal_mutex);
       
       SymbolImpl::non_terminal_set_type::iterator iter = __non_terminal_map.insert(__id).first;
       
