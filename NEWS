@@ -3,7 +3,7 @@ INCOMPATIBLE CHANGE by better ITG parsing: use of pialign-style parsing with sim
 Better indexing: prune away unused space for indexed (tree-)grammar(s)
 New: added PYP-pos, an unsupervised pos induction (currently, we support training, and no pos assinger exists)
 New: added PYP-pialign, an unsupervised phrasal ITG aligner! (currently, we support training, and no phrasal aligner exists)
-New: added BleuS, Inv-WER and CDER
+New: added BleuS, Inv-WER and CDER for MT evaluation
 
 2012-4-9
 INCOMPATIBLE CHANGE: renamed cicada_learn_block_mpi to cicada_learn_online_kbest_mpi and use the block-wise algorithms for cicada_learn_online_mpi
