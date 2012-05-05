@@ -74,7 +74,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	ticket_type::scoped_reader_lock lock(__mutex_data);
+	ticket_type::scoped_reader_lock lock(__mutex);
 	
 	maps[__id] = &(__attributes()[__id]);
       }
@@ -126,7 +126,7 @@ namespace cicada
   public:
     static bool exists(const piece_type& x)
     {
-      ticket_type::scoped_reader_lock lock(__mutex_index);
+      ticket_type::scoped_reader_lock lock(__mutex);
       
       const attribute_index_type& index = __index();
       
@@ -135,14 +135,13 @@ namespace cicada
     
     static size_t allocated()
     {
-      ticket_type::scoped_reader_lock lock(__mutex_data);
+      ticket_type::scoped_reader_lock lock(__mutex);
       
       return __attributes().size();
     }
     
   private:
-    static ticket_type    __mutex_index;
-    static ticket_type    __mutex_data;
+    static ticket_type    __mutex;
     
     static attribute_map_type& __attribute_maps();
     
@@ -166,15 +165,13 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      ticket_type::scoped_writer_lock lock(__mutex_index);
+      ticket_type::scoped_writer_lock lock(__mutex);
       
       attribute_index_type& index = __index();
       
       std::pair<attribute_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
-	ticket_type::scoped_writer_lock lock(__mutex_data);
-
 	attribute_set_type& attributes = __attributes();
 	attributes.push_back(x);
 	const_cast<piece_type&>(*result.first) = attributes.back();	
