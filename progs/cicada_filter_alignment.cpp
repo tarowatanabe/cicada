@@ -335,7 +335,7 @@ std::ostream& visualize(std::ostream& os,
     for (size_t trg = 0; trg != target.size(); ++ trg) {
       // blue background: \u001b[44m\u0020\u001b[0m
       if (matrix(src, trg))
-	os << char(0x1b) << "[44m" << ' ' << char(0x1b) << "[0m";
+	os << char(0x1b) << "[44m" << '*' << char(0x1b) << "[0m";
       else {
 	const bool bar_vertical = ! ((trg + 1) % 5);
 	
@@ -344,7 +344,7 @@ std::ostream& visualize(std::ostream& os,
       os << ' ';
     }
     
-    os << '|' << source[src] << '\n';
+    os << '|' << ' ' << source[src] << '\n';
   }
   
   return os;
