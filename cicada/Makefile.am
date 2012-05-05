@@ -197,6 +197,8 @@ stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
+stemmer/fullwidth.hpp \
+stemmer/halfwidth.hpp \
 stemmer/digit.hpp \
 stemmer/nfkc.hpp \
 stemmer/snowball.hpp
@@ -207,6 +209,8 @@ stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
+stemmer/fullwidth.cpp \
+stemmer/halfwidth.cpp \
 stemmer/digit.cpp \
 stemmer/nfkc.cpp \
 stemmer/snowball.cpp

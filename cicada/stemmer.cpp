@@ -9,6 +9,8 @@
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
+#include "stemmer/halfwidth.hpp"
+#include "stemmer/fullwidth.hpp"
 #include "stemmer/nfkc.hpp"
 #include "stemmer/snowball.hpp"
 
@@ -38,6 +40,8 @@ suffix: taking suffix of letters\n\
 digit: digits normalized to @\n\
 latin: romanization\n\
 lower: lower casing\n\
+halfwidth: Fullwidth-Halfwidth\n\
+fullwidth: Halfwidth-Fullwidth\n\
 nfkc: NFKC\n\
 ";
     return desc;
@@ -152,6 +156,26 @@ nfkc: NFKC\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "halfwidth" || utils::ipiece(param.name()) == "half") {
+      const std::string name("halfwidth");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Halfwidth()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "fullwidth" || utils::ipiece(param.name()) == "full") {
+      const std::string name("fullwidth");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Fullwidth()))).first;
 	iter->second->__algorithm = parameter;
       }
       
