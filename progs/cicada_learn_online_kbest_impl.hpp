@@ -265,7 +265,7 @@ struct LearnXBLEU : public LearnBase
 	throw std::runtime_error("no bleu statistics?");
       
       // collect scaled bleu stats
-      for (int n = 1; n <= order; ++ n) {
+      for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 	if (n - 1 < bleu->ngrams_reference.size())
 	  hypo[n] += prob * bleu->ngrams_reference[n - 1];
 	if (n - 1 < bleu->ngrams_hypothesis.size())
@@ -292,7 +292,7 @@ struct LearnXBLEU : public LearnBase
 	const weight_type value(fiter->second * scale);
 	
 	// bleu statistics
-	for (int n = 1; n <= order; ++ n) {
+	for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 	  weight_type& grad_hypo    = gradients_hypo[n][fiter->first];
 	  weight_type& grad_matched = gradients_matched[n][fiter->first];
 	  

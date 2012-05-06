@@ -428,7 +428,7 @@ struct TaskLearn
 	    
 	    const word_type& source_word = biter->source[aiter->source];
 	    const word_type& source_prefix = (aiter->source == 0 ? vocab_type::BOS : biter->source[aiter->source - 1]);
-	    const word_type& source_suffix = (aiter->source + 1 == biter->source.size() ? vocab_type::EOS : biter->source[aiter->source + 1]);
+	    const word_type& source_suffix = (aiter->source + 1 == static_cast<int>(biter->source.size()) ? vocab_type::EOS : biter->source[aiter->source + 1]);
 	    const word_type& target_word = biter->target[aiter->target];
 	    
 	    ++ ttable[target_word][source_word];

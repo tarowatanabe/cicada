@@ -129,7 +129,7 @@ void learn(const path_type& path,
   queue_type queue(threads);
   thread_ptr_set_type mapper(threads);
   
-  for (int i = 0; i < mapper.size(); ++ i) {
+  for (size_t i = 0; i != mapper.size(); ++ i) {
     const path_type path_lexicon = rep.path(std::string("lexicon.") + utils::lexical_cast<std::string>(i) + ".gz");
     
     if (learn_maxent)
@@ -177,10 +177,10 @@ void learn(const path_type& path,
     std::cerr << '\n';
 
   
-  for (int i = 0; i < mapper.size(); ++ i)
+  for (size_t i = 0; i != mapper.size(); ++ i)
     queue.push(word_type());
   
-  for (int i = 0; i < mapper.size(); ++ i)
+  for (size_t i = 0; i != mapper.size(); ++ i)
     mapper[i]->join();
 }
 

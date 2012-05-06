@@ -3613,7 +3613,7 @@ struct OptimizeXBLEU
 	      throw std::runtime_error("no bleu statistics?");
 	    
 	    // collect scaled bleu stats
-	    for (int n = 1; n <= order; ++ n) {
+	    for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 	      if (n - 1 < bleu->ngrams_reference.size())
 		hypo[n] += prob * bleu->ngrams_reference[n - 1];
 	      if (n - 1 < bleu->ngrams_hypothesis.size())
@@ -3672,7 +3672,7 @@ struct OptimizeXBLEU
 	      const weight_type value(fiter->second * scale);
 	      
 	      // bleu statistics
-	      for (int n = 1; n <= order; ++ n) {
+	      for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 		if (n - 1 < bleu->ngrams_reference.size())
 		  gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
 		
@@ -3689,7 +3689,7 @@ struct OptimizeXBLEU
 	    
 	    const weight_type value_scale(margin);
 	    
-	    for (int n = 1; n <= order; ++ n) {
+	    for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
 	      if (n - 1 < bleu->ngrams_reference.size())
 		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n - 1];
 	      
