@@ -414,7 +414,7 @@ void read_tstset(const path_set_type& files,
 	
 	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	if (id % mpi_size != mpi_rank) continue;
+	if (static_cast<int>(id % mpi_size) != mpi_rank) continue;
 	
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id?");
