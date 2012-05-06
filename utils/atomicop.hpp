@@ -102,7 +102,7 @@ namespace utils
 #elif defined(__ICL) || defined(_MSC_VER)
 	return _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), addend);
 #elif defined(__APPLE__)
-	return OSAtomicAdd32Barrier(addend, (int32_t*) ptr);
+	return OSAtomicAdd32Barrier(addend, (int32_t*) ptr) + addend;
 #elif defined(__GNUC__)
 	return __sync_fetch_and_add(ptr, addend);
 #elif defined(__SUNPRO_CC) && defined(__sparc)
@@ -152,7 +152,7 @@ namespace utils
 	//#elif defined(_WIN32)
 	//  return _InterlockedExchangeAdd64(reinterpret_cast<volatile long long*>(ptr), addend);
 #elif defined(__APPLE__)
-	return OSAtomicAdd64Barrier(addend, (int64_t*) ptr);
+	return OSAtomicAdd64Barrier(addend, (int64_t*) ptr) + addend;
 #elif defined(__GNUC__) && defined(__x86_64)
 	return __sync_fetch_and_add(ptr, addend);
 #elif defined(__GNUC__) && defined(__i386) && (defined(__i686) || defined(__pentium4) || defined(__athlon))
