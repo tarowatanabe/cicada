@@ -318,7 +318,7 @@ namespace cicada
 	    const symbol_type target_curr = (normalizers_target.empty() || ! sentence
 					     ? vocab_type::EPSILON
 					     : normalizers_target.front()(sentence->operator[](pos_target)));
-	    const symbol_type target_next = (normalizers_target.empty() || ! sentence || pos_target + 1 >= sentence->size()
+	    const symbol_type target_next = (normalizers_target.empty() || ! sentence || pos_target + 1 >= static_cast<int>(sentence->size())
 					     ? vocab_type::EOS
 					     : normalizers_target.front()(sentence->operator[](pos_target + 1)));
 	    
@@ -350,7 +350,7 @@ namespace cicada
 	      const symbol_type target_curr = (normalizers_target.empty() || ! sentence
 					       ? vocab_type::EPSILON
 					       : normalizers_target.front()(sentence->operator[](next_target)));
-	      const symbol_type target_next = (normalizers_target.empty() || ! sentence || next_target + 1 >= sentence->size()
+	      const symbol_type target_next = (normalizers_target.empty() || ! sentence || next_target + 1 >= static_cast<int>(sentence->size())
 					       ? vocab_type::EOS
 					       : normalizers_target.front()(sentence->operator[](next_target + 1)));
 

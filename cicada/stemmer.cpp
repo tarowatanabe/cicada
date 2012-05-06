@@ -9,6 +9,7 @@
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
+#include "stemmer/upper.hpp"
 #include "stemmer/halfwidth.hpp"
 #include "stemmer/fullwidth.hpp"
 #include "stemmer/simplified.hpp"
@@ -42,6 +43,7 @@ suffix: taking suffix of letters\n\
 digit: digits normalized to @\n\
 latin: romanization\n\
 lower: lower casing\n\
+upper: upper casing\n\
 halfwidth: Fullwidth-Halfwidth\n\
 fullwidth: Halfwidth-Fullwidth\n\
 traditional: Simplified-Traditional\n\
@@ -160,6 +162,16 @@ nfkc: NFKC\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "upper") {
+      const std::string name("upper");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Upper()))).first;
 	iter->second->__algorithm = parameter;
       }
       

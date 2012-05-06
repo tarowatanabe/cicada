@@ -197,6 +197,7 @@ stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
+stemmer/upper.hpp \
 stemmer/fullwidth.hpp \
 stemmer/halfwidth.hpp \
 stemmer/simplified.hpp \
@@ -211,6 +212,7 @@ stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
+stemmer/upper.cpp \
 stemmer/fullwidth.cpp \
 stemmer/halfwidth.cpp \
 stemmer/simplified.cpp \
