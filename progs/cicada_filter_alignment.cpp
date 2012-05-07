@@ -207,7 +207,7 @@ int main(int argc, char** argv)
 	  
 	  if (visualize_mode)
 	    visualize(os, sentence_source, sentence_target, alignment);
-	  if (giza_mode)
+	  else if (giza_mode)
 	    giza(os, sentence_source, sentence_target, alignment);
 	  else
 	    os << alignment << '\n';
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
 	  
 	  if (visualize_mode)
 	    visualize(os, sentence_source, sentence_target, alignment);
-	  if (giza_mode)
+	  else if (giza_mode)
 	    giza(os, sentence_source, sentence_target, alignment);
 	  else
 	    os << alignment << '\n';
