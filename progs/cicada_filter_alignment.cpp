@@ -44,6 +44,7 @@ path_type output_file = "-";
 
 bool inverse_mode = false;
 bool visualize_mode = false;
+bool giza_mode = false;
 
 void options(int argc, char** argv);
 
@@ -51,6 +52,10 @@ std::ostream& visualize(std::ostream& os,
 			const sentence_type& source,
 			const sentence_type& target,
 			const alignment_type& alignment);
+std::ostream& giza(std::ostream& os,
+		   const sentence_type& source,
+		   const sentence_type& target,
+		   const alignment_type& alignment);
 
 int main(int argc, char** argv)
 {
@@ -75,8 +80,11 @@ int main(int argc, char** argv)
     if (! target_files.empty())
       if (target_files.size() != alignment_files.size())
 	throw std::runtime_error("# of target files does not match");
+
+    if (visualize_mode && giza_mode)
+      throw std::runtime_error("either visualize or giza");
     
-    if (visualize_mode) {
+    if (visualize_mode || giza_mode) {
       if (source_files.empty())
 	throw std::runtime_error("no source data?");
       if (target_files.empty())
@@ -92,9 +100,12 @@ int main(int argc, char** argv)
     if (! permutation_source_files.empty() || ! permutation_target_files.empty()) {
       sentence_type    sentence_source;
       sentence_type    sentence_target;
+      sentence_type    permuted_source;
+      sentence_type    permuted_target;      
       permutation_type permutation_source;
       permutation_type permutation_target;
       alignment_type   alignment;
+      std::vector<bool, std::allocator<bool> > assigned;
 
       const bool has_source = ! source_files.empty();
       const bool has_target = ! target_files.empty();
@@ -147,6 +158,48 @@ int main(int argc, char** argv)
 	    }
 	  }
 	  
+	  if (has_permutation_source && has_source) {
+	    permuted_source.resize(sentence_source.size());
+	    
+	    assigned.clear();
+	    assigned.resize(sentence_source.size(), false);
+	    
+	    for (size_t pos = 0; pos != sentence_source.size(); ++ pos) {
+	      if (permutation_source[pos] >= static_cast<int>(sentence_source.size()))
+		throw std::runtime_error("invalid permutation: out of range");
+	      
+	      if (assigned[permutation_source[pos]])
+		throw std::runtime_error("invalid permutation: duplicates");
+	      
+	      assigned[permutation_source[pos]] = true;
+	      
+	      permuted_source[pos] = sentence_source[permutation_source[pos]];
+	    }
+	    
+	    sentence_source.swap(permuted_source);
+	  }
+	  
+	  if (has_permutation_target && has_target) {
+	    permuted_target.resize(sentence_target.size());
+	    
+	    assigned.clear();
+	    assigned.resize(sentence_target.size(), false);
+	    
+	    for (size_t pos = 0; pos != sentence_target.size(); ++ pos) {
+	      if (permutation_target[pos] >= static_cast<int>(sentence_target.size()))
+		throw std::runtime_error("invalid permutation: out of range");
+	      
+	      if (assigned[permutation_target[pos]])
+		throw std::runtime_error("invalid permutation: duplicates");
+	      
+	      assigned[permutation_target[pos]] = true;
+	      
+	      permuted_target[pos] = sentence_target[permutation_target[pos]];
+	    }
+	    
+	    sentence_target.swap(permuted_target);
+	  }
+	  
 	  if (inverse_mode)
 	    alignment.inverse();
 	  
@@ -154,6 +207,8 @@ int main(int argc, char** argv)
 	  
 	  if (visualize_mode)
 	    visualize(os, sentence_source, sentence_target, alignment);
+	  if (giza_mode)
+	    giza(os, sentence_source, sentence_target, alignment);
 	  else
 	    os << alignment << '\n';
 	}
@@ -198,6 +253,8 @@ int main(int argc, char** argv)
 	  
 	  if (visualize_mode)
 	    visualize(os, sentence_source, sentence_target, alignment);
+	  if (giza_mode)
+	    giza(os, sentence_source, sentence_target, alignment);
 	  else
 	    os << alignment << '\n';
 	}
@@ -274,6 +331,56 @@ struct ostream_sink : public ByteSink
   
   std::ostream& os;
 };
+
+std::ostream& giza(std::ostream& os,
+		   const sentence_type& source,
+		   const sentence_type& target,
+		   const alignment_type& alignment)
+{  
+  os << "# Sentence pair (0)"
+     << " source length " << source.size() 
+     << " target length " << target.size() 
+     << " alignment score : " << 0 << '\n';
+  os << target << '\n';
+  
+  if (alignment.empty() || source.empty() || target.empty()) {
+    os << "NULL ({ })";
+    sentence_type::const_iterator siter_end = source.end();
+    for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+      os << ' ' << *siter << " ({ })";
+    os << '\n';
+  } else {
+    typedef std::vector<int, std::allocator<int> > index_set_type;
+    typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
+    typedef std::vector<bool, std::allocator<bool> > align_none_type;
+    
+    align_set_type  aligns(source.size());
+    align_none_type aligns_none(target.size(), true);
+    
+    alignment_type::const_iterator aiter_end = alignment.end();
+    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+      aligns[aiter->source].push_back(aiter->target + 1);
+      aligns_none[aiter->target] = false;
+    }
+    
+    os << "NULL";
+    os << " ({ ";
+    for (size_t j = 0; j != target.size(); ++ j)
+      if (aligns_none[j])
+	os << (j + 1) << ' ';
+    os << "})";
+    
+    for (size_t src = 0; src != source.size(); ++ src) {
+      os << ' ' << source[src];
+      os << " ({ ";
+      std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<int>(os, " "));
+      os << "})";
+    }
+    os << '\n';
+  }
+  
+  return os;
+}
 
 std::ostream& visualize(std::ostream& os,
 			const sentence_type& source,
@@ -363,8 +470,9 @@ void options(int argc, char** argv)
     ("permutation-target", po::value<path_set_type>(&permutation_target_files)->multitoken(), "target side permutation file(s)")
     ("output",             po::value<path_type>(&output_file)->default_value(output_file),    "output file")
     
-    ("inverse",   po::bool_switch(&inverse_mode), "inverse alignment")
+    ("inverse",   po::bool_switch(&inverse_mode),   "inverse alignment")
     ("visualize", po::bool_switch(&visualize_mode), "visualization")
+    ("giza",      po::bool_switch(&giza_mode),      "giza-style")
         
     ("help", "help message");
   

@@ -322,6 +322,18 @@ namespace utils
       -- customers;
       return std::make_pair(floor, erased);
     }
+
+    template <typename PriorIterator, typename LambdaIterator>
+    typename std::iterator_traits<PriorIterator>::value_type prob(PriorIterator first, PriorIterator last, LambdaIterator lambda) const
+    {
+      typedef typename std::iterator_traits<PriorIterator>::value_type P;
+      typename dish_set_type::const_iterator diter = dishes.find(dish);
+      
+      const P p0 = std::inner_product(first, last, lambda, P(0));
+      
+      return P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength);
+    }
+
     
     template <typename PriorIterator, typename LambdaIterator>
     typename std::iterator_traits<PriorIterator>::value_type prob(const dish_type& dish, PriorIterator first, PriorIterator last, LambdaIterator lambda) const
