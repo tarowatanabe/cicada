@@ -802,10 +802,10 @@ bool infinite = false;
 double discount = 0.9;
 double strength = 1;
 
-double discount_prior_alpha = 1.0;
-double discount_prior_beta  = 1.0;
-double strength_prior_shape = 1.0;
-double strength_prior_rate  = 1.0;
+double discount_alpha = 1.0;
+double discount_beta  = 1.0;
+double strength_shape = 1.0;
+double strength_rate  = 1.0;
 
 double order_alpha = 10.0;
 double order_beta = 1.0;
@@ -846,10 +846,10 @@ int main(int argc, char ** argv)
 	     1.0 / num_vocab,
 	     discount,
 	     strength,
-	     discount_prior_alpha,
-	     discount_prior_beta,
-	     strength_prior_shape,
-	     strength_prior_rate,
+	     discount_alpha,
+	     discount_beta,
+	     strength_shape,
+	     strength_rate,
 	     order_alpha,
 	     order_beta,
 	     infinite);
@@ -1200,12 +1200,12 @@ void options(int argc, char** argv)
     ("infinite",            po::bool_switch(&infinite),                                               "infinite n-gram language model")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
-    ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    ("discount-alpha", po::value<double>(&discount_alpha)->default_value(discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("discount-beta",  po::value<double>(&discount_beta)->default_value(discount_beta),   "discount ~ Beta(alpha,beta)")
 
     ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
-    ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    ("strength-shape", po::value<double>(&strength_shape)->default_value(strength_shape), "strength ~ Gamma(shape,rate)")
+    ("strength-rate",  po::value<double>(&strength_rate)->default_value(strength_rate),   "strength ~ Gamma(shape,rate)")
 
     ("order-alpha", po::value<double>(&order_alpha)->default_value(order_alpha), "order ~ Beta(alpha,beta)")
     ("order-beta",  po::value<double>(&order_beta)->default_value(order_beta),   "order ~ Beta(alpha,beta)")

@@ -824,18 +824,18 @@ bool slice_sampling = false;
 double emission_discount = 0.1;
 double emission_strength = 1;
 
-double emission_discount_prior_alpha = 1.0;
-double emission_discount_prior_beta  = 1.0;
-double emission_strength_prior_shape = 1.0;
-double emission_strength_prior_rate  = 1.0;
+double emission_discount_alpha = 1.0;
+double emission_discount_beta  = 1.0;
+double emission_strength_shape = 1.0;
+double emission_strength_rate  = 1.0;
 
 double transition_discount = 0.1;
 double transition_strength = 10;
 
-double transition_discount_prior_alpha = 0.1;
-double transition_discount_prior_beta  = 1.0;
-double transition_strength_prior_shape = 0.1;
-double transition_strength_prior_rate  = 1.0;
+double transition_discount_alpha = 0.1;
+double transition_discount_beta  = 1.0;
+double transition_strength_shape = 0.1;
+double transition_strength_rate  = 1.0;
 
 
 int threads = 1;
@@ -894,17 +894,17 @@ int main(int argc, char ** argv)
 		 classes,
 		 PYPPOS::parameter_type(emission_discount,
 					emission_strength,
-					emission_discount_prior_alpha,
-					emission_discount_prior_beta,
-					emission_strength_prior_shape,
-					emission_strength_prior_rate),
+					emission_discount_alpha,
+					emission_discount_beta,
+					emission_strength_shape,
+					emission_strength_rate),
 		 
 		 PYPPOS::parameter_type(transition_discount,
 					transition_strength,
-					transition_discount_prior_alpha,
-					transition_discount_prior_beta,
-					transition_strength_prior_shape,
-					transition_strength_prior_rate));
+					transition_discount_alpha,
+					transition_discount_beta,
+					transition_strength_shape,
+					transition_strength_rate));
     
     model.initialize(sampler, classes, resample_iterations);
 
@@ -1167,20 +1167,20 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     
     ("emission-discount",       po::value<double>(&emission_discount)->default_value(emission_discount),                         "discount ~ Beta(alpha,beta)")
-    ("emission-discount-alpha", po::value<double>(&emission_discount_prior_alpha)->default_value(emission_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("emission-discount-beta",  po::value<double>(&emission_discount_prior_beta)->default_value(emission_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    ("emission-discount-alpha", po::value<double>(&emission_discount_alpha)->default_value(emission_discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("emission-discount-beta",  po::value<double>(&emission_discount_beta)->default_value(emission_discount_beta),   "discount ~ Beta(alpha,beta)")
 
     ("emission-strength",       po::value<double>(&emission_strength)->default_value(emission_strength),                         "strength ~ Gamma(shape,rate)")
-    ("emission-strength-shape", po::value<double>(&emission_strength_prior_shape)->default_value(emission_strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("emission-strength-rate",  po::value<double>(&emission_strength_prior_rate)->default_value(emission_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    ("emission-strength-shape", po::value<double>(&emission_strength_shape)->default_value(emission_strength_shape), "strength ~ Gamma(shape,rate)")
+    ("emission-strength-rate",  po::value<double>(&emission_strength_rate)->default_value(emission_strength_rate),   "strength ~ Gamma(shape,rate)")
 
     ("transition-discount",       po::value<double>(&transition_discount)->default_value(transition_discount),                         "discount ~ Beta(alpha,beta)")
-    ("transition-discount-alpha", po::value<double>(&transition_discount_prior_alpha)->default_value(transition_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("transition-discount-beta",  po::value<double>(&transition_discount_prior_beta)->default_value(transition_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    ("transition-discount-alpha", po::value<double>(&transition_discount_alpha)->default_value(transition_discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("transition-discount-beta",  po::value<double>(&transition_discount_beta)->default_value(transition_discount_beta),   "discount ~ Beta(alpha,beta)")
 
     ("transition-strength",       po::value<double>(&transition_strength)->default_value(transition_strength),                         "strength ~ Gamma(shape,rate)")
-    ("transition-strength-shape", po::value<double>(&transition_strength_prior_shape)->default_value(transition_strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("transition-strength-rate",  po::value<double>(&transition_strength_prior_rate)->default_value(transition_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    ("transition-strength-shape", po::value<double>(&transition_strength_shape)->default_value(transition_strength_shape), "strength ~ Gamma(shape,rate)")
+    ("transition-strength-rate",  po::value<double>(&transition_strength_rate)->default_value(transition_strength_rate),   "strength ~ Gamma(shape,rate)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     

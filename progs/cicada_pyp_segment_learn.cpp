@@ -1538,18 +1538,18 @@ bool slice_sampling = false;
 double discount = 0.9;
 double strength = 1;
 
-double discount_prior_alpha = 1.0;
-double discount_prior_beta  = 1.0;
-double strength_prior_shape = 1.0;
-double strength_prior_rate  = 1.0;
+double discount_alpha = 1.0;
+double discount_beta  = 1.0;
+double strength_shape = 1.0;
+double strength_rate  = 1.0;
 
 double spell_discount = 0.9;
 double spell_strength = 1.0;
 
-double spell_discount_prior_alpha = 1.0;
-double spell_discount_prior_beta  = 1.0;
-double spell_strength_prior_shape = 1.0;
-double spell_strength_prior_rate  = 1.0;
+double spell_discount_alpha = 1.0;
+double spell_discount_beta  = 1.0;
+double spell_strength_shape = 1.0;
+double spell_strength_rate  = 1.0;
 
 double spell_lambda = 8;
 double spell_lambda_shape = 0.2;
@@ -1613,20 +1613,20 @@ int main(int argc, char ** argv)
 		     1.0 / vocab.size(),
 		     spell_discount,
 		     spell_strength,
-		     spell_discount_prior_alpha,
-		     spell_discount_prior_beta,
-		     spell_strength_prior_shape,
-		     spell_strength_prior_rate,
+		     spell_discount_alpha,
+		     spell_discount_beta,
+		     spell_strength_shape,
+		     spell_strength_rate,
 		     spell_lambda,
 		     spell_lambda_shape,
 		     spell_lambda_rate),
 	     order,
 	     discount,
 	     strength,
-	     discount_prior_alpha,
-	     discount_prior_beta,
-	     strength_prior_shape,
-	     strength_prior_rate);
+	     discount_alpha,
+	     discount_beta,
+	     strength_shape,
+	     strength_rate);
     
     if (slice_sampling)
       lm.slice_sample_parameters(sampler, resample_iterations);
@@ -1847,20 +1847,20 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     
     ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
-    ("discount-alpha", po::value<double>(&discount_prior_alpha)->default_value(discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("discount-beta",  po::value<double>(&discount_prior_beta)->default_value(discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    ("discount-alpha", po::value<double>(&discount_alpha)->default_value(discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("discount-beta",  po::value<double>(&discount_beta)->default_value(discount_beta),   "discount ~ Beta(alpha,beta)")
 
     ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
-    ("strength-shape", po::value<double>(&strength_prior_shape)->default_value(strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("strength-rate",  po::value<double>(&strength_prior_rate)->default_value(strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    ("strength-shape", po::value<double>(&strength_shape)->default_value(strength_shape), "strength ~ Gamma(shape,rate)")
+    ("strength-rate",  po::value<double>(&strength_rate)->default_value(strength_rate),   "strength ~ Gamma(shape,rate)")
 
     ("spell-discount",       po::value<double>(&spell_discount)->default_value(spell_discount),                         "discount ~ Beta(alpha,beta)")
-    ("spell-discount-alpha", po::value<double>(&spell_discount_prior_alpha)->default_value(spell_discount_prior_alpha), "discount ~ Beta(alpha,beta)")
-    ("spell-discount-beta",  po::value<double>(&spell_discount_prior_beta)->default_value(spell_discount_prior_beta),   "discount ~ Beta(alpha,beta)")
+    ("spell-discount-alpha", po::value<double>(&spell_discount_alpha)->default_value(spell_discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("spell-discount-beta",  po::value<double>(&spell_discount_beta)->default_value(spell_discount_beta),   "discount ~ Beta(alpha,beta)")
 
     ("spell-strength",       po::value<double>(&spell_strength)->default_value(spell_strength),                         "strength ~ Gamma(shape,rate)")
-    ("spell-strength-shape", po::value<double>(&spell_strength_prior_shape)->default_value(spell_strength_prior_shape), "strength ~ Gamma(shape,rate)")
-    ("spell-strength-rate",  po::value<double>(&spell_strength_prior_rate)->default_value(spell_strength_prior_rate),   "strength ~ Gamma(shape,rate)")
+    ("spell-strength-shape", po::value<double>(&spell_strength_shape)->default_value(spell_strength_shape), "strength ~ Gamma(shape,rate)")
+    ("spell-strength-rate",  po::value<double>(&spell_strength_rate)->default_value(spell_strength_rate),   "strength ~ Gamma(shape,rate)")
     
     ("spell-lambda",       po::value<double>(&spell_lambda)->default_value(spell_lambda),             "lambda for spell")
     ("spell-lambda-shape", po::value<double>(&spell_lambda_shape)->default_value(spell_lambda_shape), "lambda ~ Gamma(shape,rate)")
