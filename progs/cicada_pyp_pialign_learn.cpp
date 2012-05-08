@@ -1840,6 +1840,10 @@ struct PYPGraph
     
     stack.clear();
     stack.push_back(span_pair_type(0, source.size(), 0, target.size()));
+
+    // we will transform the pre-order stack operation into post-order operation via stack_derivation...
+    // HOW?
+    stack_derivation.clear();
     
     while (! stack.empty()) {
       const span_pair_type span_pair = stack.back();
@@ -1894,12 +1898,13 @@ struct PYPGraph
   logprob_type logprob_str;
   logprob_type logprob_inv;
 
-  chart_type chart;
+  chart_type      chart;
   edge_chart_type edges;
   
-  agenda_type agenda;
-  stack_type stack;
-  heap_type  heap;
+  agenda_type     agenda;
+  stack_type      stack;
+  derivation_type stack_derivation;
+  heap_type       heap;
 
   chart_mono_type chart_source;
   chart_mono_type chart_target;

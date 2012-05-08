@@ -44,6 +44,8 @@
 #include "utils/packed_vector.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/rwticket.hpp"
+#include "utils/atomicop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -67,12 +69,17 @@ struct PYPLM
   {
     typedef utils::restaurant<word_type, boost::hash<word_type>, std::equal_to<word_type>,
 			      std::allocator<word_type > > table_type;
+
+    typedef utils::rwticket mutex_type;
   
-    Node() : table(), parent(id_type(-1)), order(0)  {}
+    Node() : table(), parent(id_type(-1)), order(0), mutex()  {}
+    Node(const Node& x) : table(x.table), parent(x.parent), order(x.order), mutex() {}
   
     table_type table;
     id_type parent;
     int     order;
+  
+    mutex_type mutex;
   };
   typedef Node node_type;
   
@@ -158,11 +165,14 @@ struct PYPLM
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
   {    
-    orders_cache.clear();
+    //orders_cache.clear();
     
     if (node == trie.root()) {
-      ++ orders[0].first;
+      utils::atomicop::fetch_and_add(orders[0].first, size_type(1));
+      //++ orders[0].first;
       order = 1;
+
+      node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
       if (root.table.increment(word, p0, sampler, temperature)) {
 	++ counts0;
@@ -187,10 +197,15 @@ struct PYPLM
       history_type::const_reverse_iterator hiter_begin = history.rbegin();
       history_type::const_reverse_iterator hiter_end = history.rend();
       for (history_type::const_reverse_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter, ++ n) {
-	if (*hiter == trie.root())
+	if (*hiter == trie.root()) {
+	  node_type::mutex_type::scoped_reader_lock lock(root.mutex);
+	  
 	  prob_ngram = root.table.prob(word, prob_ngram);
-	else if (! trie[*hiter].table.empty())
+	} else if (! trie[*hiter].table.empty()) {
+	  node_type::mutex_type::scoped_reader_lock lock(trie[*hiter].mutex);
+
 	  prob_ngram = trie[*hiter].table.prob(word, prob_ngram);
+	}
 	
 	const double prob_n_denom = (orders[n].first + orders[n].second + order_alpha + order_beta);
 	const double prob_n = backoff_n * (orders[n].first + order_alpha) / prob_n_denom;
@@ -204,9 +219,12 @@ struct PYPLM
       
       order = (piter - probs.begin()) + 1;
       
-      for (int n = 0; n < order - 1; ++ n)
-	++ orders[n].second;
-      ++ orders[order - 1].first;
+      for (int n = 0; n < order - 1; ++ n) {
+	utils::atomicop::fetch_and_add(orders[n].second, size_type(1));
+	//++ orders[n].second;
+      }
+      utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(1));
+      //++ orders[order - 1].first;
       
       return increment(word, *(hiter_begin + order - 1), sampler, temperature);
     }
@@ -218,12 +236,16 @@ struct PYPLM
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
+      node_type::mutex_type::scoped_writer_lock lock(root.mutex);
+
       if (root.table.increment(word, p0, sampler, temperature))
 	++ counts0;
       else
 	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
+
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
       
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler, temperature))
@@ -238,7 +260,7 @@ struct PYPLM
   template <typename Sampler>
   bool decrement(const word_type& word, id_type node, int order, Sampler& sampler)
   {
-    orders_cache.clear();
+    //orders_cache.clear();
     
     // move at the right position...
     while (node != trie.root() && trie[node].order != order - 1)
@@ -246,7 +268,10 @@ struct PYPLM
     
     if (node == trie.root()) {
       // penetration count
-      -- orders[0].first;
+      utils::atomicop::fetch_and_add(orders[0].first, size_type(-1));
+      //-- orders[0].first;
+      
+      node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
       if (root.table.decrement(word, sampler))
 	-- counts0;
@@ -254,9 +279,14 @@ struct PYPLM
 	return false;
     } else {
       // penetration count
-      for (int n = 0; n < order - 1; ++ n)
-	-- orders[n].second;
-      -- orders[order - 1].first;
+      for (int n = 0; n < order - 1; ++ n) {
+	utils::atomicop::fetch_and_add(orders[n].second, size_type(-1));
+	//-- orders[n].second;
+      }
+      utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(-1));
+      //-- orders[order - 1].first;
+
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
 
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
@@ -270,11 +300,15 @@ struct PYPLM
   bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
+      node_type::mutex_type::scoped_writer_lock lock(root.mutex);
+      
       if (root.table.decrement(word, sampler))
 	-- counts0;
       else
 	return false;
     } else {
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
       else
@@ -286,10 +320,14 @@ struct PYPLM
   
   double prob(const word_type& word, const id_type& node) const
   {
-    if (node == trie.root())
+    if (node == trie.root()) {
+      node_type::mutex_type::scoped_reader_lock lock(const_cast<node_type&>(root).mutex);
+      
       return root.table.prob(word, p0);
-    else {
+    } else {
       const double p = prob(word, trie[node].parent);
+
+      node_type::mutex_type::scoped_reader_lock lock(const_cast<node_type&>(trie[node]).mutex);
       
       if (trie[node].table.empty())
 	return p;
