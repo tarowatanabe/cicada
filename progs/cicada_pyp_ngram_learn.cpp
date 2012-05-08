@@ -225,7 +225,7 @@ struct PYPLM
     
     return true;
   }
-
+  
   template <typename Sampler>
   bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
@@ -239,15 +239,21 @@ struct PYPLM
     } else {
       const double backoff = prob(word, trie[node].parent);
 
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      bool result = false;
+      
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	
+	result = trie[node].table.increment(word, backoff, sampler, temperature);
+      }
       
       // we will also increment lower-order when new table is created!
-      if (trie[node].table.increment(word, backoff, sampler, temperature))
+      if (result)
 	increment(word, trie[node].parent, sampler, temperature);
       else
 	return false;
     }
-      
+    
     return true;
   }
 
@@ -280,9 +286,15 @@ struct PYPLM
       utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(-1));
       //-- orders[order - 1].first;
 
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      bool result = false;
 
-      if (trie[node].table.decrement(word, sampler))
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	
+	result = trie[node].table.decrement(word, sampler);
+      }
+
+      if (result)
 	decrement(word, trie[node].parent, sampler);
       else
 	return false;
@@ -301,9 +313,15 @@ struct PYPLM
       else
 	return false;
     } else {
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
-
-      if (trie[node].table.decrement(word, sampler))
+      bool result = false;
+      
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	
+	result = trie[node].table.decrement(word, sampler);
+      }
+      
+      if (result)
 	decrement(word, trie[node].parent, sampler);
       else
 	return false;
