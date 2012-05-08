@@ -800,7 +800,6 @@ public:
   history_type  history;
   prob_set_type probs;
   
-  
   bool infinite;
 };
 
@@ -809,6 +808,78 @@ typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef utils::sampler<boost::mt19937> sampler_type;
+
+typedef PYPLM::size_type size_type;
+
+// we will precompute <word, node> pair...
+typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
+typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
+
+typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
+typedef std::vector<int, std::allocator<int> > derivation_set_type;
+
+struct Task
+{
+  typedef PYPLM::size_type       size_type;
+  typedef PYPLM::difference_type difference_type;
+
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+  
+  Task(queue_type& __mapper,
+       queue_type& __reducer,
+       const data_set_type& __training,
+       derivation_set_type& __derivations,
+       PYPLM& __model,
+       const sampler_type& __sampler,
+       const bool __infinite)
+    : mapper(__mapper),
+      reducer(__reducer),
+      training(__training),
+      derivations(__derivations),
+      model(__model),
+      sampler(__sampler),
+      infinite(__infinite) {}
+  
+  void operator()()
+  {
+    size_type pos;
+    
+    for (;;) {
+      mapper.pop(pos);
+      
+      if (pos == size_type(-1)) break;
+      
+      if (infinite)  {
+	if (derivations[pos])
+	  model.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler);
+	  
+	model.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler, temperature);
+      } else {
+	if (derivations[pos])
+	  model.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler);
+	else
+	  derivations[pos] = true;
+	
+	model.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler, temperature);
+      }
+      
+      reducer.push(pos);
+    }
+  }
+  
+  queue_type& mapper;
+  queue_type& reducer;
+  
+  const data_set_type& training;
+  derivation_set_type& derivations;
+  
+  PYPLM& model;
+  sampler_type sampler;
+  
+  double temperature;
+  const bool infinite;
+};
+
 
 template <typename Training>
 struct less_rank
@@ -892,22 +963,18 @@ int main(int argc, char ** argv)
 	     order_beta,
 	     infinite);
     
-    // we will precompute <word, node> pair...
-    typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
-    typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
+
     typedef std::vector<bool, std::allocator<bool> > non_oov_type;
 
     typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
     typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
     typedef std::vector<size_t, std::allocator<size_t> > index_type;
-    
-    typedef PYPLM::size_type size_type;
-    typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
-    typedef std::vector<int, std::allocator<int> > derivation_set_type;
+        
+
 
     data_set_type        training;
     word_unique_set_type uniques;
-    non_oov_type non_oov;
+    non_oov_type         non_oov;
     
     if (vocab_type::BOS.id() >= non_oov.size())
       non_oov.resize(vocab_type::BOS.id() + 1, false);
@@ -979,6 +1046,21 @@ int main(int argc, char ** argv)
       for (int n = 0; n != order; ++ n)
 	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
     
+    Task::queue_type queue_mapper;
+    Task::queue_type queue_reducer;
+    
+    std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
+								 queue_reducer,
+								 training,
+								 derivations,
+								 lm,
+								 sampler,
+								 infinite));
+
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
     size_t anneal_iter = 0;
     const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
     
@@ -1026,45 +1108,25 @@ int main(int argc, char ** argv)
 	else
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
+
+      // assign temperature...
+      for (size_type i = 0; i != tasks.size(); ++ i)
+	tasks[i].temperature = temperature;
       
+      // shuffle
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
+      
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_rank<data_set_type>(training));
       
-      if (infinite)  {
-	position_set_type::const_iterator piter_end = positions.end();
-	for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
-	  const size_type& pos = *piter;
-	  
-	  if (derivations[pos])
-	    lm.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler);
-	  
-	  lm.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), derivations[pos], sampler, temperature);
-	}
-	
-	if (debug >= 2) {
-	  std::cerr << "penetration count" << std::endl;
-	  size_t total = 0;
-	  for (size_t n = 0; n != lm.orders.size(); ++ n) {
-	    std::cerr << "order=" << n << " a=" << lm.orders[n].first << " b=" << lm.orders[n].second << std::endl;
-	    total += lm.orders[n].first;
-	  }
-	  std::cerr << "total=" << total << std::endl;
-	}
-
-      } else {
-	position_set_type::const_iterator piter_end = positions.end();
-	for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
-	  const size_type& pos = *piter;
-	  
-	  if (derivations[pos])
-	    lm.decrement(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler);
-	  else
-	    derivations[pos] = true;
-	  
-	  lm.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler, temperature);
-	}
+      position_set_type::const_iterator piter_end = positions.end();
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_mapper.push(*piter);
+      
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
+	size_type pos = 0;
+	queue_reducer.pop(pos);
       }
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
@@ -1082,6 +1144,11 @@ int main(int argc, char ** argv)
 	std::cerr << "log-likelihood: " << lm.log_likelihood() << std::endl;
     }
     
+    for (int i = 0; i != threads; ++ i)
+      queue_mapper.push(size_type(-1));
+    
+    workers.join_all();
+
     // clear training data
     training.clear();
     data_set_type(training).swap(training);
