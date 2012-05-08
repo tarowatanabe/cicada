@@ -181,8 +181,11 @@ struct PYPLM
 	return false;
     } else {
       id_type parent = node;
-      history.clear();
-      probs.clear();
+      history_type history;
+      prob_set_type probs;
+
+      history.reserve(orders.size());
+      probs.reserve(orders.size());
       
       while (parent != trie.root()) {
 	history.push_back(parent);
@@ -795,10 +798,6 @@ public:
   prob_map_type        orders_cache;
   double order_alpha;
   double order_beta;
-
-  // global... should be moved to thread specific...
-  history_type  history;
-  prob_set_type probs;
   
   bool infinite;
 };
@@ -1127,6 +1126,16 @@ int main(int argc, char ** argv)
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;
 	queue_reducer.pop(pos);
+      }
+
+      if (infinite && debug >= 2) {
+	std::cerr << "penetration count" << std::endl;
+	size_t total = 0;
+	for (size_t n = 0; n != lm.orders.size(); ++ n) {
+	  std::cerr << "order=" << n << " a=" << lm.orders[n].first << " b=" << lm.orders[n].second << std::endl;
+	  total += lm.orders[n].first;
+	}
+	std::cerr << "total=" << total << std::endl;
       }
       
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
