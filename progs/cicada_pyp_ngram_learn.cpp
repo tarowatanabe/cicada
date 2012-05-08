@@ -817,15 +817,52 @@ typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<int, std::allocator<int> > derivation_set_type;
 
+struct Counter
+{
+  Counter() : counter(0) {}
+  
+  void increment()
+  {
+    utils::atomicop::fetch_and_add(counter, size_type(1));
+  }
+  
+  void wait(size_type target)
+  {
+    for (;;) {
+      utils::atomicop::memory_barrier();
+      
+      for (int i = 0; i < 64; ++ i) {
+	const size_type curr = counter;
+	
+	if (curr == target)
+	  return;
+	else
+	  boost::thread::yield();
+      }
+      
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    }
+  }
+
+  void clear() { counter = 0; }
+  
+  size_type counter;
+};
+typedef Counter counter_type;
+
 struct Task
 {
   typedef PYPLM::size_type       size_type;
   typedef PYPLM::difference_type difference_type;
 
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
+
   
-  Task(queue_type& __mapper,
-       queue_type& __reducer,
+  Task(queue_type&   __mapper,
+       counter_type& __reducer,
        const data_set_type& __training,
        derivation_set_type& __derivations,
        PYPLM& __model,
@@ -862,12 +899,13 @@ struct Task
 	model.increment(boost::fusion::get<0>(training[pos]), boost::fusion::get<1>(training[pos]), sampler, temperature);
       }
       
-      reducer.push(pos);
+      //reducer.push(pos);
+      reducer.increment();
     }
   }
   
-  queue_type& mapper;
-  queue_type& reducer;
+  queue_type&   mapper;
+  counter_type& reducer;
   
   const data_set_type& training;
   derivation_set_type& derivations;
@@ -1046,10 +1084,11 @@ int main(int argc, char ** argv)
 	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
     
     Task::queue_type queue_mapper;
-    Task::queue_type queue_reducer;
+    //Task::queue_type queue_reducer;
+    counter_type reducer;
     
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
-								 queue_reducer,
+								 reducer,
 								 training,
 								 derivations,
 								 lm,
@@ -1118,15 +1157,14 @@ int main(int argc, char ** argv)
       
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_rank<data_set_type>(training));
+
+      reducer.clear();
       
       position_set_type::const_iterator piter_end = positions.end();
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
 	queue_mapper.push(*piter);
-      
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
-      }
+
+      reducer.wait(positions.size());
 
       if (infinite && debug >= 2) {
 	std::cerr << "penetration count" << std::endl;
