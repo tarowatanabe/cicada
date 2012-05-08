@@ -86,8 +86,6 @@ struct PYPLM
   typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
-  typedef std::vector<double, std::allocator<double> > parameter_set_type;
-
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
@@ -98,13 +96,11 @@ struct PYPLM
   typedef std::vector<double, std::allocator<double> > prob_set_type;
   typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
 
-  //typedef utils::pyp_parameter parameter_type;
-  //typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
+  typedef utils::pyp_parameter parameter_type;
+  typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
   
   PYPLM(const int order,
 	const double __p0,
-	const double __discount,
-	const double __strength,
 	const double __discount_alpha,
 	const double __discount_beta,
 	const double __strength_shape,
@@ -114,12 +110,7 @@ struct PYPLM
 	const bool __infinite=false)
     : trie(word_type()),
       nodes(order),
-      discount(order, __discount),
-      strength(order, __strength),
-      discount_alpha(__discount_alpha),
-      discount_beta(__discount_beta),
-      strength_shape(__strength_shape),
-      strength_rate(__strength_rate),
+      parameters(order, parameter_type(__discount_alpha, __discount_beta, __strength_shape, __strength_rate)),
       p0(__p0),
       counts0(0),
       orders(order),
@@ -130,7 +121,7 @@ struct PYPLM
     // unitialize root table...
     root.parent = id_type(-1);
     root.order = 0;
-    root.table = node_type::table_type(discount[0], strength[0]);
+    root.table = node_type::table_type(parameters[0].discount, parameters[0].strength);
   }
 
   template <typename Iterator>
@@ -153,7 +144,7 @@ struct PYPLM
       if (! trie_node.order) {
 	trie_node.parent = node_prev;
 	trie_node.order = order;
-	trie_node.table = node_type::table_type(discount[order], strength[order]);
+	trie_node.table = node_type::table_type(parameters[order].discount, parameters[order].strength);
 	
 	nodes[order].push_back(node);
       }
@@ -439,8 +430,8 @@ struct PYPLM
   {
     double logprob = std::log(p0) * counts0;
     
-    for (size_type order = 0; order != discount.size(); ++ order)
-      logprob += log_likelihood(order, discount[order], strength[order]);
+    for (size_type order = 0; order != parameters.size(); ++ order)
+      logprob += log_likelihood(order, parameters[order].discount, parameters[order].strength);
     
     return logprob;
   }
@@ -449,8 +440,7 @@ struct PYPLM
   {
     if (strength <= - discount) return - std::numeric_limits<double>::infinity();
     
-    double logprob = (utils::mathop::log_beta_density(discount, discount_alpha, discount_beta)
-		      + utils::mathop::log_gamma_density(strength + discount, strength_shape, strength_rate));
+    double logprob = parameters[order].log_likelihood();
     
     if (order == 0)
       return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
@@ -473,7 +463,7 @@ struct PYPLM
     
     double operator()(const double& proposed_discount) const
     {
-      return pyplm.log_likelihood(order, proposed_discount, pyplm.strength[order]);
+      return pyplm.log_likelihood(order, proposed_discount, pyplm.parameters[order].strength);
     }
   };
   
@@ -486,33 +476,33 @@ struct PYPLM
     
     double operator()(const double& proposed_strength) const
     {
-      return pyplm.log_likelihood(order, pyplm.discount[order], proposed_strength);
+      return pyplm.log_likelihood(order, pyplm.parameters[order].discount, proposed_strength);
     }
   };
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    for (size_type order = 0; order != discount.size(); ++ order) {
+    for (size_type order = 0; order != parameters.size(); ++ order) {
       
       for (int iter = 0; iter != num_loop; ++ iter) {
-	strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+	parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
 	
-	discount[order] = sample_discount(order, sampler, discount[order], strength[order]);
+	parameters[order].discount = sample_discount(order, sampler, parameters[order].discount, parameters[order].strength);
       }
       
-      strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
+      parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
       
       if (order == 0) {
-	root.table.discount() = discount[order];
-	root.table.strength() = strength[order];
+	root.table.discount() = parameters[order].discount;
+	root.table.strength() = parameters[order].strength;
 
 	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
-	  trie[*niter].table.discount() = discount[order];
-	  trie[*niter].table.strength() = strength[order];
+	  trie[*niter].table.discount() = parameters[order].discount;
+	  trie[*niter].table.strength() = parameters[order].strength;
 	  
 	  trie[*niter].table.verify_parameters();
 	}
@@ -538,7 +528,7 @@ struct PYPLM
 	}
     }
     
-    return sampler.gamma(strength_shape + y, strength_rate - x);
+    return sampler.gamma(parameters[order].strength_shape + y, parameters[order].strength_rate - x);
   }
   
   template <typename Sampler>
@@ -559,56 +549,56 @@ struct PYPLM
 	}
     }
     
-    return sampler.beta(discount_alpha + y, discount_beta + z);
+    return sampler.beta(parameters[order].discount_alpha + y, parameters[order].discount_beta + z);
   }
   
   
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    for (size_type order = 0; order != discount.size(); ++ order) {
+    for (size_type order = 0; order != parameters.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
 
       for (int iter = 0; iter != num_loop; ++ iter) {
-	strength[order] = utils::slice_sampler(strength_sampler,
-					       strength[order],
-					       sampler,
-					       - discount[order] + std::numeric_limits<double>::min(),
-					       std::numeric_limits<double>::infinity(),
-					       0.0,
-					       num_iterations,
-					       100 * num_iterations);
+	parameters[order].strength = utils::slice_sampler(strength_sampler,
+							  parameters[order].strength,
+							  sampler,
+							  - parameters[order].discount + std::numeric_limits<double>::min(),
+							  std::numeric_limits<double>::infinity(),
+							  0.0,
+							  num_iterations,
+							  100 * num_iterations);
 	
-	discount[order] = utils::slice_sampler(discount_sampler,
-					       discount[order],
-					       sampler,
-					       (strength[order] < 0.0 ? - strength[order] : 0.0) + std::numeric_limits<double>::min(),
-					       1.0,
-					       0.0,
-					       num_iterations,
-					       100 * num_iterations);
+	parameters[order].discount = utils::slice_sampler(discount_sampler,
+							  parameters[order].discount,
+							  sampler,
+							  (parameters[order].strength < 0.0 ? - parameters[order].strength : 0.0) + std::numeric_limits<double>::min(),
+							  1.0,
+							  0.0,
+							  num_iterations,
+							  100 * num_iterations);
       }
       
-      strength[order] = utils::slice_sampler(strength_sampler,
-					     strength[order],
-					     sampler,
-					     - discount[order] + std::numeric_limits<double>::min(),
-					     std::numeric_limits<double>::infinity(),
-					     0.0,
-					     num_iterations,
-					     100 * num_iterations);
+      parameters[order].strength = utils::slice_sampler(strength_sampler,
+							parameters[order].strength,
+							sampler,
+							- parameters[order].discount + std::numeric_limits<double>::min(),
+							std::numeric_limits<double>::infinity(),
+							0.0,
+							num_iterations,
+							100 * num_iterations);
       
       if (order == 0) {
-	root.table.discount() = discount[order];
-	root.table.strength() = strength[order];
+	root.table.discount() = parameters[order].discount;
+	root.table.strength() = parameters[order].strength;
 
 	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
-	  trie[*niter].table.discount() = discount[order];
-	  trie[*niter].table.strength() = strength[order];
+	  trie[*niter].table.discount() = parameters[order].discount;
+	  trie[*niter].table.strength() = parameters[order].strength;
 	  
 	  trie[*niter].table.verify_parameters();
 	}
@@ -631,19 +621,19 @@ struct PYPLM
       
     repository_type rep(path, repository_type::write);
       
-    rep["order"] = boost::lexical_cast<std::string>(discount.size());
+    rep["order"] = boost::lexical_cast<std::string>(parameters.size());
 
     rep["p0"]      = boost::lexical_cast<std::string>(p0);
     rep["counts0"] = boost::lexical_cast<std::string>(counts0);
     
-    rep["discount-alpha"] = boost::lexical_cast<std::string>(discount_alpha);
-    rep["discount-beta"]  = boost::lexical_cast<std::string>(discount_beta);
-    rep["strength-shape"] = boost::lexical_cast<std::string>(strength_shape);
-    rep["strength-rate"]  = boost::lexical_cast<std::string>(strength_rate);
+    rep["discount-alpha"] = boost::lexical_cast<std::string>(parameters[0].discount_alpha);
+    rep["discount-beta"]  = boost::lexical_cast<std::string>(parameters[0].discount_beta);
+    rep["strength-shape"] = boost::lexical_cast<std::string>(parameters[0].strength_shape);
+    rep["strength-rate"]  = boost::lexical_cast<std::string>(parameters[0].strength_rate);
           
-    for (size_type order = 0; order != discount.size(); ++ order) {
-      rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(discount[order]);
-      rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(strength[order]);
+    for (size_type order = 0; order != parameters.size(); ++ order) {
+      rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].discount);
+      rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].strength);
     }
     
     // we will compute on-memory for faster indexing... (and assuming small data!)
@@ -704,7 +694,7 @@ struct PYPLM
     }
     
     
-    for (size_type order = 1; order < discount.size(); ++ order) {
+    for (size_type order = 1; order < parameters.size(); ++ order) {
       nodes_next.clear();
       
       node_set_type::const_iterator niter_end = nodes.end();
@@ -782,14 +772,8 @@ public:
   trie_type trie;
   node_type root;
   node_map_type nodes;
-  
-  parameter_set_type discount;
-  parameter_set_type strength;
-  
-  double discount_alpha;
-  double discount_beta;
-  double strength_shape;
-  double strength_rate;
+
+  parameter_set_type parameters;
   
   double    p0;
   size_type counts0;
@@ -945,9 +929,6 @@ int resample_iterations = 1;
 bool slice_sampling = false;
 bool infinite = false;
 
-double discount = 0.9;
-double strength = 1;
-
 double discount_alpha = 1.0;
 double discount_beta  = 1.0;
 double strength_shape = 1.0;
@@ -982,16 +963,11 @@ int main(int argc, char ** argv)
     if (train_files.empty())
       throw std::runtime_error("no training data?");
     
-    if (! slice_sampling && strength < 0.0)
-      throw std::runtime_error("negative strength w/o slice sampling is not supported!");
-
     sampler_type sampler;
     const size_t num_vocab = vocabulary_size(train_files);
     
     PYPLM lm(order,
 	     1.0 / num_vocab,
-	     discount,
-	     strength,
 	     discount_alpha,
 	     discount_beta,
 	     strength_shape,
@@ -1081,7 +1057,7 @@ int main(int argc, char ** argv)
     
     if (debug >= 2)
       for (int n = 0; n != order; ++ n)
-	std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+	std::cerr << "order=" << n << " discount=" << lm.parameters[n].discount << " strength=" << lm.parameters[n].strength << std::endl;
     
     Task::queue_type queue_mapper;
     //Task::queue_type queue_reducer;
@@ -1184,7 +1160,7 @@ int main(int argc, char ** argv)
 	
 	if (debug >= 2)
 	  for (int n = 0; n != order; ++ n)
-	    std::cerr << "order=" << n << " discount=" << lm.discount[n] << " strength=" << lm.strength[n] << std::endl;
+	    std::cerr << "order=" << n << " discount=" << lm.parameters[n].discount << " strength=" << lm.parameters[n].strength << std::endl;
       }
 	
       if (debug)
@@ -1351,11 +1327,9 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("infinite",            po::bool_switch(&infinite),                                               "infinite n-gram language model")
     
-    ("discount",       po::value<double>(&discount)->default_value(discount),                         "discount ~ Beta(alpha,beta)")
     ("discount-alpha", po::value<double>(&discount_alpha)->default_value(discount_alpha), "discount ~ Beta(alpha,beta)")
     ("discount-beta",  po::value<double>(&discount_beta)->default_value(discount_beta),   "discount ~ Beta(alpha,beta)")
 
-    ("strength",       po::value<double>(&strength)->default_value(strength),                         "strength ~ Gamma(shape,rate)")
     ("strength-shape", po::value<double>(&strength_shape)->default_value(strength_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_rate)->default_value(strength_rate),   "strength ~ Gamma(shape,rate)")
 
