@@ -440,7 +440,7 @@ struct PYPLM
   {
     if (strength <= - discount) return - std::numeric_limits<double>::infinity();
     
-    double logprob = parameters[order].log_likelihood();
+    double logprob = parameters[order].log_likelihood(discount, strength);
     
     if (order == 0)
       return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);

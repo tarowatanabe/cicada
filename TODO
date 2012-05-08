@@ -153,3 +153,7 @@ BUGFIX for atomicop: use of fetch_and_add for Mac OSX...
 An analysis tool based on error metrics?
  Compute an error metric, i.e. BLEU, and visualize matched portions (such as ngrams, alignment etc.)
  TOOD: API?
+
+Mixture PYP-LM:
+ We employ multi-floor CRP for representing mixture of multiple LM.
+ Multiple: surface, prefix-4 and suffix-4! (+ class-LM or +POS-LM?)
