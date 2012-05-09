@@ -1192,6 +1192,7 @@ int main(int argc, char ** argv)
       sentence_type ngram(1, vocab_type::BOS);
 
       double logprob_total = 0.0;
+      double logprob = 0.0;
       size_t num_word = 0;
       size_t num_oov = 0;
       size_t num_sentence = 0;
@@ -1206,9 +1207,11 @@ int main(int argc, char ** argv)
 	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
 	    const bool is_oov = ! (siter->id() < non_oov.size() && non_oov[siter->id()]);
 	    const double prob = lm.prob(*siter, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
+	    const double lp = std::log(prob);
 	    
 	    if (! is_oov)
-	      logprob_total += std::log(prob);
+	      logprob_total += lp;
+	    logprob += lp;
 	    
 	    num_oov += is_oov;
 	    
@@ -1216,7 +1219,10 @@ int main(int argc, char ** argv)
 	  }
 
 	  const double prob = lm.prob(vocab_type::EOS, std::max(ngram.begin(), ngram.end() - order + 1), ngram.end());
-	  logprob_total += std::log(prob);
+	  const double lp = std::log(prob);
+	  
+	  logprob_total += lp;
+	  logprob += lp;
 	  
 	  num_word += sentence.size();
 	  ++ num_sentence;
@@ -1229,11 +1235,13 @@ int main(int argc, char ** argv)
 		<< " order: " << order
 		<< std::endl;
       
-      std::cerr << "logprob = " << logprob_total << std::endl;
-      std::cerr << "ppl     = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
-      std::cerr << "ppl1    = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
+      std::cerr << "logprob       = " << logprob_total << std::endl;
+      std::cerr << "logprob(+oov) = " << logprob << std::endl;
+      std::cerr << "ppl           = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
+      std::cerr << "ppl1          = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
+      std::cerr << "ppl(+oov)     = " << utils::mathop::exp(- logprob / (num_word + num_sentence)) << std::endl;
+      std::cerr << "ppl1(+oov)    = " << utils::mathop::exp(- logprob / (num_word)) << std::endl;
     }
-    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
