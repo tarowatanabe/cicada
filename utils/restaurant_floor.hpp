@@ -285,7 +285,7 @@ namespace utils
       typename dish_set_type::iterator diter = dishes.find(dish);
       
       if (diter == dishes.end())
-	throw std::runtime_error("dish was not inserted?");
+	throw std::runtime_error("restaurant_floor: dish was not inserted?");
       
       location_type& loc = diter->second;
       
@@ -327,7 +327,6 @@ namespace utils
     typename std::iterator_traits<PriorIterator>::value_type prob(PriorIterator first, PriorIterator last, LambdaIterator lambda) const
     {
       typedef typename std::iterator_traits<PriorIterator>::value_type P;
-      typename dish_set_type::const_iterator diter = dishes.find(dish);
       
       const P p0 = std::inner_product(first, last, lambda, P(0));
       
@@ -371,13 +370,7 @@ namespace utils
     // http://en.wikipedia.org/wiki/Chinese_restaurant_process
     double log_likelihood(const double& discount, const double& strength) const
     {      
-      double logprob = 0.0;
-      
-      if (has_discount_prior())
-	logprob += utils::mathop::log_beta_density(discount, parameter.discount_alpha, parameter.discount_beta);
-      
-      if (has_strength_prior())
-	logprob += utils::mathop::log_gamma_density(strength + discount, parameter.strength_prior_shape, parameter.strength_prior_rate);
+      double logprob = parameter.log_likelihood(discount, strength);
       
       if (! customers) return logprob;
       
@@ -509,7 +502,7 @@ namespace utils
       const double x = sample_log_x(sampler, discount, strength);
       const double y = sample_y(sampler, discount, strength);
       
-      return sampler.gamma(parameter.strength_prior_shape + y, parameter.strength_prior_rate - x);
+      return sampler.gamma(parameter.strength_shape + y, parameter.strength_rate - x);
     }
     
     template <typename Sampler>
@@ -531,7 +524,7 @@ namespace utils
       const double y = sample_y(sampler, discount, strength);
       
       if (has_strength_prior())
-	return (parameter.strength_prior_shape + y) / (parameter.strength_prior_rate - x);
+	return (parameter.strength_shape + y) / (parameter.strength_rate - x);
       else
 	return - y / x;
     }

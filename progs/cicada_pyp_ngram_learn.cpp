@@ -239,16 +239,10 @@ struct PYPLM
     } else {
       const double backoff = prob(word, trie[node].parent);
 
-      bool result = false;
-      
-      {
-	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
-	
-	result = trie[node].table.increment(word, backoff, sampler, temperature);
-      }
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
       
       // we will also increment lower-order when new table is created!
-      if (result)
+      if (trie[node].table.increment(word, backoff, sampler, temperature))
 	increment(word, trie[node].parent, sampler, temperature);
       else
 	return false;
@@ -286,15 +280,9 @@ struct PYPLM
       utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(-1));
       //-- orders[order - 1].first;
 
-      bool result = false;
-
-      {
-	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
-	
-	result = trie[node].table.decrement(word, sampler);
-      }
-
-      if (result)
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      
+      if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
       else
 	return false;
@@ -313,15 +301,9 @@ struct PYPLM
       else
 	return false;
     } else {
-      bool result = false;
+      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
       
-      {
-	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
-	
-	result = trie[node].table.decrement(word, sampler);
-      }
-      
-      if (result)
+      if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
       else
 	return false;

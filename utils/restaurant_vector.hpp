@@ -392,13 +392,7 @@ namespace utils
     // http://en.wikipedia.org/wiki/Chinese_restaurant_process
     double log_likelihood(const double& discount, const double& strength) const
     {      
-      double logprob = 0.0;
-      
-      if (has_discount_prior())
-	logprob += utils::mathop::log_beta_density(discount, parameter.discount_alpha, parameter.discount_beta);
-      
-      if (has_strength_prior())
-	logprob += utils::mathop::log_gamma_density(strength + discount, parameter.strength_shape, parameter.strength_rate);
+      double logprob = parameter.log_likelihood();
       
       if (! customers) return logprob;
       
