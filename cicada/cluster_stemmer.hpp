@@ -46,6 +46,12 @@ namespace cicada
     }
     
   public:
+    bool is_stemmer() const { return stemmer; }
+    bool is_cluster() const { return cluster; }
+
+    cluster_type::path_type cluster_path() const { return (cluster ? cluster->path() : cluster_type::path_type()); }
+    std::string             stemmer_algorithm() const { return (stemmer ? stemmer->algorithm() : std::string()); }
+    
     symbol_type operator()(const symbol_type& word) const { return operator[](word); }
     symbol_type operator[](const symbol_type& word) const
     {
