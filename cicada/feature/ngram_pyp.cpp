@@ -317,10 +317,7 @@ namespace cicada
 	      const symbol_type::id_type* context_star = std::find(context, context_end, id_star);
 
 	      // adjust antecedent context
-	      if (context_star != context_end)
-		score -= ngram_estimate(context, context_star);
-	      else
-		score -= ngram_estimate(context, context_end);
+	      score -= ngram_estimate(context, context_star);
 	      
 	      buffer.insert(buffer.end(), context, context_star);
 	      if (biter - biter_first >= context_size || star_first >= 0)
