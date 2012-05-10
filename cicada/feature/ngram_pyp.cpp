@@ -117,7 +117,7 @@ namespace cicada
 	id_oov           = x.id_oov;
 	id_bos           = x.id_bos;
 	id_eos           = x.id_eos;
-		
+	
 	initialize_cache();
 	
 	return *this;
@@ -143,7 +143,6 @@ namespace cicada
 	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
       
-
       template <typename Iterator>
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
@@ -157,12 +156,13 @@ namespace cicada
 	if (! equal_phrase(first, iter, cache.context) || ! equal_phrase(iter, last, cache.ngram)) {
 	  cache.context.assign(first, iter);
 	  cache.ngram.assign(iter, last);
-	  cache.score = 0.0;
+	  
 	  
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
 	  buffer.clear();
 	  buffer.insert(buffer.end(), first, iter);
 	  
+	  cache.score = 0.0;
 	  for (/**/; iter != last; ++ iter) {
 	    buffer.push_back(*iter);
 	    
@@ -182,7 +182,6 @@ namespace cicada
 	
 	if (! cache_estimate.equal_to(cache_pos, first, last)) {
 	  ngram_cache_type& cache = const_cast<ngram_cache_type&>(cache_estimate);
-	  cache.assign(cache_pos, first, last);
 	  
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
 	  buffer.clear();
@@ -200,6 +199,7 @@ namespace cicada
 	    score += ngram->logprob(buffer.begin(), buffer.end());
 	  }
 	  
+	  cache.assign(cache_pos, first, last);
 	  cache.score(cache_pos) = score;
 	}
 	
@@ -290,12 +290,12 @@ namespace cicada
 	    
 	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->ngram_prefix(biter_begin, biter_begin + context_size);
 	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram->ngram_suffix(biter_end - context_size, biter_end);
-
+	    
 	    std::copy(prefix.first, prefix.second, context);
 	    context[prefix.second - prefix.first] = id_star;
 	    std::fill(std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1), context_end, id_empty);
 	    
-	    return ngram_estimate(prefix.first, prefix.second) + ngram_score(prefix.first, prefix.second, suffix.second);
+	    return ngram_estimate(prefix.first, prefix.second) + ngram_score(prefix.first, prefix.second, biter_end);
 	  }
 	} else {
 	  double score = 0.0;
