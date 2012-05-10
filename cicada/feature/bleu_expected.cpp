@@ -196,8 +196,8 @@ namespace cicada
 	      biter = buffer.end();
 	      
 	      if (antecedent_star != antecedent_end) {
-		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()) + 1, star_first);
-		star_last  = buffer.size() + 1;
+		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()), star_first);
+		star_last  = buffer.size();
 		
 		biter_first = buffer.end() + 1;
 		buffer.insert(buffer.end(), antecedent_star, antecedent_end);
@@ -219,7 +219,7 @@ namespace cicada
 	  
 	  if (star_first >= 0) {
 	    const int prefix_size = utils::bithack::min(star_first, context_size);
-	    const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
+	    const int suffix_size = utils::bithack::min(int(buffer.size() - (star_last + 1)), context_size);
 	    
 	    buffer_type::const_iterator biter_begin = buffer.begin();
 	    buffer_type::const_iterator biter_end   = buffer.end();
