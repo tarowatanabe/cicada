@@ -252,6 +252,7 @@ namespace cicada
 	buffer_type::const_reverse_iterator begin(biter);
 	buffer_type::const_reverse_iterator end(buffer.begin());
 	
+	// TODO...!
 	
 	return state_type();
       }
