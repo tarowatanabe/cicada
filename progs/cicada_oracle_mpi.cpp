@@ -54,6 +54,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/filesystem.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -192,13 +193,13 @@ int main(int argc, char ** argv)
     if (mpi_rank == 0) {
       if (directory_mode) {
 	if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	  boost::filesystem::remove_all(output_file);
+	  utils::filesystem::remove_all(output_file);
 	
 	boost::filesystem::create_directories(output_file);
 	
 	boost::filesystem::directory_iterator iter_end;
 	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	  boost::filesystem::remove_all(*iter);
+	  utils::filesystem::remove_all(*iter);
 	
 	if (forest_mode) {
 	  for (size_t id = 0; id != oracles_forest.size(); ++ id)

@@ -17,6 +17,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/unordered_set.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
@@ -115,9 +116,9 @@ int main(int argc, char ** argv)
     
     if (directory_mode) {
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	boost::filesystem::remove_all(output_file);
+	utils::filesystem::remove_all(output_file);
       
-      boost::filesystem::create_directories(output_file);
+      utils::filesystem::create_directories(output_file);
       
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
