@@ -199,7 +199,7 @@ namespace cicada
 	    
 	    score += ngram->logprob(buffer.begin(), buffer.end());
 	  }
-	  	  
+	  
 	  cache.score(cache_pos) = score;
 	}
 	
@@ -391,7 +391,7 @@ namespace cicada
 	      std::fill(std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1), context_end, id_empty);
 	      
 	      score += ngram_estimate(prefix.first, prefix.second);
-	      score += ngram_score(prefix.first, prefix.second, suffix.second);
+	      score += ngram_score(prefix.first, prefix.second, biter_begin + context_size);
 	    }
 	  }
 	  
