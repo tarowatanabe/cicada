@@ -311,6 +311,8 @@ namespace cicada
     template <typename Iterator>
     std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
     {
+      return std::make_pair(first, last);
+#if 0
       typedef std::reverse_iterator<Iterator> reverse_iterator;
       
       if (first == last) return std::make_pair(first, last);
@@ -330,6 +332,7 @@ namespace cicada
       }
       
       return std::make_pair(iter.base(), last);
+#endif
     }
 
     

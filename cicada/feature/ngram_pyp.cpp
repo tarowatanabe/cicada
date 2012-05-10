@@ -157,7 +157,6 @@ namespace cicada
 	  cache.context.assign(first, iter);
 	  cache.ngram.assign(iter, last);
 	  
-	  
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
 	  buffer.clear();
 	  buffer.insert(buffer.end(), first, iter);
