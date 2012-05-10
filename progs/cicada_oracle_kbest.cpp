@@ -118,11 +118,11 @@ int main(int argc, char ** argv)
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
 	utils::filesystem::remove_all(output_file);
       
-      utils::filesystem::create_directories(output_file);
+      boost::filesystem::create_directories(output_file);
       
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	boost::filesystem::remove_all(*iter);
+	utils::filesystem::remove_all(*iter);
       
       for (size_t id = 0; id != oracles.size(); ++ id)
 	if (! oracles[id].empty()) {

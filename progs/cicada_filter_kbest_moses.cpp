@@ -31,6 +31,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
+#include "utils/filesystem.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
@@ -111,14 +112,14 @@ int main(int argc, char** argv)
       
       {
 	if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	  boost::filesystem::remove_all(output_file);
+	  utils::filesystem::remove_all(output_file);
 	
 	boost::filesystem::create_directories(output_file);
 	
 	if (! keep_mode) {
 	  boost::filesystem::directory_iterator iter_end;
 	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	    boost::filesystem::remove_all(*iter);
+	    utils::filesystem::remove_all(*iter);
 	}
       }
       
