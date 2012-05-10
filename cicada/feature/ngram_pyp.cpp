@@ -181,6 +181,8 @@ namespace cicada
 	
 	if (! cache_estimate.equal_to(cache_pos, first, last)) {
 	  ngram_cache_type& cache = const_cast<ngram_cache_type&>(cache_estimate);
+
+	  cache.assign(cache_pos, first, last);
 	  
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_score_impl);
 	  buffer.clear();
@@ -197,8 +199,7 @@ namespace cicada
 	    
 	    score += ngram->logprob(buffer.begin(), buffer.end());
 	  }
-	  
-	  cache.assign(cache_pos, first, last);
+	  	  
 	  cache.score(cache_pos) = score;
 	}
 	
