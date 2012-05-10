@@ -44,8 +44,6 @@
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 
-#include "lbfgs.h"
-
 #include "utils/base64.hpp"
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"

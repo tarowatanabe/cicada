@@ -49,7 +49,7 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 
-#include "lbfgs.h"
+#include "liblbfgs/lbfgs.h"
 #include "liblinear/linear.h"
 
 typedef std::string op_type;

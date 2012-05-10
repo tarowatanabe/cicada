@@ -47,9 +47,9 @@
 #include <boost/tokenizer.hpp>
 #include <boost/random.hpp>
 
-#include "lbfgs.h"
-#include "lbfgs_fortran.h"
-#include "lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.h"
+#include "liblbfgs/lbfgs_fortran.h"
+#include "liblbfgs/lbfgs_error.hpp"
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;

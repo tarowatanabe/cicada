@@ -44,8 +44,8 @@
 #include <boost/functional/hash/hash.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
 
-#include "lbfgs.h"
-#include "lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.h"
+#include "liblbfgs/lbfgs_error.hpp"
 #include "liblinear/linear.h"
 
 typedef cicada::eval::Scorer         scorer_type;

@@ -25,9 +25,8 @@
 #include "cicada/vocab.hpp"
 #include "cicada/sentence.hpp"
 
-#include "lbfgs.h"
-
 #include "liblinear/linear.h"
+#include "liblbfgs/lbfgs.h"
 
 typedef boost::filesystem::path path_type;
 

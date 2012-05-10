@@ -525,6 +525,7 @@ AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
 		 libstemmer_c/Makefile
 		 liblinear/Makefile
+		 liblbfgs/Makefile
 		 wn/Makefile
 		 progs/Makefile
 		 scripts/Makefile

@@ -37,8 +37,8 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 
-#include "lbfgs.h"
-#include "lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.h"
+#include "liblbfgs/lbfgs_error.hpp"
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 

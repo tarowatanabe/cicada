@@ -48,8 +48,8 @@
 #include <boost/random.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 
-#include "lbfgs.h"
-#include "lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.h"
+#include "liblbfgs/lbfgs_error.hpp"
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;

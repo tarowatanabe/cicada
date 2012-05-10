@@ -5,7 +5,7 @@
 #ifndef __LBFGS__ERROR_HPP__
 #define __LBFGS__ERROR_HPP__ 1
 
-#include <lbfgs.h>
+#include <liblbfgs/lbfgs.h>
 
 static inline
 const char* lbfgs_error(const int error)
