@@ -154,22 +154,19 @@ struct PYPLM
   }
   
   template <typename Sampler>
-  bool increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
+  void increment(const word_type& word, const id_type& node, int& order, Sampler& sampler, const double temperature=1.0)
   {    
     //orders_cache.clear();
     
     if (node == trie.root()) {
       utils::atomicop::fetch_and_add(orders[0].first, size_type(1));
       //++ orders[0].first;
+      
       order = 1;
-
+      
       node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
-      if (root.table.increment(word, p0, sampler, temperature)) {
-	++ counts0;
-	return true;
-      } else
-	return false;
+      counts0 += root.table.increment(word, p0, sampler, temperature);
     } else {
       id_type parent = node;
       history_type history;
@@ -220,22 +217,17 @@ struct PYPLM
       utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(1));
       //++ orders[order - 1].first;
       
-      return increment(word, *(hiter_begin + order - 1), sampler, temperature);
+      increment(word, *(hiter_begin + order - 1), sampler, temperature);
     }
-    
-    return true;
   }
   
   template <typename Sampler>
-  bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
+  void increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
       node_type::mutex_type::scoped_writer_lock lock(root.mutex);
-
-      if (root.table.increment(word, p0, sampler, temperature))
-	++ counts0;
-      else
-	return false;
+      
+      counts0 += root.table.increment(word, p0, sampler, temperature);
     } else {
       const double backoff = prob(word, trie[node].parent);
 
@@ -244,15 +236,11 @@ struct PYPLM
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler, temperature))
 	increment(word, trie[node].parent, sampler, temperature);
-      else
-	return false;
     }
-    
-    return true;
   }
 
   template <typename Sampler>
-  bool decrement(const word_type& word, id_type node, int order, Sampler& sampler)
+  void decrement(const word_type& word, id_type node, int order, Sampler& sampler)
   {
     //orders_cache.clear();
     
@@ -267,10 +255,7 @@ struct PYPLM
       
       node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
-      if (root.table.decrement(word, sampler))
-	-- counts0;
-      else
-	return false;
+      counts0 -= root.table.decrement(word, sampler);
     } else {
       // penetration count
       for (int n = 0; n < order - 1; ++ n) {
@@ -284,32 +269,22 @@ struct PYPLM
       
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
-      else
-	return false;
     }
-    return true;
   }
   
   template <typename Sampler>
-  bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
+  void decrement(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
       node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
-      if (root.table.decrement(word, sampler))
-	-- counts0;
-      else
-	return false;
+      counts0 -= root.table.decrement(word, sampler);
     } else {
       node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
       
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
-      else
-	return false;
     }
-      
-    return true;
   }
   
   double prob(const word_type& word, const id_type& node) const
@@ -797,6 +772,7 @@ typedef PYPLM::size_type size_type;
 // we will precompute <word, node> pair...
 typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
 typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
+typedef std::vector<bool, std::allocator<bool> > non_oov_type;
 
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<int, std::allocator<int> > derivation_set_type;
@@ -976,15 +952,9 @@ int main(int argc, char ** argv)
 	     order_beta,
 	     infinite);
     
-
-    typedef std::vector<bool, std::allocator<bool> > non_oov_type;
-
     typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
     typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
-    typedef std::vector<size_t, std::allocator<size_t> > index_type;
-        
-
-
+    
     data_set_type        training;
     word_unique_set_type uniques;
     non_oov_type         non_oov;
@@ -1250,61 +1220,111 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct string_hash : public utils::hashmurmur<size_t>
+struct TaskVocab
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
-  
-  size_t operator()(const std::string& x) const
+  struct string_hash : public utils::hashmurmur<size_t>
   {
-    return hasher_type::operator()(x.begin(), x.end(), 0);
-  }
-};
+    typedef utils::hashmurmur<size_t> hasher_type;
+    
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  template <typename Tp>
+  struct greater_second
+  {
+    bool operator()(const Tp& x, const Tp& y) const
+    {
+      return x.second > y.second;
+    }
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->second > y->second;
+    }
+  };
+  
+  typedef uint64_t count_type;
+  typedef utils::unordered_map<std::string, count_type, string_hash, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
+  
+  typedef std::vector<const vocab_type::value_type*, std::allocator<const vocab_type::value_type*> > sorted_type;
 
-template <typename Tp>
-struct greater_second
-{
-  bool operator()(const Tp& x, const Tp& y) const
+  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type > > queue_type;
+  
+  TaskVocab(queue_type& __queue)
+    : queue(__queue) {}
+
+  void operator()()
   {
-    return x.second > y.second;
+    path_type path;
+    std::string word;
+    
+    for (;;) {
+      queue.pop_swap(path);
+      
+      if (path.empty()) break;
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      while (is >> word) 
+	++ vocab[word];
+    }
   }
   
-  bool operator()(const Tp* x, const Tp* y) const
-  {
-    return x->second > y->second;
-  }
+  queue_type& queue;
+  vocab_type  vocab;
 };
 
 size_t vocabulary_size(const path_set_type& files)
 {
-  typedef uint64_t count_type;
-  typedef utils::unordered_map<std::string, count_type, string_hash, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
-
-  typedef std::vector<const vocab_type::value_type*, std::allocator<const vocab_type::value_type*> > sorted_type;
+  typedef TaskVocab task_type;
   
-  vocab_type vocab;
-  std::string word;
+  task_type::queue_type queue;
+
+  std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue));
+  
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     if (! boost::filesystem::exists(*fiter))
       throw std::runtime_error("no file? " + fiter->string());
     
-    utils::compress_istream is(*fiter, 1024 * 1024);
-    
-    while (is >> word) 
-      ++ vocab[word];
+    queue.push(*fiter);
   }
 
-  sorted_type sorted;
+  for (int i = 0; i != threads; ++ i)
+    queue.push(path_type());
+  
+  workers.join_all();
+  
+  task_type::vocab_type vocab;
+  for (int i = 0; i != threads; ++ i) {
+    if (vocab.empty())
+      vocab.swap(tasks[i].vocab);
+    else {
+      task_type::vocab_type::const_iterator viter_end = tasks[i].vocab.end();
+      for (task_type::vocab_type::const_iterator viter = tasks[i].vocab.begin(); viter != viter_end; ++ viter)
+	vocab[viter->first] += viter->second;
+    }
+    
+    tasks[i].vocab.clear();
+  }
+  
+  task_type::sorted_type sorted;
   sorted.reserve(vocab.size());
   
-  vocab_type::const_iterator viter_end = vocab.end();
-  for (vocab_type::const_iterator viter = vocab.begin(); viter != viter_end; ++ viter)
+  task_type::vocab_type::const_iterator viter_end = vocab.end();
+  for (task_type::vocab_type::const_iterator viter = vocab.begin(); viter != viter_end; ++ viter)
     sorted.push_back(&(*viter));
   
-  std::sort(sorted.begin(), sorted.end(), greater_second<vocab_type::value_type>());
+  std::sort(sorted.begin(), sorted.end(), task_type::greater_second<task_type::vocab_type::value_type>());
 
-  sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
+  task_type::sorted_type::const_iterator siter_end = sorted.end();
+  for (task_type::sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
     word_type __tmptmp((*siter)->first);
   }
   
