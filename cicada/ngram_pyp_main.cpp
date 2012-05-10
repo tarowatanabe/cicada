@@ -26,6 +26,8 @@ int main(int argc, char** argv)
   
   while (std::cin >> sentence) {
     ngram.resize(1);
+
+    double logprob_sentence = 0.0;
 	  
     sentence_type::const_iterator siter_end = sentence.end();
     for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
@@ -33,9 +35,11 @@ int main(int argc, char** argv)
       
       const bool is_oov = ! lm.vocab().exists(*siter);
       const double prob = lm.prob(std::max(ngram.begin(), ngram.end() - lm.order()), ngram.end());
+      const double lp = std::log(prob);
       
       if (! is_oov)
-	logprob_total += std::log(prob);
+	logprob_total += lp;
+      logprob_sentence += lp;
       
       num_oov += is_oov;
     }
@@ -43,8 +47,12 @@ int main(int argc, char** argv)
     ngram.push_back(vocab_type::EOS);
     
     const double prob = lm.prob(std::max(ngram.begin(), ngram.end() - lm.order()), ngram.end());
+    const double lp = std::log(prob);
     
-    logprob_total += std::log(prob);
+    logprob_total += lp;
+    logprob_sentence += lp;
+    
+    std::cout << "logprob: " << logprob_sentence << std::endl;
     
     num_word += sentence.size();
     ++ num_sentence;
