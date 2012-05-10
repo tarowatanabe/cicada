@@ -327,7 +327,7 @@ namespace cicada
 	      biter = buffer.end();
 	      
 	      if (context_star != context_end) {
-		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()) + 1, star_first);
+		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()), star_first);
 		star_last  = buffer.size() + 1;
 		
 		biter_first = buffer.end() + 1;
