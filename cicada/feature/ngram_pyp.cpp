@@ -328,7 +328,7 @@ namespace cicada
 	      
 	      if (context_star != context_end) {
 		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()), star_first);
-		star_last  = buffer.size() + 1;
+		star_last  = buffer.size();
 		
 		biter_first = buffer.end() + 1;
 		buffer.insert(buffer.end(), context_star, context_end);
@@ -353,8 +353,13 @@ namespace cicada
 	  symbol_type::id_type* context_end = context + order * 2;
 	  
 	  if (star_first >= 0) {
+	    if (buffer[star_first] != id_star)
+	      throw std::runtime_error("no star at star-first?");
+	    if (buffer[star_last] != id_star)
+	      throw std::runtime_error("no star at star-last?");
+
 	    const int prefix_size = utils::bithack::min(star_first, context_size);
-	    const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
+	    const int suffix_size = utils::bithack::min(int(buffer.size() - (star_last + 1)), context_size);
 	    
 	    buffer_type::const_iterator biter_begin = buffer.begin();
 	    buffer_type::const_iterator biter_end   = buffer.end();
