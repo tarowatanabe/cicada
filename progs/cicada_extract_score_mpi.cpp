@@ -3,6 +3,7 @@
 //
 
 #include "cicada_extract_score_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -67,8 +68,6 @@ path_type prog_name;
 
 int debug = 0;
 
-void prepare(const path_type& output_file);
-
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files);
 template <typename Extractor, typename Lexicon>
@@ -132,9 +131,11 @@ int main(int argc, char** argv)
       
       path_set_type reversed_files;
       root_count_set_type root_sources;
-
-      // prepare directory...
-      prepare(output_file);
+      
+      if (mpi_rank == 0)
+	prepare_directory(output_file);
+      
+      MPI::COMM_WORLD.Barrier();
       
       utils::resource start_modify;
       modify_counts_reducer(comm_parent, output_file);
@@ -348,26 +349,6 @@ int loop_sleep(bool found, int non_found_iter)
     non_found_iter = 0;
   }
   return non_found_iter;
-}
-
-void prepare(const path_type& output_file)
-{
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  // create directories for output
-  if (mpi_rank == 0) {
-    if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-      utils::filesystem::remove_all(output_file);
-    
-    boost::filesystem::create_directories(output_file);
-    
-    boost::filesystem::directory_iterator iter_end;
-    for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-      utils::filesystem::remove_all(*iter);
-  }
-  
-  MPI::COMM_WORLD.Barrier();
 }
 
 void synchronize_mapper(utils::mpi_intercomm& reducer)

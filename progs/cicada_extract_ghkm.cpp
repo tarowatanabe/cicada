@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "cicada_extract_ghkm_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
@@ -69,15 +70,7 @@ int main(int argc, char** argv)
 
     threads = utils::bithack::max(threads, 1);
     
-    // create directories for output
-    if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-      utils::filesystem::remove_all(output_file);
-    
-    boost::filesystem::create_directories(output_file);
-    
-    boost::filesystem::directory_iterator iter_end;
-    for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-      utils::filesystem::remove_all(*iter);
+    prepare_directory(output_file);
 
     utils::resource start_extract;
     

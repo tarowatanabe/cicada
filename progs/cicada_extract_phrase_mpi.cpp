@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "cicada_extract_phrase_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
@@ -92,18 +93,8 @@ int main(int argc, char** argv)
     if (output_file.empty())
       throw std::runtime_error("no output directory?");
     
-
-    if (mpi_rank == 0) {
-      // create directories for output
-      if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	utils::filesystem::remove_all(output_file);
-      
-      boost::filesystem::create_directories(output_file);
-      
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	utils::filesystem::remove_all(*iter);
-    }
+    if (mpi_rank == 0)
+      prepare_directory(output_file);
 
     static const size_t queue_size = 1024;
     

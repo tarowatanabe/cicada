@@ -3,6 +3,7 @@
 //
 
 #include "cicada_extract_score_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -231,16 +232,8 @@ void score_counts(const path_type& output_file,
   if (static_cast<int>(reversed_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
   
-  // create directories for output
-  if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-    utils::filesystem::remove_all(output_file);
+  prepare_directory(output_file);
   
-  boost::filesystem::create_directories(output_file);
-  
-  boost::filesystem::directory_iterator iter_end;
-  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-    utils::filesystem::remove_all(*iter);
-
   path_map_type mapped_files(threads);
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
