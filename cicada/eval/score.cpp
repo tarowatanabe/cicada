@@ -101,7 +101,7 @@ namespace cicada
     const char* Scorer::lists()
     {
       static const char* desc = "\
-combined: combined scorer\n\
+combined: combined scorer (we assume it is a reward, not loss!)\n\
 \tmetric=[scorer spec] i.e. metric=\"bleu:order=4\"\n\
 \tweight=[weight for the scorer]\n\
 bleu:\n\
