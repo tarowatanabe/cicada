@@ -105,6 +105,15 @@ namespace cicada
       cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
     };
 
+    struct cache_prob_type
+    {
+      double    prob;
+      size_type pos;
+      id_type   word;
+      
+      cache_prob_type() : prob(0.0), pos(size_type(-1)), word(id_type(-1)) {}
+    };
+
     struct cache_state_type
     {
       state_type curr;
@@ -114,7 +123,8 @@ namespace cicada
       cache_state_type() : curr(), next(), word(id_type(-1)) {}
     };
     
-    typedef utils::array_power2<cache_pos_type,   1024 * 128, std::allocator<cache_pos_type> >     cache_pos_set_type;
+    typedef utils::array_power2<cache_pos_type,   1024 * 256, std::allocator<cache_pos_type> >   cache_pos_set_type;
+    typedef utils::array_power2<cache_prob_type,  1024 * 256, std::allocator<cache_prob_type> >  cache_prob_set_type;
     typedef utils::array_power2<cache_state_type, 1024 * 128, std::allocator<cache_state_type> > cache_state_set_type;
 
   public:
@@ -138,6 +148,7 @@ namespace cicada
       offsets_.clear();
       vocab_.clear();
       caches_pos_.clear();
+      caches_prob_.clear();
       caches_state_.clear();
     }
 
@@ -312,8 +323,6 @@ namespace cicada
     template <typename Iterator>
     std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
     {
-      //return std::make_pair(first, last);
-#if 1
       typedef std::reverse_iterator<Iterator> reverse_iterator;
       
       if (first == last) return std::make_pair(first, last);
@@ -333,9 +342,7 @@ namespace cicada
       }
       
       return std::make_pair(iter.base(), last);
-#endif
     }
-
     
     template <typename Iterator>
     prob_type __prob_dispatch(Iterator first, Iterator last, id_type) const
@@ -344,7 +351,7 @@ namespace cicada
       
       const id_type word = *(last - 1);
       
-      double p = __prob_dispatch(0, size_type(-1), word, p0_);
+      double p = __prob(0, size_type(-1), word, p0_);
       
       // we will traverse from the back!
       reverse_iterator begin(last - 1);
@@ -360,7 +367,7 @@ namespace cicada
 	if (node == size_type(-1) || pos_total_customer >= total_.size() || ! total_[pos_total_customer])
 	  return p;
 	else
-	  p = __prob_dispatch(order, node, word, p);
+	  p = __prob(order, node, word, p);
       }
       
       return p;
@@ -373,7 +380,7 @@ namespace cicada
       
       const id_type word = vocab_[*(last - 1)];
       
-      double p = __prob_dispatch(0, size_type(-1), word, p0_);
+      double p = __prob(0, size_type(-1), word, p0_);
       
       // we will traverse from the back!
       reverse_iterator begin(last - 1);
@@ -389,13 +396,33 @@ namespace cicada
 	if (node == size_type(-1) || pos_total_customer >= total_.size() || ! total_[pos_total_customer])
 	  return p;
 	else
-	  p = __prob_dispatch(order, node, word, p);
+	  p = __prob(order, node, word, p);
       }
       
       return p;
     }
+
+    prob_type __prob(int order, const size_type pos, const id_type word, const double p0) const
+    {
+      // lock here!
+      spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_.mutex));
+      
+      if (lock) {
+	const size_type cache_pos = hasher_type::operator()(word, pos) &(caches_prob_.size() - 1);
+	cache_prob_type& cache = const_cast<cache_prob_type&>(caches_prob_[cache_pos]);
+	
+	if (cache.pos != pos || cache.word != word) {
+	  cache.prob = __prob_internal(order, pos, word, p0);
+	  cache.pos  = pos;
+	  cache.word = word;
+	}
+	
+	return cache.prob;
+      } else
+	return __prob_internal(order, pos, word, p0);
+    }
     
-    prob_type __prob_dispatch(int order, size_type pos, const id_type& word, const double p0) const
+    prob_type __prob_internal(int order, const size_type pos, const id_type word, const double p0) const
     {
       const size_type pos_total = utils::bithack::branch(pos == size_type(-1), size_type(0), pos + 1);
       
@@ -418,7 +445,7 @@ namespace cicada
 	return (double(customer_dish_size) - discount_[order] * table_dish_size + r * p0) / (double(customer_size) + strength_[order]);
       }
     }
-
+    
   private:
     size_type __find(size_type pos, const id_type& id) const
     {
@@ -477,8 +504,10 @@ namespace cicada
     int               order_;
     
     spinlock_type        spinlock_pos_;
+    spinlock_type        spinlock_prob_;
     spinlock_type        spinlock_state_;
     cache_pos_set_type   caches_pos_;
+    cache_prob_set_type  caches_prob_;
     cache_state_set_type caches_state_;
   };
   
