@@ -12,11 +12,12 @@
 inline
 void prepare_directory(const boost::filesystem::path& path)
 {
-  if (boost::filesystem::exists(path) && ! boost::filesystem::is_directory(path))
-    utils::filesystem::remove_all(path);
-  
   if (! boost::filesystem::exists(path))
     boost::filesystem::create_directories(path);
+  else if (! boost::filesystem::is_directory(path)) {
+    utils::filesystem::remove_all(path);
+    boost::filesystem::create_directories(path);
+  }
   
   boost::filesystem::directory_iterator iter_end;
   for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter)
