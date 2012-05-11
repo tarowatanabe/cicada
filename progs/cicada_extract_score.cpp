@@ -14,6 +14,7 @@
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
 
+#include <utils/filesystem.hpp>
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/lexical_cast.hpp>

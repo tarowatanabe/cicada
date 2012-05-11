@@ -11,6 +11,7 @@
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 
+#include <utils/filesystem.hpp>
 #include <utils/resource.hpp>
 
 #include "utils/mpi.hpp"
