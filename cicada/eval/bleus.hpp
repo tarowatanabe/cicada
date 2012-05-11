@@ -57,6 +57,8 @@ namespace cicada
       }
 
       double loss() const { return 1.0 - score(); }
+
+      double reward() const { return score(); }
       
       bool error_metric() const { return false; }
 

@@ -39,6 +39,7 @@ namespace cicada
 
       virtual double score() const = 0;
       virtual double loss() const = 0;
+      virtual double reward() const = 0;
       virtual bool error_metric() const = 0;
 
       virtual bool equal(const score_type& score) const = 0;
