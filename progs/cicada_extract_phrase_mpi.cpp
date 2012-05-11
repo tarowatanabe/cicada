@@ -95,13 +95,13 @@ int main(int argc, char** argv)
     if (mpi_rank == 0) {
       // create directories for output
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	boost::filesystem::remove_all(output_file);
+	utils::filesystem::remove_all(output_file);
       
       boost::filesystem::create_directories(output_file);
       
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	boost::filesystem::remove_all(*iter);
+	utils::filesystem::remove_all(*iter);
     }
 
     static const size_t queue_size = 1024;

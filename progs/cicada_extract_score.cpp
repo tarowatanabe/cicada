@@ -232,13 +232,13 @@ void score_counts(const path_type& output_file,
   
   // create directories for output
   if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-    boost::filesystem::remove_all(output_file);
+    utils::filesystem::remove_all(output_file);
   
   boost::filesystem::create_directories(output_file);
   
   boost::filesystem::directory_iterator iter_end;
   for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-    boost::filesystem::remove_all(*iter);
+    utils::filesystem::remove_all(*iter);
 
   path_map_type mapped_files(threads);
   for (size_t i = 0; i != counts_files.size(); ++ i)
