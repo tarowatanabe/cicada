@@ -102,8 +102,6 @@ namespace cicada
     {
       static const char* desc = "\
 combined: combined scorer\n\
-\terror=[true|fase] error metric\n\
-\treward=[true|fase] reward metric\n\
 \tmetric=[scorer spec] i.e. metric=\"bleu:order=4\"\n\
 \tweight=[weight for the scorer]\n\
 bleu:\n\
@@ -192,27 +190,17 @@ depeval: dependency parse evaluation\n\
       scorer_ptr_type scorer;
 
       if (utils::ipiece(param.name()) == "combined") {
-	bool error = false;
-	bool reward = false;
-
 	std::vector<std::string, std::allocator<std::string> > metrics;
 	std::vector<double, std::allocator<double> > weights;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (utils::ipiece(piter->first) == "error")
-	    error = utils::lexical_cast<bool>(piter->second);
-	  else if (utils::ipiece(piter->first) == "reward")
-	    reward = utils::lexical_cast<bool>(piter->second);
-	  else if (utils::ipiece(piter->first) == "metric")
+	  if (utils::ipiece(piter->first) == "metric")
 	    metrics.push_back(piter->second);
 	  else if (utils::ipiece(piter->first) == "weight")
 	    weights.push_back(utils::lexical_cast<double>(piter->second));
 	  else
 	    std::cerr << "WARNING: unsupported parameter for combined: " << piter->first << "=" << piter->second << std::endl;
 	}
-	
-	if (int(error) + reward != 1)
-	  throw std::runtime_error("specify whether this is error or reward metric");
 	
 	if (metrics.empty())
 	  throw std::runtime_error("no metrics?");
@@ -222,7 +210,6 @@ depeval: dependency parse evaluation\n\
 	  throw std::runtime_error("metrics and weights size do not match");
 	
 	std::auto_ptr<CombinedScorer> combined(new CombinedScorer());
-	combined->error = error;
 	
 	for (size_t i = 0; i != metrics.size(); ++ i) {
 	  combined->scorers.push_back(create(metrics[i]));

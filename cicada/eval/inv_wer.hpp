@@ -35,6 +35,10 @@ namespace cicada
 	return edits / references;
       }
 
+      double loss() const { return score(); }
+      
+      bool error_metric() const { return true; }
+
       bool equal(const score_type& score) const
       {
 	const InvWER* rhs = dynamic_cast<const InvWER*>(&score);

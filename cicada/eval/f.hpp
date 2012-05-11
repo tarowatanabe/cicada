@@ -29,6 +29,10 @@ namespace cicada
 	return precision * recall / (0.5 * recall + 0.5 * precision);
       }
 
+      double loss() const { return 1.0 - score(); }
+      
+      bool error_metric() const { return false; }
+
       bool equal(const score_type& score) const
       {
 	const F* rhs = dynamic_cast<const F*>(&score);

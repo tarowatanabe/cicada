@@ -31,6 +31,10 @@ namespace cicada
       {
 	return 2.0 * matched / (test + reference);
       }
+      
+      double loss() const { return 1.0 - score(); }
+      
+      bool error_metric() const { return false; }
 
       bool equal(const score_type& score) const
       {

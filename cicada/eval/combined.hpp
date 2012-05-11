@@ -39,6 +39,10 @@ namespace cicada
 	return result;
       }
       
+      double loss() const { return 1.0 - score(); }
+
+      bool error_metric() const { return false; }
+      
       bool equal(const score_type& score) const
       {
 	const Combined* rhs = dynamic_cast<const Combined*>(&score);
@@ -173,7 +177,7 @@ namespace cicada
 	return *this;
       }
       
-      bool error_metric() const { return error; }
+      bool error_metric() const { return false; }
       
       scorer_ptr_type clone() const
       {
@@ -219,7 +223,6 @@ namespace cicada
     private:
       scorer_ptr_set_type scorers;
       weight_set_type weights;
-      bool error;
     };
   };
 };

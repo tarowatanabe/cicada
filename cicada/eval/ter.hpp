@@ -34,6 +34,10 @@ namespace cicada
 	return edits / references;
       }
 
+      double loss() const { return score(); }
+      
+      bool error_metric() const { return true; }
+
       bool equal(const score_type& score) const
       {
 	const TER* rhs = dynamic_cast<const TER*>(&score);

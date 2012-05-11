@@ -31,6 +31,10 @@ namespace cicada
       {
 	return (penalty != 0.0 ? distance / penalty : 0.0);
       }
+
+      double loss() const { return score(); }
+      
+      bool error_metric() const { return true; }
       
       bool equal(const score_type& score) const
       {

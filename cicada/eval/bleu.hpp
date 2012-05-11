@@ -61,6 +61,10 @@ namespace cicada
 	
 	return std::exp(score);
       }
+      
+      double loss() const { return 1.0 - score(); }
+      
+      bool error_metric() const { return false; }
 
       bool equal(const score_type& score) const
       {
