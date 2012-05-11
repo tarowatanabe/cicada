@@ -1,6 +1,6 @@
 2012-5-x
 Bugfix: variational decoding and bleu/bleuS computation on a forest :(
-INCOMPATIBLE CHANGE by adding loss/reward to evaluation statistics, and always use loss() (no negative-Bleu, but 1-Bleu)
+INCOMPATIBLE CHANGE by adding loss/reward to evaluation statistics, and always use loss() (no negative-Bleu, but 1-Bleu for tuning)
 INCOMPATIBLE CHANGE by better ITG parsing: use of pialign-style parsing with simple outside estimates
 Better indexing: prune away unused space for indexed (tree-)grammar(s)
 New: added PYP-pos, an unsupervised pos induction (currently, we support training, and no pos assinger exists)
