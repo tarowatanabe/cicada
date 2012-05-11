@@ -215,7 +215,6 @@ bool powell(const scorer_document_type& scorers,
 												bound_upper,
 												tolerance,
 												samples,
-												scorers.error_metric(),
 												debug);
   
   return optimizer(score, weights);
@@ -717,9 +716,7 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   
   workers.join_all();
 
-  const double score_factor = (scorers.error_metric() ? 1.0 : - 1.0);
-  
-  return score->score() * score_factor;
+  return score->loss();
 }
 
 void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const size_t scorers_size)

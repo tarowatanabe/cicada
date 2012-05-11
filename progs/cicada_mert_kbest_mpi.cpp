@@ -258,7 +258,6 @@ bool powell(const scorer_document_type& scorers,
 												bound_upper,
 												tolerance,
 												samples,
-												scorers.error_metric(),
 												debug);
   
   return optimizer(score, weights);
@@ -914,7 +913,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
-    return score->score() * (scorers.error_metric() ? 1.0 : - 1.0);
+    return score->loss();
   } else {
     bcast_weights(0, weights);
     

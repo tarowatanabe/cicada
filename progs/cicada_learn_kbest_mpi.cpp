@@ -2781,9 +2781,6 @@ double optimize_cp(const scorer_document_type& scorers,
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  const double loss_factor = (scorers.error_metric() ? 1.0 : - 1.0);
-  const double loss_oracle = (scorers.error_metric() ? 0.0 : - 1.0);
   
   Optimize opt(scorers, kbests, oracles, kbest_map);
   
@@ -2828,8 +2825,8 @@ double optimize_cp(const scorer_document_type& scorers,
 	// reduce score part
 	reduce_score(risk_local.second);
 	
-	risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : loss_oracle);
-	risk += (risk_local.second.second ? risk_local.second.second->score() * loss_factor : 0.0);
+	risk -= (risk_local.second.first ? risk_local.second.first->loss() : 0.0);
+	risk += (risk_local.second.second ? risk_local.second.second->loss() : 0.0);
 	
 	if (mpi_rank == 0) {
 	  // b = risk + a \cdot w
@@ -2881,8 +2878,8 @@ double optimize_cp(const scorer_document_type& scorers,
     // reduce score part
     reduce_score(risk_local.second);
     
-    risk -= (risk_local.second.first ? risk_local.second.first->score() * loss_factor : loss_oracle);
-    risk += (risk_local.second.second ? risk_local.second.second->score() * loss_factor : 0.0);
+    risk -= (risk_local.second.first ? risk_local.second.first->loss() : 0.0);
+    risk += (risk_local.second.second ? risk_local.second.second->loss() : 0.0);
     
     size_t active_size = 0;
     
@@ -3113,7 +3110,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	
 	line_search_type line_search;
         
-        const optimum_type optimum = line_search(segments, 0.01, 2.0, scorers.error_metric());
+        const optimum_type optimum = line_search(segments, 0.01, 2.0);
         
         const double update = (optimum.lower + optimum.upper) * 0.5;
         
@@ -3241,7 +3238,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	
 	line_search_type line_search;
         
-        const optimum_type optimum = line_search(segments, line_search_type::RegularizeL2(C, origin, direction), 0.01, 2.0, scorers.error_metric());
+        const optimum_type optimum = line_search(segments, line_search_type::RegularizeL2(C, origin, direction), 0.01, 2.0);
 	
         const double update = (optimum.lower + optimum.upper) * 0.5;
         
@@ -3292,8 +3289,8 @@ double optimize_cp(const scorer_document_type& scorers,
     // reduce score part
     reduce_score(objective_master_local.second);
     
-    objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->score() * loss_factor : loss_oracle);
-    objective_master += (objective_master_local.second.second ? objective_master_local.second.second->score() * loss_factor : 0.0);
+    objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->loss() : 0.0);
+    objective_master += (objective_master_local.second.second ? objective_master_local.second.second->loss() : 0.0);
     
     objective_master += 0.5 * C * cicada::dot_product(weights, weights);
 
@@ -4594,7 +4591,7 @@ double optimize_mert(const scorer_document_type& scorers,
 
     line_search_type line_search;
     
-    const optimum_type optimum = line_search(segments, scale_min, scale_max, scorers.error_metric());
+    const optimum_type optimum = line_search(segments, scale_min, scale_max);
 
     const double update = (optimum.lower + optimum.upper) * 0.5;
 
@@ -4669,10 +4666,7 @@ void read_kbest(const scorer_document_type& scorers,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  const bool error_metric = scorers.error_metric();
-  const double loss_factor = (error_metric ? 1.0 : - 1.0);
-  
+    
   parser_type parser;
   kbest_feature_type kbest;
 
@@ -4721,7 +4715,7 @@ void read_kbest(const scorer_document_type& scorers,
 	      throw std::runtime_error("reference positions outof index");
 	    
 	    kbest.score = scorers[i]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->score() * loss_factor;
+	    kbest.loss  = kbest.score->loss();
 	  } else
 	    kbest.loss = 1;
 	}
@@ -4778,7 +4772,7 @@ void read_kbest(const scorer_document_type& scorers,
 	  
 	  if (! scorers.empty()) {
 	    kbest.score = scorers[refset_pos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->score() * loss_factor;
+	    kbest.loss  = kbest.score->loss();
 	  } else
 	    kbest.loss = 1;
 	}
@@ -4803,9 +4797,6 @@ void read_kbest(const scorer_document_type& scorers,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  const bool error_metric = scorers.error_metric();
-  const double loss_factor = (error_metric ? 1.0 : - 1.0);
   
   parser_type parser;
   kbest_feature_type kbest;
@@ -4855,7 +4846,7 @@ void read_kbest(const scorer_document_type& scorers,
 	      throw std::runtime_error("reference positions outof index");
 	    
 	    kbest.score = scorers[i]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->score() * loss_factor;
+	    kbest.loss  = kbest.score->loss();
 	  } else
 	    kbest.loss = 1;
 	}
@@ -4906,7 +4897,7 @@ void read_kbest(const scorer_document_type& scorers,
 	      throw std::runtime_error("reference positions outof index");
 	    
 	    oracle.score = scorers[i]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
-	    oracle.loss  = oracle.score->score() * loss_factor;
+	    oracle.loss  = oracle.score->loss();
 	  } else
 	    oracle.loss = 0;
 	}
@@ -4965,7 +4956,7 @@ void read_kbest(const scorer_document_type& scorers,
 	    
 	    if (! scorers.empty()) {
 	    kbest.score = scorers[refset_pos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->score() * loss_factor;
+	    kbest.loss  = kbest.score->loss();
 	  } else
 	    kbest.loss = 1;
 	  }
@@ -4995,7 +4986,7 @@ void read_kbest(const scorer_document_type& scorers,
 
 	    if (! scorers.empty()) {
 	      oracle.score = scorers[refset_pos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
-	      oracle.loss  = oracle.score->score() * loss_factor;
+	      oracle.loss  = oracle.score->loss();
 	    } else
 	      oracle.loss = 0.0;
 	  }

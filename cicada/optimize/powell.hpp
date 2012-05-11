@@ -58,7 +58,6 @@ namespace cicada
 	     const weight_set_type&        __bound_upper,
 	     const double __tolerance,
 	     const int __samples,
-	     const bool __minimize,
 	     const int __debug=0)
 	: envelopes(__envelopes),
 	  viterbi(__viterbi),
@@ -68,7 +67,6 @@ namespace cicada
 	  bound_upper(__bound_upper),
 	  tolerance(__tolerance),
 	  samples(__samples),
-	  minimize(__minimize),
 	  debug(__debug)
       { line_search_type::initialize_bound(bound_lower, bound_upper); }
       
@@ -108,7 +106,7 @@ namespace cicada
 
 	  envelopes(segments, optimum_weights, directions[0]);
 	  
-	  optimums[0] = line_search(segments, optimum_weights, directions[0], regularizer, minimize);
+	  optimums[0] = line_search(segments, optimum_weights, directions[0], regularizer);
 	  
 	  if (optimums[0].lower != optimums[0].upper && optimums[0].objective < optimum_objective)
 	    points[0] = optimums[0](optimum_weights, directions[0]); // move point...
@@ -131,7 +129,7 @@ namespace cicada
 	    
 	    envelopes(segments, points[dir - 1], directions[dir]);
 	    
-	    optimums[dir] = line_search(segments, points[dir - 1], directions[dir], regularizer, minimize);
+	    optimums[dir] = line_search(segments, points[dir - 1], directions[dir], regularizer);
 	    
 	    if (optimums[dir].lower != optimums[dir].upper && optimums[dir].objective < optimums[dir - 1].objective)
 	      points[dir] = optimums[dir](points[dir - 1], directions[dir]); // move point...
@@ -263,13 +261,12 @@ namespace cicada
       const regularizer_type&       regularizer;
       
       generator_type& generator;
-
+      
       weight_set_type bound_lower;
       weight_set_type bound_upper;
-
+      
       double tolerance;
       int samples;
-      const bool minimize;
       const int  debug;
     };
   };

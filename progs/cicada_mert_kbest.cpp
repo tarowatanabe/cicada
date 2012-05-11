@@ -214,7 +214,6 @@ bool powell(const scorer_document_type& scorers,
 												bound_upper,
 												tolerance,
 												samples,
-												scorers.error_metric(),
 												debug);
   
   return optimizer(score, weights);
@@ -689,7 +688,7 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
     else
       *score += *scores[id];
   
-  return score->score() * (scorers.error_metric() ? 1.0 : - 1.0);
+  return score->loss();
 }
 
 struct TaskInit

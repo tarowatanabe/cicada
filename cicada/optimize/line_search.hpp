@@ -292,12 +292,10 @@ namespace cicada
       void operator()(const segment_document_type& segments,
 		      const double value_min,
 		      const double value_max,
-		      const bool minimize,
 		      Iterator iter)
       {
 	// we assume a set of line_ptr and score_ptr pair...
 	
-	const double score_factor = (minimize ? 1.0 : - 1.0);
 	const std::pair<double, double> range(value_min, value_max);
 
 	heap_type heap;
@@ -329,7 +327,7 @@ namespace cicada
 	// priority queue...
 	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	
-	const double score = score_factor * stat->score();
+	const double score = stat->loss();
 	
 	double lower = lower_bound(heap.front().first->x, range.first);
 	double upper = heap.front().first->x;
@@ -372,7 +370,7 @@ namespace cicada
 	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
-	  const double score = score_factor * stat->score();
+	  const double score = stat->loss();
 	  if (score != score_prev) {
 	    segment_prev = segment_curr;
 	    score_prev = score;
@@ -402,12 +400,9 @@ namespace cicada
 
       value_type operator()(const segment_document_type& segments,
 			    const double value_min,
-			    const double value_max,
-			    const bool minimize)
+			    const double value_max)
       {
 	// we assume a set of line_ptr and score_ptr pair...
-	
-	const double score_factor = (minimize ? 1.0 : - 1.0);
 	const std::pair<double, double> range(value_min, value_max);
 
 	heap_type heap;
@@ -440,7 +435,7 @@ namespace cicada
 	// priority queue...
 	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	
-	const double score = score_factor * stat->score();
+	const double score = stat->loss();
 	
 	double optimum_lower = lower_bound(heap.front().first->x, range.first);
 	double optimum_upper = heap.front().first->x;
@@ -483,7 +478,7 @@ namespace cicada
 	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
-	  const double score = score_factor * stat->score();
+	  const double score = stat->loss();
 	  if (score != score_prev) {
 	    segment_prev = segment_curr;
 	    score_prev = score;
@@ -531,12 +526,10 @@ namespace cicada
       value_type operator()(const segment_document_type& segments,
 			    Regularizer regularizer,
 			    const double value_min,
-			    const double value_max,
-			    const bool minimize)
+			    const double value_max)
       {
 	// we assume a set of line_ptr and score_ptr pair...
 	
-	const double score_factor = (minimize ? 1.0 : - 1.0);
 	const std::pair<double, double> range(value_min, value_max);
 
 	heap_type heap;
@@ -569,7 +562,7 @@ namespace cicada
 	// priority queue...
 	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	
-	const double score = score_factor * stat->score();
+	const double score = stat->loss();
 	
 	double optimum_lower = lower_bound(heap.front().first->x, range.first);
 	double optimum_upper = heap.front().first->x;
@@ -611,7 +604,7 @@ namespace cicada
 	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
-	  const double score = score_factor * stat->score();
+	  const double score = stat->loss();
 	  if (score != score_prev) {
 	    segment_prev = segment_curr;
 	    score_prev = score;
@@ -659,12 +652,10 @@ namespace cicada
       value_type operator()(const segment_document_type& segments,
 			    const weight_set_type& origin,
 			    const weight_set_type& direction,
-			    Regularizer regularizer,
-			    const bool minimize)
+			    Regularizer regularizer)
       {
 	// we assume a set of line_ptr and score_ptr pair...
 	
-	const double score_factor = (minimize ? 1.0 : - 1.0);
 	const std::pair<double, double> range = valid_range(origin, direction);
 
 	heap_type heap;
@@ -697,7 +688,7 @@ namespace cicada
 	// priority queue...
 	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	
-	const double score = score_factor * stat->score();
+	const double score = stat->loss();
 	
 	double optimum_lower = lower_bound(heap.front().first->x, range.first);
 	double optimum_upper = heap.front().first->x;
@@ -740,7 +731,7 @@ namespace cicada
 	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->x);
 	  
 	  // we perform merging of ranges if error counts are equal...
-	  const double score = score_factor * stat->score();
+	  const double score = stat->loss();
 	  if (score != score_prev) {
 	    segment_prev = segment_curr;
 	    score_prev = score;

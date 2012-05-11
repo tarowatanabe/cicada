@@ -2651,7 +2651,7 @@ double optimize_mert(const scorer_document_type& scorers,
   
   line_search_type line_search;
   
-  const optimum_type optimum = line_search(segments, 0.1, 1.1, scorers.error_metric());
+  const optimum_type optimum = line_search(segments, 0.1, 1.1);
   
   const double update = (optimum.lower + optimum.upper) * 0.5;
   
@@ -2679,9 +2679,6 @@ struct TaskLoss
 
   void operator()()
   {
-    const bool error_metric = scorers.error_metric();
-    const double loss_factor = (error_metric ? 1.0 : - 1.0);
-    
     for (;;) {
       int id = 0;
       queue.pop(id);
@@ -2690,7 +2687,7 @@ struct TaskLoss
       hypothesis_set_type::iterator kiter_end = kbests[id].end();
       for (hypothesis_set_type::iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	kiter->score = scorers[id]->score(sentence_type(sentence_type(kiter->sentence.begin(), kiter->sentence.end())));
-	kiter->loss = kiter->score->score() * loss_factor;
+	kiter->loss = kiter->score->loss();
       }
     }
   }
@@ -2845,9 +2842,6 @@ struct TaskReadSync
     typedef boost::spirit::istream_iterator iter_type;
     typedef kbest_feature_parser<iter_type> parser_type;
     
-    const bool error_metric = scorers.error_metric();
-    const double loss_factor = (error_metric ? 1.0 : - 1.0);
-    
     parser_type parser;
     kbest_feature_type kbest;
 
@@ -2892,7 +2886,7 @@ struct TaskReadSync
 	  
 	  if (! scorers.empty()) {
 	    kbest.score = scorers[refpos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->score() * loss_factor;
+	    kbest.loss  = kbest.score->loss();
 	  } else
 	    kbest.loss = 1;
 	}
@@ -2919,7 +2913,7 @@ struct TaskReadSync
 	  
 	  if (! scorers.empty()) {
 	    oracle.score = scorers[refpos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
-	    oracle.loss  = oracle.score->score() * loss_factor;
+	    oracle.loss  = oracle.score->loss();
 	  } else
 	    oracle.loss = 0.0;
 	}

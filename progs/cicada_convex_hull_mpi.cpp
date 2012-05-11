@@ -198,7 +198,7 @@ int main(int argc, char ** argv)
       
       utils::compress_ostream os(output_file, 1024 * 1024);
       
-      line_search(segments, value_lower, value_upper, scorers.error_metric(), OutputIterator(os, weights[direction_name]));
+      line_search(segments, value_lower, value_upper, OutputIterator(os, weights[direction_name]));
     }
   }
   catch (const std::exception& err) {
