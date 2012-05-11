@@ -81,7 +81,7 @@ int main(int argc, char** argv)
       if (target_files.size() != alignment_files.size())
 	throw std::runtime_error("# of target files does not match");
 
-    if (visualize_mode && giza_mode)
+    if (int(visualize_mode) + giza_mode > 1)
       throw std::runtime_error("either visualize or giza");
     
     if (visualize_mode || giza_mode) {
@@ -381,6 +381,7 @@ std::ostream& giza(std::ostream& os,
   
   return os;
 }
+
 
 std::ostream& visualize(std::ostream& os,
 			const sentence_type& source,
