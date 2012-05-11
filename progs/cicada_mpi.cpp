@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "cicada_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 #include "cicada/eval/score.hpp"
 #include "cicada/format.hpp"
@@ -168,18 +169,8 @@ int main(int argc, char ** argv)
 				  debug);
     
     // make sure to synchronize here... otherwise, badthink may happen...
-    if (mpi_rank == 0 && ! operations.get_output_data().directory.empty()) {
-      const path_type& directory = operations.get_output_data().directory;
-      
-      if (boost::filesystem::exists(directory) && ! boost::filesystem::is_directory(directory))
-	utils::filesystem::remove_all(directory);
-      
-      boost::filesystem::create_directories(directory);
-      
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
-	utils::filesystem::remove_all(*iter);
-    }
+    if (mpi_rank == 0 && ! operations.get_output_data().directory.empty())
+      prepare_directory(operations.get_output_data().directory);
     
     synchronize();
     

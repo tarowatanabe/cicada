@@ -54,6 +54,7 @@
 
 #include "cicada_text_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -148,16 +149,9 @@ int main(int argc, char ** argv)
 
     boost::spirit::karma::real_generator<double, real_precision_20> double20;
     
-    if (mpi_rank == 0) {
+    if (mpi_rank == 0 && ! output_file.empty()) {
       if (directory_mode) {
-	if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	  utils::filesystem::remove_all(output_file);
-	
-	boost::filesystem::create_directories(output_file);
-	
-	boost::filesystem::directory_iterator iter_end;
-	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	  utils::filesystem::remove_all(*iter);
+	prepare_directory(output_file);
 	
 	for (size_t id = 0; id != oracles.size(); ++ id)
 	  if (! oracles[id].empty()) {

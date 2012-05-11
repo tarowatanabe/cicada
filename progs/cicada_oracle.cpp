@@ -40,6 +40,8 @@
 
 #include "cicada/eval.hpp"
 
+#include "cicada_output_impl.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -171,46 +173,42 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    if (directory_mode) {
-      if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	utils::filesystem::remove_all(output_file);
+    if (! output_file.empty()) {
+      if (directory_mode) {
 	
-      boost::filesystem::create_directories(output_file);
+	prepare_directory(output_file);
 	
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	utils::filesystem::remove_all(*iter);
-	
-      if (forest_mode) {
-	for (size_t id = 0; id != oracles_forest.size(); ++ id)
-	  if (oracles_forest[id].is_valid()) {
-	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
-	    os.precision(10);
+	if (forest_mode) {
+	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
+	    if (oracles_forest[id].is_valid()) {
+	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      os.precision(10);
 	      
-	    os << id << " ||| " << oracles_forest[id] << '\n';
-	  }
-      } else {
-	for (size_t id = 0; id != oracles.size(); ++ id)
-	  if (! oracles[id].empty()) {
-	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
-	    os.precision(10);
+	      os << id << " ||| " << oracles_forest[id] << '\n';
+	    }
+	} else {
+	  for (size_t id = 0; id != oracles.size(); ++ id)
+	    if (! oracles[id].empty()) {
+	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      os.precision(10);
 	      
-	    os << id << " ||| " << oracles[id] << '\n';
-	  }
-      }
+	      os << id << " ||| " << oracles[id] << '\n';
+	    }
+	}
 	
-    } else {
-      utils::compress_ostream os(output_file, 1024 * 1024);
-      os.precision(10);
-
-      if (forest_mode) {
-	for (size_t id = 0; id != oracles_forest.size(); ++ id)
-	  if (oracles_forest[id].is_valid())
-	    os << id << " ||| " << oracles_forest[id] << '\n';
       } else {
-	for (size_t id = 0; id != oracles.size(); ++ id)
-	  if (! oracles[id].empty())
-	    os << id << " ||| " << oracles[id] << '\n';
+	utils::compress_ostream os(output_file, 1024 * 1024);
+	os.precision(10);
+	
+	if (forest_mode) {
+	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
+	    if (oracles_forest[id].is_valid())
+	      os << id << " ||| " << oracles_forest[id] << '\n';
+	} else {
+	  for (size_t id = 0; id != oracles.size(); ++ id)
+	    if (! oracles[id].empty())
+	      os << id << " ||| " << oracles[id] << '\n';
+	}
       }
     }
   }

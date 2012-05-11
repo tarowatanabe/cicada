@@ -47,6 +47,8 @@
 #include "cicada/operation/functional.hpp"
 #include "cicada/operation/traversal.hpp"
 
+#include "cicada_output_impl.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -190,16 +192,9 @@ int main(int argc, char ** argv)
     if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    if (mpi_rank == 0) {
+    if (mpi_rank == 0 && ! output_file.empty()) {
       if (directory_mode) {
-	if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	  utils::filesystem::remove_all(output_file);
-	
-	boost::filesystem::create_directories(output_file);
-	
-	boost::filesystem::directory_iterator iter_end;
-	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	  utils::filesystem::remove_all(*iter);
+	prepare_directory(output_file);
 	
 	if (forest_mode) {
 	  for (size_t id = 0; id != oracles_forest.size(); ++ id)

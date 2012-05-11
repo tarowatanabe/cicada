@@ -29,6 +29,7 @@
 
 #include "cicada_text_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_output_impl.hpp"
 
 typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
 typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
@@ -114,65 +115,60 @@ int main(int argc, char ** argv)
     
     boost::spirit::karma::real_generator<double, real_precision20> double20;
     
-    if (directory_mode) {
-      if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-	utils::filesystem::remove_all(output_file);
+    if (! output_file.empty()) {
+      if (directory_mode) {
+	prepare_directory(output_file);
       
-      boost::filesystem::create_directories(output_file);
-      
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	utils::filesystem::remove_all(*iter);
-      
-      for (size_t id = 0; id != oracles.size(); ++ id)
-	if (! oracles[id].empty()) {
-	  namespace karma = boost::spirit::karma;
-	  namespace standard = boost::spirit::standard;
+	for (size_t id = 0; id != oracles.size(); ++ id)
+	  if (! oracles[id].empty()) {
+	    namespace karma = boost::spirit::karma;
+	    namespace standard = boost::spirit::standard;
 	  
-	  utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
-	  os.precision(10);
+	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	    os.precision(10);
 	  
-	  oracle_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (oracle_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	    const hypothesis_type& hyp(*(*oiter));
+	    oracle_set_type::const_iterator oiter_end = oracles[id].end();
+	    for (oracle_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	      const hypothesis_type& hyp(*(*oiter));
 	    
-	    os << id << " ||| ";
+	      os << id << " ||| ";
 	    
-	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
-	      throw std::runtime_error("tokens generation failed...?");
-	    if (! hyp.features.empty()) {
-	      os << " ||| ";
-	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+	      if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 		throw std::runtime_error("tokens generation failed...?");
+	      if (! hyp.features.empty()) {
+		os << " ||| ";
+		if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		  throw std::runtime_error("tokens generation failed...?");
+	      }
+	      os << '\n';
 	    }
-	    os << '\n';
 	  }
-	}
-    } else {
-      utils::compress_ostream os(output_file, 1024 * 1024);
-      os.precision(10);
+      } else {
+	utils::compress_ostream os(output_file, 1024 * 1024);
+	os.precision(10);
       
-      for (size_t id = 0; id != oracles.size(); ++ id)
-	if (! oracles[id].empty()) {
-	  namespace karma = boost::spirit::karma;
-	  namespace standard = boost::spirit::standard;
+	for (size_t id = 0; id != oracles.size(); ++ id)
+	  if (! oracles[id].empty()) {
+	    namespace karma = boost::spirit::karma;
+	    namespace standard = boost::spirit::standard;
 	  
-	  oracle_set_type::const_iterator oiter_end = oracles[id].end();
-	  for (oracle_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
-	    const hypothesis_type& hyp(*(*oiter));
+	    oracle_set_type::const_iterator oiter_end = oracles[id].end();
+	    for (oracle_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	      const hypothesis_type& hyp(*(*oiter));
 	    
-	    os << id << " ||| ";
+	      os << id << " ||| ";
 	    
-	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
-	      throw std::runtime_error("tokens generation failed...?");
-	    if (! hyp.features.empty()) {
-	      os << " ||| ";
-	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+	      if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 		throw std::runtime_error("tokens generation failed...?");
+	      if (! hyp.features.empty()) {
+		os << " ||| ";
+		if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		  throw std::runtime_error("tokens generation failed...?");
+	      }
+	      os << '\n';
 	    }
-	    os << '\n';
 	  }
-	}
+      }
     }
   }
   catch (const std::exception& err) {
