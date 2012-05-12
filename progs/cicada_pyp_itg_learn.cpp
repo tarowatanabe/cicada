@@ -785,7 +785,7 @@ struct PYPGraph
 	if (src < source.size() && trg < target.size()) {
 	  // one-to-one
 	  {
-	    const logprob_type prob = matrix(source_first + 1, target_first + 1);
+	    const logprob_type prob = matrix(source_first + 1, target_first + 1) * logprob_term;
 	    
 	    const size_type source_last = source_first + 1;
 	    const size_type target_last = target_first + 1;
@@ -804,7 +804,7 @@ struct PYPGraph
 	  
 	  // one-to-many
 	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1);
+	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 
 	    for (size_type source_last = source_first + 2; source_last <= source.size(); ++ source_last) {
 	      const size_type target_last = target_first + 1;
@@ -826,7 +826,7 @@ struct PYPGraph
 
 	  // one-to-many
 	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1);
+	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 	    
 	    for (size_type target_last = target_first + 2; target_last <= target.size(); ++ target_last) {
 	      const size_type source_last = source_first + 1;
@@ -848,7 +848,7 @@ struct PYPGraph
 	
 	// epsilon-to-many
 	if (src < source.size()) {
-	  logprob_type prob = 1.0;
+	  logprob_type prob = logprob_term;
 	  
 	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	    const size_type target_last = target_first;
@@ -870,7 +870,7 @@ struct PYPGraph
 	
 	// epsilon-to-many
 	if (trg < target.size()) {
-	  logprob_type prob = 1.0;
+	  logprob_type prob = logprob_term;
 	  
 	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	    const size_type source_last = source_first;
