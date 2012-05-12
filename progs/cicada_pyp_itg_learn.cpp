@@ -1681,6 +1681,17 @@ int main(int argc, char ** argv)
 	  }
 	}
       }
+
+      if (sampling && ! output_model_file.empty()) {
+	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
+	
+	utils::compress_ostream os(path, 1024 * 1024);
+	os.precision(20);
+	
+	PYPLexicon::table_type::const_iterator liter_end = model.lexicon.table.end();
+	for (PYPLexicon::table_type::const_iterator liter = model.lexicon.table.begin(); liter != liter_end; ++ liter)
+	  os << liter->first.source << ' ' << liter->first.target << ' ' << model.lexicon.prob(liter->first.source, liter->first.target) << '\n';
+      }
     }
     
     for (int i = 0; i != threads; ++ i)
