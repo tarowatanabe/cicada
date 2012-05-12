@@ -599,13 +599,10 @@ struct PYPLength
   {
     double logprob = 0.0;
     
-    logprob += std::log(length_source.lambda_null) * counts_source[0];
-    logprob += std::log(length_target.lambda_null) * counts_target[0];
-    
-    for (size_type source = 1; source < counts_source.size(); ++ source)
+    for (size_type source = 0; source != counts_source.size(); ++ source)
       logprob += length_source.logprob(source) * counts_source[source];
     
-    for (size_type target = 1; target < counts_target.size(); ++ target)
+    for (size_type target = 0; target != counts_target.size(); ++ target)
       logprob += length_target.logprob(target) * counts_target[target];
     
     return logprob;
@@ -619,15 +616,17 @@ struct PYPLength
     double target_alpha = 0.0;
     double target_beta = 0.0;
     
-    for (size_type source = 1; source < counts_source.size(); ++ source) {
-      source_alpha += source * counts_source[source];
-      source_beta += counts_source[source];
-    }
+    if (! counts_source.empty())
+      for (size_type source = 1; source != counts_source.size(); ++ source) {
+	source_alpha += source * counts_source[source];
+	source_beta += counts_source[source];
+      }
 
-    for (size_type target = 1; target < counts_target.size(); ++ target) {
-      target_alpha += target * counts_target[target];
-      target_beta += counts_target[target];
-    }
+    if (! counts_target.empty())
+      for (size_type target = 1; target != counts_target.size(); ++ target) {
+	target_alpha += target * counts_target[target];
+	target_beta += counts_target[target];
+      }
 
     length_source.sample_parameters(source_alpha, source_beta, sampler);
     length_target.sample_parameters(target_alpha, target_beta, sampler);
@@ -776,12 +775,12 @@ struct PYPITG
     rule.increment(r, sampler, temperature);
     
     if (r.is_terminal()) {
-      const phrase_type source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
-      const phrase_type target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
+      const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
+      const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
       
-      length.increment(source, target, sampler, temperature);
+      length.increment(phrase_source, phrase_target, sampler, temperature);
       
-      lexicon.increment(source, target, sampler, temperature);
+      lexicon.increment(phrase_source, phrase_target, sampler, temperature);
     }
   }
 
@@ -791,12 +790,12 @@ struct PYPITG
     rule.decrement(r, sampler);
     
     if (r.is_terminal()) {
-      const phrase_type source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
-      const phrase_type target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
+      const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
+      const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
       
-      length.decrement(source, target, sampler);
+      length.decrement(phrase_source, phrase_target, sampler);
       
-      lexicon.decrement(source, target, sampler);
+      lexicon.decrement(phrase_source, phrase_target, sampler);
     }
   }
 
@@ -896,7 +895,10 @@ struct PYPGraph
     matrix.reserve(source.size() + 1, target.size() + 1);
     matrix.resize(source.size() + 1, target.size() + 1);
     
+    length_source.clear();
     length_source.resize(2, source.size() + 1);
+    
+    length_target.clear();
     length_target.resize(2, target.size() + 1);
     
     logprob_term = model.rule.prob_terminal();
@@ -908,14 +910,13 @@ struct PYPGraph
 	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
 					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
     
-    for (size_type src = 0; src != source.size(); ++ src) {
-      length_source(0, src + 1) = model.length.logprob(src + 1, 0);
-      length_source(1, src + 1) = model.length.logprob(src + 1, 1);
+    for (size_type src = 1; src <= source.size(); ++ src) {
+      length_source(0, src) = model.length.logprob(src, 0);
+      length_source(1, src) = model.length.logprob(src, 1);
     }
-    
-    for (size_type trg = 0; trg != target.size(); ++ trg) {
-      length_target(0, trg + 1) = model.length.logprob(0, trg + 1);
-      length_target(1, trg + 1) = model.length.logprob(1, trg + 1);
+    for (size_type trg = 1; trg <= target.size(); ++ trg) {
+      length_target(0, trg) = model.length.logprob(0, trg);
+      length_target(1, trg) = model.length.logprob(1, trg);
     }
   }
   
@@ -1103,7 +1104,7 @@ struct PYPGraph
 	  }
 	}
       }
-    
+
     // forward-backward to compute estiamtes...
     forward_backward(source, chart_source, alpha_source, beta_source);
     forward_backward(target, chart_target, alpha_target, beta_target);
@@ -1537,7 +1538,7 @@ double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
 double length_shape = 1e-2;
-double length_rate  = 1e+7;
+double length_rate  = 1;
 
 int threads = 1;
 int debug = 0;
