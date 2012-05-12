@@ -593,10 +593,11 @@ struct PYPITG
   {
     rule.increment(r, sampler, temperature);
     
-    lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
-		      phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-		      sampler,
-		      temperature);
+    if (r.is_terminal())
+      lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
+			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+			sampler,
+			temperature);
   }
 
   template <typename Sampler>
@@ -604,9 +605,10 @@ struct PYPITG
   {
     rule.decrement(r, sampler);
     
-    lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
-		      phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-		      sampler);
+    if (r.is_terminal())
+      lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
+			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+			sampler);
   }
 
   double log_likelihood() const
