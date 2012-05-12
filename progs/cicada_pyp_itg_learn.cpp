@@ -1308,14 +1308,14 @@ int resample_iterations = 2;
 bool slice_sampling = false;
 bool sample_hypergraph = false;
 
-double rule_discount_alpha = 2.0;
-double rule_discount_beta  = 2.0;
-double rule_strength_shape = 2.0;
+double rule_discount_alpha = 1.0;
+double rule_discount_beta  = 1.0;
+double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double lexicon_discount_alpha = 2.0;
-double lexicon_discount_beta  = 2.0;
-double lexicon_strength_shape = 2.0;
+double lexicon_discount_alpha = 1.0;
+double lexicon_discount_beta  = 1.0;
+double lexicon_strength_shape = 1.0;
 double lexicon_strength_rate  = 1.0;
 
 int threads = 1;
