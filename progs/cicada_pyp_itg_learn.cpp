@@ -922,17 +922,19 @@ struct PYPGraph
   
   void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
   {
+    const logprob_type logprob_rule = std::max(logprob_str, logprob_inv);
+
     // forward...
     alpha[0] = 1.0;
     for (size_type last = 1; last <= sentence.size(); ++ last)
       for (size_type first = 0; first != last; ++ first)
-	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last));
+	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last) * logprob_rule);
     
     // backward...
     beta[sentence.size()] = 1.0;
     for (difference_type first = sentence.size() - 1; first >= 0; -- first)
       for (size_type last = first + 1; last <= sentence.size(); ++ last)
-	beta[first] = std::max(beta[first], chart(first, last) * beta[last]);
+	beta[first] = std::max(beta[first], chart(first, last) * beta[last] * logprob_rule);
   }
   
   // sort by less so that we can pop from a greater item
