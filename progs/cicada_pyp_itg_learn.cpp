@@ -53,6 +53,7 @@
 #include <queue>
 
 #include <cicada/sentence.hpp>
+#include <cicada/alignment.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
@@ -98,6 +99,7 @@
 
 typedef cicada::Vocab      vocab_type;
 typedef cicada::Sentence   sentence_type;
+typedef cicada::Alignment  alignment_type;
 typedef cicada::Symbol     symbol_type;
 typedef cicada::Symbol     word_type;
 typedef cicada::HyperGraph hypergraph_type;
@@ -1526,7 +1528,9 @@ int anneal_steps = 1;
 int resample_rate = 1;
 int resample_iterations = 2;
 bool slice_sampling = false;
+
 bool sample_hypergraph = false;
+bool sample_alignment = false;
 
 double rule_discount_alpha = 1.0;
 double rule_discount_beta  = 1.0;
@@ -1866,6 +1870,33 @@ int main(int argc, char ** argv)
 	    
 	    os << graph_source << " ||| " << graph_target << '\n';
 	  }
+	} else if (sample_alignment) {
+	  alignment_type alignment;
+	  
+	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
+	    if (! derivations[pos].empty()) {
+	      
+	      alignment.clear();
+	      
+	      derivation_type::const_iterator diter_end = derivations[pos].end();
+	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+		if (diter->is_terminal() && ! diter->span.source.empty() && ! diter->span.target.empty()) {
+		  
+		  for (size_type src = diter->span.source.first; src != diter->span.source.last; ++ src)
+		    for (size_type trg = diter->span.target.first; trg != diter->span.target.last; ++ trg)
+		      alignment.push_back(std::make_pair(src, trg));
+		}
+		
+	      }
+	      
+	      std::sort(alignment.begin(), alignment.end());
+	      
+	      os << alignment;
+	    }
+	    
+	    os << '\n';
+	  }
+	  
 	} else {
 	  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
 	  
@@ -1906,6 +1937,7 @@ int main(int argc, char ** argv)
 		}
 	      }
 	    }
+	    
 	    os << '\n';
 	  }
 	}
@@ -1985,6 +2017,7 @@ void options(int argc, char** argv)
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
+    ("alignment",           po::bool_switch(&sample_alignment),                                       "dump sampled derivation in alignment")
     
     ("rule-discount-alpha", po::value<double>(&rule_discount_alpha)->default_value(rule_discount_alpha), "discount ~ Beta(alpha,beta)")
     ("rule-discount-beta",  po::value<double>(&rule_discount_beta)->default_value(rule_discount_beta),   "discount ~ Beta(alpha,beta)")
