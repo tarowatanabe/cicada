@@ -1542,7 +1542,7 @@ double lexicon_discount_beta  = 1.0;
 double lexicon_strength_shape = 1.0;
 double lexicon_strength_rate  = 1.0;
 
-double length_null = 1e-10;
+double length_null = 1e-3;
 double length_shape = 1e-2;
 double length_rate  = 1;
 
