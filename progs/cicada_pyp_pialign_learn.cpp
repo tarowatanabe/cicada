@@ -1630,13 +1630,13 @@ struct PYPGraph
     alpha[0] = 1.0;
     for (size_type last = 1; last <= sentence.size(); ++ last)
       for (size_type first = 0; first != last; ++ first)
-	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last) * logprob_rule);
+	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last) * (first != 0 ? logprob_rule : logprob_type(1.0)));
     
     // backward...
     beta[sentence.size()] = 1.0;
     for (difference_type first = sentence.size() - 1; first >= 0; -- first)
       for (size_type last = first + 1; last <= sentence.size(); ++ last)
-	beta[first] = std::max(beta[first], chart(first, last) * beta[last] * logprob_rule);
+	beta[first] = std::max(beta[first], chart(first, last) * beta[last] * (last != sentence.size() ? logprob_rule : logprob_type(1.0)));
   }
 
   
