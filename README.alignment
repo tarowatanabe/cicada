@@ -23,6 +23,9 @@ cicada_lexicon
 	+ ITG constrained combiner
 	+ MaxMatch combiner (using Hungarian algorithm)
 
+cicada_pyp_itg_learn
+    Direct ITG word alignment training (Highly exprerimental)
+
 [1]
 @article{Brown:1993:MSM:972470.972474,
  author = {Brown, Peter F. and Pietra, Vincent J. Della and Pietra, Stephen A. Della and Mercer, Robert L.},

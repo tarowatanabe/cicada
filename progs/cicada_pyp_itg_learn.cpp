@@ -1516,6 +1516,12 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 path_type train_source_file = "-";
 path_type train_target_file = "-";
 
+path_type test_source_file;
+path_type test_target_file;
+
+path_type output_file;      // dump model file
+path_type output_test_file; // dump test output file
+
 path_type output_sample_file;
 path_type output_model_file;
 
@@ -2003,8 +2009,14 @@ void options(int argc, char** argv)
     ("train-source", po::value<path_type>(&train_source_file), "source train file")
     ("train-target", po::value<path_type>(&train_target_file), "target train file")
     
-    ("output-sample", po::value<path_type>(&output_sample_file), "output sample file")
-    ("output-model",  po::value<path_type>(&output_model_file),  "output model file (or phrase table)")
+    ("test-source", po::value<path_type>(&test_source_file), "source test file")
+    ("test-target", po::value<path_type>(&test_target_file), "target test file")
+    
+    ("output",      po::value<path_type>(&output_file),      "output file for model")
+    ("output-test", po::value<path_type>(&output_test_file), "output file for the inferred test")
+    
+    ("output-sample", po::value<path_type>(&output_sample_file), "output derivation for each sample file")
+    ("output-model",  po::value<path_type>(&output_model_file),  "output model for each sample file (or phrase table)")
     
     ("beam",                po::value<double>(&beam)->default_value(beam),                            "beam threshold")
     

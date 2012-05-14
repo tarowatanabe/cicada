@@ -362,7 +362,7 @@ struct ttable_type
   
   typedef utils::alloc_vector<count_map_type, std::allocator<count_map_type> > count_dict_type;
   
-  ttable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
+  ttable_type(const double __prior=0.1, const double __smooth=1e-20) : ttable(), prior(__prior), smooth(__smooth) {}
   
   count_map_type& operator[](const word_type& word)
   {
@@ -484,6 +484,12 @@ struct aligned_type
     {
       aligned.swap(x.aligned);
     }
+
+    aligned_map_type& operator=(const aligned_map_type& x)
+    {
+      aligned = x.aligned;
+      return *this;
+    }
     
     aligned_map_type& operator+=(const aligned_map_type& x)
     {
@@ -498,6 +504,8 @@ struct aligned_type
   };
   
   typedef utils::alloc_vector<aligned_map_type, std::allocator<aligned_map_type> > aligned_set_type;
+
+  aligned_type() : aligned() {}
   
   aligned_map_type& operator[](const word_type& word)
   {
@@ -516,6 +524,8 @@ struct aligned_type
   
   void resize(size_type __size) { aligned.resize(__size); }
   void reserve(size_type __size) { aligned.reserve(__size); }
+
+  void swap(aligned_type& x) { aligned.swap(x.aligned); }
   
   void shrink() { aligned.shrink(); }
   void clear() { aligned.clear(); }
