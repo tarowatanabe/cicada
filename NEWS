@@ -8,6 +8,7 @@ New: added PYP-pialign, an unsupervised phrasal ITG aligner! (currently, we supp
 New: added BleuS, Inv-WER and CDER for MT evaluation
 New: added cicada_filter_alignment with visualization mode for the ease of word alignment analysis (combined with less -R or lv -c!)
 New: added PYP-itg, an unsupervised ITG word-aligner!
+New: added L0-regularization in cicada_lexicon_{hmm, model1}
 
 2012-4-9
 INCOMPATIBLE CHANGE: renamed cicada_learn_block_mpi to cicada_learn_online_kbest_mpi and use the block-wise algorithms for cicada_learn_online_mpi

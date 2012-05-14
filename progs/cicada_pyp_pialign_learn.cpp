@@ -1017,16 +1017,18 @@ struct PYPRule
 
   typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
 
-  PYPRule(const parameter_type& parameter)
-    : p0(1.0 / 3), counts0(0), table(parameter) {}
-
+  PYPRule(const double& __p0_terminal, const parameter_type& parameter)
+    : p0_terminal(__p0_terminal), p0((1.0 - __p0_terminal) * 0.5), counts0_terminal(0), counts0(0), table(parameter) {}
+  
   template <typename Sampler>
   void increment(const rule_type& rule, Sampler& sampler, const double temperature=1.0)
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.increment(itg, p0, sampler, temperature))
-      ++ counts0;
+    if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
+      counts0_terminal += (itg == PYP::TERMINAL);
+      counts0          += (itg != PYP::TERMINAL);
+    }
   }
   
   template <typename Sampler>
@@ -1034,27 +1036,29 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.decrement(itg, sampler))
-      -- counts0;
+    if (table.decrement(itg, sampler)) {
+      counts0_terminal -= (itg == PYP::TERMINAL);
+      counts0          -= (itg != PYP::TERMINAL);
+    }
   }
   
   double prob(const rule_type& rule) const
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    return table.prob(itg, p0);
+    return table.prob(itg, itg == PYP::TERMINAL ? p0_terminal : p0);
   }
   
   double prob_terminal() const
   {
-    return table.prob(PYP::TERMINAL, p0);
+    return table.prob(PYP::TERMINAL, p0_terminal);
   }
 
   double prob_straight() const
   {
     return table.prob(PYP::STRAIGHT, p0);
   }
-
+  
   double prob_inverted() const
   {
     return table.prob(PYP::INVERTED, p0);
@@ -1062,7 +1066,7 @@ struct PYPRule
   
   double log_likelihood() const
   {
-    return table.log_likelihood() + std::log(p0) * counts0;
+    return table.log_likelihood() + std::log(p0_terminal) * counts0_terminal + std::log(p0) * counts0;
   }
   
   template <typename Sampler>
@@ -1077,7 +1081,9 @@ struct PYPRule
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
   
+  double     p0_terminal;
   double     p0;
+  size_type  counts0_terminal;
   size_type  counts0;
   table_type table;
 };
@@ -2093,19 +2099,21 @@ int resample_iterations = 2;
 bool slice_sampling = false;
 bool sample_hypergraph = false;
 
-double rule_discount_alpha = 2.0;
-double rule_discount_beta  = 2.0;
-double rule_strength_shape = 2.0;
+double rule_prior_terminal = 0.1;
+
+double rule_discount_alpha = 1.0;
+double rule_discount_beta  = 1.0;
+double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double phrase_discount_alpha = 2.0;
-double phrase_discount_beta  = 2.0;
-double phrase_strength_shape = 2.0;
+double phrase_discount_alpha = 1e+4;
+double phrase_discount_beta  = 1.0;
+double phrase_strength_shape = 1e+10;
 double phrase_strength_rate  = 1.0;
 
-double lexicon_discount_alpha = 2.0;
-double lexicon_discount_beta  = 2.0;
-double lexicon_strength_shape = 2.0;
+double lexicon_discount_alpha = 1.0;
+double lexicon_discount_beta  = 1.0;
+double lexicon_strength_shape = 1.0;
 double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
@@ -2134,6 +2142,10 @@ int main(int argc, char ** argv)
     
     if (beam < 0.0 || beam > 1.0)
       throw std::runtime_error("invalid beam width");
+    
+    if (rule_prior_terminal <= 0.0 || rule_prior_terminal >= 1.0)
+      throw std::runtime_error("invalid rule-prior for terminal");
+    
     
     sentence_set_type   sources;
     sentence_set_type   targets;
@@ -2168,7 +2180,8 @@ int main(int argc, char ** argv)
       workers_open.join_all();
     }
 
-    PYPRule model_rule(PYPRule::parameter_type(rule_discount_alpha,
+    PYPRule model_rule(rule_prior_terminal,
+		       PYPRule::parameter_type(rule_discount_alpha,
 					       rule_discount_beta,
 					       rule_strength_shape,
 					       rule_strength_rate));
@@ -2732,6 +2745,8 @@ void options(int argc, char** argv)
     
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
+
+    ("rule-prior-terminal", po::value<double>(&rule_prior_terminal)->default_value(rule_prior_terminal), "prior for terminal")
     
     ("rule-discount-alpha", po::value<double>(&rule_discount_alpha)->default_value(rule_discount_alpha), "discount ~ Beta(alpha,beta)")
     ("rule-discount-beta",  po::value<double>(&rule_discount_beta)->default_value(rule_discount_beta),   "discount ~ Beta(alpha,beta)")

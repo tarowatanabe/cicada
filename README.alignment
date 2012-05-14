@@ -26,6 +26,8 @@ cicada_lexicon
 cicada_pyp_itg_learn
     Direct ITG word alignment training (Highly exprerimental)
 
+For ciada_lexicon_{hmm, model1}, we support L0 regularization [5]
+
 [1]
 @article{Brown:1993:MSM:972470.972474,
  author = {Brown, Peter F. and Pietra, Vincent J. Della and Pietra, Stephen A. Della and Mercer, Robert L.},
@@ -83,3 +85,6 @@ cicada_pyp_itg_learn
   pages     = {210--218},
   url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
 }
+
+[5]
+L0
