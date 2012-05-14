@@ -56,7 +56,11 @@ struct MaximizeL0
     parameter_type expected;
     parameter_type previous;
     parameter_type estimated;
-
+    
+    expected.reserve(counts.size());
+    previous.reserve(counts.size());
+    estimated.reserve(counts.size());
+    
     if (probs.empty()) {
       // if our previous probabilities are empty (initial iteration), then
       // we perform normalization and use it as our starting point...
@@ -94,9 +98,9 @@ struct MaximizeL0
   void gradient_descent(const parameter_type& counts, const parameter_type& point, parameter_type& point_new)
   {
     parameter_type point_curr(point);
-    parameter_type point_projected;
-    parameter_type gradient;
-    parameter_type point_delta;
+    parameter_type point_projected(point.size());
+    parameter_type point_delta(point.size());
+    parameter_type gradient(point.size());
     
     for (int iter = 0; iter != 30; ++ iter) {
       const double objective_curr = compute_objective(counts, point_curr);
@@ -123,7 +127,6 @@ struct MaximizeL0
       double objective_min = objective_curr;
       
       for (int steps = 0; steps != 20; ++ steps) {
-	point_delta.resize(point_curr.size());
 	for (size_t i = 0; i != point_curr.size(); ++ i)
 	  point_delta[i] = (1.0 - gamma_curr) * point_curr[i] + gamma_curr * point_projected[i];
 	
