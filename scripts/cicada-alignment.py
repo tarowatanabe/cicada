@@ -90,7 +90,7 @@ opt_parser = OptionParser(
     make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
 
     make_option("--l0-alpha", default=10, action="store", type="float", help="L0 regularization parameter (default: 10)"),
-    make_option("--l0-beta",  default=0.5, action="store", type="float", help="L0 regularization parameter (default: 0.5)"),
+    make_option("--l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
 
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
