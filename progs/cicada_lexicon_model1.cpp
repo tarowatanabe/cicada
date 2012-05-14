@@ -56,7 +56,7 @@ double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
 
 double l0_alpha = 10;
-double l0_beta = 0.5;
+double l0_beta = 0.01;
 
 double threshold = 0.0;
 
@@ -68,7 +68,8 @@ int debug = 0;
 #include "cicada_lexicon_model1_impl.hpp"
 
 template <typename Learner, typename Maximizer>
-void learn(ttable_type& ttable_source_target,
+void learn(const Maximizer& maximizer,
+	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source);
@@ -141,40 +142,40 @@ int main(int argc, char ** argv)
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 
       } else if (pgd_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
       }
     }
@@ -330,8 +331,10 @@ struct LearnReducer : public Maximizer
 	       const ttable_type& __ttable,
 	       const aligned_type& __aligned,
 	       ttable_type& __ttable_new,
-	       aligned_type& __aligned_new)
-    : queue(__queue),
+	       aligned_type& __aligned_new,
+	       const Maximizer& __base)
+    : Maximizer(__base),
+      queue(__queue),
       ttable(__ttable),
       aligned(__aligned),
       ttable_new(__ttable_new),
@@ -513,7 +516,8 @@ void merge_tables(TableSet& tables, Table& merged)
 }
 
 template <typename Learner, typename Maximizer>
-void learn(ttable_type& ttable_source_target,
+void learn(const Maximizer& maximizer, 
+	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source)
@@ -566,13 +570,15 @@ void learn(ttable_type& ttable_source_target,
 									      ttable_source_target,
 									      aligned_source_target,
 									      ttable_source_target_new[i],
-									      aligned_source_target_new[i])));
+									      aligned_source_target_new[i],
+									      maximizer)));
     for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
       workers_reducer_target_source.add_thread(new boost::thread(reducer_type(queue_ttable_target_source[i],
 									      ttable_target_source,
 									      aligned_target_source,
 									      ttable_target_source_new[i],
-									      aligned_target_source_new[i])));
+									      aligned_target_source_new[i],
+									      maximizer)));
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);

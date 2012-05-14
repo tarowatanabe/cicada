@@ -66,7 +66,7 @@ double prior_alignment = 0.01;
 double smooth_alignment = 1e-20;
 
 double l0_alpha = 10;
-double l0_beta = 0.5;
+double l0_beta = 0.01;
 
 double threshold = 0.0;
 
@@ -79,7 +79,8 @@ int debug = 0;
 #include "cicada_lexicon_hmm_impl.hpp"
 
 template <typename Learner, typename Maximizer>
-void learn(const int iteration,
+void learn(const Maximizer& maximier,
+	   const int iteration,
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   atable_type& atable_source_target,
@@ -206,7 +207,8 @@ int main(int argc, char ** argv)
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(iteration_model1,
+	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(MaximizeBayes(),
+								iteration_model1,
 								ttable_source_target,
 								ttable_target_source,
 								atable_source_target,
@@ -216,7 +218,8 @@ int main(int argc, char ** argv)
 								aligned_source_target,
 								aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeBayes>(iteration_model1,
+	    learn<LearnModel1Symmetric, MaximizeBayes>(MaximizeBayes(),
+						       iteration_model1,
 						       ttable_source_target,
 						       ttable_target_source,
 						       atable_source_target,
@@ -227,7 +230,8 @@ int main(int argc, char ** argv)
 						       aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeBayes>(iteration_model1,
+	    learn<LearnModel1Posterior, MaximizeBayes>(MaximizeBayes(),
+						       iteration_model1,
 						       ttable_source_target,
 						       ttable_target_source,
 						       atable_source_target,
@@ -237,7 +241,8 @@ int main(int argc, char ** argv)
 						       aligned_source_target,
 						       aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeBayes>(iteration_model1,
+	    learn<LearnModel1, MaximizeBayes>(MaximizeBayes(),
+					      iteration_model1,
 					      ttable_source_target,
 					      ttable_target_source,
 					      atable_source_target,
@@ -251,7 +256,8 @@ int main(int argc, char ** argv)
       } else if (pgd_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(iteration_model1,
+	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+							     iteration_model1,
 							     ttable_source_target,
 							     ttable_target_source,
 							     atable_source_target,
@@ -261,7 +267,8 @@ int main(int argc, char ** argv)
 							     aligned_source_target,
 							     aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeL0>(iteration_model1,
+	    learn<LearnModel1Symmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						    iteration_model1,
 						    ttable_source_target,
 						    ttable_target_source,
 						    atable_source_target,
@@ -272,7 +279,8 @@ int main(int argc, char ** argv)
 						    aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeL0>(iteration_model1,
+	    learn<LearnModel1Posterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						    iteration_model1,
 						    ttable_source_target,
 						    ttable_target_source,
 						    atable_source_target,
@@ -282,7 +290,8 @@ int main(int argc, char ** argv)
 						    aligned_source_target,
 						    aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeL0>(iteration_model1,
+	    learn<LearnModel1, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+					   iteration_model1,
 					   ttable_source_target,
 					   ttable_target_source,
 					   atable_source_target,
@@ -296,7 +305,8 @@ int main(int argc, char ** argv)
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, Maximize>(iteration_model1,
+	    learn<LearnModel1SymmetricPosterior, Maximize>(Maximize(),
+							   iteration_model1,
 							   ttable_source_target,
 							   ttable_target_source,
 							   atable_source_target,
@@ -306,7 +316,8 @@ int main(int argc, char ** argv)
 							   aligned_source_target,
 							   aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, Maximize>(iteration_model1,
+	    learn<LearnModel1Symmetric, Maximize>(Maximize(),
+						  iteration_model1,
 						  ttable_source_target,
 						  ttable_target_source,
 						  atable_source_target,
@@ -317,7 +328,8 @@ int main(int argc, char ** argv)
 						  aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, Maximize>(iteration_model1,
+	    learn<LearnModel1Posterior, Maximize>(Maximize(),
+						  iteration_model1,
 						  ttable_source_target,
 						  ttable_target_source,
 						  atable_source_target,
@@ -327,7 +339,8 @@ int main(int argc, char ** argv)
 						  aligned_source_target,
 						  aligned_target_source);
 	  else
-	    learn<LearnModel1, Maximize>(iteration_model1,
+	    learn<LearnModel1, Maximize>(Maximize(),
+					 iteration_model1,
 					 ttable_source_target,
 					 ttable_target_source,
 					 atable_source_target,
@@ -347,7 +360,8 @@ int main(int argc, char ** argv)
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnHMMSymmetricPosterior, MaximizeBayes>(iteration_hmm,
+	    learn<LearnHMMSymmetricPosterior, MaximizeBayes>(MaximizeBayes(),
+							     iteration_hmm,
 							     ttable_source_target,
 							     ttable_target_source,
 							     atable_source_target,
@@ -357,7 +371,8 @@ int main(int argc, char ** argv)
 							     aligned_source_target,
 							     aligned_target_source);
 	  else
-	    learn<LearnHMMSymmetric, MaximizeBayes>(iteration_hmm,
+	    learn<LearnHMMSymmetric, MaximizeBayes>(MaximizeBayes(),
+						    iteration_hmm,
 						    ttable_source_target,
 						    ttable_target_source,
 						    atable_source_target,
@@ -368,7 +383,8 @@ int main(int argc, char ** argv)
 						    aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnHMMPosterior, MaximizeBayes>(iteration_hmm,
+	    learn<LearnHMMPosterior, MaximizeBayes>(MaximizeBayes(),
+						    iteration_hmm,
 						    ttable_source_target,
 						    ttable_target_source,
 						    atable_source_target,
@@ -378,7 +394,8 @@ int main(int argc, char ** argv)
 						    aligned_source_target,
 						    aligned_target_source);
 	  else
-	    learn<LearnHMM, MaximizeBayes>(iteration_hmm,
+	    learn<LearnHMM, MaximizeBayes>(MaximizeBayes(),
+					   iteration_hmm,
 					   ttable_source_target,
 					   ttable_target_source,
 					   atable_source_target,
@@ -388,11 +405,61 @@ int main(int argc, char ** argv)
 					   aligned_source_target,
 					   aligned_target_source);
 	}
+
+      } else if (pgd_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnHMMSymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+							  iteration_hmm,
+							  ttable_source_target,
+							  ttable_target_source,
+							  atable_source_target,
+							  atable_target_source,
+							  classes_source,
+							  classes_target,
+							  aligned_source_target,
+							  aligned_target_source);
+	  else
+	    learn<LearnHMMSymmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						 iteration_hmm,
+						 ttable_source_target,
+						 ttable_target_source,
+						 atable_source_target,
+						 atable_target_source,
+						 classes_source,
+						 classes_target,
+						 aligned_source_target,
+						 aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnHMMPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						 iteration_hmm,
+						 ttable_source_target,
+						 ttable_target_source,
+						 atable_source_target,
+						 atable_target_source,
+						 classes_source,
+						 classes_target,
+						 aligned_source_target,
+						 aligned_target_source);
+	  else
+	    learn<LearnHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+					iteration_hmm,
+					ttable_source_target,
+					ttable_target_source,
+					atable_source_target,
+					atable_target_source,
+					classes_source,
+					classes_target,
+					aligned_source_target,
+					aligned_target_source);
+	}	
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnHMMSymmetricPosterior, Maximize>(iteration_hmm,
+	    learn<LearnHMMSymmetricPosterior, Maximize>(Maximize(),
+							iteration_hmm,
 							ttable_source_target,
 							ttable_target_source,
 							atable_source_target,
@@ -402,7 +469,8 @@ int main(int argc, char ** argv)
 							aligned_source_target,
 							aligned_target_source);
 	  else
-	    learn<LearnHMMSymmetric, Maximize>(iteration_hmm,
+	    learn<LearnHMMSymmetric, Maximize>(Maximize(),
+					       iteration_hmm,
 					       ttable_source_target,
 					       ttable_target_source,
 					       atable_source_target,
@@ -413,7 +481,8 @@ int main(int argc, char ** argv)
 					       aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnHMMPosterior, Maximize>(iteration_hmm,
+	    learn<LearnHMMPosterior, Maximize>(Maximize(),
+					       iteration_hmm,
 					       ttable_source_target,
 					       ttable_target_source,
 					       atable_source_target,
@@ -423,7 +492,8 @@ int main(int argc, char ** argv)
 					       aligned_source_target,
 					       aligned_target_source);
 	  else
-	    learn<LearnHMM, Maximize>(iteration_hmm,
+	    learn<LearnHMM, Maximize>(Maximize(),
+				      iteration_hmm,
 				      ttable_source_target,
 				      ttable_target_source,
 				      atable_source_target,
@@ -664,8 +734,10 @@ struct LearnReducer : public Maximizer
 	       const ttable_type& __ttable,
 	       const aligned_type& __aligned,
 	       ttable_type& __ttable_new,
-	       aligned_type& __aligned_new)
-    : queue(__queue),
+	       aligned_type& __aligned_new,
+	       const Maximizer& __base)
+    : Maximizer(__base),
+      queue(__queue),
       ttable(__ttable),
       aligned(__aligned),
       ttable_new(__ttable_new),
@@ -846,7 +918,8 @@ void merge_tables(TableSet& tables, Table& merged)
 }
 
 template <typename Learner, typename Maximizer>
-void learn(const int iteration,
+void learn(const Maximizer& maximizer,
+	   const int iteration,
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   atable_type& atable_source_target,
@@ -906,13 +979,15 @@ void learn(const int iteration,
 									      ttable_source_target,
 									      aligned_source_target,
 									      ttable_source_target_new[i],
-									      aligned_source_target_new[i])));
+									      aligned_source_target_new[i],
+									      maximizer)));
     for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
       workers_reducer_target_source.add_thread(new boost::thread(reducer_type(queue_ttable_target_source[i],
 									      ttable_target_source,
 									      aligned_target_source,
 									      ttable_target_source_new[i],
-									      aligned_target_source_new[i])));
+									      aligned_target_source_new[i],
+									      maximizer)));
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);

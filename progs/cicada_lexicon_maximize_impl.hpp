@@ -47,8 +47,8 @@ struct MaximizeL0
 {
   typedef std::vector<double, std::allocator<double> > parameter_type;
 
-  MaximizeL0()
-    : alpha(10), beta(0.5), gamma(0.5), sigma(0.5), eta(0.1) {}
+  MaximizeL0(const double& __alpha, const double& __beta)
+    : alpha(__alpha), beta(__beta), gamma(0.5), sigma(0.5), eta(0.1) {}
 
   template <typename Counts, typename Probs>
   void operator()(const Counts& counts, const Probs& probs, Probs& probs_new, const double& prior, const double& smooth)
