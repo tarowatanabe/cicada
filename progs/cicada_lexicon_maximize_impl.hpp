@@ -85,7 +85,6 @@ struct MaximizeL0
     // PGD...
     gradient_descent(expected, previous, estimated);
     
-    
     parameter_type::const_iterator piter = estimated.begin();
     typename Counts::const_iterator iter_end = counts.end();
     for (typename Counts::const_iterator iter = counts.begin(); iter != iter_end; ++ iter, ++ piter)
@@ -115,8 +114,7 @@ struct MaximizeL0
       double armijo_bound = 0.0;
       for (size_t i = 0; i != point_curr.size(); ++ i)
 	armijo_bound += sigma * gamma * gradient[i] * (point_projected[i] - point_curr[i]);
-
-      bool terminated = false;
+      
       bool updated = false;
       
       double gamma_curr = gamma;
@@ -124,7 +122,7 @@ struct MaximizeL0
       double armijo_bound_curr = armijo_bound;
       double objective_min = objective_curr;
       
-      for (int steps = 0; ! terminated && steps != 20; ++ steps) {
+      for (int steps = 0; steps != 20; ++ steps) {
 	point_delta.resize(point_curr.size());
 	for (size_t i = 0; i != point_curr.size(); ++ i)
 	  point_delta[i] = (1.0 - gamma_curr) * point_curr[i] + gamma_curr * point_projected[i];
@@ -138,7 +136,7 @@ struct MaximizeL0
 	}
 	
 	if (objective_delta <= objective_curr + armijo_bound_curr)
-	  terminated = true;
+	  break;
 	
 	gamma_curr *= gamma;
 	armijo_bound_curr *= gamma;

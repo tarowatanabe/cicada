@@ -80,6 +80,7 @@ opt_parser = OptionParser(
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
     make_option("--posterior",   default=None, action="store_true", help="posterior constrained training"),
     make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
+    make_option("--l0",          default=None, action="store_true", help="L0 regularization"),
     
     ## options for lexicon model training
     make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 0.01)"),
@@ -87,6 +88,9 @@ opt_parser = OptionParser(
     make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.01)"),
     make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-20)"),
     make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
+
+    make_option("--l0-alpha", default=10, action="store", type="float", help="L0 regularization parameter (default: 10)"),
+    make_option("--l0-beta",  default=0.5, action="store", type="float", help="L0 regularization parameter (default: 0.5)"),
 
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
@@ -266,6 +270,9 @@ class Giza:
                  symmetric=None,
                  posterior=None,
                  variational=None,
+                 l0=None,
+                 l0_alpha=10,
+                 l0_beta=0.5,
                  threads=8,
                  debug=0):
 
@@ -325,6 +332,11 @@ class Giza:
             command += " --posterior"
         if variational:
             command += " --variational-bayes"
+        if l0:
+            command += " --pgd"
+        
+        command += " --l0-alpha %g" %(l0_alpha)
+        command += " --l0-beta %g" %(l0_beta)
         
         self.p0 = p0
         self.prior_lexicon = prior_lexicon
@@ -679,6 +691,9 @@ giza = Giza(cicada=cicada,
             symmetric=options.symmetric,
             posterior=options.posterior,
             variational=options.variational,
+            l0=options.l0,
+            l0_alpha=options.l0_alpha,
+            l0_beta=options.l0_beta,
             threads=options.threads,
             debug=options.debug)
 
