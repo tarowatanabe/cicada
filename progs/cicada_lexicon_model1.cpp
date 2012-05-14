@@ -38,6 +38,7 @@ int iteration = 5;
 bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
+bool pgd_mode = false;
 
 bool moses_mode = false;
 bool itg_mode = false;
@@ -53,6 +54,9 @@ bool single_root_mode = false;
 double p0    = 0.01;
 double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
+
+double l0_alpha = 10;
+double l0_beta = 0.5;
 
 double threshold = 0.0;
 
@@ -145,6 +149,19 @@ int main(int argc, char ** argv)
 	    learn<LearnModel1Posterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
 	    learn<LearnModel1, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	}
+
+      } else if (pgd_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	  else
+	    learn<LearnModel1Symmetric, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnModel1Posterior, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	  else
+	    learn<LearnModel1, MaximizeL0>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 	
       } else {
@@ -1617,6 +1634,7 @@ void options(int argc, char** argv)
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
+    ("pgd",               po::bool_switch(&pgd_mode),               "projected gradient descent")
     
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
@@ -1631,6 +1649,9 @@ void options(int argc, char** argv)
     ("p0",             po::value<double>(&p0)->default_value(p0),                         "parameter for NULL alignment")
     ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),   "Dirichlet prior for variational Bayes")
     ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon), "smoothing parameter for uniform distribution")
+
+    ("l0-alpha", po::value<double>(&l0_alpha)->default_value(l0_alpha), "L0 regularization")
+    ("l0-beta",  po::value<double>(&l0_beta)->default_value(l0_beta),   "L0 regularization")
 
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "write with beam-threshold (<= 0.0 implies no beam)")
 

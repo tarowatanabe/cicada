@@ -46,6 +46,7 @@ int iteration_hmm = 5;
 bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
+bool pgd_mode = false;
 
 bool moses_mode = false;
 bool itg_mode = false;
@@ -63,6 +64,9 @@ double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
 double prior_alignment = 0.01;
 double smooth_alignment = 1e-20;
+
+double l0_alpha = 10;
+double l0_beta = 0.5;
 
 double threshold = 0.0;
 
@@ -242,6 +246,51 @@ int main(int argc, char ** argv)
 					      classes_target,
 					      aligned_source_target,
 					      aligned_target_source);
+	}
+
+      } else if (pgd_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(iteration_model1,
+							     ttable_source_target,
+							     ttable_target_source,
+							     atable_source_target,
+							     atable_target_source,
+							     classes_source,
+							     classes_target,
+							     aligned_source_target,
+							     aligned_target_source);
+	  else
+	    learn<LearnModel1Symmetric, MaximizeL0>(iteration_model1,
+						    ttable_source_target,
+						    ttable_target_source,
+						    atable_source_target,
+						    atable_target_source,
+						    classes_source,
+						    classes_target,
+						    aligned_source_target,
+						    aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnModel1Posterior, MaximizeL0>(iteration_model1,
+						    ttable_source_target,
+						    ttable_target_source,
+						    atable_source_target,
+						    atable_target_source,
+						    classes_source,
+						    classes_target,
+						    aligned_source_target,
+						    aligned_target_source);
+	  else
+	    learn<LearnModel1, MaximizeL0>(iteration_model1,
+					   ttable_source_target,
+					   ttable_target_source,
+					   atable_source_target,
+					   atable_target_source,
+					   classes_source,
+					   classes_target,
+					   aligned_source_target,
+					   aligned_target_source);
 	}
 	
       } else {
@@ -1968,6 +2017,7 @@ void options(int argc, char** argv)
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric training")
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
+    ("pgd",               po::bool_switch(&pgd_mode),               "projected gradient descent")
     
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
@@ -1984,6 +2034,9 @@ void options(int argc, char** argv)
     ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon),       "smoothing parameter for uniform distribution")
     ("prior-alignment",  po::value<double>(&prior_alignment)->default_value(prior_alignment),   "Dirichlet prior for variational Bayes")
     ("smooth-alignment", po::value<double>(&smooth_alignment)->default_value(smooth_alignment), "smoothing parameter for uniform distribution")
+    
+    ("l0-alpha", po::value<double>(&l0_alpha)->default_value(l0_alpha), "L0 regularization")
+    ("l0-beta",  po::value<double>(&l0_beta)->default_value(l0_beta),   "L0 regularization")
     
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "write with beam-threshold (<= 0.0 implies no beam)")
 
