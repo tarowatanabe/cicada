@@ -55,7 +55,7 @@ double p0    = 0.01;
 double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
 
-double l0_alpha = 10;
+double l0_alpha = 100;
 double l0_beta = 0.01;
 
 double threshold = 0.0;
