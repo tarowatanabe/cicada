@@ -2102,6 +2102,184 @@ void options(int argc, char** argv);
 
 size_t read_data(const path_type& path, sentence_set_type& sentences);
 
+struct DumpDerivation
+{
+  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
+  
+  std::ostream& operator()(std::ostream& os, const sentence_type& source, const sentence_type& target, const derivation_type& derivation)
+  {
+    stack.clear();
+    derivation_type::const_iterator diter_end = derivation.end();
+    for (derivation_type::const_iterator diter = derivation.begin(); diter != diter_end; ++ diter) {
+      if (diter->is_terminal()) {
+	os << "((( "
+	   << PYP::phrase_type(source.begin() + diter->span.source.first, source.begin() + diter->span.source.last)
+	   << " ||| "
+	   << PYP::phrase_type(target.begin() + diter->span.target.first, target.begin() + diter->span.target.last)
+	   << " )))";
+	
+	while (! stack.empty() && stack.back() != " ") {
+	  os << stack.back();
+	  stack.pop_back();
+	}
+	
+	if (! stack.empty() && stack.back() == " ") {
+	  os << stack.back();
+	  stack.pop_back();
+	}
+	
+      } else if (diter->is_straight()) {
+	os << "[ ";
+	stack.push_back(" ]");
+	stack.push_back(" ");
+      } else {
+	os << "< ";
+	stack.push_back(" >");
+	stack.push_back(" ");
+      }
+    }
+    
+    return os;
+  }
+  
+  stack_type stack;
+};
+
+struct DumpAlignment
+{
+  std::ostream& operator()(std::ostream& os, const sentence_type& source, const sentence_type& target, const derivation_type& derivation)
+  {
+    alignment.clear();
+    
+    derivation_type::const_iterator diter_end = derivation.end();
+    for (derivation_type::const_iterator diter = derivation.begin(); diter != diter_end; ++ diter) {
+      if (diter->is_terminal() && ! diter->span.source.empty() && ! diter->span.target.empty()) {
+	
+	for (size_type src = diter->span.source.first; src != diter->span.source.last; ++ src)
+	  for (size_type trg = diter->span.target.first; trg != diter->span.target.last; ++ trg)
+	    alignment.push_back(std::make_pair(src, trg));
+      }
+      
+    }
+    
+    std::sort(alignment.begin(), alignment.end());
+    
+    os << alignment;
+    
+    return os;
+  }
+  
+  alignment_type alignment;
+};
+
+struct DumpHypergraph
+{
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > stack_type;
+  typedef hypergraph_type::rule_type     rule_type;
+  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+  DumpHypergraph()
+  {
+    rule_type::symbol_set_type straight(2);
+    rule_type::symbol_set_type inverted(2);
+    
+    straight[0] = vocab_type::X1;
+    straight[1] = vocab_type::X2;
+    
+    inverted[0] = vocab_type::X2;
+    inverted[1] = vocab_type::X1;
+	  
+    rule_straight = rule_type::create(rule_type(vocab_type::X, straight));
+    rule_inverted = rule_type::create(rule_type(vocab_type::X, inverted));
+  }
+
+  std::ostream& operator()(std::ostream& os, const sentence_type& source, const sentence_type& target, const derivation_type& derivation)
+  {
+    hypergraph_type::edge_type::node_set_type tails(2);
+    
+    graph_source.clear();
+    graph_target.clear();
+    
+    graph_source.goal = graph_source.add_node().id;
+    graph_target.goal = graph_target.add_node().id;
+    
+    stack.clear();
+    stack.push_back(0);
+	      
+    derivation_type::const_iterator diter_end = derivation.end();
+    for (derivation_type::const_iterator diter = derivation.begin(); diter != diter_end; ++ diter) {
+      const hypergraph_type::id_type head = stack.back();
+      stack.pop_back();
+		
+      if (diter->is_terminal()) {
+	hypergraph_type::edge_type& edge_source = graph_source.add_edge();
+	hypergraph_type::edge_type& edge_target = graph_target.add_edge();
+		  
+
+	if (diter->span.source.empty())
+	  edge_source.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
+	else
+	  edge_source.rule = rule_type::create(rule_type(vocab_type::X,
+							 source.begin() + diter->span.source.first,
+							 source.begin() + diter->span.source.last));
+
+	if (diter->span.target.empty())
+	  edge_target.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
+	else
+	  edge_target.rule = rule_type::create(rule_type(vocab_type::X,
+							 target.begin() + diter->span.target.first,
+							 target.begin() + diter->span.target.last));
+		  
+	graph_source.connect_edge(edge_source.id, head);
+	graph_target.connect_edge(edge_target.id, head);
+		  
+      } else {
+	hypergraph_type::node_type& node_source1 = graph_source.add_node();
+	hypergraph_type::node_type& node_source2 = graph_source.add_node();
+
+	hypergraph_type::node_type& node_target1 = graph_target.add_node();
+	hypergraph_type::node_type& node_target2 = graph_target.add_node();
+		  
+	// push in reverse order!
+	stack.push_back(node_source2.id);
+	stack.push_back(node_source1.id);
+		  
+	tails[0] = node_source1.id;
+	tails[1] = node_source2.id;
+		  
+	hypergraph_type::edge_type& edge_source = graph_source.add_edge(tails.begin(), tails.end());
+	hypergraph_type::edge_type& edge_target = graph_target.add_edge(tails.begin(), tails.end());
+
+	if (diter->is_straight()) {
+	  edge_source.rule = rule_straight;
+	  edge_target.rule = rule_straight;
+	} else {
+	  edge_source.rule = rule_inverted;
+	  edge_target.rule = rule_inverted;
+	}
+	
+	graph_source.connect_edge(edge_source.id, head);
+	graph_target.connect_edge(edge_target.id, head);
+      }
+    }
+    
+    graph_source.topologically_sort();
+    graph_target.topologically_sort();
+    
+    os << graph_source << " ||| " << graph_target;
+    
+    return os;
+  }
+  
+  stack_type stack;
+  
+  hypergraph_type graph_source;
+  hypergraph_type graph_target;
+
+  rule_ptr_type rule_straight;
+  rule_ptr_type rule_inverted;
+};
+
 int main(int argc, char ** argv)
 {
   try {
@@ -2320,173 +2498,28 @@ int main(int argc, char ** argv)
 	utils::compress_ostream os(path, 1024 * 1024);
 
 	if (sample_hypergraph) {
-	  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > stack_type;
-	  typedef hypergraph_type::rule_type     rule_type;
-	  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
-
-	  stack_type stack;
-	  
-	  hypergraph_type graph_source;
-	  hypergraph_type graph_target;
-	  
-	  rule_type::symbol_set_type straight(2);
-	  rule_type::symbol_set_type inverted(2);
-	  
-	  straight[0] = vocab_type::X1;
-	  straight[1] = vocab_type::X2;
-	  
-	  inverted[0] = vocab_type::X2;
-	  inverted[1] = vocab_type::X1;
-
-	  hypergraph_type::edge_type::node_set_type tails(2);
-	  
-	  const rule_ptr_type rule_straight(rule_type::create(rule_type(vocab_type::X, straight)));
-	  const rule_ptr_type rule_inverted(rule_type::create(rule_type(vocab_type::X, inverted)));
+	  DumpHypergraph dumper;
 	  
 	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    graph_source.clear();
-	    graph_target.clear();
-	    
-	    if (! derivations[pos].empty()) {
-	      // construct pair of hypergrpahs
-	      
-	      graph_source.goal = graph_source.add_node().id;
-	      graph_target.goal = graph_target.add_node().id;
-	      
-	      stack.clear();
-	      stack.push_back(0);
-	      
-	      derivation_type::const_iterator diter_end = derivations[pos].end();
-	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-		const hypergraph_type::id_type head = stack.back();
-		stack.pop_back();
-		
-		if (diter->is_terminal()) {
-		  hypergraph_type::edge_type& edge_source = graph_source.add_edge();
-		  hypergraph_type::edge_type& edge_target = graph_target.add_edge();
-		  
-
-		  if (diter->span.source.empty())
-		    edge_source.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
-		  else
-		    edge_source.rule = rule_type::create(rule_type(vocab_type::X,
-								   sources[pos].begin() + diter->span.source.first,
-								   sources[pos].begin() + diter->span.source.last));
-
-		  if (diter->span.target.empty())
-		    edge_target.rule = rule_type::create(rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1));
-		  else
-		    edge_target.rule = rule_type::create(rule_type(vocab_type::X,
-								   targets[pos].begin() + diter->span.target.first,
-								   targets[pos].begin() + diter->span.target.last));
-		  
-		  graph_source.connect_edge(edge_source.id, head);
-		  graph_target.connect_edge(edge_target.id, head);
-		  
-		} else {
-		  hypergraph_type::node_type& node_source1 = graph_source.add_node();
-		  hypergraph_type::node_type& node_source2 = graph_source.add_node();
-
-		  hypergraph_type::node_type& node_target1 = graph_target.add_node();
-		  hypergraph_type::node_type& node_target2 = graph_target.add_node();
-		  
-		  // push in reverse order!
-		  stack.push_back(node_source2.id);
-		  stack.push_back(node_source1.id);
-		  
-		  tails[0] = node_source1.id;
-		  tails[1] = node_source2.id;
-		  
-		  hypergraph_type::edge_type& edge_source = graph_source.add_edge(tails.begin(), tails.end());
-		  hypergraph_type::edge_type& edge_target = graph_target.add_edge(tails.begin(), tails.end());
-
-		  if (diter->is_straight()) {
-		    edge_source.rule = rule_straight;
-		    edge_target.rule = rule_straight;
-		  } else {
-		    edge_source.rule = rule_inverted;
-		    edge_target.rule = rule_inverted;
-		  }
-		  
-		  graph_source.connect_edge(edge_source.id, head);
-		  graph_target.connect_edge(edge_target.id, head);
-		}
-	      }
-	      
-	      graph_source.topologically_sort();
-	      graph_target.topologically_sort();
-	    }
-	    
-	    os << graph_source << " ||| " << graph_target << '\n';
+	    if (! derivations[pos].empty())
+	      dumper(os, sources[pos], targets[pos], derivations[pos]);
+	    os << '\n';
 	  }
 	} else if (sample_alignment) {
-	  alignment_type alignment;
+	  DumpAlignment dumper;
 	  
 	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    if (! derivations[pos].empty()) {
-	      
-	      alignment.clear();
-	      
-	      derivation_type::const_iterator diter_end = derivations[pos].end();
-	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-		if (diter->is_terminal() && ! diter->span.source.empty() && ! diter->span.target.empty()) {
-		  
-		  for (size_type src = diter->span.source.first; src != diter->span.source.last; ++ src)
-		    for (size_type trg = diter->span.target.first; trg != diter->span.target.last; ++ trg)
-		      alignment.push_back(std::make_pair(src, trg));
-		}
-		
-	      }
-	      
-	      std::sort(alignment.begin(), alignment.end());
-	      
-	      os << alignment;
-	    }
-	    
+	    if (! derivations[pos].empty())
+	      dumper(os, sources[pos], targets[pos], derivations[pos]);
 	    os << '\n';
 	  }
 	  
 	} else {
-	  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
-	  
-	  stack_type stack;
+	  DumpDerivation dumper;
 	  
 	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    if (! derivations[pos].empty()) {
-	      // we need to transform the stack-structure into tree-struct... HOW?
-	    
-	      stack.clear();
-	      derivation_type::const_iterator diter_end = derivations[pos].end();
-	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-		if (diter->is_terminal()) {
-		  os << "((( "
-		     << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-		     << " ||| "
-		     << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
-		     << " )))";
-		
-		  while (! stack.empty() && stack.back() != " ") {
-		    os << stack.back();
-		    stack.pop_back();
-		  }
-		
-		  if (! stack.empty() && stack.back() == " ") {
-		    os << stack.back();
-		    stack.pop_back();
-		  }
-		
-		} else if (diter->is_straight()) {
-		  os << "[ ";
-		  stack.push_back(" ]");
-		  stack.push_back(" ");
-		} else {
-		  os << "< ";
-		  stack.push_back(" >");
-		  stack.push_back(" ");
-		}
-	      }
-	    }
-	    
+	    if (! derivations[pos].empty())
+	      dumper(os, sources[pos], targets[pos], derivations[pos]);
 	    os << '\n';
 	  }
 	}
