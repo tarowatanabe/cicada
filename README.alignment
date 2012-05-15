@@ -28,6 +28,23 @@ cicada_pyp_itg_learn
 
 For ciada_lexicon_{hmm, model1}, we support L0 regularization [5]
 
+We also support alignment visulization by cicada_filter_alignment:
+
+cicada_fiter_alignment 
+	--source <source language file>
+	--target <target langauge file>
+	--alignment  <alignment file>
+	--alignment2 <secondary alignment file> (optional)
+	--inverse (inverse alignment, optional)
+	--visualize (required for visualization!)
+
+blue point indicates "intersection"
+green point indicates word alignment only in the primary alignment
+yello point indicates word alignment only in the secondary alignment
+
+
+
+
 [1]
 @article{Brown:1993:MSM:972470.972474,
  author = {Brown, Peter F. and Pietra, Vincent J. Della and Pietra, Stephen A. Della and Mercer, Robert L.},
