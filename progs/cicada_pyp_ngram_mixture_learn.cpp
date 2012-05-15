@@ -944,7 +944,7 @@ struct PYPMixture
       // update by the latent models
       for (size_type i = 0; i != models.size(); ++ i) 
 	if (order == 0 || nodes[i + 1] != models[i].trie.root()) {
-	  nodes[i + 1] = models[i].trie.find(nodes[i + 1], normalizer->operator()(*iter));
+	  nodes[i + 1] = models[i].trie.find(nodes[i + 1], normalizer[i](*iter));
 	  
 	  if (nodes[i + 1] != models[i].trie.root())
 	    probs[i + 1] = models[i].trie[nodes[i + 1]].table.prob(word, probs[i + 1]);
