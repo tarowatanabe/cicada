@@ -581,9 +581,9 @@ std::ostream& visualize(std::ostream& os,
     const bool bar_horizontal = ! ((src + 1) % 5);
     
     for (size_t trg = 0; trg != target.size(); ++ trg) {
-      // intersection: blue background:   \u001b[44m\u0020\u001b[0m
-      // align1:       green background:  \u001b[42m\u0020\u001b[0m
-      // align2:       yellow background: \u001b[43m\u0020\u001b[0m
+      // intersection: blue background:   \u001b[44m...\u001b[0m
+      // align1:       green background:  \u001b[42m...\u001b[0m
+      // align2:       yellow background: \u001b[43m...\u001b[0m
       
       if (matrix(src, trg)) {
 	if (matrix(src, trg) == 3)
