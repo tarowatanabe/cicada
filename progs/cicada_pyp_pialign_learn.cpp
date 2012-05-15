@@ -2087,9 +2087,6 @@ int max_phrase_length = 7;
 int max_sentence_length = 40;
 double beam = 1e-4;
 
-bool infinite = false;
-int order = 3;
-
 int samples = 1;
 int burns = 10;
 int baby_steps = 1;
