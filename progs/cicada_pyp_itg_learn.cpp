@@ -854,7 +854,6 @@ struct PYPGraph
   typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
   
   typedef utils::bichart<logprob_type, std::allocator<logprob_type> > chart_type;
-  typedef utils::bichart<logprob_type, std::allocator<logprob_type> > base_type;
   
   struct edge_type
   {
@@ -1302,7 +1301,6 @@ struct PYPGraph
     
     stack.clear();
     stack.push_back(span_pair_type(0, source.size(), 0, target.size()));
-
     
     while (! stack.empty()) {
       const span_pair_type span_pair = stack.back();
@@ -1349,6 +1347,551 @@ struct PYPGraph
       derivation.push_back(rule);
     }
 
+    return prob_derivation;
+  }
+
+  logprob_type logprob_term;
+  logprob_type logprob_str;
+  logprob_type logprob_inv;
+  matrix_type  matrix;
+  matrix_type  length_source;
+  matrix_type  length_target;
+
+  chart_type      chart;
+  edge_chart_type edges;
+  
+  agenda_type     agenda;
+  stack_type      stack;
+  heap_type       heap;
+  
+  chart_mono_type chart_source;
+  chart_mono_type chart_target;
+  
+  alpha_type alpha_source;
+  alpha_type alpha_target;
+  beta_type  beta_source;
+  beta_type  beta_target;
+  
+  prob_set_type probs;
+};
+
+struct PYPViterbi
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::phrase_type      phrase_type;
+  typedef PYP::phrase_pair_type phrase_pair_type;
+  
+  typedef PYP::span_type      span_type;
+  typedef PYP::span_pair_type span_pair_type;
+  
+  typedef PYP::rule_type rule_type;
+  
+  typedef std::vector<rule_type, std::allocator<rule_type> > derivation_type;
+
+  typedef PYPLexicon::logprob_type logprob_type;
+  typedef PYPLexicon::prob_type    prob_type;
+  
+  typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
+  
+  typedef utils::bichart<logprob_type, std::allocator<logprob_type> > chart_type;
+  
+  struct edge_type
+  {
+    rule_type    rule;
+    logprob_type prob;
+    
+    edge_type() : rule(), prob() {}
+    edge_type(const rule_type& __rule, const logprob_type& __prob)
+      : rule(__rule), prob(__prob) {}
+  };
+  
+  typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
+  typedef utils::bichart<edge_set_type, std::allocator<edge_set_type> > edge_chart_type;
+  
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
+  typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
+  
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
+
+  typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
+  typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+
+  typedef utils::chart<logprob_type, std::allocator<logprob_type> > chart_mono_type;
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > alpha_type;
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > beta_type;
+
+  typedef utils::vector2<logprob_type, std::allocator<logprob_type> > matrix_type;
+
+  typedef std::pair<logprob_type, span_pair_type> score_span_pair_type;
+  typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
+
+  
+  void initialize(const sentence_type& source,
+		  const sentence_type& target,
+		  const PYPITG& model)
+  {
+    //std::cerr << "initialize" << std::endl;
+    matrix.clear();
+    matrix.reserve(source.size() + 1, target.size() + 1);
+    matrix.resize(source.size() + 1, target.size() + 1);
+    
+    length_source.clear();
+    length_source.resize(2, source.size() + 1);
+    
+    length_target.clear();
+    length_target.resize(2, target.size() + 1);
+    
+    logprob_term = model.rule.prob_terminal();
+    logprob_str  = model.rule.prob_straight();
+    logprob_inv  = model.rule.prob_inverted();
+
+    for (size_type src = 0; src <= source.size(); ++ src)
+      for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
+	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+    
+    for (size_type src = 1; src <= source.size(); ++ src) {
+      length_source(0, src) = model.length.logprob(src, 0);
+      length_source(1, src) = model.length.logprob(src, 1);
+    }
+    for (size_type trg = 1; trg <= target.size(); ++ trg) {
+      length_target(0, trg) = model.length.logprob(0, trg);
+      length_target(1, trg) = model.length.logprob(1, trg);
+    }
+  }
+  
+  void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
+  {
+    const logprob_type logprob_rule = std::max(logprob_str, logprob_inv);
+
+    // forward...
+    alpha[0] = 1.0;
+    for (size_type last = 1; last <= sentence.size(); ++ last)
+      for (size_type first = 0; first != last; ++ first)
+	alpha[last] = std::max(alpha[last], alpha[first] * chart(first, last) * (first != 0 ? logprob_rule : logprob_type(1.0)));
+    
+    // backward...
+    beta[sentence.size()] = 1.0;
+    for (difference_type first = sentence.size() - 1; first >= 0; -- first)
+      for (size_type last = first + 1; last <= sentence.size(); ++ last)
+	beta[first] = std::max(beta[first], chart(first, last) * beta[last] * (last != sentence.size() ? logprob_rule : logprob_type(1.0)));
+  }
+  
+  // sort by less so that we can pop from a greater item
+  struct heap_compare
+  {
+    bool operator()(const score_span_pair_type& x, const score_span_pair_type& y) const
+    {
+      return x.first < y.first;
+    }
+  };
+  
+  // forward filtering
+  std::pair<logprob_type, bool> forward(const sentence_type& source,
+					const sentence_type& target,
+					const logprob_type beam)
+  {
+    //std::cerr << "forward" << std::endl;
+
+    
+    // initialize...
+    chart.clear();
+    chart.reserve(source.size() + 1, target.size() + 1);
+    chart.resize(source.size() + 1, target.size() + 1);
+    
+    edges.clear();
+    edges.reserve(source.size() + 1, target.size() + 1);
+    edges.resize(source.size() + 1, target.size() + 1);
+    
+    agenda.clear();
+    agenda.reserve(source.size() + target.size() + 1);
+    agenda.resize(source.size() + target.size() + 1);
+
+    chart_source.clear();
+    chart_source.reserve(source.size() + 1);
+    chart_source.resize(source.size() + 1);
+
+    chart_target.clear();
+    chart_target.reserve(target.size() + 1);
+    chart_target.resize(target.size() + 1);
+
+    alpha_source.clear();
+    alpha_target.clear();
+    beta_source.clear();
+    beta_target.clear();
+    
+    alpha_source.resize(source.size() + 1);
+    alpha_target.resize(target.size() + 1);
+    beta_source.resize(source.size() + 1);
+    beta_target.resize(target.size() + 1);
+    
+    for (size_type src = 0; src <= source.size(); ++ src)
+      for (size_type trg = 0; trg <= target.size(); ++ trg) {
+	const size_type source_first = src;
+	const size_type target_first = trg;
+	
+	if (src < source.size() && trg < target.size()) {
+	  // one-to-one
+	  {
+	    const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term * length_source(1, 1);
+	    
+	    const size_type source_last = source_first + 1;
+	    const size_type target_last = target_first + 1;
+	    
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	    chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	    
+	    agenda[span_pair.size()].push_back(span_pair);
+	  }
+	  
+	  // one-to-many
+	  {
+	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
+
+	    for (size_type source_last = source_first + 2; source_last <= source.size(); ++ source_last) {
+	      const size_type target_last = target_first + 1;
+	      
+	      prob *= matrix(source_last, target_last);
+	      
+	      const logprob_type prob_term = prob * length_source(1, source_last - source_first);
+	      
+	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
+	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	      
+	      chart(source_first, source_last, target_first, target_last) = prob_term;
+	      
+	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	      
+	      agenda[span_pair.size()].push_back(span_pair);
+	    }
+	  }
+
+	  // one-to-many
+	  {
+	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
+	    
+	    for (size_type target_last = target_first + 2; target_last <= target.size(); ++ target_last) {
+	      const size_type source_last = source_first + 1;
+	      
+	      prob *= matrix(source_last, target_last);
+	      
+	      const logprob_type prob_term = prob * length_target(1, target_last - target_first);
+	      
+	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	      
+	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	      
+	      chart(source_first, source_last, target_first, target_last) = prob_term;
+	      
+	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	      
+	      agenda[span_pair.size()].push_back(span_pair);
+	    }
+	  }
+	}
+	
+	// epsilon-to-many
+	if (src < source.size()) {
+	  logprob_type prob = logprob_term;
+	  
+	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
+	    const size_type target_last = target_first;
+	    
+	    prob *= matrix(source_last, 0);
+
+	    const logprob_type prob_term = prob * length_source(0, source_last - source_first);
+	    
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	    chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	    
+	    agenda[span_pair.size()].push_back(span_pair);
+	  }
+	  
+	}
+	
+	// epsilon-to-many
+	if (trg < target.size()) {
+	  logprob_type prob = logprob_term;
+	  
+	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
+	    const size_type source_last = source_first;
+	    
+	    prob *= matrix(0, target_last);
+
+	    const logprob_type prob_term = prob * length_target(0, target_last - target_first);
+	    
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	    chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	    
+	    agenda[span_pair.size()].push_back(span_pair);
+	  }
+	}
+      }
+
+    // forward-backward to compute estiamtes...
+    forward_backward(source, chart_source, alpha_source, beta_source);
+    forward_backward(target, chart_target, alpha_target, beta_target);
+      
+    
+    // start parsing...
+    
+    span_pairs_unique_type spans_unique;
+    spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
+					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
+    
+    // traverse agenda, smallest first...
+    const size_type length_max = source.size() + target.size();
+
+    for (size_type length = 1; length != length_max; ++ length) 
+      if (! agenda[length].empty()) {
+	span_pair_set_type& spans = agenda[length];
+
+	// construct heap...
+	heap.clear();
+	heap.reserve(spans.size());
+	span_pair_set_type::const_iterator siter_end = spans.end();
+	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
+	  const logprob_type score = (chart(siter->source.first, siter->source.last, siter->target.first, siter->target.last)
+				      * std::min(alpha_source[siter->source.first] * beta_source[siter->source.last],
+						 alpha_target[siter->target.first] * beta_target[siter->target.last]));
+	  
+	  heap.push_back(score_span_pair_type(score, *siter));
+	  std::push_heap(heap.begin(), heap.end(), heap_compare());
+	}
+
+	heap_type::iterator hiter_begin = heap.begin();
+	heap_type::iterator hiter       = heap.end();
+	heap_type::iterator hiter_end   = heap.end();
+	
+	const logprob_type logprob_threshold = hiter_begin->first * beam;
+	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
+	  std::pop_heap(hiter_begin, hiter, heap_compare());
+	
+	// we will process from hiter to hiter_end...
+	spans_unique.clear();
+	
+	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
+	  const span_pair_type& span_pair = iter->second;
+	  
+	  // we borrow the notation...
+	  
+	  const difference_type l = length;
+	  const difference_type s = span_pair.source.first;
+	  const difference_type t = span_pair.source.last;
+	  const difference_type u = span_pair.target.first;
+	  const difference_type v = span_pair.target.last;
+	  
+	  const difference_type T = source.size();
+	  const difference_type V = target.size();
+	  
+	  // remember, we have processed only upto length l. thus, do not try to combine with spans greather than l!
+	  // also, keep used pair of spans in order to remove duplicates.
+	  
+	  for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
+	    const difference_type L = l - (s - S);
+	    
+	    // straight
+	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == s); ++ U) {
+	      // parent span: StUv
+	      // span1: SsUu
+	      // span2: stuv
+
+	      if (edges(S, s, U, u).empty()) continue;
+	      
+	      const span_pair_type  span1(S, s, U, u);
+	      const span_pair_type& span2(span_pair);
+
+	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      const logprob_type logprob = (logprob_str
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+	      
+	      if (logprob > chart(S, t, U, v)) {
+		const span_pair_type span_head(S, t, U, v);
+		
+		chart(S, t, U, v) = logprob;
+		
+		if (edges(S, t, U, v).empty()) {
+		  edges(S, t, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
+		  
+		  agenda[span_head.size()].push_back(span_head);
+		} else
+		  edges(S, t, U, v).back() = edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob);
+	      }
+	    }
+	    
+	    // inversion
+	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + L, V); ++ U) {
+	      // parent span: StuU
+	      // span1: SsvU
+	      // span2: stuv
+	      
+	      if (edges(S, s, v, U).empty()) continue;
+	      
+	      const span_pair_type  span1(S, s, v, U);
+	      const span_pair_type& span2(span_pair);
+
+	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      const logprob_type logprob = (logprob_inv
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+
+	      if (logprob > chart(S, t, u, U)) {
+		const span_pair_type span_head(S, t, u, U);
+		
+		chart(S, t, u, U) = logprob;
+		
+		if (edges(S, t, u, U).empty()) {
+		  edges(S, t, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
+		  
+		  agenda[span_head.size()].push_back(span_head);
+		} else
+		  edges(S, t, u, U).back() = edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob);
+	      }
+	    }
+	  }
+	  
+	  for (difference_type S = t; S <= utils::bithack::min(t + l, T); ++ S) {
+	    const difference_type L = l - (S - t);
+	    
+	    // inversion
+	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == t); ++ U) {
+	      // parent span: sSUv
+	      // span1: stuv
+	      // span2: tSUu
+	      
+	      if (edges(t, S, U, u).empty()) continue;
+	      
+	      const span_pair_type& span1(span_pair);
+	      const span_pair_type  span2(t, S, U, u);
+
+	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      const logprob_type logprob = (logprob_inv
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+
+	      if (logprob > chart(s, S, U, v)) {
+		const span_pair_type span_head(s, S, U, v);
+		
+		chart(s, S, U, v) = logprob;
+
+		if (edges(s, S, U, v).empty()) {
+		  edges(s, S, U, v).push_back(edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob));
+		  
+		  agenda[span_head.size()].push_back(span_head);
+		} else
+		  edges(s, S, U, v).back() = edge_type(rule_type(span_head, span1, span2, PYP::INVERTED), logprob);
+	      }
+	    }
+	    
+	    // straight
+	    for (difference_type U = v + (S == t); U <= utils::bithack::min(v + L, V); ++ U) {
+	      // parent span: sSuU
+	      // span1: stuv
+	      // span2: tSvU
+	      
+	      if (edges(t, S, v, U).empty()) continue;
+	      
+	      const span_pair_type& span1(span_pair);
+	      const span_pair_type  span2(t, S, v, U);
+	      
+	      if (! spans_unique.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      const logprob_type logprob = (logprob_str
+					    * chart(span1.source.first, span1.source.last, span1.target.first, span1.target.last)
+					    * chart(span2.source.first, span2.source.last, span2.target.first, span2.target.last));
+	      
+	      if (logprob > chart(s, S, u, U)) {
+		const span_pair_type span_head(s, S, u, U);
+		
+		chart(s, S, u, U) = logprob;
+		
+		if (edges(s, S, u, U).empty()) {
+		  edges(s, S, u, U).push_back(edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob));
+		  
+		  agenda[span_head.size()].push_back(span_head);
+		} else
+		  edges(s, S, u, U).back() = edge_type(rule_type(span_head, span1, span2, PYP::STRAIGHT), logprob);
+	      }
+	    }
+	  }
+	}
+      }
+    
+    return std::make_pair(chart(0, source.size(), 0, target.size()), ! edges(0, source.size(), 0, target.size()).empty());
+  }
+  
+  // backward Viterbi
+  template <typename Sampler>
+  logprob_type backward(const sentence_type& source,
+			const sentence_type& target,
+			derivation_type& derivation)
+  {
+    derivation.clear();
+    logprob_type prob_derivation = cicada::semiring::traits<logprob_type>::one(); 
+    
+    stack.clear();
+    stack.push_back(span_pair_type(0, source.size(), 0, target.size()));
+    
+    while (! stack.empty()) {
+      const span_pair_type span_pair = stack.back();
+      stack.pop_back();
+      
+      const edge_set_type& edges_span = edges(span_pair.source.first, span_pair.source.last, span_pair.target.first, span_pair.target.last);
+      
+      if (edges_span.empty()) {
+	// no derivation???
+	derivation.clear();
+	return logprob_type();
+      }
+      
+      // we will push in a right first manner, so that when popped, we will derive left-to-right traversal.
+      
+      const rule_type& rule = edges_span.front().rule;
+      logprob_type prob = edges_span.front().prob;
+      
+      if (! rule.right.empty()) {
+	prob /= chart(rule.right.source.first, rule.right.source.last, rule.right.target.first, rule.right.target.last);
+	
+	stack.push_back(rule.right);
+      }
+      
+      if (! rule.left.empty()) {
+	prob /= chart(rule.left.source.first, rule.left.source.last, rule.left.target.first, rule.left.target.last);
+	
+	stack.push_back(rule.left);
+      }
+      
+      prob_derivation *= prob;
+      
+      derivation.push_back(rule);
+    }
+    
     return prob_derivation;
   }
 
