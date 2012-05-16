@@ -19,7 +19,7 @@
 // }
 //
 
-// TODO:
+// parallel training by:
 // @article{DBLP:journals/taslp/HuangR10,
 //   author    = {Songfang Huang and
 //                Steve Renals},
