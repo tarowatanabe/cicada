@@ -276,7 +276,6 @@ struct PYPLM
       }
   }
   
-  
   double log_likelihood() const
   {
     double logprob = std::log(p0) * counts0;
@@ -452,9 +451,9 @@ struct PYPLM
     typedef std::vector<count_type, std::allocator<count_type> > offset_set_type;
       
     repository_type rep(path, repository_type::write);
-      
+    
     rep["order"] = boost::lexical_cast<std::string>(parameters.size());
-
+    
     rep["p0"]      = boost::lexical_cast<std::string>(p0);
     rep["counts0"] = boost::lexical_cast<std::string>(counts0);
     
@@ -462,7 +461,7 @@ struct PYPLM
     rep["discount-beta"]  = boost::lexical_cast<std::string>(parameters[0].discount_beta);
     rep["strength-shape"] = boost::lexical_cast<std::string>(parameters[0].strength_shape);
     rep["strength-rate"]  = boost::lexical_cast<std::string>(parameters[0].strength_rate);
-          
+    
     for (size_type order = 0; order != parameters.size(); ++ order) {
       rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].discount);
       rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].strength);
