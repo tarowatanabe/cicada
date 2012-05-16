@@ -42,6 +42,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include "utils/lexical_cast.hpp"
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/pyp_parameter.hpp"
@@ -62,7 +63,10 @@
 #include "utils/simple_vector.hpp"
 #include "utils/rwticket.hpp"
 #include "utils/atomicop.hpp"
+#include "utils/piece.hpp"
+#include "utils/space_separator.hpp"
 
+#include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
@@ -630,6 +634,7 @@ typedef std::vector<data_set_type, std::allocator<data_set_type> > data_map_type
 typedef std::vector<bool, std::allocator<bool> > non_oov_type;
 
 path_set_type train_files;
+path_set_type train_count_files;
 path_set_type test_files;
 path_type     output_file;
 
@@ -650,7 +655,9 @@ double strength_rate  = 1.0;
 int threads = 1;
 int debug = 0;
 
-void read_training(const path_set_type& files,
+
+void read_training(const path_set_type& corpus,
+		   const path_set_type& counts,
 		   data_map_type& training,
 		   non_oov_type& non_oov,
 		   PYPLM& model);
@@ -677,7 +684,7 @@ int main(int argc, char ** argv)
     if (resample_rate <= 0)
       throw std::runtime_error("resample rate must be >= 1");
 
-    if (train_files.empty())
+    if (train_files.empty() && train_count_files.empty())
       throw std::runtime_error("no training data?");
     
     sampler_type sampler;
@@ -693,7 +700,16 @@ int main(int argc, char ** argv)
     data_map_type training;
     non_oov_type  non_oov;
     
-    read_training(train_files, training, non_oov, model);
+    read_training(train_files, train_count_files, training, non_oov, model);
+    
+    // - 1 for BOS
+    model.initialize(1.0 / (std::count(non_oov.begin(), non_oov.end(), true) - 1));
+    
+    if (debug) {
+      std::cerr << "p0=" << model.p0 << std::endl;
+      for (size_t i = 0; i != model.shards.size(); ++ i)
+	std::cerr << "shard=" << i << " node size: " << model.shards[i].trie.size() << std::endl;
+    }
     
     learn(training, model, samplers);
     
@@ -1045,8 +1061,28 @@ struct ReadMapper
   data_set_type&     training;
   PYPLM::shard_type& model;
 };
+  
+inline
+word_type escape_word(const utils::piece& __word)
+{
+  static const std::string& __BOS = static_cast<const std::string&>(vocab_type::BOS);
+  static const std::string& __EOS = static_cast<const std::string&>(vocab_type::EOS);
+  static const std::string& __UNK = static_cast<const std::string&>(vocab_type::UNK);
+  
+  const utils::ipiece word(__word);
+  
+  if (word == __BOS)
+    return vocab_type::BOS;
+  else if (word == __EOS)
+    return vocab_type::EOS;
+  else if (word == __UNK)
+    return vocab_type::UNK;
+  else
+    return __word;
+}
 
-void read_training(const path_set_type& files,
+void read_training(const path_set_type& corpus_files,
+		   const path_set_type& counts_files,
 		   data_map_type& training,
 		   non_oov_type& non_oov,
 		   PYPLM& model)
@@ -1070,7 +1106,7 @@ void read_training(const path_set_type& files,
   if (vocab_type::EOS.id() >= non_oov.size())
     non_oov.resize(vocab_type::EOS.id() + 1, false);
   
-  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+  for (path_set_type::const_iterator fiter = corpus_files.begin(); fiter != corpus_files.end(); ++ fiter) {
     utils::compress_istream is(*fiter, 1024 * 1024);
     
     sentence_type sentence;
@@ -1096,20 +1132,57 @@ void read_training(const path_set_type& files,
     }
   }
   
+  for (path_set_type::const_iterator fiter = counts_files.begin(); fiter != counts_files.end(); ++ fiter) {
+    if (boost::filesystem::is_directory(*fiter)) {
+      // assume google counts...
+      
+      
+    } else {
+      typedef std::vector<utils::piece, std::allocator<utils::piece> > tokens_type;
+      typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+      
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      
+      std::string line;
+      tokens_type tokens;
+      
+      sentence_type ngram;
+      
+      while (std::getline(is, line)) {
+	utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
+	
+	tokens.clear();
+	tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
+	
+	// exclude unigram, exclude non-ordered, or not prefixed by BOS
+	if (tokens.size() == 2) continue;
+	if (static_cast<int>(tokens.size()) != order + 1 || escape_word(tokens.front()) != vocab_type::BOS) continue;
+	
+	ngram.clear();
+	
+	tokens_type::const_iterator titer_end = tokens.end() - 1;
+	for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end; ++ titer)
+	  ngram.push_back(escape_word(*titer));
+	
+	const size_type count = utils::lexical_cast<size_type>(tokens.back());
+	const ngram_type ngram_model(ngram.begin(), ngram.end());
+	  
+	for (size_type i = 0; i != count; ++ i)
+	  queues[model.shard(ngram[ngram.size() - 2])].push(ngram_model);
+
+	if (ngram.back().id() >= non_oov.size())
+	  non_oov.resize(ngram.back().id() + 1, false);
+	non_oov[ngram.back().id()] = true;
+      }
+    }
+  }
+
+  
   for (size_t i = 0; i != shards_size; ++ i)
     queues[i].push(ngram_type());
   
   workers.join_all();
-  
-  // - 1 for BOS
-  model.initialize(1.0 / (std::count(non_oov.begin(), non_oov.end(), true) - 1));
-  
-  if (debug) {
-    std::cerr << "p0=" << model.p0 << std::endl;
-    for (size_t i = 0; i != shards_size; ++ i)
-      std::cerr << "shard=" << i << " node size: " << model.shards[i].trie.size() << std::endl;
-  }
-  
 }
 
 void options(int argc, char** argv)
@@ -1120,7 +1193,8 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("train", po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
+    ("train",       po::value<path_set_type>(&train_files)->multitoken(), "train file(s)")
+    ("train-count", po::value<path_set_type>(&train_count_files)->multitoken(), "train count file(s)")
     ("test",  po::value<path_set_type>(&test_files)->multitoken(),  "test file(s)")
     ("output", po::value<path_type>(&output_file), "output file")
     
