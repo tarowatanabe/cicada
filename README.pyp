@@ -3,6 +3,7 @@ Unsupervised learner based on Pitman-Yor Process
 cicada_pyp_itg_learn
 
 cicada_pyp_ngram_learn
+cicada_pyp_ngram_learn2
 
 cicada_pyp_ngram_mixture_learn
 
