@@ -117,12 +117,7 @@ struct PYPLM
       order_alpha(__order_alpha),
       order_beta(__order_beta),
       infinite(__infinite)
-  {
-    // unitialize root table...
-    root.parent = id_type(-1);
-    root.order = 0;
-    root.table = node_type::table_type(parameters[0].discount, parameters[0].strength);
-  }
+  { }
 
   template <typename Iterator>
   id_type insert(Iterator first, Iterator last)
@@ -144,7 +139,6 @@ struct PYPLM
       if (! trie_node.order) {
 	trie_node.parent = node_prev;
 	trie_node.order = order;
-	trie_node.table = node_type::table_type(parameters[order].discount, parameters[order].strength);
 	
 	nodes[order].push_back(node);
       }
@@ -230,11 +224,15 @@ struct PYPLM
       counts0 += root.table.increment(word, p0, sampler, temperature);
     } else {
       const double backoff = prob(word, trie[node].parent);
-
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      
+      bool propagate = false;
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	propagate = trie[node].table.increment(word, backoff, sampler, temperature);
+      }
       
       // we will also increment lower-order when new table is created!
-      if (trie[node].table.increment(word, backoff, sampler, temperature))
+      if (propagate)
 	increment(word, trie[node].parent, sampler, temperature);
     }
   }
@@ -264,10 +262,14 @@ struct PYPLM
       }
       utils::atomicop::fetch_and_add(orders[order - 1].first, size_type(-1));
       //-- orders[order - 1].first;
-
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
       
-      if (trie[node].table.decrement(word, sampler))
+      bool propagate = false;
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	propagate = trie[node].table.decrement(word, sampler);
+      }
+      
+      if (propagate)
 	decrement(word, trie[node].parent, sampler);
     }
   }
@@ -280,9 +282,13 @@ struct PYPLM
       
       counts0 -= root.table.decrement(word, sampler);
     } else {
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      bool propagate = false;
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	propagate = trie[node].table.decrement(word, sampler);
+      }
       
-      if (trie[node].table.decrement(word, sampler))
+      if (propagate)
 	decrement(word, trie[node].parent, sampler);
     }
   }
