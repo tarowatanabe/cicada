@@ -81,6 +81,8 @@ struct PYPLM
   
   typedef boost::filesystem::path path_type;
   
+  typedef utils::rwticket mutex_type;
+  
   struct Node
   {
     typedef utils::restaurant<word_type, boost::hash<word_type>, std::equal_to<word_type>,
@@ -105,7 +107,7 @@ struct PYPLM
 
   struct shard_type
   {
-    shard_type() : trie(word_type()), root(), p0(1) {}
+    shard_type(PYPLM& __model) : trie(word_type()), model(&__model) {}
 
     template <typename Iterator>
     id_type insert(Iterator first, Iterator last)
@@ -134,43 +136,41 @@ struct PYPLM
     }
     
     template <typename Sampler>
-    bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
+    void increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
     {
       if (node == trie.root()) {
-	root.table.increment(word, p0, sampler, temperature);
+	mutex_type::scoped_writer_lock lock(model->mutex);
 	
-	return true;
+	model->counts0 += model->root.table.increment(word, model->p0, sampler, temperature);
       } else {
 	const double backoff = prob(word, trie[node].parent);
 	
 	// we will also increment lower-order when new table is created!
 	if (trie[node].table.increment(word, backoff, sampler, temperature))
-	  return increment(word, trie[node].parent, sampler, temperature);
-	else
-	  return false;
+	  increment(word, trie[node].parent, sampler, temperature);
       }
     }
     
     template <typename Sampler>
-    bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
+    void decrement(const word_type& word, const id_type& node, Sampler& sampler)
     {
       if (node == trie.root()) {
-	root.table.decrement(word, sampler);
+	mutex_type::scoped_writer_lock lock(model->mutex);
 	
-	return true;
+	model->counts0 -= model->root.table.decrement(word, sampler);
       } else {
 	if (trie[node].table.decrement(word, sampler))
-	  return decrement(word, trie[node].parent, sampler);
-	else
-	  return false;
+	  decrement(word, trie[node].parent, sampler);
       }
     }
     
     double prob(const word_type& word, const id_type& node) const
     {
-      if (node == trie.root())
-	return root.table.prob(word, p0);
-      else {
+      if (node == trie.root()) {
+	mutex_type::scoped_reader_lock lock(model->mutex);
+	
+	return model->root.table.prob(word, model->p0);
+      } else {
 	const double p = prob(word, trie[node].parent);
 	
 	if (trie[node].table.empty())
@@ -187,9 +187,9 @@ struct PYPLM
     
       // this may happen when accessing 0-gram!
       if (! (first <= last))
-	return p0;
+	return model->p0;
     
-      double p = root.table.prob(word, p0);
+      double p = model->root.table.prob(word, model->p0);
     
       // we will traverse from the back!
       reverse_iterator begin(last);
@@ -209,15 +209,14 @@ struct PYPLM
     }
     
     trie_type trie;
-    node_type root;
-    double p0;
+    PYPLM*    model;
   };
   typedef std::vector<shard_type, std::allocator<shard_type> > shard_set_type;
   
   PYPLM(const size_type num_shard,
 	const int order,
 	const parameter_type& param)
-    : shards(num_shard),
+    : shards(num_shard, shard_type(*this)),
       root(),
       p0(1.0),
       counts0(0),
@@ -230,19 +229,6 @@ struct PYPLM
     return word.id() % shards.size();
   }
   
-  template <typename Sampler>
-  void increment(const word_type& word, Sampler& sampler, const double temperature=1.0)
-  {
-    counts0 += root.table.increment(word, p0, sampler, temperature);
-  }
-  
-  template <typename Sampler>
-  void decrement(const word_type& word, Sampler& sampler)
-  {
-    counts0 -= root.table.decrement(word, sampler);
-  }
-
-
   template <typename Iterator>
   double prob(const word_type& word, Iterator first, Iterator last) const 
   {
@@ -253,13 +239,11 @@ struct PYPLM
     else // we will shard wrt the last word in the context!
       return shards[shard(*(last - 1))].prob(word, first, last);
   }
-
+  
   void initialize(const double __p0)
   {
     // assign p0
     p0 = __p0;
-    for (size_type i = 0; i != shards.size(); ++ i)
-      shards[i].p0 = __p0;
     
     // assign nodes
     nodes.clear();
@@ -329,10 +313,6 @@ struct PYPLM
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    // first, copy root...
-    for (size_t i = 0; i != shards.size(); ++ i)
-      shards[i].root = root;
-    
     for (size_type order = 0; order != parameters.size(); ++ order) {
       
       for (int iter = 0; iter != num_loop; ++ iter) {
@@ -390,10 +370,6 @@ struct PYPLM
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
-    // first, copy root...
-    for (size_t i = 0; i != shards.size(); ++ i)
-      shards[i].root = root;
-    
     for (size_type order = 0; order != parameters.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
@@ -608,9 +584,11 @@ struct PYPLM
 
 public: 
   shard_set_type shards;
-  node_type root;
-  double    p0;
-  size_type counts0;
+  
+  mutex_type mutex;
+  node_type  root;
+  double     p0;
+  size_type  counts0;
   
   node_map_type nodes;
   parameter_set_type parameters;
@@ -771,31 +749,23 @@ int main(int argc, char ** argv)
 
 struct LearnMapReduce
 {
-  typedef std::pair<word_type, int> word_count_type;
   
-  typedef utils::lockfree_list_queue<word_count_type, std::allocator<word_count_type> > queue_type;
 };
 
 struct LearnMapper
 {
-  typedef LearnMapReduce::word_count_type word_count_type;
-  typedef LearnMapReduce::queue_type      queue_type;
-    
-  LearnMapper(queue_type& __queue,
-	      const data_set_type& __training,
+  LearnMapper(const data_set_type& __training,
 	      PYPLM::shard_type& __model,
 	      sampler_type& __sampler,
 	      const double __temperature,
 	      const bool __remove)
-    : queue(__queue), training(__training), model(__model), sampler(__sampler), temperature(__temperature), remove(__remove) {}
-
+    : training(__training), model(__model), sampler(__sampler), temperature(__temperature), remove(__remove) {}
+  
   void operator()()
   {
     typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
-    typedef std::vector<int, std::allocator<int> > count_set_type;
     
     position_set_type positions(training.size());
-    count_set_type counts;
     
     for (size_type i = 0; i != training.size(); ++ i)
       positions[i] = i;
@@ -805,78 +775,21 @@ struct LearnMapper
     
     position_set_type::const_iterator piter_end = positions.end();
     for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
-
-      const word_type& word = boost::fusion::get<0>(training[*piter]);
-
-      if (word.id() >= counts.size())
-	counts.resize(word.id() + 1, 0);
-      
-      int& counter = counts[word.id()];
-      
       if (remove)
-	counter -= model.decrement(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler);
+	model.decrement(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler);
       
-      counter += model.increment(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler, temperature);
+      model.increment(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler, temperature);
     }
-
-    for (word_type::id_type id = 0; id != counts.size(); ++ id)
-      if (counts[id])
-	queue.push(std::make_pair(word_type(id), counts[id]));
-    
-    queue.push(std::make_pair(word_type(), 0));
   }
   
-  queue_type&          queue;
   const data_set_type& training;
   PYPLM::shard_type&   model;
   sampler_type&        sampler;
-
+  
   const double         temperature;
   const bool           remove;
 };
 
-struct LearnReducer
-{
-  typedef LearnMapReduce::word_count_type word_count_type;
-  typedef LearnMapReduce::queue_type      queue_type;
-  
-  LearnReducer(const size_type __size,
-	       queue_type& __queue,
-	       PYPLM& __model,
-	       sampler_type& __sampler,
-	       const double __temperature)
-    : reduce_size(__size), queue(__queue), model(__model), sampler(__sampler), temperature(__temperature) {}
-  
-  void operator()()
-  {
-    size_type finished = 0;
-    
-    while (finished != reduce_size) {
-      word_count_type word_count;
-      queue.pop(word_count);
-      
-      if (word_count.first.empty()) {
-	++ finished;
-	continue;
-      }
-      
-      if (word_count.second < 0) {
-	for (int i = 0; i != - word_count.second; ++ i)
-	  model.decrement(word_count.first, sampler);
-      } else if (word_count.second > 0) {
-	for (int i = 0; i != word_count.second; ++ i)
-	  model.increment(word_count.first, sampler, temperature);
-      }
-    }
-  }
-  
-  const size_type      reduce_size;
-  queue_type&          queue;
-  PYPLM&               model;
-  sampler_type&        sampler;
-  
-  const double         temperature;
-};
 
 void learn(const data_map_type& training,
 	   PYPLM& model,
@@ -896,7 +809,7 @@ void learn(const data_map_type& training,
   bool sampling = false;
   int sample_iter = 0;
 
-  sampler_type sampler = samplers.front();
+  sampler_type& sampler = samplers.front();
   
   // sample parameters, first...
   if (slice_sampling)
@@ -938,19 +851,13 @@ void learn(const data_map_type& training,
 	std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
     }
     
-    LearnMapReduce::queue_type queue;
-    
     boost::thread_group workers;
     for (size_type i = 0; i != shards_size; ++ i)
-      workers.add_thread(new boost::thread(LearnMapper(queue,
-						       training[i],
+      workers.add_thread(new boost::thread(LearnMapper(training[i],
 						       model.shards[i],
 						       samplers[i],
 						       temperature,
 						       iter)));
-    
-    // reduce!
-    LearnReducer(shards_size, queue, model, sampler, temperature)();
     
     // join
     workers.join_all();
@@ -965,6 +872,9 @@ void learn(const data_map_type& training,
 	for (int n = 0; n != order; ++ n)
 	  std::cerr << "order=" << n << " discount=" << model.parameters[n].discount << " strength=" << model.parameters[n].strength << std::endl;
     }
+
+    if (debug)
+      std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
   }
 }
 
@@ -1060,7 +970,14 @@ void read_training(const path_set_type& files,
   workers.join_all();
   
   // - 1 for BOS
-  model.initialize(std::count(non_oov.begin(), non_oov.end(), true) - 1);
+  model.initialize(1.0 / (std::count(non_oov.begin(), non_oov.end(), true) - 1));
+  
+  if (debug) {
+    std::cerr << "p0=" << model.p0 << std::endl;
+    for (size_t i = 0; i != shards_size; ++ i)
+      std::cerr << "shard=" << i << " node size: " << model.shards[i].trie.size() << std::endl;
+  }
+  
 }
 
 void options(int argc, char** argv)
