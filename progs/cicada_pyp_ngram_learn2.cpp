@@ -625,7 +625,7 @@ typedef utils::sampler<boost::mt19937> sampler_type;
 typedef std::vector<sampler_type, std::allocator<sampler_type> > sampler_set_type;
 
 // we will precompute <word, node> pair...
-typedef boost::fusion::tuple<word_type, PYPLM::id_type> data_type;
+typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
 typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
 typedef std::vector<data_set_type, std::allocator<data_set_type> > data_map_type;
 typedef std::vector<bool, std::allocator<bool> > non_oov_type;
@@ -785,9 +785,23 @@ struct LearnMapper
 	      const data_set_type& __training,
 	      PYPLM::shard_type& __model,
 	      sampler_type& __sampler,
+	      const bool __baby,
 	      const double __temperature,
 	      const bool __remove)
-    : queue(__queue), training(__training), model(__model), sampler(__sampler), temperature(__temperature), remove(__remove) {}
+    : queue(__queue), training(__training), model(__model), sampler(__sampler), baby(__baby), temperature(__temperature), remove(__remove) {}
+
+  template <typename Training>
+  struct less_rank
+  {
+    less_rank(const Training& __training) : training(__training) {}
+    
+    bool operator()(const size_t& x, const size_t& y) const
+    {
+      return boost::fusion::get<2>(training[x]) < boost::fusion::get<2>(training[y]);
+    }
+    
+    const Training& training;
+  };
   
   void operator()()
   {
@@ -802,6 +816,9 @@ struct LearnMapper
     
     boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
     std::random_shuffle(positions.begin(), positions.end(), gen);
+
+    if (baby)
+      std::sort(positions.begin(), positions.end(), less_rank<data_set_type>(training));
     
     position_set_type::const_iterator piter_end = positions.end();
     for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
@@ -830,6 +847,7 @@ struct LearnMapper
   PYPLM::shard_type&   model;
   sampler_type&        sampler;
   
+  const bool           baby;
   const double         temperature;
   const bool           remove;
 };
@@ -889,6 +907,9 @@ void learn(const data_map_type& training,
   
   size_t anneal_iter = 0;
   const size_t anneal_last = utils::bithack::branch(anneal_steps > 0, anneal_steps, 0);
+
+  size_t baby_iter = 0;
+  const size_t baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
     
   size_t burn_iter = 0;
   const size_t burn_last = utils::bithack::branch(burns > 0, burns, 0);
@@ -923,13 +944,19 @@ void learn(const data_map_type& training,
 	std::cerr << "temperature: " << temperature << std::endl;
     }
       
+    bool baby_finished = true;
+    if (baby_iter != baby_last) {
+      ++ baby_iter;
+      baby_finished = false;
+    }
+    
     bool burn_finished = true;
     if (burn_iter != burn_last) {
       ++ burn_iter;
       burn_finished = false;
     }
       
-    sampling = anneal_finished && burn_finished;
+    sampling = anneal_finished && baby_finished && burn_finished;
     
     if (debug) {
       if (sampling)
@@ -946,9 +973,9 @@ void learn(const data_map_type& training,
 						       training[i],
 						       model.shards[i],
 						       samplers[i],
+						       ! baby_finished,
 						       temperature,
 						       iter)));
-    
     
     // reduce!
     LearnReducer(shards_size, queue, model, sampler, temperature)();
@@ -992,6 +1019,10 @@ struct ReadMapper
   
   void operator()()
   {
+    typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_unique_type;
+    typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
+    
+    word_unique_set_type uniques;
     ngram_type ngram;
     
     for (;;) {
@@ -999,8 +1030,16 @@ struct ReadMapper
       
       if (ngram.empty()) break;
       
-      training.push_back(data_type(ngram.back(), model.insert(ngram.begin(), ngram.end() - 1)));
+      training.push_back(data_type(ngram.back(), model.insert(ngram.begin(), ngram.end() - 1), 0));
+
+      if (boost::fusion::get<1>(training.back()) >= uniques.size())
+	uniques.resize(boost::fusion::get<1>(training.back()) + 1);
+      uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
     }
+    
+    data_set_type::iterator titer_end = training.end();
+    for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
+      boost::fusion::get<2>(*titer) = uniques[boost::fusion::get<1>(*titer)].size();
   }
   
   queue_type&        queue;
