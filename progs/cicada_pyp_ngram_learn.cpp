@@ -118,7 +118,7 @@ struct PYPLM
       order_beta(__order_beta),
       infinite(__infinite)
   { }
-
+  
   template <typename Iterator>
   id_type insert(Iterator first, Iterator last)
   {
@@ -469,23 +469,25 @@ struct PYPLM
       for (int iter = 0; iter != num_loop; ++ iter) {
 	parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
 	
+	parameters[order].verify_parameters();
+	
 	parameters[order].discount = sample_discount(order, sampler, parameters[order].discount, parameters[order].strength);
+
+	parameters[order].verify_parameters();
       }
       
       parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
       
+      parameters[order].verify_parameters();
+      
       if (order == 0) {
 	root.table.discount() = parameters[order].discount;
 	root.table.strength() = parameters[order].strength;
-
-	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
 	  trie[*niter].table.discount() = parameters[order].discount;
 	  trie[*niter].table.strength() = parameters[order].strength;
-	  
-	  trie[*niter].table.verify_parameters();
 	}
       }
     }
@@ -533,7 +535,6 @@ struct PYPLM
     return sampler.beta(parameters[order].discount_alpha + y, parameters[order].discount_beta + z);
   }
   
-  
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
@@ -550,6 +551,8 @@ struct PYPLM
 							  0.0,
 							  num_iterations,
 							  100 * num_iterations);
+
+	parameters[order].verify_parameters();
 	
 	parameters[order].discount = utils::slice_sampler(discount_sampler,
 							  parameters[order].discount,
@@ -559,6 +562,8 @@ struct PYPLM
 							  0.0,
 							  num_iterations,
 							  100 * num_iterations);
+	
+	parameters[order].verify_parameters();
       }
       
       parameters[order].strength = utils::slice_sampler(strength_sampler,
@@ -570,18 +575,16 @@ struct PYPLM
 							num_iterations,
 							100 * num_iterations);
       
+      parameters[order].verify_parameters();
+      
       if (order == 0) {
 	root.table.discount() = parameters[order].discount;
 	root.table.strength() = parameters[order].strength;
-
-	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
 	  trie[*niter].table.discount() = parameters[order].discount;
 	  trie[*niter].table.strength() = parameters[order].strength;
-	  
-	  trie[*niter].table.verify_parameters();
 	}
       }
     }
