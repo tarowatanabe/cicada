@@ -1201,27 +1201,6 @@ struct PYPPhrase
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
     
     table.sample_parameters(sampler, num_loop, num_iterations);
-
-#if 0
-    // parameter sampling used in pialign...
-    for (int iter = 0; iter != num_loop; ++ iter) {
-      {
-	// strength..
-	const double x = table.sample_log_x(sampler, table.discount(), table.strength());
-	const double y = table.sample_y(sampler, table.discount(), table.strength());
-	
-	table.strength() = sampler.gamma(table.parameters().strength_shape + y, 1.0 / (table.parameters().strength_rate - x));
-      }
-      
-      {
-	// discount...
-	const double y = table.sample_y_inv(sampler, table.discount(), table.strength());
-	const double z = table.sample_z_inv(sampler, table.discount(), table.strength());
-	
-	table.discount() = sampler.beta(table.parameters().discount_alpha + y, table.parameters().discount_beta + z);
-      }
-    }
-#endif
   }
   
   template <typename Sampler>
@@ -1257,7 +1236,7 @@ struct PYPPhrase
 	++ erased;
       } else
 	++ phrase;
-        
+    
     if (debug)
       std::cerr << "# of phrases: " << phrase << " erased: " << erased << std::endl;
   }
@@ -1495,83 +1474,160 @@ struct PYPGraph
     logprob_str  = model.rule.prob_straight() * logprob_fallback;
     logprob_inv  = model.rule.prob_inverted() * logprob_fallback;
     
-    // initialize base...
+    
+    // initialization for bases
+    for (size_type source_first = 0; source_first <= source.size(); ++ source_first)
+      for (size_type target_first = 0; target_first <= target.size(); ++ target_first) {
+
+	const size_type source_max = utils::bithack::min(source.size(), source_first + max_length);
+	const size_type target_max = utils::bithack::min(target.size(), target_first + max_length);
+	
+	// epsilons...
+	if (source_first < source.size())
+	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
+	    const size_type target_last = target_first;
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
+	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+	    
+	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
+	    logbase = base(source_first, source_last - 1, target_first, target_last) * epsilon_target[source_last - 1];
+	    
+	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	    const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	    
+	    chart(source_first, source_last, target_first, target_last) += logprob_base;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+	    
+	    agenda[span_pair.size()].push_back(span_pair);
+	  }
+	
+	// epsilons...
+	if (target_first < target.size())
+	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
+	    const size_type source_last = source_first;
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
+	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+
+	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
+	    logbase = base(source_first, source_last, target_first, target_last - 1) * epsilon_source[target_last - 1];
+	    
+	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	    const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	    
+	    chart(source_first, source_last, target_first, target_last) += logprob_base;
+	    
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	    
+	    agenda[span_pair.size()].push_back(span_pair);
+	  }
+	
+	// phrase-pair
+	
+	if (source_first < source.size() && target_first < target.size())
+	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last)
+	    for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
+	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	      
+	      const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
+	      const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+	      
+	      // base model
+	      logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
+	      logprob_type& logbase_target = base_target(source_first, source_last, target_first, target_last);
+	      
+	      logbase_source = (base_source(source_first, source_last, target_first, target_last - 1)
+				* model1_source[target_last - 1](source_first, source_last));
+	      
+	      logbase_target = (base_target(source_first, source_last - 1, target_first, target_last)
+				* model1_target[source_last - 1](target_first, target_last));
+	      
+	      logprob_type& logbase = base(source_first, source_last, target_first, target_last);
+	      logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source)
+								    + cicada::semiring::log(logbase_target));
+	      
+	      const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	      const logprob_type logprob_base = logprob_term * logbase * loglength;
+	      
+	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
+	      
+	      chart(source_first, source_last, target_first, target_last) += logprob_base;
+	      
+	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
+	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
+	      
+	      agenda[span_pair.size()].push_back(span_pair);
+	    }
+      }
+    
+    
     // actually, we should be carefull with the chart assignment, since we need to consult the base of phrase-model + rule-model
     for (size_type source_first = 0; source_first <= source.size(); ++ source_first)
       for (size_type target_first = 0; target_first <= target.size(); ++ target_first) {
-		
+	
 	// epsilons.. 
-
-	if (source_first < source.size())
+	PYPPhrase::phrase_set_type::const_iterator eiter = model.phrase.phrases.find(phrase_type(source.begin(), source.begin()));
+	const PYPPhrase::id_type empty_id = eiter - model.phrase.phrases.begin();
+	const bool has_empty = (eiter != model.phrase.phrases.end());
+	
+	if (has_empty && source_first < source.size())
 	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	    const size_type target_last = target_first;
 	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 
-	    logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
-
-	    if (source_last - source_first <= max_length) {
-	      logprob_type& logbase = base(source_first, source_last, target_first, target_last);
-	      logbase = base(source_first, source_last - 1, target_first, target_last) * epsilon_target[source_last - 1];
+	    PYPPhrase::phrase_set_type::const_iterator siter = model.phrase.phrases.find(phrase_source);
+	    const PYPPhrase::id_type source_id = siter - model.phrase.phrases.begin();
+	    const bool has_source = (siter != model.phrase.phrases.end());
 	    
-	      const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	    if (! has_source) continue;
 	    
-	      const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, empty_id), logprob_type(0.0));
 	    
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	      logprob_chart += logprob_base;
+	    if (! logprob_gen.second) continue;
 	    
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
-	    }
-	  
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
-	  
-	    if (logprob_gen.second) {
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	      logprob_chart += logprob_gen.first;
-
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
-	    }
-	  
-	    if (! edges(source_first, source_last, target_first, target_last).empty())
+	    if (edges(source_first, source_last, target_first, target_last).empty())
 	      agenda[span_pair.size()].push_back(span_pair);
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
+	    
+	    chart(source_first, source_last, target_first, target_last) += logprob_gen.first;
+	    
+	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
 	  }
 	
-	if (target_first < target.size())
+	if (has_empty && target_first < target.size())
 	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	    const size_type source_last = source_first;
 	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 	  
-	    logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
-
-	    if (target_last - target_first <= max_length) {
-	      logprob_type& logbase = base(source_first, source_last, target_first, target_last);
-	      logbase = base(source_first, source_last, target_first, target_last - 1) * epsilon_source[target_last - 1];
+	    PYPPhrase::phrase_set_type::const_iterator titer = model.phrase.phrases.find(phrase_target);
+	    const PYPPhrase::id_type target_id = titer - model.phrase.phrases.begin();
+	    const bool has_target = (titer != model.phrase.phrases.end());
 	    
-	      const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
+	    if (! has_target) continue;
 	    
-	      const logprob_type logprob_base = logprob_term * logbase * loglength;
-	    
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-	      logprob_chart += logprob_base;
-	    
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
-	    }
-
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.prob(phrase_source, phrase_target, logprob_type(0.0));
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(empty_id, target_id), logprob_type(0.0));
 	  
-	    if (logprob_gen.second) {
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-	      logprob_chart += logprob_gen.first;
+	    if (! logprob_gen.second) continue;
 	    
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
-	    }
-	  
-	    if (! edges(source_first, source_last, target_first, target_last).empty())
+	    if (edges(source_first, source_last, target_first, target_last).empty())
 	      agenda[span_pair.size()].push_back(span_pair);
+	    
+	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
+	    
+	    chart(source_first, source_last, target_first, target_last) += logprob_gen.first;
+	    
+	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	  }
 	
 	// phrases... is it correct?
@@ -1584,62 +1640,32 @@ struct PYPGraph
 	    const PYPPhrase::id_type source_id = siter - model.phrase.phrases.begin();
 	    const bool has_source = (siter != model.phrase.phrases.end());
 	  
-	    if (has_source || source_last - source_first <= max_length)
+	    if (has_source)
 	      for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
-		const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
 		const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
-	    	      
-		logprob_type& logprob_chart = chart(source_first, source_last, target_first, target_last);
-	      
-		// base model
-		if (source_last - source_first <= max_length && target_last - target_first <= max_length) {
-		  logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
-		  logprob_type& logbase_target = base_target(source_first, source_last, target_first, target_last);
 		
-		  logbase_source = (base_source(source_first, source_last, target_first, target_last - 1)
-				    * model1_source[target_last - 1](source_first, source_last));
+		const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 		
-		  logbase_target = (base_target(source_first, source_last - 1, target_first, target_last)
-				    * model1_target[source_last - 1](target_first, target_last));
-		
-		  logprob_type& logbase = base(source_first, source_last, target_first, target_last);
-#if 0
-		  logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source) * 0.5
-									+ cicada::semiring::log(logbase_target) * 0.5);
-#endif
-		  logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source)
-									+ cicada::semiring::log(logbase_target));
-		
-		  const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
-		  const logprob_type logprob_base = logprob_term * logbase * loglength;
-		
-		  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
-		  logprob_chart += logprob_base;
-	      
-		  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_base);
-		  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_base);
-		}
-
 		// generative model
 		PYPPhrase::phrase_set_type::const_iterator titer = model.phrase.phrases.find(phrase_target);
 		const PYPPhrase::id_type target_id = titer - model.phrase.phrases.begin();
 		const bool has_target = (titer != model.phrase.phrases.end());
-	      
-		if (has_source && has_target) {
-		  const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, target_id), logprob_type(0.0));
 		
-		  if (logprob_gen.second) {
-		    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
-		    logprob_chart += logprob_gen.first;
+		if (! has_target) continue;
 		
-		    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
-		    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
-		  }
-		}
+		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, target_id), logprob_type(0.0));
 		
-		if (! edges(source_first, source_last, target_first, target_last).empty())
+		if (! logprob_gen.second) continue;
+
+		if (edges(source_first, source_last, target_first, target_last).empty())
 		  agenda[span_pair.size()].push_back(span_pair);
+		
+		edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::GENERATIVE), logprob_gen.first));
+		
+		chart(source_first, source_last, target_first, target_last) += logprob_gen.first;
+		
+		chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
+		chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), logprob_gen.first);
 	      }
 	  }
       }
