@@ -1058,14 +1058,6 @@ struct PYPPhrase
     
     if (table.increment_existing(id_pair, sampler))
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-    
-#if 0
-    if (table.increment_existing(id_pair_type(id_source, id_target), sampler)) {
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-      
-      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-    }
-#endif
   }
 
   template <typename Sampler>
@@ -1078,14 +1070,6 @@ struct PYPPhrase
     
     if (table.increment_new(id_pair, sampler))
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-
-#if 0
-    if (table.increment_new(id_pair_type(id_source, id_target), sampler)) {
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-      
-      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
-    }
-#endif
   }
   
   
@@ -1099,14 +1083,6 @@ struct PYPPhrase
     
     if (table.decrement(id_pair, sampler))
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
-    
-#if 0
-    if (table.decrement(id_pair_type(id_source, id_target), sampler)) {
-      length.decrement(phrase_pair.source, phrase_pair.target, sampler);
-      
-      //lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
-    }
-#endif
   }
   
   template <typename LogProb>
@@ -1194,14 +1170,6 @@ struct PYPPhrase
 	++ phrase_pair_erased;
       }
     }
-    
-#if 0
-    table_type::const_iterator titer_end = table.end();
-    for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
-      inserted[titer->first.first] = true;
-      inserted[titer->first.second] = true;
-    }
-#endif
     
     size_type phrase = 0;
     size_type erased = 0;
@@ -1576,11 +1544,6 @@ struct PYPGraph
 	    
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
 	    
-#if 0
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, empty_id.first),
-											    logprob_type(0.0));
-#endif
-	    
 	    if (! logprob_gen.second) continue;
 	    
 	    if (edges(source_first, source_last, target_first, target_last).empty())
@@ -1612,11 +1575,6 @@ struct PYPGraph
 	    
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
 	    
-#if 0
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(empty_id.first, target_id.first),
-											    logprob_type(0.0));
-#endif
-	  
 	    if (! logprob_gen.second) continue;
 	    
 	    if (edges(source_first, source_last, target_first, target_last).empty())
@@ -1653,11 +1611,6 @@ struct PYPGraph
 		if (! pair_id.second) continue;
 		
 		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
-		
-#if 0
-		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, target_id.first),
-												logprob_type(0.0));
-#endif
 		
 		if (! logprob_gen.second) continue;
 		
@@ -2755,22 +2708,6 @@ int main(int argc, char ** argv)
 	      phrases_target[phrase_target] += prob;
 	    }
 	  }
-	
-#if 0
-	PYPPhrase::table_type::const_iterator titer_end = model.phrase.table.end();
-	for (PYPPhrase::table_type::const_iterator titer = model.phrase.table.begin(); titer != titer_end; ++ titer) {
-	  const phrase_type& phrase_source = model.phrase.phrases[titer->first.first];
-	  const phrase_type& phrase_target = model.phrase.phrases[titer->first.second];
-
-	  if (! phrase_source.empty() && ! phrase_target.empty()) {
-	    const double prob = model.phrase.table.prob(titer->first, 0.0);
-	    
-	    phrases[phrase_pair_type(phrase_source, phrase_target)] = prob;
-	    phrases_source[phrase_source] += prob;
-	    phrases_target[phrase_target] += prob;
-	  }
-	}
-#endif
 	
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
