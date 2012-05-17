@@ -88,6 +88,7 @@
 #include "utils/symbol_set.hpp"
 #include "utils/unique_set.hpp"
 #include "utils/rwticket.hpp"
+#include "utils/spinlock.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -524,31 +525,6 @@ struct PYPLexicon
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	table.increment(*titer, lexicon(*siter, *titer), sampler, temperature);
     }
-    
-#if 0
-    if (source.empty()) {
-      if (! tables.exists(vocab_type::EPSILON.id()))
-	tables[vocab_type::EPSILON.id()] = table_type(parameter.discount, parameter.strength);
-      
-      table_type& table = tables[vocab_type::EPSILON.id()];
-      
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	table.increment(*titer, lexicon(vocab_type::EPSILON, *titer), sampler, temperature);
-    } else if (! target.empty()) {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	if (! tables.exists(siter->id()))
-	  tables[siter->id()] = table_type(parameter.discount, parameter.strength);
-	
-	table_type& table = tables[siter->id()];
-	
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  table.increment(*titer, lexicon(*siter, *titer), sampler, temperature);
-      }
-    }
-#endif
   }
 
   template <typename Sampler>
@@ -580,25 +556,6 @@ struct PYPLexicon
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
 	table.decrement(*titer, sampler);
     }
-    
-#if 0
-    if (source.empty()) {
-      table_type& table = tables[vocab_type::EPSILON.id()];
-      
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	table.decrement(*titer, sampler);
-    } else if (! target.empty()) {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	table_type& table = tables[siter->id()];
-	
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  table.decrement(*titer, sampler);
-      }
-    }
-#endif
   }
   
   double prob_source_target(const word_type& source, const word_type& target) const
@@ -628,13 +585,6 @@ struct PYPLexicon
     const double logprob_target_source = logprob(target, source, tables_target_source, *lexicon_target_source);
     
     return std::exp(logprob_source_target + logprob_target_source);
-
-#if 0
-    if (source.empty() || target.empty())
-      return std::exp(logprob_source_target + logprob_target_source);
-    else
-      return std::exp((logprob_source_target + logprob_target_source) * 0.5);
-#endif
   }
 
   double prob_source_target(const phrase_type& source, const phrase_type& target) const
@@ -668,35 +618,6 @@ struct PYPLexicon
       }
     }
     
-    return lp;
-
-#if 0
-    if (source.empty()) {
-      if (! tables.exists(vocab_type::EPSILON.id())) {
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  lp += std::log(lexicon(vocab_type::EPSILON, *titer));
-      } else {
-	const table_type& table = tables[vocab_type::EPSILON.id()];
-	
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  lp += std::log(table.prob(*titer, lexicon(vocab_type::EPSILON, *titer)));
-      }
-    } else if (! target.empty()) {
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	
-	double sum = 0.0;
-	phrase_type::const_iterator siter_end = source.end();
-	for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	  sum += (! tables.exists(siter->id()) ? lexicon(*siter, *titer) : tables[siter->id()].prob(*titer, lexicon(*siter, *titer)));
-	
-	lp += std::log(sum);
-      }
-    }
-#endif
-
     return lp;
   }
   
@@ -858,6 +779,7 @@ struct LengthModel
   cache_type cache;
 };
 
+
 // length prior...
 struct PYPLength
 {
@@ -878,41 +800,33 @@ struct PYPLength
       counts_source(),
       counts_target()
   {}
-
+  
   template <typename Sampler>
   void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
   {
-    if (! source.empty()) {
-      if (source.size() >= counts_source.size())
-	counts_source.resize(source.size() + 1, 0);
-      
-      ++ counts_source[source.size()];
-    }
-
-    if (! target.empty()) {
-      if (target.size() >= counts_target.size())
-	counts_target.resize(target.size() + 1, 0);
-      
-      ++ counts_target[target.size()];
-    }
+    if (source.size() >= counts_source.size())
+      counts_source.resize(source.size() + 1, 0);
+    
+    ++ counts_source[source.size()];
+    
+    if (target.size() >= counts_target.size())
+      counts_target.resize(target.size() + 1, 0);
+    
+    ++ counts_target[target.size()];
   }
 
   template <typename Sampler>
   void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
-    if (! source.empty()) {
-      if (source.size() >= counts_source.size() || ! counts_source[source.size()])
-	throw std::runtime_error("invalid decrment");
-      
-      -- counts_source[source.size()];
-    }
+    if (source.size() >= counts_source.size() || ! counts_source[source.size()])
+      throw std::runtime_error("invalid decrment");
+    
+    -- counts_source[source.size()];
 
-    if (! target.empty()) {
-      if (target.size() >= counts_target.size() || ! counts_target[target.size()])
-	throw std::runtime_error("invalid decrment");
-      
-      -- counts_target[target.size()];
-    }
+    if (target.size() >= counts_target.size() || ! counts_target[target.size()])
+      throw std::runtime_error("invalid decrment");
+    
+    -- counts_target[target.size()];
   }
   
   double prob(const phrase_type& source, const phrase_type& target) const
@@ -930,10 +844,11 @@ struct PYPLength
     
     return cicada::semiring::traits<logprob_type>::exp(length_source.logprob(source.size()) + length_target.logprob(target.size()));
   }
-
+  
   double log_likelihood() const
   {
-    double logprob = 0.0;
+    double logprob = (std::log(length_source.lambda_null) * counts_source[0]
+		      + std::log(length_target.lambda_null) * counts_target[0]);
     
     for (size_type source = 1; source < counts_source.size(); ++ source)
       logprob += length_source.logprob(source) * counts_source[source];
@@ -987,7 +902,6 @@ struct PYPRule
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
   
-  
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
 
@@ -1002,18 +916,6 @@ struct PYPRule
   
   typedef utils::pyp_parameter parameter_type;
   typedef utils::restaurant_vector<> table_type;
-
-  struct node_type
-  {
-    node_type() : table(), parent(id_type(-1)), order(0) {}
-    
-    table_type table;
-    id_type    parent;
-    int        order;
-  };
-  
-  typedef utils::compact_trie_dense<char, node_type, boost::hash<char>, std::equal_to<char>,
-				    std::allocator<std::pair<const char, node_type> > > trie_type;
 
   typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
 
@@ -1273,7 +1175,7 @@ struct PYPPiAlign
   PYPPiAlign(const PYPRule&   __rule,
 	     const PYPPhrase& __phrase)
     : rule(__rule), phrase(__phrase) {}
-
+  
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
   {
@@ -2035,14 +1937,20 @@ struct Task
     PYPGraph graph;
     
     size_type pos;
-    
+
+    lock_time = 0.0;
+
     for (;;) {
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
 
       if (! derivations[pos].empty()) {
+	utils::resource start;
 	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	utils::resource end;
+	
+	lock_time += end.thread_time() - start.thread_time();
 	
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
@@ -2050,7 +1958,11 @@ struct Task
       }
       
       {
+	utils::resource start;
 	PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
+	utils::resource end;
+	
+	lock_time += end.thread_time() - start.thread_time();
 	
 	graph.initialize(sources[pos], targets[pos], model, max_length);
       }
@@ -2060,7 +1972,11 @@ struct Task
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
       {
+	utils::resource start;
 	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	utils::resource end;
+
+	lock_time += end.thread_time() - start.thread_time();
 	
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
@@ -2085,6 +2001,8 @@ struct Task
   int max_length;
   
   double temperature;
+
+  double lock_time;
 };
 
 
@@ -2354,8 +2272,13 @@ int main(int argc, char ** argv)
       }
 
       // assign temperature...
-      for (size_type i = 0; i != tasks.size(); ++ i)
+      double lock_time = 0.0;
+      for (size_type i = 0; i != tasks.size(); ++ i) {
 	tasks[i].temperature = temperature;
+	
+	lock_time += tasks[i].lock_time;
+      }
+      
       
       // shuffle
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
@@ -2432,6 +2355,14 @@ int main(int argc, char ** argv)
 		    << " strength=" << model.phrase.lexicon.parameter_target_source.strength << std::endl
 		    << "length source: lambda=" << model.phrase.length.length_source.lambda << std::endl
 		    << "length target: lambda=" << model.phrase.length.length_target.lambda << std::endl;
+      }
+
+      if (debug >= 2) {
+	double lock_time_end = 0.0;
+	for (size_type i = 0; i != tasks.size(); ++ i)
+	  lock_time_end += tasks[i].lock_time;
+
+	std::cerr << "lock-time: " << ((lock_time_end - lock_time) / tasks.size()) <<  " seconds" << std::endl;
       }
       
       if (debug)
