@@ -1962,8 +1962,6 @@ struct Task
     
     size_type pos;
 
-    lock_time = 0.0;
-
     for (;;) {
       mapper.pop(pos);
       
