@@ -14,12 +14,6 @@
 #include <vector>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/container/slist.hpp>
-
-//
-// slist from boost with constant-time size()
-// use before_begin(), erase_after(), insert_after()
-//
 
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
@@ -108,24 +102,16 @@ namespace utils
       parameter.verify_parameters();
     }
 
-
+    
   private:
     struct Location
     {
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
-      //typedef std::vector<size_type, alloc_type> table_set_type;
-      typedef boost::container::slist<size_type, alloc_type> table_set_type;
+      typedef std::vector<size_type, alloc_type> table_set_type;
       
       typedef typename table_set_type::const_iterator const_iterator;
       
       Location() : customers(0), tables() {}
-      Location(const Location& x) : customers(x.customers), tables(x.tables) {}
-      Location& operator=(const Location& x)
-      {
-	customers = x.customers;
-	tables = x.tables;
-	return *this;
-      }
       
       const_iterator begin() const { return tables.begin(); }
       const_iterator end() const { return tables.end(); }
@@ -275,8 +261,7 @@ namespace utils
       
       location_type& loc = dishes[dish];
       
-      //loc.tables.push_back(1);
-      loc.tables.push_front(1);
+      loc.tables.push_back(1);
       ++ tables;
       
       ++ loc.customers;
@@ -328,8 +313,7 @@ namespace utils
 	  throw std::runtime_error("not incremented?");
 
       } else {
-	//loc.tables.push_back(1);
-	loc.tables.push_front(1);
+	loc.tables.push_back(1);
 	++ tables;
       }
       
@@ -360,25 +344,6 @@ namespace utils
 
       bool decremented = false;
       
-      typename location_type::table_set_type::iterator titer_prev = loc.tables.before_begin();
-      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer, ++ titer_prev) {
-	r -= *titer;
-	
-	if (r <= 0.0) {
-	  -- (*titer);
-	  decremented = true;
-	  
-	  if (! (*titer)) {
-	    erased = true;
-	    -- tables;
-	    loc.tables.erase_after(titer_prev);
-	  }
-	  break;
-	}
-      }
-      
-#if 0
       typename location_type::table_set_type::iterator titer_end = loc.tables.end();
       for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
 	r -= *titer;
@@ -395,7 +360,6 @@ namespace utils
 	  break;
 	}
       }
-#endif
 
       if (! decremented)
 	throw std::runtime_error("not decremented?");
