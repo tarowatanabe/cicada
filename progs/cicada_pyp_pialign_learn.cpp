@@ -2189,7 +2189,7 @@ double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
 double length_shape = 1e-2;
-double length_rate  = 1e+2;
+double length_rate  = 1e+7;
 
 int blocks  = 64;
 int threads = 1;
