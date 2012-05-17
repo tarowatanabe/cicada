@@ -1200,8 +1200,10 @@ struct PYPPhrase
     
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
     
-    //table.sample_parameters(sampler, num_loop, num_iterations);
+    table.sample_parameters(sampler, num_loop, num_iterations);
 
+#if 0
+    // parameter sampling used in pialign...
     for (int iter = 0; iter != num_loop; ++ iter) {
       {
 	// strength..
@@ -1219,6 +1221,7 @@ struct PYPPhrase
 	table.discount() = sampler.beta(table.parameters().discount_alpha + y, table.parameters().discount_beta + z);
       }
     }
+#endif
   }
   
   template <typename Sampler>
