@@ -1115,6 +1115,12 @@ struct PYPPhrase
       length(__length),
       table(parameter),
       phrases() {}
+
+  std::pair<id_type, bool> phrase_find(const phrase_type& phrase) const
+  {
+    phrase_set_type::const_iterator iter = phrases.find(phrase);
+    return std::make_pair(iter - phrases.begin(), iter != phrases.end());
+  }
   
   id_type phrase_id(const phrase_type& phrase)
   {
@@ -1486,9 +1492,11 @@ struct PYPGraph
 	if (source_first < source.size())
 	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
 	    const size_type target_last = target_first;
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    
 	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
 	    logbase = base(source_first, source_last - 1, target_first, target_last) * epsilon_target[source_last - 1];
@@ -1509,9 +1517,11 @@ struct PYPGraph
 	if (target_first < target.size())
 	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
 	    const size_type source_last = source_first;
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 
 	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
 	    logbase = base(source_first, source_last, target_first, target_last - 1) * epsilon_source[target_last - 1];
@@ -1533,10 +1543,10 @@ struct PYPGraph
 	if (source_first < source.size() && target_first < target.size())
 	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last)
 	    for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
-	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	      
 	      const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	      const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
+
+	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	      
 	      // base model
 	      logprob_type& logbase_source = base_source(source_first, source_last, target_first, target_last);
@@ -1568,28 +1578,28 @@ struct PYPGraph
     
     
     // actually, we should be carefull with the chart assignment, since we need to consult the base of phrase-model + rule-model
+
+    // epsilons.. 
+    const std::pair<PYPPhrase::id_type, bool> empty_id = model.phrase.phrase_find(phrase_type(source.begin(), source.begin()));
+
     for (size_type source_first = 0; source_first <= source.size(); ++ source_first)
       for (size_type target_first = 0; target_first <= target.size(); ++ target_first) {
-	
-	// epsilons.. 
-	PYPPhrase::phrase_set_type::const_iterator eiter = model.phrase.phrases.find(phrase_type(source.begin(), source.begin()));
-	const PYPPhrase::id_type empty_id = eiter - model.phrase.phrases.begin();
-	const bool has_empty = (eiter != model.phrase.phrases.end());
-	
-	if (has_empty && source_first < source.size())
+		
+	if (empty_id.second && source_first < source.size())
 	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	    const size_type target_last = target_first;
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 
-	    PYPPhrase::phrase_set_type::const_iterator siter = model.phrase.phrases.find(phrase_source);
-	    const PYPPhrase::id_type source_id = siter - model.phrase.phrases.begin();
-	    const bool has_source = (siter != model.phrase.phrases.end());
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    
-	    if (! has_source) continue;
+	    const std::pair<PYPPhrase::id_type, bool> source_id = model.phrase.phrase_find(phrase_source);
 	    
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, empty_id), logprob_type(0.0));
+	    if (! source_id.second) continue;
+	    
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, empty_id.first),
+											    logprob_type(0.0));
 	    
 	    if (! logprob_gen.second) continue;
 	    
@@ -1603,20 +1613,21 @@ struct PYPGraph
 	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), logprob_gen.first);
 	  }
 	
-	if (has_empty && target_first < target.size())
+	if (empty_id.second && target_first < target.size())
 	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 	    const size_type source_last = source_first;
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
 	    const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
-	  
-	    PYPPhrase::phrase_set_type::const_iterator titer = model.phrase.phrases.find(phrase_target);
-	    const PYPPhrase::id_type target_id = titer - model.phrase.phrases.begin();
-	    const bool has_target = (titer != model.phrase.phrases.end());
+
+	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    	    
+	    const std::pair<PYPPhrase::id_type, bool> target_id = model.phrase.phrase_find(phrase_target);
 	    
-	    if (! has_target) continue;
+	    if (! target_id.second) continue;
 	    
-	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(empty_id, target_id), logprob_type(0.0));
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(empty_id.first, target_id.first),
+											    logprob_type(0.0));
 	  
 	    if (! logprob_gen.second) continue;
 	    
@@ -1635,28 +1646,25 @@ struct PYPGraph
 	if (source_first < source.size() && target_first < target.size())
 	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
 	    const phrase_type phrase_source(source.begin() + source_first, source.begin() + source_last);
-
-	    PYPPhrase::phrase_set_type::const_iterator siter = model.phrase.phrases.find(phrase_source);
-	    const PYPPhrase::id_type source_id = siter - model.phrase.phrases.begin();
-	    const bool has_source = (siter != model.phrase.phrases.end());
+	    
+	    const std::pair<PYPPhrase::id_type, bool> source_id = model.phrase.phrase_find(phrase_source);
 	  
-	    if (has_source)
+	    if (source_id.second)
 	      for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
 		const phrase_type phrase_target(target.begin() + target_first, target.begin() + target_last);
 		
 		const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 		
 		// generative model
-		PYPPhrase::phrase_set_type::const_iterator titer = model.phrase.phrases.find(phrase_target);
-		const PYPPhrase::id_type target_id = titer - model.phrase.phrases.begin();
-		const bool has_target = (titer != model.phrase.phrases.end());
+		const std::pair<PYPPhrase::id_type, bool> target_id = model.phrase.phrase_find(phrase_target);
 		
-		if (! has_target) continue;
+		if (! target_id.second) continue;
 		
-		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id, target_id), logprob_type(0.0));
+		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, target_id.first),
+												logprob_type(0.0));
 		
 		if (! logprob_gen.second) continue;
-
+		
 		if (edges(source_first, source_last, target_first, target_last).empty())
 		  agenda[span_pair.size()].push_back(span_pair);
 		
