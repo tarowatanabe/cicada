@@ -1925,6 +1925,42 @@ struct Time
   }
 };
 
+struct Counter
+{
+  Counter() : counter(0) {}
+  
+  void increment()
+  {
+    utils::atomicop::fetch_and_add(counter, size_type(1));
+  }
+  
+  void wait(size_type target)
+  {
+    for (;;) {
+      utils::atomicop::memory_barrier();
+      
+      for (int i = 0; i < 64; ++ i) {
+	const size_type curr = counter;
+	
+	if (curr == target)
+	  return;
+	else
+	  boost::thread::yield();
+      }
+      
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    }
+  }
+
+  void clear() { counter = 0; }
+  
+  size_type counter;
+};
+typedef Counter counter_type;
+
 struct Task
 {
   typedef PYP::size_type       size_type;
@@ -1936,7 +1972,7 @@ struct Task
   typedef PYPPiAlign::prob_type    prob_type;
 
   Task(queue_type& __mapper,
-       queue_type& __reducer,
+       counter_type& __reducer,
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
@@ -1988,12 +2024,12 @@ struct Task
       time.forward  += middle.thread_time() - start.thread_time();
       time.backward += end.thread_time() - middle.thread_time();      
       
-      reducer.push(pos);
+      reducer.increment();
     }
   }
   
-  queue_type& mapper;
-  queue_type& reducer;
+  queue_type&   mapper;
+  counter_type& reducer;
   
   const sentence_set_type& sources;
   const sentence_set_type& targets;
@@ -2214,10 +2250,10 @@ int main(int argc, char ** argv)
 		<< "length target: lambda=" << model.phrase.length.length_target.lambda << std::endl;
     
     Task::queue_type queue_mapper;
-    Task::queue_type queue_reducer;
+    Counter reducer;
     
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
-								 queue_reducer,
+								 reducer,
 								 sources,
 								 targets,
 								 derivations,
@@ -2315,15 +2351,16 @@ int main(int argc, char ** argv)
 	  
 	  mapped.push_back(pos);
 	}
+
+	reducer.clear();
 	
 	position_set_type::const_iterator miter_end = mapped.end();
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
 	  queue_mapper.push(*miter);
+
+	reducer.wait(mapped.size());
 	
 	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced, ++ reduced_total) {
-	  size_type pos = 0;
-	  queue_reducer.pop(pos);
-	  
 	  if (debug) {
 	    if ((reduced_total + 1) % 10000 == 0)
 	      std::cerr << '.';
@@ -2340,56 +2377,6 @@ int main(int argc, char ** argv)
 	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
 	}
       }
-      
-#if 0
-      position_set_type::const_iterator piter_end = positions.end();
-      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	queue_mapper.push(*piter);
-      
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
-	
-	if (debug >= 3) {
-	  std::cerr << "training=" << pos << std::endl
-		    << "source=" << sources[pos] << std::endl
-		    << "target=" << targets[pos] << std::endl;
-	  
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      
-	    std::cerr << "derivation: ";
-	    switch (diter->itg) {
-	    case PYP::TERMINAL:   std::cerr << "ter"; break;
-	    case PYP::STRAIGHT:   std::cerr << "str"; break;
-	    case PYP::INVERTED:   std::cerr << "inv"; break;
-	    case PYP::GENERATIVE: std::cerr << "gen"; break;
-	    case PYP::BASE:       std::cerr << "bas"; break;
-	    default: std::cerr << "UNK";
-	    }
-	      
-	    std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-		      << " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	    if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
-	      std::cerr << " pair: "
-			<< PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			<< " ||| "
-			<< PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	    std::cerr << std::endl;
-	  }
-	}
-	
-	if (debug) {
-	  if ((reduced + 1) % 10000 == 0)
-	    std::cerr << '.';
-	  if ((reduced + 1) % 1000000 == 0)
-	    std::cerr << '\n';
-	}
-      }
-#endif
-      
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
