@@ -1056,9 +1056,10 @@ struct PYPPhrase
     
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_existing(id_pair, sampler))
-      if (leaf)
-	length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    table.increment_existing(id_pair, sampler);
+    
+    if (leaf)
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
 
   template <typename Sampler>
@@ -1069,9 +1070,10 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_new(id_pair, sampler))
-      if (leaf)
-	length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    table.increment_new(id_pair, sampler);
+
+    if (leaf)
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
   
   
@@ -1083,9 +1085,10 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.decrement(id_pair, sampler))
-      if (leaf)
-	length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    table.decrement(id_pair, sampler);
+
+    if (leaf)
+      length.decrement(phrase_pair.source, phrase_pair.target, sampler);
   }
   
   template <typename LogProb>
@@ -1110,7 +1113,6 @@ struct PYPPhrase
 	return std::make_pair(table.prob(base), false);
       else
 	return table.prob_model(piter - phrase_pairs.begin(), base);
-      //return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.begin()), base);
     }
   }
   
