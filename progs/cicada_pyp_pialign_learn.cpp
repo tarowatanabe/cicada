@@ -2380,6 +2380,7 @@ int main(int argc, char ** argv)
       position_set_type::const_iterator piter_end = positions.end();
       position_set_type::const_iterator piter = positions.begin();
       
+      Time time_model;
       position_set_type mapped;
       
       size_type reduced_total = 0;
@@ -2391,9 +2392,15 @@ int main(int argc, char ** argv)
 	  const size_type pos = *piter;
 	  
 	  if (! derivations[pos].empty()) {
+	    utils::resource start;
+	    
 	    derivation_type::const_iterator diter_end = derivations[pos].end();
 	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	      model.decrement(sources[pos], targets[pos], *diter, sampler);
+	    
+	    utils::resource end;
+	    
+	    time_model.decrement += end.thread_time() - start.thread_time();
 	  }
 	  
 	  mapped.push_back(pos);
@@ -2416,12 +2423,20 @@ int main(int argc, char ** argv)
 	  }
 	}
 	
+	
+	
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
 	  const size_type pos = *miter;
+
+	  utils::resource start;
 	  
 	  derivation_type::const_iterator diter_end = derivations[pos].end();
 	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+
+	  utils::resource end;
+	  
+	  time_model.increment += end.thread_time() - start.thread_time();
 	}
       }
       
@@ -2455,7 +2470,9 @@ int main(int argc, char ** argv)
 	
 	std::cerr << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
 		  << "forward: " << (time_end.forward - time.forward) / tasks.size() << " seconds" << std::endl
-		  << "backward: " << (time_end.backward - time.backward) / tasks.size() << " seconds" << std::endl;
+		  << "backward: " << (time_end.backward - time.backward) / tasks.size() << " seconds" << std::endl
+		  << "increment: " << time_model.increment << " seconds" << std::endl
+		  << "decrement: " << time_model.decrement << " seconds" << std::endl;
       }
       
       if (debug)
