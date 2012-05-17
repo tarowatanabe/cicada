@@ -149,6 +149,9 @@ namespace utils
   public:
     const_iterator begin() const { return dishes.begin(); }
     const_iterator end() const { return dishes.end(); }
+    
+    location_type& operator[](size_type x) { return dishes[x]; }
+    const location_type& operator[](size_type x) const { return dishes[x]; }
 
     bool has_discount_prior() const { return parameter.has_discount_prior(); }
     bool has_strength_prior() const { return parameter.has_strength_prior(); }

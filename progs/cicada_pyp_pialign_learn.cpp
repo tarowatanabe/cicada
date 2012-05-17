@@ -490,8 +490,8 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
-    //increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
-    //increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
+    increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
+    increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
   }
   
   template <typename Sampler>
@@ -533,8 +533,8 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
     
-    //decrement(source, target, tables_source_target, sampler);
-    //decrement(target, source, tables_target_source, sampler);
+    decrement(source, target, tables_source_target, sampler);
+    decrement(target, source, tables_target_source, sampler);
   }
   
   template <typename Sampler>
@@ -1008,7 +1008,11 @@ struct PYPPhrase
   typedef phrase_set_type::index_type id_type;
   typedef std::pair<id_type, id_type> id_pair_type;
   
-  typedef utils::restaurant<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type > > table_type;
+  typedef utils::symbol_set<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type> > phrase_pair_set_type;
+  
+  
+  //typedef utils::restaurant<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type > > table_type;
+  typedef utils::restaurant_vector<> table_type;
   
   PYPPhrase(const PYPLexicon& __lexicon,
 	    const PYPLength&  __length,
@@ -1017,12 +1021,13 @@ struct PYPPhrase
       length(__length),
       table(parameter),
       phrases() {}
-
+  
   std::pair<id_type, bool> phrase_find(const phrase_type& phrase) const
   {
     phrase_set_type::const_iterator iter = phrases.find(phrase);
     return std::make_pair(iter - phrases.begin(), iter != phrases.end());
   }
+  
   
   id_type phrase_id(const phrase_type& phrase)
   {
@@ -1030,17 +1035,37 @@ struct PYPPhrase
     return iter - phrases.begin();
   }
   
+  std::pair<id_type, bool> phrase_pair_find(const id_type& source, const id_type& target) const
+  {
+    phrase_pair_set_type::const_iterator iter = phrase_pairs.find(std::make_pair(source, target));
+    return std::make_pair(iter - phrase_pairs.begin(), iter != phrase_pairs.end());
+  }
+  
+  
+  id_type phrase_pair_id(const id_type& source, const id_type& target)
+  {
+    phrase_pair_set_type::iterator iter = phrase_pairs.insert(std::make_pair(source, target)).first;
+    return iter - phrase_pairs.begin();
+  }
+  
   template <typename Sampler>
   void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
-
+    
+    const id_type id_pair = phrase_pair_id(id_source, id_target);
+    
+    if (table.increment_existing(id_pair, sampler))
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    
+#if 0
     if (table.increment_existing(id_pair_type(id_source, id_target), sampler)) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
-      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
+#endif
   }
 
   template <typename Sampler>
@@ -1048,12 +1073,19 @@ struct PYPPhrase
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
+
+    const id_type id_pair = phrase_pair_id(id_source, id_target);
     
+    if (table.increment_new(id_pair, sampler))
+      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+
+#if 0
     if (table.increment_new(id_pair_type(id_source, id_target), sampler)) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
-      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
+#endif
   }
   
   
@@ -1062,12 +1094,19 @@ struct PYPPhrase
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
+
+    const id_type id_pair = phrase_pair_id(id_source, id_target);
     
+    if (table.decrement(id_pair, sampler))
+      length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    
+#if 0
     if (table.decrement(id_pair_type(id_source, id_target), sampler)) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
       
-      lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
+      //lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
     }
+#endif
   }
   
   template <typename LogProb>
@@ -1084,8 +1123,16 @@ struct PYPPhrase
 
     if (siter == phrases.end() || titer == phrases.end())
       return std::make_pair(table.prob(base), false);
-    else
-      return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.begin()), base);
+    else {
+      phrase_pair_set_type::const_iterator piter = phrase_pairs.find(std::make_pair(siter - phrases.begin(),
+										    titer - phrases.begin()));
+      
+      if (piter == phrase_pairs.end())
+	return std::make_pair(table.prob(base), false);
+      else
+	return table.prob_model(piter - phrase_pairs.begin(), base);
+      //return table.prob_model(id_pair_type(siter - phrases.begin(), titer - phrases.begin()), base);
+    }
   }
   
   double log_likelihood() const
@@ -1130,30 +1177,53 @@ struct PYPPhrase
     // erase unused phrase entry in phrases...
     std::vector<bool, std::allocator<bool> > inserted(phrases.size());
     
+    size_type phrase_pair = 0;
+    size_type phrase_pair_erased = 0;
+    
+    for (id_type id = 0; id != table.size(); ++ id) {
+      if (! table[id].empty()) {
+	const id_pair_type& pair = phrase_pairs[id];
+	
+	inserted[pair.first] = true;
+	inserted[pair.second] = true;
+	
+	++ phrase_pair;
+      } else {
+	phrase_pairs.erase(id);
+	
+	++ phrase_pair_erased;
+      }
+    }
+    
+#if 0
     table_type::const_iterator titer_end = table.end();
     for (table_type::const_iterator titer = table.begin(); titer != titer_end; ++ titer) {
       inserted[titer->first.first] = true;
       inserted[titer->first.second] = true;
     }
+#endif
     
     size_type phrase = 0;
     size_type erased = 0;
-    for (id_type id = 0; id != inserted.size(); ++ id)
+    for (id_type id = 0; id != inserted.size(); ++ id) {
       if (! inserted[id]) {
 	phrases.erase(id);
 	++ erased;
       } else
 	++ phrase;
+    }
     
     if (debug)
-      std::cerr << "# of phrases: " << phrase << " erased: " << erased << std::endl;
+      std::cerr << "# of phrases: " << phrase << " erased: " << erased << std::endl
+		<< "# of phrase pairs: " << phrase_pair << " erased: " << phrase_pair_erased << std::endl;
   }
   
   PYPLexicon lexicon;
   PYPLength  length;
   
-  table_type table;
-  phrase_set_type phrases;
+  table_type           table;
+  phrase_set_type      phrases;
+  phrase_pair_set_type phrase_pairs;
 };
 
 struct PYPPiAlign
@@ -1500,8 +1570,16 @@ struct PYPGraph
 	    
 	    if (! source_id.second) continue;
 	    
+	    const std::pair<PYPPhrase::id_type, bool> pair_id = model.phrase.phrase_pair_find(source_id.first, empty_id.first);
+
+	    if (! pair_id.second) continue;
+	    
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
+	    
+#if 0
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, empty_id.first),
 											    logprob_type(0.0));
+#endif
 	    
 	    if (! logprob_gen.second) continue;
 	    
@@ -1527,9 +1605,17 @@ struct PYPGraph
 	    const std::pair<PYPPhrase::id_type, bool> target_id = model.phrase.phrase_find(phrase_target);
 	    
 	    if (! target_id.second) continue;
+
+	    const std::pair<PYPPhrase::id_type, bool> pair_id = model.phrase.phrase_pair_find(empty_id.first, target_id.first);
 	    
+	    if (! pair_id.second) continue;
+	    
+	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
+	    
+#if 0
 	    const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(empty_id.first, target_id.first),
 											    logprob_type(0.0));
+#endif
 	  
 	    if (! logprob_gen.second) continue;
 	    
@@ -1562,8 +1648,16 @@ struct PYPGraph
 		
 		if (! target_id.second) continue;
 		
+		const std::pair<PYPPhrase::id_type, bool> pair_id = model.phrase.phrase_pair_find(source_id.first, target_id.first);
+		
+		if (! pair_id.second) continue;
+		
+		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(pair_id.first, logprob_type(0.0));
+		
+#if 0
 		const std::pair<logprob_type, bool> logprob_gen = model.phrase.table.prob_model(std::make_pair(source_id.first, target_id.first),
 												logprob_type(0.0));
+#endif
 		
 		if (! logprob_gen.second) continue;
 		
@@ -2647,7 +2741,24 @@ int main(int argc, char ** argv)
 	phrases.set_empty_key(phrase_pair_type());
 	phrases_source.set_empty_key(phrase_type());
 	phrases_target.set_empty_key(phrase_type());
+
+	for (PYPPhrase::id_type id = 0; id != model.phrase.table.size(); ++ id)
+	  if (! model.phrase.table[id].empty()) {
+	    const PYPPhrase::id_pair_type& pair = model.phrase.phrase_pairs[id];
+	    
+	    const phrase_type& phrase_source = model.phrase.phrases[pair.first];
+	    const phrase_type& phrase_target = model.phrase.phrases[pair.second];
+	    
+	    if (! phrase_source.empty() && ! phrase_target.empty()) {
+	      const double prob = model.phrase.table.prob(id, 0.0);
+	      
+	      phrases[phrase_pair_type(phrase_source, phrase_target)] = prob;
+	      phrases_source[phrase_source] += prob;
+	      phrases_target[phrase_target] += prob;
+	    }
+	  }
 	
+#if 0
 	PYPPhrase::table_type::const_iterator titer_end = model.phrase.table.end();
 	for (PYPPhrase::table_type::const_iterator titer = model.phrase.table.begin(); titer != titer_end; ++ titer) {
 	  const phrase_type& phrase_source = model.phrase.phrases[titer->first.first];
@@ -2661,6 +2772,7 @@ int main(int argc, char ** argv)
 	    phrases_target[phrase_target] += prob;
 	  }
 	}
+#endif
 	
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
