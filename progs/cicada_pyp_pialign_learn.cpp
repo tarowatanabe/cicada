@@ -1049,7 +1049,7 @@ struct PYPPhrase
   }
   
   template <typename Sampler>
-  void increment_existing(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
+  void increment_existing(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler, const double temperature=1.0)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -1058,12 +1058,12 @@ struct PYPPhrase
     
     table.increment_existing(id_pair, sampler);
     
-    if (leaf)
+    if (base)
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
 
   template <typename Sampler>
-  void increment_new(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler, const double temperature=1.0)
+  void increment_new(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler, const double temperature=1.0)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -1072,13 +1072,13 @@ struct PYPPhrase
     
     table.increment_new(id_pair, sampler);
 
-    if (leaf)
+    if (base)
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
   
   
   template <typename Sampler>
-  void decrement(const phrase_pair_type& phrase_pair, const bool leaf, Sampler& sampler)
+  void decrement(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -1087,7 +1087,7 @@ struct PYPPhrase
     
     table.decrement(id_pair, sampler);
 
-    if (leaf)
+    if (base)
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
   }
   
@@ -1228,9 +1228,9 @@ struct PYPPiAlign
 				       target.begin() + r.span.target.first, target.begin() + r.span.target.last);
     
     if (r.itg == PYP::GENERATIVE)
-      phrase.increment_existing(phrase_pair, r.is_terminal(), sampler, temperature);
+      phrase.increment_existing(phrase_pair, r.itg == PYP::BASE, sampler, temperature);
     else
-      phrase.increment_new(phrase_pair, r.is_terminal(), sampler, temperature);
+      phrase.increment_new(phrase_pair, r.itg == PYP::BASE, sampler, temperature);
   }
 
   template <typename Sampler>
@@ -1240,7 +1240,7 @@ struct PYPPiAlign
     
     phrase.decrement(phrase_pair_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last,
 				      target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-		     r.is_terminal(), 
+		     r.itg == PYP::BASE, 
 		     sampler);
   }
 
@@ -2180,7 +2180,7 @@ double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
 double length_shape = 1e-2;
-double length_rate  = 1e+7;
+double length_rate  = 1e+4;
 
 int blocks  = 64;
 int threads = 1;
