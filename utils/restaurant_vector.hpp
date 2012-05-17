@@ -115,10 +115,17 @@ namespace utils
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
       //typedef std::vector<size_type, alloc_type> table_set_type;
       typedef boost::container::slist<size_type, alloc_type> table_set_type;
-
+      
       typedef typename table_set_type::const_iterator const_iterator;
       
       Location() : customers(0), tables() {}
+      Location(const Location& x) : customers(x.customers), tables(x.tables) {}
+      Location& operator=(const Location& x)
+      {
+	customers = x.customers;
+	tables = x.tables;
+	return *this;
+      }
       
       const_iterator begin() const { return tables.begin(); }
       const_iterator end() const { return tables.end(); }
