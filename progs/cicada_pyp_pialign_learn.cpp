@@ -2396,8 +2396,8 @@ int main(int argc, char ** argv)
 	  if (! derivations[pos].empty()) {
 	    utils::resource start;
 	    
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
+	    for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
 	      model.decrement(sources[pos], targets[pos], *diter, sampler);
 	    
 	    utils::resource end;
