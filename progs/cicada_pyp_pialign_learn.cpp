@@ -490,8 +490,8 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
-    increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
-    increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
+    //increment(source, target, tables_source_target, *lexicon_source_target, parameter_source_target, sampler, temperature);
+    //increment(target, source, tables_target_source, *lexicon_target_source, parameter_target_source, sampler, temperature);
   }
   
   template <typename Sampler>
@@ -533,8 +533,8 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
     
-    decrement(source, target, tables_source_target, sampler);
-    decrement(target, source, tables_target_source, sampler);
+    //decrement(source, target, tables_source_target, sampler);
+    //decrement(target, source, tables_target_source, sampler);
   }
   
   template <typename Sampler>
