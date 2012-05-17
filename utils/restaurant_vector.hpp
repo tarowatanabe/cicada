@@ -153,6 +153,9 @@ namespace utils
     location_type& operator[](size_type x) { return dishes[x]; }
     const location_type& operator[](size_type x) const { return dishes[x]; }
 
+    void reserve(size_type x) { dishes.reserve(x); }
+    void resize(size_type x) { dishes.resize(x); }
+
     bool has_discount_prior() const { return parameter.has_discount_prior(); }
     bool has_strength_prior() const { return parameter.has_strength_prior(); }
 
