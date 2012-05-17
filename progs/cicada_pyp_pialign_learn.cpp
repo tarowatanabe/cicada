@@ -1903,6 +1903,30 @@ typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
+struct Time
+{
+  double lock;
+  double initialize;
+  double increment;
+  double decrement;
+  double forward;
+  double backward;
+  
+  Time() : lock(0), initialize(0), increment(0), decrement(0), forward(0), backward(0) {}
+
+  Time& operator+=(const Time& x)
+  {
+    lock       += x.lock;
+    initialize += x.initialize;
+    increment  += x.increment;
+    decrement  += x.decrement;
+    forward    += x.forward;
+    backward   += x.backward;
+
+    return *this;
+  }
+};
+
 struct Task
 {
   typedef PYP::size_type       size_type;
@@ -1947,40 +1971,64 @@ struct Task
 
       if (! derivations[pos].empty()) {
 	utils::resource start;
-	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
-	utils::resource end;
 	
-	lock_time += end.thread_time() - start.thread_time();
+	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	
+	utils::resource middle;
 	
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
+	
+	utils::resource end;
+	
+	time.lock      += middle.thread_time() - start.thread_time();
+	time.decrement += end.thread_time() - middle.thread_time();
       }
       
       {
 	utils::resource start;
-	PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
-	utils::resource end;
 	
-	lock_time += end.thread_time() - start.thread_time();
+	PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
+	
+	utils::resource middle;
 	
 	graph.initialize(sources[pos], targets[pos], model, max_length);
+	
+	utils::resource end;
+	
+	time.lock       += middle.thread_time() - start.thread_time();
+	time.initialize += end.thread_time() - middle.thread_time();
       }
+      
+      utils::resource start;
       
       graph.forward(sources[pos], targets[pos], beam);
       
+      utils::resource middle;
+      
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
+      
+      utils::resource end;
+      
+      time.forward  += middle.thread_time() - start.thread_time();
+      time.backward += end.thread_time() - middle.thread_time();
       
       {
 	utils::resource start;
+	
 	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
-	utils::resource end;
-
-	lock_time += end.thread_time() - start.thread_time();
+	
+	utils::resource middle;
 	
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+
+	utils::resource end;
+	
+	time.lock      += middle.thread_time() - start.thread_time();
+	time.increment += end.thread_time() - middle.thread_time();
       }
       
       reducer.push(pos);
@@ -2001,8 +2049,8 @@ struct Task
   int max_length;
   
   double temperature;
-
-  double lock_time;
+  
+  Time time;
 };
 
 
@@ -2272,11 +2320,11 @@ int main(int argc, char ** argv)
       }
 
       // assign temperature...
-      double lock_time = 0.0;
+      Time time;
       for (size_type i = 0; i != tasks.size(); ++ i) {
 	tasks[i].temperature = temperature;
 	
-	lock_time += tasks[i].lock_time;
+	time += tasks[i].time;
       }
       
       
@@ -2358,11 +2406,16 @@ int main(int argc, char ** argv)
       }
 
       if (debug >= 2) {
-	double lock_time_end = 0.0;
+	Time time_end;
 	for (size_type i = 0; i != tasks.size(); ++ i)
-	  lock_time_end += tasks[i].lock_time;
-
-	std::cerr << "lock-time: " << ((lock_time_end - lock_time) / tasks.size()) <<  " seconds" << std::endl;
+	  time_end += tasks[i].time;
+	
+	std::cerr << "lock: " << (time_end.lock - time.lock) / tasks.size() << " seconds" << std::endl
+		  << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
+		  << "increment: " << (time_end.increment - time.increment) / tasks.size() << " seconds" << std::endl
+		  << "decrement: " << (time_end.decrement - time.decrement) / tasks.size() << " seconds" << std::endl
+		  << "forward: " << (time_end.forward - time.forward) / tasks.size() << " seconds" << std::endl
+		  << "backward: " << (time_end.backward - time.backward) / tasks.size() << " seconds" << std::endl;
       }
       
       if (debug)
