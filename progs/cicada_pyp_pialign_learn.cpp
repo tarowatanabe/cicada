@@ -1056,7 +1056,7 @@ struct PYPPhrase
     
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_existing(id_pair, sampler))
+    if (table.increment_existing(id_pair, sampler) && leaf)
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
 
@@ -1068,7 +1068,7 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_new(id_pair, sampler))
+    if (table.increment_new(id_pair, sampler) && leaf)
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
   
@@ -1081,7 +1081,7 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.decrement(id_pair, sampler))
+    if (table.decrement(id_pair, sampler) && leaf)
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
   }
   
@@ -1419,7 +1419,6 @@ struct PYPGraph
     logprob_term = model.rule.prob_terminal() * logprob_fallback;
     logprob_str  = model.rule.prob_straight() * logprob_fallback;
     logprob_inv  = model.rule.prob_inverted() * logprob_fallback;
-    
     
     // initialization for bases
     for (size_type source_first = 0; source_first <= source.size(); ++ source_first)
@@ -2164,10 +2163,10 @@ double rule_discount_beta  = 1.0;
 double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double phrase_discount_alpha = 1.0;
+double phrase_discount_alpha = 1e+5;
 double phrase_discount_beta  = 1.0;
-double phrase_strength_shape = 1.0;
-double phrase_strength_rate  = 1.0;
+double phrase_strength_shape = 1e+6;
+double phrase_strength_rate  = 1e-6;
 
 double lexicon_discount_alpha = 1.0;
 double lexicon_discount_beta  = 1.0;
@@ -2176,7 +2175,7 @@ double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
 double length_shape = 1e-2;
-double length_rate  = 1e+3;
+double length_rate  = 1e+7;
 
 int blocks  = 64;
 int threads = 1;
