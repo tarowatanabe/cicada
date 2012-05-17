@@ -819,12 +819,12 @@ struct PYPLength
   void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
   {
     if (source.size() >= counts_source.size() || ! counts_source[source.size()])
-      throw std::runtime_error("invalid decrment");
+      throw std::runtime_error("invalid decrement");
     
     -- counts_source[source.size()];
 
     if (target.size() >= counts_target.size() || ! counts_target[target.size()])
-      throw std::runtime_error("invalid decrment");
+      throw std::runtime_error("invalid decrement");
     
     -- counts_target[target.size()];
   }
@@ -1056,8 +1056,9 @@ struct PYPPhrase
     
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_existing(id_pair, sampler) && leaf)
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    if (table.increment_existing(id_pair, sampler))
+      if (leaf)
+	length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
 
   template <typename Sampler>
@@ -1068,8 +1069,9 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.increment_new(id_pair, sampler) && leaf)
-      length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    if (table.increment_new(id_pair, sampler))
+      if (leaf)
+	length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
   }
   
   
@@ -1081,8 +1083,9 @@ struct PYPPhrase
 
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
-    if (table.decrement(id_pair, sampler) && leaf)
-      length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    if (table.decrement(id_pair, sampler))
+      if (leaf)
+	length.decrement(phrase_pair.source, phrase_pair.target, sampler);
   }
   
   template <typename LogProb>
