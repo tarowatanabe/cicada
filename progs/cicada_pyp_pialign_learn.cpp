@@ -1058,8 +1058,11 @@ struct PYPPhrase
     
     table.increment_existing(id_pair, sampler);
     
-    if (base)
+    if (base) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      
+      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    }
   }
 
   template <typename Sampler>
@@ -1072,8 +1075,11 @@ struct PYPPhrase
     
     table.increment_new(id_pair, sampler);
 
-    if (base)
+    if (base) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      
+      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+    }
   }
   
   
@@ -1087,8 +1093,11 @@ struct PYPPhrase
     
     table.decrement(id_pair, sampler);
 
-    if (base)
+    if (base) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+      
+      lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    }
   }
   
   template <typename LogProb>
