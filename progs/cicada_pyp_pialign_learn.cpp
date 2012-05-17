@@ -2501,8 +2501,6 @@ int main(int argc, char ** argv)
 	  time_end += tasks[i].time;
 	
 	std::cerr << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
-		  << "increment: " << (time_end.increment - time.increment) / tasks.size() << " seconds" << std::endl
-		  << "decrement: " << (time_end.decrement - time.decrement) / tasks.size() << " seconds" << std::endl
 		  << "forward: " << (time_end.forward - time.forward) / tasks.size() << " seconds" << std::endl
 		  << "backward: " << (time_end.backward - time.backward) / tasks.size() << " seconds" << std::endl;
       }
