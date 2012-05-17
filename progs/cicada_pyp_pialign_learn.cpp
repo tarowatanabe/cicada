@@ -1200,7 +1200,25 @@ struct PYPPhrase
     
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
     
-    table.sample_parameters(sampler, num_loop, num_iterations);
+    //table.sample_parameters(sampler, num_loop, num_iterations);
+
+    for (int iter = 0; iter != num_loop; ++ iter) {
+      {
+	// strength..
+	const double x = table.sample_log_x(sampler, table.discount(), table.strength());
+	const double y = table.sample_y(sampler, table.discount(), table.strength());
+	
+	table.strength() = sampler.gamma(table.parameters().strength_shape + y, 1.0 / (table.parameters().strength_rate - x));
+      }
+      
+      {
+	// discount...
+	const double y = table.sample_y_inv(sampler, table.discount(), table.strength());
+	const double z = table.sample_z_inv(sampler, table.discount(), table.strength());
+	
+	table.discount() = sampler.beta(table.parameters().discount_alpha + y, table.parameters().discount_beta + z);
+      }
+    }
   }
   
   template <typename Sampler>

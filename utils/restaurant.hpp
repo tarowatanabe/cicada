@@ -162,6 +162,8 @@ namespace utils
     const double& discount() const { return parameter.discount; }
     const double& strength() const { return parameter.strength; }
     
+    const parameter_type& parameters() const { return parameter; }
+    
     void clear()
     {
       tables = 0;
