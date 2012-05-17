@@ -1905,18 +1905,16 @@ typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
 struct Time
 {
-  double lock;
   double initialize;
   double increment;
   double decrement;
   double forward;
   double backward;
   
-  Time() : lock(0), initialize(0), increment(0), decrement(0), forward(0), backward(0) {}
+  Time() : initialize(0), increment(0), decrement(0), forward(0), backward(0) {}
 
   Time& operator+=(const Time& x)
   {
-    lock       += x.lock;
     initialize += x.initialize;
     increment  += x.increment;
     decrement  += x.decrement;
@@ -1966,39 +1964,15 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-
-#if 0
-      if (! derivations[pos].empty()) {
-	utils::resource start;
-	
-	//PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
-	
-	utils::resource middle;
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter, sampler);
-	
-	utils::resource end;
-	
-	time.lock      += middle.thread_time() - start.thread_time();
-	time.decrement += end.thread_time() - middle.thread_time();
-      }
-#endif
       
       {
 	utils::resource start;
-	
-	//PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
-	
-	utils::resource middle;
 	
 	graph.initialize(sources[pos], targets[pos], model, max_length);
 	
 	utils::resource end;
 	
-	time.lock       += middle.thread_time() - start.thread_time();
-	time.initialize += end.thread_time() - middle.thread_time();
+	time.initialize += end.thread_time() - start.thread_time();
       }
       
       utils::resource start;
@@ -2012,26 +1986,7 @@ struct Task
       utils::resource end;
       
       time.forward  += middle.thread_time() - start.thread_time();
-      time.backward += end.thread_time() - middle.thread_time();
-      
-#if 0
-      {
-	utils::resource start;
-	
-	//PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
-	
-	utils::resource middle;
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-
-	utils::resource end;
-	
-	time.lock      += middle.thread_time() - start.thread_time();
-	time.increment += end.thread_time() - middle.thread_time();
-      }
-#endif
+      time.backward += end.thread_time() - middle.thread_time();      
       
       reducer.push(pos);
     }
@@ -2369,37 +2324,6 @@ int main(int argc, char ** argv)
 	  size_type pos = 0;
 	  queue_reducer.pop(pos);
 	  
-	  if (debug >= 3) {
-	    std::cerr << "training=" << pos << std::endl
-		      << "source=" << sources[pos] << std::endl
-		      << "target=" << targets[pos] << std::endl;
-	    
-	    derivation_type::const_iterator diter_end = derivations[pos].end();
-	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      
-	      std::cerr << "derivation: ";
-	      switch (diter->itg) {
-	      case PYP::TERMINAL:   std::cerr << "ter"; break;
-	      case PYP::STRAIGHT:   std::cerr << "str"; break;
-	      case PYP::INVERTED:   std::cerr << "inv"; break;
-	      case PYP::GENERATIVE: std::cerr << "gen"; break;
-	      case PYP::BASE:       std::cerr << "bas"; break;
-	      default: std::cerr << "UNK";
-	      }
-	      
-	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
-		std::cerr << " pair: "
-			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			  << " ||| "
-			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	      std::cerr << std::endl;
-	    }
-	  }
-
 	  if (debug) {
 	    if ((reduced_total + 1) % 10000 == 0)
 	      std::cerr << '.';
@@ -2495,8 +2419,7 @@ int main(int argc, char ** argv)
 	for (size_type i = 0; i != tasks.size(); ++ i)
 	  time_end += tasks[i].time;
 	
-	std::cerr << "lock: " << (time_end.lock - time.lock) / tasks.size() << " seconds" << std::endl
-		  << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
+	std::cerr << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
 		  << "increment: " << (time_end.increment - time.increment) / tasks.size() << " seconds" << std::endl
 		  << "decrement: " << (time_end.decrement - time.decrement) / tasks.size() << " seconds" << std::endl
 		  << "forward: " << (time_end.forward - time.forward) / tasks.size() << " seconds" << std::endl
