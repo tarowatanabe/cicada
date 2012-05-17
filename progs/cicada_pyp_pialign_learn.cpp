@@ -2614,11 +2614,19 @@ int main(int argc, char ** argv)
 	      derivation_type::const_iterator diter_end = derivations[pos].end();
 	      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 		if (diter->is_terminal()) {
-		  os << "((( "
-		     << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-		     << " ||| "
-		     << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
-		     << " )))";
+
+		  if (diter->itg == PYP::GENERATIVE)
+		    os << "((( "
+		       << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+		       << " ||| "
+		       << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
+		       << " )))";
+		  else
+		    os << "{{{ "
+		       << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+		       << " ||| "
+		       << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last)
+		       << " }}}";
 		
 		  while (! stack.empty() && stack.back() != " ") {
 		    os << stack.back();
