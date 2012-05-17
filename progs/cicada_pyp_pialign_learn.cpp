@@ -2104,7 +2104,7 @@ path_type output_model_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
-int max_phrase_length = 7;
+int max_phrase_length = 3;
 int max_sentence_length = 40;
 double beam = 1e-4;
 
