@@ -2124,9 +2124,9 @@ double rule_discount_beta  = 1.0;
 double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double phrase_discount_alpha = 1e+4;
+double phrase_discount_alpha = 1.0;
 double phrase_discount_beta  = 1.0;
-double phrase_strength_shape = 1e+10;
+double phrase_strength_shape = 1.0;
 double phrase_strength_rate  = 1.0;
 
 double lexicon_discount_alpha = 1.0;
@@ -2136,7 +2136,7 @@ double lexicon_strength_rate  = 1.0;
 
 double length_null = 1e-10;
 double length_shape = 1e-2;
-double length_rate  = 1e+7;
+double length_rate  = 1e+3;
 
 int threads = 1;
 int debug = 0;
