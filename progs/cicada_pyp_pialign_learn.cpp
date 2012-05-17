@@ -1967,10 +1967,11 @@ struct Task
       
       if (pos == size_type(-1)) break;
 
+#if 0
       if (! derivations[pos].empty()) {
 	utils::resource start;
 	
-	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	//PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
 	
 	utils::resource middle;
 	
@@ -1983,11 +1984,12 @@ struct Task
 	time.lock      += middle.thread_time() - start.thread_time();
 	time.decrement += end.thread_time() - middle.thread_time();
       }
+#endif
       
       {
 	utils::resource start;
 	
-	PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
+	//PYPPiAlign::mutex_type::scoped_reader_lock lock(model.mutex);
 	
 	utils::resource middle;
 	
@@ -2012,10 +2014,11 @@ struct Task
       time.forward  += middle.thread_time() - start.thread_time();
       time.backward += end.thread_time() - middle.thread_time();
       
+#if 0
       {
 	utils::resource start;
 	
-	PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
+	//PYPPiAlign::mutex_type::scoped_writer_lock lock(model.mutex);
 	
 	utils::resource middle;
 	
@@ -2028,6 +2031,7 @@ struct Task
 	time.lock      += middle.thread_time() - start.thread_time();
 	time.increment += end.thread_time() - middle.thread_time();
       }
+#endif
       
       reducer.push(pos);
     }
@@ -2136,6 +2140,7 @@ double length_null = 1e-10;
 double length_shape = 1e-2;
 double length_rate  = 1e+3;
 
+int blocks  = 64;
 int threads = 1;
 int debug = 0;
 
@@ -2147,7 +2152,8 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
-    
+
+    blocks  = utils::bithack::max(blocks, 1);
     threads = utils::bithack::max(threads, 1);
     
     if (samples < 0)
@@ -2334,6 +2340,85 @@ int main(int argc, char ** argv)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
       position_set_type::const_iterator piter_end = positions.end();
+      position_set_type::const_iterator piter = positions.begin();
+      
+      position_set_type mapped;
+      
+      size_type reduced_total = 0;
+      while (piter != piter_end) {
+	mapped.clear();
+	
+	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
+	for (/**/; piter != piter_last; ++ piter) {
+	  const size_type pos = *piter;
+	  
+	  if (! derivations[pos].empty()) {
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	      model.decrement(sources[pos], targets[pos], *diter, sampler);
+	  }
+	  
+	  mapped.push_back(pos);
+	}
+	
+	position_set_type::const_iterator miter_end = mapped.end();
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
+	  queue_mapper.push(*miter);
+	
+	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced, ++ reduced_total) {
+	  size_type pos = 0;
+	  queue_reducer.pop(pos);
+	  
+	  if (debug >= 3) {
+	    std::cerr << "training=" << pos << std::endl
+		      << "source=" << sources[pos] << std::endl
+		      << "target=" << targets[pos] << std::endl;
+	    
+	    derivation_type::const_iterator diter_end = derivations[pos].end();
+	    for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	      
+	      std::cerr << "derivation: ";
+	      switch (diter->itg) {
+	      case PYP::TERMINAL:   std::cerr << "ter"; break;
+	      case PYP::STRAIGHT:   std::cerr << "str"; break;
+	      case PYP::INVERTED:   std::cerr << "inv"; break;
+	      case PYP::GENERATIVE: std::cerr << "gen"; break;
+	      case PYP::BASE:       std::cerr << "bas"; break;
+	      default: std::cerr << "UNK";
+	      }
+	      
+	      std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
+			<< " target: " << diter->span.target.first << "..." << diter->span.target.last;
+	      
+	      if (diter->itg == PYP::GENERATIVE || diter->itg == PYP::TERMINAL || diter->itg == PYP::BASE)
+		std::cerr << " pair: "
+			  << PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
+			  << " ||| "
+			  << PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
+	      
+	      std::cerr << std::endl;
+	    }
+	  }
+
+	  if (debug) {
+	    if ((reduced_total + 1) % 10000 == 0)
+	      std::cerr << '.';
+	    if ((reduced_total + 1) % 1000000 == 0)
+	      std::cerr << '\n';
+	  }
+	}
+	
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
+	  const size_type pos = *miter;
+	  
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+	}
+      }
+      
+#if 0
+      position_set_type::const_iterator piter_end = positions.end();
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
 	queue_mapper.push(*piter);
       
@@ -2371,7 +2456,7 @@ int main(int argc, char ** argv)
 	    std::cerr << std::endl;
 	  }
 	}
-	  
+	
 	if (debug) {
 	  if ((reduced + 1) % 10000 == 0)
 	    std::cerr << '.';
@@ -2379,6 +2464,8 @@ int main(int argc, char ** argv)
 	    std::cerr << '\n';
 	}
       }
+#endif
+      
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
@@ -2804,6 +2891,7 @@ void options(int argc, char** argv)
     ("length-shape",  po::value<double>(&length_shape)->default_value(length_shape),   "length ~ Gamma(shape,rate)")
     ("length-rate",   po::value<double>(&length_rate)->default_value(length_rate),     "length ~ Gamma(shape,rate)")
         
+    ("blocks",  po::value<int>(&blocks),  "# of blocks")
     ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
