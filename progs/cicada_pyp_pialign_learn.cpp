@@ -1083,6 +1083,10 @@ struct PYPPhrase
     
     if (table.decrement(id_pair, sampler))
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
+    
+    // erase pair!
+    if (table[id_pair].empty())
+      phrase_pairs.erase(id_pair);
   }
   
   template <typename LogProb>
