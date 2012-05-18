@@ -1061,7 +1061,7 @@ struct PYPPhrase
     if (base) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
-      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
   }
 
@@ -1078,7 +1078,7 @@ struct PYPPhrase
     if (base) {
       length.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
       
-      lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
+      //lexicon.increment(phrase_pair.source, phrase_pair.target, sampler, temperature);
     }
   }
   
@@ -1096,7 +1096,7 @@ struct PYPPhrase
     if (base) {
       length.decrement(phrase_pair.source, phrase_pair.target, sampler);
       
-      lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
+      //lexicon.decrement(phrase_pair.source, phrase_pair.target, sampler);
     }
   }
   
