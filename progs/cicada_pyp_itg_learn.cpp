@@ -87,6 +87,7 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/symbol_set.hpp"
+#include "utils/indexed_set.hpp"
 #include "utils/unique_set.hpp"
 #include "utils/rwticket.hpp"
 
@@ -108,6 +109,8 @@ struct PYP
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  typedef uint32_t id_type;
 
   typedef enum {
     TERMINAL = 0,
@@ -370,23 +373,39 @@ struct PYPLexicon
 {
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
+  typedef PYP::id_type         id_type;
   
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
-  typedef PYP::word_pair_type word_pair_type;
+  typedef PYP::word_pair_type   word_pair_type;
 
   typedef utils::pyp_parameter parameter_type;
-  
-  typedef utils::restaurant<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-			    std::allocator<word_pair_type > > table_type;
+
+  // do we use pialign style indexing...?
+  typedef utils::indexed_set<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+			     std::allocator<word_pair_type> > word_pair_set_type;
+
+  typedef utils::restaurant_vector<> table_type;
   
   PYPLexicon(const parameter_type& parameter,
 	     const double __p0)
     : table(parameter), p0(__p0), counts0(0)
   { }
+
+  id_type word_pair_id(const word_type& source, const word_type& target)
+  {
+    word_pair_set_type::iterator iter = word_pairs.insert(word_pair_type(source, target)).first;
+    return iter - word_pairs.begin();
+  }
+  
+  std::pair<id_type, bool> find_word_pair(const word_type& source, const word_type& target) const
+  {
+    word_pair_set_type::const_iterator iter = word_pairs.find(word_pair_type(source, target));
+    return std::make_pair(iter - word_pairs.begin(), iter != word_pairs.end());
+  }
   
   template <typename Sampler>
   void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
@@ -397,19 +416,19 @@ struct PYPLexicon
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	counts0 += table.increment(word_pair_type(vocab_type::EPSILON, *titer), p0, sampler, temperature);
+	counts0 += table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	counts0 += table.increment(word_pair_type(*siter, vocab_type::EPSILON), p0, sampler, temperature);
+	counts0 += table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  counts0 += table.increment(word_pair_type(*siter, *titer), p0, sampler, temperature);
+	  counts0 += table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
       }
     }
   }
@@ -423,26 +442,31 @@ struct PYPLexicon
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	counts0 -= table.decrement(word_pair_type(vocab_type::EPSILON, *titer), sampler);
+	counts0 -= table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	counts0 -= table.decrement(word_pair_type(*siter, vocab_type::EPSILON), sampler);
+	counts0 -= table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  counts0 -= table.decrement(word_pair_type(*siter, *titer), sampler);
+	  counts0 -= table.decrement(word_pair_id(*siter, *titer), sampler);
       }
     }
   }
 
   double prob(const word_type& source, const word_type& target) const
   {
-    return table.prob(word_pair_type(source, target), p0);
+    const std::pair<id_type, bool> result = find_word_pair(source, target);
+    
+    if (result.second)
+      return table.prob(result.first, p0);
+    else
+      return table.prob(p0);
   }
   
   double log_likelihood() const
@@ -461,6 +485,8 @@ struct PYPLexicon
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
+
+  word_pair_set_type word_pairs;
   
   table_type table;
   double    p0;
@@ -764,8 +790,6 @@ struct PYPITG
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
 
-  typedef utils::rwticket mutex_type;
-  
   PYPITG(const PYPRule&   __rule,
 	 const PYPLength& __length,
 	 const PYPLexicon& __lexicon)
@@ -829,8 +853,6 @@ struct PYPITG
   PYPRule    rule;
   PYPLength  length;
   PYPLexicon lexicon;
-  
-  mutex_type mutex;
 };
 
 struct PYPGraph
@@ -1931,6 +1953,42 @@ typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
+struct Counter
+{
+  Counter() : counter(0) {}
+  
+  void increment()
+  {
+    utils::atomicop::fetch_and_add(counter, size_type(1));
+  }
+  
+  void wait(size_type target)
+  {
+    for (;;) {
+      utils::atomicop::memory_barrier();
+      
+      for (int i = 0; i < 64; ++ i) {
+	const size_type curr = counter;
+	
+	if (curr == target)
+	  return;
+	else
+	  boost::thread::yield();
+      }
+      
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    }
+  }
+
+  void clear() { counter = 0; }
+  
+  size_type counter;
+};
+typedef Counter counter_type;
+
 struct Task
 {
   typedef PYP::size_type       size_type;
@@ -1942,7 +2000,7 @@ struct Task
   typedef PYPITG::prob_type    prob_type;
 
   Task(queue_type& __mapper,
-       queue_type& __reducer,
+       counter_type& __reducer,
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
@@ -1968,39 +2026,19 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
-
-      if (! derivations[pos].empty()) {
-	PYPITG::mutex_type::scoped_writer_lock lock(model.mutex);
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter, sampler);
-      }
       
-      {
-	PYPITG::mutex_type::scoped_reader_lock lock(model.mutex);
-	
-	graph.initialize(sources[pos], targets[pos], model);
-      }
+      graph.initialize(sources[pos], targets[pos], model);
       
       graph.forward(sources[pos], targets[pos], beam);
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
-      {
-	PYPITG::mutex_type::scoped_writer_lock lock(model.mutex);
-	
-	derivation_type::const_iterator diter_end = derivations[pos].end();
-	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	  model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-      }
-      
-      reducer.push(pos);
+      reducer.increment();
     }
   }
   
   queue_type& mapper;
-  queue_type& reducer;
+  counter_type& reducer;
   
   const sentence_set_type& sources;
   const sentence_set_type& targets;
@@ -2095,6 +2133,7 @@ double length_null = 1e-3;
 double length_shape = 1e-2;
 double length_rate  = 1;
 
+int blocks  = 64;
 int threads = 1;
 int debug = 0;
 
@@ -2285,6 +2324,7 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
+    blocks  = utils::bithack::max(blocks, 1);
     threads = utils::bithack::max(threads, 1);
     
     if (samples < 0)
@@ -2351,10 +2391,10 @@ int main(int argc, char ** argv)
 		<< "length target: lambda=" << model.length.length_target.lambda << std::endl;
     
     Task::queue_type queue_mapper;
-    Task::queue_type queue_reducer;
+    Counter reducer;
     
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
-								 queue_reducer,
+								 reducer,
 								 sources,
 								 targets,
 								 derivations,
@@ -2426,47 +2466,50 @@ int main(int argc, char ** argv)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
       position_set_type::const_iterator piter_end = positions.end();
-      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	queue_mapper.push(*piter);
+      position_set_type::const_iterator piter = positions.begin();
       
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
+      position_set_type mapped;
+      
+      size_type reduced_total = 0;
+      while (piter != piter_end) {
+	mapped.clear();
 	
-	if (debug >= 3) {
-	  std::cerr << "training=" << pos << std::endl
-		    << "source=" << sources[pos] << std::endl
-		    << "target=" << targets[pos] << std::endl;
+	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
+	for (/**/; piter != piter_last; ++ piter) {
+	  const size_type pos = *piter;
 	  
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	      
-	    std::cerr << "derivation: ";
-	    switch (diter->itg) {
-	    case PYP::TERMINAL:   std::cerr << "ter"; break;
-	    case PYP::STRAIGHT:   std::cerr << "str"; break;
-	    case PYP::INVERTED:   std::cerr << "inv"; break;
-	    default: std::cerr << "UNK";
-	    }
-	      
-	    std::cerr << " source: " << diter->span.source.first << "..." << diter->span.source.last
-		      << " target: " << diter->span.target.first << "..." << diter->span.target.last;
-	      
-	    if (diter->itg == PYP::TERMINAL)
-	      std::cerr << " pair: "
-			<< PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last)
-			<< " ||| "
-			<< PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last);
-	      
-	    std::cerr << std::endl;
+	  if (! derivations[pos].empty()) {
+	    derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
+	    for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
+	      model.decrement(sources[pos], targets[pos], *diter, sampler);
+	  }
+	  
+	  mapped.push_back(pos);
+	}
+
+	reducer.clear();
+	
+	position_set_type::const_iterator miter_end = mapped.end();
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
+	  queue_mapper.push(*miter);
+
+	reducer.wait(mapped.size());
+	
+	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced, ++ reduced_total) {
+	  if (debug) {
+	    if ((reduced_total + 1) % 10000 == 0)
+	      std::cerr << '.';
+	    if ((reduced_total + 1) % 1000000 == 0)
+	      std::cerr << '\n';
 	  }
 	}
+	
+	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
+	  const size_type pos = *miter;
 	  
-	if (debug) {
-	  if ((reduced + 1) % 10000 == 0)
-	    std::cerr << '.';
-	  if ((reduced + 1) % 1000000 == 0)
-	    std::cerr << '\n';
+	  derivation_type::const_iterator diter_end = derivations[pos].end();
+	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
 	}
       }
       
@@ -2530,10 +2573,13 @@ int main(int argc, char ** argv)
 	
 	utils::compress_ostream os(path, 1024 * 1024);
 	os.precision(20);
-	
-	PYPLexicon::table_type::const_iterator liter_end = model.lexicon.table.end();
-	for (PYPLexicon::table_type::const_iterator liter = model.lexicon.table.begin(); liter != liter_end; ++ liter)
-	  os << liter->first.source << ' ' << liter->first.target << ' ' << model.lexicon.prob(liter->first.source, liter->first.target) << '\n';
+
+	for (PYP::id_type id = 0; id != model.lexicon.table.size(); ++ id)
+	  if (! model.lexicon.table[id].empty()) {
+	    os << model.lexicon.word_pairs[id].source
+	       << ' ' << model.lexicon.word_pairs[id].target
+	       << ' ' << model.lexicon.table.prob(id, model.lexicon.p0) << '\n';  
+	  }
       }
     }
     
@@ -2623,7 +2669,8 @@ void options(int argc, char** argv)
     ("length-null",   po::value<double>(&length_null)->default_value(length_null),     "length for NULL")
     ("length-shape",  po::value<double>(&length_shape)->default_value(length_shape),   "length ~ Gamma(shape,rate)")
     ("length-rate",   po::value<double>(&length_rate)->default_value(length_rate),     "length ~ Gamma(shape,rate)")
-        
+    
+    ("blocks",  po::value<int>(&blocks),  "# of blocks")
     ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")

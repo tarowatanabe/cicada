@@ -2382,7 +2382,6 @@ int main(int argc, char ** argv)
 	time += tasks[i].time;
       }
       
-      
       // shuffle
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
       std::random_shuffle(positions.begin(), positions.end(), gen);
@@ -2435,8 +2434,6 @@ int main(int argc, char ** argv)
 	      std::cerr << '\n';
 	  }
 	}
-	
-	
 	
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
 	  const size_type pos = *miter;
