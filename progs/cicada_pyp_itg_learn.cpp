@@ -2495,14 +2495,13 @@ int main(int argc, char ** argv)
 
 	reducer.wait(mapped.size());
 	
-	for (size_type reduced = 0; reduced != mapped.size(); ++ reduced, ++ reduced_total) {
-	  if (debug) {
+	if (debug)
+	  for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter, ++ reduced_total) {
 	    if ((reduced_total + 1) % 10000 == 0)
 	      std::cerr << '.';
 	    if ((reduced_total + 1) % 1000000 == 0)
 	      std::cerr << '\n';
 	  }
-	}
 	
 	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
 	  const size_type pos = *miter;
