@@ -753,18 +753,22 @@ struct PYPMixture
       for (size_type i = 0; i != models.size(); ++ i)
 	probs[i + 1] = models[i].prob(word, first[i + 1]);
       
-      node_type::mutex_type::scoped_writer_lock lock(root.mutex);
+      std::pair<size_type, bool> result;
       
-      const std::pair<size_type, bool> result = root.table.increment(word,
-								     probs.begin(),
-								     probs.end(),
-								     mixtures[0].probs.begin(),
-								     sampler,
-								     temperature);
+      {
+	node_type::mutex_type::scoped_writer_lock lock(root.mutex);
+	
+	result = root.table.increment(word,
+				      probs.begin(),
+				      probs.end(),
+				      mixtures[0].probs.begin(),
+				      sampler,
+				      temperature);
+      }
       
       if (result.second) {
 	if (result.first == 0)
-	  ++ counts0;
+	  utils::atomicop::fetch_and_add(counts0, size_type(1));
 	else
 	  models[result.first - 1].increment(word, first[result.first], sampler, temperature);
       }
@@ -783,15 +787,19 @@ struct PYPMixture
       }
       
       probs.front() = prob(word, nodes.begin(), normalizer);
+
+      std::pair<size_type, bool> result;
       
-      node_type::mutex_type::scoped_writer_lock lock(node.mutex);
-      
-      const std::pair<size_type, bool> result = node.table.increment(word,
-								     probs.begin(),
-								     probs.end(),
-								     mixtures[node.order].probs.begin(),
-								     sampler,
-								     temperature);
+      {
+	node_type::mutex_type::scoped_writer_lock lock(node.mutex);
+	
+	result = node.table.increment(word,
+				      probs.begin(),
+				      probs.end(),
+				      mixtures[node.order].probs.begin(),
+				      sampler,
+				      temperature);
+      }
       
       if (result.second) {
 	if (result.first == 0)
@@ -811,14 +819,18 @@ struct PYPMixture
     
     node_type& node = (is_root ? root : trie[*first]);
 
-    node_type::mutex_type::scoped_writer_lock lock(node.mutex);
+    std::pair<size_type, bool> result;
 
-    const std::pair<size_type, bool> result = node.table.decrement(word, sampler);
+    {
+      node_type::mutex_type::scoped_writer_lock lock(node.mutex);
+      
+      result = node.table.decrement(word, sampler);
+    }
     
     if (result.second) {
       if (result.first == 0) {
 	if (is_root)
-	  -- counts0;
+	  utils::atomicop::fetch_and_add(counts0, size_type(-1));
 	else {
 	  // we need to decrement to parents!
 	  node_set_type nodes(models.size() + 1, trie[*first].parent);
