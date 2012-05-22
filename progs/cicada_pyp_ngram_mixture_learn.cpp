@@ -115,8 +115,8 @@ struct PYPLM
   typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
-  typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+  typedef std::vector<node_type*, std::allocator<node_type*> > node_ptr_set_type;
+  typedef std::vector<node_ptr_set_type, std::allocator<node_ptr_set_type> > node_ptr_map_type;
   
   typedef std::vector<id_type, std::allocator<id_type> > history_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
@@ -132,16 +132,11 @@ struct PYPLM
 	const double __strength_shape,
 	const double __strength_rate)
     : trie(word_type()),
-      nodes(order),
+      nodes(),
       parameters(order, parameter_type(__discount_alpha, __discount_beta, __strength_shape, __strength_rate)),
       p0(__p0),
       counts0(0)
-  {
-    // unitialize root table...
-    root.parent = id_type(-1);
-    root.order = 0;
-    root.table = node_type::table_type(parameters[0].discount, parameters[0].strength);
-  }
+  { }
 
   template <typename Iterator>
   id_type insert(Iterator first, Iterator last, const normalizer_type& normalizer)
@@ -162,10 +157,7 @@ struct PYPLM
       
       if (! trie_node.order) {
 	trie_node.parent = node_prev;
-	trie_node.order = order;
-	trie_node.table = node_type::table_type(parameters[order].discount, parameters[order].strength);
-	
-	nodes[order].push_back(node);
+	trie_node.order  = order;
       }
     }
     
@@ -183,10 +175,14 @@ struct PYPLM
     } else {
       const double backoff = prob(word, trie[node].parent);
       
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      bool propagate = false;
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	
+	propagate = trie[node].table.increment(word, backoff, sampler, temperature);
+      }
       
-      // we will also increment lower-order when new table is created!
-      if (trie[node].table.increment(word, backoff, sampler, temperature))
+      if (propagate)
 	increment(word, trie[node].parent, sampler, temperature);
     }
   }
@@ -199,9 +195,14 @@ struct PYPLM
       
       counts0 -= root.table.decrement(word, sampler);
     } else {
-      node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+      bool propagate = false;
+      {
+	node_type::mutex_type::scoped_writer_lock lock(trie[node].mutex);
+	
+	propagate = trie[node].table.decrement(word, sampler);
+      }
       
-      if (trie[node].table.decrement(word, sampler))
+      if (propagate)
 	decrement(word, trie[node].parent, sampler);
     }
   }
@@ -214,13 +215,10 @@ struct PYPLM
       return root.table.prob(word, p0);
     } else {
       const double p = prob(word, trie[node].parent);
-
+      
       node_type::mutex_type::scoped_reader_lock lock(const_cast<node_type&>(trie[node]).mutex);
       
-      if (trie[node].table.empty())
-	return p;
-      else
-	return trie[node].table.prob(word, p);
+      return (trie[node].table.empty() ? p : trie[node].table.prob(word, p));
     }
   }
 
@@ -268,16 +266,12 @@ struct PYPLM
     
     double logprob = parameters[order].log_likelihood(discount, strength);
     
-    if (order == 0)
-      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
-    else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty())
-	  logprob += trie[*niter].table.log_likelihood(discount, strength);
-      
-      return logprob;
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty())
+	logprob += (*niter)->table.log_likelihood(discount, strength);
+    
+    return logprob;
   }
   
   struct DiscountSampler
@@ -309,29 +303,25 @@ struct PYPLM
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    initialize();
+    
     for (size_type order = 0; order != parameters.size(); ++ order) {
       
       for (int iter = 0; iter != num_loop; ++ iter) {
 	parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
+	parameters[order].verify_parameters();
 	
 	parameters[order].discount = sample_discount(order, sampler, parameters[order].discount, parameters[order].strength);
+	parameters[order].verify_parameters();
       }
       
       parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
+      parameters[order].verify_parameters();
       
-      if (order == 0) {
-	root.table.discount() = parameters[order].discount;
-	root.table.strength() = parameters[order].strength;
-
-	root.table.verify_parameters();
-      } else {
-	node_set_type::const_iterator niter_end = nodes[order].end();
-	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
-	  trie[*niter].table.discount() = parameters[order].discount;
-	  trie[*niter].table.strength() = parameters[order].strength;
-	  
-	  trie[*niter].table.verify_parameters();
-	}
+      node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	(*niter)->table.discount() = parameters[order].discount;
+	(*niter)->table.strength() = parameters[order].strength;
       }
     }
   }
@@ -342,17 +332,12 @@ struct PYPLM
     double x = 0.0;
     double y = 0.0;
 
-    if (order == 0) {
-      x += root.table.sample_log_x(sampler, discount, strength);
-      y += root.table.sample_y(sampler, discount, strength);
-    } else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty()) {
-	  x += trie[*niter].table.sample_log_x(sampler, discount, strength);
-	  y += trie[*niter].table.sample_y(sampler, discount, strength);
-	}
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty()) {
+	x += (*niter)->table.sample_log_x(sampler, discount, strength);
+	y += (*niter)->table.sample_y(sampler, discount, strength);
+      }
     
     return sampler.gamma(parameters[order].strength_shape + y, parameters[order].strength_rate - x);
   }
@@ -363,17 +348,12 @@ struct PYPLM
     double y = 0.0;
     double z = 0.0;
     
-    if (order == 0) {
-      y += root.table.sample_y_inv(sampler, discount, strength);
-      z += root.table.sample_z_inv(sampler, discount, strength);
-    } else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty()) {
-	  y += trie[*niter].table.sample_y_inv(sampler, discount, strength);
-	  z += trie[*niter].table.sample_z_inv(sampler, discount, strength);
-	}
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty()) {
+	y += (*niter)->table.sample_y_inv(sampler, discount, strength);
+	z += (*niter)->table.sample_z_inv(sampler, discount, strength);
+      }
     
     return sampler.beta(parameters[order].discount_alpha + y, parameters[order].discount_beta + z);
   }
@@ -382,6 +362,8 @@ struct PYPLM
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    initialize();
+
     for (size_type order = 0; order != parameters.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
@@ -395,6 +377,7 @@ struct PYPLM
 							  0.0,
 							  num_iterations,
 							  100 * num_iterations);
+	parameters[order].verify_parameters();
 	
 	parameters[order].discount = utils::slice_sampler(discount_sampler,
 							  parameters[order].discount,
@@ -404,6 +387,7 @@ struct PYPLM
 							  0.0,
 							  num_iterations,
 							  100 * num_iterations);
+	parameters[order].verify_parameters();
       }
       
       parameters[order].strength = utils::slice_sampler(strength_sampler,
@@ -414,24 +398,33 @@ struct PYPLM
 							0.0,
 							num_iterations,
 							100 * num_iterations);
+      parameters[order].verify_parameters();
       
-      if (order == 0) {
-	root.table.discount() = parameters[order].discount;
-	root.table.strength() = parameters[order].strength;
-
-	root.table.verify_parameters();
-      } else {
-	node_set_type::const_iterator niter_end = nodes[order].end();
-	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
-	  trie[*niter].table.discount() = parameters[order].discount;
-	  trie[*niter].table.strength() = parameters[order].strength;
-	  
-	  trie[*niter].table.verify_parameters();
-	}
+      node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	(*niter)->table.discount() = parameters[order].discount;
+	(*niter)->table.strength() = parameters[order].strength;
       }
     }
   }
-
+  
+  void initialize()
+  {
+    if (nodes.size() == parameters.size()) return;
+    
+    nodes.clear();
+    nodes.reserve(parameters.size());
+    nodes.resize(parameters.size());
+    
+    nodes[0].push_back(&root);
+    
+    for (id_type id = 0; id != trie.size(); ++ id) {
+      node_type& node = trie[id];
+      
+      nodes[node.order].push_back(&node);
+    }
+  }
+  
   void write(const path_type& path, const normalizer_type& normalizer)
   {
     typedef utils::repository repository_type;
@@ -601,7 +594,7 @@ struct PYPLM
 public: 
   trie_type trie;
   node_type root;
-  node_map_type nodes;
+  node_ptr_map_type nodes;
   
   parameter_set_type parameters;
   
@@ -679,7 +672,7 @@ struct PYPMixture
     }
 
     template <typename Sampler>
-    void slilce_sample_parameters(Sampler& sampler, const double temperature, const int num_loop = 2, const int num_iterations = 8)
+    void slice_sample_parameters(Sampler& sampler, const double temperature, const int num_loop = 2, const int num_iterations = 8)
     {
       // transform counts into table-counts..
       const double p0 = 1.0 / counts.size();
@@ -733,9 +726,10 @@ struct PYPMixture
   typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
+  typedef std::vector<node_type*, std::allocator<node_type*> > node_ptr_set_type;
+  typedef std::vector<node_ptr_set_type, std::allocator<node_ptr_set_type> > node_ptr_map_type;
+
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-  
   typedef std::vector<id_type, std::allocator<id_type> > history_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
   typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
@@ -754,15 +748,10 @@ struct PYPMixture
       mixtures(order, mixture_type(parameter_mixture, __models.size() + 1)),
       parameters(order, parameter),
       trie(word_type()),
-      nodes(order),
+      nodes(),
       p0(__p0),
       counts0(0)
-  {
-    // unitialize root table...
-    root.parent = id_type(-1);
-    root.order = 0;
-    root.table = node_type::table_type(parameters[0].discount, parameters[0].strength);
-  }
+  { }
   
   template <typename Iterator>
   id_type insert(Iterator first, Iterator last)
@@ -784,9 +773,6 @@ struct PYPMixture
       if (! trie_node.order) {
 	trie_node.parent  = node_prev;
 	trie_node.order   = order;
-	trie_node.table   = node_type::table_type(parameters[order].discount, parameters[order].strength);
-	
-	nodes[order].push_back(node);
       }
     }
     
@@ -985,27 +971,100 @@ struct PYPMixture
     
     double logprob = parameters[order].log_likelihood(discount, strength);
     
-    if (order == 0)
-      return logprob + (! root.table.empty() ? root.table.log_likelihood(discount, strength) : 0.0);
-    else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty())
-	  logprob += trie[*niter].table.log_likelihood(discount, strength);
-      
-      return logprob;
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty())
+	logprob += (*niter)->table.log_likelihood(discount, strength);
+    
+    return logprob;
   }
   
+  struct DiscountSampler
+  {
+    DiscountSampler(const PYPMixture& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    
+    const PYPMixture& pyplm;
+    int order;
+    
+    double operator()(const double& proposed_discount) const
+    {
+      return pyplm.log_likelihood(order, proposed_discount, pyplm.parameters[order].strength);
+    }
+  };
+  
+  struct StrengthSampler
+  {
+    StrengthSampler(const PYPMixture& __pyplm, const int __order) : pyplm(__pyplm), order(__order) {}
+    
+    const PYPMixture& pyplm;
+    int order;
+    
+    double operator()(const double& proposed_strength) const
+    {
+      return pyplm.log_likelihood(order, pyplm.parameters[order].discount, proposed_strength);
+    }
+  };
+
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const double temperature, const int num_loop = 2, const int num_iterations = 8)
   {
-    sample_parameters(sampler, temperature, num_loop, num_iterations);
+    initialize();
+    
+    for (size_type i = 0; i != models.size(); ++ i)
+      models[i].slice_sample_parameters(sampler, num_loop, num_iterations);
+    
+    for (size_type order = 0; order != mixtures.size(); ++ order)
+      mixtures[order].slice_sample_parameters(sampler, temperature, num_loop, num_iterations);
+    
+    for (size_type order = 0; order != parameters.size(); ++ order) {
+      DiscountSampler discount_sampler(*this, order);
+      StrengthSampler strength_sampler(*this, order);
+
+      for (int iter = 0; iter != num_loop; ++ iter) {
+	parameters[order].strength = utils::slice_sampler(strength_sampler,
+							  parameters[order].strength,
+							  sampler,
+							  - parameters[order].discount + std::numeric_limits<double>::min(),
+							  std::numeric_limits<double>::infinity(),
+							  0.0,
+							  num_iterations,
+							  100 * num_iterations);
+	parameters[order].verify_parameters();
+	
+	parameters[order].discount = utils::slice_sampler(discount_sampler,
+							  parameters[order].discount,
+							  sampler,
+							  (parameters[order].strength < 0.0 ? - parameters[order].strength : 0.0) + std::numeric_limits<double>::min(),
+							  1.0,
+							  0.0,
+							  num_iterations,
+							  100 * num_iterations);
+	parameters[order].verify_parameters();
+      }
+      
+      parameters[order].strength = utils::slice_sampler(strength_sampler,
+							parameters[order].strength,
+							sampler,
+							- parameters[order].discount + std::numeric_limits<double>::min(),
+							std::numeric_limits<double>::infinity(),
+							0.0,
+							num_iterations,
+							100 * num_iterations);
+      parameters[order].verify_parameters();
+      
+      node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	(*niter)->table.discount() = parameters[order].discount;
+	(*niter)->table.strength() = parameters[order].strength;
+      }
+    }
   }
   
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const double temperature, const int num_loop = 2, const int num_iterations = 8)
   {
+    initialize();
+    
     for (size_type i = 0; i != models.size(); ++ i)
       models[i].sample_parameters(sampler, num_loop, num_iterations);
     
@@ -1016,25 +1075,19 @@ struct PYPMixture
       
       for (int iter = 0; iter != num_loop; ++ iter) {
 	parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
+	parameters[order].verify_parameters();
 	
 	parameters[order].discount = sample_discount(order, sampler, parameters[order].discount, parameters[order].strength);
+	parameters[order].verify_parameters();
       }
       
       parameters[order].strength = sample_strength(order, sampler, parameters[order].discount, parameters[order].strength);
+      parameters[order].verify_parameters();
       
-      if (order == 0) {
-	root.table.discount() = parameters[order].discount;
-	root.table.strength() = parameters[order].strength;
-	
-	root.table.verify_parameters();
-      } else {
-	node_set_type::const_iterator niter_end = nodes[order].end();
-	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
-	  trie[*niter].table.discount() = parameters[order].discount;
-	  trie[*niter].table.strength() = parameters[order].strength;
-	  
-	  trie[*niter].table.verify_parameters();
-	}
+      node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+      for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
+	(*niter)->table.discount() = parameters[order].discount;
+	(*niter)->table.strength() = parameters[order].strength;
       }
     }
   }
@@ -1045,17 +1098,12 @@ struct PYPMixture
     double x = 0.0;
     double y = 0.0;
 
-    if (order == 0) {
-      x += root.table.sample_log_x(sampler, discount, strength);
-      y += root.table.sample_y(sampler, discount, strength);
-    } else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty()) {
-	  x += trie[*niter].table.sample_log_x(sampler, discount, strength);
-	  y += trie[*niter].table.sample_y(sampler, discount, strength);
-	}
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty()) {
+	x += (*niter)->table.sample_log_x(sampler, discount, strength);
+	y += (*niter)->table.sample_y(sampler, discount, strength);
+      }
     
     return sampler.gamma(parameters[order].strength_shape + y, parameters[order].strength_rate - x);
   }
@@ -1066,21 +1114,32 @@ struct PYPMixture
     double y = 0.0;
     double z = 0.0;
     
-    if (order == 0) {
-      y += root.table.sample_y_inv(sampler, discount, strength);
-      z += root.table.sample_z_inv(sampler, discount, strength);
-    } else {
-      node_set_type::const_iterator niter_end = nodes[order].end();
-      for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
-	if (! trie[*niter].table.empty()) {
-	  y += trie[*niter].table.sample_y_inv(sampler, discount, strength);
-	  z += trie[*niter].table.sample_z_inv(sampler, discount, strength);
-	}
-    }
+    node_ptr_set_type::const_iterator niter_end = nodes[order].end();
+    for (node_ptr_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter)
+      if (! (*niter)->table.empty()) {
+	y += (*niter)->table.sample_y_inv(sampler, discount, strength);
+	z += (*niter)->table.sample_z_inv(sampler, discount, strength);
+      }
     
     return sampler.beta(parameters[order].discount_alpha + y, parameters[order].discount_beta + z);
   }
 
+  void initialize()
+  {
+    if (nodes.size() == parameters.size()) return;
+    
+    nodes.clear();
+    nodes.reserve(parameters.size());
+    nodes.resize(parameters.size());
+    
+    nodes[0].push_back(&root);
+    
+    for (id_type id = 0; id != trie.size(); ++ id) {
+      node_type& node = trie[id];
+      
+      nodes[node.order].push_back(&node);
+    }
+  }
   
   void write(const path_type& path)
   {
@@ -1254,7 +1313,7 @@ public:
   
   trie_type trie;
   node_type root;
-  node_map_type nodes;
+  node_ptr_map_type nodes;
   
   double p0;
   size_type counts0;
