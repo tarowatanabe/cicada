@@ -32,12 +32,8 @@
 //
 
 // TODO:
-// fix so that lambdas (mixture weights) are shared at each level, so that
-// at test time, we can back-off flexibly (i.e. merge longest perfix4 and suffix4 with shorter surface ngram)
 //
-// also fix, so that lambdas are fixed during training, then, sampled afterwards...
-//
-// Perform parallel table-count computation...
+// fix so that we also include mapping from normalized word into surface form, defined in each latent LM
 //
 
 #include <map>
@@ -51,6 +47,7 @@
 #include <cicada/cluster.hpp>
 #include <cicada/cluster_stemmer.hpp>
 
+#include "utils/alloc_vector.hpp"
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/pyp_parameter.hpp"
@@ -127,13 +124,10 @@ struct PYPLM
   
   PYPLM(const int order,
 	const double __p0,
-	const double __discount_alpha,
-	const double __discount_beta,
-	const double __strength_shape,
-	const double __strength_rate)
+	const parameter_type& __parameter)
     : trie(word_type()),
       nodes(),
-      parameters(order, parameter_type(__discount_alpha, __discount_beta, __strength_shape, __strength_rate)),
+      parameters(order, __parameter),
       p0(__p0),
       counts0(0)
   { }
@@ -149,9 +143,10 @@ struct PYPLM
     int order = 1;
     id_type node = trie.root();
     for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
+      const word_type normalized = normalizer(*iter);
       const id_type node_prev = node;
       
-      node = trie.insert(node, normalizer(*iter));
+      node = trie.insert(node, normalized);
       
       node_type& trie_node = trie[node];
       
@@ -164,7 +159,6 @@ struct PYPLM
     return node;
   }
   
-
   template <typename Sampler>
   void increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
@@ -220,34 +214,6 @@ struct PYPLM
       
       return (trie[node].table.empty() ? p : trie[node].table.prob(word, p));
     }
-  }
-
-  template <typename Iterator>
-  double prob(const word_type& word, Iterator first, Iterator last, const normalizer_type& normalizer)
-  {
-    typedef std::reverse_iterator<Iterator> reverse_iterator;
-    
-    // this may happen when accessing 0-gram!
-    if (! (first <= last))
-      return p0;
-    
-    double p = root.table.prob(word, p0);
-    
-    // we will traverse from the back!
-    reverse_iterator begin(last);
-    reverse_iterator end(first);
-    
-    id_type node = trie.root();
-    for (reverse_iterator iter = begin; iter != end; ++ iter) {
-      node = trie.find(node, normalizer(*iter));
-      
-      if (node == trie_type::npos() || trie[node].table.empty())
-	return p;
-      else
-	p = trie[node].table.prob(word, p);
-    }
-    
-    return p;
   }
   
   double log_likelihood() const
@@ -407,7 +373,7 @@ struct PYPLM
       }
     }
   }
-  
+
   void initialize()
   {
     if (nodes.size() == parameters.size()) return;
@@ -597,11 +563,10 @@ public:
   node_ptr_map_type nodes;
   
   parameter_set_type parameters;
-  
+
   double    p0;
   size_type counts0;
 };
-
 
 struct PYPMixture
 {
@@ -690,7 +655,7 @@ struct PYPMixture
     
     double log_likelihood() const
     {
-      return table.log_likelihood() + std::log(1.0 / counts.size()) * counts0;
+      return table.log_likelihood() - std::log(double(counts.size())) * counts0;
     }
     
     table_type     table;
@@ -779,15 +744,14 @@ struct PYPMixture
     return node;
   }
   
-  template <typename Iterator, typename Sampler>
-  void increment(const word_type& word, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
+  template <typename Iterator, typename Norms, typename Sampler>
+  void increment(const word_type& word, Iterator first, Norms normalizer, Sampler& sampler, const double temperature=1.0)
   {
     if (*first == trie.root()) {
       prob_set_type probs(models.size() + 1, p0);
       
-      Iterator iter = first + 1;
-      for (size_type i = 0; i != models.size(); ++ i, ++ iter)
-	probs[i + 1] = models[i].prob(word, *iter);
+      for (size_type i = 0; i != models.size(); ++ i)
+	probs[i + 1] = models[i].prob(word, first[i + 1]);
       
       node_type::mutex_type::scoped_writer_lock lock(root.mutex);
       
@@ -798,14 +762,14 @@ struct PYPMixture
 								     sampler,
 								     temperature);
       
-      mixtures[0].increment(result.first, sampler, temperature);
-      
       if (result.second) {
 	if (result.first == 0)
 	  ++ counts0;
 	else
-	  models[result.first - 1].increment(word, *(first + result.first), sampler, temperature);
+	  models[result.first - 1].increment(word, first[result.first], sampler, temperature);
       }
+      
+      mixtures[0].increment(result.first, sampler, temperature);
       
     } else {
       node_type& node = trie[*first];
@@ -813,13 +777,12 @@ struct PYPMixture
       node_set_type nodes(models.size() + 1, node.parent);
       prob_set_type probs(models.size() + 1, 0.0);
       
-      Iterator iter = first + 1;
-      for (size_type i = 0; i != models.size(); ++ i, ++ iter) {
-	nodes[i + 1] = models[i].trie[*iter].parent;
-	probs[i + 1] = models[i].prob(word, *iter);
+      for (size_type i = 0; i != models.size(); ++ i) {
+	nodes[i + 1] = models[i].trie[first[i + 1]].parent;
+	probs[i + 1] = models[i].prob(word, first[i + 1]);
       }
       
-      probs.front() = prob(word, nodes.begin(), nodes.end());
+      probs.front() = prob(word, nodes.begin(), normalizer);
       
       node_type::mutex_type::scoped_writer_lock lock(node.mutex);
       
@@ -830,19 +793,19 @@ struct PYPMixture
 								     sampler,
 								     temperature);
       
-      mixtures[node.order].increment(result.first, sampler, temperature);
-      
       if (result.second) {
 	if (result.first == 0)
-	  increment(word, nodes.begin(), nodes.end(), sampler, temperature);
+	  increment(word, nodes.begin(), normalizer, sampler, temperature);
 	else
-	  models[result.first - 1].increment(word, *(first + result.first), sampler, temperature);
+	  models[result.first - 1].increment(word, first[result.first], sampler, temperature);
       }
+      
+      mixtures[node.order].increment(result.first, sampler, temperature);
     }
   }
   
-  template <typename Iterator, typename Sampler>
-  void decrement(const word_type& word, Iterator first, Iterator last, Sampler& sampler)
+  template <typename Iterator, typename Norms, typename Sampler>
+  void decrement(const word_type& word, Iterator first, Norms normalizer, Sampler& sampler)
   {
     const bool is_root = (*first == trie.root());
     
@@ -860,26 +823,24 @@ struct PYPMixture
 	  // we need to decrement to parents!
 	  node_set_type nodes(models.size() + 1, trie[*first].parent);
 	  
-	  ++ first;
-	  for (size_type i = 0; i != models.size(); ++ i, ++ first)
-	    nodes[i + 1] = models[i].trie[*first].parent;
+	  for (size_type i = 0; i != models.size(); ++ i)
+	    nodes[i + 1] = models[i].trie[first[i + 1]].parent;
 	  
-	  decrement(word, nodes.begin(), nodes.end(), sampler);
+	  decrement(word, nodes.begin(), normalizer, sampler);
 	}
       } else
-	models[result.first - 1].decrement(word, *(first + result.first), sampler);
+	models[result.first - 1].decrement(word, first[result.first], sampler);
     }
   }
   
-  template <typename Iterator>
-  double prob(const word_type& word, Iterator first, Iterator last) const
+  template <typename Iterator, typename Norms>
+  double prob(const word_type& word, Iterator first, Norms normalizer) const
   {
     if (*first == trie.root()) {
       prob_set_type probs(models.size() + 1, p0);
       
-      ++ first;
-      for (size_type i = 0; i != models.size(); ++ i, ++ first)
-	probs[i + 1] = models[i].prob(word, *first);
+      for (size_type i = 0; i != models.size(); ++ i)
+	probs[i + 1] = models[i].prob(word, first[i + 1]);
       
       node_type::mutex_type::scoped_reader_lock lock(const_cast<node_type&>(root).mutex);
       
@@ -890,13 +851,12 @@ struct PYPMixture
       node_set_type nodes(models.size() + 1, node.parent);
       prob_set_type probs(models.size() + 1, 0.0);
       
-      ++ first;
-      for (size_type i = 0; i != models.size(); ++ i, ++ first) {
-	nodes[i + 1] = models[i].trie[*first].parent;
-	probs[i + 1] = models[i].prob(word, *first);
+      for (size_type i = 0; i != models.size(); ++ i) {
+	nodes[i + 1] = models[i].trie[first[i + 1]].parent;
+	probs[i + 1] = models[i].prob(word, first[i + 1]);
       }
       
-      probs.front() = prob(word, nodes.begin(), nodes.end());
+      probs.front() = prob(word, nodes.begin(), normalizer);
       
       node_type::mutex_type::scoped_reader_lock lock(const_cast<node_type&>(node).mutex);
       
@@ -913,7 +873,7 @@ struct PYPMixture
     // we will traverse from the back!
     reverse_iterator begin(last);
     reverse_iterator end(first);
-
+    
     node_set_type nodes(models.size() + 1, trie.root());
     prob_set_type probs(models.size() + 1, p0);
     
@@ -1386,12 +1346,14 @@ struct Task
   Task(queue_type&   __mapper,
        counter_type& __reducer,
        const data_set_type& __training,
+       const PYPMixture::normalizer_set_type& __normalizers,
        derivation_set_type& __derivations,
        PYPMixture& __model,
        const sampler_type& __sampler)
     : mapper(__mapper),
       reducer(__reducer),
       training(__training),
+      normalizers_base(__normalizers),
       derivations(__derivations),
       model(__model),
       sampler(__sampler) {}
@@ -1400,6 +1362,8 @@ struct Task
   {
     try {
       size_type pos;
+      
+      PYPMixture::normalizer_set_type normalizers(normalizers_base);
     
       for (;;) {
 	mapper.pop(pos);
@@ -1409,14 +1373,14 @@ struct Task
 	if (derivations[pos])
 	  model.decrement(boost::fusion::get<0>(training[pos]),
 			  boost::fusion::get<1>(training[pos]).begin(),
-			  boost::fusion::get<1>(training[pos]).end(),
+			  normalizers.begin(),
 			  sampler);
 	else
 	  derivations[pos] = true;
       
 	model.increment(boost::fusion::get<0>(training[pos]),
 			boost::fusion::get<1>(training[pos]).begin(),
-			boost::fusion::get<1>(training[pos]).end(),
+			normalizers.begin(),
 			sampler,
 			temperature);
       
@@ -1434,6 +1398,7 @@ struct Task
   counter_type& reducer;
   
   const data_set_type& training;
+  const PYPMixture::normalizer_set_type& normalizers_base;
   derivation_set_type& derivations;
   
   PYPMixture& model;
@@ -1476,6 +1441,11 @@ double discount_alpha = 1.0;
 double discount_beta  = 1.0;
 double strength_shape = 1.0;
 double strength_rate  = 1.0;
+
+double class_discount_alpha = 1.0;
+double class_discount_beta  = 1.0;
+double class_strength_shape = 1.0;
+double class_strength_rate  = 1.0;
 
 double lambda_discount_alpha = 1.0;
 double lambda_discount_beta  = 1.0;
@@ -1524,10 +1494,10 @@ int main(int argc, char ** argv)
     
     PYPMixture::lm_set_type latent(normalizers.size(), PYPLM(order,
 							     1.0 / num_vocab,
-							     discount_alpha,
-							     discount_beta,
-							     strength_shape,
-							     strength_rate));
+							     PYPLM::parameter_type(discount_alpha,
+										   discount_beta,
+										   strength_shape,
+										   strength_rate)));
     
     PYPMixture model(latent,
 		     order,
@@ -1647,7 +1617,6 @@ int main(int argc, char ** argv)
       for (size_t i = 0; i != latent.size(); ++ i)
 	for (int n = 0; n != order; ++ n)
 	  std::cerr << "latent=" << i << " order=" << n << " discount=" << latent[i].parameters[n].discount << " strength=" << latent[i].parameters[n].strength << std::endl;
-
       
       for (int n = 0; n != order; ++ n) {
 	std::cerr << "mixture order=" << n << " lambda=";
@@ -1662,6 +1631,7 @@ int main(int argc, char ** argv)
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
 								 reducer,
 								 training,
+								 normalizers,
 								 derivations,
 								 model,
 								 sampler));
@@ -1994,6 +1964,12 @@ void options(int argc, char** argv)
     ("strength-shape", po::value<double>(&strength_shape)->default_value(strength_shape), "strength ~ Gamma(shape,rate)")
     ("strength-rate",  po::value<double>(&strength_rate)->default_value(strength_rate),   "strength ~ Gamma(shape,rate)")
     
+    ("class-discount-alpha", po::value<double>(&class_discount_alpha)->default_value(class_discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("class-discount-beta",  po::value<double>(&class_discount_beta)->default_value(class_discount_beta),   "discount ~ Beta(alpha,beta)")
+
+    ("class-strength-shape", po::value<double>(&class_strength_shape)->default_value(class_strength_shape), "strength ~ Gamma(shape,rate)")
+    ("class-strength-rate",  po::value<double>(&class_strength_rate)->default_value(class_strength_rate),   "strength ~ Gamma(shape,rate)")
+
     ("lambda-discount-alpha", po::value<double>(&lambda_discount_alpha)->default_value(lambda_discount_alpha), "discount ~ Beta(alpha,beta)")
     ("lambda-discount-beta",  po::value<double>(&lambda_discount_beta)->default_value(lambda_discount_beta),   "discount ~ Beta(alpha,beta)")
 
