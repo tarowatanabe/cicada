@@ -1173,52 +1173,43 @@ void read_training(const path_set_type& corpus_files,
   }
   
   for (path_set_type::const_iterator fiter = counts_files.begin(); fiter != counts_files.end(); ++ fiter) {
-    if (boost::filesystem::is_directory(*fiter)) {
-      // assume google counts...
-      // we will first read vocab_cs.gz
-      // then, read the conts in the directory, "order-gram"
+    typedef std::vector<utils::piece, std::allocator<utils::piece> > tokens_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
       
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    
+    std::string line;
+    tokens_type tokens;
+    
+    sentence_type ngram;
+    
+    while (std::getline(is, line)) {
+      utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+	
+      tokens.clear();
+      tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
+	
+      // exclude unigram, exclude non-ordered, or not prefixed by BOS
+      if (tokens.size() == 2) continue;
+      if (static_cast<int>(tokens.size()) != order + 1 || escape_word(tokens.front()) != vocab_type::BOS) continue;
+	
+      ngram.clear();
+	
+      tokens_type::const_iterator titer_end = tokens.end() - 1;
+      for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end; ++ titer)
+	ngram.push_back(escape_word(*titer));
+	
+      ngram_count.first  = ngram_type(ngram.begin(), ngram.end());
+      ngram_count.second = utils::lexical_cast<size_type>(tokens.back());
+	
+      queues[model.shard(ngram[ngram.size() - 2])].push_swap(ngram_count);
       
-    } else {
-      typedef std::vector<utils::piece, std::allocator<utils::piece> > tokens_type;
-      typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-      
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      
-      std::string line;
-      tokens_type tokens;
-      
-      sentence_type ngram;
-      
-      while (std::getline(is, line)) {
-	utils::piece line_piece(line);
-	tokenizer_type tokenizer(line_piece);
-	
-	tokens.clear();
-	tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
-	
-	// exclude unigram, exclude non-ordered, or not prefixed by BOS
-	if (tokens.size() == 2) continue;
-	if (static_cast<int>(tokens.size()) != order + 1 || escape_word(tokens.front()) != vocab_type::BOS) continue;
-	
-	ngram.clear();
-	
-	tokens_type::const_iterator titer_end = tokens.end() - 1;
-	for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end; ++ titer)
-	  ngram.push_back(escape_word(*titer));
-	
-	ngram_count.first  = ngram_type(ngram.begin(), ngram.end());
-	ngram_count.second = utils::lexical_cast<size_type>(tokens.back());
-	
-	queues[model.shard(ngram[ngram.size() - 2])].push_swap(ngram_count);
-	
-	if (ngram.back().id() >= non_oov.size())
-	  non_oov.resize(ngram.back().id() + 1, false);
-	non_oov[ngram.back().id()] = true;
-      }
+      if (ngram.back().id() >= non_oov.size())
+	non_oov.resize(ngram.back().id() + 1, false);
+      non_oov[ngram.back().id()] = true;
     }
   }
-
   
   for (size_t i = 0; i != shards_size; ++ i)
     queues[i].push(ngram_count_type());
