@@ -620,6 +620,7 @@ public:
 };
 
 typedef PYPLM::size_type size_type;
+typedef PYPLM::id_type   id_type;
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -628,7 +629,18 @@ typedef utils::sampler<boost::mt19937> sampler_type;
 typedef std::vector<sampler_type, std::allocator<sampler_type> > sampler_set_type;
 
 // we will precompute <word, node> pair...
-typedef boost::fusion::tuple<word_type, PYPLM::id_type, int> data_type;
+struct data_type
+{
+  data_type(const word_type& __word, const id_type& __node)
+    : count(1), word(__word), node(__node), rank(0) {}
+  data_type(const word_type& __word, const id_type& __node, const size_type& __count)
+    : count(__count), word(__word), node(__node), rank(0) {}
+  
+  size_type      count;
+  word_type      word;
+  PYPLM::id_type node;
+  int            rank;
+};
 typedef std::vector<data_type, std::allocator<data_type> > data_set_type;
 typedef std::vector<data_set_type, std::allocator<data_set_type> > data_map_type;
 typedef std::vector<bool, std::allocator<bool> > non_oov_type;
@@ -812,7 +824,7 @@ struct LearnMapper
     
     bool operator()(const size_t& x, const size_t& y) const
     {
-      return boost::fusion::get<2>(training[x]) < boost::fusion::get<2>(training[y]);
+      return training[x].rank < training[y].rank;
     }
     
     const Training& training;
@@ -837,17 +849,19 @@ struct LearnMapper
     
     position_set_type::const_iterator piter_end = positions.end();
     for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
-      const word_type& word = boost::fusion::get<0>(training[*piter]);
+      const word_type& word = training[*piter].word;
       
       if (word.id() >= counts.size())
 	counts.resize(word.id() + 1, 0);
       
       int& counter = counts[word.id()];
       
-      if (remove)
-	counter -= model.decrement(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler);
-      
-      counter += model.increment(boost::fusion::get<0>(training[*piter]), boost::fusion::get<1>(training[*piter]), sampler, temperature);
+      for (size_type i = 0; i != training[*piter].count; ++ i) {
+	if (remove)
+	  counter -= model.decrement(training[*piter].word, training[*piter].node, sampler);
+	
+	counter += model.increment(training[*piter].word, training[*piter].node, sampler, temperature);
+      }
     }
     
     for (word_type::id_type id = 0; id != counts.size(); ++ id)
@@ -1017,15 +1031,28 @@ void learn(const data_map_type& training,
 struct ReadMapReduce
 {
   typedef utils::simple_vector<word_type, std::allocator<word_type> > ngram_type;
+
+  typedef std::pair<ngram_type, size_type> ngram_count_type;
   
-  typedef utils::lockfree_list_queue<ngram_type, std::allocator<ngram_type> > queue_type;
+  typedef utils::lockfree_list_queue<ngram_count_type, std::allocator<ngram_count_type> > queue_type;
   typedef std::vector<queue_type, std::allocator<queue_type> > queue_set_type;
+};
+
+namespace std
+{
+  inline
+  void swap(ReadMapReduce::ngram_count_type& x, ReadMapReduce::ngram_count_type& y)
+  {
+    x.first.swap(y.first);
+    std::swap(x.second, y.second);
+  }
 };
 
 struct ReadMapper
 {
-  typedef ReadMapReduce::ngram_type   ngram_type;
-  typedef ReadMapReduce::queue_type   queue_type;
+  typedef ReadMapReduce::ngram_type       ngram_type;
+  typedef ReadMapReduce::ngram_count_type ngram_count_type;
+  typedef ReadMapReduce::queue_type       queue_type;
   
   ReadMapper(queue_type& __queue,
 	     data_set_type& __training,
@@ -1038,23 +1065,25 @@ struct ReadMapper
     typedef utils::chunk_vector<word_unique_type, 4096 / sizeof(word_unique_type), std::allocator<word_unique_type> > word_unique_set_type;
     
     word_unique_set_type uniques;
-    ngram_type ngram;
+    ngram_count_type     ngram_count;
     
     for (;;) {
-      queue.pop_swap(ngram);
+      queue.pop_swap(ngram_count);
       
-      if (ngram.empty()) break;
+      if (ngram_count.first.empty()) break;
       
-      training.push_back(data_type(ngram.back(), model.insert(ngram.begin(), ngram.end() - 1), 0));
-
-      if (boost::fusion::get<1>(training.back()) >= uniques.size())
-	uniques.resize(boost::fusion::get<1>(training.back()) + 1);
-      uniques[boost::fusion::get<1>(training.back())].insert(boost::fusion::get<0>(training.back()));
+      training.push_back(data_type(ngram_count.first.back(),
+				   model.insert(ngram_count.first.begin(), ngram_count.first.end() - 1),
+				   ngram_count.second));
+      
+      if (training.back().node >= uniques.size())
+	uniques.resize(training.back().node + 1);
+      uniques[training.back().node].insert(training.back().word);
     }
     
     data_set_type::iterator titer_end = training.end();
     for (data_set_type::iterator titer = training.begin(); titer != titer_end; ++ titer)
-      boost::fusion::get<2>(*titer) = uniques[boost::fusion::get<1>(*titer)].size();
+      titer->rank = uniques[titer->node].size();
   }
   
   queue_type&        queue;
@@ -1087,7 +1116,8 @@ void read_training(const path_set_type& corpus_files,
 		   non_oov_type& non_oov,
 		   PYPLM& model)
 {
-  typedef ReadMapReduce::ngram_type ngram_type;
+  typedef ReadMapReduce::ngram_type       ngram_type;
+  typedef ReadMapReduce::ngram_count_type ngram_count_type;
 
   const size_t shards_size = model.shards.size();
 
@@ -1105,6 +1135,8 @@ void read_training(const path_set_type& corpus_files,
     non_oov.resize(vocab_type::BOS.id() + 1, false);
   if (vocab_type::EOS.id() >= non_oov.size())
     non_oov.resize(vocab_type::EOS.id() + 1, false);
+
+  ngram_count_type ngram_count;
   
   for (path_set_type::const_iterator fiter = corpus_files.begin(); fiter != corpus_files.end(); ++ fiter) {
     utils::compress_istream is(*fiter, 1024 * 1024);
@@ -1119,7 +1151,11 @@ void read_training(const path_set_type& corpus_files,
       for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
 	const size_t shard = model.shard(ngram.back());
 	ngram.push_back(*siter);
-	queues[shard].push(ngram_type(std::max(ngram.begin(), ngram.end() - order), ngram.end()));
+	
+	ngram_count.first  = ngram_type(std::max(ngram.begin(), ngram.end() - order), ngram.end());
+	ngram_count.second = 1;
+	
+	queues[shard].push_swap(ngram_count);
 	
 	if (siter->id() >= non_oov.size())
 	  non_oov.resize(siter->id() + 1, false);
@@ -1128,13 +1164,19 @@ void read_training(const path_set_type& corpus_files,
       
       const size_t shard = model.shard(ngram.back());
       ngram.push_back(vocab_type::EOS);
-      queues[shard].push(ngram_type(std::max(ngram.begin(), ngram.end() - order), ngram.end()));
+      
+      ngram_count.first  = ngram_type(std::max(ngram.begin(), ngram.end() - order), ngram.end());
+      ngram_count.second = 1;
+      
+      queues[shard].push_swap(ngram_count);
     }
   }
   
   for (path_set_type::const_iterator fiter = counts_files.begin(); fiter != counts_files.end(); ++ fiter) {
     if (boost::filesystem::is_directory(*fiter)) {
       // assume google counts...
+      // we will first read vocab_cs.gz
+      // then, read the conts in the directory, "order-gram"
       
       
     } else {
@@ -1165,12 +1207,11 @@ void read_training(const path_set_type& corpus_files,
 	for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end; ++ titer)
 	  ngram.push_back(escape_word(*titer));
 	
-	const size_type count = utils::lexical_cast<size_type>(tokens.back());
-	const ngram_type ngram_model(ngram.begin(), ngram.end());
-	  
-	for (size_type i = 0; i != count; ++ i)
-	  queues[model.shard(ngram[ngram.size() - 2])].push(ngram_model);
-
+	ngram_count.first  = ngram_type(ngram.begin(), ngram.end());
+	ngram_count.second = utils::lexical_cast<size_type>(tokens.back());
+	
+	queues[model.shard(ngram[ngram.size() - 2])].push_swap(ngram_count);
+	
 	if (ngram.back().id() >= non_oov.size())
 	  non_oov.resize(ngram.back().id() + 1, false);
 	non_oov[ngram.back().id()] = true;
@@ -1180,7 +1221,7 @@ void read_training(const path_set_type& corpus_files,
 
   
   for (size_t i = 0; i != shards_size; ++ i)
-    queues[i].push(ngram_type());
+    queues[i].push(ngram_count_type());
   
   workers.join_all();
 }

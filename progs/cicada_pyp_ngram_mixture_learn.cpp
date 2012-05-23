@@ -896,12 +896,12 @@ struct PYPMixture
     
     probs.front() = root.table.prob(word, probs.begin(), probs.end(), mixtures[0].probs.begin());
     
-    int order = 0;
+    int order = 1;
     for (reverse_iterator iter = begin; iter != end; ++ iter, ++ order) {
       
       // update by the latent models
       for (size_type i = 0; i != models.size(); ++ i) 
-	if (order == 0 || nodes[i + 1] != models[i].trie.root()) {
+	if (order == 1 || nodes[i + 1] != models[i].trie.root()) {
 	  nodes[i + 1] = models[i].trie.find(nodes[i + 1], normalizer[i](*iter));
 	  
 	  if (nodes[i + 1] != models[i].trie.root())
@@ -909,7 +909,7 @@ struct PYPMixture
 	}
       
       // update by the model
-      if (order == 0 || nodes.front() != trie.root())
+      if (order == 1 || nodes.front() != trie.root())
 	nodes.front() = trie.find(nodes.front(), *iter);
       
       if (nodes.front() != trie.root())
