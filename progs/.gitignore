@@ -102,7 +102,8 @@ cicada_oracle_kbest
 cicada_oracle_kbest_mpi
 cicada_pyp_itg_learn
 cicada_pyp_ngram_learn
-cicada_pyp_ngram_learn2
+cicada_pyp_ngram_learn
+cicada_pyp_ngram_infinite_learn
 cicada_pyp_ngram_mixture_learn
 cicada_pyp_pialign_learn
 cicada_pyp_pos_learn
