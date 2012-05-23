@@ -105,6 +105,7 @@ cicada_pyp_ngram_learn
 cicada_pyp_ngram_learn
 cicada_pyp_ngram_infinite_learn
 cicada_pyp_ngram_mixture_learn
+cicada_pyp_ngram_ordered_learn
 cicada_pyp_pialign_learn
 cicada_pyp_pos_learn
 cicada_pyp_segment_learn

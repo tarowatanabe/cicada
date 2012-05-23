@@ -102,6 +102,7 @@ bin_PROGRAMS = \
 	cicada_pyp_ngram_learn \
 	cicada_pyp_ngram_infinite_learn \
 	cicada_pyp_ngram_mixture_learn \
+	cicada_pyp_ngram_ordered_learn \
 	cicada_pyp_pialign_learn \
 	cicada_pyp_pos_learn \
 	cicada_pyp_segment_learn \
@@ -379,6 +380,9 @@ cicada_pyp_ngram_infinite_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD
 
 cicada_pyp_ngram_mixture_learn_SOURCES = cicada_pyp_ngram_mixture_learn.cpp 
 cicada_pyp_ngram_mixture_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_pyp_ngram_ordered_learn_SOURCES = cicada_pyp_ngram_ordered_learn.cpp 
+cicada_pyp_ngram_ordered_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_pyp_pialign_learn_SOURCES = cicada_pyp_pialign_learn.cpp 
 cicada_pyp_pialign_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
