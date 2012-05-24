@@ -95,6 +95,7 @@ namespace cicada
       
       mutex_type mutex;
     };
+    typedef utils::array_power2<spinlock_type, 8, std::allocator<spinlock_type> > spinlock_set_type;
     
     struct cache_pos_type
     {
@@ -198,7 +199,7 @@ namespace cicada
 	return size_type(-1);
       else {
 	// lock here!
-	spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_pos_.mutex));
+	spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_pos_[pos & 0x07].mutex));
 	
 	if (lock) {
 	  const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos_.size() - 1);
@@ -405,7 +406,7 @@ namespace cicada
     prob_type __prob(int order, const size_type pos, const id_type word, const double p0) const
     {
       // lock here!
-      spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_.mutex));
+      spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_[pos & 0x07].mutex));
       
       double p;
       if (lock) {
@@ -506,9 +507,9 @@ namespace cicada
     
     int               order_;
     
-    spinlock_type        spinlock_pos_;
-    spinlock_type        spinlock_prob_;
-    spinlock_type        spinlock_state_;
+    spinlock_set_type    spinlock_pos_;
+    spinlock_set_type    spinlock_prob_;
+    spinlock_set_type    spinlock_state_;
     cache_pos_set_type   caches_pos_;
     cache_prob_set_type  caches_prob_;
     cache_state_set_type caches_state_;
