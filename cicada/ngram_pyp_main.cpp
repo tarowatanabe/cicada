@@ -37,6 +37,8 @@ int main(int argc, char** argv)
       const double prob = lm.prob(std::max(ngram.begin(), ngram.end() - lm.order()), ngram.end());
       const double lp = std::log(prob);
       
+      std::cerr << "word logprob:" << lp << " oov: " << is_oov << std::endl;
+      
       if (! is_oov)
 	logprob_total += lp;
       logprob_sentence += lp;
@@ -52,7 +54,7 @@ int main(int argc, char** argv)
     logprob_total += lp;
     logprob_sentence += lp;
     
-    std::cout << "logprob: " << logprob_sentence << std::endl;
+    std::cerr << "logprob: " << logprob_sentence << std::endl;
     
     num_word += sentence.size();
     ++ num_sentence;

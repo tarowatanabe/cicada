@@ -102,7 +102,7 @@ namespace cicada
       size_type pos_next;
       id_type id;
       
-      cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
+      cache_pos_type() : pos(size_type(-2)), pos_next(size_type(-1)), id(id_type(-2)) {}
     };
 
     struct cache_prob_type
@@ -111,7 +111,7 @@ namespace cicada
       size_type pos;
       id_type   word;
       
-      cache_prob_type() : prob(0.0), pos(size_type(-1)), word(id_type(-1)) {}
+      cache_prob_type() : prob(0.0), pos(size_type(-2)), word(id_type(-2)) {}
     };
 
     struct cache_state_type
@@ -120,7 +120,7 @@ namespace cicada
       state_type next;
       id_type    word;
       
-      cache_state_type() : curr(), next(), word(id_type(-1)) {}
+      cache_state_type() : curr(), next(), word(id_type(-2)) {}
     };
     
     typedef utils::array_power2<cache_pos_type,   1024 * 256, std::allocator<cache_pos_type> >   cache_pos_set_type;
@@ -407,6 +407,7 @@ namespace cicada
       // lock here!
       spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_.mutex));
       
+      double p;
       if (lock) {
 	const size_type cache_pos = hasher_type::operator()(word, pos) &(caches_prob_.size() - 1);
 	cache_prob_type& cache = const_cast<cache_prob_type&>(caches_prob_[cache_pos]);
@@ -417,9 +418,11 @@ namespace cicada
 	  cache.word = word;
 	}
 	
-	return cache.prob;
+	p = cache.prob;
       } else
-	return __prob_internal(order, pos, word, p0);
+	p = __prob_internal(order, pos, word, p0);
+
+      return p;
     }
     
     prob_type __prob_internal(int order, const size_type pos, const id_type word, const double p0) const

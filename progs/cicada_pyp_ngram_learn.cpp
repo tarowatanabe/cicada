@@ -54,6 +54,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/compact_trie_dense.hpp"
+#include "utils/dense_hash_map.hpp"
 #include "utils/dense_hash_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
@@ -440,6 +441,38 @@ struct PYPLM
     }
   }
 
+  struct vocab_map_type
+  {
+    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > mapping_type;
+
+    vocab_map_type() : mapping(), inverse() {}
+
+    word_type::id_type operator[](const word_type& word)
+    {
+      if (word.id() >= mapping.size())
+	mapping.resize(word.id() + 1, word_type::id_type(-1));
+      
+      if (mapping[word.id()] == word_type::id_type(-1)) {
+	mapping[word.id()] = inverse.size();
+	inverse.push_back(word.id());
+      }
+      
+      return mapping[word.id()];
+    }
+
+    mapping_type mapping;
+    mapping_type inverse;
+  };
+  
+  template <typename Tp>
+  struct greater_pcustomer
+  {
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->second.size_customer() > y->second.size_customer();
+    }
+  };
+  
   void write(const path_type& path)
   {
     typedef utils::repository repository_type;
@@ -450,7 +483,7 @@ struct PYPLM
 
     typedef boost::fusion::tuple<shard_node_type, count_type, count_type> data_type;
 
-    typedef std::map<word_type, data_type, std::less<word_type>, std::allocator<std::pair<const word_type, data_type> >  > word_set_type;
+    typedef std::map<word_type::id_type, data_type, std::less<word_type::id_type>, std::allocator<std::pair<const word_type::id_type, data_type> >  > word_set_type;
     typedef utils::succinct_vector<std::allocator<int32_t> > position_set_type;
     typedef std::vector<count_type, std::allocator<count_type> > offset_set_type;
       
@@ -470,6 +503,30 @@ struct PYPLM
       rep["discount" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].discount);
       rep["strength" + boost::lexical_cast<std::string>(order)] = boost::lexical_cast<std::string>(parameters[order].strength);
     }
+    
+    vocab_map_type vocab_map;
+    
+    vocab_map[vocab_type::BOS];
+    vocab_map[vocab_type::EOS];
+    
+    {
+      // compute vocabulary mapping...
+      typedef std::vector<const node_type::table_type::value_type*, std::allocator<const node_type::table_type::value_type*> > sorted_type;
+      
+      sorted_type sorted;
+      sorted.reserve(root.table.size());
+      
+      node_type::table_type::const_iterator titer_end = root.table.end();
+      for (node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
+	sorted.push_back(&(*titer));
+      
+      std::sort(sorted.begin(), sorted.end(), greater_pcustomer<node_type::table_type::value_type>());
+      
+      sorted_type::const_iterator siter_end = sorted.end();
+      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+	vocab_map[(*siter)->first];
+    }
+    
     
     // we will compute on-memory for faster indexing... (and assuming small data!)
     
@@ -502,15 +559,15 @@ struct PYPLM
       
       node_type::table_type::const_iterator titer_end = root.table.end();
       for (node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
-	words.insert(std::make_pair(titer->first, data_type(std::make_pair(id_type(-1), trie_type::npos()),
-							    titer->second.size_customer(),
-							    titer->second.size_table())));
+	words.insert(std::make_pair(vocab_map[titer->first], data_type(std::make_pair(id_type(-1), trie_type::npos()),
+								       titer->second.size_customer(),
+								       titer->second.size_table())));
       
       for (size_type shard = 0; shard != shards.size(); ++ shard) {
 	trie_type::const_iterator iter_end = shards[shard].trie.end();
 	for (trie_type::const_iterator iter = shards[shard].trie.begin(); iter != iter_end; ++ iter)
 	  if (! shards[shard].trie[iter->second].table.empty()) {
-	    std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first,
+	    std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(vocab_map[iter->first],
 											  data_type(std::make_pair(shard, iter->second), 0, 0)));
 	    if (! result.second)
 	      boost::fusion::get<0>(result.first->second) = std::make_pair(shard, iter->second);
@@ -521,8 +578,7 @@ struct PYPLM
       for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
 	nodes.push_back(boost::fusion::get<0>(witer->second));
 	
-	word_type::id_type word_id = witer->first.id();
-	os_index.write((char*) &word_id, sizeof(word_type::id_type));
+	os_index.write((char*) &witer->first, sizeof(word_type::id_type));
 	os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
 	os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
       }
@@ -563,14 +619,15 @@ struct PYPLM
 	  words.clear();
 	  node_type::table_type::const_iterator titer_end = node.table.end();
 	  for (node_type::table_type::const_iterator titer = node.table.begin(); titer != titer_end; ++ titer)
-	    words.insert(std::make_pair(titer->first, data_type(std::make_pair(shard, trie_type::npos()),
-								titer->second.size_customer(),
-								titer->second.size_table())));
+	    words.insert(std::make_pair(vocab_map[titer->first], data_type(std::make_pair(shard, trie_type::npos()),
+									   titer->second.size_customer(),
+									   titer->second.size_table())));
 	  
 	  // or, we have an entry with the longer contexts..
 	  for (trie_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
 	    if (! trie[iter->second].table.empty()) {
-	      std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(iter->first, data_type(std::make_pair(shard, iter->second), 0, 0)));
+	      std::pair<word_set_type::iterator, bool> result = words.insert(std::make_pair(vocab_map[iter->first],
+											    data_type(std::make_pair(shard, iter->second), 0, 0)));
 	      if (! result.second)
 		boost::fusion::get<0>(result.first->second) = std::make_pair(shard, iter->second);
 	    }
@@ -579,8 +636,7 @@ struct PYPLM
 	  for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
 	    nodes_next.push_back(boost::fusion::get<0>(witer->second));
 	    
-	    word_type::id_type word_id = witer->first.id();
-	    os_index.write((char*) &word_id, sizeof(word_type::id_type));
+	    os_index.write((char*) &witer->first, sizeof(word_type::id_type));
 	    os_count.write((char*) &boost::fusion::get<1>(witer->second), sizeof(count_type));
 	    os_count.write((char*) &boost::fusion::get<2>(witer->second), sizeof(count_type));
 	    
@@ -605,7 +661,14 @@ struct PYPLM
       rep[boost::lexical_cast<std::string>(order) + "-gram-offset"] = boost::lexical_cast<std::string>(offsets[order]);
     
     // vocabulary...
-    word_type::write(rep.path("vocab"));
+    vocab_type vocab;
+    vocab.open(rep.path("vocab"), vocab_map.inverse.size() >> 1);
+    
+    vocab_map_type::mapping_type::const_iterator iiter_end = vocab_map.inverse.end();
+    for (vocab_map_type::mapping_type::const_iterator iiter = vocab_map.inverse.begin(); iiter != iiter_end; ++ iiter)
+      vocab.insert(static_cast<const std::string&>(word_type(*iiter)));
+
+    vocab.close();
   }
 
 public: 
