@@ -430,12 +430,13 @@ namespace cicada
       const count_type customer_size = total_[(pos_total << 1)];
       const count_type table_size    = total_[(pos_total << 1) + 1];
       
-      const double r = table_size * discount_[order] + strength_[order];
-      
+      // we have no restaurant!
       if (! customer_size)
-	return r * p0 / (double(customer_size) + strength_[order]);
+	return p0;
       
       const size_type pos_dish = find(pos, word);
+
+      const double r = table_size * discount_[order] + strength_[order];
       
       if (pos_dish == size_type(-1))
 	return r * p0 / (double(customer_size) + strength_[order]);
