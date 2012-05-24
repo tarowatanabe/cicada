@@ -435,16 +435,18 @@ namespace cicada
 	return p0;
       
       const size_type pos_dish = find(pos, word);
-
-      const double r = table_size * discount_[order] + strength_[order];
+      
+      const double discount = discount_[order];
+      const double strength = strength_[order];
+      const double r = table_size * discount + strength;
       
       if (pos_dish == size_type(-1))
-	return r * p0 / (double(customer_size) + strength_[order]);
+	return r * p0 / (double(customer_size) + strength);
       else {
 	const count_type customer_dish_size = count_[(pos_dish << 1)];
 	const count_type table_dish_size    = count_[(pos_dish << 1) + 1];
 	
-	return (double(customer_dish_size) - discount_[order] * table_dish_size + r * p0) / (double(customer_size) + strength_[order]);
+	return (double(customer_dish_size) - discount * table_dish_size + r * p0) / (double(customer_size) + strength);
       }
     }
     
