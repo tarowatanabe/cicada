@@ -1570,9 +1570,10 @@ struct PYPGraph
       epsilon_source[target_pos] = model.phrase.lexicon.prob_source_target(vocab_type::EPSILON, target[target_pos]);
       
       for (size_type source_first = 0; source_first != source.size(); ++ source_first) {
-	//double sum = 0.0;
+	const size_type source_max = utils::bithack::min(source.size(), source_first + max_length);
+      
 	double sum = epsilon_source[target_pos];
-	for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
+	for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
 	  sum += model.phrase.lexicon.prob_source_target(source[source_last - 1], target[target_pos]);
 	  model1_source[target_pos](source_first, source_last) = sum;
 	}
@@ -1580,12 +1581,13 @@ struct PYPGraph
     }
     
     for (size_type source_pos = 0; source_pos != source.size(); ++ source_pos) {
-      epsilon_target[source_pos] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[source_pos]);
+      epsilon_target[source_pos] = model.phrase.lexicon.prob_target_source(vocab_type::EPSILON, source[source_pos]);      
       
       for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
-	//double sum = 0.0;
+	const size_type target_max = utils::bithack::min(target.size(), target_first + max_length);
+	
 	double sum = epsilon_target[source_pos];
-	for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
+	for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
 	  sum += model.phrase.lexicon.prob_target_source(target[target_last - 1], source[source_pos]);
 	  model1_target[source_pos](target_first, target_last) = sum;
 	}
@@ -1593,15 +1595,21 @@ struct PYPGraph
     }
     
     // unigram
-    for (size_type source_first = 0; source_first != source.size(); ++ source_first)
-      for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source.size(), source_first + max_length); ++ source_last)
+    for (size_type source_first = 0; source_first != source.size(); ++ source_first) {
+      const size_type source_max = utils::bithack::min(source.size(), source_first + max_length);
+      
+      for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last)
 	unigram_source(source_first, source_last) = (unigram_source(source_first, source_last - 1)
 						     * model.phrase.unigram.logprob_source(source[source_last - 1]));
+    }
 
-    for (size_type target_first = 0; target_first != target.size(); ++ target_first)
-      for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target.size(), target_first + max_length); ++ target_last)
+    for (size_type target_first = 0; target_first != target.size(); ++ target_first) {
+      const size_type target_max = utils::bithack::min(target.size(), target_first + max_length);
+      
+      for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last)
 	unigram_target(target_first, target_last) = (unigram_target(target_first, target_last - 1)
 						     * model.phrase.unigram.logprob_target(target[target_last - 1]));
+    }
 
     //std::cerr << "initialize chart" << std::endl;
     
