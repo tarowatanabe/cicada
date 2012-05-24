@@ -14,6 +14,8 @@ namespace cicada
 {
   namespace semiring
   {
+    using std::log;
+
     namespace impl
     {
       template <typename Tp, bool has_infinity>

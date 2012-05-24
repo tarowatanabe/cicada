@@ -37,6 +37,10 @@
 // we use std::string (or, symbol?) as an indiction of "permutation" flag
 //
 
+// TODO: add unigram prior...
+// we will use a simple kn-discounting for estimating unigrams
+//
+
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -57,6 +61,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring/logprob.hpp>
+#include <cicada/discounter.hpp>
 
 #include "utils/vector2.hpp"
 #include "utils/lexical_cast.hpp"
@@ -108,6 +113,9 @@ struct PYP
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+  
   typedef enum {
     TERMINAL = 0,
     STRAIGHT,
@@ -341,6 +349,145 @@ struct PYP
     id_set_type child_;
     id_set_type last_;
   };
+};
+
+struct UnigramModel
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
+  typedef PYP::logprob_type logprob_type;
+  typedef PYP::prob_type    prob_type;
+
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
+  
+  UnigramModel() : p0(1e-7) {}
+  template <typename Iterator>
+  UnigramModel(Iterator first, Iterator last) : p0(1e-7) { learn(first, last); }
+
+  template <typename Iterator>
+  void learn(Iterator first, Iterator last)
+  {
+    typedef std::vector<size_type, std::allocator<size_type> > counts_type;
+    
+    typedef std::map<size_type, size_type, std::less<size_type>, std::allocator<std::pair<const size_type, size_type> > > count_set_type;
+
+    counts_type counts;
+    
+    // collect unigram counts...
+    for (/**/; first != last; ++ first) {
+      const sentence_type& sentence = *first;
+      
+      sentence_type::const_iterator siter_end = sentence.end();
+      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	if (siter->id() >= counts.size())
+	  counts.resize(siter->id(), 0);
+	++ counts[siter->id()];
+      }
+    }
+    
+    logprobs.clear();
+    logprobs.reserve(counts.size());
+    logprobs.resize(counts.size());
+    
+    // collect count of counts...
+    count_set_type count_of_counts;
+    
+    for (word_type::id_type id = 0; id != counts.size(); ++ id)
+      if (counts[id])
+	++ count_of_counts[counts[id]];
+
+    cicada::Discounter discounter(count_of_counts.begin(), count_of_counts.end());
+    
+    // estimate observed etc...
+    size_type total = 0;
+    size_type observed = 0;
+    size_type min2 = 0;
+    size_type min3 = 0;
+    
+    for (word_type::id_type id = 0; id != counts.size(); ++ id)
+      if (counts[id]) {
+	total += counts[id];
+	
+	++ observed;
+	min2 += (counts[id] >= discounter.mincount2);
+	min3 += (counts[id] >= discounter.mincount3);
+      }
+    
+    // now, perform estimation...
+    logprob_type logsum(1.0);
+    const prob_type uniform_distribution = 1.0 / observed;
+
+    p0 = logprob_type();
+    
+    for (/**/; logsum >= logprob_type(1.0); ++ total) {
+      logsum = logprob_type();
+      
+      for (word_type::id_type id = 0; id != counts.size(); ++ id)
+	if (counts[id]) {
+	  const prob_type  discount = discounter.discount(counts[id], total, observed);
+	  const prob_type  prob = (discount * counts[id] / total);
+	  const prob_type  lower_order_weight = discounter.lower_order_weight(total, observed, min2, min3);
+	  const prob_type& lower_order_prob = uniform_distribution;
+	  
+	  const logprob_type logprob(prob + lower_order_weight * lower_order_prob);
+	  
+	  logsum += logprob;
+	  logprobs[id] = logprob;
+	}
+    }
+    
+    const double discounted_mass = 1.0 - logsum;
+    
+    if (discounted_mass > 0.0)
+      for (word_type::id_type id = 0; id != counts.size(); ++ id)
+	if (counts[id])
+	  logprobs[id] /= logsum;
+    
+    if (p0 == logprob_type())
+      p0 = uniform_distribution;
+  }
+  
+  logprob_type operator()(const word_type& word) const
+  {
+    return (word.id() >= logprobs.size() || logprobs[word.id()] == logprob_type()
+	    ? p0
+	    : logprobs[word.id()]);
+  }
+  
+  logprob_type     p0;
+  logprob_set_type logprobs;
+};
+
+struct PYPUnigram
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
+  typedef PYP::logprob_type logprob_type;
+  typedef PYP::prob_type    prob_type;
+  
+  typedef PYP::phrase_type phrase_type;
+  
+  typedef UnigramModel unigram_type;
+  
+  PYPUnigram(const unigram_type& __unigram_source,
+	     const unigram_type& __unigram_target)
+    : unigram_source(&__unigram_source),
+      unigram_target(&__unigram_target) {}
+  
+  logprob_type logprob_source(const word_type& word) const
+  {
+    return unigram_source->operator()(word);
+  }
+
+  logprob_type logprob_target(const word_type& word) const
+  {
+    return unigram_target->operator()(word);
+  }
+  
+  const unigram_type* unigram_source;
+  const unigram_type* unigram_target;
 };
 
 // a base mearure for PYPLexicon
@@ -1015,9 +1162,11 @@ struct PYPPhrase
   typedef utils::restaurant_vector<> table_type;
   
   PYPPhrase(const PYPLexicon& __lexicon,
+	    const PYPUnigram& __unigram,
 	    const PYPLength&  __length,
 	    const parameter_type& parameter)
     : lexicon(__lexicon),
+      unigram(__unigram),
       length(__length),
       table(parameter),
       phrases() {}
@@ -1201,6 +1350,7 @@ struct PYPPhrase
   }
   
   PYPLexicon lexicon;
+  PYPUnigram unigram;
   PYPLength  length;
   
   table_type           table;
@@ -1324,6 +1474,8 @@ struct PYPGraph
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
   typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
 				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+
+  typedef utils::chart<logprob_type, std::allocator<logprob_type> > unigram_type;
   
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > model1_type;
   typedef std::vector<model1_type, std::allocator<model1_type> > model1_chart_type;
@@ -1334,6 +1486,12 @@ struct PYPGraph
 
   typedef std::pair<logprob_type, span_pair_type> score_span_pair_type;
   typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
+
+  static
+  logprob_type geometric_mean(const logprob_type& x)
+  {
+    return cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(x) * 0.5);
+  }
   
   void initialize(const sentence_type& source,
 		  const sentence_type& target,
@@ -1383,6 +1541,13 @@ struct PYPGraph
     base_target.clear();
     base_target.reserve(source.size() + 1, target.size() + 1);
     base_target.resize(source.size() + 1, target.size() + 1, logprob_type(1));
+
+    unigram_source.clear();
+    unigram_target.clear();
+    unigram_source.reserve(source.size() + 1);
+    unigram_target.reserve(target.size() + 1);
+    unigram_source.resize(source.size() + 1, logprob_type(1));
+    unigram_target.resize(target.size() + 1, logprob_type(1));
     
     model1_source.clear();
     model1_target.clear();
@@ -1426,6 +1591,17 @@ struct PYPGraph
 	}
       }
     }
+    
+    // unigram
+    for (size_type source_first = 0; source_first != source.size(); ++ source_first)
+      for (size_type source_last = source_first + 1; source_last <= utils::bithack::min(source.size(), source_first + max_length); ++ source_last)
+	unigram_source(source_first, source_last) = (unigram_source(source_first, source_last - 1)
+						     * model.phrase.unigram.logprob_source(source[source_last - 1]));
+
+    for (size_type target_first = 0; target_first != target.size(); ++ target_first)
+      for (size_type target_last = target_first + 1; target_last <= utils::bithack::min(target.size(), target_first + max_length); ++ target_last)
+	unigram_target(target_first, target_last) = (unigram_target(target_first, target_last - 1)
+						     * model.phrase.unigram.logprob_target(target[target_last - 1]));
 
     //std::cerr << "initialize chart" << std::endl;
     
@@ -1454,8 +1630,9 @@ struct PYPGraph
 	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
 	    logbase = base(source_first, source_last - 1, target_first, target_last) * epsilon_target[source_last - 1];
 	    
+	    const logprob_type logunigram = unigram_source(source_first, source_last);
 	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
-	    const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    const logprob_type logprob_base = logprob_term * geometric_mean(logbase * logunigram) * loglength;
 	    
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	    
@@ -1479,8 +1656,9 @@ struct PYPGraph
 	    logprob_type& logbase = base(source_first, source_last, target_first, target_last);
 	    logbase = base(source_first, source_last, target_first, target_last - 1) * epsilon_source[target_last - 1];
 	    
+	    const logprob_type logunigram = unigram_target(target_first, target_last);
 	    const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
-	    const logprob_type logprob_base = logprob_term * logbase * loglength;
+	    const logprob_type logprob_base = logprob_term * geometric_mean(logbase * logunigram) * loglength;
 	    
 	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	    
@@ -1512,11 +1690,11 @@ struct PYPGraph
 				* model1_target[source_last - 1](target_first, target_last));
 	      
 	      logprob_type& logbase = base(source_first, source_last, target_first, target_last);
-	      logbase = cicada::semiring::traits<logprob_type>::exp(cicada::semiring::log(logbase_source)
-								    + cicada::semiring::log(logbase_target));
+	      logbase = logbase_source * logbase_target;
 	      
+	      const logprob_type logunigram = unigram_source(source_first, source_last) * unigram_target(target_first, target_last);
 	      const logprob_type loglength = model.phrase.length.logprob(phrase_source, phrase_target);
-	      const logprob_type logprob_base = logprob_term * logbase * loglength;
+	      const logprob_type logprob_base = logprob_term * geometric_mean(logbase * logunigram) * loglength;
 	      
 	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::BASE), logprob_base));
 	      
@@ -1942,6 +2120,9 @@ struct PYPGraph
   base_type base;
   base_type base_source;
   base_type base_target;
+
+  unigram_type unigram_source;
+  unigram_type unigram_target;
   
   model1_chart_type model1_source;
   model1_chart_type model1_target;
@@ -2234,6 +2415,9 @@ int main(int argc, char ** argv)
     
     if (sources.size() != targets.size())
       throw std::runtime_error("source/target side do not match!");
+    
+    UnigramModel unigram_source(sources.begin(), sources.end());
+    UnigramModel unigram_target(targets.begin(), targets.end());
 
     LexiconModel lexicon_source_target(1.0 / target_vocab_size);
     LexiconModel lexicon_target_source(1.0 / source_vocab_size);
@@ -2259,6 +2443,9 @@ int main(int argc, char ** argv)
 					       rule_strength_shape,
 					       rule_strength_rate));
 
+    PYPUnigram model_unigram(unigram_source,
+			     unigram_target);
+
     PYPLexicon model_lexicon(lexicon_source_target,
 			     lexicon_target_source,
 			     PYPLexicon::parameter_type(lexicon_discount_alpha,
@@ -2270,6 +2457,7 @@ int main(int argc, char ** argv)
 			   LengthModel(length_null, length_shape, length_rate));
     
     PYPPhrase model_phrase(model_lexicon,
+			   model_unigram,
 			   model_length,
 			   PYPPhrase::parameter_type(phrase_discount_alpha,
 						     phrase_discount_beta,

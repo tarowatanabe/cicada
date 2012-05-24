@@ -339,6 +339,7 @@ compose_tree.hpp \
 compose_tree_cky.hpp \
 debinarize.hpp \
 dependency.hpp \
+discounter.hpp \
 dot_product.hpp \
 edit_distance_forest.hpp \
 eval.hpp \
