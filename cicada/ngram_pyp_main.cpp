@@ -20,6 +20,7 @@ int main(int argc, char** argv)
   sentence_type ngram(1, vocab_type::BOS);
   
   double logprob_total = 0.0;
+  double logprob = 0.0;
   size_t num_word = 0;
   size_t num_oov = 0;
   size_t num_sentence = 0;
@@ -41,6 +42,7 @@ int main(int argc, char** argv)
       
       if (! is_oov)
 	logprob_total += lp;
+      logprob += lp;
       logprob_sentence += lp;
       
       num_oov += is_oov;
@@ -52,6 +54,7 @@ int main(int argc, char** argv)
     const double lp = std::log(prob);
     
     logprob_total += lp;
+    logprob += lp;
     logprob_sentence += lp;
     
     std::cerr << "logprob: " << logprob_sentence << std::endl;
@@ -66,7 +69,10 @@ int main(int argc, char** argv)
 	    << " order: " << lm.order()
 	    << std::endl;
   
-  std::cout << "logprob = " << logprob_total << std::endl;
-  std::cout << "ppl     = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
-  std::cout << "ppl1    = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
+  std::cout << "logprob       = " << logprob_total << std::endl;
+  std::cerr << "logprob(+oov) = " << logprob << std::endl;
+  std::cout << "ppl           = " << utils::mathop::exp(- logprob_total / (num_word - num_oov + num_sentence)) << std::endl;
+  std::cout << "ppl1          = " << utils::mathop::exp(- logprob_total / (num_word - num_oov)) << std::endl;
+  std::cerr << "ppl(+oov)     = " << utils::mathop::exp(- logprob / (num_word + num_sentence)) << std::endl;
+  std::cerr << "ppl1(+oov)    = " << utils::mathop::exp(- logprob / (num_word)) << std::endl;
 }
