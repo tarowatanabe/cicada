@@ -29,6 +29,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -210,15 +211,7 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    struct traversal_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const traversal_type& x) const
-      {
-	return hasher_type::operator()(x.active, hasher_type::operator()(x.passive, x.is_active));
-      }
-    };
+    typedef utils::hashmurmur<size_type> traversal_hash_type;
     
     struct traversal_equal_type
     {
@@ -240,7 +233,7 @@ namespace cicada
        if (! x)
          return 0;
        else if (x->is_active())
-         return hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())));
+         return hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id() + ((uintptr_t) x->dot)));
        else
          return hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()));
      }

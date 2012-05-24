@@ -13,7 +13,6 @@
 #include <cicada/semiring/traits.hpp>
 
 #include <utils/simple_vector.hpp>
-#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {

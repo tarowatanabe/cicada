@@ -197,15 +197,7 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    struct traversal_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const traversal_type& x) const
-      {
-	return hasher_type::operator()(x.active, hasher_type::operator()(x.passive, x.is_active));
-      }
-    };
+    typedef utils::hashmurmur<size_type> traversal_hash_type;
     
     struct traversal_equal_type
     {
@@ -228,10 +220,10 @@ namespace cicada
 	
 	if (! x)
 	  return 0;
-	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->depth, x->lhs.id()));
 	else
-	  return hasher_type::operator()(x->depth, x->lhs.id());
+	  return hasher_type::operator()(x->lhs.id(), utils::bithack::branch(x->is_active(),
+									     uintptr_t(x->depth) + ((uintptr_t) x->dot),
+									     uintptr_t(x->depth)));
       }
     };
     

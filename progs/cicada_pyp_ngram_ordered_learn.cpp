@@ -339,25 +339,24 @@ struct PYPLM
 
       static const double weight0 = 1.0;
       
-      prob_set_type probs(mixtures->size() + 1, root.table.prob(word, &p0, (&p0) + 1, &weight0));
-      node_set_type nodes(mixtures->size() + 1, trie.root());
+      prob_set_type probs(mixtures->size(), root.table.prob(word, &p0, (&p0) + 1, &weight0));
       
       // we will traverse from the back!
       reverse_iterator begin(last);
       reverse_iterator end(first);
       
       prob_set_type::reverse_iterator piter = probs.rbegin() + 1;
-      node_set_type::reverse_iterator niter = nodes.rbegin() + 1;
       
       double p = probs.back();
-      for (reverse_iterator iter = begin; iter != end; ++ iter, ++ piter, ++ niter) {
-	if (iter == begin || *(niter - 1) != trie.root())
-	  *niter = trie.find(*(niter - 1), *iter);
+      id_type node = trie.root();
+      for (reverse_iterator iter = begin; iter != end; ++ iter, ++ piter) {
+	if (iter == begin || node != trie.root())
+	  node = trie.find(node, *iter);
 	
-	if (*niter == trie_type::npos()) 
+	if (node == trie_type::npos()) 
 	  *piter = std::inner_product(piter.base(), probs.end(), mixtures->operator[](probs.end() - piter.base()).probs.begin(), 0.0);
 	else
-	  *piter = trie[*niter].table.prob(word, piter.base(), probs.end(), mixtures->operator[](probs.end() - piter.base()).probs.begin());
+	  *piter = trie[node].table.prob(word, piter.base(), probs.end(), mixtures->operator[](probs.end() - piter.base()).probs.begin());
 	
 	p = *piter;
       }

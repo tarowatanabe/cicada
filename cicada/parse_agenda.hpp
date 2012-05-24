@@ -276,7 +276,7 @@ namespace cicada
     {
       const edge_type* active;
       const edge_type* passive;
-      bool is_active;
+      size_t is_active;
       
       Traversal(const edge_type* __active, const edge_type* __passive, const bool __is_active)
 	: active(__active), passive(__passive), is_active(__is_active) {}

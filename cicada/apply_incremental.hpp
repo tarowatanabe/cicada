@@ -109,7 +109,7 @@ namespace cicada
       
       size_t operator()(const candidate_type& x) const
       {
-	return hasher_type::operator()(x.parent,
+	return hasher_type::operator()(&x.parent, (&x.parent) + 1,
 				       hasher_type::operator()(x.out_edge.tails.begin(), x.out_edge.tails.end(),
 							       hasher_type::operator()(x.in_edge, x.dot)));
       }
@@ -165,7 +165,8 @@ namespace cicada
       
       size_type operator()(const stack_state_type& x) const
       {
-	return hasher_type::operator()(x.first, hasher(x.second));
+	return hasher_type::operator()(&x.first, (&x.first) + 1,
+				       hasher(x.second));
       }
     };
     

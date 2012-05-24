@@ -127,7 +127,7 @@ namespace cicada
     {
       size_t operator()(const derivation_type* x) const
       {
-	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), (intptr_t) x->edge));
+	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), (uintptr_t) x->edge));
       }
     };
     
