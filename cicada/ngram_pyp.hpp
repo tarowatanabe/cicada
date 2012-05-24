@@ -408,7 +408,6 @@ namespace cicada
       // lock here!
       spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_[pos & 0x07].mutex));
       
-      double p;
       if (lock) {
 	const size_type cache_pos = hasher_type::operator()(word, pos) &(caches_prob_.size() - 1);
 	cache_prob_type& cache = const_cast<cache_prob_type&>(caches_prob_[cache_pos]);
@@ -419,11 +418,9 @@ namespace cicada
 	  cache.word = word;
 	}
 	
-	p = cache.prob;
+	return cache.prob;
       } else
-	p = __prob_internal(order, pos, word, p0);
-
-      return p;
+	return __prob_internal(order, pos, word, p0);
     }
     
     prob_type __prob_internal(int order, const size_type pos, const id_type word, const double p0) const
