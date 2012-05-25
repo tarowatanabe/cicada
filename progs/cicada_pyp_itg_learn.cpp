@@ -2699,11 +2699,15 @@ struct ViterbiMapper
       
       if (bitext.id == size_type(-1)) break;
       
-      viterbi.initialize(bitext.source, bitext.target, model);
+      bitext.derivation.clear();
       
-      viterbi.forward(bitext.source, bitext.target, beam);
-      
-      viterbi.backward(bitext.source, bitext.target, bitext.derivation);
+      if (! bitext.source.empty() && ! bitext.target.empty()) {
+	viterbi.initialize(bitext.source, bitext.target, model);
+	
+	viterbi.forward(bitext.source, bitext.target, beam);
+	
+	viterbi.backward(bitext.source, bitext.target, bitext.derivation);
+      }
       
       reducer.push_swap(bitext);
     }
@@ -2837,10 +2841,9 @@ void viterbi(const path_type& output_file,
   if (is_src || is_trg)
     throw std::runtime_error("# of lines do not match...");
   
+  // join all the workers...
   for (int i = 0; i != threads; ++ i)
     mapper.push(bitext_type());
-  
-  // join all the workers...
   workers.join_all();
   
   // terminate dumper...
