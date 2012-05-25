@@ -1648,11 +1648,18 @@ typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
 struct Counter
 {
-  Counter() : counter(0) {}
+  Counter(const int __debug=0) : counter(0), debug(__debug) {}
   
   void increment()
   {
-    utils::atomicop::fetch_and_add(counter, size_type(1));
+    const size_type reduced = utils::atomicop::fetch_and_add(counter, size_type(1));
+    
+    if (debug) {
+      if ((reduced + 1) % 10000 == 0)
+	std::cerr << '.';
+      if ((reduced + 1) % 1000000 == 0)
+	std::cerr << '\n';
+    }
   }
   
   void wait(size_type target)
@@ -1679,6 +1686,7 @@ struct Counter
   void clear() { counter = 0; }
   
   size_type counter;
+  int debug;
 };
 typedef Counter counter_type;
 
@@ -1693,8 +1701,7 @@ struct Task
   typedef PYPITG::prob_type    prob_type;
 
   Task(queue_type& __mapper,
-       //counter_type& __reducer,
-       queue_type& __reducer,
+       counter_type& __reducer,
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
@@ -1737,14 +1744,12 @@ struct Task
       for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
       
-      //reducer.increment();
-      reducer.push(pos);
+      reducer.increment();
     }
   }
   
   queue_type& mapper;
-  queue_type& reducer;
-  //counter_type& reducer;
+  counter_type& reducer;
   
   const sentence_set_type& sources;
   const sentence_set_type& targets;
@@ -2108,12 +2113,10 @@ int main(int argc, char ** argv)
 		<< "lexicon: discount=" << model.lexicon.table.discount() << " strength=" << model.lexicon.table.strength() << std::endl;
     
     Task::queue_type queue_mapper;
-    Task::queue_type queue_reducer;
-    //Counter reducer;
+    Counter reducer(debug);
     
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
-								 // reducer,
-								 queue_reducer,
+								 reducer,
 								 sources,
 								 targets,
 								 derivations,
@@ -2188,15 +2191,7 @@ int main(int argc, char ** argv)
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
 	queue_mapper.push(*piter);
       
-      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
-	size_type pos = 0;
-	queue_reducer.pop(pos);
-	
-	if ((reduced + 1) % 10000 == 0)
-	  std::cerr << '.';
-	if ((reduced + 1) % 1000000 == 0)
-	  std::cerr << '\n';
-      }
+      reducer.wait(positions.size());
       
 #if 0
       position_set_type::const_iterator piter_end = positions.end();
