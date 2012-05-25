@@ -458,6 +458,11 @@ struct PYPLexicon
       }
     }
   }
+  
+  double prob(const id_type id) const
+  {
+    return table.prob(id, p0);
+  }
 
   double prob(const word_type& source, const word_type& target) const
   {
@@ -853,6 +858,8 @@ struct PYPGraph
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
 
+  typedef PYP::id_type id_type;
+
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
   
@@ -910,7 +917,7 @@ struct PYPGraph
     matrix.clear();
     matrix.reserve(source.size() + 1, target.size() + 1);
     matrix.resize(source.size() + 1, target.size() + 1);
-    
+
     length_source.clear();
     length_source.resize(2, source.size() + 1);
     
@@ -922,9 +929,10 @@ struct PYPGraph
     logprob_inv  = model.rule.prob_inverted();
 
     for (size_type src = 0; src <= source.size(); ++ src)
-      for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
+      for (size_type trg = (src == 0); trg <= target.size(); ++ trg) {
 	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
 					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+      }
     
     for (size_type src = 1; src <= source.size(); ++ src) {
       length_source(0, src) = model.length.logprob(src, 0);
@@ -2370,6 +2378,17 @@ int main(int argc, char ** argv)
       if (! sources[i].empty() && ! targets[i].empty())
 	positions.push_back(i);
     position_set_type(positions).swap(positions);
+    
+    // pre-compute word-pair-id and pre-allocate table...
+    for (size_t i = 0; i != sources.size(); ++ i)
+      if (! sources[i].empty() && ! targets[i].empty())
+	for (size_t src = 0; src <= sources[i].size(); ++ src)
+	  for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
+	    model.lexicon.word_pair_id(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
+				       trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1]);
+
+    model.lexicon.table.reserve(model.lexicon.word_pairs.size());
+    model.lexicon.table.resize(model.lexicon.word_pairs.size());
     
     sampler_type sampler;
     
