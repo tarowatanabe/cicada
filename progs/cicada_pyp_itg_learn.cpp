@@ -51,6 +51,7 @@
 #include <iterator>
 #include <numeric>
 #include <queue>
+#include <set>
 
 #include <cicada/sentence.hpp>
 #include <cicada/alignment.hpp>
@@ -109,8 +110,10 @@ struct PYP
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
-
-  typedef uint32_t id_type;
+  typedef uint32_t  id_type;
+  
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
 
   typedef enum {
     TERMINAL = 0,
@@ -929,10 +932,9 @@ struct PYPGraph
     logprob_inv  = model.rule.prob_inverted();
 
     for (size_type src = 0; src <= source.size(); ++ src)
-      for (size_type trg = (src == 0); trg <= target.size(); ++ trg) {
+      for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
 	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
 					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
-      }
     
     for (size_type src = 1; src <= source.size(); ++ src) {
       length_source(0, src) = model.length.logprob(src, 0);
@@ -1870,7 +1872,6 @@ struct PYPViterbi
   }
   
   // backward Viterbi
-  template <typename Sampler>
   logprob_type backward(const sentence_type& source,
 			const sentence_type& target,
 			derivation_type& derivation)
@@ -2143,6 +2144,11 @@ int debug = 0;
 void options(int argc, char** argv);
 
 size_t read_data(const path_type& path, sentence_set_type& sentences);
+
+void viterbi(const path_type& output_file,
+	     const path_type& source_file,
+	     const path_type& target_file,
+	     const PYPITG& model);
 
 struct DumpDerivation
 {
@@ -2603,6 +2609,15 @@ int main(int argc, char ** argv)
     workers.join_all();
     
     // compute viterbi with test...
+
+    if (! output_test_file.empty()) {
+      if (test_source_file.empty() || ! boost::filesystem::exists(test_source_file))
+	throw std::runtime_error("test file output specified, but no source data?");
+      if (test_target_file.empty() || ! boost::filesystem::exists(test_target_file))
+	throw std::runtime_error("test file output specified, but no target data?");
+      
+      viterbi(output_test_file, test_source_file, test_target_file, model);
+    }
     
     
   }
@@ -2613,6 +2628,225 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct ViterbiMapReduce
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  typedef PYP::id_type         id_type;
+
+  struct bitext_type
+  {
+    size_type       id;
+    sentence_type   source;
+    sentence_type   target;
+    derivation_type derivation;
+    
+    bitext_type() : id(size_type(-1)), source(), target(), derivation() {}
+
+    friend
+    bool operator<(const bitext_type& x, const bitext_type& y)
+    {
+      return x.id < y.id;
+    }
+    
+    void swap(bitext_type& x)
+    {
+      std::swap(id, x.id);
+      source.swap(x.source);
+      target.swap(x.target);
+      derivation.swap(x.derivation);
+    }
+  };
+  
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type > > queue_type;
+};
+
+namespace std
+{
+  inline
+  void swap(ViterbiMapReduce::bitext_type& x, ViterbiMapReduce::bitext_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+struct ViterbiMapper
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  typedef PYP::id_type         id_type;
+
+  typedef PYP::logprob_type logprob_type;
+  typedef PYP::prob_type    prob_type;
+
+  typedef ViterbiMapReduce::bitext_type bitext_type;
+  typedef ViterbiMapReduce::queue_type  queue_type;
+  
+  ViterbiMapper(queue_type& __mapper,
+		queue_type& __reducer,
+		const PYPITG& __model,
+		const logprob_type& __beam)
+    : mapper(__mapper), reducer(__reducer), model(__model), beam(__beam) {}
+  
+  void operator()()
+  {
+    PYPViterbi viterbi;
+    
+    bitext_type bitext;
+    
+    for (;;) {
+      mapper.pop_swap(bitext);
+      
+      if (bitext.id == size_type(-1)) break;
+      
+      viterbi.initialize(bitext.source, bitext.target, model);
+      
+      viterbi.forward(bitext.source, bitext.target, beam);
+      
+      viterbi.backward(bitext.source, bitext.target, bitext.derivation);
+      
+      reducer.push_swap(bitext);
+    }
+  }
+  
+  queue_type&   mapper;
+  queue_type&   reducer;
+  const PYPITG& model;
+  const logprob_type beam;
+};
+
+template <typename Dumper>
+struct ViterbiReducer
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  typedef PYP::id_type         id_type;
+
+  typedef PYP::logprob_type logprob_type;
+  typedef PYP::prob_type    prob_type;
+
+  typedef ViterbiMapReduce::bitext_type bitext_type;
+  typedef ViterbiMapReduce::queue_type  queue_type;  
+  
+  ViterbiReducer(queue_type& __reducer,
+		 std::ostream& __os)
+    : reducer(__reducer),
+      os(__os) {}
+
+  void operator()()
+  {
+    typedef std::set<bitext_type, std::less<bitext_type>, std::allocator<bitext_type> > bitext_set_type;
+
+    bitext_type     bitext;
+    bitext_set_type bitexts;
+
+    Dumper dumper;
+    
+    size_type id = 0;
+    for (;;) {
+      reducer.pop_swap(bitext);
+      
+      if (bitext.id == size_type(-1)) break;
+      
+      if (bitext.id != id)
+	bitexts.insert(bitext);
+      else {
+	if (! bitext.derivation.empty())
+	  dumper(os, bitext.source, bitext.target, bitext.derivation);
+	os << '\n';
+	++ id;
+      }
+      
+      while (! bitexts.empty() && bitexts.begin()->id == id) {
+	const bitext_type& bitext = *bitexts.begin();
+	
+	if (! bitext.derivation.empty())
+	  dumper(os, bitext.source, bitext.target, bitext.derivation);
+	os << '\n';
+	++ id;
+	
+	bitexts.erase(bitexts.begin());
+      }
+    }
+
+    while (! bitexts.empty() && bitexts.begin()->id == id) {
+      const bitext_type& bitext = *bitexts.begin();
+      
+      if (! bitext.derivation.empty())
+	dumper(os, bitext.source, bitext.target, bitext.derivation);
+      os << '\n';
+      ++ id;
+      
+      bitexts.erase(bitexts.begin());
+    }
+    
+    if (! bitexts.empty())
+      throw std::runtime_error("bitexts stil renam???");
+  }
+  
+  queue_type& reducer;
+  std::ostream& os;
+};
+
+void viterbi(const path_type& output_file,
+	     const path_type& source_file,
+	     const path_type& target_file,
+	     const PYPITG& model)
+{
+  typedef ViterbiMapReduce::bitext_type bitext_type;
+  typedef ViterbiMapReduce::queue_type  queue_type;  
+  
+  const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+  
+  utils::compress_ostream os(output_file, 1024 * 1024* (! flush_output));
+  
+  queue_type mapper(1024 * threads);
+  queue_type reducer;
+  
+  boost::thread_group workers;
+  boost::thread_group dumper;
+  
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(ViterbiMapper(mapper, reducer, model, beam)));
+  
+  if (sample_hypergraph)
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpHypergraph>(reducer, os)));
+  else if (sample_alignment)
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpAlignment>(reducer, os)));
+  else
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpDerivation>(reducer, os)));
+  
+  utils::compress_istream is_src(source_file, 1024 * 1024);
+  utils::compress_istream is_trg(target_file, 1024 * 1024);
+  
+  bitext_type bitext;
+  
+  for (;;) {
+    is_src >> bitext.source;
+    is_trg >> bitext.target;
+    
+    if (! is_src || ! is_trg) break;
+    
+    mapper.push(bitext);
+    
+    ++ bitext.id;
+  }
+  
+  if (is_src || is_trg)
+    throw std::runtime_error("# of lines do not match...");
+  
+  for (int i = 0; i != threads; ++ i)
+    mapper.push(bitext_type());
+  
+  // join all the workers...
+  workers.join_all();
+  
+  // terminate dumper...
+  reducer.push(bitext_type());
+  dumper.join_all();
+}
 
 
 size_t read_data(const path_type& path, sentence_set_type& sentences)
