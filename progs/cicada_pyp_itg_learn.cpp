@@ -1659,7 +1659,7 @@ struct Counter
       for (int i = 0; i < 64; ++ i) {
 	const size_type curr = counter;
 	
-	if (curr >= target)
+	if (curr == target)
 	  return;
 	else
 	  boost::thread::yield();
@@ -2177,12 +2177,13 @@ int main(int argc, char ** argv)
       
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
-      
+
       position_set_type::const_iterator piter_end = positions.end();
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
 	queue_mapper.push(*piter);
       
       reducer.wait(positions.size());
+      reducer.clear();
       
 #if 0
       position_set_type::const_iterator piter_end = positions.end();
