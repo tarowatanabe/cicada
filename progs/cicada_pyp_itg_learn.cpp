@@ -613,8 +613,9 @@ struct PYPITG
   typedef double prob_type;
 
   PYPITG(const PYPRule&   __rule,
-	 const PYPLexicon& __lexicon)
-    : rule(__rule), lexicon(__lexicon) {}
+	 const PYPLexicon& __lexicon,
+	 const double& __epsilon_prior)
+    : rule(__rule), lexicon(__lexicon), epsilon_prior(__epsilon_prior) {}
 
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
@@ -666,6 +667,8 @@ struct PYPITG
   
   PYPRule    rule;
   PYPLexicon lexicon;
+
+  double epsilon_prior;
 };
 
 struct PYPGraph
@@ -737,10 +740,15 @@ struct PYPGraph
     logprob_str  = model.rule.prob_straight();
     logprob_inv  = model.rule.prob_inverted();
 
+    const double prior_terminal = 1.0 - model.epsilon_prior;
+    const double prior_epsilon  = model.epsilon_prior;
+    
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+	matrix(src, trg) = (model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					       trg == 0 ? vocab_type::EPSILON : target[trg - 1])
+			    * (src == 0 ? prior_epsilon : prior_terminal)
+			    * (trg == 0 ? prior_epsilon : prior_terminal));
   }
   
   void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
@@ -1200,10 +1208,15 @@ struct PYPViterbi
     logprob_str  = model.rule.prob_straight();
     logprob_inv  = model.rule.prob_inverted();
 
+    const double prior_terminal = 1.0 - model.epsilon_prior;
+    const double prior_epsilon  = model.epsilon_prior;
+    
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+	matrix(src, trg) = (model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					       trg == 0 ? vocab_type::EPSILON : target[trg - 1])
+			    * (src == 0 ? prior_epsilon : prior_terminal)
+			    * (trg == 0 ? prior_epsilon : prior_terminal));
     
   }
   
@@ -1776,6 +1789,8 @@ bool slice_sampling = false;
 bool sample_hypergraph = false;
 bool sample_alignment = false;
 
+double epsilon_prior = 1e-2;
+
 double rule_prior_terminal = 0.1;
 
 double rule_discount_alpha = 1.0;
@@ -2024,7 +2039,7 @@ int main(int argc, char ** argv)
 			     1.0 / (double(source_vocab_size) * double(target_vocab_size)));
 
     
-    PYPITG model(model_rule, model_lexicon);
+    PYPITG model(model_rule, model_lexicon, epsilon_prior);
     
     derivation_set_type derivations(sources.size());
     position_set_type positions;
@@ -2552,6 +2567,8 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
     ("alignment",           po::bool_switch(&sample_alignment),                                       "dump sampled derivation in alignment")
+
+    ("epsilon-prior",       po::value<double>(&epsilon_prior)->default_value(epsilon_prior),             "prior for epsilon")
     
     ("rule-prior-terminal", po::value<double>(&rule_prior_terminal)->default_value(rule_prior_terminal), "prior for terminal")
     
