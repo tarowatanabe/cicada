@@ -1016,123 +1016,65 @@ struct PYPGraph
 	const size_type source_first = src;
 	const size_type target_first = trg;
 
-	const size_type source_max = source_first + 1;
-	const size_type target_max = target_first + 1;
-	
 	if (src < source.size() && trg < target.size()) {
-	  // one-to-one
-	  {
-	    const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term * length_source(1, 1);
-	    
-	    const size_type source_last = source_first + 1;
-	    const size_type target_last = target_first + 1;
-	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  //const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term * length_source(1, 1);
+	  const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term;
 	  
-	  // one-to-many
-	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
-
-	    for (size_type source_last = source_first + 2; source_last <= source_max; ++ source_last) {
-	      const size_type target_last = target_first + 1;
-	      
-	      prob *= matrix(source_last, target_last);
-	      
-	      const logprob_type prob_term = prob * length_source(1, source_last - source_first);
-	      
-	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	  const size_type source_last = source_first + 1;
+	  const size_type target_last = target_first + 1;
 	    
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	      
-	      chart(source_first, source_last, target_first, target_last) = prob_term;
-	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	      
-	      agenda[span_pair.size()].push_back(span_pair);
-	    }
-	  }
-
-	  // one-to-many
-	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
 	    
-	    for (size_type target_last = target_first + 2; target_last <= target_max; ++ target_last) {
-	      const size_type source_last = source_first + 1;
-	      
-	      prob *= matrix(source_last, target_last);
-	      
-	      const logprob_type prob_term = prob * length_target(1, target_last - target_first);
-	      
-	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	      
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	      
-	      chart(source_first, source_last, target_first, target_last) = prob_term;
-	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	      
-	      agenda[span_pair.size()].push_back(span_pair);
-	    }
-	  }
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	    
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// epsilon-to-many
 	if (src < source.size()) {
-	  logprob_type prob = logprob_term;
+	  const size_type source_last = source_first + 1;
+	  const size_type target_last = target_first;
 	  
-	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
-	    const size_type target_last = target_first;
-	    
-	    prob *= matrix(source_last, 0);
-
-	    const logprob_type prob_term = prob * length_source(0, source_last - source_first);
-	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  //const logprob_type prob = logprob_term * matrix(source_last, 0);
+	  //const logprob_type prob_term = prob * length_source(0, source_last - source_first);
 	  
+	  const logprob_type prob_term = logprob_term * matrix(source_last, 0);
+	  
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	  
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	  
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// epsilon-to-many
 	if (trg < target.size()) {
-	  logprob_type prob = logprob_term;
-	  
-	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
-	    const size_type source_last = source_first;
+	  const size_type target_last = target_first + 1;
+	  const size_type source_last = source_first;
 	    
-	    prob *= matrix(0, target_last);
+	  //const logprob_type prob = logprob_term * matrix(0, target_last);
+	  //const logprob_type prob_term = prob * length_target(0, target_last - target_first);
 
-	    const logprob_type prob_term = prob * length_target(0, target_last - target_first);
+	  const logprob_type prob_term = logprob_term * matrix(0, target_last);
+	  
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	  
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	  
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
 	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	  
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
       }
 
@@ -1561,123 +1503,65 @@ struct PYPViterbi
 	const size_type source_first = src;
 	const size_type target_first = trg;
 
-	const size_type source_max = source_first + 1;
-	const size_type target_max = target_first + 1;
-	
 	if (src < source.size() && trg < target.size()) {
-	  // one-to-one
-	  {
-	    const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term * length_source(1, 1);
-	    
-	    const size_type source_last = source_first + 1;
-	    const size_type target_last = target_first + 1;
-	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  //const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term * length_source(1, 1);
+	  const logprob_type prob_term = matrix(source_first + 1, target_first + 1) * logprob_term;
 	  
-	  // one-to-many
-	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
-
-	    for (size_type source_last = source_first + 2; source_last <= source_max; ++ source_last) {
-	      const size_type target_last = target_first + 1;
-	      
-	      prob *= matrix(source_last, target_last);
-	      
-	      const logprob_type prob_term = prob * length_source(1, source_last - source_first);
-	      
-	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	      
-	      chart(source_first, source_last, target_first, target_last) = prob_term;
-	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	      
-	      agenda[span_pair.size()].push_back(span_pair);
-	    }
-	  }
-
-	  // one-to-many
-	  {
-	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
-	    
-	    for (size_type target_last = target_first + 2; target_last <= target_max; ++ target_last) {
-	      const size_type source_last = source_first + 1;
-	      
-	      prob *= matrix(source_last, target_last);
-	      
-	      const logprob_type prob_term = prob * length_target(1, target_last - target_first);
-	      
-	      const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	      
-	      edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	      
-	      chart(source_first, source_last, target_first, target_last) = prob_term;
-	      
-	      chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	      chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	      
-	      agenda[span_pair.size()].push_back(span_pair);
-	    }
-	  }
+	  const size_type source_last = source_first + 1;
+	  const size_type target_last = target_first + 1;
+	  
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	  
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	  
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
+	  
+	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	  
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// epsilon-to-many
 	if (src < source.size()) {
-	  logprob_type prob = logprob_term;
+	  const size_type source_last = source_first + 1;
+	  const size_type target_last = target_first;
 	  
-	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
-	    const size_type target_last = target_first;
-	    
-	    prob *= matrix(source_last, 0);
+	  //const logprob_type prob = logprob_term * matrix(source_last, 0);
+	  //const logprob_type prob_term = prob * length_source(0, source_last - source_first);
 
-	    const logprob_type prob_term = prob * length_source(0, source_last - source_first);
-	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  const logprob_type prob_term = logprob_term * matrix(source_last, 0);
 	  
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	    
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	    
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
+	    
+	  chart_source(source_first, source_last) = std::max(chart_source(source_first, source_last), prob_term);
+	    
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
 	// epsilon-to-many
 	if (trg < target.size()) {
-	  logprob_type prob = logprob_term;
-	  
-	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
-	    const size_type source_last = source_first;
+	  const size_type target_last = target_first + 1;
+	  const size_type source_last = source_first;
 	    
-	    prob *= matrix(0, target_last);
+	  //const logprob_type prob = logprob_term * matrix(0, target_last);
+	  //const logprob_type prob_term = prob * length_target(0, target_last - target_first);
 
-	    const logprob_type prob_term = prob * length_target(0, target_last - target_first);
-	    
-	    const span_pair_type span_pair(source_first, source_last, target_first, target_last);
-	    
-	    edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
-	    
-	    chart(source_first, source_last, target_first, target_last) = prob_term;
-	    
-	    chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
-	    
-	    agenda[span_pair.size()].push_back(span_pair);
-	  }
+	  const logprob_type prob_term = logprob_term * matrix(0, target_last);
+	  
+	  const span_pair_type span_pair(source_first, source_last, target_first, target_last);
+	  
+	  edges(source_first, source_last, target_first, target_last).push_back(edge_type(rule_type(span_pair, PYP::TERMINAL), prob_term));
+	  
+	  chart(source_first, source_last, target_first, target_last) = prob_term;
+	  
+	  chart_target(target_first, target_last) = std::max(chart_target(target_first, target_last), prob_term);
+	  
+	  agenda[span_pair.size()].push_back(span_pair);
 	}
       }
 
