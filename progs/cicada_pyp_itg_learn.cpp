@@ -2826,6 +2826,7 @@ void viterbi(const path_type& output_file,
   utils::compress_istream is_trg(target_file, 1024 * 1024);
   
   bitext_type bitext;
+  bitext.id = 0;
   
   for (;;) {
     is_src >> bitext.source;
