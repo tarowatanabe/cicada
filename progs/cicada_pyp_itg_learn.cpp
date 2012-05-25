@@ -1015,6 +1015,9 @@ struct PYPGraph
       for (size_type trg = 0; trg <= target.size(); ++ trg) {
 	const size_type source_first = src;
 	const size_type target_first = trg;
+
+	const size_type source_max = source_first + 1;
+	const size_type target_max = target_first + 1;
 	
 	if (src < source.size() && trg < target.size()) {
 	  // one-to-one
@@ -1040,7 +1043,7 @@ struct PYPGraph
 	  {
 	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 
-	    for (size_type source_last = source_first + 2; source_last <= source.size(); ++ source_last) {
+	    for (size_type source_last = source_first + 2; source_last <= source_max; ++ source_last) {
 	      const size_type target_last = target_first + 1;
 	      
 	      prob *= matrix(source_last, target_last);
@@ -1064,7 +1067,7 @@ struct PYPGraph
 	  {
 	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 	    
-	    for (size_type target_last = target_first + 2; target_last <= target.size(); ++ target_last) {
+	    for (size_type target_last = target_first + 2; target_last <= target_max; ++ target_last) {
 	      const size_type source_last = source_first + 1;
 	      
 	      prob *= matrix(source_last, target_last);
@@ -1089,7 +1092,7 @@ struct PYPGraph
 	if (src < source.size()) {
 	  logprob_type prob = logprob_term;
 	  
-	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
+	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
 	    const size_type target_last = target_first;
 	    
 	    prob *= matrix(source_last, 0);
@@ -1113,7 +1116,7 @@ struct PYPGraph
 	if (trg < target.size()) {
 	  logprob_type prob = logprob_term;
 	  
-	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
+	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
 	    const size_type source_last = source_first;
 	    
 	    prob *= matrix(0, target_last);
@@ -1557,6 +1560,9 @@ struct PYPViterbi
       for (size_type trg = 0; trg <= target.size(); ++ trg) {
 	const size_type source_first = src;
 	const size_type target_first = trg;
+
+	const size_type source_max = source_first + 1;
+	const size_type target_max = target_first + 1;
 	
 	if (src < source.size() && trg < target.size()) {
 	  // one-to-one
@@ -1582,7 +1588,7 @@ struct PYPViterbi
 	  {
 	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 
-	    for (size_type source_last = source_first + 2; source_last <= source.size(); ++ source_last) {
+	    for (size_type source_last = source_first + 2; source_last <= source_max; ++ source_last) {
 	      const size_type target_last = target_first + 1;
 	      
 	      prob *= matrix(source_last, target_last);
@@ -1606,7 +1612,7 @@ struct PYPViterbi
 	  {
 	    logprob_type prob = matrix(source_first + 1, target_first + 1)  * logprob_term;
 	    
-	    for (size_type target_last = target_first + 2; target_last <= target.size(); ++ target_last) {
+	    for (size_type target_last = target_first + 2; target_last <= target_max; ++ target_last) {
 	      const size_type source_last = source_first + 1;
 	      
 	      prob *= matrix(source_last, target_last);
@@ -1631,7 +1637,7 @@ struct PYPViterbi
 	if (src < source.size()) {
 	  logprob_type prob = logprob_term;
 	  
-	  for (size_type source_last = source_first + 1; source_last <= source.size(); ++ source_last) {
+	  for (size_type source_last = source_first + 1; source_last <= source_max; ++ source_last) {
 	    const size_type target_last = target_first;
 	    
 	    prob *= matrix(source_last, 0);
@@ -1655,7 +1661,7 @@ struct PYPViterbi
 	if (trg < target.size()) {
 	  logprob_type prob = logprob_term;
 	  
-	  for (size_type target_last = target_first + 1; target_last <= target.size(); ++ target_last) {
+	  for (size_type target_last = target_first + 1; target_last <= target_max; ++ target_last) {
 	    const size_type source_last = source_first;
 	    
 	    prob *= matrix(0, target_last);
