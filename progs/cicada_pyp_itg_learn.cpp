@@ -1659,7 +1659,7 @@ struct Counter
       for (int i = 0; i < 64; ++ i) {
 	const size_type curr = counter;
 	
-	if (curr == target)
+	if (curr >= target)
 	  return;
 	else
 	  boost::thread::yield();
