@@ -91,6 +91,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/unique_set.hpp"
 #include "utils/rwticket.hpp"
+#include "utils/atomicop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -612,6 +613,8 @@ struct PYPITG
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
 
+  typedef utils::rwticket mutex_type;  
+
   PYPITG(const PYPRule&   __rule,
 	 const PYPLexicon& __lexicon,
 	 const double& __epsilon_prior)
@@ -620,25 +623,36 @@ struct PYPITG
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
   {
-    rule.increment(r, sampler, temperature);
+    {
+      mutex_type::scoped_writer_lock lock(mutex_rule);
+      
+      rule.increment(r, sampler, temperature);
+    }
     
     if (r.is_terminal()) {
       const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
       const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
+      
+      mutex_type::scoped_writer_lock lock(mutex_lexicon);
       
       lexicon.increment(phrase_source, phrase_target, sampler, temperature);
     }
   }
-
+  
   template <typename Sampler>
   void decrement(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler)
   {
-    rule.decrement(r, sampler);
+    {
+      mutex_type::scoped_writer_lock lock(mutex_rule);
+      
+      rule.decrement(r, sampler);
+    }
     
     if (r.is_terminal()) {
       const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
       const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
       
+      mutex_type::scoped_writer_lock lock(mutex_lexicon);
       
       lexicon.decrement(phrase_source, phrase_target, sampler);
     }
@@ -669,6 +683,9 @@ struct PYPITG
   PYPLexicon lexicon;
 
   double epsilon_prior;
+  
+  mutex_type mutex_rule;
+  mutex_type mutex_lexicon;
 };
 
 struct PYPGraph
@@ -736,12 +753,18 @@ struct PYPGraph
     matrix.reserve(source.size() + 1, target.size() + 1);
     matrix.resize(source.size() + 1, target.size() + 1);
     
-    logprob_term = model.rule.prob_terminal();
-    logprob_str  = model.rule.prob_straight();
-    logprob_inv  = model.rule.prob_inverted();
+    {
+      PYPITG::mutex_type::scoped_reader_lock lock(const_cast<PYPITG&>(model).mutex_rule);
+
+      logprob_term = model.rule.prob_terminal();
+      logprob_str  = model.rule.prob_straight();
+      logprob_inv  = model.rule.prob_inverted();
+    }
 
     const double prior_terminal = 1.0 - model.epsilon_prior;
     const double prior_epsilon  = model.epsilon_prior;
+    
+    PYPITG::mutex_type::scoped_reader_lock lock(const_cast<PYPITG&>(model).mutex_lexicon);
     
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
@@ -1670,7 +1693,8 @@ struct Task
   typedef PYPITG::prob_type    prob_type;
 
   Task(queue_type& __mapper,
-       counter_type& __reducer,
+       //counter_type& __reducer,
+       queue_type& __reducer,
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
        derivation_set_type& __derivations,
@@ -1697,18 +1721,30 @@ struct Task
       
       if (pos == size_type(-1)) break;
       
+      if (! derivations[pos].empty()) {
+	derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
+	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
+	  model.decrement(sources[pos], targets[pos], *diter, sampler);
+      }
+      
       graph.initialize(sources[pos], targets[pos], model);
       
       graph.forward(sources[pos], targets[pos], beam);
       
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
       
-      reducer.increment();
+      derivation_type::const_iterator diter_end = derivations[pos].end();
+      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
+	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      
+      //reducer.increment();
+      reducer.push(pos);
     }
   }
   
   queue_type& mapper;
-  counter_type& reducer;
+  queue_type& reducer;
+  //counter_type& reducer;
   
   const sentence_set_type& sources;
   const sentence_set_type& targets;
@@ -1721,7 +1757,6 @@ struct Task
   
   double temperature;
 };
-
 
 struct less_size
 {
@@ -2073,10 +2108,12 @@ int main(int argc, char ** argv)
 		<< "lexicon: discount=" << model.lexicon.table.discount() << " strength=" << model.lexicon.table.strength() << std::endl;
     
     Task::queue_type queue_mapper;
-    Counter reducer;
+    Task::queue_type queue_reducer;
+    //Counter reducer;
     
     std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
-								 reducer,
+								 // reducer,
+								 queue_reducer,
 								 sources,
 								 targets,
 								 derivations,
@@ -2148,6 +2185,21 @@ int main(int argc, char ** argv)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
       position_set_type::const_iterator piter_end = positions.end();
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
+	queue_mapper.push(*piter);
+      
+      for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
+	size_type pos = 0;
+	queue_reducer.pop(pos);
+	
+	if ((reduced + 1) % 10000 == 0)
+	  std::cerr << '.';
+	if ((reduced + 1) % 1000000 == 0)
+	  std::cerr << '\n';
+      }
+      
+#if 0
+      position_set_type::const_iterator piter_end = positions.end();
       position_set_type::const_iterator piter = positions.begin();
       
       position_set_type mapped;
@@ -2193,6 +2245,7 @@ int main(int argc, char ** argv)
 	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
 	}
       }
+#endif
       
       if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
 	std::cerr << std::endl;
