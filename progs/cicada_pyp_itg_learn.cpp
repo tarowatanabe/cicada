@@ -681,7 +681,6 @@ struct PYPRule
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
   
-  
   typedef PYP::phrase_type      phrase_type;
   typedef PYP::phrase_pair_type phrase_pair_type;
 
@@ -697,30 +696,20 @@ struct PYPRule
   typedef utils::pyp_parameter parameter_type;
   typedef utils::restaurant_vector<> table_type;
 
-  struct node_type
-  {
-    node_type() : table(), parent(id_type(-1)), order(0) {}
-    
-    table_type table;
-    id_type    parent;
-    int        order;
-  };
-  
-  typedef utils::compact_trie_dense<char, node_type, boost::hash<char>, std::equal_to<char>,
-				    std::allocator<std::pair<const char, node_type> > > trie_type;
-
   typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
 
-  PYPRule(const parameter_type& parameter)
-    : table(parameter), p0(1.0 / 3), counts0(0) {}
-
+  PYPRule(const double& __p0_terminal, const parameter_type& parameter)
+    : p0_terminal(__p0_terminal), p0((1.0 - __p0_terminal) * 0.5), counts0_terminal(0), counts0(0), table(parameter) {}
+  
   template <typename Sampler>
   void increment(const rule_type& rule, Sampler& sampler, const double temperature=1.0)
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.increment(itg, p0, sampler, temperature))
-      ++ counts0;
+    if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
+      counts0_terminal += (itg == PYP::TERMINAL);
+      counts0          += (itg != PYP::TERMINAL);
+    }
   }
   
   template <typename Sampler>
@@ -728,27 +717,29 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.decrement(itg, sampler))
-      -- counts0;
+    if (table.decrement(itg, sampler)) {
+      counts0_terminal -= (itg == PYP::TERMINAL);
+      counts0          -= (itg != PYP::TERMINAL);
+    }
   }
   
   double prob(const rule_type& rule) const
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    return table.prob(itg, p0);
+    return table.prob(itg, itg == PYP::TERMINAL ? p0_terminal : p0);
   }
   
   double prob_terminal() const
   {
-    return table.prob(PYP::TERMINAL, p0);
+    return table.prob(PYP::TERMINAL, p0_terminal);
   }
 
   double prob_straight() const
   {
     return table.prob(PYP::STRAIGHT, p0);
   }
-
+  
   double prob_inverted() const
   {
     return table.prob(PYP::INVERTED, p0);
@@ -756,7 +747,7 @@ struct PYPRule
   
   double log_likelihood() const
   {
-    return table.log_likelihood() + std::log(p0) * counts0;
+    return table.log_likelihood() + std::log(p0_terminal) * counts0_terminal + std::log(p0) * counts0;
   }
   
   template <typename Sampler>
@@ -771,9 +762,11 @@ struct PYPRule
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
   
-  table_type table;
+  double     p0_terminal;
   double     p0;
+  size_type  counts0_terminal;
   size_type  counts0;
+  table_type table;
 };
 
 struct PYPITG
@@ -2119,6 +2112,8 @@ bool slice_sampling = false;
 bool sample_hypergraph = false;
 bool sample_alignment = false;
 
+double rule_prior_terminal = 0.1;
+
 double rule_discount_alpha = 1.0;
 double rule_discount_beta  = 1.0;
 double rule_strength_shape = 1.0;
@@ -2351,7 +2346,8 @@ int main(int argc, char ** argv)
     if (sources.size() != targets.size())
       throw std::runtime_error("source/target side do not match!");
 
-    PYPRule model_rule(PYPRule::parameter_type(rule_discount_alpha,
+    PYPRule model_rule(rule_prior_terminal,
+		       PYPRule::parameter_type(rule_discount_alpha,
 					       rule_discount_beta,
 					       rule_strength_shape,
 					       rule_strength_rate));
@@ -2586,6 +2582,10 @@ int main(int argc, char ** argv)
       queue_mapper.push(size_type(-1));
     
     workers.join_all();
+    
+    // compute viterbi with test...
+    
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -2651,6 +2651,8 @@ void options(int argc, char** argv)
     ("slice",               po::bool_switch(&slice_sampling),                                         "slice sampling for hyperparameters")
     ("hypergraph",          po::bool_switch(&sample_hypergraph),                                      "dump sampled derivation in hypergraph")
     ("alignment",           po::bool_switch(&sample_alignment),                                       "dump sampled derivation in alignment")
+    
+    ("rule-prior-terminal", po::value<double>(&rule_prior_terminal)->default_value(rule_prior_terminal), "prior for terminal")
     
     ("rule-discount-alpha", po::value<double>(&rule_discount_alpha)->default_value(rule_discount_alpha), "discount ~ Beta(alpha,beta)")
     ("rule-discount-beta",  po::value<double>(&rule_discount_beta)->default_value(rule_discount_beta),   "discount ~ Beta(alpha,beta)")
