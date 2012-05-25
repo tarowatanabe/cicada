@@ -74,8 +74,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/restaurant.hpp"
-#include "utils/restaurant_vector.hpp"
+#include "utils/restaurant_sync.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_map.hpp"
@@ -392,7 +391,7 @@ struct PYPLexicon
   typedef utils::indexed_set<word_pair_type, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
 			     std::allocator<word_pair_type> > word_pair_set_type;
 
-  typedef utils::restaurant_vector<> table_type;
+  typedef utils::restaurant_sync<> table_type;
   
   PYPLexicon(const parameter_type& parameter,
 	     const double __p0)
@@ -416,25 +415,29 @@ struct PYPLexicon
   {
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
+
+    size_type incremented = 0;
     
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	counts0 += table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
+	incremented += table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	counts0 += table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
+	incremented += table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  counts0 += table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
+	  incremented += table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
       }
     }
+
+    utils::atomicop::fetch_and_add(counts0, incremented);
   }
 
   template <typename Sampler>
@@ -443,24 +446,28 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
+    size_type incremented = 0;
+
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	counts0 -= table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
+	incremented -= table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	counts0 -= table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
+	incremented -= table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  counts0 -= table.decrement(word_pair_id(*siter, *titer), sampler);
+	  incremented -= table.decrement(word_pair_id(*siter, *titer), sampler);
       }
     }
+
+    utils::atomicop::fetch_and_add(counts0, incremented);
   }
   
   double prob(const id_type id) const
@@ -524,7 +531,7 @@ struct PYPRule
   typedef double prob_type;
   
   typedef utils::pyp_parameter parameter_type;
-  typedef utils::restaurant_vector<> table_type;
+  typedef utils::restaurant_sync<> table_type;
 
   typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
 
@@ -537,8 +544,10 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      counts0_terminal += (itg == PYP::TERMINAL);
-      counts0          += (itg != PYP::TERMINAL);
+      utils::atomicop::fetch_and_add(counts0_terminal, size_type(itg == PYP::TERMINAL));
+      utils::atomicop::fetch_and_add(counts0,          size_type(itg != PYP::TERMINAL));
+      //counts0_terminal += (itg == PYP::TERMINAL);
+      //counts0          += (itg != PYP::TERMINAL);
     }
   }
   
@@ -548,8 +557,11 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.decrement(itg, sampler)) {
-      counts0_terminal -= (itg == PYP::TERMINAL);
-      counts0          -= (itg != PYP::TERMINAL);
+      utils::atomicop::fetch_and_add(counts0_terminal, size_type(- (itg == PYP::TERMINAL)));
+      utils::atomicop::fetch_and_add(counts0,          size_type(- (itg != PYP::TERMINAL)));
+      
+      //counts0_terminal -= (itg == PYP::TERMINAL);
+      //counts0          -= (itg != PYP::TERMINAL);
     }
   }
   
@@ -613,8 +625,6 @@ struct PYPITG
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
 
-  typedef utils::rwticket mutex_type;  
-
   PYPITG(const PYPRule&   __rule,
 	 const PYPLexicon& __lexicon,
 	 const double& __epsilon_prior)
@@ -623,17 +633,11 @@ struct PYPITG
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
   {
-    {
-      mutex_type::scoped_writer_lock lock(mutex_rule);
-      
-      rule.increment(r, sampler, temperature);
-    }
+    rule.increment(r, sampler, temperature);
     
     if (r.is_terminal()) {
       const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
       const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
-      
-      mutex_type::scoped_writer_lock lock(mutex_lexicon);
       
       lexicon.increment(phrase_source, phrase_target, sampler, temperature);
     }
@@ -642,17 +646,11 @@ struct PYPITG
   template <typename Sampler>
   void decrement(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler)
   {
-    {
-      mutex_type::scoped_writer_lock lock(mutex_rule);
-      
-      rule.decrement(r, sampler);
-    }
+    rule.decrement(r, sampler);
     
     if (r.is_terminal()) {
       const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
       const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
-      
-      mutex_type::scoped_writer_lock lock(mutex_lexicon);
       
       lexicon.decrement(phrase_source, phrase_target, sampler);
     }
@@ -683,9 +681,6 @@ struct PYPITG
   PYPLexicon lexicon;
 
   double epsilon_prior;
-  
-  mutex_type mutex_rule;
-  mutex_type mutex_lexicon;
 };
 
 struct PYPGraph
@@ -753,18 +748,12 @@ struct PYPGraph
     matrix.reserve(source.size() + 1, target.size() + 1);
     matrix.resize(source.size() + 1, target.size() + 1);
     
-    {
-      PYPITG::mutex_type::scoped_reader_lock lock(const_cast<PYPITG&>(model).mutex_rule);
-
-      logprob_term = model.rule.prob_terminal();
-      logprob_str  = model.rule.prob_straight();
-      logprob_inv  = model.rule.prob_inverted();
-    }
+    logprob_term = model.rule.prob_terminal();
+    logprob_str  = model.rule.prob_straight();
+    logprob_inv  = model.rule.prob_inverted();
 
     const double prior_terminal = 1.0 - model.epsilon_prior;
     const double prior_epsilon  = model.epsilon_prior;
-    
-    PYPITG::mutex_type::scoped_reader_lock lock(const_cast<PYPITG&>(model).mutex_lexicon);
     
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
@@ -2098,6 +2087,8 @@ int main(int argc, char ** argv)
 
     model.lexicon.table.reserve(model.lexicon.word_pairs.size());
     model.lexicon.table.resize(model.lexicon.word_pairs.size());
+    model.rule.table.reserve(3);
+    model.rule.table.resize(3);
     
     sampler_type sampler;
     

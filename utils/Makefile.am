@@ -103,6 +103,7 @@ repository.hpp \
 resource.hpp \
 restaurant.hpp \
 restaurant_floor.hpp \
+restaurant_sync.hpp \
 restaurant_vector.hpp \
 rwticket.hpp \
 sampler.hpp \
