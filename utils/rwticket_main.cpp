@@ -19,6 +19,8 @@ struct writer_type
       ++ value;
       
       std::cerr << "writer: " << value << std::endl;
+
+      boost::thread::yield();
     }
   }
   
@@ -36,7 +38,7 @@ struct reader_type
     size_t accessed = 0;
     while (value != 1024) {
       utils::rwticket::scoped_reader_lock lock(mutex);
-
+      
       boost::thread::yield();
 
       ++ accessed;
