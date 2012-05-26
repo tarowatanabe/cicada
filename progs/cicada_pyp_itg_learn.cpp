@@ -535,10 +535,8 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      if (itg == PYP::TERMINAL)
-	utils::atomicop::fetch_and_add(counts0_terminal, size_type(1));
-      else
-	utils::atomicop::fetch_and_add(counts0, size_type(1));
+      utils::atomicop::fetch_and_add(counts0_terminal, size_type(itg == PYP::TERMINAL));
+      utils::atomicop::fetch_and_add(counts0,          size_type(itg != PYP::TERMINAL));
     }
   }
   
@@ -548,10 +546,8 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.decrement(itg, sampler)) {
-      if (itg == PYP::TERMINAL)
-	utils::atomicop::fetch_and_add(counts0_terminal, size_type(- 1));
-      else
-	utils::atomicop::fetch_and_add(counts0, size_type(- 1));
+      utils::atomicop::fetch_and_add(counts0_terminal, size_type(0) - size_type(itg == PYP::TERMINAL));
+      utils::atomicop::fetch_and_add(counts0,          size_type(0) - size_type(itg != PYP::TERMINAL));
     }
   }
   
