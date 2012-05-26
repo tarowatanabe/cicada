@@ -63,7 +63,9 @@ namespace utils
 
       ticket_type t;
       for (;;) {
-	t.u = __sync_fetch_and_add(&ticket_.u, uint64_t(0));
+	t.u = ticket_.u;
+
+	atomicop::memory_barrier();
 	
 	if (val == t.s.write) break;
 	
@@ -101,7 +103,9 @@ namespace utils
       
       ticket_type t;
       for (;;) {
-	t.u = __sync_fetch_and_add(&ticket_.u, uint64_t(0));
+	t.u = ticket_.u;
+	
+	utils::atomicop::memory_barrier();
 	
 	if (val == t.s.read) break;
 	
