@@ -63,13 +63,13 @@ namespace utils
 
       ticket_type t = ticket_;
       for (;;) {
+	utils::atomicop::memory_barrier();
+	
 	if (val == t.s.write) break;
 	
 	boost::thread::yield();
 	
 	t.u = ticket_.u;
-
-	utils::atomicop::memory_barrier();
       }
     }
 
@@ -103,13 +103,13 @@ namespace utils
       
       ticket_type t = ticket_;
       for (;;) {
+	utils::atomicop::memory_barrier();
+	
 	if (val == t.s.read) break;
 	
 	boost::thread::yield();
 	
 	t.u = ticket_.u;
-	
-	utils::atomicop::memory_barrier();
       }
       
       __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
