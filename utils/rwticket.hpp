@@ -61,15 +61,13 @@ namespace utils
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
 
-      ticket_type t = ticket_;
+      ticket_type t;
       for (;;) {
-	utils::atomicop::memory_barrier();
+	t.u = __sync_fetch_and_add(&ticket_.u, uint64_t(0));
 	
 	if (val == t.s.write) break;
 	
 	boost::thread::yield();
-	
-	t.u = ticket_.u;
       }
     }
 
@@ -101,15 +99,13 @@ namespace utils
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
       
-      ticket_type t = ticket_;
+      ticket_type t;
       for (;;) {
-	utils::atomicop::memory_barrier();
+	t.u = __sync_fetch_and_add(&ticket_.u, uint64_t(0));
 	
 	if (val == t.s.read) break;
 	
 	boost::thread::yield();
-	
-	t.u = ticket_.u;
       }
       
       __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
