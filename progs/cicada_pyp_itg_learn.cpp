@@ -626,6 +626,7 @@ struct PYPITG
     rule.increment(r, sampler, temperature);
     
     if (r.is_terminal()) {
+#if 0
       const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
       const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
    
@@ -633,6 +634,7 @@ struct PYPITG
 	utils::atomicop::fetch_and_add(counts0_epsilon, counts_epsilon);
       if (counts)
 	utils::atomicop::fetch_and_add(counts0, counts);
+#endif
       
       lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
@@ -647,6 +649,7 @@ struct PYPITG
     rule.decrement(r, sampler);
     
     if (r.is_terminal()) {
+#if 0
       const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
       const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
       
@@ -654,6 +657,7 @@ struct PYPITG
 	utils::atomicop::fetch_and_add(counts0_epsilon, size_type(0) - counts_epsilon);
       if (counts)
 	utils::atomicop::fetch_and_add(counts0, size_type(0) - counts);
+#endif
       
       lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
