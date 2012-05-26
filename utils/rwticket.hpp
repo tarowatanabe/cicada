@@ -61,16 +61,8 @@ namespace utils
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
 
-      ticket_type t;
-      for (;;) {
-	t.u = ticket_.u;
-
-	atomicop::memory_barrier();
-	
-	if (val == t.s.write) break;
-	
+      while (val != ticket_.s.write)
 	boost::thread::yield();
-      }
     }
 
     bool trylock_writer()
@@ -100,17 +92,9 @@ namespace utils
     {
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
-      
-      ticket_type t;
-      for (;;) {
-	t.u = ticket_.u;
-	
-	utils::atomicop::memory_barrier();
-	
-	if (val == t.s.read) break;
-	
+
+      while (val != ticket_.s.read)
 	boost::thread::yield();
-      }
       
       __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
     }
