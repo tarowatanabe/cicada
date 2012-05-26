@@ -1637,6 +1637,28 @@ typedef PYPGraph::derivation_type derivation_type;
 typedef std::vector<derivation_type, std::allocator<derivation_type> > derivation_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 
+struct Time
+{
+  double initialize;
+  double increment;
+  double decrement;
+  double forward;
+  double backward;
+  
+  Time() : initialize(0), increment(0), decrement(0), forward(0), backward(0) {}
+
+  Time& operator+=(const Time& x)
+  {
+    initialize += x.initialize;
+    increment  += x.increment;
+    decrement  += x.decrement;
+    forward    += x.forward;
+    backward   += x.backward;
+
+    return *this;
+  }
+};
+
 struct Counter
 {
   Counter(const int __debug=0) : counter(0), debug(__debug) {}
@@ -1718,22 +1740,40 @@ struct Task
       mapper.pop(pos);
       
       if (pos == size_type(-1)) break;
+
+      utils::resource res1;
       
       if (! derivations[pos].empty()) {
 	derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
 	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
 	  model.decrement(sources[pos], targets[pos], *diter, sampler);
       }
+
+      utils::resource res2;
       
       graph.initialize(sources[pos], targets[pos], model);
+
+      utils::resource res3;
       
       graph.forward(sources[pos], targets[pos], beam);
       
+      utils::resource res4;
+      
       graph.backward(sources[pos], targets[pos], derivations[pos], sampler, temperature);
+      
+      utils::resource res5;
       
       derivation_type::const_iterator diter_end = derivations[pos].end();
       for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
 	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      
+      utils::resource res6;
+      
+      time.decrement  += res2.thread_time() - res1.thread_time();
+      time.initialize += res3.thread_time() - res2.thread_time();
+      time.forward    += res4.thread_time() - res3.thread_time();
+      time.backward   += res5.thread_time() - res4.thread_time();
+      time.increment  += res6.thread_time() - res5.thread_time();
       
       reducer.increment();
     }
@@ -1752,6 +1792,7 @@ struct Task
   logprob_type beam;
   
   double temperature;
+  Time   time;
 };
 
 struct less_size
@@ -2170,8 +2211,13 @@ int main(int argc, char ** argv)
       }
 
       // assign temperature...
-      for (size_type i = 0; i != tasks.size(); ++ i)
+      Time time;
+      
+      for (size_type i = 0; i != tasks.size(); ++ i) {
 	tasks[i].temperature = temperature;
+	
+	time += tasks[i].time;
+      }
       
       // shuffle
       boost::random_number_generator<sampler_type::generator_type> gen(sampler.generator());
@@ -2250,6 +2296,19 @@ int main(int argc, char ** argv)
 		    << "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
 		    << "lexicon: discount=" << model.lexicon.table.discount() << " strength=" << model.lexicon.table.strength() << std::endl;
       }
+      
+      if (debug >= 2) {
+	Time time_end;
+	for (size_type i = 0; i != tasks.size(); ++ i)
+	  time_end += tasks[i].time;
+	
+	std::cerr << "initialize: " << (time_end.initialize - time.initialize) / tasks.size() << " seconds" << std::endl
+		  << "forward: " << (time_end.forward - time.forward) / tasks.size() << " seconds" << std::endl
+		  << "backward: " << (time_end.backward - time.backward) / tasks.size() << " seconds" << std::endl
+		  << "increment: " << (time_end.increment - time.increment) / tasks.size() << " seconds" << std::endl
+		  << "decrement: " << (time_end.decrement - time.decrement) / tasks.size() << " seconds" << std::endl;
+      }
+
       
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
