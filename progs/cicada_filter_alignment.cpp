@@ -238,10 +238,10 @@ int main(int argc, char** argv)
 	  std::sort(alignment2.begin(), alignment2.end());
 	  
 	  if (visualize_mode) {
-	    visualize(os, sentence_source, sentence_target, alignment);
-	    
 	    if (has_alignment2)
 	      visualize(os, sentence_source, sentence_target, alignment, alignment2);
+	    else
+	      visualize(os, sentence_source, sentence_target, alignment);
 	  } else if (giza_mode)
 	    giza(os, sentence_source, sentence_target, alignment);
 	  else
@@ -298,10 +298,10 @@ int main(int argc, char** argv)
 	  std::sort(alignment2.begin(), alignment2.end());
 	  
 	  if (visualize_mode) {
-	    visualize(os, sentence_source, sentence_target, alignment);
-	    
 	    if (has_alignment2)
 	      visualize(os, sentence_source, sentence_target, alignment, alignment2);
+	    else
+	      visualize(os, sentence_source, sentence_target, alignment);  
 	  } else if (giza_mode)
 	    giza(os, sentence_source, sentence_target, alignment);
 	  else
