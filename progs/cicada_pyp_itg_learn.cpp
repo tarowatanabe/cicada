@@ -437,7 +437,8 @@ struct PYPLexicon
       }
     }
 
-    utils::atomicop::fetch_and_add(counts0, incremented);
+    if (incremented)
+      utils::atomicop::fetch_and_add(counts0, incremented);
   }
 
   template <typename Sampler>
@@ -467,7 +468,8 @@ struct PYPLexicon
       }
     }
 
-    utils::atomicop::fetch_and_add(counts0, incremented);
+    if (incremented)
+      utils::atomicop::fetch_and_add(counts0, incremented);
   }
   
   double prob(const id_type id) const
