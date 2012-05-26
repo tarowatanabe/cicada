@@ -535,8 +535,10 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      utils::atomicop::fetch_and_add(counts0_terminal, size_type(itg == PYP::TERMINAL));
-      utils::atomicop::fetch_and_add(counts0,          size_type(itg != PYP::TERMINAL));
+      if (itg == PYP::TERMINAL)
+	utils::atomicop::fetch_and_add(counts0_terminal, size_type(1));
+      else
+	utils::atomicop::fetch_and_add(counts0, size_type(1));
     }
   }
   
@@ -546,8 +548,10 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.decrement(itg, sampler)) {
-      utils::atomicop::fetch_and_add(counts0_terminal, size_type(- (itg == PYP::TERMINAL)));
-      utils::atomicop::fetch_and_add(counts0,          size_type(- (itg != PYP::TERMINAL)));
+      if (itg == PYP::TERMINAL)
+	utils::atomicop::fetch_and_add(counts0_terminal, size_type(- 1));
+      else
+	utils::atomicop::fetch_and_add(counts0, size_type(- 1));
     }
   }
   
@@ -614,7 +618,7 @@ struct PYPITG
   PYPITG(const PYPRule&   __rule,
 	 const PYPLexicon& __lexicon,
 	 const double& __epsilon_prior)
-    : rule(__rule), lexicon(__lexicon), epsilon_prior(__epsilon_prior) {}
+    : rule(__rule), lexicon(__lexicon), epsilon_prior(__epsilon_prior), counts0_epsilon(0), counts0(0) {}
 
   template <typename Sampler>
   void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
@@ -622,10 +626,16 @@ struct PYPITG
     rule.increment(r, sampler, temperature);
     
     if (r.is_terminal()) {
-      const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
-      const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
+      const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
+      const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
       
-      lexicon.increment(phrase_source, phrase_target, sampler, temperature);
+      utils::atomicop::fetch_and_add(counts0_epsilon, counts_epsilon);
+      utils::atomicop::fetch_and_add(counts0,         counts);
+      
+      lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
+			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+			sampler,
+			temperature);
     }
   }
   
@@ -635,16 +645,24 @@ struct PYPITG
     rule.decrement(r, sampler);
     
     if (r.is_terminal()) {
-      const phrase_type phrase_source(source.begin() + r.span.source.first, source.begin() + r.span.source.last);
-      const phrase_type phrase_target(target.begin() + r.span.target.first, target.begin() + r.span.target.last);
+      const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
+      const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
       
-      lexicon.decrement(phrase_source, phrase_target, sampler);
+      utils::atomicop::fetch_and_add(counts0_epsilon, size_type(0) - counts_epsilon);
+      utils::atomicop::fetch_and_add(counts0,         size_type(0) - counts);
+      
+      lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
+			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
+			sampler);
     }
   }
 
   double log_likelihood() const
   {
-    return rule.log_likelihood() + lexicon.log_likelihood();
+    return (rule.log_likelihood()
+	    + lexicon.log_likelihood()
+	    + std::log(epsilon_prior) * counts0_epsilon
+	    + std::log(1.0 - epsilon_prior) * counts0);
   }
   
   template <typename Sampler>
@@ -665,8 +683,10 @@ struct PYPITG
   
   PYPRule    rule;
   PYPLexicon lexicon;
-
+  
   double epsilon_prior;
+  size_type counts0_epsilon;
+  size_type counts0;
 };
 
 struct PYPGraph
@@ -1832,7 +1852,7 @@ path_type output_test_file; // dump test output file
 path_type output_sample_file;
 path_type output_model_file;
 
-double beam = 1e-4;
+double beam = 1e-2;
 
 int samples = 1;
 int burns = 10;
