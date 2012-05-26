@@ -241,8 +241,15 @@ namespace utils
       
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 
-      if (loc.empty())
-	return increment_new(dish, sampler);
+      if (loc.empty()) {
+	loc.tables.push_back(1);
+	utils::atomicop::fetch_and_add(tables, size_type(1));
+	
+	++ loc.customers;
+	utils::atomicop::fetch_and_add(customers, size_type(1));
+	
+	return true;
+      }
       
       double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
       
@@ -258,12 +265,11 @@ namespace utils
 	  break;
 	}
       }
-	
+      
       if (! incremented)
 	throw std::runtime_error("not incremented?");
-
+      
       ++ loc.customers;
-      //++ customers;
       utils::atomicop::fetch_and_add(customers, size_type(1));
       
       return false;
@@ -280,11 +286,9 @@ namespace utils
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 
       loc.tables.push_back(1);
-      //++ tables;
       utils::atomicop::fetch_and_add(tables, size_type(1));
       
       ++ loc.customers;
-      //++ customers;
       utils::atomicop::fetch_and_add(customers, size_type(1));
       
       return true;
@@ -336,12 +340,10 @@ namespace utils
 
       } else {
 	loc.tables.push_back(1);
-	//++ tables;
 	utils::atomicop::fetch_and_add(tables, size_type(1));
       }
       
       ++ loc.customers;
-      //++ customers;
       utils::atomicop::fetch_and_add(customers, size_type(1));
       
       return ! existing;
@@ -359,8 +361,6 @@ namespace utils
       
       if (loc.customers == 1) {
 	loc.clear();
-	//-- tables;
-	//-- customers;
 	utils::atomicop::fetch_and_add(tables, size_type(-1));
 	utils::atomicop::fetch_and_add(customers, size_type(-1));
 	return true;
@@ -382,7 +382,6 @@ namespace utils
 	  
 	  if (! (*titer)) {
 	    erased = true;
-	    //-- tables;
 	    utils::atomicop::fetch_and_add(tables, size_type(-1));
 	    loc.tables.erase(titer);
 	  }
@@ -393,8 +392,8 @@ namespace utils
       if (! decremented)
 	throw std::runtime_error("not decremented?");
       
-      //-- customers;
       utils::atomicop::fetch_and_add(customers, size_type(-1));
+      
       return erased;
     }
     
