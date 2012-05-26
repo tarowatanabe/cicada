@@ -535,8 +535,10 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      utils::atomicop::fetch_and_add(counts0_terminal, size_type(itg == PYP::TERMINAL));
-      utils::atomicop::fetch_and_add(counts0,          size_type(itg != PYP::TERMINAL));
+      if (itg == PYP::TERMINAL)
+	utils::atomicop::fetch_and_add(counts0_terminal, size_type(1));
+      else
+	utils::atomicop::fetch_and_add(counts0, size_type(1));
     }
   }
   
@@ -546,8 +548,10 @@ struct PYPRule
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
     if (table.decrement(itg, sampler)) {
-      utils::atomicop::fetch_and_add(counts0_terminal, size_type(0) - size_type(itg == PYP::TERMINAL));
-      utils::atomicop::fetch_and_add(counts0,          size_type(0) - size_type(itg != PYP::TERMINAL));
+      if (itg == PYP::TERMINAL)
+	utils::atomicop::fetch_and_add(counts0_terminal, size_type(-1));
+      else
+	utils::atomicop::fetch_and_add(counts0, size_type(-1));
     }
   }
   
@@ -624,9 +628,11 @@ struct PYPITG
     if (r.is_terminal()) {
       const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
       const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
-      
-      utils::atomicop::fetch_and_add(counts0_epsilon, counts_epsilon);
-      utils::atomicop::fetch_and_add(counts0,         counts);
+   
+      if (counts_epsilon)
+	utils::atomicop::fetch_and_add(counts0_epsilon, counts_epsilon);
+      if (counts)
+	utils::atomicop::fetch_and_add(counts0, counts);
       
       lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
@@ -644,8 +650,10 @@ struct PYPITG
       const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
       const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
       
-      utils::atomicop::fetch_and_add(counts0_epsilon, size_type(0) - counts_epsilon);
-      utils::atomicop::fetch_and_add(counts0,         size_type(0) - counts);
+      if (counts_epsilon)
+	utils::atomicop::fetch_and_add(counts0_epsilon, size_type(0) - counts_epsilon);
+      if (counts)
+	utils::atomicop::fetch_and_add(counts0, size_type(0) - counts);
       
       lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
