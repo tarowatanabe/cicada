@@ -2362,7 +2362,7 @@ int main(int argc, char ** argv)
     }
     
     // output final model file...
-    if (! output_file) {
+    if (! output_file.empty()) {
       
       
     }
