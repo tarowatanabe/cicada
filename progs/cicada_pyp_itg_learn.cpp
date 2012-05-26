@@ -534,12 +534,7 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      if (itg == PYP::TERMINAL)
-	utils::atomicop::fetch_and_add(counts0_terminal, size_type(1));
-      else
-	utils::atomicop::fetch_and_add(counts0, size_type(1));
-    }
+    table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature);
   }
   
   template <typename Sampler>
@@ -547,12 +542,7 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.decrement(itg, sampler)) {
-      if (itg == PYP::TERMINAL)
-	utils::atomicop::fetch_and_add(counts0_terminal, size_type(-1));
-      else
-	utils::atomicop::fetch_and_add(counts0, size_type(-1));
-    }
+    table.decrement(itg, sampler);
   }
   
   double prob(const rule_type& rule) const
@@ -586,12 +576,18 @@ struct PYPRule
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.sample_parameters(sampler, num_loop, num_iterations);
+    
+    counts0_terminal = table[PYP::TERMINAL].size_table();
+    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
   }
   
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    counts0_terminal = table[PYP::TERMINAL].size_table();
+    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
   }
   
   double     p0_terminal;
@@ -625,22 +621,11 @@ struct PYPITG
   {
     rule.increment(r, sampler, temperature);
     
-    if (r.is_terminal()) {
-#if 0
-      const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
-      const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
-   
-      if (counts_epsilon)
-	utils::atomicop::fetch_and_add(counts0_epsilon, counts_epsilon);
-      if (counts)
-	utils::atomicop::fetch_and_add(counts0, counts);
-#endif
-      
+    if (r.is_terminal())
       lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
 			sampler,
 			temperature);
-    }
   }
   
   template <typename Sampler>
@@ -648,21 +633,10 @@ struct PYPITG
   {
     rule.decrement(r, sampler);
     
-    if (r.is_terminal()) {
-#if 0
-      const size_type counts_epsilon = r.span.source.empty() + r.span.target.empty();
-      const size_type counts         = (!r.span.source.empty()) + (!r.span.target.empty());
-      
-      if (counts_epsilon)
-	utils::atomicop::fetch_and_add(counts0_epsilon, size_type(0) - counts_epsilon);
-      if (counts)
-	utils::atomicop::fetch_and_add(counts0, size_type(0) - counts);
-#endif
-      
+    if (r.is_terminal())
       lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
 			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
 			sampler);
-    }
   }
 
   double log_likelihood() const
@@ -679,6 +653,17 @@ struct PYPITG
     rule.sample_parameters(sampler, num_loop, num_iterations);
 
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
+    
+    // check lexicon...
+    counts0_epsilon = 0;
+    counts0 = 0;
+    for (PYP::id_type id = 0; id != lexicon.table.size(); ++ id)
+      if (! lexicon.table[id].empty()) {
+	counts0_epsilon += (lexicon.word_pairs[id].source == vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0_epsilon += (lexicon.word_pairs[id].target == vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0 += (lexicon.word_pairs[id].source != vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0 += (lexicon.word_pairs[id].target != vocab_type::EPSILON) * lexicon.table[id].size_customer();
+      }
   }
   
   template <typename Sampler>
@@ -687,6 +672,17 @@ struct PYPITG
     rule.slice_sample_parameters(sampler, num_loop, num_iterations);
 
     lexicon.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    // check lexicon...
+    counts0_epsilon = 0;
+    counts0 = 0;
+    for (PYP::id_type id = 0; id != lexicon.table.size(); ++ id)
+      if (! lexicon.table[id].empty()) {
+	counts0_epsilon += (lexicon.word_pairs[id].source == vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0_epsilon += (lexicon.word_pairs[id].target == vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0 += (lexicon.word_pairs[id].source != vocab_type::EPSILON) * lexicon.table[id].size_customer();
+	counts0 += (lexicon.word_pairs[id].target != vocab_type::EPSILON) * lexicon.table[id].size_customer();
+      }
   }
   
   PYPRule    rule;
