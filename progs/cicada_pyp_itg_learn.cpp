@@ -395,7 +395,7 @@ struct PYPLexicon
   
   PYPLexicon(const parameter_type& parameter,
 	     const double __p0)
-    : table(parameter), p0(__p0), counts0(0)
+    : table(parameter), p0(__p0)
   { }
 
   id_type word_pair_id(const word_type& source, const word_type& target)
@@ -416,29 +416,24 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
-    size_type incremented = 0;
-    
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	incremented += table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
+	table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	incremented += table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
+	table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  incremented += table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
+	  table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
       }
     }
-
-    if (incremented)
-      utils::atomicop::fetch_and_add(counts0, incremented);
   }
 
   template <typename Sampler>
@@ -447,29 +442,24 @@ struct PYPLexicon
     if (source.empty() && target.empty())
       throw std::runtime_error("invalid phrase pair");
 
-    size_type incremented = 0;
-
     if (source.empty()) {
       phrase_type::const_iterator titer_end = target.end();
       for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	incremented -= table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
+	table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
       
     } else if (target.empty()) {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	incremented -= table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
+	table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
       
     } else {
       phrase_type::const_iterator siter_end = source.end();
       for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
 	phrase_type::const_iterator titer_end = target.end();
 	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  incremented -= table.decrement(word_pair_id(*siter, *titer), sampler);
+	  table.decrement(word_pair_id(*siter, *titer), sampler);
       }
     }
-
-    if (incremented)
-      utils::atomicop::fetch_and_add(counts0, incremented);
   }
   
   double prob(const id_type id) const
@@ -489,7 +479,7 @@ struct PYPLexicon
   
   double log_likelihood() const
   {
-    return std::log(p0) * counts0 + table.log_likelihood();
+    return std::log(p0) * table.size_table() + table.log_likelihood();
   }
 
   template <typename Sampler>
@@ -508,7 +498,6 @@ struct PYPLexicon
   
   table_type table;
   double    p0;
-  size_type counts0;
 };
 
 
@@ -548,8 +537,6 @@ struct PYPRule
     if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
       utils::atomicop::fetch_and_add(counts0_terminal, size_type(itg == PYP::TERMINAL));
       utils::atomicop::fetch_and_add(counts0,          size_type(itg != PYP::TERMINAL));
-      //counts0_terminal += (itg == PYP::TERMINAL);
-      //counts0          += (itg != PYP::TERMINAL);
     }
   }
   
@@ -561,9 +548,6 @@ struct PYPRule
     if (table.decrement(itg, sampler)) {
       utils::atomicop::fetch_and_add(counts0_terminal, size_type(- (itg == PYP::TERMINAL)));
       utils::atomicop::fetch_and_add(counts0,          size_type(- (itg != PYP::TERMINAL)));
-      
-      //counts0_terminal -= (itg == PYP::TERMINAL);
-      //counts0          -= (itg != PYP::TERMINAL);
     }
   }
   
@@ -2355,11 +2339,10 @@ int main(int argc, char ** argv)
 	os.precision(20);
 
 	for (PYP::id_type id = 0; id != model.lexicon.table.size(); ++ id)
-	  if (! model.lexicon.table[id].empty()) {
+	  if (! model.lexicon.table[id].empty())
 	    os << model.lexicon.word_pairs[id].source
 	       << ' ' << model.lexicon.word_pairs[id].target
 	       << ' ' << model.lexicon.table.prob(id, model.lexicon.p0) << '\n';  
-	  }
       }
     }
     
@@ -2369,7 +2352,6 @@ int main(int argc, char ** argv)
     workers.join_all();
     
     // compute viterbi with test...
-
     if (! output_test_file.empty()) {
       if (test_source_file.empty() || ! boost::filesystem::exists(test_source_file))
 	throw std::runtime_error("test file output specified, but no source data?");
@@ -2379,7 +2361,11 @@ int main(int argc, char ** argv)
       viterbi(output_test_file, test_source_file, test_target_file, model);
     }
     
-    
+    // output final model file...
+    if (! output_file) {
+      
+      
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
