@@ -60,27 +60,9 @@ namespace utils
     {
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
-
-#if 0
-      for (;;) {
-	for (int i = 0; i != 64; ++ i) {
-	  if (val != ticket_.s.write)
-	    boost::thread::yield();
-	  else
-	    return;
-	}
-	
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-#endif
       
-#if 1
       while (val != ticket_.s.write)
 	boost::thread::yield();
-#endif
     }
 
     bool trylock_writer()
@@ -111,30 +93,10 @@ namespace utils
       const uint64_t me = __sync_fetch_and_add(&ticket_.u, uint64_t(1) << 32);
       const uint16_t val = me >> 32;
      
-#if 0
-      for (;;) {
-	for (int i = 0; i != 64; ++ i) {
-	  if (val != ticket_.s.read)
-	    boost::thread::yield();
-	  else {
-	    __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
-	    return;
-	  }
-	}
-	
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-#endif
-      
-#if 1
       while (val != ticket_.s.read)
 	boost::thread::yield();
       
       __sync_add_and_fetch(&ticket_.s.read, uint16_t(1));
-#endif
     }
 
     bool trylock_reader()
