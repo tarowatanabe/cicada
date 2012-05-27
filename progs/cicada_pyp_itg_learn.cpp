@@ -241,12 +241,14 @@ struct PYP
     span_pair_type right;
     itg_type       itg;
 
+    id_type        word_pair;
+
     rule_type()
-      : span(), left(), right(), itg() {}
+      : span(), left(), right(), itg(), word_pair(id_type(-1)) {}
     rule_type(const span_pair_type& __span, const itg_type& __itg)
-      : span(__span), left(), right(), itg(__itg) {}
+      : span(__span), left(), right(), itg(__itg), word_pair(id_type(-1)) {}
     rule_type(const span_pair_type& __span, const span_pair_type& __left, const span_pair_type& __right, const itg_type& __itg)
-      : span(__span), left(__left), right(__right), itg(__itg) {}
+      : span(__span), left(__left), right(__right), itg(__itg), word_pair(id_type(-1)) {}
     
     bool is_terminal() const { return left.empty() && right.empty(); }
     bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.first; }
@@ -1738,10 +1740,15 @@ struct Task
 	  
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
-	  if (diter->is_terminal())
+	  if (diter->is_terminal()) {
+	    model.lexicon.table.decrement(diter->word_pair, sampler);
+	    
+#if 0
 	    model.lexicon.decrement(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
 				    PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
 				    sampler);
+#endif
+	  }
 	}
 	
 	for (size_type i = 0; i != counts.size(); ++ i)
@@ -1764,16 +1771,24 @@ struct Task
       utils::resource res5;
       
       std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
-      derivation_type::const_iterator diter_end = derivations[pos].end();
-      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+      derivation_type::iterator diter_end = derivations[pos].end();
+      for (derivation_type::iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	
 	++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	
-	if (diter->is_terminal())
+	if (diter->is_terminal()) {
+	  diter->word_pair = model.lexicon.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
+							diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
+	  
+	  model.lexicon.table.increment(diter->word_pair, model.lexicon.p0, sampler, temperature);
+	  
+#if 0
 	  model.lexicon.increment(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
 				  PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
 				  sampler,
 				  temperature);
+#endif
+	}
       }
       
       for (size_type i = 0; i != counts.size(); ++ i)
