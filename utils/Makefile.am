@@ -105,6 +105,7 @@ restaurant.hpp \
 restaurant_floor.hpp \
 restaurant_sync.hpp \
 restaurant_vector.hpp \
+rwspinlock.hpp \
 rwticket.hpp \
 sampler.hpp \
 simple_vector.hpp \
@@ -176,6 +177,7 @@ piece_main \
 program_options_main \
 random_seed_main \
 restaurant_main \
+rwspinlock_main \
 rwticket_main \
 rwticket2_main \
 simple_vector_main \
@@ -279,6 +281,10 @@ byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
 restaurant_main_SOURCES = restaurant_main.cpp
+
+rwspinlock_main_SOURCES = rwspinlock_main.cpp
+rwspinlock_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+rwspinlock_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
 rwticket_main_SOURCES = rwticket_main.cpp
 rwticket_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
