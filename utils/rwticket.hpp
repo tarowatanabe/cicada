@@ -183,7 +183,8 @@ namespace utils
       ++ t.s.write;
       ++ t.s.read;
       
-      ticket_.us = t.us;
+      //ticket_.us = t.us;
+      __sync_lock_test_and_set(&ticket_.us, t.us);
     }
     
     void lock_reader()
