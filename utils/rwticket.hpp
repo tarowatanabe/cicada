@@ -14,6 +14,7 @@
 
 #include <utils/atomicop.hpp>
 
+#if 0
 namespace utils
 {
   class rwticket : private boost::noncopyable
@@ -109,8 +110,8 @@ namespace utils
     volatile int pending_;
   };
 };
+#endif
 
-#if 0
 namespace utils
 {
   class rwticket : private boost::noncopyable
@@ -216,6 +217,5 @@ namespace utils
     ticket_type ticket_;
   };
 };
-#endif
 
 #endif
