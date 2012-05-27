@@ -177,6 +177,7 @@ program_options_main \
 random_seed_main \
 restaurant_main \
 rwticket_main \
+rwticket2_main \
 simple_vector_main \
 small_vector_main \
 sparse_map_main \
@@ -282,6 +283,10 @@ restaurant_main_SOURCES = restaurant_main.cpp
 rwticket_main_SOURCES = rwticket_main.cpp
 rwticket_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 rwticket_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
+
+rwticket2_main_SOURCES = rwticket2_main.cpp
+rwticket2_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+rwticket2_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
 spinlock_main_SOURCES = spinlock_main.cpp
 spinlock_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
