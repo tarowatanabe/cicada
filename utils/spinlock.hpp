@@ -19,6 +19,7 @@
 #include <boost/thread/exceptions.hpp>
 
 #include <utils/config.hpp>
+#include <utils/atomicop.hpp>
 
 #ifdef HAVE_LIBKERN_OSATOMIC_H
   #include <libkern/OSAtomic.h>
@@ -36,11 +37,21 @@ namespace utils
     typedef boost::unique_lock<spinlock>       scoped_lock;
     typedef boost::detail::try_lock_wrapper<spinlock> scoped_try_lock;
     
+#if defined(__UTILS_SPINLOCK_GCC_CAS__)
+    typedef union {
+      uint32_t u;
+      struct
+      {
+	uint16_t ticket;
+	uint16_t users;
+      } s;
+    } ticket_type;
+#endif
     
-    spinlock() : m_spinlock()
+    spinlock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      m_spinlock = 0;
+      m_spinlock.u = 0;
 #elif defined(HAVE_OSSPINLOCK)
       m_spinlock = OS_SPINLOCK_INIT;
 #elif defined(HAVE_PTHREAD_SPINLOCK)
@@ -72,7 +83,13 @@ namespace utils
     bool try_lock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      return __sync_bool_compare_and_swap(&m_spinlock, 0, 1);
+      uint16_t me = m_spinlock.s.users;
+      uint16_t menew = me + 1;
+      uint32_t cmp    = (uint32_t(me) << 16) + me;
+      uint32_t cmpnew = (uint32_t(menew) << 16) + me;
+      
+      return utils::atomicop::compare_and_swap(m_spinlock.u, cmp, cmpnew);
+      
 #elif defined(HAVE_OSSPINLOCK)
       return OSSpinLockTry(&m_spinlock);
 #elif defined(HAVE_PTHREAD_SPINLOCK)
@@ -84,9 +101,10 @@ namespace utils
     void lock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      while (! __sync_bool_compare_and_swap(&m_spinlock, 0, 1))
-	boost::thread::yield();
+      const uint16_t me = __sync_fetch_and_add(&m_spinlock.s.users, uint16_t(1));
       
+      while (m_spinlock.s.ticket != me)
+	boost::thread::yield();
 #elif defined(HAVE_OSSPINLOCK)
       OSSpinLockLock(&m_spinlock);
 #elif defined(HAVE_PTHREAD_SPINLOCK)
@@ -105,9 +123,9 @@ namespace utils
     void unlock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      __sync_lock_test_and_set(&m_spinlock, 0);
-      //__sync_synchronize();
-      //m_spinlock = 0;
+      utils::atomicop::memory_barrier();
+      
+      ++ m_spinlock.s.ticket;
 #elif defined(HAVE_OSSPINLOCK)
       OSSpinLockUnlock(&m_spinlock);
 #elif defined(HAVE_PTHREAD_SPINLOCK)
@@ -125,7 +143,7 @@ namespace utils
     
   private:
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-    volatile int m_spinlock;
+    ticket_type m_spinlock;
 #elif defined(HAVE_OSSPINLOCK)
     OSSpinLock m_spinlock;
 #elif defined(HAVE_PTHREAD_SPINLOCK)

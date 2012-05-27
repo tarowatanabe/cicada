@@ -180,6 +180,7 @@ rwticket_main \
 simple_vector_main \
 small_vector_main \
 sparse_map_main \
+spinlock_main \
 static_allocator_main \
 stick_break_main \
 subprocess_main \
@@ -281,6 +282,10 @@ restaurant_main_SOURCES = restaurant_main.cpp
 rwticket_main_SOURCES = rwticket_main.cpp
 rwticket_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 rwticket_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
+
+spinlock_main_SOURCES = spinlock_main.cpp
+spinlock_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+spinlock_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
 chart_main_SOURCES = chart_main.cpp
 chart_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

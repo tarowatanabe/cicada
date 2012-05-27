@@ -62,6 +62,7 @@ rwticket_main
 simple_vector_main
 small_vector_main
 sparse_map_main
+spinlock_main
 static_allocator_main
 stick_break_main
 subprocess_main
