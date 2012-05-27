@@ -160,7 +160,7 @@ namespace utils
       const uint16_t val = me >> 32;
       
       for (int loop = 0; val != ticket_.s.write; ++ loop) {
-	if (loop & 0x63 == 0x63) {
+	if ((loop & 0x63) == 0x63) {
 	  struct timespec tm;
 	  tm.tv_sec = 0;
 	  tm.tv_nsec = 2000001;
@@ -199,7 +199,7 @@ namespace utils
       const uint16_t val = me >> 32;
 
       for (int loop = 0; val != ticket_.s.read; ++ loop) {
-	if (loop & 0x63 == 0x63) {
+	if ((loop & 0x63) == 0x63) {
 	  struct timespec tm;
 	  tm.tv_sec = 0;
 	  tm.tv_nsec = 2000001;
