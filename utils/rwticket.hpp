@@ -167,7 +167,7 @@ namespace utils
     {
       const uint64_t me = ticket_.s.users;
       const uint16_t menew = me + 1;
-      const uint64_t read = ticket_.s.read << 16;
+      const uint64_t read = uint64_t(ticket_.s.read) << 16;
       const uint64_t cmp    = (me << 16) + read + me;
       const uint64_t cmpnew = (uint64_t(menew) << 16) + read + me;
       
