@@ -616,28 +616,6 @@ struct PYPITG
 	 const double& __epsilon_prior)
     : rule(__rule), lexicon(__lexicon), epsilon_prior(__epsilon_prior), counts0_epsilon(0), counts0(0) {}
 
-  template <typename Sampler>
-  void increment(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler, const double temperature)
-  {
-    rule.increment(r, sampler, temperature);
-    
-    if (r.is_terminal())
-      lexicon.increment(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
-			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-			sampler,
-			temperature);
-  }
-  
-  template <typename Sampler>
-  void decrement(const sentence_type& source, const sentence_type& target, const rule_type& r, Sampler& sampler)
-  {
-    rule.decrement(r, sampler);
-    
-    if (r.is_terminal())
-      lexicon.decrement(phrase_type(source.begin() + r.span.source.first, source.begin() + r.span.source.last),
-			phrase_type(target.begin() + r.span.target.first, target.begin() + r.span.target.last),
-			sampler);
-  }
 
   double log_likelihood() const
   {
@@ -1752,9 +1730,22 @@ struct Task
       utils::resource res1;
       
       if (! derivations[pos].empty()) {
+	std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
+
 	derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
-	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
-	  model.decrement(sources[pos], targets[pos], *diter, sampler);
+	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter) {
+	  
+	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
+	  
+	  if (diter->is_terminal())
+	    model.lexicon.decrement(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
+				    PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
+				    sampler);
+	}
+	
+	for (size_type i = 0; i != counts.size(); ++ i)
+	  if (counts[i])
+	    model.rule.table.decrement(i, counts[i], sampler);
       }
 
       utils::resource res2;
@@ -1771,9 +1762,22 @@ struct Task
       
       utils::resource res5;
       
+      std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
       derivation_type::const_iterator diter_end = derivations[pos].end();
-      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
+      for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+	
+	++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
+	
+	if (diter->is_terminal())
+	  model.lexicon.increment(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
+				  PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
+				  sampler,
+				  temperature);
+      }
+      
+      for (size_type i = 0; i != counts.size(); ++ i)
+	if (counts[i])
+	  model.rule.table.increment(i, counts[i], sampler, temperature);
       
       utils::resource res6;
       
