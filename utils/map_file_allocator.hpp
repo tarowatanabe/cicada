@@ -37,7 +37,6 @@
 
 #include <utils/tempfile.hpp>
 #include <utils/config.hpp>
-#include <utils/spinlock.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
