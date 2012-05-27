@@ -1733,8 +1733,8 @@ struct Task
       if (! derivations[pos].empty()) {
 	std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
 	
-	derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
-	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter) {
+	derivation_type::const_iterator diter_end = derivations[pos].end();
+	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	  
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
