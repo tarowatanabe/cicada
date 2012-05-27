@@ -536,6 +536,7 @@ struct PYPRule
     
     table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature);
   }
+
   
   template <typename Sampler>
   void decrement(const rule_type& rule, Sampler& sampler)
@@ -1730,8 +1731,6 @@ struct Task
       utils::resource res1;
       
       if (! derivations[pos].empty()) {
-	std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
-
 	derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
 	for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter) {
 	  
@@ -1777,7 +1776,7 @@ struct Task
       
       for (size_type i = 0; i != counts.size(); ++ i)
 	if (counts[i])
-	  model.rule.table.increment(i, counts[i], sampler, temperature);
+	  model.rule.table.increment(i, counts[i], i == PYP::TERMINAL ? model.rule.p0_terminal : model.rule.p0, sampler, temperature);
       
       utils::resource res6;
       
