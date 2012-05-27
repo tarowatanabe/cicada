@@ -431,10 +431,8 @@ namespace utils
       }
       
       bool erased = false;
-      double r = sampler.uniform() * loc.customers;
-      -- loc.customers;
-
       bool decremented = false;
+      double r = sampler.uniform() * loc.customers;
       
       typename location_type::table_set_type::iterator titer_end = loc.tables.end();
       for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -456,6 +454,7 @@ namespace utils
       if (! decremented)
 	throw std::runtime_error("not decremented?");
       
+      -- loc.customers;
       utils::atomicop::fetch_and_add(customers, size_type(-1));
       
       return erased;
@@ -481,11 +480,9 @@ namespace utils
 	  ++ erased_tables;
 	  continue;
 	}
-      
-	double r = sampler.uniform() * loc.customers;
-	-- loc.customers;
-
+	
 	bool decremented = false;
+	double r = sampler.uniform() * loc.customers;
 	
 	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
 	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
@@ -506,6 +503,7 @@ namespace utils
 	if (! decremented)
 	  throw std::runtime_error("not decremented?");
 	
+	-- loc.customers;
 	++ erased_customers;
       }
       
