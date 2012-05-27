@@ -412,58 +412,6 @@ struct PYPLexicon
     return std::make_pair(iter - word_pairs.begin(), iter != word_pairs.end());
   }
   
-  template <typename Sampler>
-  void increment(const phrase_type& source, const phrase_type& target, Sampler& sampler, const double temperature=1.0)
-  {
-    if (source.empty() && target.empty())
-      throw std::runtime_error("invalid phrase pair");
-
-    if (source.empty()) {
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	table.increment(word_pair_id(vocab_type::EPSILON, *titer), p0, sampler, temperature);
-      
-    } else if (target.empty()) {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	table.increment(word_pair_id(*siter, vocab_type::EPSILON), p0, sampler, temperature);
-      
-    } else {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  table.increment(word_pair_id(*siter, *titer), p0, sampler, temperature);
-      }
-    }
-  }
-
-  template <typename Sampler>
-  void decrement(const phrase_type& source, const phrase_type& target, Sampler& sampler)
-  {
-    if (source.empty() && target.empty())
-      throw std::runtime_error("invalid phrase pair");
-
-    if (source.empty()) {
-      phrase_type::const_iterator titer_end = target.end();
-      for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	table.decrement(word_pair_id(vocab_type::EPSILON, *titer), sampler);
-      
-    } else if (target.empty()) {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	table.decrement(word_pair_id(*siter, vocab_type::EPSILON), sampler);
-      
-    } else {
-      phrase_type::const_iterator siter_end = source.end();
-      for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	phrase_type::const_iterator titer_end = target.end();
-	for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  table.decrement(word_pair_id(*siter, *titer), sampler);
-      }
-    }
-  }
-  
   double prob(const id_type id) const
   {
     return table.prob(id, p0);
@@ -1740,15 +1688,8 @@ struct Task
 	  
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
-	  if (diter->is_terminal()) {
+	  if (diter->is_terminal())
 	    model.lexicon.table.decrement(diter->word_pair, sampler);
-	    
-#if 0
-	    model.lexicon.decrement(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
-				    PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
-				    sampler);
-#endif
-	  }
 	}
 	
 	for (size_type i = 0; i != counts.size(); ++ i)
@@ -1781,13 +1722,6 @@ struct Task
 							diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
 	  
 	  model.lexicon.table.increment(diter->word_pair, model.lexicon.p0, sampler, temperature);
-	  
-#if 0
-	  model.lexicon.increment(PYP::phrase_type(sources[pos].begin() + diter->span.source.first, sources[pos].begin() + diter->span.source.last),
-				  PYP::phrase_type(targets[pos].begin() + diter->span.target.first, targets[pos].begin() + diter->span.target.last),
-				  sampler,
-				  temperature);
-#endif
 	}
       }
       
