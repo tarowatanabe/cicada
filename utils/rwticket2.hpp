@@ -163,7 +163,7 @@ namespace utils
 	if ((loop & 0x63) == 0x63) {
 	  struct timespec tm;
 	  tm.tv_sec = 0;
-	  tm.tv_nsec = 1000;
+	  tm.tv_nsec = 100;
 	  nanosleep(&tm, NULL);
 	} else
 	  boost::thread::yield();
@@ -202,7 +202,7 @@ namespace utils
 	if ((loop & 0x63) == 0x63) {
 	  struct timespec tm;
 	  tm.tv_sec = 0;
-	  tm.tv_nsec = 1000;
+	  tm.tv_nsec = 100;
 	  nanosleep(&tm, NULL);
 	} else
 	  boost::thread::yield();
