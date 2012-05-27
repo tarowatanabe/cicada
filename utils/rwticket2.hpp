@@ -27,7 +27,7 @@ namespace utils
       ~scoped_writer_lock() { lock.unlock_writer(); }
       
     private:
-      rwticket& lock;
+      rwticket2& lock;
     };
     
     struct scoped_reader_lock
@@ -36,7 +36,7 @@ namespace utils
       ~scoped_reader_lock() { lock.unlock_reader(); }
       
     private:
-      rwticket& lock;
+      rwticket2& lock;
     };
     
     rwticket2()
@@ -132,20 +132,20 @@ namespace utils
     
     struct scoped_writer_lock
     {
-      scoped_writer_lock(rwticket& x) : lock(x) { lock.lock_writer(); }
+      scoped_writer_lock(rwticket2& x) : lock(x) { lock.lock_writer(); }
       ~scoped_writer_lock() { lock.unlock_writer(); }
       
     private:
-      rwticket& lock;
+      rwticket2& lock;
     };
     
     struct scoped_reader_lock
     {
-      scoped_reader_lock(rwticket& x) : lock(x) { lock.lock_reader(); }
+      scoped_reader_lock(rwticket2& x) : lock(x) { lock.lock_reader(); }
       ~scoped_reader_lock() { lock.unlock_reader(); }
       
     private:
-      rwticket& lock;
+      rwticket2& lock;
     };
     
     rwticket2() 
