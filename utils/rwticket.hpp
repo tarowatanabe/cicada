@@ -18,6 +18,103 @@ namespace utils
 {
   class rwticket : private boost::noncopyable
   {
+  public:
+    
+    struct scoped_writer_lock
+    {
+      scoped_writer_lock(rwticket& x) : lock(x) { lock.lock_writer(); }
+      ~scoped_writer_lock() { lock.unlock_writer(); }
+      
+    private:
+      rwticket& lock;
+    };
+    
+    struct scoped_reader_lock
+    {
+      scoped_reader_lock(rwticket& x) : lock(x) { lock.lock_reader(); }
+      ~scoped_reader_lock() { lock.unlock_reader(); }
+      
+    private:
+      rwticket& lock;
+    };
+    
+    rwticket()
+      : lock_(0), pending_(0) {}
+    
+  public:
+    void lock_writer()
+    {
+      // write lock
+      while (! utils::atomicop::compare_and_swap(lock_, 0, 1))
+	boost::thread::yield();
+      
+      while (pending_)
+	boost::thread::yield();
+    }
+
+    bool trylock_writer()
+    {
+      if (pending_) return false;
+      
+      if (! utils::atomicop::compare_and_swap(lock_, 0, 1)) return false;
+      
+      if (pending_) {
+	// unlock!
+	__sync_lock_test_and_set(&lock_, 0);
+	return false;
+      }
+      
+      return true;
+    }
+    
+    void unlock_writer()
+    {
+      // test and set...
+      __sync_lock_test_and_set(&lock_, 0);
+    }
+    
+    void lock_reader()
+    {
+      for (;;) {
+	utils::atomicop::fetch_and_add(pending_, 1);
+	
+	if (! lock_) return;
+	
+	// release
+	utils::atomicop::fetch_and_add(pending_, -1);
+	
+	while (lock_)
+	  boost::thread::yield();
+      }
+    }
+
+    bool trylock_reader()
+    {
+      utils::atomicop::fetch_and_add(pending_, 1);
+      
+      if (! lock_) return true;
+      
+      utils::atomicop::fetch_and_add(pending_, -1);
+      
+      return false;
+    }
+    
+    void unlock_reader()
+    {
+      utils::atomicop::fetch_and_add(pending_, -1);
+    }
+    
+  private:
+    volatile int lock_;
+    volatile int pending_;
+  };
+};
+
+#if 0
+namespace utils
+{
+  class rwticket : private boost::noncopyable
+  {
   private:
     typedef union 
     {
@@ -119,5 +216,6 @@ namespace utils
     ticket_type ticket_;
   };
 };
+#endif
 
 #endif
