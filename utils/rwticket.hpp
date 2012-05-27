@@ -184,7 +184,6 @@ namespace utils
       ++ t.s.read;
       
       ticket_.us = t.us;
-      utils::atomicop::memory_barrier();
     }
     
     void lock_reader()
