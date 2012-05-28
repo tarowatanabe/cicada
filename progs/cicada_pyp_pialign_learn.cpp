@@ -2202,7 +2202,7 @@ struct Counter
 
   void clear() { counter = 0; }
   
-  size_type counter;
+  volatile size_type counter;
 };
 typedef Counter counter_type;
 
