@@ -1696,7 +1696,8 @@ struct Task
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
-	  ids.push_back(diter->word_pair);
+	  if (diter->is_terminal())
+	    ids.push_back(diter->word_pair);
 	}
 	
 	for (size_type i = 0; i != counts.size(); ++ i)
