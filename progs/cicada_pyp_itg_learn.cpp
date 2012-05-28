@@ -1644,11 +1644,18 @@ struct Task
 {
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;  
+  typedef PYP::id_type         id_type;
   
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type > > queue_type;
   
   typedef PYPITG::logprob_type logprob_type;
   typedef PYPITG::prob_type    prob_type;
+
+  typedef std::vector<size_type, std::allocator<size_type> > count_set_type;
+  typedef  std::vector<id_type, std::allocator<id_type> > id_set_type;
+
+  count_set_type counts;
+  id_set_type    ids;
 
   Task(queue_type& __mapper,
        counter_type& __reducer,
@@ -1681,20 +1688,26 @@ struct Task
       utils::resource res1;
       
       if (! derivations[pos].empty()) {
-	std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
+	counts.clear();
+	counts.resize(3, size_type(0));
+	ids.clear();
 	
 	derivation_type::const_iterator diter_end = derivations[pos].end();
 	for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
-	  
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
-	  if (diter->is_terminal())
-	    model.lexicon.table.decrement(diter->word_pair, sampler);
+	  ids.push_back(diter->word_pair);
 	}
 	
 	for (size_type i = 0; i != counts.size(); ++ i)
 	  if (counts[i])
 	    model.rule.table.decrement(i, counts[i], sampler);
+	
+	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
+	
+	id_set_type::const_iterator iiter_end = ids.end();
+	for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
+	  model.lexicon.table.decrement(*iiter, sampler);
       }
 
       utils::resource res2;
@@ -1711,7 +1724,10 @@ struct Task
       
       utils::resource res5;
       
-      std::vector<size_type, std::allocator<size_type> > counts(3, size_type(0));
+      counts.clear();
+      counts.resize(3, size_type(0));
+      ids.clear();
+      
       derivation_type::iterator diter_end = derivations[pos].end();
       for (derivation_type::iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	
@@ -1721,13 +1737,19 @@ struct Task
 	  diter->word_pair = model.lexicon.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
 							diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
 	  
-	  model.lexicon.table.increment(diter->word_pair, model.lexicon.p0, sampler, temperature);
+	  ids.push_back(diter->word_pair);
 	}
       }
       
       for (size_type i = 0; i != counts.size(); ++ i)
 	if (counts[i])
 	  model.rule.table.increment(i, counts[i], i == PYP::TERMINAL ? model.rule.p0_terminal : model.rule.p0, sampler, temperature);
+      
+      std::sort(ids.begin(), ids.end(), std::greater<id_type>());
+      
+      id_set_type::const_iterator iiter_end = ids.end();
+      for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
+	model.lexicon.table.increment(*iiter, model.lexicon.p0, sampler, temperature);
       
       utils::resource res6;
       
