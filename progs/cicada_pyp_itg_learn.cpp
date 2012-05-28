@@ -2421,15 +2421,15 @@ void prepare(const sentence_set_type& sources,
 
   std::vector<PrepareMapper, std::allocator<PrepareMapper> > mapper(threads, PrepareMapper(sources, targets));
   
-  size_type first = 0;
   const size_type interval = (sources.size() + threads - 1) / threads;
+  size_type first = 0;
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i) {
     const size_type last = utils::bithack::min(first + interval, sources.size());
     
     mapper[i].first = first;
-    mapper[i].last = last;
+    mapper[i].last  = last;
     
     workers.add_thread(new boost::thread(boost::ref(mapper[i])));
     
@@ -2459,7 +2459,7 @@ void prepare(const sentence_set_type& sources,
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
     sorted.push_back(&(*citer));
   
-  sort(sorted.begin(), sorted.end(), greater_psecond<const count_set_type::value_type>());
+  std::sort(sorted.begin(), sorted.end(), greater_psecond<const count_set_type::value_type>());
 
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
