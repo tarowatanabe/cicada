@@ -1865,7 +1865,11 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
-size_t read_data(const path_type& path, sentence_set_type& sentences);
+void prepare(const sentence_set_type& sources,
+	     const sentence_set_type& targets,
+	     PYPITG& model);
+size_t read_data(const path_type& path,
+		 sentence_set_type& sentences);
 
 void viterbi(const path_type& output_file,
 	     const path_type& source_file,
@@ -2096,6 +2100,9 @@ int main(int argc, char ** argv)
 
     
     PYPITG model(model_rule, model_lexicon, epsilon_prior);
+
+    // prepare model!
+    prepare(sources, targets, model);
     
     derivation_set_type derivations(sources.size());
     position_set_type positions;
@@ -2103,19 +2110,6 @@ int main(int argc, char ** argv)
       if (! sources[i].empty() && ! targets[i].empty())
 	positions.push_back(i);
     position_set_type(positions).swap(positions);
-    
-    // pre-compute word-pair-id and pre-allocate table...
-    for (size_t i = 0; i != sources.size(); ++ i)
-      if (! sources[i].empty() && ! targets[i].empty())
-	for (size_t src = 0; src <= sources[i].size(); ++ src)
-	  for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
-	    model.lexicon.word_pair_id(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
-				       trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1]);
-
-    model.lexicon.table.reserve(model.lexicon.word_pairs.size());
-    model.lexicon.table.resize(model.lexicon.word_pairs.size());
-    model.rule.table.reserve(3);
-    model.rule.table.resize(3);
     
     sampler_type sampler;
     
@@ -2372,6 +2366,64 @@ int main(int argc, char ** argv)
     return 1;
   }
   return 0;
+}
+
+template <typename Tp>
+struct greater_psecond
+{
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
+
+struct PrepareMapper
+{
+  typedef PYP::word_pair_type word_pair_type;
+  
+  typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
+
+  count_set_type counts;
+};
+
+void prepare(const sentence_set_type& sources,
+	     const sentence_set_type& targets,
+	     PYPITG& model)
+{
+  typedef PYP::word_pair_type word_pair_type;
+  
+  typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
+  typedef std::vector<const count_set_type::value_type*, std::allocator<const count_set_type::value_type*> > sorted_type;
+
+  count_set_type counts;
+  counts.set_empty_key(word_pair_type());
+  
+  for (size_t i = 0; i != sources.size(); ++ i)
+    if (! sources[i].empty() && ! targets[i].empty())
+      for (size_t src = 0; src <= sources[i].size(); ++ src)
+	for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
+	  ++ counts[word_pair_type(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
+				   trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1])];
+  
+  sorted_type sorted;
+  sorted.reserve(counts.size());
+  
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+    sorted.push_back(&(*citer));
+  
+  sort(sorted.begin(), sorted.end(), greater_psecond<const count_set_type::value_type>());
+
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+    model.lexicon.word_pair_id((*siter)->first.source, (*siter)->first.target);
+  
+  model.lexicon.table.reserve(model.lexicon.word_pairs.size());
+  model.lexicon.table.resize(model.lexicon.word_pairs.size());
+  model.rule.table.reserve(3);
+  model.rule.table.resize(3);
 }
 
 struct ViterbiMapReduce
