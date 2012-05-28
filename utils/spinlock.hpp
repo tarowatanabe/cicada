@@ -123,9 +123,10 @@ namespace utils
     void unlock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      utils::atomicop::memory_barrier();
+      //utils::atomicop::memory_barrier();
       
-      ++ m_spinlock.s.ticket;
+      //++ m_spinlock.s.ticket;
+      __sync_add_and_fetch(&m_spinlock.s.ticket, uint16_t(1));
 #elif defined(HAVE_OSSPINLOCK)
       OSSpinLockUnlock(&m_spinlock);
 #elif defined(HAVE_PTHREAD_SPINLOCK)
