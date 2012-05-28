@@ -2576,9 +2576,11 @@ struct ViterbiReducer
   typedef ViterbiMapReduce::queue_type  queue_type;  
   
   ViterbiReducer(queue_type& __reducer,
-		 std::ostream& __os)
+		 std::ostream& __os,
+		 const int __debug)
     : reducer(__reducer),
-      os(__os) {}
+      os(__os),
+      debug(__debug) {}
 
   void operator()()
   {
@@ -2602,6 +2604,13 @@ struct ViterbiReducer
 	  dumper(os, bitext.source, bitext.target, bitext.derivation);
 	os << '\n';
 	++ id;
+	
+	if (debug) {
+	  if (id % 10000 == 0)
+	    std::cerr << '.';
+	  if (id % 1000000 == 0)
+	    std::cerr << '\n';
+	}
       }
       
       while (! bitexts.empty() && bitexts.begin()->id == id) {
@@ -2612,6 +2621,13 @@ struct ViterbiReducer
 	os << '\n';
 	++ id;
 	
+	if (debug) {
+	  if (id % 10000 == 0)
+	    std::cerr << '.';
+	  if (id % 1000000 == 0)
+	    std::cerr << '\n';
+	}
+
 	bitexts.erase(bitexts.begin());
       }
     }
@@ -2623,16 +2639,27 @@ struct ViterbiReducer
 	dumper(os, bitext.source, bitext.target, bitext.derivation);
       os << '\n';
       ++ id;
+
+      if (debug) {
+	if (id % 10000 == 0)
+	  std::cerr << '.';
+	if (id % 1000000 == 0)
+	  std::cerr << '\n';
+      }
       
       bitexts.erase(bitexts.begin());
     }
     
     if (! bitexts.empty())
       throw std::runtime_error("bitexts stil renam???");
+    
+    if (debug && id >= 10000 && id % 1000000 != 0)
+      std::cerr << std::endl;
   }
   
   queue_type& reducer;
   std::ostream& os;
+  int debug;
 };
 
 void viterbi(const path_type& output_file,
@@ -2659,11 +2686,11 @@ void viterbi(const path_type& output_file,
     workers.add_thread(new boost::thread(ViterbiMapper(mapper, reducer, model, beam)));
   
   if (sample_hypergraph)
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpHypergraph>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpHypergraph>(reducer, os, debug)));
   else if (sample_alignment)
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpAlignment>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpAlignment>(reducer, os, debug)));
   else
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpDerivation>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpDerivation>(reducer, os, debug)));
   
   utils::compress_istream is_src(source_file, 1024 * 1024);
   utils::compress_istream is_trg(target_file, 1024 * 1024);
