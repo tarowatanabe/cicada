@@ -2380,12 +2380,35 @@ struct greater_psecond
 
 struct PrepareMapper
 {
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
   typedef PYP::word_pair_type word_pair_type;
   
   typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
 				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
-
+  
+  PrepareMapper(const sentence_set_type& __sources,
+		const sentence_set_type& __targets)
+    : sources(__sources), targets(__targets) { counts.set_empty_key(word_pair_type()); }
+  
+  void operator()()
+  {
+    for (size_type i = first; i != last; ++ i)
+      if (! sources[i].empty() && ! targets[i].empty())
+	for (size_t src = 0; src <= sources[i].size(); ++ src)
+	  for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
+	    ++ counts[word_pair_type(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
+				     trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1])];
+  }
+  
   count_set_type counts;
+  
+  const sentence_set_type& sources;
+  const sentence_set_type& targets;
+  
+  size_type first;
+  size_type last;
 };
 
 void prepare(const sentence_set_type& sources,
@@ -2393,20 +2416,41 @@ void prepare(const sentence_set_type& sources,
 	     PYPITG& model)
 {
   typedef PYP::word_pair_type word_pair_type;
-  
-  typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
+  typedef PrepareMapper::count_set_type count_set_type;
   typedef std::vector<const count_set_type::value_type*, std::allocator<const count_set_type::value_type*> > sorted_type;
+
+  std::vector<PrepareMapper, std::allocator<PrepareMapper> > mapper(threads, PrepareMapper(sources, targets));
+  
+  size_type first = 0;
+  const size_type interval = (sources.size() + threads - 1) / threads;
+  
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i) {
+    const size_type last = utils::bithack::min(first + interval, sources.size());
+    
+    mapper[i].first = first;
+    mapper[i].last = last;
+    
+    workers.add_thread(new boost::thread(boost::ref(mapper[i])));
+    
+    first = last;
+  }
+  workers.join_all();
 
   count_set_type counts;
   counts.set_empty_key(word_pair_type());
   
-  for (size_t i = 0; i != sources.size(); ++ i)
-    if (! sources[i].empty() && ! targets[i].empty())
-      for (size_t src = 0; src <= sources[i].size(); ++ src)
-	for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
-	  ++ counts[word_pair_type(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
-				   trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1])];
+  for (int i = 0; i != threads; ++ i) {
+    if (counts.empty())
+      counts.swap(mapper[i].counts);
+    else {
+      count_set_type::const_iterator citer_end = mapper[i].counts.end();
+      for (count_set_type::const_iterator citer = mapper[i].counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
+    }
+    
+    mapper[i].counts.clear();
+  }
   
   sorted_type sorted;
   sorted.reserve(counts.size());
