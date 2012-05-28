@@ -1074,10 +1074,7 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature)) {
-      counts0_terminal += (itg == PYP::TERMINAL);
-      counts0          += (itg != PYP::TERMINAL);
-    }
+    table.increment(itg, itg == PYP::TERMINAL ? p0_terminal : p0, sampler, temperature);
   }
   
   template <typename Sampler>
@@ -1085,10 +1082,7 @@ struct PYPRule
   {
     const itg_type itg = (rule.is_terminal() ? PYP::TERMINAL : (rule.is_straight() ? PYP::STRAIGHT : PYP::INVERTED));
     
-    if (table.decrement(itg, sampler)) {
-      counts0_terminal -= (itg == PYP::TERMINAL);
-      counts0          -= (itg != PYP::TERMINAL);
-    }
+    table.decrement(itg, sampler);
   }
   
   double prob(const rule_type& rule) const
@@ -1122,12 +1116,18 @@ struct PYPRule
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.sample_parameters(sampler, num_loop, num_iterations);
+
+    counts0_terminal = table[PYP::TERMINAL].size_table();
+    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
   }
   
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
+    
+    counts0_terminal = table[PYP::TERMINAL].size_table();
+    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
   }
   
   double     p0_terminal;
@@ -2186,12 +2186,8 @@ struct Counter
   void wait(size_type target)
   {
     for (;;) {
-      utils::atomicop::memory_barrier();
-      
       for (int i = 0; i < 64; ++ i) {
-	const size_type curr = counter;
-	
-	if (curr == target)
+	if (counter == target)
 	  return;
 	else
 	  boost::thread::yield();
@@ -2206,7 +2202,7 @@ struct Counter
 
   void clear() { counter = 0; }
   
-  size_type counter;
+  volatile size_type counter;
 };
 typedef Counter counter_type;
 

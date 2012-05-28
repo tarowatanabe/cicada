@@ -1615,12 +1615,8 @@ struct Counter
   void wait(size_type target)
   {
     for (;;) {
-      utils::atomicop::memory_barrier();
-      
       for (int i = 0; i < 64; ++ i) {
-	const size_type curr = counter;
-	
-	if (curr == target)
+	if (counter == target)
 	  return;
 	else
 	  boost::thread::yield();
@@ -1635,7 +1631,7 @@ struct Counter
 
   void clear() { counter = 0; }
   
-  size_type counter;
+  volatile size_type counter;
   int debug;
 };
 typedef Counter counter_type;
@@ -2380,12 +2376,35 @@ struct greater_psecond
 
 struct PrepareMapper
 {
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+  
   typedef PYP::word_pair_type word_pair_type;
   
   typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
 				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
-
+  
+  PrepareMapper(const sentence_set_type& __sources,
+		const sentence_set_type& __targets)
+    : sources(__sources), targets(__targets) { counts.set_empty_key(word_pair_type()); }
+  
+  void operator()()
+  {
+    for (size_type i = first; i != last; ++ i)
+      if (! sources[i].empty() && ! targets[i].empty())
+	for (size_t src = 0; src <= sources[i].size(); ++ src)
+	  for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
+	    ++ counts[word_pair_type(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
+				     trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1])];
+  }
+  
   count_set_type counts;
+  
+  const sentence_set_type& sources;
+  const sentence_set_type& targets;
+  
+  size_type first;
+  size_type last;
 };
 
 void prepare(const sentence_set_type& sources,
@@ -2393,20 +2412,41 @@ void prepare(const sentence_set_type& sources,
 	     PYPITG& model)
 {
   typedef PYP::word_pair_type word_pair_type;
-  
-  typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
+  typedef PrepareMapper::count_set_type count_set_type;
   typedef std::vector<const count_set_type::value_type*, std::allocator<const count_set_type::value_type*> > sorted_type;
+
+  std::vector<PrepareMapper, std::allocator<PrepareMapper> > mapper(threads, PrepareMapper(sources, targets));
+  
+  const size_type interval = (sources.size() + threads - 1) / threads;
+  size_type first = 0;
+  
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i) {
+    const size_type last = utils::bithack::min(first + interval, sources.size());
+    
+    mapper[i].first = first;
+    mapper[i].last  = last;
+    
+    workers.add_thread(new boost::thread(boost::ref(mapper[i])));
+    
+    first = last;
+  }
+  workers.join_all();
 
   count_set_type counts;
   counts.set_empty_key(word_pair_type());
   
-  for (size_t i = 0; i != sources.size(); ++ i)
-    if (! sources[i].empty() && ! targets[i].empty())
-      for (size_t src = 0; src <= sources[i].size(); ++ src)
-	for (size_t trg = (src == 0); trg <= targets[i].size(); ++ trg)
-	  ++ counts[word_pair_type(src == 0 ? vocab_type::EPSILON : sources[i][src - 1],
-				   trg == 0 ? vocab_type::EPSILON : targets[i][trg - 1])];
+  for (int i = 0; i != threads; ++ i) {
+    if (counts.empty())
+      counts.swap(mapper[i].counts);
+    else {
+      count_set_type::const_iterator citer_end = mapper[i].counts.end();
+      for (count_set_type::const_iterator citer = mapper[i].counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
+    }
+    
+    mapper[i].counts.clear();
+  }
   
   sorted_type sorted;
   sorted.reserve(counts.size());
@@ -2415,7 +2455,7 @@ void prepare(const sentence_set_type& sources,
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
     sorted.push_back(&(*citer));
   
-  sort(sorted.begin(), sorted.end(), greater_psecond<const count_set_type::value_type>());
+  std::sort(sorted.begin(), sorted.end(), greater_psecond<const count_set_type::value_type>());
 
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
@@ -2532,9 +2572,11 @@ struct ViterbiReducer
   typedef ViterbiMapReduce::queue_type  queue_type;  
   
   ViterbiReducer(queue_type& __reducer,
-		 std::ostream& __os)
+		 std::ostream& __os,
+		 const int __debug)
     : reducer(__reducer),
-      os(__os) {}
+      os(__os),
+      debug(__debug) {}
 
   void operator()()
   {
@@ -2558,6 +2600,13 @@ struct ViterbiReducer
 	  dumper(os, bitext.source, bitext.target, bitext.derivation);
 	os << '\n';
 	++ id;
+	
+	if (debug) {
+	  if (id % 10000 == 0)
+	    std::cerr << '.';
+	  if (id % 1000000 == 0)
+	    std::cerr << '\n';
+	}
       }
       
       while (! bitexts.empty() && bitexts.begin()->id == id) {
@@ -2568,6 +2617,13 @@ struct ViterbiReducer
 	os << '\n';
 	++ id;
 	
+	if (debug) {
+	  if (id % 10000 == 0)
+	    std::cerr << '.';
+	  if (id % 1000000 == 0)
+	    std::cerr << '\n';
+	}
+
 	bitexts.erase(bitexts.begin());
       }
     }
@@ -2579,16 +2635,27 @@ struct ViterbiReducer
 	dumper(os, bitext.source, bitext.target, bitext.derivation);
       os << '\n';
       ++ id;
+
+      if (debug) {
+	if (id % 10000 == 0)
+	  std::cerr << '.';
+	if (id % 1000000 == 0)
+	  std::cerr << '\n';
+      }
       
       bitexts.erase(bitexts.begin());
     }
     
     if (! bitexts.empty())
       throw std::runtime_error("bitexts stil renam???");
+    
+    if (debug && id >= 10000 && id % 1000000 != 0)
+      std::cerr << std::endl;
   }
   
   queue_type& reducer;
   std::ostream& os;
+  int debug;
 };
 
 void viterbi(const path_type& output_file,
@@ -2615,11 +2682,11 @@ void viterbi(const path_type& output_file,
     workers.add_thread(new boost::thread(ViterbiMapper(mapper, reducer, model, beam)));
   
   if (sample_hypergraph)
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpHypergraph>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpHypergraph>(reducer, os, debug)));
   else if (sample_alignment)
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpAlignment>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpAlignment>(reducer, os, debug)));
   else
-    dumper.add_thread(new boost::thread(ViterbiReducer<DumpDerivation>(reducer, os)));
+    dumper.add_thread(new boost::thread(ViterbiReducer<DumpDerivation>(reducer, os, debug)));
   
   utils::compress_istream is_src(source_file, 1024 * 1024);
   utils::compress_istream is_trg(target_file, 1024 * 1024);

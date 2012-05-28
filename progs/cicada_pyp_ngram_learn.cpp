@@ -251,13 +251,13 @@ struct PYPLM
   template <typename Sampler>
   void increment(const word_type& word, Sampler& sampler, const double temperature=1.0)
   {
-    counts0 += root.table.increment(word, p0, sampler, temperature);
+    root.table.increment(word, p0, sampler, temperature);
   }
   
   template <typename Sampler>
   void decrement(const word_type& word, Sampler& sampler)
   {
-    counts0 -= root.table.decrement(word, sampler);
+    root.table.decrement(word, sampler);
   }
   
   void initialize(const double __p0)
@@ -334,6 +334,8 @@ struct PYPLM
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    counts0 = root.table.size_table();
+    
     for (size_type i = 0; i != shards.size(); ++ i)
       shards[i].root.table = root.table;
     
@@ -394,6 +396,8 @@ struct PYPLM
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    counts0 = root.table.size_table();
+    
     for (size_type i = 0; i != shards.size(); ++ i)
       shards[i].root.table = root.table;
     
