@@ -2186,12 +2186,8 @@ struct Counter
   void wait(size_type target)
   {
     for (;;) {
-      utils::atomicop::memory_barrier();
-      
       for (int i = 0; i < 64; ++ i) {
-	const size_type curr = counter;
-	
-	if (curr == target)
+	if (counter == target)
 	  return;
 	else
 	  boost::thread::yield();
