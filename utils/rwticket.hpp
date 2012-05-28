@@ -42,9 +42,11 @@ namespace utils
 
       void unlock()
       {
-	utils::atomicop::memory_barrier();
+	//utils::atomicop::memory_barrier();
       
-	++ ticket_.s.ticket;
+	//++ ticket_.s.ticket;
+	
+	__sync_add_and_fetch(&ticket_.s.ticket, uint16_t(1));
       }
 
       bool try_lock()
