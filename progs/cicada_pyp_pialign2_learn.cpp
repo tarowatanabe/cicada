@@ -476,6 +476,7 @@ struct PYPPhrase
   PYPPhrase(const double& __p0,
 	    const parameter_type& parameter)
     : p0(__p0),
+      counts0(0),
       table(parameter),
       phrases(),
       phrase_pairs() {}
@@ -507,7 +508,7 @@ struct PYPPhrase
   }
   
   template <typename Sampler>
-  void increment_existing(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_existing(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler, const double temperature=1.0)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -515,10 +516,12 @@ struct PYPPhrase
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
     table.increment_existing(id_pair, sampler);
+
+    counts0 += (base && phrase_pair.source.size() <= 1 && phrase_pair.target.size() <= 1);
   }
 
   template <typename Sampler>
-  void increment_new(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
+  void increment_new(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler, const double temperature=1.0)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -526,10 +529,12 @@ struct PYPPhrase
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
     table.increment_new(id_pair, sampler);
+
+    counts0 += (base && phrase_pair.source.size() <= 1 && phrase_pair.target.size() <= 1);
   }
   
   template <typename Sampler>
-  void decrement(const phrase_pair_type& phrase_pair, Sampler& sampler)
+  void decrement(const phrase_pair_type& phrase_pair, const bool base, Sampler& sampler)
   {
     const id_type id_source = phrase_id(phrase_pair.source);
     const id_type id_target = phrase_id(phrase_pair.target);
@@ -537,6 +542,8 @@ struct PYPPhrase
     const id_type id_pair = phrase_pair_id(id_source, id_target);
     
     table.decrement(id_pair, sampler);
+
+    counts0 -= (base && phrase_pair.source.size() <= 1 && phrase_pair.target.size() <= 1);
   }
   
   logprob_type logprob_fallback() const
@@ -569,7 +576,7 @@ struct PYPPhrase
   
   double log_likelihood() const
   {
-    return table.log_likelihood() + cicada::semiring::log(p0) * table.size_table();
+    return table.log_likelihood() + cicada::semiring::log(p0) * counts0;
   }
   
   double log_likelihood(const double& discount, const double& strength) const
@@ -632,6 +639,7 @@ struct PYPPhrase
   }
   
   logprob_type p0;
+  size_type    counts0;
   
   table_type           table;
   phrase_set_type      phrases;
@@ -733,9 +741,9 @@ struct PYPPiAlign
     rule.increment(r, sampler, temperature);
     
     if (r.itg == PYP::GENERATIVE)
-      phrase.increment_existing(phrase_pair, sampler, temperature);
+      phrase.increment_existing(phrase_pair, r.itg != PYP::GENERATIVE, sampler, temperature);
     else
-      phrase.increment_new(phrase_pair, sampler, temperature);
+      phrase.increment_new(phrase_pair, r.itg != PYP::GENERATIVE, sampler, temperature);
     
     if (r.itg != PYP::GENERATIVE)
       epsilon.increment(phrase_pair, sampler, temperature);
@@ -749,7 +757,7 @@ struct PYPPiAlign
     
     rule.decrement(r, sampler);
     
-    phrase.decrement(phrase_pair, sampler);
+    phrase.decrement(phrase_pair, r.itg != PYP::GENERATIVE, sampler);
     
     if (r.itg != PYP::GENERATIVE)
       epsilon.decrement(phrase_pair, sampler);
@@ -940,7 +948,7 @@ struct PYPGraph
 	  agenda[span_pair.size()].push_back(span_pair);
 	}
 	
-	// phrase-pair
+	// word-pair
 	
 	if (source_first < source.size() && target_first < target.size()) {
 	  const size_type source_last = source_first + 1;
@@ -1593,10 +1601,10 @@ double rule_discount_beta  = 1.0;
 double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double phrase_discount_alpha = 1e+5;
+double phrase_discount_alpha = 1.0;
 double phrase_discount_beta  = 1.0;
-double phrase_strength_shape = 1e+6;
-double phrase_strength_rate  = 1e-6;
+double phrase_strength_shape = 1.0;
+double phrase_strength_rate  = 1.0;
 
 int blocks  = 64;
 int threads = 1;
