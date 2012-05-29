@@ -279,7 +279,7 @@ struct PYPWord
   }
   
   template <typename Iterator, typename Sampler>
-  bool increment(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
+  void increment(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler, const double temperature=1.0)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -304,32 +304,25 @@ struct PYPWord
       }
     }
     
-    return increment(segment, node, sampler, temperature);
+    increment(segment, node, sampler, temperature);
   }
 
   template <typename Sampler>
-  bool increment(const segment_type& segment, const id_type& node, Sampler& sampler, const double temperature=1.0)
+  void increment(const segment_type& segment, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
-    if (node == trie.root()) {
-      if (root.table.increment(segment, p0, sampler, temperature))
-	++ counts0;
-      else
-	return false;
-    } else {
+    if (node == trie.root())
+      root.table.increment(segment, p0, sampler, temperature);
+    else {
       const double backoff = prob(segment, trie[node].parent);
       
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(segment, backoff, sampler, temperature))
 	increment(segment, trie[node].parent, sampler, temperature);
-      else
-	return false;
     }
-      
-    return true;
   }
 
   template <typename Iterator, typename Sampler>
-  bool decrement(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler)
+  void decrement(const segment_type& segment, Iterator first, Iterator last, Sampler& sampler)
   {
     typedef std::reverse_iterator<Iterator> reverse_iterator;
     
@@ -340,25 +333,18 @@ struct PYPWord
     for (reverse_iterator iter = begin; iter != end; ++ iter)
       node = trie.find(node, *iter);
     
-    return decrement(segment, node, sampler);
+    decrement(segment, node, sampler);
   }
   
   template <typename Sampler>
-  bool decrement(const segment_type& segment, const id_type& node, Sampler& sampler)
+  void decrement(const segment_type& segment, const id_type& node, Sampler& sampler)
   {
-    if (node == trie.root()) {
-      if (root.table.decrement(segment, sampler))
-	-- counts0;
-      else
-	return false;
-    } else {
+    if (node == trie.root())
+      root.table.decrement(segment, sampler);
+    else {
       if (trie[node].table.decrement(segment, sampler))
 	decrement(segment, trie[node].parent, sampler);
-      else
-	return false;
     }
-      
-    return true;
   }
   
 
@@ -485,7 +471,7 @@ struct PYPWord
 
   double log_likelihood() const
   {
-    double logprob = 0.0;
+    double logprob = std::log(p0) * counts0;
     for (size_type order = 0; order != discount.size(); ++ order)
       logprob += log_likelihood(order, discount[order], strength[order]);
     
@@ -540,6 +526,8 @@ struct PYPWord
   template <typename Sampler>
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    counts0 = root.table.size_table();
+
     for (size_type order = 0; order != discount.size(); ++ order) {
       for (int iter = 0; iter != num_loop; ++ iter) {
 	strength[order] = sample_strength(order, sampler, discount[order], strength[order]);
@@ -552,15 +540,11 @@ struct PYPWord
       if (order == 0) {
 	root.table.discount() = discount[order];
 	root.table.strength() = strength[order];
-	
-	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
 	  trie[*niter].table.discount() = discount[order];
 	  trie[*niter].table.strength() = strength[order];
-	  
-	  trie[*niter].table.verify_parameters();
 	}
       }
     }
@@ -612,6 +596,8 @@ struct PYPWord
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
+    counts0 = root.table.size_table();
+
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
       StrengthSampler strength_sampler(*this, order);
@@ -648,15 +634,11 @@ struct PYPWord
       if (order == 0) {
 	root.table.discount() = discount[order];
 	root.table.strength() = strength[order];
-
-	root.table.verify_parameters();
       } else {
 	node_set_type::const_iterator niter_end = nodes[order].end();
 	for (node_set_type::const_iterator niter = nodes[order].begin(); niter != niter_end; ++ niter) {
 	  trie[*niter].table.discount() = discount[order];
 	  trie[*niter].table.strength() = strength[order];
-	  
-	  trie[*niter].table.verify_parameters();
 	}
       }
     }
@@ -789,44 +771,30 @@ struct PYPLM
   }
   
   template <typename Sampler>
-  bool increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
+  void increment(const word_type& word, const id_type& node, Sampler& sampler, const double temperature=1.0)
   {
     if (node == trie.root()) {
-      if (root.table.increment(word, base.prob(word), sampler, temperature)) {
+      if (root.table.increment(word, base.prob(word), sampler, temperature))
 	base.increment(word, sampler, temperature);
-	++ counts0;
-      } else
-	return false;
     } else {
       const double backoff = prob(word, trie[node].parent);
       
       // we will also increment lower-order when new table is created!
       if (trie[node].table.increment(word, backoff, sampler, temperature))
 	increment(word, trie[node].parent, sampler, temperature);
-      else
-	return false;
     }
-      
-    return true;
   }
   
   template <typename Sampler>
-  bool decrement(const word_type& word, const id_type& node, Sampler& sampler)
+  void decrement(const word_type& word, const id_type& node, Sampler& sampler)
   {
     if (node == trie.root()) {
-      if (root.table.decrement(word, sampler)) {
+      if (root.table.decrement(word, sampler))
 	base.decrement(word, sampler);
-	-- counts0;
-      } else
-	return false;
     } else {
       if (trie[node].table.decrement(word, sampler))
 	decrement(word, trie[node].parent, sampler);
-      else
-	return false;
     }
-      
-    return true;
   }
   
   double prob(const word_type& word, const id_type& node) const
@@ -933,6 +901,8 @@ struct PYPLM
     sample_length(sampler);
     
     base.sample_parameters(sampler, num_loop, num_iterations);
+
+    counts0 = root.table.size_table();
     
     for (size_type order = 0; order != discount.size(); ++ order) {
       
@@ -1010,6 +980,8 @@ struct PYPLM
     sample_length(sampler);
     
     base.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    counts0 = root.table.size_table();
 
     for (size_type order = 0; order != discount.size(); ++ order) {
       DiscountSampler discount_sampler(*this, order);
