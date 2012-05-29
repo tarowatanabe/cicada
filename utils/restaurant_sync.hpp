@@ -243,10 +243,10 @@ namespace utils
 
       if (loc.empty()) {
 	loc.tables.push_back(1);
-	utils::atomicop::fetch_and_add(tables, size_type(1));
+	utils::atomicop::add_and_fetch(tables, size_type(1));
 	
 	++ loc.customers;
-	utils::atomicop::fetch_and_add(customers, size_type(1));
+	utils::atomicop::add_and_fetch(customers, size_type(1));
 	
 	return true;
       }
@@ -270,7 +270,7 @@ namespace utils
 	throw std::runtime_error("not incremented?");
       
       ++ loc.customers;
-      utils::atomicop::fetch_and_add(customers, size_type(1));
+      utils::atomicop::add_and_fetch(customers, size_type(1));
       
       return false;
     }
@@ -286,10 +286,10 @@ namespace utils
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 
       loc.tables.push_back(1);
-      utils::atomicop::fetch_and_add(tables, size_type(1));
+      utils::atomicop::add_and_fetch(tables, size_type(1));
       
       ++ loc.customers;
-      utils::atomicop::fetch_and_add(customers, size_type(1));
+      utils::atomicop::add_and_fetch(customers, size_type(1));
       
       return true;
     }
@@ -340,11 +340,11 @@ namespace utils
 
       } else {
 	loc.tables.push_back(1);
-	utils::atomicop::fetch_and_add(tables, size_type(1));
+	utils::atomicop::add_and_fetch(tables, size_type(1));
       }
       
       ++ loc.customers;
-      utils::atomicop::fetch_and_add(customers, size_type(1));
+      utils::atomicop::add_and_fetch(customers, size_type(1));
       
       return ! existing;
     }
@@ -407,8 +407,8 @@ namespace utils
 	++ inserted_customers;
       }
 
-      utils::atomicop::fetch_and_add(customers, inserted_customers);
-      utils::atomicop::fetch_and_add(tables,    inserted_tables);
+      utils::atomicop::add_and_fetch(customers, inserted_customers);
+      utils::atomicop::add_and_fetch(tables,    inserted_tables);
       
       return inserted_tables;
     }
@@ -425,8 +425,8 @@ namespace utils
       
       if (loc.customers == 1) {
 	loc.clear();
-	utils::atomicop::fetch_and_add(tables, size_type(-1));
-	utils::atomicop::fetch_and_add(customers, size_type(-1));
+	utils::atomicop::add_and_fetch(tables, size_type(-1));
+	utils::atomicop::add_and_fetch(customers, size_type(-1));
 	return true;
       }
       
@@ -444,7 +444,7 @@ namespace utils
 	  
 	  if (! (*titer)) {
 	    erased = true;
-	    utils::atomicop::fetch_and_add(tables, size_type(-1));
+	    utils::atomicop::add_and_fetch(tables, size_type(-1));
 	    loc.tables.erase(titer);
 	  }
 	  break;
@@ -455,7 +455,7 @@ namespace utils
 	throw std::runtime_error("not decremented?");
       
       -- loc.customers;
-      utils::atomicop::fetch_and_add(customers, size_type(-1));
+      utils::atomicop::add_and_fetch(customers, size_type(-1));
       
       return erased;
     }
@@ -507,8 +507,8 @@ namespace utils
 	++ erased_customers;
       }
       
-      utils::atomicop::fetch_and_add(customers, size_type(0) - erased_customers);
-      utils::atomicop::fetch_and_add(tables,    size_type(0) - erased_tables);
+      utils::atomicop::add_and_fetch(customers, size_type(0) - erased_customers);
+      utils::atomicop::add_and_fetch(tables,    size_type(0) - erased_tables);
       
       return erased_tables;
     }
