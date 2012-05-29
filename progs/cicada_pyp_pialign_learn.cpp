@@ -1117,8 +1117,10 @@ struct PYPRule
   {
     table.sample_parameters(sampler, num_loop, num_iterations);
 
-    counts0_terminal = table[PYP::TERMINAL].size_table();
-    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    if (PYP::TERMINAL < table.size()) {
+      counts0_terminal = table[PYP::TERMINAL].size_table();
+      counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    }
   }
   
   template <typename Sampler>
@@ -1126,8 +1128,10 @@ struct PYPRule
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
     
-    counts0_terminal = table[PYP::TERMINAL].size_table();
-    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    if (PYP::TERMINAL < table.size()) {
+      counts0_terminal = table[PYP::TERMINAL].size_table();
+      counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    }
   }
   
   double     p0_terminal;
