@@ -1700,7 +1700,7 @@ struct Task
 	  if (counts[i])
 	    model.rule.table.decrement(i, counts[i], sampler);
 	
-	std::sort(ids.begin(), ids.end(), std::less<id_type>());
+	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
 	
 	id_set_type::const_iterator iiter_end = ids.end();
 	for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
