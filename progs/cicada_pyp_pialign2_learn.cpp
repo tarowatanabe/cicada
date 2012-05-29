@@ -424,9 +424,11 @@ struct PYPRule
   void sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.sample_parameters(sampler, num_loop, num_iterations);
-
-    counts0_terminal = table[PYP::TERMINAL].size_table();
-    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    
+    if (PYP::TERMINAL < table.size()) {
+      counts0_terminal = table[PYP::TERMINAL].size_table();
+      counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    }
   }
   
   template <typename Sampler>
@@ -434,8 +436,10 @@ struct PYPRule
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
     
-    counts0_terminal = table[PYP::TERMINAL].size_table();
-    counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    if (PYP::TERMINAL < table.size()) {
+      counts0_terminal = table[PYP::TERMINAL].size_table();
+      counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+    }
   }
   
   double     p0_terminal;
@@ -653,7 +657,6 @@ struct PYPEpsilon
       p0_epsilon(__p0_epsilon),
       counts0(0),
       counts0_epsilon(0) {}
-  
   
   template <typename Sampler>
   void increment(const phrase_pair_type& phrase_pair, Sampler& sampler, const double temperature=1.0)
@@ -1665,7 +1668,7 @@ int main(int argc, char ** argv)
     position_set_type(positions).swap(positions);
     
     sampler_type sampler;
-    
+
     // sample parameters, first...
     if (slice_sampling)
       model.slice_sample_parameters(sampler, resample_iterations);
