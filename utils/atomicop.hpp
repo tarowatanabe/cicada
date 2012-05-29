@@ -88,7 +88,7 @@ namespace utils
 	return ::InterlockedExchangeAdd64((void*)ptr, addend) + addend;
 #elif defined(__APPLE__)
 	return OSAtomicAdd64Barrier(addend, (int64_t*) ptr);
-#elif defined(__GNUC__) && defined(__x86_64)
+#elif defined(__GNUC__)
 	return __sync_add_and_fetch(ptr, addend);
 #else	//fallback, slow
 #pragma message("slow fetch_and_add_64")
@@ -168,7 +168,7 @@ namespace utils
 	return ::InterlockedExchangeAdd64((void*)ptr, addend);
 #elif defined(__APPLE__)
 	return OSAtomicAdd64Barrier(addend, (int64_t*) ptr) - addend;
-#elif defined(__GNUC__) && defined(__x86_64)
+#elif defined(__GNUC__)
 	return __sync_fetch_and_add(ptr, addend);
 #else	//fallback, slow
 #pragma message("slow fetch_and_add_64")
