@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/type_traits.hpp>
 
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
@@ -293,7 +294,7 @@ namespace utils
       
       return true;
     }
-    
+
     template <typename Sampler>
     bool increment(const dish_type dish, const double& p0, Sampler& sampler, const double temperature=1.0)
     {
@@ -349,8 +350,81 @@ namespace utils
       return ! existing;
     }
 
+    template <typename Iterator, typename Sampler>
+    size_type increment(Iterator first, Iterator last, const double& p0, Sampler& sampler, const double temperature=1.0)
+    {
+      typedef typename boost::is_integral<Iterator>::type __integral;
+      
+      return increment_dispatch(first, last, p0, sampler, temperature, __integral());
+    }
+
+    template <typename Iterator, typename Sampler>
+    size_type increment_dispatch(Iterator first, Iterator last, const double& p0, Sampler& sampler, const double temperature, boost::false_type)
+    {
+      size_type inserted_customers = 0;
+      size_type inserted_tables = 0;
+      
+      for (/**/; first != last; ++ first) {
+	const dish_type dish = *first;
+	
+	if (dish >= dishes.size())
+	  dishes.resize(dish + 1);
+	
+	location_type& loc = dishes[dish];
+	
+	typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
+	
+	bool existing = false;
+	if (loc.customers) {
+	  if (temperature == 1.0) {
+	    const double p_base = (parameter.strength + (tables + inserted_tables) * parameter.discount) * p0;
+	    const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
+	    
+	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
+	  } else {
+	    const double p_base = std::pow((parameter.strength + (tables + inserted_tables) * parameter.discount) * p0, 1.0 / temperature);
+	    const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
+	    
+	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
+	  }
+	}
+	
+	if (existing) {
+	  double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
+	  
+	  bool incremented = false;
+	  
+	  typename location_type::table_set_type::iterator titer_end = loc.tables.end();
+	  for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
+	    r -= (*titer - parameter.discount);
+	    
+	    if (r <= 0.0) {
+	      ++ (*titer);
+	      incremented = true;
+	      break;
+	    }
+	  }
+	  
+	  if (! incremented)
+	    throw std::runtime_error("not incremented?");
+	  
+	} else {
+	  loc.tables.push_back(1);
+	  ++ inserted_tables;
+	}
+	
+	++ loc.customers;
+	++ inserted_customers;
+      }
+      
+      utils::atomicop::add_and_fetch(customers, inserted_customers);
+      utils::atomicop::add_and_fetch(tables,    inserted_tables);
+      
+      return inserted_tables;
+    }
+
     template <typename Sampler>
-    size_type increment(const dish_type dish, const size_type count, const double& p0, Sampler& sampler, const double temperature=1.0)
+    size_type increment_dispatch(const dish_type dish, const size_type count, const double& p0, Sampler& sampler, const double temperature, boost::true_type)
     {
       if (dish >= dishes.size())
 	dishes.resize(dish + 1);
@@ -460,8 +534,71 @@ namespace utils
       return erased;
     }
 
+    template <typename Iterator, typename Sampler>
+    size_type decrement(Iterator first, Iterator last, Sampler& sampler)
+    {
+      typedef typename boost::is_integral<Iterator>::type __integral;
+      
+      return decrement_dispatch(first, last, sampler, __integral());
+    }
+    
+    template <typename Iterator, typename Sampler>
+    size_type decrement_dispatch(Iterator first, Iterator last, Sampler& sampler, boost::false_type)
+    {
+      size_type erased_customers = 0;
+      size_type erased_tables = 0;
+      
+      for (/**/; first != last; ++ first) {
+	const dish_type dish = *first;
+	
+	if (dish >= dishes.size())
+	  throw std::runtime_error("restaurant_sync: dish was not inserted?");
+	
+	location_type& loc = dishes[dish];
+	
+	typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
+	
+	if (loc.customers == 1) {
+	  loc.clear();
+	  ++ erased_customers;
+	  ++ erased_tables;
+	  continue;
+	}
+	
+	bool decremented = false;
+	double r = sampler.uniform() * loc.customers;
+	
+	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
+	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
+	  r -= *titer;
+	
+	  if (r <= 0.0) {
+	    -- (*titer);
+	    decremented = true;
+	    
+	    if (! (*titer)) {
+	      ++ erased_tables;
+	      loc.tables.erase(titer);
+	    }
+	    break;
+	  }
+	}
+	
+	if (! decremented)
+	  throw std::runtime_error("not decremented?");
+	
+	-- loc.customers;
+	++ erased_customers;
+      }
+      
+      utils::atomicop::add_and_fetch(customers, size_type(0) - erased_customers);
+      utils::atomicop::add_and_fetch(tables,    size_type(0) - erased_tables);
+      
+      return erased_tables;
+    }
+    
     template <typename Sampler>
-    size_type decrement(const dish_type dish, const size_type count, Sampler& sampler)
+    size_type decrement_dispatch(const dish_type dish, const size_type count, Sampler& sampler, boost::true_type)
     {
       if (dish >= dishes.size())
 	throw std::runtime_error("restaurant_sync: dish was not inserted?");

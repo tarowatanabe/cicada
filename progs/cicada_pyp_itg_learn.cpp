@@ -1701,10 +1701,8 @@ struct Task
 	    model.rule.table.decrement(i, counts[i], sampler);
 	
 	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
-	
-	id_set_type::const_iterator iiter_end = ids.end();
-	for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
-	  model.lexicon.table.decrement(*iiter, sampler);
+
+	model.lexicon.table.decrement(ids.begin(), ids.end(), sampler);
       }
 
       utils::resource res2;
@@ -1721,32 +1719,32 @@ struct Task
       
       utils::resource res5;
       
-      counts.clear();
-      counts.resize(3, size_type(0));
-      ids.clear();
-      
-      derivation_type::iterator diter_end = derivations[pos].end();
-      for (derivation_type::iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
+      {
+	counts.clear();
+	counts.resize(3, size_type(0));
+	ids.clear();
 	
-	++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
-	
-	if (diter->is_terminal()) {
-	  diter->word_pair = model.lexicon.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
-							diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
+	derivation_type::iterator diter_end = derivations[pos].end();
+	for (derivation_type::iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter) {
 	  
-	  ids.push_back(diter->word_pair);
+	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
+	  
+	  if (diter->is_terminal()) {
+	    diter->word_pair = model.lexicon.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
+							  diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
+	    
+	    ids.push_back(diter->word_pair);
+	  }
 	}
+	
+	for (size_type i = 0; i != counts.size(); ++ i)
+	  if (counts[i])
+	    model.rule.table.increment(i, counts[i], i == PYP::TERMINAL ? model.rule.p0_terminal : model.rule.p0, sampler, temperature);
+	
+	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
+	
+	model.lexicon.table.increment(ids.begin(), ids.end(), model.lexicon.p0, sampler, temperature);
       }
-      
-      for (size_type i = 0; i != counts.size(); ++ i)
-	if (counts[i])
-	  model.rule.table.increment(i, counts[i], i == PYP::TERMINAL ? model.rule.p0_terminal : model.rule.p0, sampler, temperature);
-      
-      std::sort(ids.begin(), ids.end(), std::greater<id_type>());
-      
-      id_set_type::const_iterator iiter_end = ids.end();
-      for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
-	model.lexicon.table.increment(*iiter, model.lexicon.p0, sampler, temperature);
       
       utils::resource res6;
       
