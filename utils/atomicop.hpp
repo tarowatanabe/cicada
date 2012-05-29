@@ -42,8 +42,6 @@ namespace utils
       _ReadWriteBarrier();
 #elif defined(__APPLE__)
       OSMemoryBarrier();
-#elif defined(AO_HAVE_nop_full)
-      AO_nop_full(); // for libatomic_ops from GC...
 #else
 #   warning "no memory barrier implemented for this platform"
 #endif
@@ -252,10 +250,6 @@ namespace utils
 	return __sync_bool_compare_and_swap(ptr, comparand, replacement);
 #elif defined(__SUNPRO_CC) && defined(__sparc)
 	return atomic_cas_32((volatile unsigned int*)ptr, comparand, replacement) == comparand;
-#elif defined(AO_HAVE_compare_and_swap_full)
-	return AO_compare_and_swap_full(reinterpret_cast<volatile AO_t*>(ptr),
-					reinterpret_cast<AO_t>(comparand),
-					reinterpret_cast<AO_t>(replacement));
 #else
 #pragma message("slow compare_and_swap_32")
 	bool res = false;
