@@ -156,8 +156,8 @@ namespace utils
     }
     
   private:
-    mutex_type mutex_;
-    int        pending_;
+    mutex_type        mutex_;
+    volatile int32_t  pending_;
   };
 };
 
