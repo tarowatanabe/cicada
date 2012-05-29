@@ -127,12 +127,12 @@ namespace utils
     void lock_reader()
     {
       for (;;) {
-	utils::atomicop::fetch_and_add(pending_, 1);
+	utils::atomicop::add_and_fetch(pending_, 1);
 	
 	if (! mutex_.locked()) return;
 	
 	// release
-	utils::atomicop::fetch_and_add(pending_, -1);
+	utils::atomicop::add_and_fetch(pending_, -1);
 	
 	while (mutex_.locked())
 	  boost::thread::yield();
@@ -141,18 +141,18 @@ namespace utils
 
     bool trylock_reader()
     {
-      utils::atomicop::fetch_and_add(pending_, 1);
+      utils::atomicop::add_and_fetch(pending_, 1);
       
       if (! mutex_.locked()) return true;
       
-      utils::atomicop::fetch_and_add(pending_, -1);
+      utils::atomicop::add_and_fetch(pending_, -1);
       
       return false;
     }
     
     void unlock_reader()
     {
-      utils::atomicop::fetch_and_add(pending_, -1);
+      utils::atomicop::add_and_fetch(pending_, -1);
     }
     
   private:
