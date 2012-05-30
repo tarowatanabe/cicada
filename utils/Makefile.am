@@ -177,6 +177,7 @@ piece_main \
 program_options_main \
 random_seed_main \
 restaurant_main \
+rwphase_main \
 rwspinlock_main \
 rwticket_main \
 simple_vector_main \
@@ -280,6 +281,10 @@ byte_aligned_code_main_SOURCES = byte_aligned_code_main.cpp
 byte_aligned_vector_main_SOURCES = byte_aligned_vector_main.cpp
 
 restaurant_main_SOURCES = restaurant_main.cpp
+
+rwphase_main_SOURCES = rwphase_main.cpp
+rwphase_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+rwphase_main_LDADD = $(LIBUTILS) $(BOOST_THREAD_LIBS)
 
 rwspinlock_main_SOURCES = rwspinlock_main.cpp
 rwspinlock_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
