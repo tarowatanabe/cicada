@@ -25,12 +25,14 @@ namespace utils
     inline
     void memory_barrier()
     {
-#if defined(__GNUC__) && ( (__GNUC__ > 4) || ((__GNUC__ >= 4) && (__GNUC_MINOR__ >= 1)) )
-      __sync_synchronize();
-#elif defined(_WIN32)
+#if defined(_WIN32)
       ::MemoryBarrier();
 #elif defined(__APPLE__)
       OSMemoryBarrier();
+#elif defined(__GNUC__) && defined(__x86_64__)
+      __asm__ __volatile__("mfence" ::: "memory");
+#elif defined(__GNUC__)
+      __sync_synchronize();
 #else
 #   warning "no memory barrier implemented for this platform"
 #endif
@@ -172,7 +174,7 @@ namespace utils
 	return __sync_fetch_and_add(ptr, addend);
 #else	//fallback, slow
 #pragma message("slow fetch_and_add_64")
-	int64 res;
+	int64_t res;
 	{
 	  res = *ptr;
 	  *(ptr) += addend;
@@ -304,7 +306,6 @@ namespace utils
       static inline
       int64_t result(volatile Tp* ptr) { return (int64_t) ptr; }
     };
-    
 
     template <typename Tp>
     inline
