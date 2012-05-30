@@ -19,7 +19,7 @@
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
 #include <utils/pyp_parameter.hpp>
-#include <utils/rwphase.hpp>
+#include <utils/rwticket.hpp>
 #include <utils/atomicop.hpp>
 
 // Chinese Restaurant Process
@@ -114,7 +114,7 @@ namespace utils
       
       typedef typename table_set_type::const_iterator const_iterator;
       
-      typedef utils::rwphase mutex_type;
+      typedef utils::rwticket mutex_type;
       
       Location() : customers(0), tables(), mutex() {}
       Location(const Location& x) : customers(x.customers), tables(x.tables), mutex() {}
