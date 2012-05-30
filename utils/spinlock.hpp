@@ -83,10 +83,10 @@ namespace utils
     bool try_lock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      uint16_t me = m_spinlock.s.users;
-      uint16_t menew = me + 1;
-      uint32_t cmp    = (uint32_t(me) << 16) + me;
-      uint32_t cmpnew = (uint32_t(menew) << 16) + me;
+      const uint16_t me = m_spinlock.s.users;
+      const uint16_t menew = me + 1;
+      const uint32_t cmp    = (uint32_t(me) << 16)    | me;
+      const uint32_t cmpnew = (uint32_t(menew) << 16) | me;
       
       return utils::atomicop::compare_and_swap(m_spinlock.u, cmp, cmpnew);
       
@@ -123,9 +123,6 @@ namespace utils
     void unlock()
     {
 #if defined(__UTILS_SPINLOCK_GCC_CAS__)
-      //utils::atomicop::memory_barrier();
-      
-      //++ m_spinlock.s.ticket;
       __sync_add_and_fetch(&m_spinlock.s.ticket, uint16_t(1));
 #elif defined(HAVE_OSSPINLOCK)
       OSSpinLockUnlock(&m_spinlock);

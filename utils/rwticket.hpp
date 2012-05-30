@@ -39,29 +39,25 @@ namespace utils
 	while (ticket_.s.ticket != me)
 	  boost::thread::yield();
       }
-
+      
       void unlock()
       {
-	//utils::atomicop::memory_barrier();
-      
-	//++ ticket_.s.ticket;
-	
 	__sync_add_and_fetch(&ticket_.s.ticket, uint16_t(1));
       }
-
+      
       bool try_lock()
       {
-	uint16_t me = ticket_.s.users;
-	uint16_t menew = me + 1;
-	uint32_t cmp    = (uint32_t(me) << 16) + me;
-	uint32_t cmpnew = (uint32_t(menew) << 16) + me;
+	const uint16_t me = ticket_.s.users;
+	const uint16_t menew = me + 1;
+	const uint32_t cmp    = (uint32_t(me) << 16)    | me;
+	const uint32_t cmpnew = (uint32_t(menew) << 16) | me;
 	
 	return utils::atomicop::compare_and_swap(ticket_.u, cmp, cmpnew);
       }
       
       bool locked()
       {
-	ticket_type u = ticket_;
+	const ticket_type u = ticket_;
 	
 	utils::atomicop::memory_barrier();
 	
@@ -131,7 +127,6 @@ namespace utils
 	
 	if (! mutex_.locked()) return;
 	
-	// release
 	utils::atomicop::add_and_fetch(pending_, -1);
 	
 	while (mutex_.locked())
