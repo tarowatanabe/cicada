@@ -121,6 +121,11 @@ spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
 stick_break.hpp \
+smap.hpp \
+sset.hpp \
+stree.hpp 
+stree_map.hpp \
+stree_set.hpp \
 subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \
