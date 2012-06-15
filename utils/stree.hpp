@@ -473,8 +473,8 @@ namespace sti
             typedef typename Allocator::template rebind<BaseBNode>::other::pointer base_bnode_ptr;
             typedef typename Allocator::template rebind<Key>::other KeyAllocator;
 
-            typedef KeyWrapper<Key, gist_traits, KeyAllocator, key_policy> KeyWrapper;
-            typedef KeyWithGist<Key, gist_traits, key_policy > KeyWithGist;
+	  typedef implementation::KeyWrapper<Key, gist_traits, KeyAllocator, key_policy> KeyWrapper;
+	  typedef implementation::KeyWithGist<Key, gist_traits, key_policy > KeyWithGist;
 
 
             struct InnerNode : boost::noncopyable
