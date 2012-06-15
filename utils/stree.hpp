@@ -43,9 +43,9 @@
 #include <boost/preprocessor/iteration/local.hpp>
 
 // Include TR1 stuff
-#include <boost/tr1/tr1/type_traits>
-//#include <boost/tr1/tr1/tuple>
-#include <boost/tr1/tr1/utility>
+#include <tr1/type_traits>
+#include <tr1/utility>
+#include <tr1/tuple>
 
 #ifndef ASSERT
 #  include <cassert>
