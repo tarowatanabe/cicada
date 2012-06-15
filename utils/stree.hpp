@@ -30,6 +30,7 @@
 #ifndef __STI_STREE_H__
 #define __STI_STREE_H__
 
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <functional>
