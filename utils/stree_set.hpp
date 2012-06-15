@@ -16,7 +16,7 @@ namespace utils
 	     size_t BN=64>
    struct stree_set
    {
-     typedef sti::sset<_Key,_Pred, _Aloc, BN> type;
+     typedef sti::sset<_Key,_Pred, _Alloc, BN> type;
    };
 };
 

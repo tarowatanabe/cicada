@@ -17,7 +17,7 @@ namespace utils
 	     size_t BN=64>
    struct stree_map
    {
-     typedef sti::smap<_Key,_Tp,_Pred, _Aloc, BN> type;
+     typedef sti::smap<_Key,_Tp,_Pred, _Alloc, BN> type;
    };
 };
 

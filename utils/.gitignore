@@ -67,6 +67,8 @@ sparse_map_main
 spinlock_main
 static_allocator_main
 stick_break_main
+stree_map_main
+stree_set_main
 subprocess_main
 succinct_vector_main
 symbol_set_main
