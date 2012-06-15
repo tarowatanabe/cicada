@@ -140,8 +140,11 @@ namespace cicada
 	{
 	  const uint64_t value_encode = utils::bithack::branch(x < 0, - x, x);
 	  const size_t   value_size = byte_size(value_encode);
+
+	  const uint8_t __mask_signed   = mask_signed;
+	  const uint8_t __mask_unsigned = mask_unsigned;
 	  
-	  *buffer = utils::bithack::branch(x < 0, mask_signed, mask_unsigned) | (value_size & mask_size);
+	  *buffer = utils::bithack::branch(x < 0, __mask_signed, __mask_unsigned) | (value_size & mask_size);
 	  
 	  byte_type* data = buffer + 1;
 	  
