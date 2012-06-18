@@ -6,6 +6,7 @@
 #include "stemmer/arabic.hpp"
 #include "stemmer/prefix.hpp"
 #include "stemmer/suffix.hpp"
+#include "stemmer/katakana.hpp"
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
@@ -42,6 +43,7 @@ prefix: taking prefix of letters\n\
 suffix: taking suffix of letters\n\
 \tsize=[int] suffix size\n\
 digit: digits normalized to @\n\
+katakana: katakana\n\
 latin: romanization\n\
 lower: lower casing\n\
 upper: upper casing\n\
@@ -144,6 +146,16 @@ nfkd: NFKD\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Digit()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "katakana") {
+      const std::string name("katakana");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Katakana()))).first;
 	iter->second->__algorithm = parameter;
       }
       

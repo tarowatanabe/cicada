@@ -195,6 +195,7 @@ dist_stemmer_HEADERS = \
 stemmer/arabic.hpp \
 stemmer/prefix.hpp \
 stemmer/suffix.hpp \
+stemmer/katakana.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
 stemmer/upper.hpp \
@@ -211,6 +212,7 @@ libcicada_stemmer_la_SOURCES = \
 stemmer/arabic.cpp \
 stemmer/prefix.cpp \
 stemmer/suffix.cpp \
+stemmer/katakana.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
 stemmer/upper.cpp \
