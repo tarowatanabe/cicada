@@ -15,6 +15,7 @@
 #include "stemmer/simplified.hpp"
 #include "stemmer/traditional.hpp"
 #include "stemmer/nfkc.hpp"
+#include "stemmer/nfkd.hpp"
 #include "stemmer/snowball.hpp"
 
 #include "parameter.hpp"
@@ -49,6 +50,7 @@ fullwidth: Halfwidth-Fullwidth\n\
 traditional: Simplified-Traditional\n\
 simplified: Traditioanl-Simplified\n\
 nfkc: NFKC\n\
+nfkd: NFKD\n\
 ";
     return desc;
   }
@@ -222,6 +224,16 @@ nfkc: NFKC\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::NFKC()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "nfkd") {
+      const std::string name("nfkd");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::NFKD()))).first;
 	iter->second->__algorithm = parameter;
       }
       
