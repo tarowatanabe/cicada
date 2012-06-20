@@ -680,6 +680,7 @@ namespace cicada
       return ! (x == y);
     }
     
+#if 0
     friend
     bool operator<(const FeatureVector& x, const FeatureVector& y)
     {
@@ -710,7 +711,7 @@ namespace cicada
     {
       return ! (x < y);
     }
-
+#endif
 
   public:
     

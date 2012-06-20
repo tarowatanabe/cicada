@@ -92,7 +92,12 @@ void check_compact(const feature_set_type& features)
 int main(int argc, char** argv)
 {
   srandom(utils::random_seed());
-
+  
+  std::cerr << "size: feature-vector:    " << sizeof(feature_set_type) << std::endl
+	    << "size: feature-linear:    " << sizeof(feature_linear_type)  << std::endl
+	    << "size: feature-unrodered: " << sizeof(feature_unordered_type)  << std::endl
+	    << "size: feature-compact: " << sizeof(feature_compact_type)  << std::endl;
+  
   feature_set_type features1;
   feature_set_type features2;
   feature_set_type features3;
@@ -138,9 +143,6 @@ int main(int argc, char** argv)
   std::cout << "dot_product(feature1, feature2)" << std::endl;
   std::cout << dot_product(features1, features2) << std::endl;
 
-  std::cout << "feature1 < feature2" << std::endl;
-  std::cout << (features1 < features2) << std::endl;
-
   std::cout << "feature1 == feature2" << std::endl;
   std::cout << (features1 == features2) << std::endl;
 
@@ -152,9 +154,6 @@ int main(int argc, char** argv)
 
   std::cout << "feature1 != feature1(copied)" << std::endl;
   std::cout << (features1 != feature_set_type(features1)) << std::endl;
-
-  std::cout << "feature1 > feature2" << std::endl;
-  std::cout << (features1 > features2) << std::endl;
 
   check_compact(features1);
   check_compact(features2);
