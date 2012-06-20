@@ -679,39 +679,6 @@ namespace cicada
     {
       return ! (x == y);
     }
-    
-#if 0
-    friend
-    bool operator<(const FeatureVector& x, const FeatureVector& y)
-    {
-      return ((x.__sparse && y.__sparse && *x.__sparse < *y.__sparse)
-	      || (! x.__sparse && ! y.__sparse && x.__dense < y.__dense)
-	      || (x.__sparse && ! y.__sparse && std::lexicographical_compare(x.__sparse->begin(), x.__sparse->end(),
-									     y.__dense.begin(), y.__dense.end(),
-									     __less_value()))
-	      || (! x.__sparse && y.__sparse && std::lexicographical_compare(x.__dense.begin(), x.__dense.end(),
-									     y.__sparse->begin(), y.__sparse->end(),
-									     __less_value())));
-    }
-
-    friend
-    bool operator<=(const FeatureVector& x, const FeatureVector& y)
-    {
-      return ! (y < x);
-    }
-
-    friend
-    bool operator>(const FeatureVector& x, const FeatureVector& y)
-    {
-      return y < x;
-    }
-
-    friend
-    bool operator>=(const FeatureVector& x, const FeatureVector& y)
-    {
-      return ! (x < y);
-    }
-#endif
 
   public:
     
