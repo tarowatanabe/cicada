@@ -94,11 +94,13 @@ bool operator==(const hypothesis_type& x, const hypothesis_type& y)
   return x.sentence == y.sentence && x.features == y.features;
 }
 
+#if 0
 inline
 bool operator<(const hypothesis_type& x, const hypothesis_type& y)
 {
   return x.sentence < y.sentence || (!(y.sentence < x.sentence) && x.features < y.features);
 }
+#endif
 
 typedef std::vector<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
 typedef std::vector<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
