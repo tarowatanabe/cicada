@@ -237,10 +237,10 @@ namespace cicada
   public:
     friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
     friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }
-    //friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }
-    //friend bool operator>(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map > y.__map; }
-    //friend bool operator<=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map <= y.__map; }
-    //friend bool operator>=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map >= y.__map; }
+    friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }
+    friend bool operator>(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map > y.__map; }
+    friend bool operator<=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map <= y.__map; }
+    friend bool operator>=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map >= y.__map; }
      
   private:
     map_type __map;

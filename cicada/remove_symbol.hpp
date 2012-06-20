@@ -16,6 +16,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sort_topologically.hpp>
+#include <cicada/feature_vector_linear.hpp>
 
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
@@ -40,8 +41,11 @@ namespace cicada
     
     typedef lattice_type::symbol_type      symbol_type;
     typedef lattice_type::feature_set_type feature_set_type;
+
+    typedef FeatureVectorLinear<double> feature_linear_type;
     
-    typedef std::pair<int, feature_set_type> epsilon_type;
+    typedef std::pair<int, feature_linear_type> epsilon_type;
+
     typedef std::set<epsilon_type, std::less<epsilon_type>, std::allocator<epsilon_type> > closure_type;
     typedef std::vector<closure_type, std::allocator<closure_type> > closure_set_type;
 
@@ -250,11 +254,11 @@ namespace cicada
 	  if (remove_symbol(aiter->label)) {
 	    const int last = state + aiter->distance;
 	    
-	    closure[state].insert(epsilon_type(last, aiter->features));
+	    closure[state].insert(epsilon_type(last, feature_linear_type(aiter->features)));
 	    
 	    closure_type::const_iterator citer_end = closure[last].end();
 	    for (closure_type::const_iterator citer = closure[last].begin(); citer != citer_end; ++ citer)
-	      closure[state].insert(epsilon_type(citer->first, citer->second + aiter->features));
+	      closure[state].insert(epsilon_type(citer->first, feature_linear_type(feature_set_type(citer->second) + aiter->features)));
 	  }
       }
 
@@ -282,7 +286,7 @@ namespace cicada
 	      if (! remove_symbol(niter->label)) {
 		const int state_next = citer->first + niter->distance;
 
-		graph_type::edge_type& edge = removed.add_edge(niter->label, citer->second + niter->features, state_next);
+		graph_type::edge_type& edge = removed.add_edge(niter->label, feature_set_type(citer->second) + niter->features, state_next);
 		removed.nodes[state].edges.push_back(edge.id);
 		backptr[state_next].insert(state);
 	      }
@@ -300,7 +304,7 @@ namespace cicada
 		if (arc.tail == static_cast<int>(state)) {
 		  const int state_next = source.size();
 		  
-		  graph_type::edge_type& edge = removed.add_edge(arc.label, arc.features + citer->second, state_next);
+		  graph_type::edge_type& edge = removed.add_edge(arc.label, arc.features + feature_set_type(citer->second), state_next);
 		  removed.nodes[state_prev].edges.push_back(edge.id);
 		  backptr[state_next].insert(state_prev);
 		}
