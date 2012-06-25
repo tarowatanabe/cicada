@@ -242,6 +242,11 @@ namespace cicada
 	    D.push_back(derivation);
 	    
 	    add_next = true;
+	  } else {
+	    // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
+	    lazy_next(*derivation, state);
+	    
+	    add_next = false;
 	  }
 	} else
 	  break;
