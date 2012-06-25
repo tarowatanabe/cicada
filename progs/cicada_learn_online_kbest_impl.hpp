@@ -2626,12 +2626,6 @@ struct Oracle
   std::pair<score_ptr_type, score_ptr_type>
   operator()(const hypothesis_map_type& kbests, const hypothesis_map_type& kbests_oracle, const scorer_document_type& scorers, hypothesis_map_type& oracles, Generator& generator)
   {
-    const bool error_metric = scorers.error_metric();
-    const double score_factor = (error_metric ? - 1.0 : 1.0);
-    
-    const double loss_factor   = (error_metric ? - 1.0 : 1.0);
-    const double loss_constant = (error_metric ? 0.0 : 1.0);
-    
     score_ptr_type score_1best;
     score_ptr_type score_oracle;
     
@@ -2667,7 +2661,7 @@ struct Oracle
 	  
 	  *score_segment += *hyp.score;
 	  
-	  hyp.loss = loss_constant - loss_factor * score_segment->score();
+	  hyp.loss = score_segment->loss();
 	  
 	  *score_segment -= *hyp.score;
 	}
@@ -2688,7 +2682,7 @@ struct Oracle
 	  
 	  *score_segment += *hyp.score;
 	  
-	  hyp.loss = loss_constant - loss_factor * score_segment->score();
+	  hyp.loss = score_segment->loss();
 	  
 	  *score_segment -= *hyp.score;
 	}
@@ -2713,12 +2707,6 @@ struct Oracle
   operator()(const hypothesis_map_type& kbests, const scorer_document_type& scorers, hypothesis_map_type& oracles, Generator& generator)
   {
     typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
-
-    const bool error_metric = scorers.error_metric();
-    const double score_factor = (error_metric ? - 1.0 : 1.0);
-    
-    const double loss_factor   = (error_metric ? - 1.0 : 1.0);
-    const double loss_constant = (error_metric ? 0.0 : 1.0);
 
     score_ptr_type score_1best;    
     
@@ -2759,7 +2747,7 @@ struct Oracle
 	  
 	  *score_segment += *hyp.score;
 	  
-	  hyp.loss = loss_constant - loss_factor * score_segment->score();
+	  hyp.loss = score_segment->loss();
 
 	  *score_segment -= *hyp.score;
 	}
@@ -2802,7 +2790,7 @@ struct Oracle
 	  } else
 	    score_sample = hiter->score->clone();
 	  
-	  const double objective_sample = score_sample->score() * score_factor;
+	  const double objective_sample = score_sample->reward();
 	  
 	  if (objective_sample > objective_next || oracles_next[id].empty()) {
 	    oracles_next[id].clear();
