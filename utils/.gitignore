@@ -49,6 +49,8 @@ icu_filter_main
 indexed_set_main
 istream_line_iterator_main
 lexical_cast_main
+linear_map_main
+linear_set_main
 lockfree_list_queue_main
 lockfree_queue_main
 malloc_stats_main

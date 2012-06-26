@@ -75,6 +75,8 @@ indexed_set.hpp \
 indexed_trie.hpp \
 istream_line_iterator.hpp \
 lexical_cast.hpp \
+linear_map.hpp \
+linear_set.hpp \
 lockfree_list_queue.hpp \
 lockfree_queue.hpp \
 malloc_stats.hpp \
@@ -173,6 +175,8 @@ icu_filter_main \
 indexed_set_main \
 istream_line_iterator_main \
 lexical_cast_main \
+linear_map_main \
+linear_set_main \
 lockfree_list_queue_main \
 lockfree_queue_main \
 malloc_stats_main \
@@ -409,6 +413,10 @@ vector2_main_SOURCES = vector2_main.cpp
 vector_map_main_SOURCES = vector_map_main.cpp
 
 vector_set_main_SOURCES = vector_set_main.cpp
+
+linear_set_main_SOURCES = linear_set_main.cpp
+
+linear_map_main_SOURCES = linear_map_main.cpp
 
 vertical_coded_vector_main_SOURCES = vertical_coded_vector_main.cpp
 vertical_coded_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
