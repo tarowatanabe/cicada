@@ -167,7 +167,7 @@ namespace sti
         };
 
         template<class K>
-        struct default_stree_key_policy: public std::tr1::is_pod<K>::type {};
+        struct default_stree_key_policy: public std::tr1::has_trivial_destructor<K>::type {};
 
         template<class Key, class GIST_TRAITS, class>
         struct KeyWithGistImpl
@@ -511,7 +511,7 @@ namespace sti
                 ::memmove(dest, src, sizeof(LeafNode)*count);
             }
 
-            struct BaseBNode
+	    struct BaseBNode
             {
                 typedef typename Allocator::template rebind<BaseBNode>::other BaseAlloc;
                 typedef typename Allocator::template rebind<TBNode<InnerNode> >::other ParentAlloc;
@@ -533,7 +533,7 @@ namespace sti
 
                 bool is_leaf() const    { return leaf; }
 
-                const bool    leaf;
+                bool          leaf;
                 short         count;
 
                 parent_ptr    parent;

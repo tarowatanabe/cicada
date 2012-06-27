@@ -43,7 +43,7 @@ namespace sti
         template<class T>
             struct is_small_type_helper<T, true> : std::tr1::true_type {};
         template<class T>
-            struct is_small_type: public is_small_type_helper<T, sizeof(T) <= sizeof(long)> {};
+     	    struct is_small_type: public is_small_type_helper<T, sizeof(T) <= (sizeof(long) << 1) > {};
 
         template <class IT, typename Value>
         class smap_iter_helper : 
