@@ -31,8 +31,6 @@
 #define __STI_SMAP_H__
 
 #include <utils/stree.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/iterator/indirect_iterator.hpp>
 
 namespace sti
 {
@@ -259,7 +257,7 @@ namespace sti
             {
                 iterator f = find(k);
                 if (f==this->end())
-                    std::tr1::tie(f, std::tr1::ignore) = insert(value_type(k, Type()));
+		  std::tr1::tie(f, std::tr1::ignore) = insert(value_type(k, Type()));
                 return f->second;
             }
 

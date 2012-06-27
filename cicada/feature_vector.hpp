@@ -16,7 +16,7 @@
 #include <cicada/feature.hpp>
 
 #include <utils/vector_map.hpp>
-#include <utils/stree_map.hpp>
+//#include <utils/stree_map.hpp>
 
 namespace cicada
 {
@@ -46,8 +46,7 @@ namespace cicada
     
   private:
     typedef typename Alloc::template rebind<value_type>::other sparse_alloc_type;
-    // typedef std::map<key_type, data_type, std::less<key_type>, sparse_alloc_type> sparse_vector_type;
-    typedef typename utils::stree_map<key_type, data_type, std::less<key_type>, sparse_alloc_type, 16>::type sparse_vector_type;
+    typedef std::map<key_type, data_type, std::less<key_type>, sparse_alloc_type> sparse_vector_type;
     
     typedef std::pair<feature_type, data_type> dense_value_type;
     typedef typename Alloc::template rebind<dense_value_type>::other dense_alloc_type;
