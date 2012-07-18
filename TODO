@@ -162,3 +162,5 @@ Mixture PYP-LM:
 Revise ngram-pyp so that we do not have to re-compute lower-order probabilities...
 
 Implement ADMM for potentially better parallel training
+
+Implement simple feature selection by l1/l2 norm

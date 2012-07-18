@@ -1,4 +1,4 @@
-2012-5-x
+2012-7-18
 Bugfix: variational decoding and bleu/bleuS computation on a forest :(
 Bugfix: unique kbest derivations :(
 INCOMPATIBLE CHANGE by adding loss/reward to evaluation statistics, and always use loss() (no negative-Bleu, but 1-Bleu for tuning)
