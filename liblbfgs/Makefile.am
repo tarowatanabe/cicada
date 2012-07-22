@@ -8,13 +8,10 @@ noinst_HEADERS = \
 	arithmetic_sse_double.h \
 	arithmetic_sse_float.h \
 	lbfgs.h \
-	lbfgs_fortran.h \
 	lbfgs_error.hpp
 
 liblbfgs_la_SOURCES = \
-	lbfgs.c \
-	lbfgs_fortran.c \
-	lbfgsb_fortran.c
+	lbfgs.c
 
 liblbfgs_la_LDFLAGS = -version-info $(CICADA_LTVERSION)
 
