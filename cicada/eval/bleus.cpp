@@ -23,18 +23,14 @@ namespace cicada
       
       const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
       
-      double smooth = 0.5;
       double score = 0.0;
       
       for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	const double p = (ngrams_reference[n] > 0
-			  ? (ngrams_hypothesis[n] > 0 ? ngrams_hypothesis[n] : smooth) / ngrams_reference[n]
-			  : 0.0);
+	const double logp = std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
 	
-	precisions.push_back(p);
+	score += logp;
 	
-	score += p > 0.0 ? std::log(p) : 0.0;
-	smooth *= 0.5;
+	precisions.push_back(std::exp(logp));
       }
       
       score /= ngrams_hypothesis.size();
