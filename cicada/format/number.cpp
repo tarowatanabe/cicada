@@ -88,10 +88,7 @@ namespace cicada
 	    icu::Formattable   formattable;
 	    icu::ParsePosition pos(0);
 	  
-	    if (currency)
-	      parser->parseCurrency(uphrase, formattable, pos);
-	    else
-	      parser->parse(uphrase, formattable, pos);
+	    parser->parse(uphrase, formattable, pos);
 	  
 	    if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
 	  
