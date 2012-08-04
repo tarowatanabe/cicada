@@ -264,6 +264,8 @@ group_aligned_code_offsets.hpp : group_aligned_code_offsets.py
 	./group_aligned_code_offsets.py > group_aligned_code_offsets.hpp
 
 alloc_vector_main_SOURCES = alloc_vector_main.cpp
+alloc_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
+alloc_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 
 arc_list_main_SOURCES = arc_list_main.cpp
 arc_list_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
