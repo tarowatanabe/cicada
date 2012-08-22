@@ -273,6 +273,7 @@ operation/remove_feature.hpp \
 operation/remove_sgml_tag.hpp \
 operation/remove_unary.hpp \
 operation/sort_tail.hpp \
+operation/sort_topologically.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
 operation/viterbi.hpp
@@ -301,6 +302,7 @@ operation/remove_feature.cpp \
 operation/remove_sgml_tag.cpp \
 operation/remove_unary.cpp \
 operation/sort_tail.cpp \
+operation/sort_topologically.cpp \
 operation/span_forest.cpp \
 operation/viterbi.cpp
 libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)

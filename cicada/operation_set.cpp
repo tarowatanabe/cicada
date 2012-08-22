@@ -36,6 +36,7 @@
 #include "operation/remove_sgml_tag.hpp"
 #include "operation/remove_unary.hpp"
 #include "operation/sort_tail.hpp"
+#include "operation/sort_topologically.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
@@ -244,6 +245,7 @@ remove-sgml-tag: remove sgml tag(s)\n\
 \tremove-bos-eos=[true|false] also remove BOS/EOS tags\n\
 remove-unary: remove unary rules from forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
+sort-topologically: topologically sort\n\
 span-forest: annotate terminal span\n\
 viterbi: compute viterbi tree\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
@@ -351,6 +353,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
       else if (param_name == "sort-tail")
 	operations.push_back(operation_ptr_type(new operation::SortTail(*piter, debug)));
+      else if (param_name == "sort-topologically")
+	operations.push_back(operation_ptr_type(new operation::SortTopologically(*piter, debug)));
       else if (param_name == "intersect")
 	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
       else if (param_name == "normalize")
