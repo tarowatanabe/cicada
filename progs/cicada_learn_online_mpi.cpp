@@ -22,7 +22,6 @@
 #include <string>
 #include <stdexcept>
 #include <deque>
-#include <map>
 #include <sstream>
 #include <cstdlib>
 
@@ -757,35 +756,38 @@ void cicada_learn(operation_set_type& operations,
       reduce_weights(weights);
       
       if (mpi_rank == 0) {
-	typedef std::multimap<double, feature_type::id_type, std::greater<double>,
-			      std::allocator<std::pair<const double, feature_type::id_type> > > heap_type;
-	
+	typedef std::pair<double, feature_type::id_type> value_type;
+	typedef std::vector<value_type, std::allocator<value_type> > heap_type;
 	typedef std::vector<bool, std::allocator<bool> > survived_type;
 	// compute k-best wrt column-L2
 	
 	heap_type heap;
 	survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
+
+	heap.reserve(weights_l2.size());
 	
 	for (feature_type::id_type id = 0; id != weights_l2.size(); ++ id)
-	  if (! feature_type(id).empty() && weights_l2[id] != 0.0)
-	    if (static_cast<int>(heap.size()) <= mix_kbest_features || heap.rbegin()->first <= weights_l2[id])
-	      heap.insert(std::make_pair(weights_l2[id], id));
+	  if (! feature_type(id).empty() && weights_l2[id] != 0.0) {
+	    heap.push_back(value_type(weights_l2[id], id));
+	    std::push_heap(heap.begin(), heap.end(), std::less<value_type>());
+	  }
 	
-	heap_type::const_iterator iter = heap.begin();
-	heap_type::const_iterator iter_end = heap.end();
-	heap_type::const_iterator iter_prev = iter_end;
+	heap_type::iterator iter_begin = heap.begin();
+	heap_type::iterator iter       = heap.end();
 	
-	for (int k = 0; k < mix_kbest_features && iter != iter_end; ++ k, ++ iter) {
-	  survived[iter->first] = true;
-	  iter_prev = iter;
+	for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
+	  survived[iter_begin->second] = true;
+	  std::pop_heap(iter_begin, iter, std::less<value_type>());
 	}
 	
-	// also keep the "tied" features
-	if (iter != iter_end && iter_prev != iter_end) {
-	  iter_end = heap.upper_bound(iter_prev->first);
+	// also keep the tied features...
+	if (iter != iter_begin && iter != heap.end()) {
+	  const double threshold = iter->first;
 	  
-	  for (/**/; iter != iter_end; ++ iter)
-	    survived[iter->first] = true;
+	  for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
+	    survived[iter_begin->second] = true;
+	    std::pop_heap(iter_begin, iter, std::less<value_type>());
+	  }
 	}
 	
 	for (feature_type::id_type id = 0; id != weights.size(); ++ id)
