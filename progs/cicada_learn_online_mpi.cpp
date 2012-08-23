@@ -22,6 +22,7 @@
 #include <string>
 #include <stdexcept>
 #include <deque>
+#include <map>
 #include <sstream>
 #include <cstdlib>
 
@@ -112,6 +113,7 @@ bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
 bool mert_search_mode = false;    // perform MERT search
+int  mix_kbest_features = 0;
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
 int debug = 0;
@@ -737,8 +739,62 @@ void cicada_learn(operation_set_type& operations,
     // mix weights
     if (debug && mpi_rank == 0)
       std::cerr << "mix weights" << std::endl;
-
-    {
+    
+    if (mix_kbest_features > 0) {
+      weight_set_type weights_l2(weights);
+      
+      // compute column-L2
+      std::transform(weights_l2.begin(), weights_l2.end(), weights_l2.begin(), weights_l2.begin(), std::multiplies<weight_set_type::value_type>());
+      
+      // reduce...
+      reduce_weights(weights_l2);
+      
+      // synchronize here...
+      MPI::COMM_WORLD.Barrier();
+      
+      weights *= 1.0 / mpi_size;
+      
+      reduce_weights(weights);
+      
+      if (mpi_rank == 0) {
+	typedef std::multimap<double, feature_type::id_type, std::greater<double>,
+			      std::allocator<std::pair<const double, feature_type::id_type> > > heap_type;
+	
+	typedef std::vector<bool, std::allocator<bool> > survived_type;
+	// compute k-best wrt column-L2
+	
+	heap_type heap;
+	survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
+	
+	for (feature_type::id_type id = 0; id != weights_l2.size(); ++ id)
+	  if (! feature_type(id).empty() && weights_l2[id] != 0.0)
+	    if (static_cast<int>(heap.size()) <= mix_kbest_features || heap.rbegin()->first <= weights_l2[id])
+	      heap.insert(std::make_pair(weights_l2[id], id));
+	
+	heap_type::const_iterator iter = heap.begin();
+	heap_type::const_iterator iter_end = heap.end();
+	heap_type::const_iterator iter_prev = iter_end;
+	
+	for (int k = 0; k < mix_kbest_features && iter != iter_end; ++ k, ++ iter) {
+	  survived[iter->first] = true;
+	  iter_prev = iter;
+	}
+	
+	// also keep the "tied" features
+	if (iter != iter_end && iter_prev != iter_end) {
+	  iter_end = heap.upper_bound(iter_prev->first);
+	  
+	  for (/**/; iter != iter_end; ++ iter)
+	    survived[iter->first] = true;
+	}
+	
+	for (feature_type::id_type id = 0; id != weights.size(); ++ id)
+	  if (! survived[id])
+	    weights[id] = 0.0;
+      }
+      
+      bcast_weights(weights);
+    } else {
       ++ updated; // avoid zero...
       weights *= updated;
       
@@ -1209,8 +1265,8 @@ void options(int argc, char** argv)
     ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
     ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
     
-    ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
-    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),      "online SGD algorithm")
+    ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),      "regularization constant")
@@ -1219,12 +1275,13 @@ void options(int argc, char** argv)
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
     
-    ("loss-rank",      po::bool_switch(&loss_rank),          "rank loss")
-    ("softmax-margin", po::bool_switch(&softmax_margin),     "softmax margin")
-    ("project-weight", po::bool_switch(&project_weight),     "project L2 weight")
-    ("merge-oracle",   po::bool_switch(&merge_oracle_mode),  "merge oracle forests")
-    ("mert-search",    po::bool_switch(&mert_search_mode),   "perform mert search")
-    ("dump-weights",   po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
+    ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
+    ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
+    ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
+    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle forests")
+    ("mert-search",         po::bool_switch(&mert_search_mode),   "perform mert search")
+    ("mix-kbest-featurest", po::value<int>(&mix_kbest_features),  "mix k-best features")
+    ("dump-weights",        po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
 

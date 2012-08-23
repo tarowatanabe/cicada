@@ -168,7 +168,12 @@ namespace cicada
 	__values.resize(x.size());
       }
       
+      // transform
       std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::multiplies<Tp>());
+      
+      //std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::multiplies<Tp>(), Tp()));
+      std::fill(begin() + x.size(), end(), Tp());
+      
       return *this;
     }
     
@@ -181,6 +186,9 @@ namespace cicada
       }
       
       std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::divides<Tp>());
+      
+      std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::divides<Tp>(), Tp()));
+      
       return *this;
     }
 
@@ -221,41 +229,6 @@ namespace cicada
       return *this;
     }
     
-    template <typename T, typename A>
-    self_type& operator*=(const FeatureVector<T, A>& x)
-    {
-      typedef typename FeatureVector<T, A>::const_iterator iter_type;
-      
-      if (! x.empty())
-	if (x.back().first.id() >= __values.size()) {
-	  __values.reserve(x.back().first.id() + 1);
-	  __values.resize(x.back().first.id() + 1);
-	}
-
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) *= iter->second;
-
-      return *this;
-    }
-
-    template <typename T, typename A>
-    self_type& operator/=(const FeatureVector<T, A>& x)
-    {
-      typedef typename FeatureVector<T, A>::const_iterator iter_type;
-      
-      if (! x.empty())
-	if (x.back().first.id() >= __values.size()) {
-	  __values.reserve(x.back().first.id() + 1);
-	  __values.resize(x.back().first.id() + 1);
-	}
-      
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) /= iter->second;
-      
-      return *this;
-    }
 
     template <typename T, typename A>
     self_type& operator+=(const FeatureVectorLinear<T, A>& x)
