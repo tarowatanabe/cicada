@@ -758,12 +758,11 @@ void cicada_learn(operation_set_type& operations,
       if (mpi_rank == 0) {
 	typedef std::pair<double, feature_type::id_type> value_type;
 	typedef std::vector<value_type, std::allocator<value_type> > heap_type;
-	typedef std::vector<bool, std::allocator<bool> > survived_type;
+	
 	// compute k-best wrt column-L2
 	
 	heap_type heap;
-	survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
-
+	
 	heap.reserve(weights_l2.size());
 	
 	for (feature_type::id_type id = 0; id != weights_l2.size(); ++ id)
@@ -772,27 +771,33 @@ void cicada_learn(operation_set_type& operations,
 	    std::push_heap(heap.begin(), heap.end(), std::less<value_type>());
 	  }
 	
-	heap_type::iterator iter_begin = heap.begin();
-	heap_type::iterator iter       = heap.end();
-	
-	for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
-	  survived[iter_begin->second] = true;
-	  std::pop_heap(iter_begin, iter, std::less<value_type>());
-	}
-	
-	// also keep the tied features...
-	if (iter != iter_begin && iter != heap.end()) {
-	  const double threshold = iter->first;
+	if (! heap.empty()) {
+	  typedef std::vector<bool, std::allocator<bool> > survived_type;
 	  
-	  for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
+	  survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
+	  
+	  heap_type::iterator iter_begin = heap.begin();
+	  heap_type::iterator iter       = heap.end();
+	  
+	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
 	    survived[iter_begin->second] = true;
 	    std::pop_heap(iter_begin, iter, std::less<value_type>());
 	  }
+	  
+	  // also keep the tied features...
+	  if (iter != iter_begin && iter != heap.end()) {
+	    const double threshold = iter->first;
+	    
+	    for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
+	      survived[iter_begin->second] = true;
+	      std::pop_heap(iter_begin, iter, std::less<value_type>());
+	    }
+	  }
+	  
+	  for (feature_type::id_type id = 0; id != weights.size(); ++ id)
+	    if (! survived[id])
+	      weights[id] = 0.0;
 	}
-	
-	for (feature_type::id_type id = 0; id != weights.size(); ++ id)
-	  if (! survived[id])
-	    weights[id] = 0.0;
       }
       
       bcast_weights(weights);
