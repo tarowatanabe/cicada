@@ -1,5 +1,5 @@
 2012-x-x
-???
+New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)
 
 2012-7-18
 Bugfix: variational decoding and bleu/bleuS computation on a forest :(

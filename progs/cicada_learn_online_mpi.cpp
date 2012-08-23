@@ -740,17 +740,17 @@ void cicada_learn(operation_set_type& operations,
       std::cerr << "mix weights" << std::endl;
     
     if (mix_kbest_features > 0) {
+      // reduce column-L2 weights
       weight_set_type weights_l2(weights);
       
-      // compute column-L2
       std::transform(weights_l2.begin(), weights_l2.end(), weights_l2.begin(), weights_l2.begin(), std::multiplies<weight_set_type::value_type>());
       
-      // reduce...
       reduce_weights(weights_l2);
       
       // synchronize here...
       MPI::COMM_WORLD.Barrier();
       
+      // reduced averaged weights
       weights *= 1.0 / mpi_size;
       
       reduce_weights(weights);
@@ -771,7 +771,7 @@ void cicada_learn(operation_set_type& operations,
 	    std::push_heap(heap.begin(), heap.end(), std::less<value_type>());
 	  }
 	
-	if (! heap.empty()) {
+	if (heap.size() > mix_kbest_features) {
 	  typedef std::vector<bool, std::allocator<bool> > survived_type;
 	  
 	  survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
@@ -779,6 +779,7 @@ void cicada_learn(operation_set_type& operations,
 	  heap_type::iterator iter_begin = heap.begin();
 	  heap_type::iterator iter       = heap.end();
 	  
+	  // kbest features
 	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
 	    survived[iter_begin->second] = true;
 	    std::pop_heap(iter_begin, iter, std::less<value_type>());
