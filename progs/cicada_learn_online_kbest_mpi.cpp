@@ -835,7 +835,7 @@ void cicada_learn(operation_set_type& operations,
 	    std::push_heap(heap.begin(), heap.end(), std::less<value_type>());
 	  }
 	
-	if (heap.size() > mix_kbest_features) {
+	if (static_cast<int>(heap.size()) > mix_kbest_features) {
 	  typedef std::vector<bool, std::allocator<bool> > survived_type;
 	  
 	  survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
