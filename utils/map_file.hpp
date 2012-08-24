@@ -137,12 +137,12 @@ namespace utils
       
       char buf[page_size];
       
-      const byte_type* first = mmapped;
       const byte_type* last  = mmapped + filesize;
-      for (first = mmapped; first + block_size < last; first += block_size) {
-	const off_type pos = (random() & 0x3f) * page_size;
+      for (const byte_type* first = mmapped; first + block_size < last; first += block_size) {
+	const byte_type* begin = first + (random() & 0x3f) * page_size;
+	const byte_type* end   = begin + page_size;
 	
-	std::copy(first + pos, first + pos + page_size, buf);
+	std::copy(begin, end, buf);
       }
     }
     
