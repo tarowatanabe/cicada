@@ -59,6 +59,7 @@ opt_parser = OptionParser(
     make_option("--reordering", default=None, action="store_true", help="reordering for phrase grammar"),
     
     ## additional feature functions
+    make_option("--feature-type",               default=None, action="store_true", help="observation probability"),
     make_option("--lexicon-model1",             default=None, action="store_true", help="compute Model1 features"),
     make_option("--lexicon-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--lexicon-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
@@ -362,6 +363,15 @@ class IndexTree:
         self.scores = os.path.join(model_dir, "tree-score")
         self.index  = os.path.join(model_dir, "tree-index")
 
+## additional features...
+class Features:
+    def __init__(self, feature_type=None):
+        self.feature_type = feature_type
+        self.options = ""
+        
+        if feature_type:
+            self.options += " --feature-type"
+
 class Lexicon:
     def __init__(self, lexical_dir="",
                  model1=None,
@@ -379,12 +389,28 @@ class Lexicon:
         self.threshold_insertion = threshold_insertion
         self.threshold_deletion  = threshold_deletion
 
+        self.options = ""
+        
+        if model1 or noisy_or or insertion_deletion:
+            self.options += " --lexicon-source-target \"%s\"" %(self.lexicon_source_target)
+            self.options += " --lexicon-target-source \"%s\"" %(self.lexicon_target_source)
+            
+            if model1:
+                self.options += " --model1"
+            if noisy_or:
+                self.options += " --noisy-or"
+            if insertion_deletion:
+                self.options += " --insertion-deletion"
+                self.options += " --threshold-insertion %.20g" %(self.threshold_insertion)
+                self.options += " --threshold-deletion %.20g" %(self.threshold_deletion)
+
 
 class Index(UserString.UserString):
     def __init__(self,
                  cicada=None,
                  indexer=None,
                  lexicon=None,
+                 feats=None,
                  input="",
                  output="",
                  name="",
@@ -407,21 +433,7 @@ class Index(UserString.UserString):
         
         self.name    = "index-" + indexer.name
         self.logfile = "index-" + indexer.name + "." + name + ".log"
-
-        options_lexicon = ""
-        if lexicon.model1 or lexicon.noisy_or or lexicon.insertion_deletion:
-            options_lexicon += " --lexicon-source-target \"%s\"" %(lexicon.lexicon_source_target)
-            options_lexicon += " --lexicon-target-source \"%s\"" %(lexicon.lexicon_target_source)
-            
-            if lexicon.model1:
-                options_lexicon += " --model1"
-            if lexicon.noisy_or:
-                options_lexicon += " --noisy-or"
-            if lexicon.insertion_deletion:
-                options_lexicon += " --insertion-deletion"
-                options_lexicon += " --threshold-insertion %.20g" %(lexicon.threshold_insertion)
-                options_lexicon += " --threshold-deletion %.20g" %(lexicon.threshold_deletion)
-            
+        
         command = ""
 
         if kbest > 0:
@@ -436,7 +448,10 @@ class Index(UserString.UserString):
             command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
-            command += options_lexicon
+            if feats:
+                command += feats.options
+            if lexicon:
+                command += lexicon.options
             command += " | "
             command += indexer.indexer
         else:
@@ -447,7 +462,10 @@ class Index(UserString.UserString):
             command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
-            command += options_lexicon
+            if feats:
+                command += feats.options
+            if lexicon:
+                command += lexicon.options
             command += " --input \"%s\"" %(input)
             command += " | "
             command += indexer.indexer
@@ -553,6 +571,7 @@ else:
     raise ValueError, "no indexer?"
 
 scores = Scores(indexer)
+features = Features(feature_type=options.feature_type)
 lexicon = Lexicon(lexical_dir=options.lexical_dir,
                   model1=options.lexicon_model1,
                   noisy_or=options.lexicon_noisy_or,
@@ -570,6 +589,7 @@ if options.pbs:
         index = Index(cicada=cicada,
                       indexer=indexer,
                       lexicon=lexicon,
+                      feats=features,
                       input=score.input,
                       output=score.output,
                       name=score.name,
@@ -596,6 +616,7 @@ elif options.mpi:
         index = Index(cicada=cicada,
                       indexer=indexer,
                       lexicon=lexicon,
+                      feats=features,
                       input=score.input,
                       output=score.output,
                       root_source=scores.root_source,
@@ -616,6 +637,7 @@ else:
         index = Index(cicada=cicada,
                       indexer=indexer,
                       lexicon=lexicon,
+                      feats=features,
                       input=score.input,
                       output=score.output,
                       root_source=scores.root_source,

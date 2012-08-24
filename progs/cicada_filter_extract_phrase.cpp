@@ -45,6 +45,8 @@ bool mode_bidirectional = false;
 bool mode_source_only = false;
 bool mode_target_only = false;
 
+bool feature_type_mode = false;
+
 bool model1_mode = false;
 bool noisy_or_mode = false;
 bool insertion_deletion_mode = false;
@@ -216,6 +218,14 @@ struct ScorerCICADA
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
       throw std::runtime_error("failed generation");
+
+    if (feature_type_mode) {
+      const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
+      const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_type_source_target), std::log(prob_type_target_source)))
+	throw std::runtime_error("failed generation");
+    }
     
     if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
       const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
@@ -294,6 +304,14 @@ struct ScorerCICADAReordering
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
       throw std::runtime_error("failed generation");
+
+    if (feature_type_mode) {
+      const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
+      const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_type_source_target), std::log(prob_type_target_source)))
+	throw std::runtime_error("failed generation");
+    }
     
     if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
       const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
@@ -584,6 +602,8 @@ void options(int argc, char** argv)
     ("source-only",   po::bool_switch(&mode_source_only),   "source only")
     ("target-only",   po::bool_switch(&mode_target_only),   "target only")
     
+    ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
+
     ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
     ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
     ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
