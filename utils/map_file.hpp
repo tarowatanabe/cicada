@@ -66,9 +66,6 @@ namespace utils
       filesize = static_cast<off_type>(boost::filesystem::file_size(file));
       modifiable = (flag & MAP_FILE_WRITE);
       
-#ifndef MAP_POPULATE
-      #define MAP_POPULATE 0
-#endif
       const bool writable = (flag & MAP_FILE_WRITE);
       
 #if BOOST_FILESYSTEM_VERSION == 2
@@ -88,8 +85,10 @@ namespace utils
       mmap_size = static_cast<off_type>(std::max(off_type((filesize + page_size - 1) / page_size), off_type(1)) * page_size);
 
       int mmap_flag = MAP_SHARED;
+#ifdef MAP_POPULATE
       if (flag & MAP_FILE_POPULATE)
 	mmap_flag |= MAP_POPULATE;
+#endif
       
       // First, try map_shared
       byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
@@ -97,8 +96,10 @@ namespace utils
       // Second, try map_private
       if (! (x + 1)) {
 	mmap_flag = MAP_PRIVATE;
+#ifdef MAP_POPULATE
 	if (flag & MAP_FILE_POPULATE)
 	  mmap_flag |= MAP_POPULATE;
+#endif
 	x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       }
 	
