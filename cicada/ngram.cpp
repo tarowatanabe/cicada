@@ -48,9 +48,9 @@ namespace cicada
   }
     
 
-  template <typename Path, typename Shards, typename Workers>
+  template <typename Path, typename Shards>
   inline
-  void open_shards(const Path& path, Shards& shards, Workers& workers, const int debug)
+  void open_shards(const Path& path, Shards& shards, const int debug)
   {
     typedef utils::repository repository_type;
     
@@ -63,18 +63,24 @@ namespace cicada
     shards.clear();
     shards.reserve(utils::lexical_cast<size_t>(siter->second));
     shards.resize(utils::lexical_cast<size_t>(siter->second));
+
+    boost::thread_group workers;
     
     for (size_t shard = 0; shard != shards.size(); ++ shard) {
       std::ostringstream stream_shard;
       stream_shard << "ngram-" << std::setfill('0') << std::setw(6) << shard;
       
-      workers.add_thread(new boost::thread(boost::bind(&NGram::shard_data_type::open, boost::ref(shards[shard]), rep.path(stream_shard.str()))));
-
+      workers.add_thread(new boost::thread(boost::bind(&NGram::shard_data_type::open,
+						       boost::ref(shards[shard]),
+						       rep.path(stream_shard.str()))));
+      
       //shards[shard].open(rep.path(stream_shard.str()));
       
       if (debug >= 2)
 	std::cerr << "ngram data: " << rep.path(stream_shard.str()) << std::endl;
     }
+    
+    workers.join_all();
   }
 
   void NGram::open(const path_type& path)
@@ -85,22 +91,19 @@ namespace cicada
     
     repository_type rep(path, repository_type::read);
     
-    boost::thread_group workers;
-    
     index.open(rep.path("index"));
+
     if (boost::filesystem::exists(rep.path("logprob")))
-      open_shards(rep.path("logprob"), logprobs, workers, debug);
+      open_shards(rep.path("logprob"), logprobs, debug);
     if (boost::filesystem::exists(rep.path("backoff")))
-      open_shards(rep.path("backoff"), backoffs, workers, debug);
+      open_shards(rep.path("backoff"), backoffs, debug);
     if (boost::filesystem::exists(rep.path("logbound")))
-      open_shards(rep.path("logbound"), logbounds, workers, debug);
+      open_shards(rep.path("logbound"), logbounds, debug);
     
     repository_type::const_iterator siter = rep.find("smooth");
     if (siter == rep.end())
       throw std::runtime_error("no smoothing parameter...?");
     smooth = atof(siter->second.c_str());
-    
-    workers.join_all();
     
     if (debug)
       std::cerr << "ngram: " << path

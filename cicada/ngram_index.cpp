@@ -64,15 +64,23 @@ namespace cicada
       throw std::runtime_error("no order");
     __order = utils::lexical_cast<int>(oiter->second);
     
-    // vocabulary...
-    __vocab.open(rep.path("vocab"));
+    boost::thread_group workers;
     
     for (size_t shard = 0; shard != __shards.size(); ++ shard) {
       std::ostringstream stream_shard;
       stream_shard << "ngram-" << std::setfill('0') << std::setw(6) << shard;
+
+      workers.add_thread(new boost::thread(boost::bind(&NGramIndex::shard_type::open,
+						       boost::ref(__shards[shard]),
+						       rep.path(stream_shard.str()))));
       
-      __shards[shard].open(rep.path(stream_shard.str()));
+      //__shards[shard].open(rep.path(stream_shard.str()));
     }
+    
+    // vocabulary...
+    __vocab.open(rep.path("vocab"));
+    
+    workers.join_all();
     
     __path = path;
   }
