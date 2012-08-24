@@ -8,10 +8,10 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
+#include <cstdlib>
 #include <string>
 #include <iostream>
 #include <stdexcept>
-#include <vector>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem.hpp>
@@ -111,6 +111,8 @@ namespace utils
 	mmapped = x;
       else
 	throw std::runtime_error(std::string("map_file::open() mmap()") + strerror(errno));
+
+      populate();
     }
 
     void close()
@@ -125,7 +127,24 @@ namespace utils
       
       modifiable = false;
     }
+
+    void populate()
+    {
+      if (! mmapped || filesize <= 0 || mmap_size <= 0) return;
+
+      const off_type block_size = 4096 * 64;
       
+      char buf[4096];
+      
+      const byte_type* first = mmapped;
+      const byte_type* last  = mmapped + filesize;
+      for (first = mmapped; first + block_size < last; first += block_size) {
+	const off_type pos = (random() & 0x3f) * 4096;
+	
+	std::copy(first + pos, first + pos + 4096, buf);
+      }
+    }
+    
   private:
     byte_type* mmapped;
     
