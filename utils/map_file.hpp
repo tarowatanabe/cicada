@@ -132,17 +132,16 @@ namespace utils
     {
       if (! mmapped || filesize <= 0 || mmap_size <= 0) return;
 
-      const off_type page_size = 4096;
-      const off_type block_size = page_size * 64;
+      const off_type page_size  = 4096;
+      const off_type block_size = page_size * 256;
       
       char buf[page_size];
       
-      const byte_type* last  = mmapped + filesize;
+      const byte_type* last = mmapped + filesize;
       for (const byte_type* first = mmapped; first + block_size < last; first += block_size) {
-	const byte_type* begin = first + (random() & 0x3f) * page_size;
-	const byte_type* end   = begin + page_size;
+	const byte_type* begin = first + (random() & 0xff) * page_size;
 	
-	std::copy(begin, end, buf);
+	std::copy(begin, begin + page_size, buf);
       }
     }
     
