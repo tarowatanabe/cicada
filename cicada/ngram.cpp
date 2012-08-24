@@ -69,7 +69,7 @@ namespace cicada
       stream_shard << "ngram-" << std::setfill('0') << std::setw(6) << shard;
       
       shards[shard].open(rep.path(stream_shard.str()));
-
+      
       if (debug >= 2)
 	std::cerr << "ngram data: " << rep.path(stream_shard.str()) << std::endl;
     }
@@ -82,6 +82,8 @@ namespace cicada
     clear();
     
     repository_type rep(path, repository_type::read);
+    
+    boost::thread_group workers;
     
     index.open(rep.path("index"));
     if (boost::filesystem::exists(rep.path("logprob")))
