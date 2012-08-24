@@ -42,6 +42,8 @@ double dirichlet_prior = 0.1;
 
 bool feature_root_mode = false;
 bool feature_type_mode = false;
+bool feature_singleton_mode = false;
+
 bool model1_mode = false;
 bool noisy_or_mode = false;
 bool insertion_deletion_mode = false;
@@ -233,6 +235,16 @@ struct ScorerCICADA
       if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_type_source_target), std::log(prob_type_target_source)))
 	throw std::runtime_error("failed generation");
     }
+
+    if (feature_singleton_mode) {
+      const int singleton_source = phrase_pair.observed_source == 1;
+      const int singleton_target = phrase_pair.observed_target == 1;
+      const int singleton        = singleton_source && singleton_target;
+      
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_ << ' ' << karma::int_,
+			    singleton, singleton_source, singleton_target))
+	throw std::runtime_error("failed generation");
+    }
     
     if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
       const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
@@ -285,6 +297,8 @@ void options(int argc, char** argv)
     
     ("feature-root",       po::bool_switch(&feature_root_mode),       "feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
+    ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
+    
     ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
     ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
     ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")

@@ -60,6 +60,7 @@ opt_parser = OptionParser(
     
     ## additional feature functions
     make_option("--feature-type",               default=None, action="store_true", help="observation probability"),
+    make_option("--feature-singleton",          default=None, action="store_true", help="singleton features"),
     make_option("--lexicon-model1",             default=None, action="store_true", help="compute Model1 features"),
     make_option("--lexicon-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--lexicon-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
@@ -365,12 +366,17 @@ class IndexTree:
 
 ## additional features...
 class Features:
-    def __init__(self, feature_type=None):
-        self.feature_type = feature_type
+    def __init__(self,
+                 feature_type=None,
+                 feature_singleton=None):
+        self.feature_type      = feature_type
+        self.feature_singleton = feature_singleton
         self.options = ""
         
         if feature_type:
             self.options += " --feature-type"
+        if feature_singleton:
+            self.options += " --feature-singleton"
 
 class Lexicon:
     def __init__(self, lexical_dir="",
@@ -571,7 +577,8 @@ else:
     raise ValueError, "no indexer?"
 
 scores = Scores(indexer)
-features = Features(feature_type=options.feature_type)
+features = Features(feature_type=options.feature_type,
+                    feature_singleton=options.feature_singleton)
 lexicon = Lexicon(lexical_dir=options.lexical_dir,
                   model1=options.lexicon_model1,
                   noisy_or=options.lexicon_noisy_or,
