@@ -781,7 +781,7 @@ void cicada_learn(operation_set_type& operations,
 	  
 	  // kbest features
 	  size_t num_survived = 0;
-	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
+	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; ++ k, -- iter) {
 	    survived[iter_begin->second] = true;
 	    std::pop_heap(iter_begin, iter, std::less<value_type>());
 	    ++ num_survived;
@@ -790,9 +790,6 @@ void cicada_learn(operation_set_type& operations,
 	  // also keep the tied features...
 	  if (iter != iter_begin && iter != heap.end()) {
 	    const double threshold = iter->first;
-	    
-	    if (debug && mpi_rank == 0)
-	      std::cerr << "survived: " << num_survived << " all: "<< heap.size() << " threshold: " << threshold << std::endl;
 
 	    for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
 	      survived[iter_begin->second] = true;
