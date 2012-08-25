@@ -79,34 +79,17 @@ namespace cicada
     clear();
     
     repository_type rep(path, repository_type::read);
-
-    boost::thread_group workers;
-
-    //index.open(rep.path("index"));
-    workers.add_thread(new boost::thread(boost::bind(&shard_index_type::open,
-						     boost::ref(index),
-						     rep.path("index"))));
     
-    if (boost::filesystem::exists(rep.path("logprob"))) {
-      //open_shards(rep.path("logprob"), logprobs);
-      workers.add_thread(new boost::thread(boost::bind(open_shards<path_type, shard_data_set_type>,
-						       rep.path("logprob"),
-						       boost::ref(logprobs))));
-    }
-    if (boost::filesystem::exists(rep.path("backoff"))) {
-      //open_shards(rep.path("backoff"), backoffs);
-      workers.add_thread(new boost::thread(boost::bind(open_shards<path_type, shard_data_set_type>,
-						       rep.path("backoff"),
-						       boost::ref(backoffs))));
-    }
-    if (boost::filesystem::exists(rep.path("logbound"))) {
-      //open_shards(rep.path("logbound"), logbounds);
-      workers.add_thread(new boost::thread(boost::bind(open_shards<path_type, shard_data_set_type>,
-						       rep.path("logbound"),
-						       boost::ref(logbounds))));
-    }
+    index.open(rep.path("index"));
     
-    workers.join_all();
+    if (boost::filesystem::exists(rep.path("logprob")))
+      open_shards(rep.path("logprob"), logprobs);
+    
+    if (boost::filesystem::exists(rep.path("backoff")))
+      open_shards(rep.path("backoff"), backoffs);
+    
+    if (boost::filesystem::exists(rep.path("logbound")))
+      open_shards(rep.path("logbound"), logbounds);
     
     repository_type::const_iterator siter = rep.find("smooth");
     if (siter == rep.end())

@@ -802,36 +802,24 @@ namespace cicada
     const path_type path = param.name();
     repository_type rep(path, repository_type::read);
     
-    boost::thread_group workers;
-    
-    workers.add_thread(new boost::thread(boost::bind(&phrase_db_type::open, boost::ref(source_db), rep.path("source"))));
-    workers.add_thread(new boost::thread(boost::bind(&phrase_db_type::open, boost::ref(target_db), rep.path("target"))));
-    
     rule_db.open(rep.path("rule"));
-    //source_db.open(rep.path("source"));
-    //target_db.open(rep.path("target"));
+    
+    source_db.open(rep.path("source"));
+    target_db.open(rep.path("target"));
     
     vocab.open(rep.path("vocab"));
     
-    if (boost::filesystem::exists(rep.path("feature-data"))) {
-      workers.add_thread(new boost::thread(boost::bind(&feature_data_type::open, boost::ref(feature_data), rep.path("feature-data"))));
-      //feature_data.open(rep.path("feature-data"));
-    }
-    if (boost::filesystem::exists(rep.path("feature-vocab"))) {
-      workers.add_thread(new boost::thread(boost::bind(&feature_vocab_type::open, boost::ref(feature_vocab), rep.path("feature-vocab"))));
-      //feature_vocab.open(rep.path("feature-vocab"));
-    }
-
-    if (boost::filesystem::exists(rep.path("attribute-data"))) {
-      workers.add_thread(new boost::thread(boost::bind(&attribute_data_type::open, boost::ref(attribute_data), rep.path("attribute-data"))));
-      //attribute_data.open(rep.path("attribute-data"));
-    }
-    if (boost::filesystem::exists(rep.path("attribute-vocab"))) {
-      workers.add_thread(new boost::thread(boost::bind(&attribute_vocab_type::open, boost::ref(attribute_vocab), rep.path("attribute-vocab"))));
-      //attribute_vocab.open(rep.path("attribute-vocab"));
-    }
+    if (boost::filesystem::exists(rep.path("feature-data")))
+      feature_data.open(rep.path("feature-data"));
     
+    if (boost::filesystem::exists(rep.path("feature-vocab")))
+      feature_vocab.open(rep.path("feature-vocab"));
     
+    if (boost::filesystem::exists(rep.path("attribute-data")))
+      attribute_data.open(rep.path("attribute-data"));
+    
+    if (boost::filesystem::exists(rep.path("attribute-vocab")))
+      attribute_vocab.open(rep.path("attribute-vocab"));
     
     repository_type::const_iterator iter = rep.find("feature-size");
     if (iter == rep.end())
@@ -848,8 +836,7 @@ namespace cicada
       std::ostringstream stream_score;
       stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
       
-      workers.add_thread(new boost::thread(boost::bind(&score_set_type::read, boost::ref(score_db[feature]), rep.path(stream_score.str()))));
-      //score_db[feature].read(rep.path(stream_score.str()));
+      score_db[feature].read(rep.path(stream_score.str()));
       
       const std::string name(std::string("feature") + utils::lexical_cast<std::string>(feature));
 
@@ -878,8 +865,7 @@ namespace cicada
 	std::ostringstream stream_score;
 	stream_score << "attribute-" << std::setfill('0') << std::setw(6) << attribute;
 	
-	workers.add_thread(new boost::thread(boost::bind(&score_set_type::read, boost::ref(attr_db[attribute]), rep.path(stream_score.str()))));
-	//attr_db[attribute].read(rep.path(stream_score.str()));
+	attr_db[attribute].read(rep.path(stream_score.str()));
 	
 	const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
 	
@@ -895,8 +881,6 @@ namespace cicada
 	}
       }
     }
-
-    workers.join_all();
   }
   
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
