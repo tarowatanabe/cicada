@@ -854,6 +854,9 @@ void cicada_learn(operation_set_type& operations,
 	  // also keep the tied features...
 	  if (iter != iter_begin && iter != heap.end()) {
 	    const double threshold = iter->first;
+
+	    if (debug && mpi_rank == 0)
+	      std::cerr << "survived: " << num_survived << " all: "<< heap.size() << " threshold: " << threshold << std::endl;
 	    
 	    for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
 	      survived[iter_begin->second] = true;
