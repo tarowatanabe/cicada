@@ -70,7 +70,6 @@ namespace cicada
     //total_.open(rep.path("total"));
     workers.add_thread(new boost::thread(boost::bind(&count_set_type::open, boost::ref(total_), rep.path("total"))));
     
-    // positions
     //positions_.open(rep.path("position"));
     workers.add_thread(new boost::thread(boost::bind(&position_set_type::open, boost::ref(positions_), rep.path("position"))));
     
