@@ -469,15 +469,34 @@ namespace cicada
 	container.insert(first2, last2);
     }
 
+    template <typename __Tp>
+    struct __less_first
+    {
+      bool operator()(const __Tp& x, const __Tp& y) const
+      {
+	return x.first < y.first;
+      }
+    };
+
     template <typename Iterator, typename Prefix>
     void update_unordered(Iterator first, Iterator last, const Prefix& prefix)
     {
+      typedef std::pair<feature_type, double> pair_type;
+      typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
+      
       // update this by x
       // logically, we erase-prefix, then *this += x;
+
+      raw_type raw(first, last);
+      std::sort(raw.begin(), raw.end(), __less_first<pair_type>());
       
+      update_ordered(raw.begin(), raw.end(), prefix, raw.size() > __dense_size);
+      
+#if 0
       erase_prefix(prefix);
       for (/**/; first != last; ++ first)
 	operator[](first->first) = first->second;
+#endif
     }
 
   public:
