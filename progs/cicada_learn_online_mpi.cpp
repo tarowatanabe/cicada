@@ -780,9 +780,11 @@ void cicada_learn(operation_set_type& operations,
 	  heap_type::iterator iter       = heap.end();
 	  
 	  // kbest features
+	  size_t num_survived = 0;
 	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; -- iter) {
 	    survived[iter_begin->second] = true;
 	    std::pop_heap(iter_begin, iter, std::less<value_type>());
+	    ++ num_survived;
 	  }
 	  
 	  // also keep the tied features...
@@ -792,8 +794,12 @@ void cicada_learn(operation_set_type& operations,
 	    for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
 	      survived[iter_begin->second] = true;
 	      std::pop_heap(iter_begin, iter, std::less<value_type>());
+	      ++ num_survived;
 	    }
 	  }
+
+	  if (debug && mpi_rank == 0)
+	    std::cerr << "survived: " << num_survived << " all: "<< heap.size() << std::endl;
 	  
 	  for (feature_type::id_type id = 0; id != weights.size(); ++ id)
 	    if (! survived[id])
@@ -1288,7 +1294,7 @@ void options(int argc, char** argv)
     ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle forests")
     ("mert-search",         po::bool_switch(&mert_search_mode),   "perform mert search")
-    ("mix-kbest-featurest", po::value<int>(&mix_kbest_features),  "mix k-best features")
+    ("mix-kbest-features",  po::value<int>(&mix_kbest_features),  "mix k-best features")
     ("dump-weights",        po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
