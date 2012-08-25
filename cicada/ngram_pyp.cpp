@@ -57,17 +57,27 @@ namespace cicada
     
     parameter_set_type(discount_).swap(discount_);
     parameter_set_type(strength_).swap(strength_);
+
+    boost::thread_group workers;
     
     // then, models...
-    index_.open(rep.path("index"));
-    count_.open(rep.path("count"));
-    total_.open(rep.path("total"));
+    //index_.open(rep.path("index"));
+    workers.add_thread(new boost::thread(boost::bind(&id_set_type::open, boost::ref(index_), rep.path("index"))));
+    
+    //count_.open(rep.path("count"));
+    workers.add_thread(new boost::thread(boost::bind(&count_set_type::open, boost::ref(count_), rep.path("count"))));
+    
+    //total_.open(rep.path("total"));
+    workers.add_thread(new boost::thread(boost::bind(&count_set_type::open, boost::ref(total_), rep.path("total"))));
     
     // positions
-    positions_.open(rep.path("position"));
+    //positions_.open(rep.path("position"));
+    workers.add_thread(new boost::thread(boost::bind(&position_set_type::open, boost::ref(positions_), rep.path("position"))));
     
     // vocab
     vocab_.open(rep.path("vocab"));
+    
+    workers.join_all();
     
     // offsets
     offsets_.push_back(0);

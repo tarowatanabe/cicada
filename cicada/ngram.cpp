@@ -87,8 +87,6 @@ namespace cicada
 						     boost::ref(index),
 						     rep.path("index"))));
     
-    
-
     if (boost::filesystem::exists(rep.path("logprob"))) {
       //open_shards(rep.path("logprob"), logprobs);
       workers.add_thread(new boost::thread(boost::bind(open_shards<path_type, shard_data_set_type>,
