@@ -481,7 +481,7 @@ namespace cicada
     template <typename Iterator, typename Prefix>
     void update_unordered(Iterator first, Iterator last, const Prefix& prefix)
     {
-      typedef std::pair<feature_type, double> pair_type;
+      typedef std::pair<feature_type, Tp> pair_type;
       typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
       
       // update this by x
