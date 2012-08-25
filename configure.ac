@@ -527,6 +527,7 @@ AC_CONFIG_FILES([Makefile
 		 liblinear/Makefile
 		 liblbfgs/Makefile
 		 wn/Makefile
+		 stx/Makefile
 		 progs/Makefile
 		 scripts/Makefile
                  succinct_db/Makefile

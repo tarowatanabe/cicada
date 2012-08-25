@@ -216,3 +216,9 @@ file does not by itself cause the resulting executable to be covered by
 the GNU General Public License.  This exception does not however
 invalidate any other reasons why the executable file might be covered by
 the GNU General Public License.
+
+==========================================================
+STX B+ Tree C++ Template Classes
+
+The complete source code is released under the GNU Lesser General Public
+License v2.1 (LGPL) which can be found in the file COPYING.
