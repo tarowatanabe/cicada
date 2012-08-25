@@ -112,7 +112,7 @@ namespace utils
       else
 	throw std::runtime_error(std::string("map_file::open() mmap()") + strerror(errno));
 
-      populate();
+      //populate();
     }
 
     void close()
