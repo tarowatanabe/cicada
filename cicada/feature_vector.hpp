@@ -386,7 +386,11 @@ namespace cicada
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
-      if (x.sparse())
+      if (empty())
+	assign(x);
+      else if (x.empty())
+	erase_prefix(prefix);
+      else if (x.sparse())
 	update_ordered(x.sparse_begin(), x.sparse_end(), prefix, true);
       else
 	update_ordered(x.dense_begin(), x.dense_end(), prefix, false);
@@ -395,47 +399,53 @@ namespace cicada
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVectorLinear<T,A>& x, const Prefix& prefix)
     {
-      update_ordered(x.begin(), x.end(), prefix, x.size() > __dense_size);
+      if (empty())
+	assign(x);
+      else if (x.empty())
+	erase_prefix(prefix);
+      else
+	update_ordered(x.begin(), x.end(), prefix, x.size() > __dense_size);
     }
 
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVectorUnordered<T,A>& x, const Prefix& prefix)
     {
-      update_unordered(x.begin(), x.end(), prefix);
+      if (empty())
+	assign(x);
+      else if (x.empty())
+	erase_prefix(prefix);
+      else
+	update_unordered(x.begin(), x.end(), prefix);
     }
 
   private:
     template <typename Iterator, typename Prefix>
     void update_ordered(Iterator first, Iterator last, const Prefix& prefix, const bool large=false)
     {
-      if (first == last)
-	erase_prefix(prefix);
-      else {
-	if (__sparse || large) {
-	  if (! __sparse) {
-	    __sparse = new sparse_vector_type();
+      if (__sparse || large) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type();
 	    
-	    update_ordered(*__sparse, __dense.begin(), __dense.end(), first, last, prefix);
+	  update_ordered(*__sparse, __dense.begin(), __dense.end(), first, last, prefix);
 	    
-	    __dense.clear();
-	  } else {
-	    sparse_vector_type sparse_new;
-	    
-	    update_ordered(sparse_new, __sparse->begin(), __sparse->end(), first, last, prefix);
-	    
-	    __sparse->swap(sparse_new);
-	  }
+	  __dense.clear();
 	} else {
-	  dense_vector_type dense_new;
+	  sparse_vector_type sparse_new;
+	    
+	  update_ordered(sparse_new, __sparse->begin(), __sparse->end(), first, last, prefix);
+	    
+	  __sparse->swap(sparse_new);
+	}
+      } else {
+	dense_vector_type dense_new;
 	  
-	  update_ordered(dense_new, __dense.begin(), __dense.end(), first, last, prefix);
+	update_ordered(dense_new, __dense.begin(), __dense.end(), first, last, prefix);
 	  
-	  __dense.swap(dense_new);
+	__dense.swap(dense_new);
 	  
-	  if (__dense.size() > __dense_size) {
-	    __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
-	    __dense.clear();
-	  }
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
 	}
       }
     }
@@ -486,17 +496,11 @@ namespace cicada
       
       // update this by x
       // logically, we erase-prefix, then *this += x;
-
+      
       raw_type raw(first, last);
       std::sort(raw.begin(), raw.end(), __less_first<pair_type>());
       
       update_ordered(raw.begin(), raw.end(), prefix, raw.size() > __dense_size);
-      
-#if 0
-      erase_prefix(prefix);
-      for (/**/; first != last; ++ first)
-	operator[](first->first) = first->second;
-#endif
     }
 
   public:
