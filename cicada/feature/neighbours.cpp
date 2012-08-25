@@ -11,6 +11,7 @@
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
+#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
@@ -47,6 +48,8 @@ namespace cicada
       
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
+      
+      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -162,7 +165,7 @@ namespace cicada
       void neighbours_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
-			    feature_set_type& features) const
+			    feature_unordered_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 
@@ -269,10 +272,10 @@ namespace cicada
 	}
       }
 
-      void apply_feature(feature_set_type& features, const symbol_type& node, const symbol_type& prev, const symbol_type& next, const int span) const
+      void apply_feature(feature_unordered_set_type& features, const symbol_type& node, const symbol_type& prev, const symbol_type& next, const int span) const
       {
 	const std::string name = feature_name(node, prev, next, span);
-	if (forced_feature || feature_set_type::feature_type::exists(name))
+	if (forced_feature || feature_type::exists(name))
 	  features[name] += 1.0;
 
 	for (size_t i = 0; i != normalizers.size(); ++ i) {
@@ -281,13 +284,13 @@ namespace cicada
 	  
 	  if (prev_norm != prev || next_norm != next) {
 	    const std::string name = feature_name(node, prev_norm, next_norm, span);
-	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	    if (forced_feature || feature_type::exists(name))
 	      features[name] += 1.0;
 	  }
 	}
       }
 
-      id_type apply_features(feature_set_type& features, id_type id_curr, id_type id, const symbol_type& prefix, const symbol_type& suffix) const
+      id_type apply_features(feature_unordered_set_type& features, id_type id_curr, id_type id, const symbol_type& prefix, const symbol_type& suffix) const
       {
 	typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
 
@@ -383,7 +386,7 @@ namespace cicada
       }
       
       void neighbours_final_score(const state_ptr_type& __state,
-				  feature_set_type& features) const
+				  feature_unordered_set_type& features) const
       {
 
 	apply_features(features, id_type(-1), *reinterpret_cast<const id_type*>(__state), vocab_type::BOS, vocab_type::EOS);
@@ -475,7 +478,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
 
-      feature_set_type feats;
+      impl_type::feature_unordered_set_type feats;
       
       pimpl->neighbours_score(state, states, edge, feats);
       if (final)

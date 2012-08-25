@@ -116,7 +116,7 @@ namespace cicada
       void ngram_final_score(state_ptr_type& state,
 			     const state_ptr_set_type& states,
 			     const edge_type& edge,
-			     feature_set_type& features)
+			     feature_unordered_set_type& features)
       {
 	if (no_bos_eos) return;
 	
@@ -142,7 +142,7 @@ namespace cicada
       void ngram_score(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
-		       feature_set_type& features)
+		       feature_unordered_set_type& features)
       {
 	if (skip_sgml_tag)
 	  ngram_score(state, states, edge, features, skipper_sgml());
@@ -154,7 +154,7 @@ namespace cicada
       void ngram_score(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
-		       feature_set_type& features,
+		       feature_unordered_set_type& features,
 		       Skipper skipper)
       {
 	const int context_size = order - 1;
@@ -267,7 +267,7 @@ namespace cicada
       }
 
       template <typename Iterator>
-      void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_set_type& features)
+      void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_unordered_set_type& features)
       {
 	if (first == iter || iter == last) return;
 	
@@ -309,7 +309,7 @@ namespace cicada
       }
       
       template <typename Iterator>
-      void ngram_feature(Iterator first, Iterator last, feature_set_type& features)
+      void ngram_feature(Iterator first, Iterator last, feature_unordered_set_type& features)
       {
 	if (first == last) return;
 
@@ -515,7 +515,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      feature_set_type feats;
+      impl_type::feature_unordered_set_type feats;
       
       pimpl->ngram_score(state, states, edge, feats);
       if (final)

@@ -123,7 +123,7 @@ namespace cicada
       };
       
       void lexicon_score(const edge_type& edge,
-			 feature_set_type& features)
+			 feature_unordered_set_type& features)
       {
 	if (skip_sgml_tag)
 	  lexicon_score(edge, features, skipper_sgml());
@@ -134,7 +134,7 @@ namespace cicada
       
       template <typename Skipper>
       void lexicon_score(const edge_type& edge,
-			 feature_set_type& features,
+			 feature_unordered_set_type& features,
 			 Skipper skipper)
       {
 	const phrase_type& phrase = edge.rule->rhs;
@@ -660,7 +660,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      feature_set_type feats;
+      impl_type::feature_unordered_set_type feats;
       
       pimpl->lexicon_score(edge, feats);
 

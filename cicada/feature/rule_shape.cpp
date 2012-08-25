@@ -7,6 +7,7 @@
 
 #include "cicada/feature/rule_shape.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
@@ -40,6 +41,8 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
+      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
+      
       typedef feature_function_type::rule_type rule_type;
       
       typedef utils::compact_trie_dense<int, std::string, utils::hashmurmur<size_t>, std::equal_to<int>,
@@ -64,7 +67,7 @@ namespace cicada
       void rule_shape_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
-			    feature_set_type& features)
+			    feature_unordered_set_type& features)
       {
 	id_type node = trie.root();
 	
@@ -222,7 +225,7 @@ namespace cicada
 			  feature_set_type& features,
 			  const bool final) const
     {
-      feature_set_type feats;
+      impl_type::feature_unordered_set_type feats;
  
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
