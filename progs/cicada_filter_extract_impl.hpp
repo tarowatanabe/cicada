@@ -27,6 +27,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
+#include <cicada/alignment.hpp>
 #include <cicada/tree_rule.hpp>
 
 struct RootCount
@@ -624,7 +625,6 @@ struct LexiconBase
     return std::make_pair(score_source_target, score_target_source);
   }
   
-  
   sentence_type source;
   sentence_type target;
 };
@@ -645,7 +645,6 @@ struct LexiconPhrase : public LexiconBase
   {
     target.assign(phrase);
   }
-
 };
 
 struct LexiconSCFG : public LexiconBase
@@ -675,6 +674,112 @@ struct LexiconGHKM : public LexiconBase
 	      const lexicon_model_type& __lexicon_target_source)
     : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
 
+  void assign_source(const utils::piece& phrase)
+  {
+    source.clear();
+    cicada::TreeRule(phrase).frontier(std::back_inserter(source));
+  }
+
+  void assign_target(const utils::piece& phrase)
+  {
+    target.clear();
+    cicada::TreeRule(phrase).frontier(std::back_inserter(target));
+  }
+};
+
+struct CrossBase
+{
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Alignment alignment_type;
+
+  typedef std::vector<size_type, std::allocator<size_type> > position_type;
+  
+  size_type operator()()
+  {
+    //
+    // compute non-terminal alignment
+    //
+    
+    // first, enumerate source-position...
+    position_source.clear();
+    
+    int pos = 1;
+    sentence_type::const_iterator siter_begin = source.begin();
+    sentence_type::const_iterator siter_end   = source.end();
+    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+      if (siter->is_non_terminal()) {
+	const int non_terminal_pos = siter->non_terminal_index();
+	const int non_terminal_index = utils::bithack::branch(non_terminal_pos <= 0, pos, non_terminal_pos);
+	
+	if (non_terminal_index >= static_cast<int>(position_source.size()))
+	  position_source.resize(non_terminal_index + 1);
+	
+	position_source[non_terminal_index] = siter - siter_begin;
+	
+	++ pos;
+      }
+    
+    if (pos == 1) return 0;
+    
+    // then, enumerate target-position...
+    alignment.clear();
+
+    pos = 1;
+    sentence_type::const_iterator titer_begin = target.begin();
+    sentence_type::const_iterator titer_end   = target.end();
+    for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+      if (titer->is_non_terminal()) {
+	const int non_terminal_pos = titer->non_terminal_index();
+	const int non_terminal_index = utils::bithack::branch(non_terminal_pos <= 0, pos, non_terminal_pos);
+	
+	alignment.push_back(alignment_type::value_type(position_source[non_terminal_index], titer - titer_begin));
+	
+	++ pos;
+      }
+    
+    //
+    // compute crossing...
+    //
+    
+    size_type crossed = 0;
+    
+    // check whether niter crossed agains aiter...
+    alignment_type::const_iterator aiter_end = alignment.end();
+    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end - 1; ++ aiter)
+      for (alignment_type::const_iterator niter = aiter + 1; niter != aiter_end; ++ niter)
+	crossed += ((aiter->source < niter->source && niter->target < aiter->target)
+		    || (niter->source < aiter->source && aiter->target < niter->target));
+    
+    return crossed;
+  }
+  
+  sentence_type source;
+  sentence_type target;
+  
+  alignment_type alignment;
+  position_type  position_source;
+};
+
+struct CrossSCFG : public CrossBase
+{
+  void assign_source(const std::string& phrase)
+  {
+    source.assign(phrase);
+    source.erase(source.begin());
+  }
+
+  void assign_target(const std::string& phrase)
+  {
+    target.assign(phrase);
+    target.erase(target.begin());
+  }
+
+};
+
+struct CrossGHKM : public CrossBase
+{
   void assign_source(const utils::piece& phrase)
   {
     source.clear();

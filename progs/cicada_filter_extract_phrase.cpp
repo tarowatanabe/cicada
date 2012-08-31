@@ -47,6 +47,7 @@ bool mode_target_only = false;
 
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
+bool feature_cross_mode = false;
 
 bool model1_mode = false;
 bool noisy_or_mode = false;
@@ -625,6 +626,7 @@ void options(int argc, char** argv)
     
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
+    ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")
 
     ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
     ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
