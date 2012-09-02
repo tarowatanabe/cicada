@@ -5,9 +5,9 @@
 #include <iostream>
 
 #include <cicada/parameter.hpp>
-#include <cicada/push_bos_eos.hpp>
+#include <cicada/push_weights_root.hpp>
 
-#include <cicada/operation/push_bos_eos.hpp>
+#include <cicada/operation/push_weights_root.hpp>
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
@@ -17,20 +17,20 @@ namespace cicada
 {
   namespace operation
   {
-    PushBosEos::PushBosEos(const std::string& parameter, const int __debug)
-      :  base_type("push-bos/eos"), debug(__debug)
+    PushWeightsRoot::PushWeightsRoot(const std::string& parameter, const int __debug)
+      :  base_type("push-weights-root"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (utils::ipiece(param.name()) != "push-bos-eos")
-	throw std::runtime_error("this is not a bos-eos pusher");
+      if (utils::ipiece(param.name()) != "push-weights-root")
+	throw std::runtime_error("this is not a weights-root pusher");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
-	std::cerr << "WARNING: unsupported parameter for push-bos-eos: " << piter->first << "=" << piter->second << std::endl;
+	std::cerr << "WARNING: unsupported parameter for push weights-root: " << piter->first << "=" << piter->second << std::endl;
     }
 
-    void PushBosEos::operator()(data_type& data) const
+    void PushWeightsRoot::operator()(data_type& data) const
     {
       if (! data.hypergraph.is_valid()) return;
       
@@ -41,8 +41,8 @@ namespace cicada
 	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
-	
-      cicada::push_bos_eos(hypergraph, pushed);
+      
+      cicada::push_weights_root(hypergraph, pushed);
 	
       utils::resource end;
 	

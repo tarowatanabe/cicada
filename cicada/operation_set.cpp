@@ -29,6 +29,7 @@
 #include "operation/posterior.hpp"
 #include "operation/prune.hpp"
 #include "operation/push_bos_eos.hpp"
+#include "operation/push_weights_root.hpp"
 #include "operation/remove_annotation.hpp"
 #include "operation/remove_bos_eos.hpp"
 #include "operation/remove_epsilon.hpp"
@@ -230,6 +231,7 @@ prune: pruning\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
 push-bos-eos: push bos/eos\n\
+push-weights-root: push weights toward root\n\
 remove-annotation: remove latent annotation from forest\n\
 remove-bos-eos: remove BOS/EOS\n\
 \tlattice=[true|false] remove BOS/EOS for lattice\n\
@@ -361,6 +363,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
       else if (param_name == "push-bos-eos")
 	operations.push_back(operation_ptr_type(new operation::PushBosEos(*piter, debug)));
+      else if (param_name == "push-weights-root")
+	operations.push_back(operation_ptr_type(new operation::PushWeightsRoot(*piter, debug)));
       else if (param_name == "remove-annotation")
 	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
       else if (param_name == "remove-bos-eos")
