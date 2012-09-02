@@ -73,8 +73,8 @@ namespace cicada
       }
       
       // visit in an inverse topological order, and push-features!
-      hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+      hypergraph_type::node_set_type::const_reverse_iterator niter_end = target.nodes.rend();
+      for (hypergraph_type::node_set_type::const_reverse_iterator niter = target.nodes.rbegin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
 	// nothing to propagate!
