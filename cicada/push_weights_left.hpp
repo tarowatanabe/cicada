@@ -7,19 +7,10 @@
 #define __CICADA__PUSH_WEIGHTS_LEFT__HPP__ 1
 
 #include <vector>
-#include <queue>
-#include <deque>
-#include <set>
-#include <utility>
 
 #include <cicada/hypergraph.hpp>
-#include <cicada/vocab.hpp>
-#include <cicada/sort_topologically.hpp>
 
-#include <utils/hashmurmur.hpp>
-#include <utils/mathop.hpp>
 #include <utils/bithack.hpp>
-
 
 namespace cicada
 {
@@ -34,18 +25,89 @@ namespace cicada
     typedef hypergraph_type::id_type id_type;
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
+    typedef hypergraph_type::rule_type rule_type;
     
     typedef hypergraph_type::feature_set_type feature_set_type;
-    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
+    
+    typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+    typedef std::vector<edge_set_type, std::allocator<edge_set_type> > edge_map_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      target.clear();
-
-      if (! source.is_valid())
+      if (! source.is_valid()) {
+	target.clear();
 	return;
+      }
       
+      target = source;
       
+      edge_map_type    edges(source.nodes.size());
+
+      // visit in a topological order, then, compute a "left-learning graph"
+      {
+	hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
+	for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+	  const hypergraph_type::node_type& node = *niter;
+	
+	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const edge_type& edge = target.edges[*eiter];
+	  
+	    if (edge.tails.empty()) continue;
+	  
+	    int tail_pos = 0;
+	    int non_terminal_pos = 1;
+	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) 
+	      if (riter->is_non_terminal()) {
+		const int __non_terminal_index = riter->non_terminal_index();
+		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index);
+		
+		if (antecedent_index == 1) break;
+		
+		++ tail_pos;
+		++ non_terminal_pos;
+	      }
+	    
+	    edges[edge.tails[tail_pos]].push_back(edge.id);
+	  }
+	}
+      }
+      
+      // visit in an inverse topological order, and push-features!
+      hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+	
+	// nothing to propagate!
+	if (edges[node.id].empty()) continue;
+	
+	if (edges[node.id].size() == 1) {
+	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
+	    target.edges[*eiter].features += target.edges[edges[node.id].front()].features;
+	  
+	  target.edges[edges[node.id].front()].features.clear();
+	} else {
+	  feature_set_type intersected(target.edges[edges[node.id].front()].features);
+	  
+	  edge_set_type::const_iterator eiter_end = edges[node.id].end();
+	  for (edge_set_type::const_iterator eiter = edges[node.id].begin() + 1; eiter != eiter_end; ++ eiter)
+	    intersected.intersect(target.edges[*eiter].features);
+	  
+	  if (! intersected.empty()) {
+	    edge_set_type::const_iterator eiter_end = edges[node.id].end();
+	    for (edge_set_type::const_iterator eiter = edges[node.id].begin(); eiter != eiter_end; ++ eiter)
+	      target.edges[*eiter].features -= intersected;
+	    
+	    {
+	      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
+		target.edges[*eiter].features += intersected;
+	    }
+	  }
+	}
+      }
     }
   };
   

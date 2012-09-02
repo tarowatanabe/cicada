@@ -7,19 +7,8 @@
 #define __CICADA__PUSH_WEIGHTS_ROOT__HPP__ 1
 
 #include <vector>
-#include <queue>
-#include <deque>
-#include <set>
-#include <utility>
 
 #include <cicada/hypergraph.hpp>
-#include <cicada/vocab.hpp>
-#include <cicada/sort_topologically.hpp>
-
-#include <utils/hashmurmur.hpp>
-#include <utils/mathop.hpp>
-#include <utils/bithack.hpp>
-
 
 namespace cicada
 {
