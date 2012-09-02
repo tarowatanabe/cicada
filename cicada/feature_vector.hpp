@@ -383,6 +383,21 @@ namespace cicada
       }
     }
 
+    template <typename T, typename A>
+    FeatureVector& intersect(const FeatureVector<T,A>& x)
+    {
+      if (empty()) 
+	return *this;
+      else if (x.empty())
+	clear();
+      else if (x.sparse())
+	intersect(x.sparse_begin(), x.sparse_end(), true);
+      else
+	intersect(x.dense_begin(), x.dense_end(), false);
+      
+      return *this; 
+    }
+
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
@@ -419,6 +434,66 @@ namespace cicada
     }
 
   private:
+    template <typename Iterator>
+    void intersect(Iterator first, Iterator last, const bool large=false)
+    {
+      if (__sparse || large) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type();
+	  
+	  intersect(*__sparse, __dense.begin(), __dense.end(), first, last);
+
+	  __dense.clear();
+	} else {
+	  sparse_vector_type sparse_new;
+	  
+	  intersect(sparse_new, __sparse->begin(), __sparse->end(), first, last);
+	  
+	  __sparse->swap(sparse_new);
+	}
+      } else {
+	dense_vector_type dense_new;
+	
+	intersect(dense_new, __dense.begin(), __dense.end(), first, last);
+	
+	__dense.swap(dense_new);
+	  
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+      }
+    }
+    
+    template <typename Container, typename Iterator1, typename Iterator2>
+    void intersect(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
+    {
+      typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
+      typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
+
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first)
+	  ++ first1;
+	else if (first2->first < first1->first)
+	  ++ first2;
+	else {
+	  if (first1->second > value1_type() && first2->second > value2_type()) {
+	    const value1_type value(std::min(first1->second, static_cast<value1_type>(first2->second)));
+	    
+	    container.insert(container.end(), std::make_pair(first1->first, value));
+	    
+	  } else if (first1->second < value1_type() && first2->second < value2_type()) {
+	    const value1_type value(std::max(first1->second, static_cast<value1_type>(first2->second)));
+	    
+	    container.insert(container.end(), std::make_pair(first1->first, value));
+	  }
+	  
+	  ++ first1;
+	  ++ first2;
+	}
+      }
+    }
+
     template <typename Iterator, typename Prefix>
     void update_ordered(Iterator first, Iterator last, const Prefix& prefix, const bool large=false)
     {
@@ -431,7 +506,7 @@ namespace cicada
 	  __dense.clear();
 	} else {
 	  sparse_vector_type sparse_new;
-	    
+	  
 	  update_ordered(sparse_new, __sparse->begin(), __sparse->end(), first, last, prefix);
 	    
 	  __sparse->swap(sparse_new);

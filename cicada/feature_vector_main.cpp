@@ -206,6 +206,20 @@ int main(int argc, char** argv)
   check_compact(features2);
   check_compact(features3);
   
+  std::cout << "feature1" << std::endl;
+  std::cout << features1;
+  std::cout << "feature3" << std::endl;
+  std::cout << features3;
+  
+  features1.intersect(features3);
+  
+  std::cout << "feature1.intersect(features3)" << std::endl;
+  std::cout << features1;
+  
+  check_compact(features1);
+  check_compact(features2);
+  check_compact(features3);
+  
   for (int iter = 0; iter != 64; ++ iter) {
 
     for (int i = 0; i != 32; ++ i) {
