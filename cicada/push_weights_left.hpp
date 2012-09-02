@@ -56,17 +56,15 @@ namespace cicada
 	    if (edge.tails.empty()) continue;
 	  
 	    int tail_pos = 0;
-	    int non_terminal_pos = 1;
 	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) 
 	      if (riter->is_non_terminal()) {
 		const int __non_terminal_index = riter->non_terminal_index();
-		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index);
+		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, tail_pos, __non_terminal_index - 1);
 		
-		if (antecedent_index == 1) break;
+		if (antecedent_index == 0) break;
 		
 		++ tail_pos;
-		++ non_terminal_pos;
 	      }
 	    
 	    edges[edge.tails[tail_pos]].push_back(edge.id);
