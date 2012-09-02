@@ -28,7 +28,8 @@ namespace cicada
     typedef hypergraph_type::rule_type rule_type;
     
     typedef hypergraph_type::feature_set_type feature_set_type;
-    
+    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
+
     typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
     typedef std::vector<edge_set_type, std::allocator<edge_set_type> > edge_map_type;
     
@@ -41,7 +42,8 @@ namespace cicada
       
       target = source;
       
-      edge_map_type    edges(source.nodes.size());
+      feature_map_type features(target.nodes.size());
+      edge_map_type    edges(target.nodes.size());
 
       // visit in a topological order, then, compute a "left-learning graph"
       {
@@ -52,9 +54,9 @@ namespace cicada
 	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const edge_type& edge = target.edges[*eiter];
-	  
+	    
 	    if (edge.tails.empty()) continue;
-	  
+	    
 	    int tail_pos = 0;
 	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) 
@@ -80,12 +82,21 @@ namespace cicada
 	// nothing to propagate!
 	if (edges[node.id].empty()) continue;
 	
-	if (edges[node.id].size() == 1) {
-	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-	    target.edges[*eiter].features += target.edges[edges[node.id].front()].features;
+	// collect pushed features...
+	edge_set_type::const_iterator eiter_end = edges[node.id].end();
+	for (edge_set_type::const_iterator eiter = edges[node.id].begin(); eiter != eiter_end; ++ eiter) {
+	  edge_type& edge = target.edges[*eiter];
 	  
-	  target.edges[edges[node.id].front()].features.clear();
+	  edge.features += features[edge.head];
+	}
+	
+	// push features...
+	if (edges[node.id].size() == 1) {
+	  const id_type pushing = edges[node.id].front();
+	  
+	  features[node.id] += target.edges[pushing].features;
+	  
+	  target.edges[pushing].features.clear();
 	} else {
 	  feature_set_type intersected(target.edges[edges[node.id].front()].features);
 	  
@@ -94,15 +105,23 @@ namespace cicada
 	    intersected.intersect(target.edges[*eiter].features);
 	  
 	  if (! intersected.empty()) {
+	    features[node.id] += intersected;
+	    
 	    edge_set_type::const_iterator eiter_end = edges[node.id].end();
 	    for (edge_set_type::const_iterator eiter = edges[node.id].begin(); eiter != eiter_end; ++ eiter)
 	      target.edges[*eiter].features -= intersected;
+	  }
+	}
+	
+	{
+	  // pushed to source-nodes...
+	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    edge_type& edge = target.edges[*eiter];
 	    
-	    {
-	      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-		target.edges[*eiter].features += intersected;
-	    }
+	    if (! edge.tails.empty()) continue;
+	    
+	    edge.features += features[node.id];
 	  }
 	}
       }
