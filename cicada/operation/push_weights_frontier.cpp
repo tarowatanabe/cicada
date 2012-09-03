@@ -5,9 +5,9 @@
 #include <iostream>
 
 #include <cicada/parameter.hpp>
-#include <cicada/push_weights_root.hpp>
+#include <cicada/push_weights_frontier.hpp>
 
-#include <cicada/operation/push_weights_root.hpp>
+#include <cicada/operation/push_weights_frontier.hpp>
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
@@ -17,20 +17,20 @@ namespace cicada
 {
   namespace operation
   {
-    PushWeightsRoot::PushWeightsRoot(const std::string& parameter, const int __debug)
-      :  base_type("push-weights-root"), debug(__debug)
+    PushWeightsFrontier::PushWeightsFrontier(const std::string& parameter, const int __debug)
+      :  base_type("push-weights-frontier"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (utils::ipiece(param.name()) != "push-weights-root")
-	throw std::runtime_error("this is not a weights-root pusher");
+      if (utils::ipiece(param.name()) != "push-weights-frontier")
+	throw std::runtime_error("this is not a weights-frontier pusher");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
-	std::cerr << "WARNING: unsupported parameter for push weights-root: " << piter->first << "=" << piter->second << std::endl;
+	std::cerr << "WARNING: unsupported parameter for push weights-frontier: " << piter->first << "=" << piter->second << std::endl;
     }
 
-    void PushWeightsRoot::operator()(data_type& data) const
+    void PushWeightsFrontier::operator()(data_type& data) const
     {
       if (! data.hypergraph.is_valid()) return;
       
@@ -42,7 +42,7 @@ namespace cicada
       
       utils::resource start;
       
-      cicada::push_weights_root(hypergraph, pushed);
+      cicada::push_weights_frontier(hypergraph, pushed);
 	
       utils::resource end;
 	
