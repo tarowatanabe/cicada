@@ -27,6 +27,8 @@ namespace cicada
     typedef hypergraph_type::feature_set_type feature_set_type;
     typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
     
+    typedef std::vector<bool, std::allocator<bool> > processed_type;
+
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       if (! source.is_valid()) {
@@ -36,53 +38,41 @@ namespace cicada
       
       target = source;
 
-      feature_map_type features(target.nodes.size());
+      feature_map_type outside(target.nodes.size());
+      processed_type   processed(target.nodes.size());
       
-      // visit in a topological order, then, computed intersection of features, 
-      hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
-	const hypergraph_type::node_type& node = *niter;
-	
-	// this should not happen, though..
-	if (node.edges.empty()) continue;
-	
-	// collect pushed features...
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  edge_type& edge = target.edges[*eiter];
+      // visit in a topological order, then, compute intersection of features, 
+      processed[target.goal] = true;
+      
+      {
+	hypergraph_type::node_set_type::const_reverse_iterator niter_end = target.nodes.rend();
+	for (hypergraph_type::node_set_type::const_reverse_iterator niter = target.nodes.rbegin(); niter != niter_end; ++ niter) {
+	  const hypergraph_type::node_type& node = *niter;
 	  
-	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    edge.features += features[*titer];
-	}
-	
-	if (node.id == target.goal) continue;
-	
-	// push features...
-	
-	if (node.edges.size() == 1) {
-	  features[node.id] += target.edges[node.edges.front()].features;
-	  
-	  target.edges[node.edges.front()].features.clear();
-	} else {
-	  feature_set_type intersected(target.edges[node.edges.front()].features);
+	  // this should not happen, though..
+	  if (node.edges.empty()) continue;
 	  
 	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin() + 1; eiter != eiter_end; ++ eiter)
-	    intersected.intersect(target.edges[*eiter].features);
-	  
-	  if (! intersected.empty()) {
-	    features[node.id] += intersected;
+	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    edge_type& edge = target.edges[*eiter];
 	    
-	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-	      target.edges[*eiter].features -= intersected;
+	    feature_set_type intersected(edge.features);
+	    intersected += outside[node.id];
+	    
+	    edge_type::node_set_type::const_iterator titer_begin = edge.tails.begin();
+	    edge_type::node_set_type::const_iterator titer_end   = edge.tails.end();
+	    for (edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	      if (! processed[*titer]) {
+		outside[*titer] = intersected;
+		processed[*titer] = true;
+	      } else
+		outside[*titer].intersect(intersected);
+	    }
 	  }
 	}
       }
     }
   };
-  
   
   inline
   void push_weights_frontier(const HyperGraph& source, HyperGraph& target)
