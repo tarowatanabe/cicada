@@ -14,7 +14,6 @@
 
 namespace cicada
 {
-  
   struct PushWeightsLeft
   {
     typedef size_t    size_type;
@@ -22,16 +21,14 @@ namespace cicada
     
     typedef HyperGraph hypergraph_type;
     
-    typedef hypergraph_type::id_type id_type;
-    typedef hypergraph_type::node_type node_type;
-    typedef hypergraph_type::edge_type edge_type;
+    typedef hypergraph_type::id_type   id_type;
     typedef hypergraph_type::rule_type rule_type;
     
     typedef hypergraph_type::feature_set_type feature_set_type;
     typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
-
-    typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
-    typedef std::vector<edge_set_type, std::allocator<edge_set_type> > edge_map_type;
+    
+    typedef std::vector<id_type, std::allocator<id_type> > edge_list_type;
+    typedef std::vector<edge_list_type, std::allocator<edge_list_type> > edge_set_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -42,18 +39,18 @@ namespace cicada
       
       target = source;
       
-      feature_map_type features(target.nodes.size());
-      edge_map_type    edges(target.nodes.size());
-
-      // visit in a topological order, then, compute a "left-learning graph"
+      edge_set_type incoming(target.nodes.size());
+      edge_set_type outgoing(target.nodes.size());
+      
+      // visit in a topological order, then, compute a list of outgoing edges
       {
 	hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
 	for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	  const hypergraph_type::node_type& node = *niter;
-	
-	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    const edge_type& edge = target.edges[*eiter];
+	  
+	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const hypergraph_type::edge_type& edge = target.edges[*eiter];
 	    
 	    if (edge.tails.empty()) continue;
 	    
@@ -69,64 +66,279 @@ namespace cicada
 		++ tail_pos;
 	      }
 	    
-	    edges[edge.tails[tail_pos]].push_back(edge.id);
+	    outgoing[edge.head].push_back(edge.id);
+	    incoming[edge.tails[tail_pos]].push_back(edge.id);
 	  }
 	}
       }
       
-      // visit in an inverse topological order, and push-features!
+      // visit in an inverse of topilogical order, then, propagate weights
+
+      feature_map_type features(target.nodes.size());
+      
       hypergraph_type::node_set_type::const_reverse_iterator niter_end = target.nodes.rend();
       for (hypergraph_type::node_set_type::const_reverse_iterator niter = target.nodes.rbegin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
-	// nothing to propagate!
-	if (edges[node.id].empty()) continue;
-	
-	// collect pushed features...
-	edge_set_type::const_iterator eiter_end = edges[node.id].end();
-	for (edge_set_type::const_iterator eiter = edges[node.id].begin(); eiter != eiter_end; ++ eiter) {
-	  edge_type& edge = target.edges[*eiter];
+	edge_list_type::const_iterator iiter_end = incoming[node.id].end();
+	for (edge_list_type::const_iterator iiter = incoming[node.id].begin(); iiter != iiter_end; ++ iiter) {
+	  hypergraph_type::edge_type& edge = target.edges[*iiter];
 	  
 	  edge.features += features[edge.head];
 	}
 	
-	// push features...
-	if (edges[node.id].size() == 1) {
-	  const id_type pushing = edges[node.id].front();
+	if (incoming[node.id].empty() || outgoing[node.id].empty()) continue;
+	
+	if (incoming[node.id].size() == 1) {
+	  features[node.id] = target.edges[incoming[node.id].front()].features;
 	  
-	  features[node.id] += target.edges[pushing].features;
-	  
-	  target.edges[pushing].features.clear();
+	  target.edges[incoming[node.id].front()].features.clear();
 	} else {
-	  feature_set_type intersected(target.edges[edges[node.id].front()].features);
+	  feature_set_type intersected(target.edges[incoming[node.id].front()].features);
 	  
-	  edge_set_type::const_iterator eiter_end = edges[node.id].end();
-	  for (edge_set_type::const_iterator eiter = edges[node.id].begin() + 1; eiter != eiter_end; ++ eiter)
-	    intersected.intersect(target.edges[*eiter].features);
+	  edge_list_type::const_iterator iiter_end = incoming[node.id].end();
+	  for (edge_list_type::const_iterator iiter = incoming[node.id].begin() + 1; iiter != iiter_end; ++ iiter)
+	    intersected.intersect(target.edges[*iiter].features);
 	  
 	  if (! intersected.empty()) {
-	    features[node.id] += intersected;
+	    features[node.id] = intersected;
 	    
-	    edge_set_type::const_iterator eiter_end = edges[node.id].end();
-	    for (edge_set_type::const_iterator eiter = edges[node.id].begin(); eiter != eiter_end; ++ eiter)
-	      target.edges[*eiter].features -= intersected;
+	    edge_list_type::const_iterator iiter_end = incoming[node.id].end();
+	    for (edge_list_type::const_iterator iiter = incoming[node.id].begin(); iiter != iiter_end; ++ iiter)
+	      target.edges[*iiter].features -= intersected;
 	  }
 	}
 	
-	{
-	  // pushed to source-nodes...
-	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    edge_type& edge = target.edges[*eiter];
+	// we will also propagate to edges without tails...
+	
+	if (! features[node.id].empty()) {
+	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    hypergraph_type::edge_type& edge = target.edges[*eiter];
 	    
-	    if (! edge.tails.empty()) continue;
-	    
-	    edge.features += features[node.id];
+	    if (edge.tails.empty())
+	      edge.features += features[node.id];
 	  }
 	}
       }
     }
   };
+  
+#if 0
+  struct PushWeightsLeft
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    
+    typedef HyperGraph hypergraph_type;
+    
+    typedef hypergraph_type::id_type   id_type;
+    typedef hypergraph_type::rule_type rule_type;
+    
+    typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
+
+    typedef std::vector<bool, std::allocator<bool> > root_set_type;
+
+    typedef hypergraph_type::edge_type::node_set_type tail_set_type;
+    
+    typedef std::vector<tail_set_type, std::allocator<tail_set_type> > edge_set_type;
+    
+    typedef std::vector<id_type, std::allocator<id_type> > edge_list_type;
+    typedef std::vector<edge_list_type, std::allocator<edge_list_type> > node_set_type;
+    
+    enum color_type {
+      white,
+      gray,
+      black
+    };
+
+    struct dfs_type
+    {
+      id_type node;
+      int edge;
+      int tail;
+      
+      dfs_type(const id_type& _node, const int& _edge, const int& _tail) 
+	: node(_node), edge(_edge), tail(_tail) {}
+    };
+    
+
+    typedef std::vector<int, std::allocator<int> > reloc_set_type;
+    typedef std::vector<color_type, std::allocator<color_type> > color_set_type;
+    typedef std::vector<dfs_type, std::allocator<dfs_type> > stack_type;
+
+    void operator()(const hypergraph_type& source, hypergraph_type& target)
+    {
+      if (! source.is_valid()) {
+	target.clear();
+	return;
+      }
+      
+      target = source;
+      
+      root_set_type roots(target.nodes.size(), true);
+      node_set_type nodes(target.nodes.size() + 1);
+      edge_set_type edges(target.edges.size() + 1);
+      
+      // visit in a topological order, then, compute a "left-learning graph"
+      {
+	hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
+	for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+	  const hypergraph_type::node_type& node = *niter;
+	  
+	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const hypergraph_type::edge_type& edge = target.edges[*eiter];
+	    
+	    if (edge.tails.empty()) {
+	      nodes[edge.head].push_back(edge.id);
+	      continue;
+	    }
+	    
+	    int tail_pos = 0;
+	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) 
+	      if (riter->is_non_terminal()) {
+		const int __non_terminal_index = riter->non_terminal_index();
+		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, tail_pos, __non_terminal_index - 1);
+		
+		if (antecedent_index == 0) break;
+		
+		++ tail_pos;
+	      }
+	    
+	    nodes[edge.tails[tail_pos]].push_back(edge.id);
+	    
+	    roots[edge.head] = false;
+	    
+	    edges[edge.id] = edge.tails;
+	    edges[edge.id][tail_pos] = edge.head;
+	  }
+	}
+      }
+      
+      // add a pseudo root with a hyperedge...
+      {
+	std::vector<id_type, std::allocator<id_type> > tails;
+	
+	for (id_type node = 0; node != roots.size(); ++ node)
+	  if (roots[node])
+	    tails.push_back(node);
+	
+	edges.back() = tail_set_type(tails.begin(), tails.end());
+	nodes.back().push_back(edges.size() - 1);
+      }
+      
+      // topologically sort...
+      reloc_set_type reloc_node(nodes.size(), -1);
+      color_set_type color(nodes.size(), white);
+      stack_type stack;
+      
+      stack.reserve(nodes.size());
+      stack.push_back(dfs_type(nodes.size() - 1, 0, 0));
+      
+      int node_count = 0;
+      
+      while (! stack.empty()) {
+	const dfs_type& dfs = stack.back();
+	id_type node_id = dfs.node;
+	size_t pos_edge = dfs.edge;
+	size_t pos_tail = dfs.tail;
+	
+	stack.pop_back();
+	
+	const edge_list_type* curr_node = &nodes[node_id];
+	
+	while (pos_edge != curr_node->size()) {
+	  const tail_set_type& curr_edge = edges[curr_node->operator[](pos_edge)];
+	  
+	  if (pos_tail == curr_edge.size()) {
+	    // reach end: proceed to the next edge with pos_tail initialized to the first tail
+	    ++ pos_edge;
+	    pos_tail = 0;
+	    continue;
+	  }
+	  
+	  const id_type    tail_node  = curr_edge[pos_tail];
+	  const color_type tail_color = color[tail_node];
+	  
+	  switch (tail_color) {
+	  case white:
+	    ++ pos_tail;
+	    stack.push_back(dfs_type(node_id, pos_edge, pos_tail));
+	    
+	    node_id = tail_node;
+	    curr_node = &nodes[node_id];
+	    
+	    color[node_id] = gray;
+	    pos_edge = 0;
+	    pos_tail = 0;
+	    
+	    break;
+	  case black:
+	    ++ pos_tail;
+	    
+	    break;
+	  case gray:
+	    ++ pos_tail;
+	    
+	    break;
+	  }
+	}
+	
+	color[node_id] = black;
+	reloc_node[node_count ++] = node_id;
+      }
+      
+      feature_map_type features(target.nodes.size());
+      
+      size_t pos = 0;
+      reloc_set_type::const_iterator riter_end = reloc_node.end() - 1;
+      for (reloc_set_type::const_iterator riter = reloc_node.begin(); riter != riter_end; ++ riter, ++ pos) {
+	
+	// this should not happen...
+	if (*riter < 0) continue;
+	if (nodes[*riter].empty()) continue;
+	
+	// first, propagate features toward edges
+	edge_list_type::const_iterator eiter_end = nodes[*riter].end();
+	for (edge_list_type::const_iterator eiter = nodes[*riter].begin(); eiter != eiter_end; ++ eiter) {
+	  hypergraph_type::edge_type& edge = target.edges[*eiter];
+	  
+	  tail_set_type::const_iterator titer_end = edges[*eiter].end();
+	  for (tail_set_type::const_iterator titer = edges[*eiter].begin(); titer != titer_end; ++ titer)
+	    edge.features += features[*titer];
+	}
+	
+	// if this is a root, then, do nothing...
+	if (roots[*riter]) continue;
+	
+	// second, compute intersection, and propagate intersected weights.
+	
+	if (nodes[*riter].size() == 1) {
+	  features[*riter] += target.edges[nodes[*riter].front()].features;
+	  
+	  target.edges[nodes[*riter].front()].features.clear();
+	} else {
+	  feature_set_type intersected(target.edges[nodes[*riter].front()].features);
+	  
+	  edge_list_type::const_iterator eiter_end = nodes[*riter].end();
+	  for (edge_list_type::const_iterator eiter = nodes[*riter].begin() + 1; eiter != eiter_end; ++ eiter)
+	    intersected.intersect(target.edges[*eiter].features);
+	  
+	  if (! intersected.empty()) {
+	    features[*riter] += intersected;
+	    
+	    edge_list_type::const_iterator eiter_end = nodes[*riter].end();
+	    for (edge_list_type::const_iterator eiter = nodes[*riter].begin(); eiter != eiter_end; ++ eiter)
+	      target.edges[*eiter].features -= intersected;
+	  }
+	}
+      }
+    }
+  };
+#endif
   
   
   inline
