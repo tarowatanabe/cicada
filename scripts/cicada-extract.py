@@ -38,24 +38,27 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
     
     ### source/target flags
-    make_option("--f", default="F", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  language suffix for training corpus"),
-    make_option("--e", default="E", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
+    make_option("--f", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  language file or suffix"),
+    make_option("--e", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') language file or suffix"),
+    make_option("--a", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="alignment file or suffix"),
+
     ### span...
-    make_option("--sf", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  span suffix for training corpus"),
-    make_option("--se", default="SE", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') span suffix for training corpus"),
+    make_option("--sf", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  span file or suffix"),
+    make_option("--se", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') span file or suffix"),
     ### forest!
-    make_option("--ff", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  forest suffix for training corpus"),
-    make_option("--fe", default="SE", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') forest suffix for training corpus"),
+    make_option("--ff", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  forest file or suffix"),
+    make_option("--fe", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') forest file or suffix"),
     
     # data prefix
-    make_option("--corpus", default="corpus", action="store", type="string",
-                help="bilingual trainging corpus"),
+    make_option("--corpus", default="", action="store", type="string",
+                help="bilingual trainging corpus prefix"),
 
     # alignment method
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
@@ -65,7 +68,6 @@ opt_parser = OptionParser(
     # steps
     make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: 4)"),
     make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: 6)"),
-
 
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
@@ -326,33 +328,41 @@ class CICADA:
         
 class Corpus:
 
-    def __init__(self, corpus="", f="", e="", sf="", se="", ff="", fe=""):
-
-        self.source_tag = f
-        self.target_tag = e
-
-        self.source_span_tag = sf
-        self.target_span_tag = se
-
-        self.source_forest_tag = ff
-        self.target_forest_tag = fe
+    def __init__(self, corpus="", f="", e="", a="", sf="", se="", ff="", fe=""):
         
-        self.source = compressed_file(corpus+'.'+f)
-        self.target = compressed_file(corpus+'.'+e)
+        if not corpus:
+            # Directly specify data
+            self.source = compressed_file(f)
+            self.target = compressed_file(e)
+            self.alignment = compressed_file(a)
+            
+            self.source_span = compressed_file(sf)
+            self.target_span = compressed_file(se)
         
-        self.source_span = compressed_file(corpus+'.'+sf)
-        self.target_span = compressed_file(corpus+'.'+se)
-        
-        self.source_forest = compressed_file(corpus+'.'+ff)
-        self.target_forest = compressed_file(corpus+'.'+fe)
+            self.source_forest = compressed_file(ff)
+            self.target_forest = compressed_file(fe)
+        else:
+            # Moses style access
+            self.source = compressed_file(corpus+'.'+f)
+            self.target = compressed_file(corpus+'.'+e)
+            self.alignment = compressed_file(corpus+'.'+a)
+            
+            self.source_span = compressed_file(corpus+'.'+sf)
+            self.target_span = compressed_file(corpus+'.'+se)
+            
+            self.source_forest = compressed_file(corpus+'.'+ff)
+            self.target_forest = compressed_file(corpus+'.'+fe)
 
 class Alignment:
-    def __init__(self, alignment_dir="", alignment=""):
-        self.alignment = compressed_file(os.path.join(alignment_dir, 'aligned.'+alignment))
-
-        if not os.path.exists(self.alignment):
-            raise ValueError, "no alignment data %s" %(self.alignment)
+    def __init__(self, corpus=None, alignment_dir="", alignment=""):
         
+        if os.path.exists(corpus.alignment):
+            self.alignment = corpus.alignment
+        else:
+            self.alignment = compressed_file(os.path.join(alignment_dir, 'aligned.'+alignment))
+
+            if not os.path.exists(self.alignment):
+                raise ValueError, "no alignment data %s" %(self.alignment)
 
 class Lexicon:
     def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
@@ -795,12 +805,13 @@ if options.pbs:
 corpus = Corpus(corpus=options.corpus,
                 f=options.f,
                 e=options.e,
+                a=options.a,
                 sf=options.sf,
                 se=options.se,
                 ff=options.ff,
                 fe=options.fe)
 
-alignment = Alignment(options.alignment_dir, options.alignment)
+alignment = Alignment(corpus=corpus, alignment_dir=options.alignment_dir, alignment=options.alignment)
 
 lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
