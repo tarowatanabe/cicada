@@ -25,10 +25,10 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
     
     typedef hypergraph_type::feature_set_type feature_set_type;
-    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
     
-    typedef std::vector<bool, std::allocator<bool> > processed_type;
-
+    typedef std::vector<id_type, std::allocator<id_type> > edge_list_type;
+    typedef std::vector<edge_list_type, std::allocator<edge_list_type> > edge_set_type;
+    
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       if (! source.is_valid()) {
@@ -38,36 +38,51 @@ namespace cicada
       
       target = source;
 
-      feature_map_type outside(target.nodes.size());
-      processed_type   processed(target.nodes.size());
+      edge_set_type outgoing(target.nodes.size());
       
-      // visit in a topological order, then, compute intersection of features, 
-      processed[target.goal] = true;
+      hypergraph_type::edge_set_type::const_iterator eiter_end = target.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = target.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const edge_type& edge = *eiter;
+	
+	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	  outgoing[*titer].push_back(edge.id);
+      }
       
-      {
-	hypergraph_type::node_set_type::const_reverse_iterator niter_end = target.nodes.rend();
-	for (hypergraph_type::node_set_type::const_reverse_iterator niter = target.nodes.rbegin(); niter != niter_end; ++ niter) {
-	  const hypergraph_type::node_type& node = *niter;
+      hypergraph_type::node_set_type::const_reverse_iterator niter_end = target.nodes.rend();
+      for (hypergraph_type::node_set_type::const_reverse_iterator niter = target.nodes.rbegin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
 	  
-	  // this should not happen, though..
-	  if (node.edges.empty()) continue;
+	// this should not happen, though..
+	if (node.edges.empty()) continue;
+	if (outgoing[node.id].empty()) continue;
 	  
-	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    edge_type& edge = target.edges[*eiter];
+	if (outgoing[node.id].size() == 1) {
+
+	  if (! target.edges[outgoing[node.id].front()].features.empty()) {
+	    const feature_set_type intersected(target.edges[outgoing[node.id].front()].features);
+	      
+	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
+	      target.edges[*eiter].features += intersected;
+	      
+	    target.edges[outgoing[node.id].front()].features.clear();
+	  }
+	} else {
+	  feature_set_type intersected(target.edges[outgoing[node.id].front()].features);
 	    
-	    feature_set_type intersected(edge.features);
-	    intersected += outside[node.id];
-	    
-	    edge_type::node_set_type::const_iterator titer_begin = edge.tails.begin();
-	    edge_type::node_set_type::const_iterator titer_end   = edge.tails.end();
-	    for (edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	      if (! processed[*titer]) {
-		outside[*titer] = intersected;
-		processed[*titer] = true;
-	      } else
-		outside[*titer].intersect(intersected);
-	    }
+	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
+	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin() + 1; oiter != oiter_end; ++ oiter)
+	    intersected.intersect(target.edges[*oiter].features);
+
+	  if (! intersected.empty()) {
+	    edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
+	    for (edge_list_type::const_iterator oiter = outgoing[node.id].begin(); oiter != oiter_end; ++ oiter)
+	      target.edges[*oiter].features -= intersected;
+	      
+	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
+	      target.edges[*eiter].features += intersected;
 	  }
 	}
       }
