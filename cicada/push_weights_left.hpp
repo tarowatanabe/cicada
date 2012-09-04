@@ -3,12 +3,6 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-//
-// one of the major problem is the interaction from other tails...
-// HOW TO SOLVE THIS???
-// use of inside/outside???
-//
-
 #ifndef __CICADA__PUSH_WEIGHTS_LEFT__HPP__
 #define __CICADA__PUSH_WEIGHTS_LEFT__HPP__ 1
 

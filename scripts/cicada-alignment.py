@@ -39,27 +39,28 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
     
     ### source/target flags
-    make_option("--f", default="F", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  language suffix for training corpus"),
-    make_option("--e", default="E", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
-    make_option("--a", default="A", action="store", type="string",
-                metavar="SUFFIX", help="source-to-target alignment suffix for training corpus"),
+    make_option("--f", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  language file or suffix"),
+    make_option("--e", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') language file or suffix"),
+    make_option("--a", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="alignment file or suffix"),
+
     ### span...
-    make_option("--sf", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  span suffix for training corpus"),
-    make_option("--se", default="SE", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') span suffix for training corpus"),
+    make_option("--sf", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  span file or suffix"),
+    make_option("--se", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') span file or suffix"),
     ### forest!
-    make_option("--ff", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French')  forest suffix for training corpus"),
-    make_option("--fe", default="SE", action="store", type="string",
-                metavar="SUFFIX", help="target (or 'English') forest suffix for training corpus"),
+    make_option("--ff", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="source (or 'French')  forest file or suffix"),
+    make_option("--fe", default="", action="store", type="string",
+                metavar="FILE-OR-SUFFIX", help="target (or 'English') forest file or suffix"),
     
     # data prefix
-    make_option("--corpus", default="corpus", action="store", type="string",
-                help="bilingual trainging corpus"),
-
+    make_option("--corpus", default="", action="store", type="string",
+                help="bilingual trainging corpus prefix"),
+    
     # alignment method
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
                 help="alignment methods (default: grow-diag-final-and)"),
@@ -175,25 +176,46 @@ class Corpus:
 
     def __init__(self, corpus_dir="", corpus="", f="", e="", a="", sf="", se="", ff="", fe=""):
 
-        self.source_tag = f
-        self.target_tag = e
-        self.alignment_tag = a
+        if not corpus:
+            self.source_tag = 'src'
+            self.target_tag = 'trg'
+            self.alignment_tag = 'algn'
+            
+            self.source_span_tag = 'span-src'
+            self.target_span_tag = 'span-trg'
+            
+            self.source_forest_tag = 'forest-src'
+            self.target_forest_tag = 'forest-trg'
+            
+            self.source = compressed_file(f)
+            self.target = compressed_file(e)
+            self.alignment = compressed_file(a)
+            
+            self.source_span = compressed_file(sf)
+            self.target_span = compressed_file(se)
+            
+            self.source_forest = compressed_file(ff)
+            self.target_forest = compressed_file(fe)
+        else:
+            self.source_tag = f
+            self.target_tag = e
+            self.alignment_tag = a
 
-        self.source_span_tag = sf
-        self.target_span_tag = se
+            self.source_span_tag = sf
+            self.target_span_tag = se
 
-        self.source_forest_tag = ff
-        self.target_forest_tag = fe
+            self.source_forest_tag = ff
+            self.target_forest_tag = fe
         
-        self.source = compressed_file(corpus+'.'+f)
-        self.target = compressed_file(corpus+'.'+e)
-        self.alignment = compressed_file(corpus+'.'+a)
+            self.source = compressed_file(corpus+'.'+f)
+            self.target = compressed_file(corpus+'.'+e)
+            self.alignment = compressed_file(corpus+'.'+a)
         
-        self.source_span = compressed_file(corpus+'.'+sf)
-        self.target_span = compressed_file(corpus+'.'+se)
+            self.source_span = compressed_file(corpus+'.'+sf)
+            self.target_span = compressed_file(corpus+'.'+se)
         
-        self.source_forest = compressed_file(corpus+'.'+ff)
-        self.target_forest = compressed_file(corpus+'.'+fe)
+            self.source_forest = compressed_file(corpus+'.'+ff)
+            self.target_forest = compressed_file(corpus+'.'+fe)
 
         self.corpus_dir = corpus_dir
 
