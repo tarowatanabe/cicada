@@ -80,15 +80,13 @@ namespace cicada
       
       if (state_full && state_less)
 	throw std::runtime_error("either state-full| state-less");
-
-      if ((state_full || state_less) && (sparse || dense))
-	throw std::runtime_error("currently, we do not allow mixing sparse|dense and state-full|state-less");
       
+      // construct sparse or dense
       if (sparse) {
 	model_type model_sparse;
 
 	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
-
+	
 	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
 	  if ((*iter)->sparse_feature())
 	    model_sparse.push_back(*iter);
@@ -110,7 +108,10 @@ namespace cicada
 	  throw std::runtime_error("we have no dense features");
 	
 	model_local.swap(model_dense);
-      } else if (state_less) {
+      }
+      
+      // construct state-less or state-full
+      if (state_less) {
 	model_type model_less;
 
 	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
