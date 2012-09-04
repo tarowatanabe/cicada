@@ -1,5 +1,10 @@
 2012-x-x
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)
+New: added weight pusing toward root, frontier and left-corner
+New: added feature-vector intersection computation for weight pusing
+New: added sort-topologically operation so that we can verify the forest constructed by 3rd parties.
+New: added # of non-terminal crossing feature
+New: added singleton feature and type-based feature
 
 2012-7-18
 Bugfix: variational decoding and bleu/bleuS computation on a forest :(

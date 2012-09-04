@@ -696,7 +696,7 @@ struct CrossBase
 
   typedef std::vector<size_type, std::allocator<size_type> > position_type;
   
-  size_type operator()()
+  difference_type operator()()
   {
     //
     // compute non-terminal alignment
@@ -743,7 +743,7 @@ struct CrossBase
     // compute crossing...
     //
     
-    size_type crossed = 0;
+    difference_type crossed = 0;
     
     // check whether niter crossed agains aiter...
     alignment_type::const_iterator aiter_end = alignment.end();
@@ -752,7 +752,7 @@ struct CrossBase
 	crossed += ((aiter->source < niter->source && niter->target < aiter->target)
 		    || (niter->source < aiter->source && aiter->target < niter->target));
     
-    return crossed;
+    return - crossed;
   }
   
   sentence_type source;

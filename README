@@ -86,6 +86,7 @@ Various learning components are implemented:
      + softmax-margin [9] (New! But still open problems!)
    - Small/large feature set learned by iteratively construncting training samples with rank-learning.
      + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
+     + larger batching with optimized updates [37]
      + we have a script-based implementation + single-binary implementation for efficiency
    - xBLEU objective learned either by L-BFGS or SGD, which directly maximize expected-BLEU (not BLEU expectaiton) [35]
      + Now, this is a recommended optimization method (either kbest or hypergraph learning)
@@ -554,4 +555,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {11--21},
   url       = {http://www.aclweb.org/anthology/P12-1002}
+}
+
+[37]
+@InProceedings{watanabe:2012:NAACL-HLT,
+  author    = {Watanabe, Taro},
+  title     = {Optimized Online Rank Learning for Machine Translation},
+  booktitle = {Proceedings of the 2012 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies},
+  month     = {June},
+  year      = {2012},
+  address   = {Montr\'{e}al, Canada},
+  publisher = {Association for Computational Linguistics},
+  pages     = {253--262},
+  url       = {http://www.aclweb.org/anthology/N12-1026}
 }
