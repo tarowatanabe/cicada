@@ -189,7 +189,15 @@ namespace cicada
 	const hypergraph_type::node_type& node = target.nodes[*piter];
 	
 	// we will collect weights from outging, then distribute to incoming...
-	// if no outgoing, we will treat neutral as outgoing, otherwise, neutral is a part of incoming...
+	// if no incoming, we will treat neutral as incoming. otherwise neutral is outgoing
+	
+#if 0
+	std::cerr << "node: " << node.id
+		  << " incoming: " << incoming[node.id].size()
+		  << " outgoing: " << outgoing[node.id].size()
+		  << " neutral: " << neutral[node.id].size()
+		  << std::endl;
+#endif
 	
 	const edge_list_type& accumulate = (incoming[node.id].empty() ? neutral[node.id] : incoming[node.id]);
 	
