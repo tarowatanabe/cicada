@@ -88,6 +88,7 @@ compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tordered=[true|false] ordered non-terminal index\n\
 \tunique-goal=[true|false] unique goal\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
@@ -157,6 +158,7 @@ parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tordered=[true|false] ordered non-terminal index\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \tsize=<beam size>\n\
@@ -166,6 +168,7 @@ parse-cky|cyk: parsing via CKY\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tordered=[true|false] ordered non-terminal index\n\
 \tunique-goal=[true|false] unique goal\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
@@ -176,6 +179,7 @@ parse-coarse: parsing via coarse-to-fine\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tordered=[true|false] ordered non-terminal index\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\

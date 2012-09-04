@@ -100,6 +100,7 @@ namespace cicada
       bool yield_source;
       bool treebank;
       bool pos_mode;
+      bool ordered;
       bool unique_goal;
       
       int debug;
@@ -130,6 +131,7 @@ namespace cicada
       bool yield_source;
       bool treebank;
       bool pos_mode;
+      bool ordered;
       
       int debug;
     };
@@ -166,6 +168,7 @@ namespace cicada
       bool yield_source;
       bool treebank;
       bool pos_mode;
+      bool ordered;
       
       int debug;
     };

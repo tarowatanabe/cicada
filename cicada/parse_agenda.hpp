@@ -353,7 +353,8 @@ namespace cicada
 		const int __beam_size,
 		const bool __yield_source=false,
 		const bool __treebank=false,
-		const bool __pos_mode=false)
+		const bool __pos_mode=false,
+		const bool __ordered=false)
       : goal(__goal),
 	grammar(__grammar),
 	function(__function),
@@ -361,6 +362,7 @@ namespace cicada
 	yield_source(__yield_source),
 	treebank(__treebank),
 	pos_mode(__pos_mode),
+	ordered(__ordered),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -859,6 +861,29 @@ namespace cicada
       // assign metadata...
       edge_new.attributes[attr_span_first] = attribute_set_type::int_type(edge.span.first);
       edge_new.attributes[attr_span_last]  = attribute_set_type::int_type(edge.span.last);
+
+      if (ordered && ! edge_new.tails.empty()) {
+	// perform reordering of rule...
+	
+	hypergraph_type::edge_type::node_set_type tails(edge_new.tails);
+	rule_type::symbol_set_type rhs(edge_new.rule->rhs);
+	
+	int pos = 0;
+	rule_type::symbol_set_type::iterator riter_end = rhs.end();
+	for (rule_type::symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
+	  if (riter->is_non_terminal()) {
+	    const int non_terminal_pos = riter->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(non_terminal_pos == 0, pos, non_terminal_pos - 1);
+	    
+	    tails[pos] = edge_new.tails[antecedent_index];
+	    
+	    *riter = riter->non_terminal();
+	    ++ pos;
+	  }
+	
+	edge_new.rule = rule_type::create(rule_type(edge_new.rule->lhs, rhs));
+	edge_new.tails = tails;
+      }
       
       graph.connect_edge(edge_new.id, head_id);
     };
@@ -897,6 +922,7 @@ namespace cicada
     const bool yield_source;
     const bool treebank;
     const bool pos_mode;
+    const bool ordered;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     
@@ -920,9 +946,9 @@ namespace cicada
   
   template <typename Function>
   inline
-  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false)
+  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool ordered=false)
   {
-    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, pos_mode)(lattice, graph);
+    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, pos_mode, ordered)(lattice, graph);
   }
 
 };

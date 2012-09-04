@@ -54,8 +54,9 @@ namespace cicada
 	       const bool __yield_source=false,
 	       const bool __treebank=false,
 	       const bool __pos_mode=false,
+	       const bool __ordered=false,
 	       const bool __unique_goal=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), unique_goal(__unique_goal),
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), ordered(__ordered), unique_goal(__unique_goal),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -464,11 +465,34 @@ namespace cicada
       edge.rule = rule;
       edge.features = features;
       edge.attributes = attributes;
-      
+
       // assign metadata...
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
-
+      
+      if (ordered && ! edge.tails.empty()) {
+	// perform reordering of rule...
+	
+	hypergraph_type::edge_type::node_set_type tails(edge.tails);
+	rule_type::symbol_set_type rhs(rule->rhs);
+	
+	int pos = 0;
+	rule_type::symbol_set_type::iterator riter_end = rhs.end();
+	for (rule_type::symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
+	  if (riter->is_non_terminal()) {
+	    const int non_terminal_pos = riter->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(non_terminal_pos == 0, pos, non_terminal_pos - 1);
+	    
+	    tails[pos] = edge.tails[antecedent_index];
+	    
+	    *riter = riter->non_terminal();
+	    ++ pos;
+	  }
+	
+	edge.rule = rule_type::create(rule_type(rule->lhs, rhs));
+	edge.tails = tails;
+      }
+      
       const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
       
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, cat_level), 0));
@@ -538,6 +562,7 @@ namespace cicada
     const bool yield_source;
     const bool treebank;
     const bool pos_mode;
+    const bool ordered;
     const bool unique_goal;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
@@ -555,9 +580,9 @@ namespace cicada
   };
   
   inline
-  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool unique_goal=false)
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool ordered=false, const bool unique_goal=false)
   {
-    ComposeCKY(goal, grammar, yield_source, treebank, pos_mode, unique_goal)(lattice, graph);
+    ComposeCKY(goal, grammar, yield_source, treebank, pos_mode, ordered, unique_goal)(lattice, graph);
   }
 };
 

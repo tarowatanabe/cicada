@@ -304,6 +304,7 @@ namespace cicada
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
+	ordered(false),
 	unique_goal(false),
 	debug(__debug)
     { 
@@ -328,6 +329,8 @@ namespace cicada
 	  treebank = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "pos")
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "ordered")
+	  ordered = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "goal")
@@ -362,7 +365,7 @@ namespace cicada
 
       grammar_compose.assign(lattice);
 	
-      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
+      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, ordered, unique_goal);
     
       utils::resource end;
     

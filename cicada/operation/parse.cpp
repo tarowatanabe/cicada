@@ -297,6 +297,7 @@ namespace cicada
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
+	ordered(false),
 	unique_goal(false),
 	debug(__debug)
     { 
@@ -331,6 +332,8 @@ namespace cicada
 	  treebank = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "pos")
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "ordered")
+	  ordered = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else
@@ -381,9 +384,9 @@ namespace cicada
       grammar_parse.assign(lattice);
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, unique_goal);
       else
-	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, unique_goal);
       
       utils::resource end;
     
@@ -428,6 +431,7 @@ namespace cicada
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
+	ordered(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -461,6 +465,8 @@ namespace cicada
 	  treebank = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "pos")
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "ordered")
+	  ordered = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for agenda parser: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -509,9 +515,9 @@ namespace cicada
       grammar_parse.assign(lattice);
       
       if (weights_one)
-	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
       else
-	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
       
       utils::resource end;
     
@@ -567,6 +573,7 @@ namespace cicada
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
+	ordered(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -596,6 +603,8 @@ namespace cicada
 	  treebank = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "pos")
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "ordered")
+	  ordered = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "goal")
 	  goal = piter->second;
 	else if (utils::ipiece(piter->first) == "grammar")
@@ -707,12 +716,12 @@ namespace cicada
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
+			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
       else
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
+			     weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
       
       utils::resource end;
     

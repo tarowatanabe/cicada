@@ -95,6 +95,7 @@ namespace cicada
       bool yield_source;
       bool treebank;
       bool pos_mode;
+      bool ordered;
       bool unique_goal;
   
       int debug;
