@@ -3,8 +3,8 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__OPERATION__PUSH_WEIGHTS_ROOT__HPP__
-#define __CICADA__OPERATION__PUSH_WEIGHTS_ROOT__HPP__ 1
+#ifndef __CICADA__OPERATION__PUSH_WEIGHTS__HPP__
+#define __CICADA__OPERATION__PUSH_WEIGHTS__HPP__ 1
 
 #include <iostream>
 
@@ -15,12 +15,16 @@ namespace cicada
   namespace operation
   {
 
-    class PushWeightsRoot : public cicada::Operation
+    class PushWeights : public cicada::Operation
     {
     public:
-      PushWeightsRoot(const std::string& parameter, const int __debug);
+      PushWeights(const std::string& parameter, const int __debug);
   
       void operator()(data_type& data) const;
+
+      bool left;
+      bool frontier;
+      bool root;
   
       int debug;
     };

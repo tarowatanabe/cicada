@@ -50,7 +50,7 @@ namespace cicada
       }
 
       if (int(left) + right + all + terminal + cyk == 0)
-	throw std::runtime_error("what direction? left, right or all");
+	throw std::runtime_error("what direction? left, right, all, terminal or cyk?");
       
       if (int(left) + right + all + terminal + cyk > 1)
 	throw std::runtime_error("we do not binarization in many directions!");
