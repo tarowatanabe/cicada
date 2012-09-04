@@ -62,7 +62,6 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> > position_set_type;
     typedef std::vector<color_type, std::allocator<color_type> > color_set_type;
     typedef std::vector<dfs_type, std::allocator<dfs_type> > stack_type;
-    
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -188,38 +187,27 @@ namespace cicada
 	
 	const hypergraph_type::node_type& node = target.nodes[*piter];
 	
-	// we will collect weights from outging, then distribute to incoming...
-	// if no incoming, we will treat neutral as incoming. otherwise neutral is outgoing
+
+#if 0	
+	// we will collect weights from incoming and neutral, then, distribute to outging...
 	
-#if 0
-	std::cerr << "node: " << node.id
-		  << " incoming: " << incoming[node.id].size()
-		  << " outgoing: " << outgoing[node.id].size()
-		  << " neutral: " << neutral[node.id].size()
-		  << std::endl;
-#endif
-	
-	const edge_list_type& accumulate = (incoming[node.id].empty() ? neutral[node.id] : incoming[node.id]);
-	
-	if (accumulate.empty()) continue;
+	if (incoming[node.id].empty() && neutral[node.id].empty()) continue;
+	if (outgoing[node.id].empty()) continue;
 	
 	feature_set_type intersected;
-	bool processed = false;
 	
-	if (! outgoing[node.id].empty()) {
-	  intersected = target.edges[outgoing[node.id].front()].features;
-	  processed = true;
+	if (! incoming[node.id].empty()) {
+	  intersected = target.edges[incoming[node.id].front()].features;
 	  
-	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
-	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin() + 1; oiter != oiter_end; ++ oiter)
-	    intersected.intersect(target.edges[*oiter].features);
+	  edge_list_type::const_iterator iiter_end = incoming[node.id].end();
+	  for (edge_list_type::const_iterator iiter = incoming[node.id].begin() + 1; iiter != iiter_end; ++ iiter)
+	    intersected.intersect(target.edges[*iiter].features);
 	}
 	
-	if (! incoming[node.id].empty() && ! neutral[node.id].empty()) {
-	  if (! processed) {
+	if (! neutral[node.id].empty()) {
+	  if (incoming[node.id].empty())
 	    intersected = target.edges[neutral[node.id].front()].features;
-	    processed = true;
-	  } else
+	  else
 	    intersected.intersect(target.edges[neutral[node.id].front()].features);
 	  
 	  edge_list_type::const_iterator niter_end = neutral[node.id].end();
@@ -228,6 +216,59 @@ namespace cicada
 	}
 	
 	if (! intersected.empty()) {
+	  edge_list_type::const_iterator iiter_end = incoming[node.id].end();
+	  for (edge_list_type::const_iterator iiter = incoming[node.id].begin(); iiter != iiter_end; ++ iiter)
+	    target.edges[*iiter].features -= intersected;
+	  
+	  edge_list_type::const_iterator niter_end = neutral[node.id].end();
+	  for (edge_list_type::const_iterator niter = neutral[node.id].begin(); niter != niter_end; ++ niter)
+	    target.edges[*niter].features -= intersected;
+	  
+	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
+	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin(); oiter != oiter_end; ++ oiter)
+	    target.edges[*oiter].features += intersected;
+	}
+#endif
+	
+#if 1
+	// we will collect weights from outging, then distribute to incoming...
+	// if no incoming, we will treat neutral as incoming. otherwise neutral is outgoing
+	
+	const edge_list_type& accumulate = (incoming[node.id].empty() ? neutral[node.id] : incoming[node.id]);
+	
+	if (accumulate.empty()) continue;
+	
+	feature_set_type intersected;
+	
+	if (! outgoing[node.id].empty()) {
+	  intersected = target.edges[outgoing[node.id].front()].features;
+	  
+	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
+	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin() + 1; oiter != oiter_end; ++ oiter)
+	    intersected.intersect(target.edges[*oiter].features);
+	}
+	
+	if (! incoming[node.id].empty() && ! neutral[node.id].empty()) {
+	  if (outgoing[node.id].empty())
+	    intersected = target.edges[neutral[node.id].front()].features;
+	  else
+	    intersected.intersect(target.edges[neutral[node.id].front()].features);
+	  
+	  edge_list_type::const_iterator niter_end = neutral[node.id].end();
+	  for (edge_list_type::const_iterator niter = neutral[node.id].begin() + 1; niter != niter_end; ++ niter)
+	    intersected.intersect(target.edges[*niter].features);
+	}
+	
+	if (! intersected.empty()) {
+#if 0
+	  std::cerr << "propagated: " << node.id
+		    << " incoming: " << incoming[node.id].size()
+		    << " outgoing: " << outgoing[node.id].size()
+		    << " neutral: " << neutral[node.id].size()
+		    << std::endl;
+	  std::cerr << intersected;
+#endif
+
 	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
 	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin(); oiter != oiter_end; ++ oiter)
 	    target.edges[*oiter].features -= intersected;
@@ -242,6 +283,8 @@ namespace cicada
 	  for (edge_list_type::const_iterator aiter = accumulate.begin(); aiter != aiter_end; ++ aiter)
 	    target.edges[*aiter].features += intersected;
 	}
+
+#endif
       }
     }
   };
