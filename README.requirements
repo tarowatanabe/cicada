@@ -23,12 +23,14 @@ Optional:
 		 or, try postcat (http://www.seas.upenn.edu/~strctlrn/CAT/CAT.html).
 		 Remark that cicada can "align words" using symmetized training of berkeley aligner and posterior
 		 constrained training of postcat.
+	
+	For better memory management:
 
 	gperftools (http://code.google.com/p/gperftools/)
 	jemalloc  (http://www.canonware.com/jemalloc/)
-	
-	For Linux, you should install one of them for better memory performance
-	and to measure how many bytes malloced, since mallinfo is "broken" for memory more than 4GB.
+
+	   For Linux, you should install one of them for better memory performance
+	   and to measure how many bytes malloced, since mallinfo is "broken" for memory more than 4GB.
 
 Included libraries + licenses:
 

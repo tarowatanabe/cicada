@@ -71,14 +71,12 @@ namespace cicada
 	
 	// this should not happen, though..
 	if (node.edges.empty()) continue;
-	if (outgoing[node.id].empty()) continue;
+	if (leaning[node.id].empty()) continue;
 	
-	const edge_list_type& accumulate = (leaning[node.id].empty() ? outgoing[node.id] : leaning[node.id]);
-	
-	if (accumulate.size() == 1) {
+	if (outgoing[node.id].size() == 1) {
 	  
-	  if (! target.edges[accumulate.front()].features.empty()) {
-	    const feature_set_type intersected(target.edges[accumulate.front()].features);
+	  if (! target.edges[outgoing[node.id].front()].features.empty()) {
+	    const feature_set_type intersected(target.edges[outgoing[node.id].front()].features);
 	    
 	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
@@ -89,10 +87,10 @@ namespace cicada
 	      target.edges[*oiter].features -= intersected;
 	  }
 	} else {
-	  feature_set_type intersected(target.edges[accumulate.front()].features);
+	  feature_set_type intersected(target.edges[outgoing[node.id].front()].features);
 	    
-	  edge_list_type::const_iterator oiter_end = accumulate.end();
-	  for (edge_list_type::const_iterator oiter = accumulate.begin() + 1; oiter != oiter_end; ++ oiter)
+	  edge_list_type::const_iterator oiter_end = outgoing[node.id].end();
+	  for (edge_list_type::const_iterator oiter = outgoing[node.id].begin() + 1; oiter != oiter_end; ++ oiter)
 	    intersected.intersect(target.edges[*oiter].features);
 
 	  if (! intersected.empty()) {
