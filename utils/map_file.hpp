@@ -42,9 +42,9 @@ namespace utils
     
   public:
     __map_file_impl(const std::string& file, const flag_type flag=MAP_FILE_NONE)
-      : mmapped(), filesize(), mmap_size(), filename() { open(file, flag); }
+      : mmapped(), filesize(), filename() { open(file, flag); }
     __map_file_impl(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
-      : mmapped(), filesize(), mmap_size(), filename() { open(file, flag); }
+      : mmapped(), filesize(), filename() { open(file, flag); }
     ~__map_file_impl() { close(); }
     
   public:
@@ -81,9 +81,6 @@ namespace utils
       if (fd < 0)
 	throw std::runtime_error("map_file::open() open()");
       
-      const size_t page_size = getpagesize();
-      mmap_size = static_cast<off_type>(std::max(off_type((filesize + page_size - 1) / page_size), off_type(1)) * page_size);
-
       int mmap_flag = MAP_SHARED;
 #ifdef MAP_POPULATE
       if (flag & MAP_FILE_POPULATE)
@@ -91,7 +88,7 @@ namespace utils
 #endif
       
       // First, try map_shared
-      byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
+      byte_type* x = static_cast<byte_type*>(::mmap(0, filesize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       
       // Second, try map_private
       if (! (x + 1)) {
@@ -100,7 +97,7 @@ namespace utils
 	if (flag & MAP_FILE_POPULATE)
 	  mmap_flag |= MAP_POPULATE;
 #endif
-	x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
+	x = static_cast<byte_type*>(::mmap(0, filesize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       }
 	
       // no need to keep file-descriptor
@@ -117,12 +114,11 @@ namespace utils
 
     void close()
     {
-      if (mmapped && filesize > 0 && mmap_size > 0)
-	::munmap(mmapped, mmap_size);
+      if (mmapped && filesize > 0)
+	::munmap(mmapped, filesize);
       
       mmapped = 0;
       filesize = 0;
-      mmap_size = 0;
       filename = std::string();
       
       modifiable = false;
@@ -130,7 +126,7 @@ namespace utils
 
     void populate()
     {
-      if (! mmapped || filesize <= 0 || mmap_size <= 0) return;
+      if (! mmapped || filesize <= 0) return;
 
       const off_type page_size  = 4096;
       const off_type block_size = page_size * 256;
@@ -149,7 +145,6 @@ namespace utils
     byte_type* mmapped;
     
     off_type filesize;
-    off_type mmap_size;
     
     boost::filesystem::path filename;
 
