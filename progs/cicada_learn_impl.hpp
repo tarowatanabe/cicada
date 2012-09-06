@@ -69,12 +69,16 @@ struct OptimizerSGDL2 : public OptimizerBase
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
+
   
   void operator()(const gradient_type& correct, 
 		  const gradient_type& gradient, 
 		  const weight_type& Z_correct,
 		  const weight_type& Z)
   {
+    typedef std::pair<feature_type, double> pair_type;
+    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
+  
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
@@ -82,12 +86,18 @@ struct OptimizerSGDL2 : public OptimizerBase
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
-
-    gradient_type::const_iterator citer = correct.begin();
-    gradient_type::const_iterator citer_end = correct.end();
     
-    gradient_type::const_iterator miter = gradient.begin();
-    gradient_type::const_iterator miter_end = gradient.end();
+    sorted_type correct_sorted(correct.begin(), correct.end());
+    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+
+    std::sort(correct_sorted.begin(), correct_sorted.end());
+    std::sort(gradient_sorted.begin(), gradient_sorted.end());
+        
+    sorted_type::const_iterator citer = correct_sorted.begin();
+    sorted_type::const_iterator citer_end = correct_sorted.end();
+    
+    sorted_type::const_iterator miter = gradient_sorted.begin();
+    sorted_type::const_iterator miter_end = gradient_sorted.end();
 
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
@@ -133,6 +143,9 @@ struct OptimizerSGDL2 : public OptimizerBase
 		  const weight_set_type& bounds_lower,
 		  const weight_set_type& bounds_upper)
   {
+    typedef std::pair<feature_type, double> pair_type;
+    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
+
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
@@ -143,11 +156,17 @@ struct OptimizerSGDL2 : public OptimizerBase
     
     const double inf = std::numeric_limits<double>::infinity();
 
-    gradient_type::const_iterator citer = correct.begin();
-    gradient_type::const_iterator citer_end = correct.end();
+    sorted_type correct_sorted(correct.begin(), correct.end());
+    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+
+    std::sort(correct_sorted.begin(), correct_sorted.end());
+    std::sort(gradient_sorted.begin(), gradient_sorted.end());
+        
+    sorted_type::const_iterator citer = correct_sorted.begin();
+    sorted_type::const_iterator citer_end = correct_sorted.end();
     
-    gradient_type::const_iterator miter = gradient.begin();
-    gradient_type::const_iterator miter_end = gradient.end();
+    sorted_type::const_iterator miter = gradient_sorted.begin();
+    sorted_type::const_iterator miter_end = gradient_sorted.end();
 
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
@@ -264,6 +283,9 @@ struct OptimizerSGDL1 : public OptimizerBase
 		  const weight_type& Z_correct,
 		  const weight_type& Z)
   {
+    typedef std::pair<feature_type, double> pair_type;
+    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
+    
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
@@ -272,11 +294,17 @@ struct OptimizerSGDL1 : public OptimizerBase
     
     penalty += eta * lambda;
     
-    gradient_type::const_iterator citer = correct.begin();
-    gradient_type::const_iterator citer_end = correct.end();
+    sorted_type correct_sorted(correct.begin(), correct.end());
+    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+
+    std::sort(correct_sorted.begin(), correct_sorted.end());
+    std::sort(gradient_sorted.begin(), gradient_sorted.end());
+        
+    sorted_type::const_iterator citer = correct_sorted.begin();
+    sorted_type::const_iterator citer_end = correct_sorted.end();
     
-    gradient_type::const_iterator miter = gradient.begin();
-    gradient_type::const_iterator miter_end = gradient.end();
+    sorted_type::const_iterator miter = gradient_sorted.begin();
+    sorted_type::const_iterator miter_end = gradient_sorted.end();
     
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
@@ -319,6 +347,9 @@ struct OptimizerSGDL1 : public OptimizerBase
 		  const weight_set_type& bounds_lower,
 		  const weight_set_type& bounds_upper)
   {
+    typedef std::pair<feature_type, double> pair_type;
+    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
+
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
@@ -326,12 +357,18 @@ struct OptimizerSGDL1 : public OptimizerBase
     ++ epoch;
     
     penalty += eta * lambda;
+
+    sorted_type correct_sorted(correct.begin(), correct.end());
+    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+
+    std::sort(correct_sorted.begin(), correct_sorted.end());
+    std::sort(gradient_sorted.begin(), gradient_sorted.end());
+        
+    sorted_type::const_iterator citer = correct_sorted.begin();
+    sorted_type::const_iterator citer_end = correct_sorted.end();
     
-    gradient_type::const_iterator citer = correct.begin();
-    gradient_type::const_iterator citer_end = correct.end();
-    
-    gradient_type::const_iterator miter = gradient.begin();
-    gradient_type::const_iterator miter_end = gradient.end();
+    sorted_type::const_iterator miter = gradient_sorted.begin();
+    sorted_type::const_iterator miter_end = gradient_sorted.end();
     
     while (citer != citer_end && miter != miter_end) {
       if (citer < miter) {
