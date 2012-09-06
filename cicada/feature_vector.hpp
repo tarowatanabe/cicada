@@ -120,6 +120,8 @@ namespace cicada
     void assign(const FeatureVector<T,A>& x)
     {
       __vector.clear();
+      if (x.size() > __vector.size())
+	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
 
@@ -129,6 +131,8 @@ namespace cicada
     void assign(const FeatureVectorLinear<T,A>& x)
     {
       __vector.clear();
+      if (x.size() > __vector.size())
+	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
 
@@ -136,6 +140,8 @@ namespace cicada
     void assign(const FeatureVectorUnordered<T,A>& x)
     {
       __vector.clear();
+      if (x.size() > __vector.size())
+	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
     
@@ -171,7 +177,7 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(x.size());
+	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
 	initialize(vector_new);
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
@@ -191,7 +197,7 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(x.size());
+	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
 	initialize(vector_new);
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
@@ -211,7 +217,7 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(x.size());
+	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
 	initialize(vector_new);
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
