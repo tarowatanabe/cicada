@@ -86,8 +86,8 @@ struct EnvelopeKBest
     for (/**/; first != last; ++ first) {
       const hypothesis_type& hyp = *first;
       
-      const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
-      const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
+      const double m = cicada::dot_product(direction, hyp.features);
+      const double y = cicada::dot_product(origin,    hyp.features);
       
       lines.push_back(line_type(m, y, hyp));
     }
@@ -108,10 +108,8 @@ struct EnvelopeKBest
 	
 	if (hyp2.loss > hyp.loss) continue;
 	
-	const double m = (cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0)
-			  - cicada::dot_product(direction, hyp2.features.begin(), hyp2.features.end(), 0.0));
-	const double y = (cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0)
-			  - cicada::dot_product(origin,    hyp2.features.begin(), hyp2.features.end(), 0.0));
+	const double m = (cicada::dot_product(direction, hyp.features) - cicada::dot_product(direction, hyp2.features));
+	const double y = (cicada::dot_product(origin,    hyp.features) - cicada::dot_product(origin,    hyp2.features));
 	
 	lines.push_back(line_type(m, y, hyp));
       }
@@ -126,8 +124,8 @@ struct EnvelopeKBest
     for (/**/; first != last; ++ first) {
       const hypothesis_type& hyp = *first;
       
-      const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
-      const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
+      const double m = cicada::dot_product(direction, hyp.features);
+      const double y = cicada::dot_product(origin,    hyp.features);
       
       *result = line_type(m, y, hyp);
       ++ result;
@@ -145,10 +143,8 @@ struct EnvelopeKBest
 	
 	if (hyp2.loss > hyp.loss) continue;
 	
-	const double m = (cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0)
-			  - cicada::dot_product(direction, hyp2.features.begin(), hyp2.features.end(), 0.0));
-	const double y = (cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0)
-			  - cicada::dot_product(origin,    hyp2.features.begin(), hyp2.features.end(), 0.0));
+	const double m = (cicada::dot_product(direction, hyp.features) - cicada::dot_product(direction, hyp2.features));
+	const double y = (cicada::dot_product(origin,    hyp.features) - cicada::dot_product(origin,    hyp2.features));
 	
 	*result = line_type(m, y, hyp);
 	++ result;

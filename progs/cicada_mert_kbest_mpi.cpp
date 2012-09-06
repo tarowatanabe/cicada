@@ -862,7 +862,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	  const hypothesis_type& hyp(*kiter);
-	  const double score_curr = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end(), 0.0);
+	  const double score_curr = cicada::dot_product(weights, hyp.features);
 	  
 	  if (score_curr > score_viterbi) {
 	    score_viterbi = score_curr;
@@ -929,7 +929,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
 	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	  const hypothesis_type& hyp(*kiter);
-	  const double score = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end(), 0.0);
+	  const double score = cicada::dot_product(weights, hyp.features);
 	  
 	  if (score > score_viterbi) {
 	    score_viterbi = score;
