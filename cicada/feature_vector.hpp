@@ -68,14 +68,14 @@ namespace cicada
     FeatureVector() : __vector() { initialize(__vector); }
     FeatureVector(const FeatureVector<Tp,Alloc>& x) : __vector(x.__vector) {}
     template <typename T, typename A>
-    FeatureVector(const FeatureVector<T,A>& x) : __vector() { initialize(__vector);  assign(x); }
+    FeatureVector(const FeatureVector<T,A>& x) : __vector(x.size()) { initialize(__vector);  assign(x); }
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last) : __vector() { initialize(__vector); assign(first, last); }
     FeatureVector(const FeatureVectorCompact& x) : __vector() { initialize(__vector); assign(x); }
     template <typename T, typename A>
-    FeatureVector(const FeatureVectorLinear<T,A>& x): __vector() { initialize(__vector); assign(x); } 
+    FeatureVector(const FeatureVectorLinear<T,A>& x): __vector(x.size()) { initialize(__vector); assign(x); } 
     template <typename T, typename A>
-    FeatureVector(const FeatureVectorUnordered<T,A>& x) : __vector() { initialize(__vector); assign(x); }
+    FeatureVector(const FeatureVectorUnordered<T,A>& x) : __vector(x.size()) { initialize(__vector); assign(x); }
     
     FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
     {
