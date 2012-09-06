@@ -16,6 +16,7 @@
 #include <cicada/feature.hpp>
 
 #include <utils/unordered_map.hpp>
+#include <utils/dense_hash_map.hpp>
 #include <utils/linear_map.hpp>
 #include <utils/hashmurmur.hpp>
 
@@ -47,7 +48,7 @@ namespace cicada
     
   private:
     typedef typename Alloc::template rebind<value_type>::other sparse_alloc_type;
-    typedef typename utils::unordered_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, sparse_alloc_type>::type sparse_vector_type;
+    typedef typename utils::dense_hash_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, sparse_alloc_type>::type sparse_vector_type;
     
     typedef std::pair<feature_type, data_type> dense_value_type;
     typedef typename Alloc::template rebind<dense_value_type>::other dense_alloc_type;
@@ -162,10 +163,10 @@ namespace cicada
     FeatureVector()
       : __dense(), __sparse(0) {}
     FeatureVector(const FeatureVector<Tp,Alloc>& x)
-      : __dense(x.__dense), __sparse(x.__sparse ? new sparse_vector_type(*x.__sparse) : 0) {}
+      : __dense(x.__dense), __sparse(x.__sparse ? construct(*x.__sparse) : 0) {}
     template <typename T, typename A>
     FeatureVector(const FeatureVector<T,A>& x)
-      : __dense(x.__dense.begin(), x.__dense.end()), __sparse(x.__sparse ? new sparse_vector_type(x.__sparse->begin(), x.__sparse->end()) : 0) { }
+      : __dense(x.__dense.begin(), x.__dense.end()), __sparse(x.__sparse ? construct(x.__sparse->begin(), x.__sparse->end()) : 0) { }
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last)
       : __dense(), __sparse(0) { assign(first, last); }
@@ -227,7 +228,7 @@ namespace cicada
 	if (__sparse)
 	  *__sparse = *x.__sparse;
 	else
-	  __sparse = new sparse_vector_type(*x.__sparse);
+	  __sparse = construct(*x.__sparse);
       } else if (__sparse) {
 	delete __sparse;
 	__sparse = 0;
@@ -244,7 +245,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
 	} else
-	  __sparse = new sparse_vector_type(x.__sparse->begin(), x.__sparse->end());
+	  __sparse = construct(x.__sparse->begin(), x.__sparse->end());
       } else if (__sparse) {
 	delete __sparse;
 	__sparse = 0;
@@ -264,7 +265,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = new sparse_vector_type(x.begin(), x.end());
+	  __sparse = construct(x.begin(), x.end());
       } else {
 	if (__sparse) {
 	  delete __sparse;
@@ -286,7 +287,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = new sparse_vector_type(x.begin(), x.end());
+	  __sparse = construct(x.begin(), x.end());
       } else {
 	if (__sparse) {
 	  delete __sparse;
@@ -308,7 +309,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(first, last);
 	} else
-	  __sparse = new sparse_vector_type(first, last);
+	  __sparse = construct(first, last);
       } else {
 	if (__sparse) {
 	  delete __sparse;
@@ -330,7 +331,7 @@ namespace cicada
 	__dense.insert(first, last);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -346,7 +347,7 @@ namespace cicada
 	__dense.insert(iter.diter, x);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -362,7 +363,7 @@ namespace cicada
 	__dense.insert(x);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -436,7 +437,7 @@ namespace cicada
     {
       if (__sparse || large) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
+	  __sparse = construct();
 	  
 	  intersect(*__sparse, __dense, first, last);
 	  
@@ -456,7 +457,7 @@ namespace cicada
 	__dense.swap(dense_new);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -523,7 +524,7 @@ namespace cicada
 	if (! result.second || __dense.size() <= __dense_size)
 	  return result.first->second;
 	
-	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end());
 	__dense.clear();
 	return __sparse->operator[](x);
       }
@@ -743,7 +744,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	
@@ -755,7 +756,7 @@ namespace cicada
 	plus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -777,7 +778,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	
@@ -786,7 +787,7 @@ namespace cicada
 	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -806,7 +807,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	
@@ -815,7 +816,7 @@ namespace cicada
 	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -830,7 +831,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	  
@@ -842,7 +843,7 @@ namespace cicada
 	minus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -859,7 +860,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	
@@ -868,7 +869,7 @@ namespace cicada
 	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -883,7 +884,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
 	
@@ -892,7 +893,7 @@ namespace cicada
 	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -910,7 +911,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
+	  __sparse = construct();
 	  
 	  if (x.sparse())
 	    multiply_equal(*__sparse, __dense, x.__sparse->begin(), x.__sparse->end());
@@ -936,7 +937,7 @@ namespace cicada
 	__dense.swap(dense_new);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end());
 	  __dense.clear();
 	}
       }
@@ -1007,7 +1008,38 @@ namespace cicada
 	  container.insert(std::make_pair(first->first, value));
       }
     }
+
+  private:
+    sparse_vector_type* construct()
+    {
+      std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
+      
+      instance->set_empty_key(feature_type(feature_type::id_type(-1)));
+      instance->set_deleted_key(feature_type(feature_type::id_type(-2)));
+      
+      return instance.release();
+    }
     
+    sparse_vector_type* construct(const sparse_vector_type& x)
+    {
+      std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type(x));
+      
+      return instance.release();
+    }
+    
+    template <typename Iterator>
+    sparse_vector_type* construct(Iterator first, Iterator last)
+    {
+      std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
+
+      instance->set_empty_key(feature_type(feature_type::id_type(-1)));
+      instance->set_deleted_key(feature_type(feature_type::id_type(-2)));
+
+      instance->insert(first, last);
+      
+      return instance.release();
+    }
+
   public:
     dense_vector_type   __dense;
     sparse_vector_type* __sparse;
@@ -1215,7 +1247,7 @@ namespace cicada
       plus_equal(__dense, x.begin(), x.end());
       
       if (__dense.size() > __dense_size) {
-	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end());
 	__dense.clear();
       }
     }
@@ -1235,7 +1267,7 @@ namespace cicada
       minus_equal(__dense, x.begin(), x.end());
 	
       if (__dense.size() > __dense_size) {
-	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end());
 	__dense.clear();
       }
     }
