@@ -279,7 +279,6 @@ struct OptimizerSGDL1 : public OptimizerBase
 	weights[miter->first] = std::max(weights[miter->first], bounds_lower[miter->first]);
       if (miter->first.id() < bounds_upper.size())
 	weights[miter->first] = std::min(weights[miter->first], bounds_upper[miter->first]);
-	
 
       apply(weights[miter->first], penalties[miter->first], penalty);
     }
