@@ -15,8 +15,9 @@
 
 #include <cicada/feature.hpp>
 
-#include <utils/vector_map.hpp>
-//#include <utils/stree_map.hpp>
+#include <utils/unordered_map.hpp>
+#include <utils/linear_map.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {
@@ -46,11 +47,11 @@ namespace cicada
     
   private:
     typedef typename Alloc::template rebind<value_type>::other sparse_alloc_type;
-    typedef std::map<key_type, data_type, std::less<key_type>, sparse_alloc_type> sparse_vector_type;
+    typedef typename utils::unordered_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, sparse_alloc_type>::type sparse_vector_type;
     
     typedef std::pair<feature_type, data_type> dense_value_type;
     typedef typename Alloc::template rebind<dense_value_type>::other dense_alloc_type;
-    typedef utils::vector_map<key_type, data_type, std::less<key_type>,  dense_alloc_type> dense_vector_type;
+    typedef utils::linear_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>,  dense_alloc_type> dense_vector_type;
     
     typedef FeatureVector<Tp, Alloc> self_type;
     
@@ -116,15 +117,6 @@ namespace cicada
 	return *this;
       }
       
-      __iterator& operator--()
-      {
-	if (diter)
-	  -- diter;
-	else
-	  -- siter;
-	return *this;
-      }
-      
       __iterator operator++(int)
       {
 	__iterator tmp = *this;
@@ -132,13 +124,6 @@ namespace cicada
 	return tmp;
       }
 
-      __iterator operator--(int)
-      {
-	__iterator tmp = *this;
-	-- *this;
-	return tmp;
-      }
-      
       template <typename D, typename S, typename R, typename P>
       friend
       bool operator==(const __iterator<DIterator,SIterator,Ref,Ptr>& x, const __iterator<D,S,R,P>& y)
@@ -397,18 +382,29 @@ namespace cicada
       
       return *this; 
     }
-
+    
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
       if (empty())
 	assign(x);
-      else if (x.empty())
+      else {
 	erase_prefix(prefix);
-      else if (x.sparse())
-	update_ordered(x.sparse_begin(), x.sparse_end(), prefix, true);
-      else
-	update_ordered(x.dense_begin(), x.dense_end(), prefix, false);
+	
+	operator+=(x);
+      }
+    }
+    
+    template <typename Prefix>
+    void update(const FeatureVectorCompact& x, const Prefix& prefix)
+    {
+      if (empty())
+	assign(x);
+      else {
+	erase_prefix(prefix);
+	
+	operator+=(x);
+      }
     }
     
     template <typename T, typename A, typename Prefix>
@@ -416,21 +412,22 @@ namespace cicada
     {
       if (empty())
 	assign(x);
-      else if (x.empty())
+      else {
 	erase_prefix(prefix);
-      else
-	update_ordered(x.begin(), x.end(), prefix, x.size() > __dense_size);
+	operator+=(x);
+      }
     }
-
+    
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVectorUnordered<T,A>& x, const Prefix& prefix)
     {
       if (empty())
 	assign(x);
-      else if (x.empty())
+      else {
 	erase_prefix(prefix);
-      else
-	update_unordered(x.begin(), x.end(), prefix);
+	
+	operator+=(x);
+      }
     }
 
   private:
@@ -441,23 +438,23 @@ namespace cicada
 	if (! __sparse) {
 	  __sparse = new sparse_vector_type();
 	  
-	  intersect(*__sparse, __dense.begin(), __dense.end(), first, last);
-
+	  intersect(*__sparse, __dense, first, last);
+	  
 	  __dense.clear();
 	} else {
 	  sparse_vector_type sparse_new;
 	  
-	  intersect(sparse_new, __sparse->begin(), __sparse->end(), first, last);
+	  intersect(sparse_new, *__sparse, first, last);
 	  
 	  __sparse->swap(sparse_new);
 	}
       } else {
 	dense_vector_type dense_new;
 	
-	intersect(dense_new, __dense.begin(), __dense.end(), first, last);
+	intersect(dense_new, __dense, first, last);
 	
 	__dense.swap(dense_new);
-	  
+	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
 	  __dense.clear();
@@ -465,119 +462,29 @@ namespace cicada
       }
     }
     
-    template <typename Container, typename Iterator1, typename Iterator2>
-    void intersect(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
+    template <typename Container, typename Original, typename Iterator>
+    void intersect(Container& container, const Original& orig, Iterator first, Iterator last)
     {
-      typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
-      typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
-
-      while (first1 != last1 && first2 != last2) {
-	if (first1->first < first2->first)
-	  ++ first1;
-	else if (first2->first < first1->first)
-	  ++ first2;
-	else {
-	  if (first1->second > value1_type() && first2->second > value2_type()) {
-	    const value1_type value(std::min(first1->second, static_cast<value1_type>(first2->second)));
-	    
-	    container.insert(container.end(), std::make_pair(first1->first, value));
-	    
-	  } else if (first1->second < value1_type() && first2->second < value2_type()) {
-	    const value1_type value(std::max(first1->second, static_cast<value1_type>(first2->second)));
-	    
-	    container.insert(container.end(), std::make_pair(first1->first, value));
-	  }
+      typedef typename Original::value_type::second_type                       value1_type;
+      typedef typename std::iterator_traits<Iterator>::value_type::second_type value2_type;
+      
+      for (/**/; first != last; ++ first) {
+	typename Original::const_iterator iter = orig.find(first->first);
+	
+	if (iter == orig.end()) continue;
+	
+	if (iter->second > value1_type() && first->second > value2_type()) {
+	  const value1_type value(std::min(iter->second, static_cast<value1_type>(first->second)));
 	  
-	  ++ first1;
-	  ++ first2;
-	}
-      }
-    }
-
-    template <typename Iterator, typename Prefix>
-    void update_ordered(Iterator first, Iterator last, const Prefix& prefix, const bool large=false)
-    {
-      if (__sparse || large) {
-	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
-	    
-	  update_ordered(*__sparse, __dense.begin(), __dense.end(), first, last, prefix);
-	    
-	  __dense.clear();
-	} else {
-	  sparse_vector_type sparse_new;
+	  container.insert(std::make_pair(iter->first, value));
+	} else if (iter->second < value1_type() && first->second < value2_type()) {
+	  const value1_type value(std::max(iter->second, static_cast<value1_type>(first->second)));
 	  
-	  update_ordered(sparse_new, __sparse->begin(), __sparse->end(), first, last, prefix);
-	    
-	  __sparse->swap(sparse_new);
-	}
-      } else {
-	dense_vector_type dense_new;
-	  
-	update_ordered(dense_new, __dense.begin(), __dense.end(), first, last, prefix);
-	  
-	__dense.swap(dense_new);
-	  
-	if (__dense.size() > __dense_size) {
-	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
-	  __dense.clear();
+	  container.insert(std::make_pair(iter->first, value));
 	}
       }
     }
     
-    template <typename Container, typename Iterator1, typename Iterator2, typename Prefix>
-    void update_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, const Prefix& prefix)
-    {
-      // update this by x
-      // logically, we erase-prefix, then *this += x;
-      
-      while (first1 != last1 && first2 != last2) {
-	if (first1->first < first2->first) {
-	  if (first1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), first1->first.begin()))
-	    container.insert(container.end(), *first1);
-	  ++ first1;
-	} else if (first2->first < first1->first) {
-	  container.insert(container.end(), *first2);
-	  ++ first2;
-	} else {
-	  container.insert(container.end(), *first2);
-	  ++ first1;
-	  ++ first2;
-	}
-      }
-      
-      for (/**/; first1 != last1; ++ first1) 
-	if (first1->first.size() < prefix.size() || ! std::equal(prefix.begin(), prefix.end(), first1->first.begin()))
-	  container.insert(container.end(), *first1);
-      
-      if (first2 != last2)
-	container.insert(first2, last2);
-    }
-
-    template <typename __Tp>
-    struct __less_first
-    {
-      bool operator()(const __Tp& x, const __Tp& y) const
-      {
-	return x.first < y.first;
-      }
-    };
-
-    template <typename Iterator, typename Prefix>
-    void update_unordered(Iterator first, Iterator last, const Prefix& prefix)
-    {
-      typedef std::pair<feature_type, Tp> pair_type;
-      typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
-      
-      // update this by x
-      // logically, we erase-prefix, then *this += x;
-      
-      raw_type raw(first, last);
-      std::sort(raw.begin(), raw.end(), __less_first<pair_type>());
-      
-      update_ordered(raw.begin(), raw.end(), prefix, raw.size() > __dense_size);
-    }
-
   public:
 
     size_type size() const { return (__sparse ? __sparse->size() : __dense.size()); }
@@ -622,13 +529,6 @@ namespace cicada
       }
     }
     
-    const_reference front() const { return (__sparse ? *__sparse->begin() : *((const value_type*) &__dense.front())); }
-    reference front() { return (__sparse ? *__sparse->begin() : *((value_type*) &__dense.front())); }
-    
-    const_reference back() const { return (__sparse ? *__sparse->rbegin() : *((const value_type*) &__dense.back())); }
-    reference back() { return (__sparse ? *__sparse->rbegin() : *((value_type*) &__dense.back()));}
-
-    
     const_iterator find(const key_type& x) const
     {
       return (__sparse ? const_iterator(__sparse->find(x)) : const_iterator(__dense.find(x)));
@@ -638,27 +538,6 @@ namespace cicada
     {
       return (__sparse ? iterator(__sparse->find(x)) : iterator(__dense.find(x)));
     }
-    
-    const_iterator lower_bound(const key_type& x) const
-    {
-      return (__sparse ? const_iterator(__sparse->lower_bound(x)) : const_iterator(__dense.lower_bound(x)));
-    }
-    
-    iterator lower_bound(const key_type& x)
-    {
-      return (__sparse ? iterator(__sparse->lower_bound(x)) : iterator(__dense.lower_bound(x)));
-    }
-
-    const_iterator upper_bound(const key_type& x) const
-    {
-      return (__sparse ? const_iterator(__sparse->upper_bound(x)) : const_iterator(__dense.upper_bound(x)));
-    }
-    
-    iterator upper_bound(const key_type& x)
-    {
-      return (__sparse ? iterator(__sparse->upper_bound(x)) : iterator(__dense.upper_bound(x)));
-    }
-    
     
     void erase(const key_type& x)
     {
@@ -722,6 +601,7 @@ namespace cicada
 	      : __sum_aux(__dense.begin(), __dense.end()));
     }
 
+  private:
     template <typename Iterator>
     Tp __sum_aux(Iterator first, Iterator last) const
     {
@@ -734,43 +614,46 @@ namespace cicada
   private:
     struct __equal_value
     {
-      bool operator()(const dense_value_type& x, const value_type& y) const
+      bool operator()(const sparse_vector_type& x, const dense_vector_type& y) const
       {
-	return x.first == y.first && x.second == y.second;
+	if (x.size() != y.size()) return false;
+	
+	const_dense_iterator diter_end = y.end();
+	for (const_dense_iterator diter = y.begin(); diter != diter_end; ++ diter)
+	  if (x.find(diter->first) == x.end()) return false;
+	
+	return true;
       }
-      
-      bool operator()(const value_type& x, const dense_value_type& y) const
+
+      bool operator()(const sparse_vector_type& x, const sparse_vector_type& y) const
       {
-	return x.first== y.first && x.second == y.second;
+	if (x.size() != y.size()) return false;
+
+	if (x.size() > y.size()) {
+	  const_sparse_iterator siter_end = y.end();
+	  for (const_sparse_iterator siter = y.begin(); siter != siter_end; ++ siter)
+	    if (x.find(siter->first) == x.end())
+	      return false;
+	} else {
+	  const_sparse_iterator siter_end = x.end();
+	  for (const_sparse_iterator siter = x.begin(); siter != siter_end; ++ siter)
+	    if (y.find(siter->first) == y.end())
+	      return false;
+	}
+	
+	return true;
       }
     };
-
-    struct __less_value
-    {
-      bool operator()(const dense_value_type& x, const value_type& y) const
-      {
-	return x.first < y.first || (!(y.first < x.first) && x.second < y.second);
-      }
-      
-      bool operator()(const value_type& x, const dense_value_type& y) const
-      {
-	return x.first < y.first || (!(y.first < x.first) && x.second < y.second);
-      }
-    };
-
+    
   public:
     // comparison
     friend
     bool operator==(const FeatureVector& x, const FeatureVector& y)
     {
-      return ((x.__sparse && y.__sparse && *x.__sparse == *y.__sparse)
+      return ((x.__sparse && y.__sparse && __equal_value()(*x.__sparse, *y.__sparse))
 	      || (! x.__sparse && ! y.__sparse && x.__dense == y.__dense)
-	      || (x.__sparse && ! y.__sparse
-		  && x.__sparse->size() == y.__dense.size()
-		  && std::equal(x.__sparse->begin(), x.__sparse->end(), y.__dense.begin(), __equal_value()))
-	      || (! x.__sparse && y.__sparse
-		  && x.__dense.size() == y.__sparse->size()
-		  && std::equal(x.__dense.begin(), x.__dense.end(), y.__sparse->begin(), __equal_value())));
+	      || (x.__sparse && ! y.__sparse && __equal_value()(*x.__sparse, y.__dense))
+	      || (! x.__sparse && y.__sparse && __equal_value()(*y.__sparse, x.__dense)));
     }
     
     friend
@@ -860,26 +743,16 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
-	  
-	  if (x.sparse())
-	    plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__sparse->begin(), x.__sparse->end());
-	  else
-	    plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
-	  
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
 	  __dense.clear();
-	} else {
-	  if (x.sparse())
-	    plus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
-	  else
-	    plus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
 	}
-      } else {
-	dense_vector_type dense_new;
-
-	plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
 	
-	__dense.swap(dense_new);
+	if (x.sparse())
+	  plus_equal(*__sparse, x.__sparse->begin(), x.__sparse->end());
+	else
+	  plus_equal(*__sparse, x.__dense.begin(), x.__dense.end());
+      } else {
+	plus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -904,19 +777,13 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
-	  
-	  plus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.begin(), x.end());
-	  
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
 	  __dense.clear();
-	} else
-	  plus_equal_ordered(*__sparse, x.begin(), x.end());
+	}
+	
+	plus_equal(*__sparse, x.begin(), x.end());
       } else {
-	dense_vector_type dense_new;
-	
-	plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
-	
-	__dense.swap(dense_new);
+	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -943,9 +810,9 @@ namespace cicada
 	  __dense.clear();
 	}
 	
-	plus_equal_unordered(*__sparse, x.begin(), x.end());
+	plus_equal(*__sparse, x.begin(), x.end());
       } else {
-	plus_equal_unordered(__dense, x.begin(), x.end());
+	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -963,26 +830,16 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
-	  
-	  if (x.sparse())
-	    minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__sparse->begin(), x.__sparse->end());
-	  else
-	    minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
-	  
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
 	  __dense.clear();
-	} else {
-	  if (x.sparse())
-	    minus_equal_ordered(*__sparse, x.__sparse->begin(), x.__sparse->end());
-	  else
-	    minus_equal_ordered(*__sparse, x.__dense.begin(), x.__dense.end());
 	}
+	  
+	if (x.sparse())
+	  minus_equal(*__sparse, x.__sparse->begin(), x.__sparse->end());
+	else
+	  minus_equal(*__sparse, x.__dense.begin(), x.__dense.end());
       } else {
-	dense_vector_type dense_new;
-	
-	minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.__dense.begin(), x.__dense.end());
-	
-	__dense.swap(dense_new);
+	minus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -992,7 +849,7 @@ namespace cicada
       
       return *this;
     }
-
+    
     self_type& operator-=(const FeatureVectorCompact& x);
 
     template <typename T, typename A>
@@ -1002,19 +859,13 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = new sparse_vector_type();
-	  
-	  minus_equal_ordered(*__sparse, __dense.begin(), __dense.end(), x.begin(), x.end());
-	  
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
 	  __dense.clear();
-	} else
-	  minus_equal_ordered(*__sparse, x.begin(), x.end());
+	}
+	
+	minus_equal(*__sparse, x.begin(), x.end());
       } else {
-	dense_vector_type dense_new;
-	
-	minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
-	
-	__dense.swap(dense_new);
+	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -1036,9 +887,9 @@ namespace cicada
 	  __dense.clear();
 	}
 	
-	minus_equal_unordered(*__sparse, x.begin(), x.end());
+	minus_equal(*__sparse, x.begin(), x.end());
       } else {
-	minus_equal_unordered(__dense, x.begin(), x.end());
+	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -1052,39 +903,43 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator*=(const FeatureVector<T,A>& x)
     {
-      typedef FeatureVector<T,A> another_type;
-      typedef std::pair<feature_type, data_type> feat_type;
-      typedef std::vector<feat_type, std::allocator<feat_type> > feat_set_type;
-      
       if (empty() || x.empty()) {
 	clear();
 	return *this;
       }
       
-      feat_set_type feats;
-      
-      const_iterator iter1     = lower_bound(x.begin()->first);
-      const_iterator iter1_end = end();
-      
-      typename another_type::const_iterator iter2     = (iter1 != iter1_end ? x.lower_bound(iter1->first) : x.begin());
-      typename another_type::const_iterator iter2_end = x.end();
-      
-      while (iter1 != iter1_end && iter2 != iter2_end) {
-	if (iter1->first < iter2->first)
-	  ++ iter1;
-	else if (iter2->first < iter1->first)
-	  ++ iter2;
-	else {
-	  const Tp value = iter1->second * iter2->second;
-	  if (value != Tp())
-	    feats.push_back(std::make_pair(iter1->first, value));
+      if (__sparse || x.sparse()) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type();
 	  
-	  ++ iter1;
-	  ++ iter2;
+	  if (x.sparse())
+	    multiply_equal(*__sparse, __dense, x.__sparse->begin(), x.__sparse->end());
+	  else
+	    multiply_equal(*__sparse, __dense, x.__dense.begin(), x.__dense.end());
+	  
+	  __dense.clear();
+	} else {
+	  sparse_vector_type sparse_new;
+	  
+	  if (x.sparse())
+	    multiply_equal(sparse_new, *__sparse, x.__sparse->begin(), x.__sparse->end());
+	  else
+	    multiply_equal(sparse_new, *__sparse, x.__dense.begin(), x.__dense.end());
+	  
+	  __sparse->swap(sparse_new);
+	}
+      } else {
+	dense_vector_type dense_new;
+	
+	multiply_equal(dense_new, __dense, x.__dense.begin(), x.__dense.end());
+	
+	__dense.swap(dense_new);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
 	}
       }
-      
-      assign(feats.begin(), feats.end());
       
       return *this;
     }
@@ -1105,56 +960,9 @@ namespace cicada
     FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
 
   private:
-    template <typename Container, typename Iterator1, typename Iterator2>
-    void plus_equal_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
-    {
-      while (first1 != last1 && first2 != last2) {
-	if (first1->first < first2->first) {
-	  container.insert(container.end(), *first1);
-	  ++ first1;
-	} else if (first2->first < first1->first) {
-	  container.insert(container.end(), *first2);
-	  ++ first2;
-	} else {
-	  const Tp value = first1->second + first2->second;
-	  if (value != Tp())
-	    container.insert(container.end(), std::make_pair(first1->first, value));
-	  ++ first1;
-	  ++ first2;
-	}
-      }
-      
-      if (first1 != last1)
-	container.insert(first1, last1);
-      if (first2 != last2)
-	container.insert(first2, last2);
-    }
-
     template <typename Container, typename Iterator>
-    void plus_equal_ordered(Container& container, Iterator first, Iterator last)
-    {
-      typename Container::iterator hint = container.begin();
-      
-      for (/**/; first != last && hint != container.end(); ++ first) {
-	std::pair<typename Container::iterator, bool> result = container.insert(*first);
-	
-	hint = result.first;
-	++ hint;
-	
-	if (! result.second) {
-	  result.first->second += first->second;
-	  
-	  if (result.first->second == Tp())
-	    container.erase(result.first);
-	}
-      }
-      
-      if (first != last)
-	container.insert(first, last);
-    }
-    
-    template <typename Container, typename Iterator>
-    void plus_equal_unordered(Container& container, Iterator first, Iterator last)
+    static inline
+    void plus_equal(Container& container, Iterator first, Iterator last)
     {
       for (/**/; first != last; ++ first) {
 	std::pair<typename Container::iterator, bool> result = container.insert(*first);
@@ -1167,57 +975,10 @@ namespace cicada
 	}
       }
     }
-
-    template <typename Container, typename Iterator1, typename Iterator2>
-    void minus_equal_ordered(Container& container, Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
-    {
-      while (first1 != last1 && first2 != last2) {
-	if (first1->first < first2->first) {
-	  container.insert(container.end(), *first1);
-	  ++ first1;
-	} else if (first2->first < first1->first) {
-	  container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
-	  ++ first2;
-	} else {
-	  const Tp value = first1->second - first2->second;
-	  if (value != Tp())
-	    container.insert(container.end(), std::make_pair(first1->first, value));
-	  ++ first1;
-	  ++ first2;
-	}
-      }
-      
-      if (first1 != last1)
-	container.insert(first1, last1);
-      for (/**/; first2 != last2; ++ first2)
-	container.insert(container.end(), std::make_pair(first2->first, -Tp(first2->second)));
-    }
-
-    template <typename Container, typename Iterator>
-    void minus_equal_ordered(Container& container, Iterator first, Iterator last)
-    {
-      typename Container::iterator hint = container.begin();
-      
-      for (/**/; first != last && hint != container.end(); ++ first) {
-	std::pair<typename Container::iterator, bool> result = container.insert(std::make_pair(first->first, -Tp(first->second)));
-	
-	hint = result.first;
-	++ hint;
-	
-	if (! result.second) {
-	  result.first->second -= first->second;
-	  
-	  if (result.first->second == Tp())
-	    container.erase(result.first);
-	}
-      }
-      
-      for (/**/; first != last; ++ first)
-	container.insert(container.end(), std::make_pair(first->first, -Tp(first->second)));
-    }
     
     template <typename Container, typename Iterator>
-    void minus_equal_unordered(Container& container, Iterator first, Iterator last)
+    static inline
+    void minus_equal(Container& container, Iterator first, Iterator last)
     {
       for (/**/; first != last; ++ first) {
 	std::pair<typename Container::iterator, bool> result = container.insert(std::make_pair(first->first, -Tp(first->second)));
@@ -1230,7 +991,23 @@ namespace cicada
 	}
       }
     }
-
+    
+    template <typename Container, typename Original, typename Iterator>
+    static inline
+    void multiply_equal(Container& container, const Original& orig, Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	typename Original::const_iterator iter = orig.find(first->first);
+	
+	if (iter == orig.end()) continue;
+	
+	const Tp value(iter->second * first->second);
+	
+	if (value != Tp())
+	  container.insert(std::make_pair(first->first, value));
+      }
+    }
+    
   public:
     dense_vector_type   __dense;
     sparse_vector_type* __sparse;
@@ -1352,27 +1129,11 @@ namespace cicada
       return left_type();
     
     left_type features;
-    
-    typename left_type::const_iterator iter1     = x.lower_bound(y.begin()->first);
-    typename left_type::const_iterator iter1_end = x.end();
 
-    typename right_type::const_iterator iter2     = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.begin());
-    typename right_type::const_iterator iter2_end = y.end();
-    
-    while (iter1 != iter1_end && iter2 != iter2_end) {
-      if (iter1->first < iter2->first)
-	++ iter1;
-      else if (iter2->first < iter1->first)
-	++ iter2;
-      else {
-	const T1 value = iter1->second * iter2->second;
-	if (value != T1())
-	  features.insert(features.end(), std::make_pair(iter1->first, value));
-	
-	++ iter1;
-	++ iter2;
-      }
-    }
+    if (y.sparse())
+      left_type::multiply_equal(features, x, y.sparse_begin(), y.sparse_end());
+    else
+      left_type::multiply_equal(features, x, y.dense_begin(), y.dense_end());
     
     return features;
   }
@@ -1447,15 +1208,11 @@ namespace cicada
       assign(x);
       return *this;
     }
-      
+    
     if (__sparse)
-      plus_equal_ordered(*__sparse, x.begin(), x.end());
+      plus_equal(*__sparse, x.begin(), x.end());
     else {
-      dense_vector_type dense_new;
-      
-      plus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
-      
-      __dense.swap(dense_new);
+      plus_equal(__dense, x.begin(), x.end());
       
       if (__dense.size() > __dense_size) {
 	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
@@ -1473,13 +1230,9 @@ namespace cicada
     if (x.empty()) return *this;
     
     if (__sparse)
-      minus_equal_ordered(*__sparse, x.begin(), x.end());
+      minus_equal(*__sparse, x.begin(), x.end());
     else {
-      dense_vector_type dense_new;
-	
-      minus_equal_ordered(dense_new, __dense.begin(), __dense.end(), x.begin(), x.end());
-	
-      __dense.swap(dense_new);
+      minus_equal(__dense, x.begin(), x.end());
 	
       if (__dense.size() > __dense_size) {
 	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());

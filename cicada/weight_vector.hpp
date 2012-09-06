@@ -196,17 +196,19 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator+=(const FeatureVector<T, A>& x)
     {
-      typedef typename FeatureVector<T, A>::const_iterator iter_type;
-
-      if (! x.empty())
-	if (x.back().first.id() >= __values.size()) {
-	  __values.reserve(x.back().first.id() + 1);
-	  __values.resize(x.back().first.id() + 1);
-	}
-      
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) += iter->second;
+      if (x.sparse()) {
+	typedef typename FeatureVector<T, A>::const_sparse_iterator iter_type;
+	
+	iter_type iter_end = x.sparse_end();
+	for (iter_type iter = x.sparse_begin(); iter != iter_end; ++ iter)
+	  operator[](iter->first) += iter->second;
+      } else {
+	typedef typename FeatureVector<T, A>::const_dense_iterator iter_type;
+	
+	iter_type iter_end = x.dense_end();
+	for (iter_type iter = x.dense_begin(); iter != iter_end; ++ iter)
+	  operator[](iter->first) += iter->second;
+      }
 
       return *this;
     }
@@ -214,18 +216,20 @@ namespace cicada
     template <typename T, typename A>
     self_type& operator-=(const FeatureVector<T, A>& x)
     {
-      typedef typename FeatureVector<T, A>::const_iterator iter_type;
+      if (x.sparse()) {
+	typedef typename FeatureVector<T, A>::const_sparse_iterator iter_type;
+	
+	iter_type iter_end = x.sparse_end();
+	for (iter_type iter = x.sparse_begin(); iter != iter_end; ++ iter)
+	  operator[](iter->first) -= iter->second;
+      } else {
+	typedef typename FeatureVector<T, A>::const_dense_iterator iter_type;
+	
+	iter_type iter_end = x.dense_end();
+	for (iter_type iter = x.dense_begin(); iter != iter_end; ++ iter)
+	  operator[](iter->first) -= iter->second;
+      }
       
-      if (! x.empty())
-	if (x.back().first.id() >= __values.size()) {
-	  __values.reserve(x.back().first.id() + 1);
-	  __values.resize(x.back().first.id() + 1);
-	}
-
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) -= iter->second;
-
       return *this;
     }
     

@@ -32,7 +32,7 @@ void check_compact(const feature_set_type& features, const feature_compact_type&
   std::cerr << "size: " << features.size() * sizeof(feature_set_type::value_type)
 	    << " compressed: " << feats.size_compressed()
 	    << std::endl;
-
+#if 0
   while (iter != iter_end && citer != citer_end) {
     if (iter->first < citer->first) {
       std::cerr << "differ for the original vector!" << std::endl;
@@ -54,6 +54,7 @@ void check_compact(const feature_set_type& features, const feature_compact_type&
   
   for (/**/; citer != citer_end; ++ citer)
     std::cerr << "differ for the compressed vector!" << std::endl;
+#endif
 
   feature_unordered_type features_unordered(features);
   feature_linear_type features_linear(features);

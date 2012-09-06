@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__DOT_PRODUCT__HPP__
@@ -9,12 +9,110 @@
 #include <numeric>
 
 #include <cicada/feature_vector.hpp>
+#include <cicada/feature_vector_linear.hpp>
+#include <cicada/feature_vector_compact.hpp>
+#include <cicada/feature_vector_unordered.hpp>
 #include <cicada/weight_vector.hpp>
 
 #include <utils/bithack.hpp>
 
 namespace cicada
 {
+  namespace details
+  {
+    template <typename Iterator, typename Tp>
+    inline
+    Tp __inner_product(Iterator first, Iterator last, Tp __dot)
+    {
+      for (/**/; first != last; ++ first)
+	__dot += first->second * first->second;
+      return __dot;
+    }
+
+    template <typename Iterator, typename Tp1, typename Alloc1, typename Tp>
+    inline
+    Tp __inner_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, Tp __dot)
+    {
+      for (/**/; first != last; ++ first)
+	__dot += first->second * w[first->first] * first->second;
+      return __dot;
+    }
+  };
+
+  // ordered iterator...
+  template <typename Iterator1, typename Iterator2, typename Tp>
+  inline
+  Tp dot_product(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, Tp __dot)
+  {
+    while (first1 != last1 && first2 != last2) {
+      if (first1->first < first2->first)
+        ++ first1;
+      else if (first2->first < first1->first)
+        ++ first2;
+      else if (first1->first == first2->first) {
+        __dot += first1->second * first2->second;
+        
+        ++ first1;
+        ++ first2;
+      } else
+	throw std::runtime_error("unsorted dot-product?");
+    }
+    return __dot;
+  }
+  
+  template <typename Iterator1, typename Iterator2, typename Tp, typename BinaryOp>
+  inline
+  Tp dot_product(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, Tp __dot, BinaryOp op)
+  {
+    typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
+    typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
+    
+    while (first1 != last1 && first2 != last2) {
+      if (first1->first < first2->first) {
+        __dot += op(first1->second, value2_type());
+        ++ first1;
+      } else if (first2->first < first1->first) {
+        __dot += op(value1_type(), first2->second);
+        ++ first2;
+      } else if (first1->first == first2->first) {
+        __dot += op(first1->second, first2->second);
+        
+        ++ first1;
+        ++ first2;
+      } else
+	throw std::runtime_error("unsorted dot-product?");
+    }
+    
+    for (/**/; first1 != last1; ++ first1)
+      __dot += op(first1->second, value2_type());
+    for (/**/; first2 != last2; ++ first2)
+      __dot += op(value1_type(), first2->second);
+
+    return __dot;
+  }
+  
+  template <typename Iterator1, typename Tp1, typename Alloc1, typename Iterator2, typename Tp>
+  inline
+  Tp dot_product(Iterator1 first1, Iterator1 last1, const WeightVector<Tp1, Alloc1>& w, Iterator2 first2, Iterator2 last2, Tp __dot)
+  {
+    while (first1 != last1 && first2 != last2) {
+      if (first1->first < first2->first)
+        ++ first1;
+      else if (first2->first < first1->first)
+        ++ first2;
+      else if (first1->first == first2->first) {
+        __dot += first1->second * w[first1->first] * first2->second;
+        
+        ++ first1;
+        ++ first2;
+      } else
+	throw std::runtime_error("unsorted dot-product?");
+    }
+    return __dot;
+  }
+  
+  // weight-vector dot weight-vector
+  
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
   Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
@@ -65,6 +163,8 @@ namespace cicada
     return __dot;
   }
 
+  // feature-vector dot weight-vector
+
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
   Tp1 dot_product(const FeatureVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
@@ -82,73 +182,243 @@ namespace cicada
 	    ? dot_product(x, y.sparse_begin(), y.sparse_end(), Tp1())
 	    : dot_product(x, y.dense_begin(), y.dense_end(), Tp1()));
   }
-
-  template <typename Iterator1, typename Iterator2, typename Tp>
+  
+  template <typename Iterator, typename Tp2, typename Alloc2, typename Tp>
   inline
-  Tp dot_product(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, Tp __dot)
+  Tp dot_product(Iterator first, Iterator last, const FeatureVector<Tp2, Alloc2>& y, Tp __dot)
   {
-    while (first1 != last1 && first2 != last2) {
-      if (first1->first < first2->first)
-	++ first1;
-      else if (first2->first < first1->first)
-	++ first2;
-      else {
-	__dot += first1->second * first2->second;
-	
-	++ first1;
-	++ first2;
-      }
+    typedef FeatureVector<Tp2, Alloc2> feature_vector2_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * iter->second;
+    }
+    
+    return __dot;
+  }
+
+  template <typename Tp1, typename Alloc1, typename Iterator, typename Tp>
+  inline
+  Tp dot_product(const FeatureVector<Tp1, Alloc1>& x, Iterator first, Iterator last, Tp __dot)
+  {
+    typedef FeatureVector<Tp1, Alloc1> feature_vector1_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * first->second;
     }
     return __dot;
   }
 
-  template <typename Iterator1, typename Iterator2, typename Tp, typename BinaryOp>
+  template <typename Iterator, typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Tp>
   inline
-  Tp dot_product(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, Tp __dot, BinaryOp op)
+  Tp dot_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, const FeatureVector<Tp2, Alloc2>& y, Tp __dot)
   {
-    typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
-    typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
+    typedef WeightVector<Tp1, Alloc1> weight_vector_type;
+    typedef FeatureVector<Tp2, Alloc2> feature_vector2_type;
     
-    while (first1 != last1 && first2 != last2) {
-      if (first1->first < first2->first) {
-	__dot += op(first1->second, value2_type());
-	++ first1;
-      } else if (first2->first < first1->first) {
-	__dot += op(value1_type(), first2->second);
-	++ first2;
-      } else {
-	__dot += op(first1->second, first2->second);
-	
-	++ first1;
-	++ first2;
-      }
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * w[first->first] * iter->second;
     }
     
-    for (/**/; first1 != last1; ++ first1)
-      __dot += op(first1->second, value2_type());
-    for (/**/; first2 != last2; ++ first2)
-      __dot += op(value1_type(), first2->second);
-
     return __dot;
   }
 
-  template <typename Iterator, typename Tp>
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Iterator, typename Tp>
   inline
-  Tp __dot_product(Iterator first, Iterator last, Tp __dot)
+  Tp dot_product(const FeatureVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& w, Iterator first, Iterator last, Tp __dot)
   {
-    for (/**/; first != last; ++ first)
-      __dot += first->second * first->second;
+    typedef FeatureVector<Tp1, Alloc1> feature_vector1_type;
+    typedef WeightVector<Tp2, Alloc2> weight_vector_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * w[first->first] * first->second;
+    }
+    return __dot;
+  }
+  
+  template <typename Tp2, typename Alloc2>
+  inline
+  FeatureVectorCompact::data_type dot_product(const FeatureVectorCompact& x, const WeightVector<Tp2, Alloc2>& y)
+  {
+    return dot_product(x.begin(), x.end(), y, FeatureVectorCompact::data_type());
+  }
+  
+  template <typename Tp1, typename Alloc1>
+  inline
+  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVectorCompact& y)
+  {
+    return dot_product(x, y.begin(), y.end(), Tp1());
+  }
+  
+
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const FeatureVectorLinear<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
+  {
+    return dot_product(x.begin(), x.end(), y, Tp1());
+  }
+  
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVectorLinear<Tp2, Alloc2>& y)
+  {
+    return dot_product(x, y.begin(), y.end(), Tp1());
+  }
+
+  template <typename Iterator, typename Tp2, typename Alloc2, typename Tp>
+  inline
+  Tp dot_product(Iterator first, Iterator last, const FeatureVectorLinear<Tp2, Alloc2>& y, Tp __dot)
+  {
+    typedef FeatureVectorLinear<Tp2, Alloc2> feature_vector2_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * iter->second;
+    }
+    
     return __dot;
   }
 
-  template <typename Iterator, typename Tp, typename BinaryOp>
+  template <typename Tp1, typename Alloc1, typename Iterator, typename Tp>
   inline
-  Tp __dot_product(Iterator first, Iterator last, Tp __dot, BinaryOp op)
+  Tp dot_product(const FeatureVectorLinear<Tp1, Alloc1>& x, Iterator first, Iterator last, Tp __dot)
   {
-    for (/**/; first != last; ++ first)
-      __dot += op(first->second, first->second);
+    typedef FeatureVectorLinear<Tp1, Alloc1> feature_vector1_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * first->second;
+    }
     return __dot;
   }
+
+  template <typename Iterator, typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Tp>
+  inline
+  Tp dot_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, const FeatureVectorLinear<Tp2, Alloc2>& y, Tp __dot)
+  {
+    typedef WeightVector<Tp1, Alloc1> weight_vector_type;
+    typedef FeatureVectorLinear<Tp2, Alloc2> feature_vector2_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * w[first->first] * iter->second;
+    }
+    
+    return __dot;
+  }
+
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Iterator, typename Tp>
+  inline
+  Tp dot_product(const FeatureVectorLinear<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& w, Iterator first, Iterator last, Tp __dot)
+  {
+    typedef WeightVector<Tp2, Alloc2> weight_vector_typ;
+    typedef FeatureVectorLinear<Tp1, Alloc1> feature_vector1_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * w[first->first] * first->second;
+    }
+    return __dot;
+  }
+  
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
+  {
+    return dot_product(x.begin(), x.end(), y, Tp1());
+  }
+  
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVectorUnordered<Tp2, Alloc2>& y)
+  {
+    return dot_product(x, y.begin(), y.end(), Tp1());
+  }
+  
+  template <typename Iterator, typename Tp2, typename Alloc2, typename Tp>
+  inline
+  Tp dot_product(Iterator first, Iterator last, const FeatureVectorUnordered<Tp2, Alloc2>& y, Tp __dot)
+  {
+    typedef FeatureVectorUnordered<Tp2, Alloc2> feature_vector2_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * iter->second;
+    }
+    
+    return __dot;
+  }
+
+  template <typename Tp1, typename Alloc1, typename Iterator, typename Tp>
+  inline
+  Tp dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, Iterator first, Iterator last, Tp __dot)
+  {
+    typedef FeatureVectorUnordered<Tp1, Alloc1> feature_vector1_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * first->second;
+    }
+    return __dot;
+  }
+
+  template <typename Iterator, typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Tp>
+  inline
+  Tp dot_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, const FeatureVectorUnordered<Tp2, Alloc2>& y, Tp __dot)
+  {
+    typedef WeightVector<Tp1, Alloc1> weight_vector_type;
+    typedef FeatureVectorUnordered<Tp2, Alloc2> feature_vector2_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector2_type::const_iterator iter = y.find(first->first);
+      
+      if (iter != y.end())
+	__dot += first->second * w[first->first] * iter->second;
+    }
+    
+    return __dot;
+  }
+
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Iterator, typename Tp>
+  inline
+  Tp dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& w, Iterator first, Iterator last, Tp __dot)
+  {
+    typedef WeightVector<Tp2, Alloc2> weight_vector_typ;
+    typedef FeatureVectorUnordered<Tp1, Alloc1> feature_vector1_type;
+    
+    for (/**/; first != last; ++ first) {
+      typename feature_vector1_type::const_iterator iter = x.find(first->first);
+      
+      if (iter != x.end())
+	__dot += iter->second * w[first->first] * first->second;
+    }
+    return __dot;
+  }
+
+  // feature-vector dot feature-vector
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
@@ -162,90 +432,17 @@ namespace cicada
     // if the same address, we are identical!
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
       return (x.sparse()
-	      ? __dot_product(x.sparse_begin(), x.sparse_end(), Tp1())
-	      : __dot_product(x.dense_begin(), x.dense_end(), Tp1()));
+	      ? details::__inner_product(x.sparse_begin(), x.sparse_end(), Tp1())
+	      : details::__inner_product(x.dense_begin(), x.dense_end(), Tp1()));
     
-    if (x.sparse()) {
-      typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_sparse_iterator iter1_end = x.end();
-      
-      if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
-      } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
-      }
-    } else {
-      typename feature_vector1_type::const_dense_iterator iter1     = x.lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_dense_iterator iter1_end = x.end();
-      
-      if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
-      } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
-      }
-    }
-  }
-
-  
-  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename BinaryOp>
-  inline
-  Tp1 dot_product(const FeatureVector<Tp1, Alloc1>& x, const FeatureVector<Tp2, Alloc2>& y, BinaryOp op)
-  {
-    if (x.empty() && y.empty()) return Tp1();
-    
-    if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
-      return (x.sparse()
-	      ? __dot_product(x.sparse_begin(), x.sparse_end(), Tp1(), op)
-	      : __dot_product(x.dense_begin(), x.dense_end(), Tp1(), op));
-    
-    if (x.sparse())
-      return (y.sparse()
-	      ? dot_product(x.sparse_begin(), x.sparse_end(), y.sparse_begin(), y.sparse_end(), Tp1(), op)
-	      : dot_product(x.sparse_begin(), x.sparse_end(), y.dense_begin(), y.dense_end(), Tp1(), op));
+    if (! x.sparse())
+      return dot_product(x.dense_begin(), x.dense_end(), y, Tp1());
+    else if (! y.sparse())
+      return dot_product(x, y.dense_begin(), y.dense_end(), Tp1());
+    else if (x.size() < y.size())
+      return dot_product(x.sparse_begin(), x.sparse_end(), y, Tp1());
     else
-      return (y.sparse()
-	      ? dot_product(x.dense_begin(), x.dense_end(), y.sparse_begin(), y.sparse_end(), Tp1(), op)
-	      : dot_product(x.dense_begin(), x.dense_end(), y.dense_begin(), y.dense_end(), Tp1(), op));
-  }
-  
-  template <typename Iterator, typename Tp1, typename Alloc1, typename Tp>
-  inline
-  Tp __dot_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, Tp __dot)
-  {
-    for (/**/; first != last; ++ first)
-      __dot += first->second * w[first->first] * first->second;
-    return __dot;
-  }
-  
-  template <typename Iterator1, typename Tp1, typename Alloc1, typename Iterator2, typename Tp>
-  inline
-  Tp dot_product(Iterator1 first1, Iterator1 last1, const WeightVector<Tp1, Alloc1>& w, Iterator2 first2, Iterator2 last2, Tp __dot)
-  {
-        while (first1 != last1 && first2 != last2) {
-      if (first1->first < first2->first)
-	++ first1;
-      else if (first2->first < first1->first)
-	++ first2;
-      else {
-	__dot += first1->second * w[first1->first] * first2->second;
-	
-	++ first1;
-	++ first2;
-      }
-    }
-    return __dot;
+      return dot_product(x, y.sparse_begin(), y.sparse_end(), Tp1());
   }
   
   template <typename Tp1, typename Alloc1, typename Tp, typename Alloc, typename Tp2, typename Alloc2>
@@ -260,42 +457,18 @@ namespace cicada
     
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
       return (x.sparse()
-	      ? __dot_product(x.sparse_begin(), x.sparse_end(), w, Tp1())
-	      : __dot_product(x.dense_begin(),  x.dense_end(), w, Tp1()));
+	      ? details::__inner_product(x.sparse_begin(), x.sparse_end(), w, Tp1())
+	      : details::__inner_product(x.dense_begin(),  x.dense_end(), w, Tp1()));
     
-    if (x.sparse()) {
-      typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_sparse_iterator iter1_end = x.end();
-      
-      if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
-      } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
-      }
-    } else {
-      typename feature_vector1_type::const_dense_iterator iter1     = x.lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_dense_iterator iter1_end = x.end();
-      
-      if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
-      } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
-	
-	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
-      }
-    }
+    if (! x.sparse())
+      return dot_product(x.dense_begin(), x.dense_end(), w, y, Tp1());
+    else if (! y.sparse())
+      return dot_product(x, w, y.dense_begin(), y.dense_end(), Tp1());
+    else if (x.size() < y.size())
+      return dot_product(x.sparse_begin(), x.sparse_end(), w, y, Tp1());
+    else
+      return dot_product(x, w, y.sparse_begin(), y.sparse_end(), Tp1());
   }
-  
 
 };
 

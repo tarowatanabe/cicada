@@ -169,6 +169,11 @@ namespace cicada
      
     inline const_iterator end() const { return __map.end(); }
     inline       iterator end()       { return __map.end(); }
+
+    reference front() { return __map.front(); }
+    const_reference front() const { return __map.front(); }
+    reference back() { return __map.back(); }
+    const_reference back() const { return __map.back(); }
     
     inline const_iterator find(const key_type& x) const { return __map.find(x); }
     inline       iterator find(const key_type& x)       { return __map.find(x); }

@@ -391,12 +391,27 @@ namespace cicada
     template <typename T, typename A>
     void assign(const FeatureVector<T, A>& x)
     {
+      typedef std::pair<feature_type, double> pair_type;
+      typedef std::vector<pair_type, std::allocator<pair_type> > raw_type;
       typedef std::vector<byte_type, std::allocator<byte_type> > compressed_type;
-
-      encoder_type encoder;
-      compressed_type compressed(x.size() * 16);
       
-      impl.assign(compressed.begin(), encoder(x.begin(), x.end(), compressed.begin()));
+      if (x.sparse()) {
+	raw_type raw(x.sparse_begin(), x.sparse_end());
+	std::sort(raw.begin(), raw.end(), less_first<pair_type>());
+	
+	encoder_type encoder;
+	compressed_type compressed(raw.size() * 16);
+	
+	impl.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
+      } else {
+	raw_type raw(x.dense_begin(), x.dense_end());
+	std::sort(raw.begin(), raw.end(), less_first<pair_type>());
+	
+	encoder_type encoder;
+	compressed_type compressed(raw.size() * 16);
+	
+	impl.assign(compressed.begin(), encoder(raw.begin(), raw.end(), compressed.begin()));
+      }
     }
 
     template <typename T, typename A>
