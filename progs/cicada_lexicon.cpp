@@ -135,7 +135,11 @@ path_type output_source_target_file = "-";
 path_type output_target_source_file = "-";
 
 bool variational_bayes_mode = false;
+bool pgd_mode = false;
 double prior = 0.1;
+double l0_alpha = 100;
+double l0_beta = 0.01;
+
 bool inverse_mode = false;
 bool logprob_mode = false;
 
@@ -145,6 +149,7 @@ int debug = 0;
 
 struct Maximize;
 struct MaximizeBayes;
+struct MaximizePGD;
 
 void dump(const path_type& path, const ttable_type& lexicon);
 
@@ -160,12 +165,17 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     threads = utils::bithack::max(threads, 1);
+
+    if (variational_bayes_mode && pgd_mode)
+      throw std::runtime_error("either variational-bayes, pgd or none");
     
     ttable_type ttable_source_target;
     ttable_type ttable_target_source;
       
     if (variational_bayes_mode)
       learn<MaximizeBayes>(ttable_source_target, ttable_target_source);
+    else if (pgd_mode)
+      learn<MaximizePGD>(ttable_source_target, ttable_target_source);
     else
       learn<Maximize>(ttable_source_target, ttable_target_source);
       
@@ -487,6 +497,218 @@ struct Maximize
   }
 };
 
+struct MaximizePGD
+{
+  typedef std::vector<double, std::allocator<double> > parameter_type;
+
+  MaximizePGD() : gamma(0.5), sigma(0.5), eta(0.1) {}
+  
+  template <typename Counts>
+  void operator()(Counts& counts)
+  {
+    parameter_type expected;
+    parameter_type previous;
+    parameter_type estimated;
+
+    double sum = 0.0;
+    typename Counts::iterator iter_end = counts.end();
+    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter)
+      sum += iter->second + prior;
+    
+    const double factor = 1.0 / sum;
+    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter) {
+      expected.push_back(iter->second);
+      previous.push_back((iter->second + prior) * factor);
+    }
+    
+    // PGD...
+    gradient_descent(expected, previous, estimated);
+    
+    parameter_type::const_iterator piter = estimated.begin();
+    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter, ++ piter)
+      iter->second = *piter;
+  }
+  
+  
+  void gradient_descent(const parameter_type& counts, const parameter_type& point, parameter_type& point_new)
+  {
+    parameter_type point_curr(point);
+    parameter_type point_projected(point.size());
+    parameter_type point_delta(point.size());
+    parameter_type gradient(point.size());
+    
+    for (int iter = 0; iter != 30; ++ iter) {
+      const double objective_curr = compute_objective(counts, point_curr);
+      
+      compute_gradient(counts, point_curr, gradient);
+      
+      // compute new point...
+      point_new.resize(counts.size());
+      for (size_t i = 0; i != point_curr.size(); ++ i)
+	point_new[i] = point_curr[i] - eta * gradient[i];
+      
+      // project into 1.0 simplex...
+      project_simplex(point_new, point_projected);
+      
+      double armijo_bound = 0.0;
+      for (size_t i = 0; i != point_curr.size(); ++ i)
+	armijo_bound += sigma * gamma * gradient[i] * (point_projected[i] - point_curr[i]);
+      
+      bool updated = false;
+      
+      double gamma_curr = gamma;
+      double gamma_min = 0.0;
+      double armijo_bound_curr = armijo_bound;
+      double objective_min = objective_curr;
+      
+      for (int steps = 0; steps != 20; ++ steps) {
+	for (size_t i = 0; i != point_curr.size(); ++ i)
+	  point_delta[i] = (1.0 - gamma_curr) * point_curr[i] + gamma_curr * point_projected[i];
+	
+	const double objective_delta = compute_objective(counts, point_delta);
+	
+	if (objective_delta < objective_min) {
+	  objective_min = objective_delta;
+	  gamma_min = gamma_curr;
+	  updated = true;
+	}
+	
+	if (objective_delta <= objective_curr + armijo_bound_curr)
+	  break;
+	
+	gamma_curr *= gamma;
+	armijo_bound_curr *= gamma;
+      }
+      
+      // finish gradient descent, since we made no update!
+      if (! updated) break;
+      
+      // update current point...
+      for (size_t i = 0; i != point_curr.size(); ++ i)
+	point_curr[i] = (1.0 - gamma_min) * point_curr[i] + gamma_min * point_projected[i];
+    }
+    
+    // the final current point == result..
+    point_new = point_curr;
+  }
+
+  double compute_objective(const parameter_type& counts, const parameter_type& point) const
+  {
+    parameter_type::const_iterator citer_end = counts.end();
+    parameter_type::const_iterator citer     = counts.begin();
+    
+    parameter_type::const_iterator piter_end = point.end();
+    parameter_type::const_iterator piter     = point.begin();
+
+    double objective = 0.0;
+    
+    for (/**/; citer != citer_end; ++ citer, ++ piter) {
+      if (*piter != 0.0)
+	objective -= *citer * std::log(*piter) + l0_alpha * std::exp(- *piter / l0_beta);
+      else
+	objective -= l0_alpha * std::exp(- *piter / l0_beta);
+    }
+
+    return objective;
+  }
+  
+  
+  void compute_gradient(const parameter_type& counts, const parameter_type& point, parameter_type& gradient) const
+  {
+    gradient.resize(point.size());
+
+    parameter_type::const_iterator citer_end = counts.end();
+    parameter_type::const_iterator citer     = counts.begin();
+    
+    parameter_type::const_iterator piter_end = point.end();
+    parameter_type::const_iterator piter     = point.begin();
+    
+    parameter_type::iterator giter_end = gradient.end();
+    parameter_type::iterator giter = gradient.begin();
+    
+    for (/**/; citer != citer_end; ++ citer, ++ piter, ++ giter) {
+      if (*piter != 0.0)
+	*giter = - (*citer / *piter) + l0_alpha / l0_beta * std::exp(- *piter / l0_beta);
+      else
+	*giter = l0_alpha / l0_beta * std::exp(- *piter / l0_beta);
+    }
+  }
+  
+  //
+  // projection onto a simplex
+  //
+  // @inproceedings{Duchi:2008:EPL:1390156.1390191,
+  //  author = {Duchi, John and Shalev-Shwartz, Shai and Singer, Yoram and Chandra, Tushar},
+  //  title = {Efficient projections onto the l1-ball for learning in high dimensions},
+  //  booktitle = {Proceedings of the 25th international conference on Machine learning},
+  //  series = {ICML '08},
+  //  year = {2008},
+  //  isbn = {978-1-60558-205-4},
+  //  location = {Helsinki, Finland},
+  //  pages = {272--279},
+  //  numpages = {8},
+  //  url = {http://doi.acm.org/10.1145/1390156.1390191},
+  //  doi = {10.1145/1390156.1390191},
+  //  acmid = {1390191},
+  //  publisher = {ACM},
+  //  address = {New York, NY, USA},
+  // } 
+  
+  struct projection
+  {
+    projection(const double& __theta) : theta(__theta) {}
+
+    double operator()(const double& x) const
+    {
+      return std::max(x - theta, 0.0);
+    }
+    
+    double theta;
+  };
+  
+  void project_simplex(const parameter_type& v, parameter_type& projected)
+  {
+    if (v.empty()) {
+      projected.clear();
+      return;
+    }
+    
+    mu.clear();
+    mu.insert(mu.end(), v.begin(), v.end());
+    std::sort(mu.begin(), mu.end(), std::greater<double>());
+    
+    const double z = 1.0;
+    
+    size_t j = 1;
+    double sum = 0.0;
+    
+    size_t rho = 0;
+    double rho_sum = 0.0;
+    
+    parameter_type::const_iterator miter_end = mu.end();
+    for (parameter_type::const_iterator miter = mu.begin(); miter != miter_end; ++ miter, ++ j) {
+      sum += *miter;
+      
+      if (*miter - (1.0 / j) * (sum - z) > 0.0) {
+	rho = j;
+	rho_sum = sum;
+      }
+    }
+    
+    const double theta = (1.0 / rho) * (rho_sum - z);
+    
+    projected.resize(v.size());
+    
+    std::transform(v.begin(), v.end(), projected.begin(), projection(theta));
+  }
+  
+  double gamma;
+  double sigma;
+  double eta;
+  
+  parameter_type mu;
+};
+
 struct MaximizeBayes
 {
   template <typename Counts>
@@ -512,16 +734,19 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("source",    po::value<path_type>(&source_file), "source file")
-    ("target",    po::value<path_type>(&target_file), "target file")
+    ("source",    po::value<path_type>(&source_file),    "source file")
+    ("target",    po::value<path_type>(&target_file),    "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output for P(source | target)")
     
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
+    ("pgd",               po::bool_switch(&pgd_mode),               "projected gradient descent")
     
-    ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
+    ("prior",    po::value<double>(&prior)->default_value(prior),       "Dirichlet prior for variational Bayes")
+    ("l0-alpha", po::value<double>(&l0_alpha)->default_value(l0_alpha), "L0 regularization")
+    ("l0-beta",  po::value<double>(&l0_beta)->default_value(l0_beta),   "L0 regularization")
     
     ("inverse",   po::bool_switch(&inverse_mode),                          "inverse alignment")
     ("logprob",   po::bool_switch(&logprob_mode),                          "dump in log-domain")

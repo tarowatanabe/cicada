@@ -176,42 +176,6 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "statistics"<< '\n'
 		<< stats;
-    
-#if 0
-    // we will force non directory-input-mode....
-    if (input_directory_mode) {
-      std::string line;
-      
-      for (size_t i = 0; /**/; ++ i) {
-	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
-	
-	const path_type path_input = input_file / file_name;
-	
-	if (! boost::filesystem::exists(path_input)) break;
-	
-	utils::compress_istream is(path_input, 1024 * 1024);
-	
-	if (std::getline(is, line)) {
-	  operations(line);
-	  operations.clear();
-	}
-      }
-      
-    } else {
-      utils::compress_istream is(input_file, 1024 * 1024);
-      
-      std::string line;
-      while (std::getline(is, line)) {
-	operations(line);
-	operations.clear();
-      }
-    }
-    
-    if (debug)
-      std::cerr << "statistics"<< '\n'
-		<< operations.get_statistics();
-#endif
-    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

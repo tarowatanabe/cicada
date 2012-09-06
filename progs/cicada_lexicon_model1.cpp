@@ -96,6 +96,9 @@ int main(int argc, char ** argv)
     if (itg_mode && max_match_mode)
       throw std::runtime_error("you cannot specify both of ITG and max-match for Viterbi alignment");
 
+    if (variational_bayes_mode && pgd_mode)
+      throw std::runtime_error("either variational-bayes, pgd or none");
+    
     if (! projected_target_file.empty())
       if (dependency_source_file != "-" && ! boost::filesystem::exists(dependency_source_file))
 	throw std::runtime_error("no source side dependency");
