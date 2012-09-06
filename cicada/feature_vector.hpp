@@ -117,7 +117,7 @@ namespace cicada
     void assign(const FeatureVector<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.size())
+      if (x.size() > __vector.bucket_count())
 	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
@@ -128,7 +128,7 @@ namespace cicada
     void assign(const FeatureVectorLinear<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.size())
+      if (x.size() > __vector.bucket_count())
 	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
@@ -137,7 +137,7 @@ namespace cicada
     void assign(const FeatureVectorUnordered<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.size())
+      if (x.size() > __vector.bucket_count())
 	__vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }

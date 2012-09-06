@@ -44,18 +44,33 @@ namespace cicada
   inline
   Tp dot_product(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, Tp __dot)
   {
+    Iterator1 prev1 = last1;
+    Iterator2 prev2 = last2;
     while (first1 != last1 && first2 != last2) {
-      if (first1->first < first2->first)
+      
+      if (prev1 != last1)
+	if (prev1->first > first1->first)
+	  throw std::runtime_error("not ordered?");
+
+      if (prev2 != last2)
+	if (prev2->first > first2->first)
+	  throw std::runtime_error("not ordered?");
+
+      if (first1->first < first2->first) {
+	prev1 = first1;
         ++ first1;
-      else if (first2->first < first1->first)
+      } else if (first2->first < first1->first) {
+	prev2 = first2;
         ++ first2;
-      else if (first1->first == first2->first) {
+      } else {
         __dot += first1->second * first2->second;
-        
+	
+	prev1 = first1;
+	prev2 = first2;
+	
         ++ first1;
         ++ first2;
-      } else
-	throw std::runtime_error("unsorted dot-product?");
+      }
     }
     return __dot;
   }
@@ -67,20 +82,35 @@ namespace cicada
     typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
     typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
     
+    Iterator1 prev1 = last1;
+    Iterator2 prev2 = last2;
+    
     while (first1 != last1 && first2 != last2) {
+      if (prev1 != last1)
+	if (prev1->first > first1->first)
+	  throw std::runtime_error("not ordered?");
+
+      if (prev2 != last2)
+	if (prev2->first > first2->first)
+	  throw std::runtime_error("not ordered?");
+      
       if (first1->first < first2->first) {
         __dot += op(first1->second, value2_type());
+	prev1 = first1;
         ++ first1;
       } else if (first2->first < first1->first) {
         __dot += op(value1_type(), first2->second);
+	prev2 = first2;
         ++ first2;
-      } else if (first1->first == first2->first) {
+      } else {
         __dot += op(first1->second, first2->second);
         
+	prev1 = first1;
+	prev2 = first2;
+
         ++ first1;
         ++ first2;
-      } else
-	throw std::runtime_error("unsorted dot-product?");
+      } 
     }
     
     for (/**/; first1 != last1; ++ first1)
@@ -95,18 +125,33 @@ namespace cicada
   inline
   Tp dot_product(Iterator1 first1, Iterator1 last1, const WeightVector<Tp1, Alloc1>& w, Iterator2 first2, Iterator2 last2, Tp __dot)
   {
+    Iterator1 prev1 = last1;
+    Iterator2 prev2 = last2;
+
     while (first1 != last1 && first2 != last2) {
-      if (first1->first < first2->first)
+      if (prev1 != last1)
+	if (prev1->first > first1->first)
+	  throw std::runtime_error("not ordered?");
+
+      if (prev2 != last2)
+	if (prev2->first > first2->first)
+	  throw std::runtime_error("not ordered?");
+
+      if (first1->first < first2->first) {
+	prev1 = first1;
         ++ first1;
-      else if (first2->first < first1->first)
+      } else if (first2->first < first1->first) {
+	prev2 = first2;
         ++ first2;
-      else if (first1->first == first2->first) {
+      } else {
         __dot += first1->second * w[first1->first] * first2->second;
         
+	prev1 = first1;
+	prev2 = first2;
+
         ++ first1;
         ++ first2;
-      } else
-	throw std::runtime_error("unsorted dot-product?");
+      } 
     }
     return __dot;
   }
