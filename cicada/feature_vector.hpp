@@ -61,11 +61,8 @@ namespace cicada
     typedef typename vector_type::reference       reference;
     typedef typename vector_type::pointer         pointer;
     
-  private:
-    static const size_type __size = 20;
-    
   public:
-    FeatureVector() : __vector() { initialize(__vector); }
+    FeatureVector(size_type hint=8) : __vector(hint) { initialize(__vector); }
     FeatureVector(const FeatureVector<Tp,Alloc>& x) : __vector(x.__vector) {}
     template <typename T, typename A>
     FeatureVector(const FeatureVector<T,A>& x) : __vector(x.size()) { initialize(__vector);  assign(x); }
@@ -748,7 +745,7 @@ namespace cicada
     if (y.empty())
       return x;
     else if (x.empty()) {
-      left_type features;
+      left_type features(y.size());
       
       typename right_type::const_iterator iter2_end = y.end();
       for (typename right_type::const_iterator iter2 = y.begin(); iter2 != iter2_end; ++ iter2)
@@ -774,7 +771,7 @@ namespace cicada
     if (x.empty() || y.empty())
       return left_type();
     
-    left_type features;
+    left_type features(utils::bithack::max(x.size(), y.size()));
 
     left_type::multiply_equal(features, x, y.begin(), y.end());
     
