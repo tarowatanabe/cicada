@@ -169,18 +169,14 @@ namespace cicada
   inline
   Tp1 dot_product(const FeatureVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
   {
-    return (x.sparse()
-	    ? dot_product(x.sparse_begin(), x.sparse_end(), y, Tp1())
-	    : dot_product(x.dense_begin(), x.dense_end(), y, Tp1()));
+    return dot_product(x.begin(), x.end(), y, Tp1());
   }
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
   Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVector<Tp2, Alloc2>& y)
   {
-    return (y.sparse()
-	    ? dot_product(x, y.sparse_begin(), y.sparse_end(), Tp1())
-	    : dot_product(x, y.dense_begin(), y.dense_end(), Tp1()));
+    return dot_product(x, y.begin(), y.end(), Tp1());
   }
   
   template <typename Iterator, typename Tp2, typename Alloc2, typename Tp>
@@ -431,18 +427,12 @@ namespace cicada
     
     // if the same address, we are identical!
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
-      return (x.sparse()
-	      ? details::__inner_product(x.sparse_begin(), x.sparse_end(), Tp1())
-	      : details::__inner_product(x.dense_begin(), x.dense_end(), Tp1()));
+      return details::__inner_product(x.begin(), x.end(), Tp1());
     
-    if (! x.sparse())
-      return dot_product(x.dense_begin(), x.dense_end(), y, Tp1());
-    else if (! y.sparse())
-      return dot_product(x, y.dense_begin(), y.dense_end(), Tp1());
-    else if (x.size() < y.size())
-      return dot_product(x.sparse_begin(), x.sparse_end(), y, Tp1());
+    if (x.size() < y.size())
+      return dot_product(x.begin(), x.end(), y, Tp1());
     else
-      return dot_product(x, y.sparse_begin(), y.sparse_end(), Tp1());
+      return dot_product(x, y.begin(), y.end(), Tp1());
   }
   
   template <typename Tp1, typename Alloc1, typename Tp, typename Alloc, typename Tp2, typename Alloc2>
@@ -456,18 +446,12 @@ namespace cicada
     if (x.empty() || y.empty()) return Tp1();
     
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
-      return (x.sparse()
-	      ? details::__inner_product(x.sparse_begin(), x.sparse_end(), w, Tp1())
-	      : details::__inner_product(x.dense_begin(),  x.dense_end(), w, Tp1()));
+      return details::__inner_product(x.begin(), x.end(), w, Tp1());
     
-    if (! x.sparse())
-      return dot_product(x.dense_begin(), x.dense_end(), w, y, Tp1());
-    else if (! y.sparse())
-      return dot_product(x, w, y.dense_begin(), y.dense_end(), Tp1());
-    else if (x.size() < y.size())
-      return dot_product(x.sparse_begin(), x.sparse_end(), w, y, Tp1());
+if (x.size() < y.size())
+      return dot_product(x.begin(), x.end(), w, y, Tp1());
     else
-      return dot_product(x, w, y.sparse_begin(), y.sparse_end(), Tp1());
+      return dot_product(x, w, y.begin(), y.end(), Tp1());
   }
 
 };

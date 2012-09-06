@@ -124,10 +124,7 @@ namespace cicada
     void assign(const FeatureVector<T,A>& x)
     {
       __map.clear();
-      if (x.sparse())
-	__map.insert(x.sparse_begin(), x.sparse_end());
-      else
-	__map.insert(x.dense_begin(), x.dense_end());
+      __map.insert(x.begin(), x.end());
     }
 
     void assign(const FeatureVectorCompact& x);

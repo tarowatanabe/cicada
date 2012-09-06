@@ -122,11 +122,7 @@ namespace cicada
     void assign(const FeatureVector<T,A>& x)
     {
       __map.clear();
-      
-      if (x.sparse())
-	__map.insert(x.sparse_begin(), x.sparse_end());
-      else
-	__map.insert(x.dense_begin(), x.dense_end());
+      __map.insert(x.begin(), x.end());
     }
 
     void assign(const FeatureVectorCompact& x);
@@ -231,10 +227,7 @@ namespace cicada
     template <typename T, typename A>
     FeatureVectorUnordered& operator+=(const FeatureVector<T,A>& x)
     {
-      if (x.sparse())
-	plus_equal(x.sparse_begin(), x.sparse_end());
-      else
-	plus_equal(x.dense_begin(), x.dense_end());
+      plus_equal(x.begin(), x.end());
       return *this;
     }
     
@@ -257,10 +250,7 @@ namespace cicada
     template <typename T, typename A>
     FeatureVectorUnordered& operator-=(const FeatureVector<T,A>& x)
     {
-      if (x.sparse())
-	minus_equal(x.sparse_begin(), x.sparse_end());
-      else
-	minus_equal(x.dense_begin(), x.dense_end());
+      minus_equal(x.begin(), x.end());
       return *this;
     }
 
