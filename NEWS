@@ -1,3 +1,6 @@
+2012-x-x
+
+
 2012-9-6
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)
 New: added weight pusing toward root, frontier and left-corner

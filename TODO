@@ -164,3 +164,7 @@ Revise ngram-pyp so that we do not have to re-compute lower-order probabilities.
 Implement ADMM for potentially better parallel training
 
 # of crossed word alignment in synchronous rules
+
+Use of unordered-map for sparse-feature-vector representation for faster processing:
+    This will break many feature-vector related computation, since many codes assume that they are "ordered"
+    Use linear-map for smaller storage, then, use unordered-map for larger storage
