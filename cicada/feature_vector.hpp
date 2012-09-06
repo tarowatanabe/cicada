@@ -310,8 +310,8 @@ namespace cicada
     
     Tp operator[](const key_type& x) const
     {
-      const_iterator iter = __vector->find(x);
-      return (iter == __vector->end() ? Tp() : iter->second);
+      const_iterator iter = __vector.find(x);
+      return (iter == __vector.end() ? Tp() : iter->second);
     }
     
     Tp& operator[](const key_type& x)
