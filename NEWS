@@ -4,6 +4,7 @@ New: added weight pusing toward root, frontier and left-corner
 New: added feature-vector intersection computation for weight pusing
 New: added sort-topologically operation so that we can verify the forest constructed by 3rd parties.
 New: added # of non-terminal crossing features, singleton features, and type-based features
+New: added L0 prior for count-based lexicon model induciton (cicada_lexicon)
 
 2012-7-18
 Bugfix: variational decoding and bleu/bleuS computation on a forest :(
