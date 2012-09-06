@@ -238,7 +238,7 @@ namespace cicada
       if (x.__sparse) {
 	if (__sparse) {
 	  __sparse->clear();
-	  __sparse->hint(x.__sparse->size());
+	  __sparse->rehash(x.__sparse->size());
 	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
 	} else
 	  __sparse = construct(x.__sparse->begin(), x.__sparse->end(), x.__sparse->size());
@@ -257,7 +257,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
-	  __sparse->hint(__n);
+	  __sparse->rehash(__n);
 	  __sparse->insert(x.begin(), x.end());
 	} else
 	  __sparse = construct(x.begin(), x.end(), __n);
@@ -277,7 +277,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
-	  __sparse->hint(__n);
+	  __sparse->rehash(__n);
 	  __sparse->insert(x.begin(), x.end());
 	} else
 	  __sparse = construct(x.begin(), x.end(), __n);
@@ -297,7 +297,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
-	  __sparse->hint(__n);
+	  __sparse->rehash(__n);
 	  __sparse->insert(first, last);
 	} else
 	  __sparse = construct(first, last, __n);
@@ -427,7 +427,7 @@ namespace cicada
     {
       if (__sparse || large) {
 	if (! __sparse) {
-	  __sparse = construct();
+	  __sparse = construct(__dense_size);
 	  
 	  intersect(*__sparse, __dense, first, last);
 	  
@@ -900,7 +900,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = construct();
+	  __sparse = construct(x.size());
 	  
 	  if (x.sparse())
 	    multiply_equal(*__sparse, __dense, x.__sparse->begin(), x.__sparse->end());
@@ -1015,11 +1015,14 @@ namespace cicada
       }
     }
 
-    sparse_vector_type* construct()
+    sparse_vector_type* construct(size_t hint=0)
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
 
       initialize(*instance);
+
+      if (hint)
+	instance->rehash(hint);
       
       return instance.release();
     }
