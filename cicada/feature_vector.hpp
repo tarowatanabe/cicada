@@ -166,7 +166,7 @@ namespace cicada
       : __dense(x.__dense), __sparse(x.__sparse ? construct(*x.__sparse) : 0) {}
     template <typename T, typename A>
     FeatureVector(const FeatureVector<T,A>& x)
-      : __dense(x.__dense.begin(), x.__dense.end()), __sparse(x.__sparse ? construct(x.__sparse->begin(), x.__sparse->end()) : 0) { }
+      : __dense(x.__dense.begin(), x.__dense.end()), __sparse(x.__sparse ? construct(x.__sparse->begin(), x.__sparse->end(), x.__sparse->size()) : 0) { }
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last)
       : __dense(), __sparse(0) { assign(first, last); }
@@ -214,10 +214,7 @@ namespace cicada
 
     ~FeatureVector()
     {
-      if (__sparse) {
-	delete __sparse;
-	__sparse = 0;
-      }
+      destruct();
     }
     
   public:
@@ -229,10 +226,8 @@ namespace cicada
 	  *__sparse = *x.__sparse;
 	else
 	  __sparse = construct(*x.__sparse);
-      } else if (__sparse) {
-	delete __sparse;
-	__sparse = 0;
-      }
+      } else 
+	destruct();
     }
     
     template <typename T, typename A>
@@ -245,11 +240,9 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
 	} else
-	  __sparse = construct(x.__sparse->begin(), x.__sparse->end());
-      } else if (__sparse) {
-	delete __sparse;
-	__sparse = 0;
-      }
+	  __sparse = construct(x.__sparse->begin(), x.__sparse->end(), x.__sparse->size());
+      } else 
+	destruct();
     }
 
     void assign(const FeatureVectorCompact& x);
@@ -265,12 +258,9 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = construct(x.begin(), x.end());
+	  __sparse = construct(x.begin(), x.end(), x.size());
       } else {
-	if (__sparse) {
-	  delete __sparse;
-	  __sparse = 0;
-	}
+	destruct();
 	__dense.clear();
 	__dense.insert(x.begin(), x.end());
       }
@@ -287,12 +277,9 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = construct(x.begin(), x.end());
+	  __sparse = construct(x.begin(), x.end(), x.size());
       } else {
-	if (__sparse) {
-	  delete __sparse;
-	  __sparse = 0;
-	}
+	destruct();
 	__dense.clear();
 	__dense.insert(x.begin(), x.end());
       }
@@ -309,12 +296,9 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(first, last);
 	} else
-	  __sparse = construct(first, last);
+	  __sparse = construct(first, last, __n);
       } else {
-	if (__sparse) {
-	  delete __sparse;
-	  __sparse = 0;
-	}
+	destruct();
 	__dense.clear();
 	__dense.insert(first, last);
       }
@@ -331,7 +315,7 @@ namespace cicada
 	__dense.insert(first, last);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -347,7 +331,7 @@ namespace cicada
 	__dense.insert(iter.diter, x);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -363,7 +347,7 @@ namespace cicada
 	__dense.insert(x);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -459,7 +443,7 @@ namespace cicada
 	__dense.swap(dense_new);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -500,10 +484,7 @@ namespace cicada
     {
       __dense.clear();
       
-      if (__sparse) {
-	delete __sparse;
-	__sparse = 0;
-      }
+      destruct();
     }
     
     Tp operator[](const key_type& x) const
@@ -526,7 +507,7 @@ namespace cicada
 	if (! result.second || __dense.size() <= __dense_size)
 	  return result.first->second;
 	
-	__sparse = construct(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	__dense.clear();
 	return __sparse->operator[](x);
       }
@@ -746,7 +727,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	
@@ -758,7 +739,7 @@ namespace cicada
 	plus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -780,7 +761,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	
@@ -789,7 +770,7 @@ namespace cicada
 	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -809,7 +790,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	
@@ -818,7 +799,7 @@ namespace cicada
 	plus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -833,7 +814,7 @@ namespace cicada
       
       if (__sparse || x.sparse()) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	  
@@ -845,7 +826,7 @@ namespace cicada
 	minus_equal(__dense, x.__dense.begin(), x.__dense.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -862,7 +843,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	
@@ -871,7 +852,7 @@ namespace cicada
 	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -886,7 +867,7 @@ namespace cicada
       
       if (__sparse || x.size() > __dense_size) {
 	if (! __sparse) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size() + x.size());
 	  __dense.clear();
 	}
 	
@@ -895,7 +876,7 @@ namespace cicada
 	minus_equal(__dense, x.begin(), x.end());
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -941,7 +922,7 @@ namespace cicada
 	__dense.swap(dense_new);
 	
 	if (__dense.size() > __dense_size) {
-	  __sparse = construct(__dense.begin(), __dense.end());
+	  __sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	  __dense.clear();
 	}
       }
@@ -1020,6 +1001,14 @@ namespace cicada
       x.set_deleted_key(feature_type(feature_type::id_type(-2)));
     }
 
+    void destruct()
+    {
+      if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
+      }
+    }
+
     sparse_vector_type* construct()
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
@@ -1037,11 +1026,14 @@ namespace cicada
     }
     
     template <typename Iterator>
-    sparse_vector_type* construct(Iterator first, Iterator last)
+    sparse_vector_type* construct(Iterator first, Iterator last, size_t hint=0)
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
 
       initialize(*instance);
+
+      if (hint)
+	instance->rehash(hint);
       
       instance->insert(first, last);
       
@@ -1255,7 +1247,7 @@ namespace cicada
       plus_equal(__dense, x.begin(), x.end());
       
       if (__dense.size() > __dense_size) {
-	__sparse = construct(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	__dense.clear();
       }
     }
@@ -1275,7 +1267,7 @@ namespace cicada
       minus_equal(__dense, x.begin(), x.end());
 	
       if (__dense.size() > __dense_size) {
-	__sparse = construct(__dense.begin(), __dense.end());
+	__sparse = construct(__dense.begin(), __dense.end(), __dense.size());
 	__dense.clear();
       }
     }
