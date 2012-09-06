@@ -88,7 +88,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     rescale(1.0 - eta * lambda);
     
     sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+    sorted_type gradient_sorted(grandient.begin(), gradient.end());
 
     std::sort(correct_sorted.begin(), correct_sorted.end());
     std::sort(gradient_sorted.begin(), gradient_sorted.end());
@@ -157,7 +157,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     const double inf = std::numeric_limits<double>::infinity();
 
     sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+    sorted_type gradient_sorted(grandient.begin(), gradient.end());
 
     std::sort(correct_sorted.begin(), correct_sorted.end());
     std::sort(gradient_sorted.begin(), gradient_sorted.end());
@@ -295,7 +295,7 @@ struct OptimizerSGDL1 : public OptimizerBase
     penalty += eta * lambda;
     
     sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+    sorted_type gradient_sorted(grandient.begin(), gradient.end());
 
     std::sort(correct_sorted.begin(), correct_sorted.end());
     std::sort(gradient_sorted.begin(), gradient_sorted.end());
@@ -359,7 +359,7 @@ struct OptimizerSGDL1 : public OptimizerBase
     penalty += eta * lambda;
 
     sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_tyep gradient_sorted(grandient.begin(), gradient.end());
+    sorted_type gradient_sorted(grandient.begin(), gradient.end());
 
     std::sort(correct_sorted.begin(), correct_sorted.end());
     std::sort(gradient_sorted.begin(), gradient_sorted.end());
