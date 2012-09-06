@@ -445,6 +445,8 @@ namespace cicada
 	} else {
 	  sparse_vector_type sparse_new;
 	  
+	  initialize(sparse_new);
+	  
 	  intersect(sparse_new, *__sparse, first, last);
 	  
 	  __sparse->swap(sparse_new);
@@ -921,6 +923,8 @@ namespace cicada
 	  __dense.clear();
 	} else {
 	  sparse_vector_type sparse_new;
+
+	  initialize(sparse_new);
 	  
 	  if (x.sparse())
 	    multiply_equal(sparse_new, *__sparse, x.__sparse->begin(), x.__sparse->end());
@@ -1010,12 +1014,17 @@ namespace cicada
     }
 
   private:
+    void initialize(sparse_vector_type& x)
+    {
+      x.set_empty_key(feature_type(feature_type::id_type(-1)));
+      x.set_deleted_key(feature_type(feature_type::id_type(-2)));
+    }
+
     sparse_vector_type* construct()
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
-      
-      instance->set_empty_key(feature_type(feature_type::id_type(-1)));
-      instance->set_deleted_key(feature_type(feature_type::id_type(-2)));
+
+      initialize(*instance);
       
       return instance.release();
     }
@@ -1023,7 +1032,7 @@ namespace cicada
     sparse_vector_type* construct(const sparse_vector_type& x)
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type(x));
-      
+            
       return instance.release();
     }
     
@@ -1032,9 +1041,8 @@ namespace cicada
     {
       std::auto_ptr<sparse_vector_type> instance(new sparse_vector_type());
 
-      instance->set_empty_key(feature_type(feature_type::id_type(-1)));
-      instance->set_deleted_key(feature_type(feature_type::id_type(-2)));
-
+      initialize(*instance);
+      
       instance->insert(first, last);
       
       return instance.release();
