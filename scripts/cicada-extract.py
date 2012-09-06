@@ -26,10 +26,6 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="root directory for outputs"),
     make_option("--corpus-dir", default="", action="store", type="string",
                 metavar="PREFIX", help="corpus directory (default: ${root_dir}/corpus)"),
-    make_option("--giza-f2e", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})"),
-    make_option("--giza-e2f", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})"),
     make_option("--model-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
     make_option("--alignment-dir", default="", action="store", type="string",
@@ -72,7 +68,11 @@ opt_parser = OptionParser(
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
     make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
-    
+    make_option("--lexicon-variational", default=None, action="store_true", help="variational Bayes estimates"),
+    make_option("--lexicon-l0",          default=None, action="store_true", help="L0 regularization"),
+    make_option("--lexicon-l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
+    make_option("--lexicon-l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
+
     # option for extraction
     make_option("--phrase", default=None, action="store_true", help="extract phrase"),
     make_option("--scfg",   default=None, action="store_true", help="extract SCFG"),
@@ -365,7 +365,12 @@ class Alignment:
                 raise ValueError, "no alignment data %s" %(self.alignment)
 
 class Lexicon:
-    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
+    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="",
+                 prior=0.1,
+                 variational=None,
+                 l0=None,
+                 l0_alpha=10,
+                 l0_beta=0.5,
                  inverse=None,
                  threads=4, mpi=None, pbs=None,
                  debug=None):
@@ -389,9 +394,15 @@ class Lexicon:
         
         command += " --output-source-target \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.f2n'))
         command += " --output-target-source \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.n2f'))
+
+        if variational:
+            command += " --variational-bayes"
+        if l0:
+            command += " --pgd"
         
-        command += " --variational-bayes"
         command += " --prior %g" %(prior)
+        command += " --l0-alpha %g" %(l0_alpha)
+        command += " --l0-beta %g" %(l0_beta)
         
         if inverse:
             command += " --inverse"
@@ -816,6 +827,10 @@ alignment = Alignment(corpus=corpus, alignment_dir=options.alignment_dir, alignm
 lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
                   prior=options.lexicon_prior,
+                  variational=options.lexicon_variational,
+                  l0=options.lexicon_l0,
+                  l0_alpha=options.lexicon_l0_alpha,
+                  l0_beta=options.lexicon_l0_beta,
                   inverse=options.lexicon_inverse,
                   threads=options.threads, mpi=mpi, pbs=pbs,
                   debug=options.debug)

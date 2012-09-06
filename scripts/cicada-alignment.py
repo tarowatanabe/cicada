@@ -179,6 +179,7 @@ class CICADA:
 class Corpus:
 
     def __init__(self, corpus_dir="", corpus="", f="", e="", a="", sf="", se="", ff="", fe=""):
+        print corpus
 
         if not corpus:
             self.source_tag = 'src'
@@ -676,10 +677,6 @@ if options.root_dir:
 
 if not options.corpus_dir:
     options.corpus_dir = os.path.join(options.root_dir, "corpus")
-if not options.giza_f2e:
-    options.giza_f2e = os.path.join(options.root_dir, "giza.%s-%s" %(options.f, options.e))
-if not options.giza_e2f:
-    options.giza_e2f = os.path.join(options.root_dir, "giza.%s-%s" %(options.e, options.f))
 if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:
@@ -698,6 +695,11 @@ corpus = Corpus(corpus_dir=options.corpus_dir,
                 se=options.se,
                 ff=options.ff,
                 fe=options.fe)
+
+if not options.giza_f2e:
+    options.giza_f2e = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.source_tag, corpus.target_tag))
+if not options.giza_e2f:
+    options.giza_e2f = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.target_tag, corpus.source_tag))
 
 prepare = Prepare(cicada=cicada,
                   corpus=corpus,
