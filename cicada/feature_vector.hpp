@@ -258,7 +258,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = construct(x.begin(), x.end(), x.size());
+	  __sparse = construct(x.begin(), x.end(), __n);
       } else {
 	destruct();
 	__dense.clear();
@@ -277,7 +277,7 @@ namespace cicada
 	  __sparse->clear();
 	  __sparse->insert(x.begin(), x.end());
 	} else
-	  __sparse = construct(x.begin(), x.end(), x.size());
+	  __sparse = construct(x.begin(), x.end(), __n);
       } else {
 	destruct();
 	__dense.clear();
