@@ -152,9 +152,9 @@ namespace cicada
 	weights = &base_type::weights();
       
       name = (std::string("apply-")
-	      + std::string(state_full ? "full-" : (state_less ? "less-" : ""))
-	      + std::string(sparse ? "sparse-" : (dense ? "dense-" : ""))
-	      + (exact ? "exact" : (incremental ? "incremental" : (grow_coarse ? "grow-coarse" : (grow ? "grow" : "prune")))));
+	      + std::string(exact ? "exact" : (incremental ? "incremental" : (grow_coarse ? "grow-coarse" : (grow ? "grow" : "prune"))))
+	      + std::string(sparse ? "-sparse" : (dense ? "-dense" : ""))
+	      + std::string(state_full ? "-statefull" : (state_less ? "-stateless" : "")));
     }
     
     void Apply::operator()(data_type& data) const
