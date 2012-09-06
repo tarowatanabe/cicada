@@ -238,6 +238,7 @@ namespace cicada
       if (x.__sparse) {
 	if (__sparse) {
 	  __sparse->clear();
+	  __sparse->hint(x.__sparse->size());
 	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
 	} else
 	  __sparse = construct(x.__sparse->begin(), x.__sparse->end(), x.__sparse->size());
@@ -256,6 +257,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
+	  __sparse->hint(__n);
 	  __sparse->insert(x.begin(), x.end());
 	} else
 	  __sparse = construct(x.begin(), x.end(), __n);
@@ -275,6 +277,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
+	  __sparse->hint(__n);
 	  __sparse->insert(x.begin(), x.end());
 	} else
 	  __sparse = construct(x.begin(), x.end(), __n);
@@ -294,6 +297,7 @@ namespace cicada
 	__dense.clear();
 	if (__sparse) {
 	  __sparse->clear();
+	  __sparse->hint(__n);
 	  __sparse->insert(first, last);
 	} else
 	  __sparse = construct(first, last, __n);
@@ -358,7 +362,8 @@ namespace cicada
     {
       if (empty()) 
 	return *this;
-      else if (x.empty())
+      
+      if (x.empty())
 	clear();
       else if (x.sparse())
 	intersect(x.sparse_begin(), x.sparse_end(), true);
@@ -399,6 +404,7 @@ namespace cicada
 	assign(x);
       else {
 	erase_prefix(prefix);
+	
 	operator+=(x);
       }
     }
