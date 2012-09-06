@@ -96,6 +96,10 @@ opt_parser = OptionParser(
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
     make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
+    make_option("--lexicon-variational", default=None, action="store_true", help="variational Bayes estimates"),
+    make_option("--lexicon-l0",          default=None, action="store_true", help="L0 regularization"),
+    make_option("--lexicon-l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
+    make_option("--lexicon-l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
     
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -602,7 +606,12 @@ class Aligner:
         
 
 class Lexicon:
-    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
+    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="",
+                 prior=0.1,
+                 variational=None,
+                 l0=None,
+                 l0_alpha=10,
+                 l0_beta=0.5,
                  inverse=None,
                  threads=4,
                  debug=None):
@@ -625,8 +634,14 @@ class Lexicon:
         command += " --output-source-target \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.f2n'))
         command += " --output-target-source \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.n2f'))
         
-        command += " --variational-bayes"
+        if variational:
+            command += " --variational-bayes"
+        if l0:
+            command += " --pgd"
+        
         command += " --prior %g" %(prior)
+        command += " --l0-alpha %g" %(l0_alpha)
+        command += " --l0-beta %g" %(l0_beta)
         
         if inverse:
             command += " --inverse"
@@ -767,6 +782,10 @@ if options.first_step <= 3 and options.last_step >= 3:
 lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
                   prior=options.lexicon_prior,
+                  variational=options.lexicon_variational,
+                  l0=options.lexicon_l0,
+                  l0_alpha=options.lexicon_l0_alpha,
+                  l0_beta=options.lexicon_l0_beta,
                   inverse=options.lexicon_inverse,
                   threads=options.threads, 
                   debug=options.debug)
