@@ -7,11 +7,15 @@ cicada_lexicon_dice
 
 cicada_lexicon_model1
 	IBM Model1[1] + symmetric learning[2] + posterior constrained learning [3]
+	+ naive variational Bayes
+	+ L0 regularization [5]
 	+ ITG constrained posterior alignment
 	+ MaxMatch posterior alignment (using Hungarian algorithm)
 
 cicada_lexicon_hmm
 	HMM Model[2] + symmetric learning[2] + posterior constrained learning [3]
+	+ naive variational Bayes
+	+ L0 regularization [5]
 	+ ITG constrained posteriors
 	+ MaxMatch posteriors (using Hungarian algorithm)
 
@@ -19,14 +23,21 @@ cicada_lexicon_global{,_mpi}
 	Trigger based global lexicon[4]
 
 cicada_lexicon
+	Learn lexicon model from word aligned data, primarily used for lexical-probabilities for phrase/rule scoring
+	+ naive variational Bayes
+	+ L0 regularization [5]
+
+cicada_alignment
 	Heuristic word alignment combiner (as in Moses grow-diagl-final-and etc.)
 	+ ITG constrained combiner
 	+ MaxMatch combiner (using Hungarian algorithm)
 
+	Posterior word alignment matrix combiner
+  	+ ITG constraint
+	+ MaxMatch (using Hungarian algorithm)	
+
 cicada_pyp_itg_learn
     Direct ITG word alignment training (Highly exprerimental)
-
-For ciada_lexicon_{hmm, model1}, we support L0 regularization [5]
 
 We also support alignment visulization by cicada_filter_alignment:
 
@@ -41,8 +52,6 @@ cicada_fiter_alignment
 blue point indicates "intersection"
 green point indicates word alignment only in the primary alignment
 yello point indicates word alignment only in the secondary alignment
-
-
 
 
 [1]
@@ -104,4 +113,15 @@ yello point indicates word alignment only in the secondary alignment
 }
 
 [5]
-L0
+@InProceedings{vaswani-huang-chiang:2012:ACL2012,
+  author    = {Vaswani, Ashish  and  Huang, Liang  and  Chiang, David},
+  title     = {Smaller Alignment Models for Better Translations: Unsupervised Word Alignment with the l0-norm},
+  booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  month     = {July},
+  year      = {2012},
+  address   = {Jeju Island, Korea},
+  publisher = {Association for Computational Linguistics},
+  pages     = {311--319},
+  url       = {http://www.aclweb.org/anthology/P12-1033}
+}
+
