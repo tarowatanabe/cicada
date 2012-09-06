@@ -76,9 +76,6 @@ struct OptimizerSGDL2 : public OptimizerBase
 		  const weight_type& Z_correct,
 		  const weight_type& Z)
   {
-    typedef std::pair<feature_type, double> pair_type;
-    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
-  
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
@@ -86,40 +83,15 @@ struct OptimizerSGDL2 : public OptimizerBase
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
-    
-    sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_type gradient_sorted(gradient.begin(), gradient.end());
 
-    std::sort(correct_sorted.begin(), correct_sorted.end());
-    std::sort(gradient_sorted.begin(), gradient_sorted.end());
-        
-    sorted_type::const_iterator citer = correct_sorted.begin();
-    sorted_type::const_iterator citer_end = correct_sorted.end();
-    
-    sorted_type::const_iterator miter = gradient_sorted.begin();
-    sorted_type::const_iterator miter_end = gradient_sorted.end();
-
-    while (citer != citer_end && miter != miter_end) {
-      if (citer < miter) {
-	update(weights[citer->first], double(citer->second) * eta * factor);
-	++ citer;
-      } else if (miter < citer) {
-	update(weights[miter->first], - double(miter->second) * eta * factor);
-	++ miter;
-      } else {
-	const double alpha = double(citer->second) - double(miter->second);
-	if (alpha != 0.0)
-	  update(weights[citer->first], alpha * eta * factor);
-	++ citer;
-	++ miter;
-      }
-    }
-    
-    for (/**/; citer != citer_end; ++ citer)
+    gradient_type::const_iterator citer_end = correct.end();
+    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer)
       update(weights[citer->first], double(citer->second) * eta * factor);
-
-    for (/**/; miter != miter_end; ++ miter)
+    
+    gradient_type::const_iterator miter_end = gradient.end();
+    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter)
       update(weights[miter->first], - double(miter->second) * eta * factor);
+    
     
     // projection...
     if (weight_norm > 1.0 / lambda)
@@ -143,9 +115,6 @@ struct OptimizerSGDL2 : public OptimizerBase
 		  const weight_set_type& bounds_lower,
 		  const weight_set_type& bounds_upper)
   {
-    typedef std::pair<feature_type, double> pair_type;
-    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
-
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0;
@@ -156,49 +125,17 @@ struct OptimizerSGDL2 : public OptimizerBase
     
     const double inf = std::numeric_limits<double>::infinity();
 
-    sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_type gradient_sorted(gradient.begin(), gradient.end());
-
-    std::sort(correct_sorted.begin(), correct_sorted.end());
-    std::sort(gradient_sorted.begin(), gradient_sorted.end());
-        
-    sorted_type::const_iterator citer = correct_sorted.begin();
-    sorted_type::const_iterator citer_end = correct_sorted.end();
-    
-    sorted_type::const_iterator miter = gradient_sorted.begin();
-    sorted_type::const_iterator miter_end = gradient_sorted.end();
-
-    while (citer != citer_end && miter != miter_end) {
-      if (citer < miter) {
-	update(weights[citer->first], double(citer->second) * eta * factor,
-	       citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
-	       citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
-	++ citer;
-      } else if (miter < citer) {
-	update(weights[miter->first], - double(miter->second) * eta * factor,
-	       citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
-	       citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
-	++ miter;
-      } else {
-	const double alpha = double(citer->second) - double(miter->second);
-	if (alpha != 0.0)
-	  update(weights[citer->first], alpha * eta * factor,
-		 citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
-		 citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
-	++ citer;
-	++ miter;
-      }
-    }
-    
-    for (/**/; citer != citer_end; ++ citer)
+    gradient_type::const_iterator citer_end = correct.end();
+    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer)
       update(weights[citer->first], double(citer->second) * eta * factor,
 	     citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
 	     citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
-
-    for (/**/; miter != miter_end; ++ miter)
+    
+    gradient_type::const_iterator miter_end = gradient.end();
+    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter)
       update(weights[miter->first], - double(miter->second) * eta * factor,
-	     citer->first.id() < bounds_lower.size() ? bounds_lower[citer->first] : - inf,
-	     citer->first.id() < bounds_upper.size() ? bounds_upper[citer->first] :   inf);
+	     miter->first.id() < bounds_lower.size() ? bounds_lower[miter->first] : - inf,
+	     miter->first.id() < bounds_upper.size() ? bounds_upper[miter->first] :   inf);
     
     // projection...
     if (weight_norm > 1.0 / lambda)
@@ -283,9 +220,6 @@ struct OptimizerSGDL1 : public OptimizerBase
 		  const weight_type& Z_correct,
 		  const weight_type& Z)
   {
-    typedef std::pair<feature_type, double> pair_type;
-    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
-    
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
@@ -294,44 +228,14 @@ struct OptimizerSGDL1 : public OptimizerBase
     
     penalty += eta * lambda;
     
-    sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_type gradient_sorted(gradient.begin(), gradient.end());
-
-    std::sort(correct_sorted.begin(), correct_sorted.end());
-    std::sort(gradient_sorted.begin(), gradient_sorted.end());
-        
-    sorted_type::const_iterator citer = correct_sorted.begin();
-    sorted_type::const_iterator citer_end = correct_sorted.end();
-    
-    sorted_type::const_iterator miter = gradient_sorted.begin();
-    sorted_type::const_iterator miter_end = gradient_sorted.end();
-    
-    while (citer != citer_end && miter != miter_end) {
-      if (citer < miter) {
-	weights[citer->first] += eta * double(citer->second) * factor;
-	apply(weights[citer->first], penalties[citer->first], penalty);
-	
-	++ citer;
-      } else if (miter < citer) {
-	weights[miter->first] -= eta * double(miter->second) * factor;
-	apply(weights[miter->first], penalties[miter->first], penalty);
-	
-	++ miter;
-      } else {
-	weights[citer->first] += eta * (double(citer->second) - double(miter->second)) * factor;
-	apply(weights[citer->first], penalties[citer->first], penalty);
-	
-	++ citer;
-	++ miter;
-      }
-    }
-    
-    for (/**/; citer != citer_end; ++ citer) {
+    gradient_type::const_iterator citer_end = correct.end();
+    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
       weights[citer->first] += eta * double(citer->second) * factor;
       apply(weights[citer->first], penalties[citer->first], penalty);
     }
     
-    for (/**/; miter != miter_end; ++ miter) {
+    gradient_type::const_iterator miter_end = gradient.end();
+    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter) {
       weights[miter->first] -= eta * double(miter->second) * factor;
       apply(weights[miter->first], penalties[miter->first], penalty);
     }
@@ -347,9 +251,6 @@ struct OptimizerSGDL1 : public OptimizerBase
 		  const weight_set_type& bounds_lower,
 		  const weight_set_type& bounds_upper)
   {
-    typedef std::pair<feature_type, double> pair_type;
-    typedef std::vector<pair_type, std::allocator<pair_type> > sorted_type;
-
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double factor = 1.0 / instances;
@@ -358,74 +259,27 @@ struct OptimizerSGDL1 : public OptimizerBase
     
     penalty += eta * lambda;
 
-    sorted_type correct_sorted(correct.begin(), correct.end());
-    sorted_type gradient_sorted(gradient.begin(), gradient.end());
-
-    std::sort(correct_sorted.begin(), correct_sorted.end());
-    std::sort(gradient_sorted.begin(), gradient_sorted.end());
-        
-    sorted_type::const_iterator citer = correct_sorted.begin();
-    sorted_type::const_iterator citer_end = correct_sorted.end();
-    
-    sorted_type::const_iterator miter = gradient_sorted.begin();
-    sorted_type::const_iterator miter_end = gradient_sorted.end();
-    
-    while (citer != citer_end && miter != miter_end) {
-      if (citer < miter) {
-	weights[citer->first] += eta * double(citer->second) * factor;
-	
-	if (citer->first.id() < bounds_lower.size())
-	  weights[citer->first] = std::max(weights[citer->first], bounds_lower[citer->first]);
-	if (citer->first.id() < bounds_upper.size())
-	  weights[citer->first] = std::min(weights[citer->first], bounds_upper[citer->first]);
-
-	apply(weights[citer->first], penalties[citer->first], penalty);
-	
-	++ citer;
-      } else if (miter < citer) {
-	weights[miter->first] -= eta * double(miter->second) * factor;
-	
-	if (citer->first.id() < bounds_lower.size())
-	  weights[citer->first] = std::max(weights[citer->first], bounds_lower[citer->first]);
-	if (citer->first.id() < bounds_upper.size())
-	  weights[citer->first] = std::min(weights[citer->first], bounds_upper[citer->first]);
-	
-	apply(weights[miter->first], penalties[miter->first], penalty);
-	
-	++ miter;
-      } else {
-	weights[citer->first] += eta * (double(citer->second) - double(miter->second)) * factor;
-	
-	if (citer->first.id() < bounds_lower.size())
-	  weights[citer->first] = std::max(weights[citer->first], bounds_lower[citer->first]);
-	if (citer->first.id() < bounds_upper.size())
-	  weights[citer->first] = std::min(weights[citer->first], bounds_upper[citer->first]);
-
-	apply(weights[citer->first], penalties[citer->first], penalty);
-	
-	++ citer;
-	++ miter;
-      }
-    }
-    
-    for (/**/; citer != citer_end; ++ citer) {
+    gradient_type::const_iterator citer_end = correct.end();
+    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
       weights[citer->first] += eta * double(citer->second) * factor;
-      
+
       if (citer->first.id() < bounds_lower.size())
 	weights[citer->first] = std::max(weights[citer->first], bounds_lower[citer->first]);
       if (citer->first.id() < bounds_upper.size())
 	weights[citer->first] = std::min(weights[citer->first], bounds_upper[citer->first]);
-      
+
       apply(weights[citer->first], penalties[citer->first], penalty);
     }
     
-    for (/**/; miter != miter_end; ++ miter) {
+    gradient_type::const_iterator miter_end = gradient.end();
+    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter) {
       weights[miter->first] -= eta * double(miter->second) * factor;
-
-      if (citer->first.id() < bounds_lower.size())
-	weights[citer->first] = std::max(weights[citer->first], bounds_lower[citer->first]);
-      if (citer->first.id() < bounds_upper.size())
-	weights[citer->first] = std::min(weights[citer->first], bounds_upper[citer->first]);
+      
+      if (miter->first.id() < bounds_lower.size())
+	weights[miter->first] = std::max(weights[miter->first], bounds_lower[miter->first]);
+      if (miter->first.id() < bounds_upper.size())
+	weights[miter->first] = std::min(weights[miter->first], bounds_upper[miter->first]);
+	
 
       apply(weights[miter->first], penalties[miter->first], penalty);
     }
