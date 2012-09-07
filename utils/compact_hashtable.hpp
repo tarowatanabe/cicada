@@ -316,9 +316,8 @@ namespace utils
     
     void clear()
     {
-      typename bucket_type::iterator biter_end = __bucket.end();
-      for (typename bucket_type::iterator biter = __bucket.begin(); biter != biter_end; ++ biter)
-	set_value(*biter, __value_empty);
+      utils::destroy_range(__bucket.begin(), __bucket.end());
+      std::uninitialized_fill(__bucket.begin(), __bucket.end(), __value_empty);
       
       __size_element = 0;
       __size_deleted = 0;
