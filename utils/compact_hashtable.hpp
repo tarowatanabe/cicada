@@ -236,7 +236,9 @@ namespace utils
   private:
     static const size_type __cache_bytes = 128;
     static const size_type __cache_size = __cache_bytes / sizeof(value_type);
-    static const size_type __cache_max = (__cache_size == 0 ? size_type(1) : __cache_size);
+    static const size_type __cache_size_power2 = (utils::bithack::static_next_largest_power2<__cache_size>::result >> 1);
+    static const size_type __cache_minimum = (__cache_size_power2 == 0 ? size_type(1) : __cache_size_power2);
+    static const size_type __cache_linear = (__cache_minimum << 1);
     
   public:
     compact_hashtable(size_type hint=0)
@@ -362,7 +364,7 @@ namespace utils
     {
       if (empty()) return end();
       
-      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(key)
 						   : find_bucket(key));
       
@@ -376,7 +378,7 @@ namespace utils
     {
       if (empty()) return end();
       
-      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(key)
 						   : find_bucket(key));
       
@@ -470,7 +472,7 @@ namespace utils
     {
       rehash(__size_element + 1);
       
-      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(x)
 						   : find_bucket(x));
       
@@ -559,8 +561,8 @@ namespace utils
     {
       const size_type size_power2 = capacity_power2(n);
       
-      return utils::bithack::branch(size_power2 <= __cache_max,
-				    size_power2,
+      return utils::bithack::branch(size_power2 <= __cache_linear,
+				    utils::bithack::max(size_power2, __cache_minimum),
 				    capacity_power2(n + (n >> 2)));
     }
     
@@ -569,24 +571,16 @@ namespace utils
       minimum_size = utils::bithack::max(table.size(), minimum_size);
       
       if (minimum_size == 0) return;
-      
-      const size_type size_power2 = capacity_power2(minimum_size);
-      
-      if (size_power2 <= __cache_max) {
-	bucket_type bucket_new(size_power2, __value_empty);
 
-	__bucket.swap(bucket_new);
-	
+      const size_type bucket_size = capacity_bucket(minimum_size);
+      
+      bucket_type bucket_new(bucket_size, __value_empty);
+      __bucket.swap(bucket_new);
+      
+      if (bucket_size <= __cache_linear)
 	initialize_linear(table);
-      } else {
-	// allocate enough space...
-	const size_type size_power2 = capacity_power2(minimum_size + (minimum_size >> 2));
-
-	bucket_type bucket_new(size_power2, __value_empty);
-	__bucket.swap(bucket_new);
-	
+      else
 	initialize_bucket(table);
-      }
     }
     
     void initialize_linear(const compact_hashtable& table)
@@ -649,7 +643,7 @@ namespace utils
     // insert when we already know that the storage is big enough
     std::pair<iterator, bool> insert_noresize(const value_type& x)
     {
-      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(extract_key()(x))
 						   : find_bucket(extract_key()(x)));
       if (pos.first != size_type(-1))
