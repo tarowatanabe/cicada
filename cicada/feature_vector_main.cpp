@@ -18,7 +18,6 @@
 
 typedef cicada::FeatureVector<double> feature_set_type;
 typedef cicada::FeatureVectorLinear<double> feature_linear_type;
-typedef cicada::FeatureVectorUnordered<double> feature_unordered_type;
 typedef cicada::FeatureVectorCompact  feature_compact_type;
 
 void check_compact(const feature_set_type& features, const feature_compact_type& feats)
@@ -56,14 +55,9 @@ void check_compact(const feature_set_type& features, const feature_compact_type&
     std::cerr << "differ for the compressed vector!" << std::endl;
 #endif
 
-  feature_unordered_type features_unordered(features);
   feature_linear_type features_linear(features);
-
-  feature_set_type feats1(features_unordered);
   feature_set_type feats2(features_linear);
 
-  if (feats1 != features)
-    std::cerr << "different from unordered" << std::endl;
   if (feats2 != features)
     std::cerr << "different from linear" << std::endl;
   
