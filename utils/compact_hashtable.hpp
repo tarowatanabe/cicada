@@ -247,18 +247,14 @@ namespace utils
 	__value_deleted(),
 	__size_element(0),
 	__size_deleted(0) {  }
-    compact_hashtable(const compact_hashtable& x,
-		      size_type minimum_size=0)
+    compact_hashtable(const compact_hashtable& x)
       : __bucket(),
 	__value_empty(x.__value_empty),
 	__value_deleted(x.__value_deleted),
 	__size_element(0),
 	__size_deleted(0) 
     {
-      if (minimum_size == 0)
-	assign(x);
-      else
-	initialize(x, minimum_size);
+      assign(x);
     }
     
   public:
@@ -494,12 +490,21 @@ namespace utils
     bool rehash_bucket(size_type minimum_size)
     {
       if (minimum_size <= __size_element) return false;
+
+      const size_type capacity = capacity_bucket(minimum_size);
       
-      if (capacity_bucket(minimum_size) <= __bucket.size())
-	return false;
+      if (capacity <= __bucket.size()) return false;
       
-      compact_hashtable table_new(*this, minimum_size);
-      swap(table_new);
+      bucket_type bucket_new(capacity, __value_empty);
+      __bucket.swap(bucket_new);
+
+      __size_element = 0;
+      __size_deleted = 0;
+      
+      if (capacity <= __cache_linear)
+	initialize_linear(bucket_new);
+      else
+	initialize_bucket(bucket_new);
       
       return true;
     }
@@ -566,37 +571,20 @@ namespace utils
 				    capacity_power2(n + (n >> 2)));
     }
     
-    void initialize(const compact_hashtable& table, size_type minimum_size = 0)
-    {
-      minimum_size = utils::bithack::max(table.size(), minimum_size);
-      
-      if (minimum_size == 0) return;
-
-      const size_type bucket_size = capacity_bucket(minimum_size);
-      
-      bucket_type bucket_new(bucket_size, __value_empty);
-      __bucket.swap(bucket_new);
-      
-      if (bucket_size <= __cache_linear)
-	initialize_linear(table);
-      else
-	initialize_bucket(table);
-    }
-    
-    void initialize_linear(const compact_hashtable& table)
+    void initialize_linear(const bucket_type& bucket)
     {
       // we assume that: we are empty, and the old bucket has no duplicates
       // enough bucket allocated
 
-      if (table.empty()) return;
+      if (bucket.empty()) return;
 
       const key_type& key_empty   = extract_key()(__value_empty);
       const key_type& key_deleted = extract_key()(__value_deleted);
 
       typename bucket_type::iterator iter = __bucket.begin();
       
-      typename bucket_type::const_iterator biter_end = table.__bucket.end();
-      for (typename bucket_type::const_iterator biter = table.__bucket.begin(); biter != biter_end; ++ biter) {
+      typename bucket_type::const_iterator biter_end = bucket.end();
+      for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
 	if (pred()(key, key_empty) || pred()(key, key_deleted)) continue;
@@ -607,18 +595,18 @@ namespace utils
       }
     }
     
-    void initialize_bucket(const compact_hashtable& table)
+    void initialize_bucket(const bucket_type& bucket)
     {
       // we assume that: we are empty, and the old bucket has no duplicates
       // enough bucket allocated
 
-      if (table.empty()) return;
+      if (bucket.empty()) return;
       
       const key_type& key_empty   = extract_key()(__value_empty);
       const key_type& key_deleted = extract_key()(__value_deleted);
       
-      typename bucket_type::const_iterator biter_end = table.__bucket.end();
-      for (typename bucket_type::const_iterator biter = table.__bucket.begin(); biter != biter_end; ++ biter) {
+      typename bucket_type::const_iterator biter_end = bucket.end();
+      for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
 	if (pred()(key, key_empty) || pred()(key, key_deleted)) continue;
