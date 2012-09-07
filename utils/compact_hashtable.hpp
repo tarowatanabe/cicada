@@ -147,13 +147,13 @@ namespace utils
     
     template <typename T, typename I, typename R, typename V>
     __compact_hashtable_iterator(const __compact_hashtable_iterator<T,I,R,V>& x)
-      : table(x.table), pos(static_cast<pointer>(x.pos)), last(static_cast<pointer>(x.last)) {}
+      : table(x.table), pos(const_cast<pointer>(x.pos)), last(const_cast<pointer>(x.last)) {}
     
     __compact_hashtable_iterator(const Table& __table,
 				 Iterator __pos,
 				 Iterator __last,
 				 bool forward)
-      : table(&__table), pos(static_cast<pointer>(__pos)), last(static_cast<pointer>(__last))
+      : table(&__table), pos(const_cast<pointer>(__pos)), last(const_cast<pointer>(__last))
     {
       if (forward)
 	advance();
@@ -227,6 +227,7 @@ namespace utils
   public:
     typedef typename bucket_type::reference       reference;
     typedef typename bucket_type::const_reference const_reference;
+    typedef typename bucket_type::pointer         pointer;
 
   public:
     typedef __compact_hashtable_iterator<self_type, typename bucket_type::iterator, reference, value_type> iterator;
@@ -259,7 +260,7 @@ namespace utils
     }
     
   public:
-    compact_hashtable& operator==(const compact_hashtable& x)
+    compact_hashtable& operator=(const compact_hashtable& x)
     {
       assign(x);
       return *this;
@@ -278,11 +279,9 @@ namespace utils
       __size_element = x.__size_element;
       __size_deleted = x.__size_deleted;
 
-#if 0      
       extract_key() = x.extract_key();
       hash() = x.hash();
       pred() = x.pred();
-#endif
     }
 
     void swap(compact_hashtable& x)
@@ -305,11 +304,9 @@ namespace utils
       std::swap(__size_element, x.__size_element);
       std::swap(__size_deleted, x.__size_deleted);
       
-#if 0
       std::swap(extract_key(), x.extract_key());
       std::swap(hash(), x.hash());
       std::swap(pred(), x.pred());
-#endif
     }
     
     void clear()
@@ -329,7 +326,7 @@ namespace utils
     void resize(size_type __n) { rehash(__n); }
     void rehash(size_type minimum_size)
     {
-      if (minimum_size <= size()) return;
+      if (minimum_size <= __size_element) return;
       
       size_type target = 0;
       

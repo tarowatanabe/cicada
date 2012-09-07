@@ -37,6 +37,7 @@ namespace utils
     
     typedef typename impl_type::iterator       iterator;
     typedef typename impl_type::const_iterator const_iterator;
+    typedef typename impl_type::pointer        pointer;
     
     typedef mapped_type&      reference;
     typedef const mapped_type& const_reference;
@@ -62,6 +63,7 @@ namespace utils
     
     bool empty() const { return impl.empty(); }
     size_type size() const { return impl.size(); }
+    size_type bucket_count() const { return impl.size(); }
     void clear() { impl.clear(); }
 
     void rehash(size_type hint) { impl.rehash(hint); }
@@ -70,6 +72,9 @@ namespace utils
     iterator find(const key_type& x) { return impl.find(x); }
 
     std::pair<iterator, bool> insert(const value_type& x) { return impl.insert(x); }
+
+    iterator insert(iterator, const value_type& x) { return insert(x).first; }
+    
     template <typename Iterator>
     void insert(Iterator first, Iterator last) { impl.insert(first, last); }
     

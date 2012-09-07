@@ -15,7 +15,8 @@
 
 #include <cicada/feature.hpp>
 
-#include <utils/dense_hash_map.hpp>
+//#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -46,7 +47,8 @@ namespace cicada
     
   private:
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
-    typedef typename utils::dense_hash_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type>::type vector_type;
+    //typedef typename utils::dense_hash_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type>::type vector_type;
+    typedef typename utils::compact_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type> vector_type;
     
     typedef FeatureVector<Tp, Alloc> self_type;
     
@@ -375,13 +377,32 @@ namespace cicada
 	__sum += first->second;
       return __sum;
     }
+
+  private:
+    struct __equal_to
+    {
+      bool operator()(const vector_type& x, const vector_type& y) const
+      {
+	if (x.size() != y.size()) return false;
+	
+	typename vector_type::const_iterator iter_end = y.end();
+	for (typename vector_type::const_iterator iter = y.begin(); iter != iter_end; ++ iter) {
+	  typename vector_type::const_iterator fiter = x.find(iter->first);
+	  
+	  if (fiter == x.end() || *fiter != *iter)
+	    return false;
+	}
+	
+	return true;
+      }
+    };
     
   public:
     // comparison
     friend
     bool operator==(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__vector == y.__vector;
+      return __equal_to()(x.__vector, y.__vector);
     }
     
     friend
