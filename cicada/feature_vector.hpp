@@ -64,7 +64,7 @@ namespace cicada
     typedef typename vector_type::pointer         pointer;
     
   public:
-    FeatureVector(size_type hint=8) : __vector(hint) { initialize(__vector); }
+    FeatureVector(size_type hint=8) : __vector(hint) { initialize(__vector); rehash(hint); }
     FeatureVector(const FeatureVector<Tp,Alloc>& x) : __vector(x.__vector) {}
     template <typename T, typename A>
     FeatureVector(const FeatureVector<T,A>& x) : __vector(x.size()) { initialize(__vector);  assign(x); }
@@ -119,8 +119,7 @@ namespace cicada
     void assign(const FeatureVector<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.bucket_count())
-	__vector.rehash(x.size());
+      __vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
 
@@ -130,8 +129,7 @@ namespace cicada
     void assign(const FeatureVectorLinear<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.bucket_count())
-	__vector.rehash(x.size());
+      __vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
 
@@ -139,8 +137,7 @@ namespace cicada
     void assign(const FeatureVectorUnordered<T,A>& x)
     {
       __vector.clear();
-      if (x.size() > __vector.bucket_count())
-	__vector.rehash(x.size());
+      __vector.rehash(x.size());
       __vector.insert(x.begin(), x.end());
     }
     
@@ -176,8 +173,9 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
+	vector_type vector_new;
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
 	
@@ -196,8 +194,9 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
+	vector_type vector_new;
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
 	
@@ -216,8 +215,9 @@ namespace cicada
       if (x.empty())
 	clear();
       else {
-	vector_type vector_new(utils::bithack::max(__vector.size(), x.size()));
+	vector_type vector_new;
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
 	
@@ -478,6 +478,7 @@ namespace cicada
 	assign(x);
 	return *this;
       } else {
+	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
 	plus_equal(__vector, x.begin(), x.end());
 	return *this;
       }
@@ -494,6 +495,7 @@ namespace cicada
 	assign(x);
 	return *this;
       } else {
+	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
 	plus_equal(__vector, x.begin(), x.end());
 	return *this;
       }
@@ -508,6 +510,7 @@ namespace cicada
 	assign(x);
 	return *this;
       } else {
+	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
 	plus_equal(__vector, x.begin(), x.end());
 	return *this;
       }
@@ -518,6 +521,7 @@ namespace cicada
     {
       if (x.empty()) return *this;
       
+      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
       minus_equal(__vector, x.begin(), x.end());
       
       return *this;
@@ -530,6 +534,7 @@ namespace cicada
     {
       if (x.empty()) return *this;
       
+      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
       minus_equal(__vector, x.begin(), x.end());
       
       return *this;
@@ -540,6 +545,7 @@ namespace cicada
     {
       if (x.empty()) return *this;
 
+      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
       minus_equal(__vector, x.begin(), x.end());
       
       return *this;
@@ -553,8 +559,8 @@ namespace cicada
 	return *this;
       } else {
 	vector_type vector_new;
-	
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	multiply_equal(vector_new, __vector, x.begin(), x.end());
 	
@@ -574,8 +580,8 @@ namespace cicada
 	return *this;
       } else {
 	vector_type vector_new;
-	
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	multiply_equal(vector_new, __vector, x.begin(), x.end());
 	
@@ -593,8 +599,8 @@ namespace cicada
 	return *this;
       } else {
 	vector_type vector_new;
-	
 	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	multiply_equal(vector_new, __vector, x.begin(), x.end());
 	
@@ -894,7 +900,6 @@ namespace cicada
       return *this;
     } else {
       vector_type vector_new;
-      
       initialize(vector_new);
       
       multiply_equal(vector_new, __vector, x.begin(), x.end());
