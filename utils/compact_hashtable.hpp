@@ -464,27 +464,25 @@ namespace utils
       
       return insert_noresize(x);
     }
-
+    
     template <typename DefaultValue>
-    value_type& find_or_insert(const key_type& x)
+    value_type& insert_default(const key_type& x)
     {
+      rehash(__size_element + 1);
+      
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
 						   ? find_linear(x)
 						   : find_bucket(x));
       
-      DefaultValue default_value;
-
       if (pos.first != size_type(-1))
 	return __bucket[pos.first];
-      else if (rehash_bucket(__size_element + 1))
-	return *insert_noresize(default_value(x)).first;
       else {
 	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(__value_deleted)))
 	  -- __size_deleted;
 	else
 	  ++ __size_element;
 	
-	set_value(__bucket[pos.second], default_value(x));
+	set_value(__bucket[pos.second], DefaultValue()(x));
 	return __bucket[pos.second];
       }
     }
@@ -495,19 +493,7 @@ namespace utils
     {
       if (minimum_size <= __size_element) return false;
       
-      size_type target = 0;
-      
-      if (__bucket.size() <= __cache_max) { // we are linear-table mode...
-	const size_type size_power2 = capacity_power2(minimum_size);
-	
-	if (size_power2 <= __cache_max) // still, keep linear-table
-	  target = size_power2;
-	else // migrate to hash-table mode...
-	  target = capacity_power2(minimum_size + (minimum_size >> 2));
-      } else // we are hash-table mode...
-	target = capacity_power2(minimum_size + (minimum_size >> 2));
-      
-      if (target <= __bucket.size())
+      if (capacity_bucket(minimum_size) <= __bucket.size())
 	return false;
       
       compact_hashtable table_new(*this, minimum_size);
@@ -562,9 +548,20 @@ namespace utils
       }
     }
 
+    static inline
     size_type capacity_power2(size_type n)
     {
       return bithack::branch(bithack::is_power2(n), n, static_cast<size_type>(bithack::next_largest_power2(n)));
+    }
+    
+    static inline
+    size_type capacity_bucket(size_type n)
+    {
+      const size_type size_power2 = capacity_power2(n);
+      
+      return utils::bithack::branch(size_power2 <= __cache_max,
+				    size_power2,
+				    capacity_power2(n + (n >> 2)));
     }
     
     void initialize(const compact_hashtable& table, size_type minimum_size = 0)

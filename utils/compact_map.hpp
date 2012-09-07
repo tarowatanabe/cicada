@@ -61,7 +61,7 @@ namespace utils
   public:
     inline mapped_type& operator[](const key_type& x)
     {
-      return impl.template find_or_insert<default_value_type>(x).second;
+      return impl.template insert_default<default_value_type>(x).second;
     }
     
     const_iterator begin() const { return impl.begin(); }
