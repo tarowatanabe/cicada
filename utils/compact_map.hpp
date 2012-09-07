@@ -49,11 +49,19 @@ namespace utils
   public:
     void assign(const compact_map& x) { impl.assign(x.impl); }
     void swap(compact_map& x) { impl.swap(x.impl); }
+
+  private:
+    struct default_value_type
+    {
+      value_type operator()(const Key& key) {
+	return std::make_pair(key, Data());
+      }
+    };
     
   public:
     inline mapped_type& operator[](const key_type& x)
     {
-      return insert(std::make_pair(x, mapped_type())).first->second;
+      return impl.template find_or_insert<default_value_type>(x).second;
     }
     
     const_iterator begin() const { return impl.begin(); }

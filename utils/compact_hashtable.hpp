@@ -328,27 +328,10 @@ namespace utils
     size_type bucket_count() const { return __bucket.size(); }
     
     void resize(size_type __n) { rehash(__n); }
+    
     void rehash(size_type minimum_size)
     {
-      if (minimum_size <= __size_element) return;
-      
-      size_type target = 0;
-      
-      if (__bucket.size() <= __cache_max) { // we are linear-table mode...
-	const size_type size_power2 = capacity_power2(minimum_size);
-	
-	if (size_power2 <= __cache_max) // still, keep linear-table
-	  target = size_power2;
-	else // migrate to hash-table mode...
-	  target = capacity_power2(minimum_size + (minimum_size >> 2));
-      } else // we are hash-table mode...
-	target = capacity_power2(minimum_size + (minimum_size >> 2));
-
-      if (target > __bucket.size()) {
-	compact_hashtable table_new(*this, minimum_size);
-	
-	swap(table_new);
-      }
+      rehash_bucket(minimum_size);
     }
     
     const_iterator begin() const { return const_iterator(*this, __bucket.begin(), __bucket.end(), true); }
@@ -482,8 +465,56 @@ namespace utils
       return insert_noresize(x);
     }
 
+    template <typename DefaultValue>
+    value_type& find_or_insert(const key_type& x)
+    {
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_max
+						   ? find_linear(x)
+						   : find_bucket(x));
+      
+      DefaultValue default_value;
+
+      if (pos.first != size_type(-1))
+	return __bucket[pos.first];
+      else if (rehash_bucket(__size_element + 1))
+	return *insert_noresize(default_value(x)).first;
+      else {
+	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(__value_deleted)))
+	  -- __size_deleted;
+	else
+	  ++ __size_element;
+	
+	set_value(__bucket[pos.second], default_value(x));
+	return __bucket[pos.second];
+      }
+    }
+
     
   private:
+    bool rehash_bucket(size_type minimum_size)
+    {
+      if (minimum_size <= __size_element) return false;
+      
+      size_type target = 0;
+      
+      if (__bucket.size() <= __cache_max) { // we are linear-table mode...
+	const size_type size_power2 = capacity_power2(minimum_size);
+	
+	if (size_power2 <= __cache_max) // still, keep linear-table
+	  target = size_power2;
+	else // migrate to hash-table mode...
+	  target = capacity_power2(minimum_size + (minimum_size >> 2));
+      } else // we are hash-table mode...
+	target = capacity_power2(minimum_size + (minimum_size >> 2));
+      
+      if (target <= __bucket.size())
+	return false;
+      
+      compact_hashtable table_new(*this, minimum_size);
+      swap(table_new);
+      
+      return true;
+    }
 
     std::pair<size_type, size_type> find_linear(const key_type& key) const
     {
