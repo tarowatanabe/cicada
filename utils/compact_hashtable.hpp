@@ -473,7 +473,7 @@ namespace utils
     
     std::pair<iterator, bool> insert(const value_type& x)
     {
-      rehash(size() + 1);
+      rehash(__size_element + 1);
       
       return insert_noresize(x);
     }
@@ -639,7 +639,7 @@ namespace utils
     {
       size_type __n = std::distance(first, last);
       
-      rehash(size() + __n);
+      rehash(__size_element + __n);
       
       for (/**/; __n != 0; -- __n, ++ first)
 	insert_noresize(*first);
