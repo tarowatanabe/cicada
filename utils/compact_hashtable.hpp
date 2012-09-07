@@ -493,8 +493,10 @@ namespace utils
       size_type pos_insert = size_type(-1);
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
-	
-	if (pred()(key_buck, key_empty) || pred()(key_buck, key_deleted))
+
+	if (pred()(key_buck, key_empty))
+	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
+	else if (pred()(key_buck, key_deleted))
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -516,12 +518,9 @@ namespace utils
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, key_empty)) { // no searching further
-	  if (pos_insert == size_type(-1))
-	    return std::make_pair(size_type(-1), pos_buck);
-	  else
-	    return std::make_pair(size_type(-1), pos_insert);
-	} else if (pred()(key_buck, key_deleted)) // searching...
+	if (pred()(key_buck, key_empty)) // no searching further
+	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
+	else if (pred()(key_buck, key_deleted)) // searching...
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
