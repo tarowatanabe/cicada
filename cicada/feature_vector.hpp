@@ -425,7 +425,7 @@ namespace cicada
 	assign(x);
 	return *this;
       } else {
-	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
+	__vector.rehash(__vector.size() + x.size());
 	plus_equal(__vector, x.begin(), x.end());
 	return *this;
       }
@@ -442,7 +442,7 @@ namespace cicada
 	assign(x);
 	return *this;
       } else {
-	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
+	__vector.rehash(__vector.size() + x.size());
 	plus_equal(__vector, x.begin(), x.end());
 	return *this;
       }
@@ -453,7 +453,7 @@ namespace cicada
     {
       if (x.empty()) return *this;
       
-      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
+      __vector.rehash(__vector.size() + x.size());
       minus_equal(__vector, x.begin(), x.end());
       
       return *this;
@@ -466,7 +466,7 @@ namespace cicada
     {
       if (x.empty()) return *this;
       
-      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
+      __vector.rehash(__vector.size() + x.size());
       minus_equal(__vector, x.begin(), x.end());
       
       return *this;

@@ -432,7 +432,9 @@ namespace cicada
 				     attribute_data[pos_feature].end(),
 				     attribute_vocab,
 				     options.back().attributes);
-
+	    
+	    // rehash...
+	    options.back().features.rehash(score_db.size());
 	    
 	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
