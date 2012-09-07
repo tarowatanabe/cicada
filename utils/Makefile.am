@@ -50,6 +50,8 @@ c_string_generator.hpp \
 c_string_parser.hpp \
 chart.hpp \
 chunk_vector.hpp \
+compact_hashtable.hpp \
+compact_map.hpp \
 compact_trie.hpp \
 compact_trie_dense.hpp \
 compact_trie_set.hpp \
@@ -166,6 +168,7 @@ byte_aligned_code_main \
 byte_aligned_vector_main \
 chart_main \
 chunk_vector_main \
+compact_map_main \
 compress_stream_main \
 dense_map_main \
 double_base64_main \
@@ -419,6 +422,8 @@ vector_set_main_SOURCES = vector_set_main.cpp
 linear_set_main_SOURCES = linear_set_main.cpp
 
 linear_map_main_SOURCES = linear_map_main.cpp
+
+compact_map_main_SOURCES = compact_map_main.cpp
 
 vertical_coded_vector_main_SOURCES = vertical_coded_vector_main.cpp
 vertical_coded_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)

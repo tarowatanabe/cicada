@@ -40,6 +40,7 @@ byte_aligned_code_main
 byte_aligned_vector_main
 chart_main
 chunk_vector_main
+compact_map_main
 compress_stream_main
 dense_map_main
 double_base64_main
