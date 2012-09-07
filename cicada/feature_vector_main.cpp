@@ -90,7 +90,6 @@ int main(int argc, char** argv)
   
   std::cerr << "size: feature-vector:    " << sizeof(feature_set_type) << std::endl
 	    << "size: feature-linear:    " << sizeof(feature_linear_type)  << std::endl
-	    << "size: feature-unrodered: " << sizeof(feature_unordered_type)  << std::endl
 	    << "size: feature-compact: " << sizeof(feature_compact_type)  << std::endl;
   
   feature_set_type features1;
