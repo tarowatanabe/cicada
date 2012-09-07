@@ -271,8 +271,13 @@ namespace utils
       if (this == &x) return;
       
       // new bucket, then, swap
-      bucket_type __bucket_new(x.__bucket.begin(), x.__bucket.end());
-      __bucket.swap(__bucket_new);
+      if (x.empty()) {
+	bucket_type __bucket_new;
+	__bucket.swap(__bucket_new);
+      } else {
+	bucket_type __bucket_new(x.__bucket.begin(), x.__bucket.end());
+	__bucket.swap(__bucket_new);
+      }
       
       set_value(__value_empty, x.__value_empty);
       set_value(__value_deleted, x.__value_deleted);
