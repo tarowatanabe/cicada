@@ -1747,7 +1747,7 @@ struct OptimizeXBLEU
     
     typedef std::vector<double, std::allocator<double> > margins_type;
 
-    typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > expectation_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
     
     // queue...
     typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;

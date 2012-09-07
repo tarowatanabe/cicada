@@ -753,7 +753,7 @@ struct OptimizeXBLEU
     
     struct bleu_gradient_type
     {
-      typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > accumulated_type;
+      typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
       typedef std::vector<accumulated_type, std::allocator<accumulated_type> > accumulated_set_type;
 
       struct value_type
@@ -899,7 +899,7 @@ struct OptimizeXBLEU
 
     struct entropy_gradient_type
     {
-      typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > accumulated_type;
+      typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
 
       struct proxy_type
       {

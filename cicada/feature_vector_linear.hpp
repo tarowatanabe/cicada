@@ -29,10 +29,7 @@ namespace cicada
   class FeatureVector;
 
   class FeatureVectorCompact;
-  
-  template <typename Tp, typename Alloc >
-  class FeatureVectorUnordered;
-  
+    
   template <typename Tp, typename Alloc >
   class WeightVector;
   
@@ -73,8 +70,6 @@ namespace cicada
     FeatureVectorLinear(const FeatureVectorCompact& x) : __map() { assign(x); }
     template <typename T, typename A>
     FeatureVectorLinear(const FeatureVectorLinear<T,A>& x) : __map() { assign(x); }
-    template <typename T, typename A>
-    FeatureVectorLinear(const FeatureVectorUnordered<T,A>& x) : __map() { assign(x); }
     template <typename Iterator>
     FeatureVectorLinear(Iterator first, Iterator last) : __map() { __map.insert(first, last); } 
     
@@ -99,13 +94,6 @@ namespace cicada
 
     template <typename T, typename A>
     FeatureVectorLinear& operator=(const FeatureVectorLinear<T,A>& x)
-    {
-      assign(x);
-      return *this;
-    }
-
-    template <typename T, typename A>
-    FeatureVectorLinear& operator=(const FeatureVectorUnordered<T,A>& x)
     {
       assign(x);
       return *this;
@@ -136,13 +124,6 @@ namespace cicada
       __map.insert(x.begin(), x.end());
     }
     
-    template <typename T, typename A>
-    void assign(const FeatureVectorUnordered<T,A>& x)
-    {
-      __map.clear();
-      __map.insert(x.begin(), x.end());
-    }
-     
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
@@ -321,7 +302,6 @@ namespace std
 #include <cicada/weight_vector.hpp>
 #include <cicada/feature_vector.hpp>
 #include <cicada/feature_vector_compact.hpp>
-#include <cicada/feature_vector_unordered.hpp>
 
 namespace cicada
 {

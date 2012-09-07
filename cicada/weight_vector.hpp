@@ -27,9 +27,6 @@ namespace cicada
   template <typename Tp, typename Alloc >
   class FeatureVectorLinear;
 
-  template <typename Tp, typename Alloc >
-  class FeatureVectorUnordered;
-
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class WeightVector
   {
@@ -254,31 +251,6 @@ namespace cicada
       return *this;
     }
 
-    template <typename T, typename A>
-    self_type& operator+=(const FeatureVectorUnordered<T, A>& x)
-    {
-      typedef typename FeatureVectorUnordered<T, A>::const_iterator iter_type;
-      
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) += iter->second;
-
-      return *this;
-    }
-
-    template <typename T, typename A>
-    self_type& operator-=(const FeatureVectorUnordered<T, A>& x)
-    {
-      typedef typename FeatureVectorUnordered<T, A>::const_iterator iter_type;
-      
-      iter_type iter_end = x.end();
-      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
-	operator[](iter->first) -= iter->second;
-
-      return *this;
-    }
-
-
   public:
     //comparison...
     friend
@@ -381,6 +353,5 @@ namespace std
 
 #include <cicada/feature_vector.hpp>
 #include <cicada/feature_vector_linear.hpp>
-#include <cicada/feature_vector_unordered.hpp>
 
 #endif

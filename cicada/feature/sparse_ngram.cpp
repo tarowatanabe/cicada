@@ -8,7 +8,6 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 #include "cicada/feature_vector_linear.hpp"
-#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/array_power2.hpp"
 #include "utils/piece.hpp"
@@ -44,7 +43,6 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
-      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
       typedef FeatureVectorLinear<feature_set_type::mapped_type>    feature_linear_set_type;
       
       typedef feature_function_type::state_ptr_type     state_ptr_type;
@@ -116,7 +114,7 @@ namespace cicada
       void ngram_final_score(state_ptr_type& state,
 			     const state_ptr_set_type& states,
 			     const edge_type& edge,
-			     feature_unordered_set_type& features)
+			     feature_set_type& features)
       {
 	if (no_bos_eos) return;
 	
@@ -142,7 +140,7 @@ namespace cicada
       void ngram_score(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
-		       feature_unordered_set_type& features)
+		       feature_set_type& features)
       {
 	if (skip_sgml_tag)
 	  ngram_score(state, states, edge, features, skipper_sgml());
@@ -154,7 +152,7 @@ namespace cicada
       void ngram_score(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
-		       feature_unordered_set_type& features,
+		       feature_set_type& features,
 		       Skipper skipper)
       {
 	const int context_size = order - 1;
@@ -267,7 +265,7 @@ namespace cicada
       }
 
       template <typename Iterator>
-      void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_unordered_set_type& features)
+      void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_set_type& features)
       {
 	if (first == iter || iter == last) return;
 	
@@ -283,7 +281,7 @@ namespace cicada
 	  cache.ngram.assign(iter, last);
 	  cache.features.clear();
 	  
-	  feature_unordered_set_type features;
+	  feature_set_type features;
 	  
 	  for (/**/; first != iter; ++ first) {
 	    trie_type::id_type id = trie.root();
@@ -309,7 +307,7 @@ namespace cicada
       }
       
       template <typename Iterator>
-      void ngram_feature(Iterator first, Iterator last, feature_unordered_set_type& features)
+      void ngram_feature(Iterator first, Iterator last, feature_set_type& features)
       {
 	if (first == last) return;
 
@@ -320,7 +318,7 @@ namespace cicada
 	  cache.ngram.assign(first, last);
 	  cache.features.clear();
 
-	  feature_unordered_set_type features;
+	  feature_set_type features;
 	  
 	  for (/**/; first != last; ++ first) {
 	    trie_type::id_type id = trie.root();
@@ -515,7 +513,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      impl_type::feature_unordered_set_type feats;
+      feature_set_type feats;
       
       pimpl->ngram_score(state, states, edge, feats);
       if (final)

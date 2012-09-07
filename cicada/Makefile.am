@@ -358,7 +358,6 @@ feature_vector.hpp \
 feature_vector_codec.hpp \
 feature_vector_compact.hpp \
 feature_vector_linear.hpp \
-feature_vector_unordered.hpp \
 format.hpp \
 generate.hpp \
 generate_earley.hpp \

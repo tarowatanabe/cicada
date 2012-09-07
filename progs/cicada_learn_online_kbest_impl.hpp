@@ -166,10 +166,10 @@ struct LearnXBLEU : public LearnBase
     //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
   }
   
-  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
+  typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
 
-  typedef cicada::FeatureVectorUnordered<double, std::allocator<double> > expectation_type;
+  typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   

@@ -16,8 +16,6 @@
 #include "utils/chunk_vector.hpp"
 #include "utils/unordered_map.hpp"
 
-#include "cicada/feature_vector_unordered.hpp"
-
 #include <boost/fusion/tuple.hpp>
 #include <boost/array.hpp>
 
@@ -49,8 +47,6 @@ namespace cicada
       
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
-      
-      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
       
       typedef std::pair<int, int> lattice_edge_type;
       typedef std::vector<lattice_edge_type, std::allocator<lattice_edge_type> > lattice_edge_set_type;
@@ -101,7 +97,7 @@ namespace cicada
       void dependency_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
-			    feature_unordered_set_type& features)
+			    feature_set_type& features)
       {
 	typedef dependency_index_type::id_type id_type;
 	
@@ -199,7 +195,7 @@ namespace cicada
       }	
 
       template <typename Iterator>
-      void apply_features(Iterator first, Iterator last, feature_unordered_set_type& features)
+      void apply_features(Iterator first, Iterator last, feature_set_type& features)
       {
 	for (/**/; first != last; ++ first)
 	  if (*first != feat_none)
@@ -209,7 +205,7 @@ namespace cicada
       void apply_features(const dependency_index_type::id_type& state,
 			  const int& pos_head,
 			  const int& pos_tail,
-			  feature_unordered_set_type& features)
+			  feature_set_type& features)
       {
 	// we will do caching for base features....
 	
@@ -389,7 +385,7 @@ namespace cicada
 			  const int& pos_head,
 			  const int& pos_tail,
 			  const dependency_map_type& antecedents,
-			  feature_unordered_set_type& features)
+			  feature_set_type& features)
       {
 	static const std::string empty;
 	const dependency_type parent(pos_head, pos_tail);
@@ -673,7 +669,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      impl_type::feature_unordered_set_type feats;
+      feature_set_type feats;
       
       pimpl->dependency_score(state, states, edge, feats);
 

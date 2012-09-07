@@ -3493,7 +3493,7 @@ struct OptimizeXBLEU
     
     typedef std::vector<double, std::allocator<double> > margins_type;
 
-    typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > expectation_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
     
     Task(const hypothesis_map_type& __kbests,
 	 const sample_set_type& __features_kbest,

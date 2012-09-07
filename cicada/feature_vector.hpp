@@ -31,9 +31,6 @@ namespace cicada
   template <typename Tp, typename Alloc >
   class FeatureVectorLinear;
 
-  template <typename Tp, typename Alloc >
-  class FeatureVectorUnordered;
-
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class FeatureVector
   {
@@ -73,8 +70,6 @@ namespace cicada
     FeatureVector(const FeatureVectorCompact& x) : __vector() { initialize(__vector); assign(x); }
     template <typename T, typename A>
     FeatureVector(const FeatureVectorLinear<T,A>& x): __vector(x.size()) { initialize(__vector); assign(x); } 
-    template <typename T, typename A>
-    FeatureVector(const FeatureVectorUnordered<T,A>& x) : __vector(x.size()) { initialize(__vector); assign(x); }
     
     FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
     {
@@ -97,13 +92,6 @@ namespace cicada
 
     template <typename T, typename A>
     FeatureVector& operator=(const FeatureVectorLinear<T, A>& x)
-    {
-      assign(x);
-      return *this;
-    }
-
-    template <typename T, typename A>
-    FeatureVector& operator=(const FeatureVectorUnordered<T, A>& x)
     {
       assign(x);
       return *this;
@@ -133,14 +121,6 @@ namespace cicada
       __vector.insert(x.begin(), x.end());
     }
 
-    template <typename T, typename A>
-    void assign(const FeatureVectorUnordered<T,A>& x)
-    {
-      __vector.clear();
-      __vector.rehash(x.size());
-      __vector.insert(x.begin(), x.end());
-    }
-    
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
@@ -205,28 +185,6 @@ namespace cicada
       
       return *this; 
     }
-
-    template <typename T, typename A>
-    FeatureVector& intersect(const FeatureVectorUnordered<T,A>& x)
-    {
-      if (empty()) 
-	return *this;
-      
-      if (x.empty())
-	clear();
-      else {
-	vector_type vector_new;
-	initialize(vector_new);
-	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
-	
-	intersect(vector_new, __vector, x.begin(), x.end());
-	
-	__vector.swap(vector_new);
-      }
-      
-      return *this; 
-    }
-
     
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
@@ -261,17 +219,6 @@ namespace cicada
       }
     }
     
-    template <typename T, typename A, typename Prefix>
-    void update(const FeatureVectorUnordered<T,A>& x, const Prefix& prefix)
-    {
-      if (empty())
-	assign(x);
-      else {
-	erase_prefix(prefix);
-	operator+=(x);
-      }
-    }
-
   private:
     template <typename Container, typename Original, typename Iterator>
     static inline
@@ -502,21 +449,6 @@ namespace cicada
     }
 
     template <typename T, typename A>
-    self_type& operator+=(const FeatureVectorUnordered<T,A>& x)
-    {
-      if (x.empty())
-	return *this;
-      else if (empty()) {
-	assign(x);
-	return *this;
-      } else {
-	__vector.rehash(utils::bithack::max(__vector.size(), x.size()));
-	plus_equal(__vector, x.begin(), x.end());
-	return *this;
-      }
-    }
-    
-    template <typename T, typename A>
     self_type& operator-=(const FeatureVector<T,A>& x)
     {
       if (x.empty()) return *this;
@@ -540,17 +472,6 @@ namespace cicada
       return *this;
     }
 
-    template <typename T, typename A>
-    self_type& operator-=(const FeatureVectorUnordered<T,A>& x)
-    {
-      if (x.empty()) return *this;
-
-      __vector.rehash(utils::bithack::max(__vector.size(), x.size()));
-      minus_equal(__vector, x.begin(), x.end());
-      
-      return *this;
-    }
-    
     template <typename T, typename A>
     self_type& operator*=(const FeatureVector<T,A>& x)
     {
@@ -591,25 +512,6 @@ namespace cicada
       }
     }
 
-    template <typename T, typename A>
-    self_type& operator*=(const FeatureVectorUnordered<T,A>& x)
-    {
-      if (empty() || x.empty()) {
-	clear();
-	return *this;
-      } else {
-	vector_type vector_new;
-	initialize(vector_new);
-	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
-	
-	multiply_equal(vector_new, __vector, x.begin(), x.end());
-	
-	__vector.swap(vector_new);
-	
-	return *this;
-      }
-    }
-    
     
     template <typename T1, typename A1, typename T2, typename A2>
     friend
@@ -849,7 +751,6 @@ namespace std
 #include <cicada/weight_vector.hpp>
 #include <cicada/feature_vector_compact.hpp>
 #include <cicada/feature_vector_linear.hpp>
-#include <cicada/feature_vector_unordered.hpp>
 
 namespace cicada
 {

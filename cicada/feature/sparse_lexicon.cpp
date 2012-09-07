@@ -12,7 +12,6 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 #include "cicada/feature_vector_linear.hpp"
-#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -54,7 +53,6 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
 
-      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
       typedef FeatureVectorLinear<feature_set_type::mapped_type>    feature_linear_set_type;
 
       typedef feature_function_type::state_ptr_type     state_ptr_type;
@@ -123,7 +121,7 @@ namespace cicada
       };
       
       void lexicon_score(const edge_type& edge,
-			 feature_unordered_set_type& features)
+			 feature_set_type& features)
       {
 	if (skip_sgml_tag)
 	  lexicon_score(edge, features, skipper_sgml());
@@ -134,7 +132,7 @@ namespace cicada
       
       template <typename Skipper>
       void lexicon_score(const edge_type& edge,
-			 feature_unordered_set_type& features,
+			 feature_set_type& features,
 			 Skipper skipper)
       {
 	const phrase_type& phrase = edge.rule->rhs;
@@ -145,7 +143,7 @@ namespace cicada
 	    const word_type& target = *titer;
 	    
 	    if (! caches.exists(titer->id())) {
-	      feature_unordered_set_type features;
+	      feature_set_type features;
 	      
 	      size_t fertility_pair = 0;
 	      size_t fertility_prefix = 0;
@@ -660,7 +658,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      impl_type::feature_unordered_set_type feats;
+      feature_set_type feats;
       
       pimpl->lexicon_score(edge, feats);
 

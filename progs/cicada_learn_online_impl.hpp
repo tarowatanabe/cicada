@@ -115,10 +115,10 @@ struct LearnXBLEU : public LearnBase
     //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
   }
   
-  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
+  typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
   
-  typedef cicada::FeatureVectorUnordered<double, std::allocator<double> > expectation_type;
+  typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   
@@ -251,7 +251,7 @@ struct LearnXBLEU : public LearnBase
     
   struct bleu_gradient_type
   {
-    typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > accumulated_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
     typedef std::vector<accumulated_type, std::allocator<accumulated_type> > accumulated_set_type;
 
     struct value_type
@@ -665,8 +665,8 @@ struct LearnLR : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
-  typedef cicada::FeatureVectorUnordered<weight_type, std::allocator<weight_type> > gradient_type;
-  typedef cicada::FeatureVectorUnordered<double, std::allocator<double> > expectation_type;
+  typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+  typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
   LearnLR() { clear(); }
   

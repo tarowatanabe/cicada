@@ -11,7 +11,6 @@
 #include <cicada/feature_vector.hpp>
 #include <cicada/feature_vector_linear.hpp>
 #include <cicada/feature_vector_compact.hpp>
-#include <cicada/feature_vector_unordered.hpp>
 #include <cicada/weight_vector.hpp>
 
 #include <utils/bithack.hpp>
@@ -381,84 +380,6 @@ namespace cicada
     return __dot;
   }
   
-  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
-  inline
-  Tp1 dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
-  {
-    return dot_product(x.begin(), x.end(), y, Tp1());
-  }
-  
-  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
-  inline
-  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVectorUnordered<Tp2, Alloc2>& y)
-  {
-    return dot_product(x, y.begin(), y.end(), Tp1());
-  }
-  
-  template <typename Iterator, typename Tp2, typename Alloc2, typename Tp>
-  inline
-  Tp dot_product(Iterator first, Iterator last, const FeatureVectorUnordered<Tp2, Alloc2>& y, Tp __dot)
-  {
-    typedef FeatureVectorUnordered<Tp2, Alloc2> feature_vector2_type;
-    
-    for (/**/; first != last; ++ first) {
-      typename feature_vector2_type::const_iterator iter = y.find(first->first);
-      
-      if (iter != y.end())
-	__dot += first->second * iter->second;
-    }
-    
-    return __dot;
-  }
-
-  template <typename Tp1, typename Alloc1, typename Iterator, typename Tp>
-  inline
-  Tp dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, Iterator first, Iterator last, Tp __dot)
-  {
-    typedef FeatureVectorUnordered<Tp1, Alloc1> feature_vector1_type;
-    
-    for (/**/; first != last; ++ first) {
-      typename feature_vector1_type::const_iterator iter = x.find(first->first);
-      
-      if (iter != x.end())
-	__dot += iter->second * first->second;
-    }
-    return __dot;
-  }
-
-  template <typename Iterator, typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Tp>
-  inline
-  Tp dot_product(Iterator first, Iterator last, const WeightVector<Tp1, Alloc1>& w, const FeatureVectorUnordered<Tp2, Alloc2>& y, Tp __dot)
-  {
-    typedef WeightVector<Tp1, Alloc1> weight_vector_type;
-    typedef FeatureVectorUnordered<Tp2, Alloc2> feature_vector2_type;
-    
-    for (/**/; first != last; ++ first) {
-      typename feature_vector2_type::const_iterator iter = y.find(first->first);
-      
-      if (iter != y.end())
-	__dot += first->second * w[first->first] * iter->second;
-    }
-    
-    return __dot;
-  }
-
-  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2, typename Iterator, typename Tp>
-  inline
-  Tp dot_product(const FeatureVectorUnordered<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& w, Iterator first, Iterator last, Tp __dot)
-  {
-    typedef WeightVector<Tp2, Alloc2> weight_vector_typ;
-    typedef FeatureVectorUnordered<Tp1, Alloc1> feature_vector1_type;
-    
-    for (/**/; first != last; ++ first) {
-      typename feature_vector1_type::const_iterator iter = x.find(first->first);
-      
-      if (iter != x.end())
-	__dot += iter->second * w[first->first] * first->second;
-    }
-    return __dot;
-  }
-
   // feature-vector dot feature-vector
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>

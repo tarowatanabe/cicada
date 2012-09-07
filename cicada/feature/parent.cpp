@@ -7,7 +7,6 @@
 
 #include "cicada/feature/parent.hpp"
 #include "cicada/parameter.hpp"
-#include "cicada/feature_vector_unordered.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
@@ -71,8 +70,6 @@ namespace cicada
       
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
-      
-      typedef FeatureVectorUnordered<feature_set_type::mapped_type> feature_unordered_set_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -241,7 +238,7 @@ namespace cicada
       void parent_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
 			const edge_type& edge,
-			feature_unordered_set_type& features) const
+			feature_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
@@ -360,14 +357,14 @@ namespace cicada
       
       void parent_final_score(const state_ptr_type& state,
 			      const edge_type& edge,
-			      feature_unordered_set_type& features) const
+			      feature_set_type& features) const
       {
 	const id_type* id = reinterpret_cast<const id_type*>(state);
 	
 	apply_feature(features, vocab_type::BOS, string_map[*id]);
       }
       
-      void apply_feature(feature_unordered_set_type& features,
+      void apply_feature(feature_set_type& features,
 			 const std::string& rule) const
       {
 	const std::string name = static_cast<const std::string&>(feature_name_prefix) + ":" + rule;
@@ -375,7 +372,7 @@ namespace cicada
 	  features[name] += 1.0;
       }
       
-      void apply_feature(feature_unordered_set_type& features,
+      void apply_feature(feature_set_type& features,
 			 const std::string& parent,
 			 const std::string& rule) const
       {
@@ -461,7 +458,7 @@ namespace cicada
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
 
-      impl_type::feature_unordered_set_type feats;
+      feature_set_type feats;
 
       pimpl->parent_score(state, states, edge, feats);
       if (final)
