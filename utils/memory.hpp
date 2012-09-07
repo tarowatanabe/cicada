@@ -7,6 +7,7 @@
 #define __UTILS__MEMORY__HPP__ 1
 
 #include <iterator>
+#include <memory>
 
 #include <boost/type_traits.hpp>
 
