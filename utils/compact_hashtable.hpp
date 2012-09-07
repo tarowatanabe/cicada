@@ -324,6 +324,7 @@ namespace utils
     bool empty() const { return size() == 0; }
     size_type size() const { return __size_element - __size_deleted; }
     size_type bucket_count() const { return __bucket.size(); }
+    size_type occupied_count() const { return __size_element; }
     
     void resize(size_type __n) { rehash(__n); }
     

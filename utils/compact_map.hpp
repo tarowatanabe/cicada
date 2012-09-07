@@ -71,7 +71,8 @@ namespace utils
     
     bool empty() const { return impl.empty(); }
     size_type size() const { return impl.size(); }
-    size_type bucket_count() const { return impl.size(); }
+    size_type bucket_count() const { return impl.bucket_count(); }
+    size_type occupied_count() const { return impl.occupied_count(); }
     void clear() { impl.clear(); }
 
     void rehash(size_type hint) { impl.rehash(hint); }
