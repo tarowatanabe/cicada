@@ -189,12 +189,14 @@ namespace cicada
 				 feature_set_type& features,
 				 const bool final) const
   {
+    features.rehash(features.size() + models.size());
+
     state_type state = allocator->allocate();
     
     feature_function_type::state_ptr_set_type states(edge.tails.size());
 
     //std::cerr << "apply features for: " << *(edge.rule) << std::endl;
-    
+
     for (size_t i = 0; i != models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
@@ -217,6 +219,8 @@ namespace cicada
 					feature_set_type& features,
 					const bool final) const
   {
+    features.rehash(features.size() + models.size());
+    
     state_type state = allocator->allocate();
     
     feature_function_type::state_ptr_set_type states(edge.tails.size());
@@ -246,9 +250,11 @@ namespace cicada
 			    feature_set_type& features,
 			    const bool final) const
   {
+    features.rehash(features.size() + models.size());
+    
     if (state.empty())
       state = allocator->allocate();
-    
+
     feature_function_type::state_ptr_set_type states(edge.tails.size());
     
     for (size_t i = 0; i != models.size(); ++ i) {
@@ -267,6 +273,8 @@ namespace cicada
 			 feature_set_type& features,
 			 const bool final) const
   {
+    features.rehash(features.size() + models.size());
+
     feature_function_type::state_ptr_set_type states(edge.tails.size());
     
     for (size_t i = 0; i != models.size(); ++ i) {
@@ -284,6 +292,8 @@ namespace cicada
 			     feature_set_type& features,
 			     const bool final) const
   {
+    features.rehash(features.size() + models.size());
+
     feature_function_type::state_ptr_set_type states(edge.tails.size());
     
     for (size_t i = 0; i != models.size(); ++ i) {
