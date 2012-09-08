@@ -716,7 +716,7 @@ namespace utils
     void set_value(value_type& dest, const value_type& x) 
     {
       utils::destroy_object(&dest);
-      ::new(&dest) value_type(x);
+      utils::construct_object(&dest, x);
     }
     
   private:
