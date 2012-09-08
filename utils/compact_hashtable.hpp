@@ -167,6 +167,7 @@ namespace utils
 	advance();
     }
     
+  public:
     reference operator*() const { return *pos; }
     Iterator operator->() const { return &(operator*()); }
     
@@ -183,12 +184,8 @@ namespace utils
       ++ *this;
       return tmp;
     }
-
-    void advance()
-    {
-      for (/**/; pos != table->__bucket.end() && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
-    }
-
+    
+  public:
     template <typename T1, typename I1, typename R1, typename V1,
 	      typename T2, typename I2, typename R2, typename V2>
     friend
@@ -200,6 +197,12 @@ namespace utils
     friend
     bool operator!=(const __compact_hashtable_iterator<T1,I1,R1,V1>& x,
 		    const __compact_hashtable_iterator<T2,I2,R2,V2>& y);
+
+  private:
+    void advance()
+    {
+      for (/**/; pos != table->__bucket.end() && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
+    }
     
   private:
     const Table* table;
