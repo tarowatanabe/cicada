@@ -11,8 +11,9 @@
 #include <stdexcept>
 #include <algorithm>
 #include <iterator>
+#include <cstring>
 
-#include <boost/numeric/conversion/bounds.hpp>
+#include <boost/type_traits.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/memory.hpp>
@@ -303,8 +304,8 @@ namespace utils
 	__bucket.swap(__bucket_new);
       }
       
-      set_value(__value_empty, x.__value_empty);
-      set_value(__value_deleted, x.__value_deleted);
+      copy_value(__value_empty, x.__value_empty);
+      copy_value(__value_deleted, x.__value_deleted);
       __size_element = x.__size_element;
       __size_deleted = x.__size_deleted;
 
@@ -320,14 +321,14 @@ namespace utils
       // very strange swapping
       {
 	const value_type tmptmp(x.__value_empty);
-	set_value(x.__value_empty, __value_empty);
-	set_value(__value_empty, tmptmp);
+	copy_value(x.__value_empty, __value_empty);
+	copy_value(__value_empty, tmptmp);
       }
       
       {
 	const value_type tmptmp(x.__value_deleted);
-	set_value(x.__value_deleted, __value_deleted);
-	set_value(__value_deleted, tmptmp);
+	copy_value(x.__value_deleted, __value_deleted);
+	copy_value(__value_deleted, tmptmp);
       }
       
       std::swap(__size_element, x.__size_element);
@@ -398,7 +399,7 @@ namespace utils
       iterator iter = find(key);
       
       if (iter != end()) {
-	set_value(*iter, __value_deleted);
+	copy_value(*iter, __value_deleted);
 	++ __size_deleted;
 	return 1;
       } else
@@ -412,7 +413,7 @@ namespace utils
       const key_type& key = extract_key()(*iter.pos);
       
       if (! pred()(key, extract_key()(__value_empty)) && ! pred()(key, extract_key()(__value_deleted))) {
-	set_value(*iter.pos, __value_deleted);
+	copy_value(*iter.pos, __value_deleted);
 	++ __size_deleted;
       }
     }
@@ -426,7 +427,7 @@ namespace utils
 	const key_type& key = extract_key()(*first.pos);
 	
 	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
-	  set_value(*first.pos, __value_deleted);
+	  copy_value(*first.pos, __value_deleted);
 	  ++ __size_deleted;
 	}
       }
@@ -439,7 +440,7 @@ namespace utils
       const key_type& key = extract_key()(*iter.pos);
       
       if (! pred()(key, extract_key()(__value_empty)) && ! pred()(key, extract_key()(__value_deleted))) {
-	set_value(*iter.pos, __value_deleted);
+	copy_value(*iter.pos, __value_deleted);
 	++ __size_deleted;
       }
     }
@@ -453,7 +454,7 @@ namespace utils
 	const key_type& key = extract_key()(*first.pos);
 	
 	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
-	  set_value(*first.pos, __value_deleted);
+	  copy_value(*first.pos, __value_deleted);
 	  ++ __size_deleted;
 	}
       }
@@ -489,7 +490,7 @@ namespace utils
 	else
 	  ++ __size_element;
 	
-	set_value(__bucket[pos.second], DefaultValue()(x));
+	copy_value(__bucket[pos.second], DefaultValue()(x));
 	return __bucket[pos.second];
       }
     }
@@ -616,7 +617,7 @@ namespace utils
 	
 	if (pred()(key, key_empty) || pred()(key, key_deleted)) continue;
 	
-	set_value(*iter, *biter);
+	copy_value(*iter, *biter);
 	++ iter;
 	++ __size_element;
       }
@@ -650,7 +651,7 @@ namespace utils
 	  pos_buck = (pos_buck + num_probes) & (__bucket.size() - 1);
 	}
 	
-	set_value(__bucket[pos_buck], *biter);
+	copy_value(__bucket[pos_buck], *biter);
 	++ __size_element;
       }
     }
@@ -669,7 +670,7 @@ namespace utils
 	else
 	  ++ __size_element;
 	
-	set_value(__bucket[pos.second], x);
+	copy_value(__bucket[pos.second], x);
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, false), true);
       }
     }
@@ -695,12 +696,12 @@ namespace utils
   public:
     void set_empty_key(const value_type& x)
     {
-      set_value(__value_empty, x);
+      copy_value(__value_empty, x);
     }
     
     void set_deleted_key(const value_type& x)
     {
-      set_value(__value_deleted, x);
+      copy_value(__value_deleted, x);
     }
 
     extract_key_type& extract_key() { return static_cast<extract_key_type&>(*this); }
@@ -713,11 +714,22 @@ namespace utils
     const pred_type& pred() const { return static_cast<const pred_type&>(*this); }
     
   private:
-    void set_value(value_type& dest, const value_type& x) 
+    void copy_value(value_type& dest, const value_type& x) 
+    {
+      copy_value(dest, x, boost::has_trivial_copy<value_type>());
+    }
+    
+    void copy_value(value_type& dest, const value_type& x, boost::true_type)
+    {
+      std::memcpy(&dest, x, sizeof(value_type));
+    }
+
+    void copy_value(value_type& dest, const value_type& x, boost::false_type)
     {
       utils::destroy_object(&dest);
-      utils::construct_object(&dest, x);
+      utils::construct_object(&dest, x);      
     }
+      
     
   private:
     bucket_type __bucket;
