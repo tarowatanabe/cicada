@@ -137,6 +137,9 @@ namespace utils
     template <typename K, typename V, typename E,typename H,typename P, typename A>
     friend class compact_hashtable;
 
+    template <typename T, typename I, typename R, typename V>
+    friend struct __compact_hashtable_iterator;
+
     typedef std::forward_iterator_tag iterator_category;
     
     typedef size_t    size_type;
@@ -185,7 +188,20 @@ namespace utils
     {
       for (/**/; pos != table->__bucket.end() && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
     }
+
+    template <typename T1, typename I1, typename R1, typename V1,
+	      typename T2, typename I2, typename R2, typename V2>
+    friend
+    bool operator==(const __compact_hashtable_iterator<T1,I1,R1,V1>& x,
+		    const __compact_hashtable_iterator<T2,I2,R2,V2>& y);
+
+    template <typename T1, typename I1, typename R1, typename V1,
+	      typename T2, typename I2, typename R2, typename V2>
+    friend
+    bool operator!=(const __compact_hashtable_iterator<T1,I1,R1,V1>& x,
+		    const __compact_hashtable_iterator<T2,I2,R2,V2>& y);
     
+  private:
     const Table* table;
     pointer pos;
   };
