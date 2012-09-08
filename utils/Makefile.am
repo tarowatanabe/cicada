@@ -125,11 +125,6 @@ spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
 stick_break.hpp \
-smap.hpp \
-sset.hpp \
-stree.hpp \
-stree_map.hpp \
-stree_set.hpp \
 subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \
@@ -198,8 +193,6 @@ sparse_map_main \
 spinlock_main \
 static_allocator_main \
 stick_break_main \
-stree_map_main \
-stree_set_main \
 subprocess_main \
 succinct_vector_main \
 symbol_set_main \
@@ -428,8 +421,3 @@ compact_map_main_SOURCES = compact_map_main.cpp
 vertical_coded_vector_main_SOURCES = vertical_coded_vector_main.cpp
 vertical_coded_vector_main_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
 vertical_coded_vector_main_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_THREAD_LIBS)
-
-stree_map_main_SOURCES = stree_map_main.cpp
-
-stree_set_main_SOURCES = stree_set_main.cpp
-

@@ -19,6 +19,9 @@
 
 namespace utils
 {
+  template <typename Key, typename Value, typename ExtractKey, typename Hash, typename Pred, typename Alloc>
+  class compact_hashtable;
+  
   // bucket impelemntation
   template <typename _Tp, typename _Alloc>
   struct __compact_hashtable_bucket : public _Alloc
@@ -131,6 +134,9 @@ namespace utils
   template <typename Table, typename Iterator, typename Reference, typename Tp>
   struct __compact_hashtable_iterator
   {
+    template <typename K, typename V, typename E,typename H,typename P, typename A>
+    friend class compact_hashtable;
+
     typedef std::forward_iterator_tag iterator_category;
     
     typedef size_t    size_type;
@@ -141,19 +147,18 @@ namespace utils
 
     typedef __compact_hashtable_iterator<Table, Iterator, Reference, Tp> iterator;
 
-    __compact_hashtable_iterator() : table(0), pos(), last() {}
+    __compact_hashtable_iterator() : table(0), pos() {}
     __compact_hashtable_iterator(const __compact_hashtable_iterator& x)
-      : table(x.table), pos(x.pos), last(x.last) {}
+      : table(x.table), pos(x.pos) {}
     
     template <typename T, typename I, typename R, typename V>
     __compact_hashtable_iterator(const __compact_hashtable_iterator<T,I,R,V>& x)
-      : table(x.table), pos(const_cast<pointer>(x.pos)), last(const_cast<pointer>(x.last)) {}
+      : table(x.table), pos(const_cast<pointer>(x.pos)) {}
     
     __compact_hashtable_iterator(const Table& __table,
 				 Iterator __pos,
-				 Iterator __last,
 				 bool forward)
-      : table(&__table), pos(const_cast<pointer>(__pos)), last(const_cast<pointer>(__last))
+      : table(&__table), pos(const_cast<pointer>(__pos))
     {
       if (forward)
 	advance();
@@ -178,12 +183,11 @@ namespace utils
 
     void advance()
     {
-      for (/**/; pos != last && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
+      for (/**/; pos != table->__bucket.end() && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
     }
     
     const Table* table;
     pointer pos;
-    pointer last;
   };
 
   template <typename T1, typename I1, typename R1, typename V1,
@@ -209,6 +213,9 @@ namespace utils
                             public Hash,
                             public Pred
   {
+    template <typename T, typename I, typename R, typename V>
+    friend struct __compact_hashtable_iterator;
+
   public:
     typedef Key        key_type;
     typedef Value      value_type;
@@ -333,30 +340,12 @@ namespace utils
       rehash_bucket(minimum_size);
     }
     
-    const_iterator begin() const { return const_iterator(*this, __bucket.begin(), __bucket.end(), true); }
-    iterator begin() { return iterator(*this, __bucket.begin(), __bucket.end(), true); }
+    const_iterator begin() const { return const_iterator(*this, __bucket.begin(), true); }
+    iterator begin() { return iterator(*this, __bucket.begin(), true); }
       
-    const_iterator end() const { return const_iterator(*this, __bucket.end(), __bucket.end(), true); }
-    iterator end() { return iterator(*this, __bucket.end(), __bucket.end(), true); }
-
-    bool is_deleted(const_iterator& x) const
-    {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
-    }
-    bool is_deleted(iterator& x) const
-    {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
-    }
-      
-    bool is_empty(const_iterator& x) const
-    {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
-    }
-    bool is_empty(iterator& x) const
-    {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
-    }
-    
+    const_iterator end() const { return const_iterator(*this, __bucket.end(), false); }
+    iterator end() { return iterator(*this, __bucket.end(), false); }
+								
     const_iterator find(const key_type& key) const
     {
       if (empty()) return end();
@@ -368,7 +357,7 @@ namespace utils
       if (pos.first == size_type(-1))
 	return end();
       else
-	return const_iterator(*this, __bucket.begin() + pos.first, __bucket.end(), false);
+	return const_iterator(*this, __bucket.begin() + pos.first, false);
     }
 
     iterator find(const key_type& key)
@@ -382,7 +371,7 @@ namespace utils
       if (pos.first == size_type(-1))
 	return end();
       else
-	return iterator(*this, __bucket.begin() + pos.first, __bucket.end(), false);
+	return iterator(*this, __bucket.begin() + pos.first, false);
     }
     
     size_type erase(const key_type& key)
@@ -486,6 +475,24 @@ namespace utils
       }
     }
 
+  private:
+    bool is_deleted(const_iterator& x) const
+    {
+      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
+    }
+    bool is_deleted(iterator& x) const
+    {
+      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
+    }
+      
+    bool is_empty(const_iterator& x) const
+    {
+      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
+    }
+    bool is_empty(iterator& x) const
+    {
+      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
+    }
     
   private:
     bool rehash_bucket(size_type minimum_size)
@@ -636,7 +643,7 @@ namespace utils
 						   ? find_linear(extract_key()(x))
 						   : find_bucket(extract_key()(x)));
       if (pos.first != size_type(-1))
-	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, __bucket.end(), false), false);
+	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, false), false);
       else {
 	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(__value_deleted)))
 	  -- __size_deleted;
@@ -644,7 +651,7 @@ namespace utils
 	  ++ __size_element;
 	
 	set_value(__bucket[pos.second], x);
-	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, __bucket.end(), false), true);
+	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, false), true);
       }
     }
 
