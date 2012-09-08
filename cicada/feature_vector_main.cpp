@@ -88,6 +88,13 @@ int main(int argc, char** argv)
 {
   srandom(utils::random_seed());
   
+  std::cerr << "trivial assign: " << boost::has_trivial_assign<feature_set_type::feature_type>::value << std::endl
+	    << "trivial construct: " << boost::has_trivial_constructor<feature_set_type::feature_type>::value << std::endl
+	    << "trivial copy: " << boost::has_trivial_copy<feature_set_type::feature_type>::value << std::endl
+	    << "trivial copy-construct: " << boost::has_trivial_copy_constructor<feature_set_type::feature_type>::value << std::endl
+	    << "trivial default-construct: " << boost::has_trivial_default_constructor<feature_set_type::feature_type>::value << std::endl
+	    << "trivial destructor: " << boost::has_trivial_destructor<feature_set_type::feature_type>::value << std::endl;
+
   std::cerr << "size: feature-vector:    " << sizeof(feature_set_type) << std::endl
 	    << "size: feature-linear:    " << sizeof(feature_linear_type)  << std::endl
 	    << "size: feature-compact: " << sizeof(feature_compact_type)  << std::endl;
