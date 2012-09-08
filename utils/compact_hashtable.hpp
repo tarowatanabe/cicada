@@ -721,7 +721,7 @@ namespace utils
     
     void copy_value(value_type& dest, const value_type& x, boost::true_type)
     {
-      std::memcpy(&dest, x, sizeof(value_type));
+      std::memcpy(&dest, &x, sizeof(value_type));
     }
 
     void copy_value(value_type& dest, const value_type& x, boost::false_type)
