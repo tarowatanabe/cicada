@@ -716,12 +716,12 @@ namespace utils
   private:
     void copy_value(value_type& dest, const value_type& x) 
     {
-      copy_value(dest, x, boost::has_trivial_copy<value_type>());
+      copy_value(dest, x, boost::has_trivial_assign<value_type>());
     }
     
     void copy_value(value_type& dest, const value_type& x, boost::true_type)
     {
-      std::memmove(&dest, &x, sizeof(value_type));
+      std::memcpy(&dest, &x, sizeof(value_type));
     }
 
     void copy_value(value_type& dest, const value_type& x, boost::false_type)

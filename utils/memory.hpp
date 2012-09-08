@@ -21,7 +21,7 @@ namespace utils
   template <typename Tp>
   inline void __construct_object(Tp* pointer, const Tp& value, boost::true_type)
   {
-    std::memmove(pointer, &value, sizeof(Tp));
+    std::memcpy(pointer, &value, sizeof(Tp));
   }
   
   template <typename Tp>
