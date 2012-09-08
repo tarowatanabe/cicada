@@ -8,6 +8,7 @@
 
 #include <iterator>
 #include <memory>
+#include <cstring>
 
 #include <boost/type_traits.hpp>
 
