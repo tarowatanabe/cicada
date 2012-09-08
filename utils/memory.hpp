@@ -33,7 +33,7 @@ namespace utils
   template <typename Tp>
   inline void construct_object(Tp* pointer, const Tp& value)
   {
-    __construct_object(pointer, value, boost::has_trivial_constructor<Tp>());
+    __construct_object(pointer, value, boost::has_trivial_copy<Tp>());
   }
   
   template <typename Tp>
