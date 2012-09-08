@@ -17,10 +17,22 @@ int main(int argc, char** argv)
   vec_map.set_empty_key("");
   vec_map.set_deleted_key("This is not allowed!");
 
+  size_t prev_size = 0;
+  size_t prev_bucket = 0;
+
   std::string token;
   while (std::cin >> token) {
     ++ map_map[token];
+    
+    prev_size = vec_map.size();
+    prev_bucket = vec_map.bucket_count();
+
     ++ vec_map[token];
+    
+    if (prev_bucket != vec_map.bucket_count())
+      std::cerr << "prev size: " <<  prev_size << " bucket: " << prev_bucket << std::endl
+		<< "curr size: " <<  vec_map.size() << " bucket: " << vec_map.bucket_count() << std::endl;
+    
   }
   
   std::cerr << "map size: " << map_map.size() << std::endl
