@@ -165,6 +165,8 @@ namespace cicada
       return *this; 
     }
 
+    FeatureVector& intersect(const FeatureVectorCompact& x);
+
     template <typename T, typename A>
     FeatureVector& intersect(const FeatureVectorLinear<T,A>& x)
     {
@@ -516,16 +518,38 @@ namespace cicada
     template <typename T1, typename A1, typename T2, typename A2>
     friend
     FeatureVector<T1,A1> operator+(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
-
     
     template <typename T1, typename A1, typename T2, typename A2>
     friend
     FeatureVector<T1,A1> operator-(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
-
     
     template <typename T1, typename A1, typename T2, typename A2>
     friend
     FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
+
+    template <typename T1, typename A1>
+    friend
+    FeatureVector<T1,A1> operator+(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y);
+    
+    template <typename T1, typename A1>
+    friend
+    FeatureVector<T1,A1> operator-(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y);
+    
+    template <typename T1, typename A1>
+    friend
+    FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y);
+
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVector<T1,A1> operator+(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
+    
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVector<T1,A1> operator-(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
+    
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
 
   private:
     template <typename Container, typename Iterator>
@@ -707,6 +731,67 @@ namespace cicada
     return features;
   }
 
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVector<T1,A1> operator+(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorLinear<T2,A2> right_type;
+
+    if (y.empty())
+      return x;
+    else if (x.empty())
+      return y;
+    else {
+      left_type features(x);
+      features += y;
+      return features;
+    }
+  }
+
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVector<T1,A1> operator-(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorLinear<T2,A2> right_type;
+
+    if (y.empty())
+      return x;
+    else if (x.empty()) {
+      left_type features(y.size());
+      
+      typename right_type::const_iterator iter2_end = y.end();
+      for (typename right_type::const_iterator iter2 = y.begin(); iter2 != iter2_end; ++ iter2)
+	features.insert(features.end(), std::make_pair(iter2->first, - T1(iter2->second)));
+      
+      return features;
+    } else {
+      left_type features(x);
+      
+      features -= y;
+      
+      return features;
+    }
+  }
+
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorLinear<T2,A2> right_type;
+    
+    if (x.empty() || y.empty())
+      return left_type();
+    
+    left_type features(utils::bithack::max(x.size(), y.size()));
+
+    left_type::multiply_equal(features, x, y.begin(), y.end());
+    
+    return features;
+  }
+
 
   template <typename T, typename A>
   inline
@@ -765,6 +850,29 @@ namespace cicada
     
     assign(feats.begin(), feats.end());
   }
+  
+  template <typename T, typename A>
+  inline
+  FeatureVector<T,A>& FeatureVector<T,A>::intersect(const FeatureVectorCompact& x)
+  {
+    if (empty()) 
+      return *this;
+    
+    if (x.empty())
+      clear();
+    else {
+      vector_type vector_new;
+      initialize(vector_new);
+      vector_new.rehash(__vector.size());
+      
+      intersect(vector_new, __vector, x.begin(), x.end());
+      
+      __vector.swap(vector_new);
+    }
+    
+    return *this; 
+  }
+  
 
   template <typename T, typename A>
   inline
@@ -802,6 +910,7 @@ namespace cicada
     } else {
       vector_type vector_new;
       initialize(vector_new);
+      vector_new.rehash(__vector.size());
       
       multiply_equal(vector_new, __vector, x.begin(), x.end());
       
@@ -811,6 +920,66 @@ namespace cicada
     }
   }
   
+  template <typename T1, typename A1>
+  inline
+  FeatureVector<T1,A1> operator+(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorCompact right_type;
+
+    if (y.empty())
+      return x;
+    else if (x.empty())
+      return y;
+    else {
+      left_type features(x);
+      features += y;
+      return features;
+    }
+  }
+
+  template <typename T1, typename A1>
+  inline
+  FeatureVector<T1,A1> operator-(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorCompact right_type;
+
+    if (y.empty())
+      return x;
+    else if (x.empty()) {
+      left_type features;
+      
+      typename right_type::const_iterator iter2_end = y.end();
+      for (typename right_type::const_iterator iter2 = y.begin(); iter2 != iter2_end; ++ iter2)
+	features.insert(features.end(), std::make_pair(iter2->first, - T1(iter2->second)));
+      
+      return features;
+    } else {
+      left_type features(x);
+      
+      features -= y;
+      
+      return features;
+    }
+  }
+
+  template <typename T1, typename A1>
+  inline
+  FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVector<T1,A1> left_type;
+    typedef FeatureVectorCompact right_type;
+    
+    if (x.empty() || y.empty())
+      return left_type();
+    
+    left_type features(x.size());
+
+    left_type::multiply_equal(features, x, y.begin(), y.end());
+    
+    return features;
+  }
 };  
 
 #endif

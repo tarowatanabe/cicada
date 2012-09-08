@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/type_traits.hpp>
 
 #include "utils/random_seed.hpp"
 
@@ -37,6 +38,13 @@ int main(int argc, char** argv)
 {
   typedef cicada::Symbol symbol_type;
 
+  std::cerr << "trivial assign: " << boost::has_trivial_assign<symbol_type>::value << std::endl
+	    << "trivial construct: " << boost::has_trivial_constructor<symbol_type>::value << std::endl
+	    << "trivial copy: " << boost::has_trivial_copy<symbol_type>::value << std::endl
+	    << "trivial copy-construct: " << boost::has_trivial_copy_constructor<symbol_type>::value << std::endl
+	    << "trivial default-construct: " << boost::has_trivial_default_constructor<symbol_type>::value << std::endl
+	    << "trivial destructor: " << boost::has_trivial_destructor<symbol_type>::value << std::endl;
+  
   process("good", 1);
   process("[,]", 2);
   process("[x]", 1);
