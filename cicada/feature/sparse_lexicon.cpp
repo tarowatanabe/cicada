@@ -300,7 +300,7 @@ namespace cicada
 							    static_cast<int>(utils::bithack::next_largest_power2(fertility)));
 	
 	feature_builder.clear();
-	feature_builder << prefix << ":fertility" << tag << target << "|" << fertility_power2;
+	feature_builder << prefix << ":fertility" << tag << "|" << target << "|" << fertility_power2;
 	
 	if (forced_feature || feature_builder.exists())
 	  features[feature_builder] += 1.0;
