@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "cicada/feature/antecedent.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -56,6 +58,8 @@ namespace cicada
 					std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
       
       typedef tree_map_type::id_type id_type;
+
+      typedef FeatureBuilder feature_builder_type;
       
       AntecedentImpl()
 	: tree_map(symbol_type()),
@@ -76,6 +80,8 @@ namespace cicada
       tree_map_type  tree_map;
 
       feature_type feature_name_prefix;
+      
+      feature_builder_type feature_builder;
 
       const sentence_type* sentence;
 
@@ -266,38 +272,33 @@ namespace cicada
 			 const symbol_type& prefix, const symbol_type& suffix,
 			 const int span_size) const
       {
-	const std::string name = feature_name(node, antecedent, prefix, suffix, span_size);
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
 	
-	for (size_t i = 0; i != normalizers.size(); ++ i) {
-	  const symbol_type prefix_norm = normalizers[i](prefix);
-	  const symbol_type suffix_norm = normalizers[i](suffix);
-	  
-	  if (prefix_norm != prefix || suffix_norm != suffix) {
-	    const std::string name = feature_name(node, antecedent, prefix_norm, suffix_norm, span_size);
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
-	  }
-	}
-      }
-      
-      const std::string feature_name(const std::string& node,
-				     const std::string& antecedent,
-				     const std::string& prefix,
-				     const std::string& suffix,
-				     const int span_size) const
-      {
 	const int span_size_power2 = utils::bithack::branch(utils::bithack::is_power2(span_size),
 							    span_size,
 							    static_cast<int>(utils::bithack::next_largest_power2(span_size)));
+	
+	builder.clear();
+	builder << feature_name_prefix
+		<< ":" << node << antecedent
+		<< "|" << prefix
+		<< "|" << suffix
+		<< "|" << span_size_power2;
 
-	return (static_cast<const std::string&>(feature_name_prefix)
-		+ ':' + node + antecedent
-		+ '|' + prefix
-		+ '|' + suffix
-		+ '|' + utils::lexical_cast<std::string>(span_size_power2));
-		
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
+	
+	for (size_t i = 0; i != normalizers.size(); ++ i) {
+	  builder.clear();
+	  builder << feature_name_prefix
+		  << ":" << node << antecedent
+		  << "|" << normalizers[i](prefix)
+		  << "|" << normalizers[i](suffix)
+		  << "|" << span_size_power2;
+	  
+	  if (forced_feature || builder.exists())
+	    features[builder] += 1.0;
+	}
       }
     };
     

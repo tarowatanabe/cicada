@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "cicada/feature/rule_shape.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 
 #include "utils/compact_trie_dense.hpp"
@@ -58,6 +60,8 @@ namespace cicada
 	node_map_type() : map_type() { map_type::set_empty_key(id_type(-1)); }
       };
       typedef std::deque<node_map_type, std::allocator<node_map_type> > cache_bigram_type;
+
+      typedef FeatureBuilder feature_builder_type;
     
       RuleShapeImpl() : trie(-1), forced_feature(false) {}
     
@@ -123,10 +127,12 @@ namespace cicada
 	
 	if (! checked_unigram[node]) {
 	  checked_unigram[node] = true;
+
+	  feature_builder.clear();
+	  feature_builder << "rule-shape:" << trie[node];
 	  
-	  const std::string name = "rule-shape:" + trie[node];
-	  if (forced_feature || feature_type::exists(name))
-	    cache_unigram[node] = name;
+	  if (forced_feature || feature_builder.exists())
+	    cache_unigram[node] = feature_builder;
 	}
 	
 	if (! cache_unigram[node].empty())
@@ -149,10 +155,11 @@ namespace cicada
 	      
 	      std::pair<node_map_type::iterator, bool> result = cache_bigram[node_parent].insert(std::make_pair(node_child, feature_type()));
 	      if (result.second) {
-		const std::string name = "rule-shape2:" + trie[node_parent] + '+' + trie[node_child];
+		feature_builder.clear();
+		feature_builder << "rule-shape2:" << trie[node_parent] << "+" << trie[node_child];
 		
-		if (forced_feature || feature_type::exists(name))
-		  result.first->second = name;
+		if (forced_feature || feature_builder.exists())
+		  result.first->second = feature_builder;
 	      }
 	      
 	      if (! result.first->second.empty())
@@ -174,6 +181,8 @@ namespace cicada
       checked_unigram_type checked_unigram;
       cache_unigram_type   cache_unigram;
       cache_bigram_type    cache_bigram;
+
+      feature_builder_type feature_builder;
       
       bool forced_feature;
     };

@@ -131,6 +131,7 @@ feature/bleu_multi.hpp \
 feature/dependency.hpp \
 feature/depeval.hpp \
 feature/distortion.hpp \
+feature/feature_builder.hpp \
 feature/global_lexicon.hpp \
 feature/lexicalized_reordering.hpp \
 feature/lexicon.hpp \

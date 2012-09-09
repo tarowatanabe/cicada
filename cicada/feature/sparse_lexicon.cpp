@@ -5,6 +5,7 @@
 #include <set>
 
 #include "sparse_lexicon.hpp"
+#include "feature_builder.hpp"
 
 #include "cicada/lexicon.hpp"
 #include "cicada/parameter.hpp"
@@ -91,6 +92,8 @@ namespace cicada
 
       typedef cicada::Lexicon lexicon_type;
       
+      typedef FeatureBuilder feature_builder_type;
+      
       SparseLexiconImpl()
 	: lexicon(0), lexicon_prefix(0), lexicon_suffix(0), caches(),
 	  skip_sgml_tag(false), unique_source(false), prefix("sparse-lexicon"), forced_feature(false),
@@ -128,7 +131,6 @@ namespace cicada
 	else
 	  lexicon_score(edge, features, skipper_epsilon());
       }
-      
       
       template <typename Skipper>
       void lexicon_score(const edge_type& edge,
@@ -189,30 +191,35 @@ namespace cicada
       template <typename Features>
       void apply(const word_type& source, const word_type& target, Features& features)
       {
-	const std::string name = prefix + ":" + static_cast<const std::string&>(source) + "_" + static_cast<const std::string&>(target);
+	feature_builder.clear();
+	feature_builder << prefix << ":" << source << "_" << target;
 	
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	if (forced_feature || feature_builder.exists())
+	  features[feature_builder] += 1.0;
 	
 	if (! normalizers_source.empty()) {
 	  const cache_normalize_type::word_set_type& normalized_source = normalize(source,  normalizers_source, cache_source);
 	  
 	  cache_normalize_type::word_set_type::const_iterator siter_end = normalized_source.end();
 	  for (cache_normalize_type::word_set_type::const_iterator siter = normalized_source.begin(); siter != siter_end; ++ siter) {
-	    const std::string name = prefix + ":" + static_cast<const std::string&>(*siter) + "_" + static_cast<const std::string&>(target);
 	    
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
+	    feature_builder.clear();
+	    feature_builder << prefix << ":" << *siter << "_" << target;
+	    
+	    if (forced_feature || feature_builder.exists())
+	      features[feature_builder] += 1.0;
 	    
 	    if (! normalizers_target.empty()) {
 	      const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
 	      
 	      cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 	      for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
-		const std::string name = prefix + ":" + static_cast<const std::string&>(*siter) + "_" + static_cast<const std::string&>(*titer);
 		
-		if (forced_feature || feature_type::exists(name))
-		  features[name] += 1.0;
+		feature_builder.clear();
+		feature_builder << prefix << ":" << *siter << "_" << *titer;
+		
+		if (forced_feature || feature_builder.exists())
+		  features[feature_builder] += 1.0;
 	      }
 	    }
 	  }
@@ -223,10 +230,11 @@ namespace cicada
 	  
 	  cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 	  for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
-	    const std::string name = prefix + ":" + static_cast<const std::string&>(source) + "_" + static_cast<const std::string&>(*titer);
+	    feature_builder.clear();
+	    feature_builder << prefix << ":" << source << "_" << *titer;
 	    
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
+	    if (forced_feature || feature_builder.exists())
+	      features[feature_builder] += 1.0;
 	  }
 	}
       }
@@ -234,13 +242,11 @@ namespace cicada
       template <typename Features>
       void apply(const char* tag, const word_pair_type& source, const word_type& target, Features& features)
       {
-	const std::string name = (prefix + ':'
-				  + tag + static_cast<const std::string&>(source.first)
-				  + ':' + static_cast<const std::string&>(source.second)
-				  + '_' + static_cast<const std::string&>(target));
+	feature_builder.clear();
+	feature_builder << prefix << ":" << tag << source.first << ":" << source.second << "_" << target;
 	
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	if (forced_feature || feature_builder.exists())
+	  features[feature_builder] += 1.0;
 	
 	if (! normalizers_source.empty()) {
 	  const cache_normalize_type::word_set_type normalized_source_prev = normalize(source.first,  normalizers_source, cache_source);
@@ -250,26 +256,22 @@ namespace cicada
 	  for (cache_normalize_type::word_set_type::const_iterator piter = normalized_source_prev.begin(); piter != piter_end; ++ piter) {
 	    cache_normalize_type::word_set_type::const_iterator niter_end = normalized_source_next.end();
 	    for (cache_normalize_type::word_set_type::const_iterator niter = normalized_source_next.begin(); niter != niter_end; ++ niter) {
-	      const std::string name = (prefix + ':'
-					+ tag + static_cast<const std::string&>(*piter)
-					+ ':' + static_cast<const std::string&>(*niter)
-					+ '_' + static_cast<const std::string&>(target));
+	      feature_builder.clear();
+	      feature_builder << prefix << ":" << tag << *piter << ":" << *niter << "_" << target;
 	      
-	      if (forced_feature || feature_type::exists(name))
-		features[name] += 1.0;
+	      if (forced_feature || feature_builder.exists())
+		features[feature_builder] += 1.0;
 	      
 	      if (! normalizers_target.empty()) {
 		const cache_normalize_type::word_set_type& normalized_target = normalize(target, normalizers_target, cache_target);
 		
 		cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 		for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
-		  const std::string name = (prefix + ':'
-					    + tag + static_cast<const std::string&>(*piter)
-					    + ':' + static_cast<const std::string&>(*niter)
-					    + '_' + static_cast<const std::string&>(*titer));
+		  feature_builder.clear();
+		  feature_builder << prefix << ":" << tag << *piter << ":" << *niter << "_" << *titer;
 		  
-		  if (forced_feature || feature_type::exists(name))
-		    features[name] += 1.0;
+		  if (forced_feature || feature_builder.exists())
+		    features[feature_builder] += 1.0;
 		}
 	      }
 	    }
@@ -281,13 +283,11 @@ namespace cicada
 	  
 	  cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 	  for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
-	    const std::string name = (prefix + ':'
-				      + tag + static_cast<const std::string&>(source.first)
-				      + ':' + static_cast<const std::string&>(source.second)
-				      + '_' + static_cast<const std::string&>(*titer));
+	    feature_builder.clear();
+	    feature_builder << prefix << ":" << tag << source.first << ":" << source.second << "_" << *titer;
 	    
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
+	    if (forced_feature || feature_builder.exists())
+	      features[feature_builder] += 1.0;
 	  }
 	}
       }
@@ -299,12 +299,11 @@ namespace cicada
 							    fertility,
 							    static_cast<int>(utils::bithack::next_largest_power2(fertility)));
 	
-	const std::string name = (prefix + ":fertility"
-				  + tag + static_cast<const std::string&>(target)
-				  + '|' + utils::lexical_cast<std::string>(fertility_power2));
+	feature_builder.clear();
+	feature_builder << prefix << ":fertility" << tag << target << "|" << fertility_power2;
 	
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	if (forced_feature || feature_builder.exists())
+	  features[feature_builder] += 1.0;
       }
       
       void assign(const lattice_type& lattice)
@@ -491,6 +490,8 @@ namespace cicada
       word_pair_unique_type  uniques_prefix;
       word_pair_unique_type  uniques_suffix;
       word_map_type          lattice_prev;
+      
+      feature_builder_type feature_builder;
       
       bool skip_sgml_tag;
       bool unique_source;

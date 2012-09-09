@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "cicada/feature/ngram_tree.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -65,6 +67,8 @@ namespace cicada
 
       typedef tree_map_type::id_type id_type;
 
+      typedef FeatureBuilder feature_builder_type;
+
       NGramTreeImpl()
 	: tree_map(symbol_type()),
 	  sentence(0),
@@ -86,6 +90,8 @@ namespace cicada
       phrase_span_set_type phrase_spans_impl;
       
       feature_type feature_name_prefix;
+
+      feature_builder_type feature_builder;
       
       const sentence_type* sentence;
       
@@ -283,19 +289,30 @@ namespace cicada
 
       void apply_feature(feature_set_type& features, const symbol_type& node, const id_type& prev, const id_type& next) const
       {
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
 	
-	const std::string name = feature_name(node, prev_node.nodes.front(), next_node.nodes.front());
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	builder.clear();
+	builder << feature_name_prefix << ":"
+		<< node
+		<< "(" << prev_node.nodes.front() << ")"
+		<< "(" << next_node.nodes.front() << ")";
 	
-	for (size_t i = 0; i != normalizers.size(); ++ i) 
-	  if (prev_node.nodes.front() != prev_node.nodes[i + 1] || next_node.nodes.front() != next_node.nodes[i + 1]) {
-	    const std::string name = feature_name(node, prev_node.nodes[i + 1], next_node.nodes[i + 1]);
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
-	  }
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
+	
+	for (size_t i = 0; i != normalizers.size(); ++ i) {
+	  builder.clear();
+	  builder << feature_name_prefix << ":"
+		  << node
+		  << "(" << prev_node.nodes[i + 1] << ")"
+		  << "(" << next_node.nodes[i + 1] << ")";
+	  
+	  if (forced_feature || builder.exists())
+	    features[builder] += 1.0;
+	}
       }
 
       template <typename Iterator>
@@ -318,16 +335,6 @@ namespace cicada
       const std::string compose_path(const std::string& node, const std::string& antecedent) const
       {
 	return node + '(' + antecedent + ')';
-      }
-
-      const std::string compose_tree(const std::string& node, const std::string& prev, const std::string& next) const
-      {
-	return node + '(' + prev + ")(" + next + ')';
-      }
-      
-      const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next) const
-      {
-	return static_cast<const std::string&>(feature_name_prefix) + ":" +  compose_tree(node, prev, next);
       }
     };
 

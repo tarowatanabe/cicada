@@ -1,6 +1,6 @@
 2012-x-x
 INCOMPATIBLE: The feature-vector is re-implemented by a privately implemented compact-hashtable.
-	      Thus, the element is not "sorted" but randomly inserted in the table.
+	      Thus, the element is not "sorted" but randomly inserted in the vector.
 
 2012-9-6
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)

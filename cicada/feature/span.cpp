@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "cicada/feature/span.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 
 #include "utils/unordered_map.hpp"
@@ -55,6 +57,8 @@ namespace cicada
       typedef utils::unordered_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
 				   std::allocator<std::pair<const span_type, std::string> > >::type label_map_type;
       
+      typedef FeatureBuilder feature_builder_type;
+
       SpanImpl()
 	: forced_feature(false), attr_span_first("span-first"), attr_span_last("span-last") {}
       
@@ -89,8 +93,12 @@ namespace cicada
 	int* context = reinterpret_cast<int*>(state);
 	context[0] = span.first;
 	context[1] = span.second;
+
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
 	
-	std::string rule_string = "span:" + span_label(span) + '(';
+	builder.clear();
+	builder << "span:" << span_label(span) << "(";
+	//std::string rule_string = "span:" + span_label(span) + '(';
 	
 	int pos_non_terminal = 0;
 	phrase_type::const_iterator piter_end = edge.rule->rhs.end();
@@ -101,7 +109,8 @@ namespace cicada
 	    
 	    const int* antecedent_context = reinterpret_cast<const int*>(states[antecedent_index]);
 	    
-	    rule_string += span_label(std::make_pair(antecedent_context[0], antecedent_context[1]));
+	    builder << span_label(std::make_pair(antecedent_context[0], antecedent_context[1]));
+	    //rule_string += span_label(std::make_pair(antecedent_context[0], antecedent_context[1]));
 	    
 	    span.first = antecedent_context[1];
 	    
@@ -109,14 +118,16 @@ namespace cicada
 	  } else if (span.first >= span.second) {
 	    std::cerr << "WARNING: invalid span?" << std::endl;
 	  } else {
-	    rule_string += '<' + span_label(std::make_pair(span.first, span.first + 1)) + '>';
+	    builder << "<" << span_label(std::make_pair(span.first, span.first + 1)) << ">";
+	    //rule_string += '<' + span_label(std::make_pair(span.first, span.first + 1)) + '>';
 	    ++ span.first;
 	  }
 	
-	rule_string += ')';
+	builder << ")";
+	//rule_string += ')';
 	
-	if (forced_feature || feature_set_type::feature_type::exists(rule_string))
-	  features[rule_string] += 1.0;
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
       }
       
       std::string strip_label(const std::string& label) const
@@ -237,6 +248,8 @@ namespace cicada
 
       label_chart_type label_chart;
       label_map_type   label_map;
+
+      feature_builder_type feature_builder;
 
       bool forced_feature;
 

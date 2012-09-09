@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "cicada/feature/parent.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 
 #include "utils/indexed_set.hpp"
@@ -92,6 +94,8 @@ namespace cicada
       typedef utils::simple_vector<std::string, std::allocator<std::string> > normalized_set_type;
       typedef utils::chunk_vector<normalized_set_type, 4096 /sizeof(normalized_set_type), std::allocator<normalized_set_type> > normalized_map_type;
       
+      typedef FeatureBuilder feature_builder_type;
+
       ParentImpl()
 	: exclude_terminal(false),
 	  sentence(0),
@@ -112,28 +116,31 @@ namespace cicada
 				      Iterator first, Iterator last,
 				      Extractor extractor) const
       {
-	std::string rule = lhs;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+
+	builder.clear();
+	builder << lhs;
       
 	if (exclude_terminal) {
 	  if (last != first) {
-	    rule += '(';
+	    builder << "(";
 	    for (/**/; first != last - 1; ++ first)
 	      if (first->is_non_terminal())
-		rule += extractor(*first) + '|';
+		builder << extractor(*first) << "|";
 	    if (first->is_non_terminal())
-	      rule += extractor(*first);
-	    rule += ')';
+	      builder << extractor(*first);
+	    builder << ")";
 	  }
 	} else {
 	  if (last != first) {
-	    rule += '(';
+	    builder << "(";
 	    for (/**/; first != last - 1; ++ first)
-	      rule += extractor(*first) + '|';
-	    rule += extractor(*first) + ')';
+	      builder << extractor(*first) << "|";
+	    builder << extractor(*first) << ")";
 	  }
 	}
-
-	return rule;
+	
+	return static_cast<std::string>(builder);
       }
     
       template <typename Iterator, typename Extractor>
@@ -141,27 +148,31 @@ namespace cicada
 			       Iterator first, Iterator last,
 			       Extractor extractor) const
       {
-	std::string rule = lhs;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+
+	builder.clear();
+	builder << lhs;
 
 	if (exclude_terminal) {
 	  if (last != first) {
-	    rule += '(';
+	    builder << "(";
 	    for (/**/; first != last - 1; ++ first)
 	      if (first->is_non_terminal())
-		rule += extractor(first->non_terminal()) + '|';
+		builder << extractor(first->non_terminal()) << "|";
 	    if (first->is_non_terminal())
-	      rule += extractor(first->non_terminal());
-	    rule += ')';
+	      builder << extractor(first->non_terminal());
+	    builder << ")";
 	  }
 	} else {
 	  if (last != first) {
-	    rule += '(';
+	    builder << "(";
 	    for (/**/; first != last - 1; ++ first)
-	      rule += extractor(first->non_terminal()) + '|';
-	    rule += extractor(first->non_terminal()) + ')';
+	      builder << extractor(first->non_terminal()) << "|";
+	    builder << extractor(first->non_terminal()) << ")";
 	  }
 	}
-	return rule;
+	
+	return static_cast<std::string>(builder);
       }
 
       normalizer_set_type normalizers;
@@ -172,6 +183,8 @@ namespace cicada
       normalized_map_type normalized;
 
       feature_type feature_name_prefix;
+
+      feature_builder_type feature_builder;
 
       const sentence_type* sentence;
       
@@ -269,8 +282,7 @@ namespace cicada
 	      if (rule_norm.empty())
 		rule_norm = extract_phrase_rule(cat, &symbol, (&symbol) + 1, __extractor<normalizer_type>(normalizers[i]));
 	      
-	      if (rule_string != rule_norm)
-		apply_feature(features, rule_norm);
+	      apply_feature(features, rule_norm);
 	    }
 	    
 	    *reinterpret_cast<id_type*>(state) = id_string;
@@ -286,8 +298,7 @@ namespace cicada
 	      if (rule_norm.empty())
 		rule_norm = extract_phrase_rule(cat, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
 	      
-	      if (rule_string != rule_norm)
-		apply_feature(features, rule_norm);
+	      apply_feature(features, rule_norm);
 	    }
 	    
 	    *reinterpret_cast<id_type*>(state) = id_string;
@@ -313,8 +324,7 @@ namespace cicada
 	      apply_feature(features, cat, string_map[*antecedent_context]);
 	      
 	      for (size_t i = 0; i != normalizers.size(); ++ i)
-		if (string_map[*antecedent_context] != normalized[*antecedent_context][i])
-		  apply_feature(features, cat, normalized[*antecedent_context][i]);
+		apply_feature(features, cat, normalized[*antecedent_context][i]);
 	    } else
 	      buffer.push_back(*piter);
 	  
@@ -329,8 +339,7 @@ namespace cicada
 	    if (rule_norm.empty())
 	      rule_norm = extract_rule(cat, buffer.begin(), buffer.end(), __extractor<normalizer_type>(normalizers[i]));
 	    
-	    if (rule_string != rule_norm)
-	      apply_feature(features, rule_norm);
+	    apply_feature(features, rule_norm);
 	  }
 	  
 	  *reinterpret_cast<id_type*>(state) = id_string;
@@ -354,7 +363,6 @@ namespace cicada
 	return id;
       }
       
-      
       void parent_final_score(const state_ptr_type& state,
 			      const edge_type& edge,
 			      feature_set_type& features) const
@@ -367,18 +375,26 @@ namespace cicada
       void apply_feature(feature_set_type& features,
 			 const std::string& rule) const
       {
-	const std::string name = static_cast<const std::string&>(feature_name_prefix) + ":" + rule;
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+
+	builder.clear();
+	builder << feature_name_prefix << ":" << rule;
+
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
       }
       
       void apply_feature(feature_set_type& features,
 			 const std::string& parent,
 			 const std::string& rule) const
       {
-	const std::string name = static_cast<const std::string&>(feature_name_prefix) + ":" + parent + '(' + rule + ')';
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+	
+	builder.clear();
+	builder << feature_name_prefix << ":" << parent << "(" << rule << ")";
+	
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
       }
     };
     

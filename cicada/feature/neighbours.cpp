@@ -7,6 +7,8 @@
 #include <algorithm>
 
 #include "cicada/feature/neighbours.hpp"
+#include "cicada/feature/feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -93,7 +95,9 @@ namespace cicada
       };
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
-      
+
+      typedef FeatureBuilder feature_builder_type;
+
       NeighboursImpl()
 	: sentence(0),
 	  forced_feature(false),
@@ -112,7 +116,9 @@ namespace cicada
       state_map_type state_map;
       
       phrase_span_set_type phrase_spans_impl;
-      
+
+      feature_builder_type feature_builder;
+
       feature_type feature_name_prefix;
       const sentence_type* sentence;
       
@@ -271,19 +277,32 @@ namespace cicada
 
       void apply_feature(feature_set_type& features, const symbol_type& node, const symbol_type& prev, const symbol_type& next, const int span) const
       {
-	const std::string name = feature_name(node, prev, next, span);
-	if (forced_feature || feature_type::exists(name))
-	  features[name] += 1.0;
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
+
+	const int span_power2 = utils::bithack::branch(utils::bithack::is_power2(span),
+						       span,
+						       static_cast<int>(utils::bithack::next_largest_power2(span)));
+	
+	builder.clear();
+	builder << feature_name_prefix
+		<< ":" << node 
+		<< "|" << prev
+		<< "|" << next
+		<< "|" << span_power2;
+	
+	if (forced_feature || builder.exists())
+	  features[builder] += 1.0;
 
 	for (size_t i = 0; i != normalizers.size(); ++ i) {
-	  const symbol_type prev_norm = normalizers[i](prev);
-	  const symbol_type next_norm = normalizers[i](next);
+	  builder.clear();
+	  builder << feature_name_prefix
+		  << ":" << node
+		  << "|" << normalizers[i](prev)
+		  << "|" << normalizers[i](next)
+		  << "|" << span_power2;
 	  
-	  if (prev_norm != prev || next_norm != next) {
-	    const std::string name = feature_name(node, prev_norm, next_norm, span);
-	    if (forced_feature || feature_type::exists(name))
-	      features[name] += 1.0;
-	  }
+	  if (forced_feature || builder.exists())
+	    features[builder] += 1.0;
 	}
       }
 
@@ -367,19 +386,6 @@ namespace cicada
 	}
 	
 	return id_curr;
-      }
-      
-      const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next, const int span) const
-      {
-	const int span_power2 = utils::bithack::branch(utils::bithack::is_power2(span),
-						       span,
-						       static_cast<int>(utils::bithack::next_largest_power2(span)));
-
-	return (static_cast<const std::string&>(feature_name_prefix)
-		+ ':' + node
-		+ '|' + prev
-		+ '|' + next
-		+ '|' + utils::lexical_cast<std::string>(span_power2));
       }
       
       void neighbours_final_score(const state_ptr_type& __state,

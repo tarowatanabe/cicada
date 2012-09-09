@@ -3,6 +3,8 @@
 //
 
 #include "sparse_ngram.hpp"
+#include "feature_builder.hpp"
+
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -92,6 +94,8 @@ namespace cicada
       
       typedef utils::array_power2<cache_context_type,  1024 * 32, std::allocator<cache_context_type> >  cache_context_set_type;
       typedef utils::array_power2<cache_ngram_type,    1024 * 8,  std::allocator<cache_ngram_type> >    cache_ngram_set_type;
+
+      typedef FeatureBuilder feature_builder_type;
       
       SparseNGramImpl() : trie(), cache_feature(), checked_feature(), prefix("sparse-ngram"), forced_feature(false) {}
       
@@ -377,24 +381,23 @@ namespace cicada
 	
 	if (! checked_feature[id]) {
 	  // ngram at [first, iter + 1)
-	  
-	  std::string name = prefix + ":";
-	  for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
-	    name += "_" + static_cast<const std::string&>(*fiter);
-	  
-	  if (forced_feature || feature_type::exists(name))
-	    cache_feature[id].push_back(name);
 
-	  const std::string& name_surface = name;
+	  feature_builder.clear();
+	  feature_builder << prefix << ":";
+	  for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
+	    feature_builder << "_" << *fiter;
 	  
+	  if (forced_feature || feature_builder.exists())
+	    cache_feature[id].push_back(feature_builder);
+
 	  for (size_t i = 0; i != normalizers.size(); ++ i) {
-	    std::string name = prefix + ":";
+	    feature_builder.clear();
+	    feature_builder << prefix << ":";
 	    for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
-	      name += "_" + static_cast<const std::string&>(normalizers[i](*fiter));
+	      feature_builder << "_" << normalizers[i](*fiter);
 	    
-	    if (name != name_surface)
-	      if (forced_feature || feature_type::exists(name))
-		cache_feature[id].push_back(name);
+	    if (forced_feature || feature_builder.exists())
+	      cache_feature[id].push_back(feature_builder);
 	  }
 	  
 	  std::sort(cache_feature[id].begin(), cache_feature[id].end());
@@ -425,6 +428,8 @@ namespace cicada
       cache_ngram_set_type   cache_ngram;
 
       normalizer_set_type normalizers;
+
+      feature_builder_type feature_builder;
       
       int order;
       bool no_bos_eos;
