@@ -243,7 +243,7 @@ namespace cicada
       void apply(const char* tag, const word_pair_type& source, const word_type& target, Features& features)
       {
 	feature_builder.clear();
-	feature_builder << prefix << ":" << tag << source.first << ":" << source.second << "_" << target;
+	feature_builder << prefix << ":" << tag << "|" << source.first << ":" << source.second << "_" << target;
 	
 	if (forced_feature || feature_builder.exists())
 	  features[feature_builder] += 1.0;
@@ -257,7 +257,7 @@ namespace cicada
 	    cache_normalize_type::word_set_type::const_iterator niter_end = normalized_source_next.end();
 	    for (cache_normalize_type::word_set_type::const_iterator niter = normalized_source_next.begin(); niter != niter_end; ++ niter) {
 	      feature_builder.clear();
-	      feature_builder << prefix << ":" << tag << *piter << ":" << *niter << "_" << target;
+	      feature_builder << prefix << ":" << tag << "|" << *piter << ":" << *niter << "_" << target;
 	      
 	      if (forced_feature || feature_builder.exists())
 		features[feature_builder] += 1.0;
@@ -268,7 +268,7 @@ namespace cicada
 		cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 		for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
 		  feature_builder.clear();
-		  feature_builder << prefix << ":" << tag << *piter << ":" << *niter << "_" << *titer;
+		  feature_builder << prefix << ":" << tag << "|" << *piter << ":" << *niter << "_" << *titer;
 		  
 		  if (forced_feature || feature_builder.exists())
 		    features[feature_builder] += 1.0;
@@ -284,7 +284,7 @@ namespace cicada
 	  cache_normalize_type::word_set_type::const_iterator titer_end = normalized_target.end();
 	  for (cache_normalize_type::word_set_type::const_iterator titer = normalized_target.begin(); titer != titer_end; ++ titer) {
 	    feature_builder.clear();
-	    feature_builder << prefix << ":" << tag << source.first << ":" << source.second << "_" << *titer;
+	    feature_builder << prefix << ":" << tag << "|" << source.first << ":" << source.second << "_" << *titer;
 	    
 	    if (forced_feature || feature_builder.exists())
 	      features[feature_builder] += 1.0;
