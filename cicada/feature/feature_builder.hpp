@@ -16,9 +16,9 @@
 #include <vector>
 #include <iterator>
 
-#include <cicada/Attribute.hpp>
-#include <cicada/Feature.hpp>
-#include <cicada/Symbol.hpp>
+#include <cicada/attribute.hpp>
+#include <cicada/feature.hpp>
+#include <cicada/symbol.hpp>
 
 #include <utils/piece.hpp>
 
