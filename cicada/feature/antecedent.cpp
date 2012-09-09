@@ -82,6 +82,7 @@ namespace cicada
       feature_type feature_name_prefix;
       
       feature_builder_type feature_builder;
+      feature_builder_type tree_builder;
 
       const sentence_type* sentence;
 
@@ -182,9 +183,12 @@ namespace cicada
 	  symbol_type prefix = vocab_type::EMPTY;
 	  symbol_type suffix = vocab_type::EMPTY;
 	  
-	  std::string antecedent_string;
-	  id_type     node = tree_map.root();
-	  int span_size = 0;
+	  feature_builder_type& builder = const_cast<feature_builder_type&>(tree_builder);
+	  builder.clear();
+	  
+	  //std::string antecedent_string;
+	  id_type node = tree_map.root();
+	  int     span_size = 0;
 	  
 	  int pos_non_terminal = 0;
 	  phrase_type::const_iterator piter_end = phrase.end();
@@ -199,7 +203,13 @@ namespace cicada
 	      const symbol_type* antecedent_root   = reinterpret_cast<const symbol_type*>(antecedent_size + 1);
 	      
 	      node = tree_id(*antecedent_root, node);
-	      antecedent_string += compose_tree(*antecedent_root, *antecedent_tree);
+	      //antecedent_string += compose_tree(*antecedent_root, *antecedent_tree);
+	      
+	      if (tree_map.is_root(*antecedent_tree))
+		builder << "(" << *antecedent_root << ")";
+	      else
+		builder << "(" << *antecedent_root << "(" << tree_map[*antecedent_tree] << "))";
+
 	      span_size += *antecedent_size;
 	      
 	      if (prefix == vocab_type::EMPTY)
@@ -218,7 +228,8 @@ namespace cicada
 	  // apply feature...
 	  const symbol_type cat = root_label(edge);
 
-	  apply_feature(features, cat, antecedent_string, prefix, suffix, span_size);
+	  //apply_feature(features, cat, antecedent_string, prefix, suffix, span_size);
+	  apply_feature(features, cat, builder, prefix, suffix, span_size);
 	  
 	  // next context...
 	  id_type*     context_tree   = reinterpret_cast<id_type*>(state);
@@ -240,6 +251,7 @@ namespace cicada
 	// nothing to apply!
       }
 
+#if 0
       const std::string compose_tree(const std::string& node, const id_type& id) const
       {
 	if (tree_map.is_root(id))
@@ -247,7 +259,7 @@ namespace cicada
         else
           return '(' + node + '(' + tree_map[id] + "))";
       }
-
+#endif
       
       id_type tree_id(const symbol_type& node, const id_type parent) const
       {
@@ -268,17 +280,17 @@ namespace cicada
 
       void apply_feature(feature_set_type& features,
 			 const std::string& node,
-			 const std::string& antecedent,
+			 const feature_builder_type& antecedent,
 			 const symbol_type& prefix, const symbol_type& suffix,
 			 const int span_size) const
       {
-	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
-	
 	const int span_size_power2 = utils::bithack::branch(utils::bithack::is_power2(span_size),
 							    span_size,
 							    static_cast<int>(utils::bithack::next_largest_power2(span_size)));
 	
+	feature_builder_type& builder = const_cast<feature_builder_type&>(feature_builder);
 	builder.clear();
+	
 	builder << feature_name_prefix
 		<< ":" << node << antecedent
 		<< "|" << prefix

@@ -38,6 +38,13 @@ namespace cicada
       typedef buffer_type::const_iterator const_iterator;
 
       friend
+      FeatureBuilder& operator<<(FeatureBuilder& builder, const FeatureBuilder& x)
+      {
+	builder.buffer.insert(builder.buffer.end(), x.buffer.begin(), x.buffer.end());
+	return builder;
+      }
+
+      friend
       FeatureBuilder& operator<<(FeatureBuilder& builder, const symbol_type& x)
       {
 	builder.buffer.insert(builder.buffer.end(), x.begin(), x.end());
