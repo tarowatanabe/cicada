@@ -31,6 +31,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
+#include <utils/vector2.hpp>
 
 struct Bitext
 {
@@ -225,7 +226,18 @@ struct ExtractPhrase
   typedef boost::array<int, 5> counts_type;
 
   typedef std::pair<int, int> span_type;
+  struct span_pair_type
+  {
+    span_type source;
+    span_type target;
+    
+    span_pair_type() : source(), target() {}
+    span_pair_type(const span_type& __source, const span_type& __target) : source(__source), target(__target) {}
+  };
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
 
+  typedef utils::vector2<bool, std::allocator<bool> > alignment_matrix_type;
+  
   typedef PhrasePair phrase_pair_type;
 
   typedef utils::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
@@ -260,6 +272,9 @@ struct ExtractPhrase
   
   alignment_count_set_type alignment_count_source;
   alignment_count_set_type alignment_count_target;
+
+  span_pair_set_type    spans;
+  alignment_matrix_type alignment_matrix;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -331,7 +346,6 @@ struct ExtractPhrase
     span_target_chart.reserve(target_size + 1);
     span_target_chart.resize(target_size + 1, span_type(source_size, 0));
     
-    
     for (int target_first = 0; target_first < static_cast<int>(target_size); ++ target_first) {
       span_type span_source(source_size, 0);
 	
@@ -347,6 +361,16 @@ struct ExtractPhrase
     }
     
     phrase_pair_type phrase_pair;
+    
+    // clear span..
+    spans.clear();
+    
+    // clear alignment_matrix.
+    alignment_matrix.clear();
+    alignment_matrix.resize(source_size + 2, target_size + 2, false);
+    
+    alignment_matrix(0, 0) = true; // BOS
+    alignment_matrix(source_size + 1, target_size + 1) = true; // EOS
     
     for (int source_first = 0; source_first < static_cast<int>(source_size); ++ source_first) {
       span_type span_target(target_size, 0);
@@ -367,7 +391,14 @@ struct ExtractPhrase
 	  if (span_count_source == span_count_target) {
 	    
 	    // unique span-pair
-	    //const span_type& span_source = span_target_chart(span_target.first, span_target.second);
+	    const span_type& span_source = span_target_chart(span_target.first, span_target.second);
+	    if (span_source.first == source_first && span_source.second == source_last) {
+	      // we will assign four-corners of a phrase in the alignment matrix...
+	      alignment_matrix(span_source.first + 1, span_target.first + 1) = true;
+	      alignment_matrix(span_source.first + 1, span_target.second)    = true;
+	      alignment_matrix(span_source.second,    span_target.first + 1) = true;
+	      alignment_matrix(span_source.second,    span_target.second)    = true;
+	    }
 	    
 	    // enlarge the target-span...
 	    for (int target_first = span_target.first; target_first >= 0; -- target_first)
@@ -377,7 +408,11 @@ struct ExtractPhrase
 		
 		if (span_count_source != span_count_target)
 		  break;
+
+		spans.push_back(span_pair_type(span_type(source_first, source_last),
+					       span_type(target_first, target_last)));
 		
+#if 0
 		if (max_length > 0 && source_last - source_first > max_length) continue;
 		if (max_length > 0 && target_last - target_first > max_length) continue;
 		if (max_fertility > 0
@@ -398,7 +433,6 @@ struct ExtractPhrase
 		    phrase += static_cast<const std::string&>(target[i]) + ' ';
 		  phrase += static_cast<const std::string&>(target[target_last - 1]);
 		}
-		
 		
 		// work with this span!
 		phrase_pair.source = phrases_source(source_first, source_last);
@@ -427,15 +461,77 @@ struct ExtractPhrase
 		counts[2] += (! connected_left_top &&   connected_right_top);
 		counts[3] += (  connected_left_bottom && ! connected_right_bottom);
 		counts[4] += (! connected_left_bottom &&   connected_right_bottom);
+#endif
 	      }
 	  }
 	}
       }
     }
+    
+    span_pair_set_type::const_iterator siter_end = spans.end();
+    for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter) {
+      const int& source_first = siter->source.first;
+      const int& source_last  = siter->source.second;
+      const int& target_first = siter->target.first;
+      const int& target_last  = siter->target.second;
+      
+      if (max_length > 0 && source_last - source_first > max_length) continue;
+      if (max_length > 0 && target_last - target_first > max_length) continue;
+      if (max_fertility > 0
+	  && (double(utils::bithack::max(source_last - source_first, target_last - target_first))
+	      / double(utils::bithack::min(source_last - source_first, target_last - target_first))) >= max_fertility) continue;
+      
+      if (phrases_source(source_first, source_last).empty()) {
+	phrase_type& phrase = phrases_source(source_first, source_last);
+	for (int i = source_first; i != source_last - 1; ++ i)
+	  phrase += static_cast<const std::string&>(source[i]) + ' ';
+	phrase += static_cast<const std::string&>(source[source_last - 1]);
+      }
+		
+      if (phrases_target(target_first, target_last).empty()) {
+	phrase_type& phrase = phrases_target(target_first, target_last);
+	for (int i = target_first; i != target_last - 1; ++ i)
+	  phrase += static_cast<const std::string&>(target[i]) + ' ';
+	phrase += static_cast<const std::string&>(target[target_last - 1]);
+      }
+      
+      // work with this span!
+      phrase_pair.source = phrases_source(source_first, source_last);
+      phrase_pair.target = phrases_target(target_first, target_last);
+      
+      
+      phrase_pair.alignment.clear();
+      for (int src = source_first; src != source_last; ++ src) {
+	point_set_type::const_iterator titer_end = alignment_source_target[src].end();
+	for (point_set_type::const_iterator titer = alignment_source_target[src].begin(); titer != titer_end; ++ titer)
+	  phrase_pair.alignment.push_back(std::make_pair(src - source_first, *titer - target_first));
+      }
+      
+      // connected implies we have a "phrase" 
+      const bool connected_left_top     = is_aligned(source_first - 1, target_first - 1);
+      const bool connected_right_top    = is_aligned(source_last,      target_first - 1);
+      const bool connected_left_bottom  = is_aligned(source_first - 1, target_last);
+      const bool connected_right_bottom = is_aligned(source_last,      target_last);
+      
+      phrase_pair_set_type::iterator iter = phrase_pairs.find(phrase_pair);
+      if (iter == phrase_pairs.end())
+	iter = phrase_pairs.insert(phrase_pair).first;
+      
+      counts_type& counts = const_cast<counts_type&>(iter->counts);
+      
+      counts[0] += 1;
+      counts[1] += (  connected_left_top && ! connected_right_top);
+      counts[2] += (! connected_left_top &&   connected_right_top);
+      counts[3] += (  connected_left_bottom && ! connected_right_bottom);
+      counts[4] += (! connected_left_bottom &&   connected_right_bottom);
+    }
   }
   
   bool is_aligned(const int source, const int target) const
   {
+    // zero-based is_aligned should be readjusted...
+    return alignment_matrix(source + 1, target + 1);
+#if 0
     const int source_size = alignment_source_target.size();
     const int target_size = alignment_target_source.size();
     
@@ -449,6 +545,7 @@ struct ExtractPhrase
     
     // check if there exists alignment point!
     return std::find(aiter_begin, aiter_end, target) != aiter_end;
+#endif
   }
   
 };
