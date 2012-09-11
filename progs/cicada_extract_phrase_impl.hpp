@@ -235,8 +235,18 @@ struct ExtractPhrase
     span_pair_type(const span_type& __source, const span_type& __target) : source(__source), target(__target) {}
   };
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
-
-  typedef utils::vector2<bool, std::allocator<bool> > alignment_matrix_type;
+  
+  struct corner_type
+  {
+    char left_top;
+    char right_top;
+    char left_bottom;
+    char right_bottom;
+    
+    corner_type() : left_top(0), right_top(0), left_bottom(0), right_bottom(0) {}
+  };
+  
+  typedef utils::vector2<corner_type, std::allocator<corner_type> > corner_set_type;
   
   typedef PhrasePair phrase_pair_type;
 
@@ -273,8 +283,8 @@ struct ExtractPhrase
   alignment_count_set_type alignment_count_source;
   alignment_count_set_type alignment_count_target;
 
-  span_pair_set_type    spans;
-  alignment_matrix_type alignment_matrix;
+  span_pair_set_type spans;
+  corner_set_type    corners;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -365,12 +375,12 @@ struct ExtractPhrase
     // clear span..
     spans.clear();
     
-    // clear alignment_matrix.
-    alignment_matrix.clear();
-    alignment_matrix.resize(source_size + 2, target_size + 2, false);
-    
-    alignment_matrix(0, 0) = true; // BOS
-    alignment_matrix(source_size + 1, target_size + 1) = true; // EOS
+    // clear corners.
+    corners.clear();
+    corners.resize(source_size + 2, target_size + 2);
+
+    corners(0, 0).right_bottom = true; //BOS
+    corners(source_size + 1, target_size + 1).left_top = true; // EOS
     
     for (int source_first = 0; source_first < static_cast<int>(source_size); ++ source_first) {
       span_type span_target(target_size, 0);
@@ -390,15 +400,17 @@ struct ExtractPhrase
 	  
 	  if (span_count_source == span_count_target) {
 	    
+#if 0
 	    // unique span-pair
 	    const span_type& span_source = span_target_chart(span_target.first, span_target.second);
 	    if (span_source.first == source_first && span_source.second == source_last) {
 	      // we will assign four-corners of a phrase in the alignment matrix...
-	      alignment_matrix(span_source.first + 1, span_target.first + 1) = true;
-	      alignment_matrix(span_source.first + 1, span_target.second)    = true;
-	      alignment_matrix(span_source.second,    span_target.first + 1) = true;
-	      alignment_matrix(span_source.second,    span_target.second)    = true;
+	      corners(span_source.first + 1, span_target.first + 1).left_top  = true;
+	      corners(span_source.second,    span_target.first + 1).right_top = true;
+	      corners(span_source.first + 1, span_target.second).left_bottom  = true;
+	      corners(span_source.second,    span_target.second).right_bottom = true;
 	    }
+#endif
 	    
 	    // enlarge the target-span...
 	    for (int target_first = span_target.first; target_first >= 0; -- target_first)
@@ -409,6 +421,11 @@ struct ExtractPhrase
 		if (span_count_source != span_count_target)
 		  break;
 
+		corners(source_first + 1, target_first + 1).left_top  = true;
+		corners(source_last,      target_first + 1).right_top = true;
+		corners(source_first + 1, target_last).left_bottom  = true;
+		corners(source_last,      target_last).right_bottom = true;
+		
 		spans.push_back(span_pair_type(span_type(source_first, source_last),
 					       span_type(target_first, target_last)));
 	      }
@@ -455,17 +472,19 @@ struct ExtractPhrase
 	  phrase_pair.alignment.push_back(std::make_pair(src - source_first, *titer - target_first));
       }
       
-      // connected implies we have a "phrase"...alignment_matrix is one-based!
-      const bool connected_left_top     = alignment_matrix(source_first,    target_first);
-      const bool connected_right_top    = alignment_matrix(source_last + 1, target_first);
-      const bool connected_left_bottom  = alignment_matrix(source_first,    target_last + 1);
-      const bool connected_right_bottom = alignment_matrix(source_last + 1, target_last + 1);
+      // connected implies we have a "phrase"...corners is one-based!
+      const bool connected_left_top     = corners(source_first,    target_first).right_bottom;
+      const bool connected_right_top    = corners(source_last + 1, target_first).left_bottom;
+      const bool connected_left_bottom  = corners(source_first,    target_last + 1).right_top;
+      const bool connected_right_bottom = corners(source_last + 1, target_last + 1).left_top;
       
       phrase_pair_set_type::iterator iter = phrase_pairs.find(phrase_pair);
       if (iter == phrase_pairs.end())
 	iter = phrase_pairs.insert(phrase_pair).first;
       
       counts_type& counts = const_cast<counts_type&>(iter->counts);
+      
+      // monotone/swap counts are computed by "unique" monotone and "unique" swap
       
       counts[0] += 1;
       counts[1] += (  connected_left_top && ! connected_right_top);
