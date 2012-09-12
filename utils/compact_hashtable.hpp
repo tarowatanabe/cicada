@@ -129,9 +129,6 @@ namespace utils
 
     void assign(const_iterator first, const_iterator last)
     {
-      if (last - first != __last - __first)
-	throw std::runtime_error("wrong size!");
-      
       __assign_dispatch(first, last, boost::has_trivial_assign<value_type>());
     }
     
@@ -142,10 +139,8 @@ namespace utils
 
     void __assign_dispatch(const_iterator first, const_iterator last, boost::false_type)
     {
-      for (pointer iter = __first; first != last; ++ first, ++ iter) {
-	utils::destroy_object(iter);
-	utils::construct_object(iter, *first);
-      }
+      utils::destroy_range(__first, __last);
+      std::uninitialized_copy(first, last, __first);
     }
     
   private:
