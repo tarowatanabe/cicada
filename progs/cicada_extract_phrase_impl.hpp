@@ -420,7 +420,13 @@ struct ExtractPhrase
 		
 		if (span_count_source != span_count_target)
 		  break;
-
+		
+		if (max_length > 0 && source_last - source_first > max_length) continue;
+		if (max_length > 0 && target_last - target_first > max_length) continue;
+		if (max_fertility > 0
+		    && (double(utils::bithack::max(source_last - source_first, target_last - target_first))
+			/ double(utils::bithack::min(source_last - source_first, target_last - target_first))) >= max_fertility) continue;
+		
 		corners(source_first + 1, target_first + 1).left_top  = true;
 		corners(source_last,      target_first + 1).right_top = true;
 		corners(source_first + 1, target_last).left_bottom  = true;
@@ -440,12 +446,6 @@ struct ExtractPhrase
       const int& source_last  = siter->source.second;
       const int& target_first = siter->target.first;
       const int& target_last  = siter->target.second;
-      
-      if (max_length > 0 && source_last - source_first > max_length) continue;
-      if (max_length > 0 && target_last - target_first > max_length) continue;
-      if (max_fertility > 0
-	  && (double(utils::bithack::max(source_last - source_first, target_last - target_first))
-	      / double(utils::bithack::min(source_last - source_first, target_last - target_first))) >= max_fertility) continue;
       
       if (phrases_source(source_first, source_last).empty()) {
 	phrase_type& phrase = phrases_source(source_first, source_last);
