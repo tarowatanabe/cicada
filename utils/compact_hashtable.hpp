@@ -126,6 +126,27 @@ namespace utils
 	std::uninitialized_copy(first, last, __first);
       }
     }
+
+    void assign(const_iterator first, const_iterator last)
+    {
+      if (last - first != __last - __first)
+	throw std::runtime_error("wrong size!");
+      
+      __assign_dispatch(first, last, boost::has_trivial_assign<value_type>());
+    }
+    
+    void __assign_dispatch(const_iterator first, const_iterator last, boost::true_type)
+    {
+      std::memcpy(__first, first, sizeof(value_type) * size());
+    }
+
+    void __assign_dispatch(const_iterator first, const_iterator last, boost::false_type)
+    {
+      for (pointer iter = __first; first != last; ++ first, ++ iter) {
+	utils::destroy_object(iter);
+	utils::construct_object(iter, *first);
+      }
+    }
     
   private:
     pointer __first;
@@ -299,6 +320,9 @@ namespace utils
       if (x.empty()) {
 	bucket_type __bucket_new;
 	__bucket.swap(__bucket_new);
+      } else if (__bucket.size() == x.__bucket.size()) {
+	// the same bucket size
+	__bucket.assign(x.__bucket.begin(), x.__bucket.end());
       } else {
 	bucket_type __bucket_new(x.__bucket.begin(), x.__bucket.end());
 	__bucket.swap(__bucket_new);
@@ -727,7 +751,7 @@ namespace utils
     void copy_value(value_type& dest, const value_type& x, boost::false_type)
     {
       utils::destroy_object(&dest);
-      utils::construct_object(&dest, x);      
+      utils::construct_object(&dest, x);
     }
       
     
