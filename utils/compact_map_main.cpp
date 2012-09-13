@@ -37,6 +37,17 @@ int main(int argc, char** argv)
   
   std::cerr << "map size: " << map_map.size() << std::endl
 	    << "vec size: " << vec_map.size() << std::endl;
+
+  vec_map_type vec_map2 = vec_map;
+  {
+     for (map_map_type::const_iterator miter = map_map.begin(); miter != map_map.end(); ++ miter) {
+       vec_map_type::const_iterator viter = vec_map2.find(miter->first);
+       
+       if (viter == vec_map2.end())
+	 std::cerr << "assignmen failed?" << std::endl;
+     }
+  }
+  
   
   {
     for (map_map_type::const_iterator miter = map_map.begin(); miter != map_map.end(); ++ miter) {
