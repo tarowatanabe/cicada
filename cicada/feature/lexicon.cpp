@@ -239,6 +239,7 @@ namespace cicada
 
       std::string path;
       
+      bool populate = false;
       bool skip_sgml_tag = false;
       bool unique_source = false;
       
@@ -247,6 +248,8 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
+	else if (utils::ipiece(piter->first) == "populate")
+	  populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique-source")
@@ -273,6 +276,9 @@ namespace cicada
 
       if (! lexicon_impl->lexicon)
 	throw std::runtime_error("no lexicon");
+
+      if (populate)
+	lexicon_impl->lexicon->populate();
       
       base_type::__state_size = 0;
       base_type::__feature_name = (name.empty() ? std::string("lexicon") : name);

@@ -93,6 +93,7 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tfeature=attribute name mapping\n\
 lexicon: lexicon model feature\n\
 \tfile=lexicon model file\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tunique-source=[true|source] unique source labels\n\
 \tname=feature-name-prefix (default: lexicon)\n\
