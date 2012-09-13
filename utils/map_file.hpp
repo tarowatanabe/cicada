@@ -62,15 +62,15 @@ namespace utils
     void populate()
     {
       if (! mmapped || filesize <= 0) return;
-
+      
       const off_type page_size  = 4096;
-      const off_type block_size = page_size * 256;
+      const off_type block_size = page_size * 64;
       
       char buf[page_size];
       
       const byte_type* last = mmapped + filesize;
       for (const byte_type* first = mmapped; first + block_size < last; first += block_size) {
-	const byte_type* begin = first + (random() & 0xff) * page_size;
+	const byte_type* begin = first + (random() & (64 - 1)) * page_size;
 	
 	std::copy(begin, begin + page_size, buf);
       }

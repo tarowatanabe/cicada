@@ -187,7 +187,89 @@ namespace cicada
       
       return *this; 
     }
+
+    template <typename T, typename A>
+    FeatureVector& intersect_absmax(const FeatureVector<T,A>& x)
+    {
+      if (empty()) 
+	operator=(x);
+      else if (! x.empty()) {
+	vector_type vector_new;
+	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
+	
+	intersect_absmax(vector_new, __vector, x.begin(), x.end());
+	
+	__vector.swap(vector_new);
+      }
+      
+      return *this; 
+    }
+
+    FeatureVector& intersect_absmax(const FeatureVectorCompact& x);
+
+    template <typename T, typename A>
+    FeatureVector& intersect_absmax(const FeatureVectorLinear<T,A>& x)
+    {
+      if (empty()) 
+	operator=(x);
+      else if (! x.empty()) {
+	vector_type vector_new;
+	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
+	
+	intersect_absmax(vector_new, __vector, x.begin(), x.end());
+	
+	__vector.swap(vector_new);
+      }
+      
+      return *this; 
+    }
     
+    template <typename T, typename A>
+    FeatureVector& intersect_absmin(const FeatureVector<T,A>& x)
+    {
+      if (empty()) 
+	return *this;
+      
+      if (x.empty())
+	clear();
+      else {
+	vector_type vector_new;
+	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
+	
+	intersect_absmin(vector_new, __vector, x.begin(), x.end());
+	
+	__vector.swap(vector_new);
+      }
+      
+      return *this; 
+    }
+
+    FeatureVector& intersect_absmin(const FeatureVectorCompact& x);
+
+    template <typename T, typename A>
+    FeatureVector& intersect_absmin(const FeatureVectorLinear<T,A>& x)
+    {
+      if (empty()) 
+	return *this;
+      
+      if (x.empty())
+	clear();
+      else {
+	vector_type vector_new;
+	initialize(vector_new);
+	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
+	
+	intersect_absmin(vector_new, __vector, x.begin(), x.end());
+	
+	__vector.swap(vector_new);
+      }
+      
+      return *this; 
+    }
+
     template <typename T, typename A, typename Prefix>
     void update(const FeatureVector<T,A>& x, const Prefix& prefix)
     {
@@ -243,6 +325,57 @@ namespace cicada
 	  
 	  container.insert(std::make_pair(iter->first, value));
 	}
+      }
+    }
+
+    template <typename Container, typename Original, typename Iterator>
+    static inline
+    void intersect_absmax(Container& container, const Original& orig, Iterator first, Iterator last)
+    {
+      typedef typename Original::value_type::second_type                       value1_type;
+      typedef typename std::iterator_traits<Iterator>::value_type::second_type value2_type;
+      
+      for (/**/; first != last; ++ first) {
+	typename Original::const_iterator iter = orig.find(first->first);
+	
+	if (iter == orig.end()) {
+	  if (first->second != value2_type())
+	    container.insert(*first);
+	} else {
+	  const value1_type abs1 = (iter->second < value1_type()  ? - iter->second : iter->second);
+	  const value2_type abs2 = (first->second < value2_type() ? - first->second : first->second);
+	  
+	  if (abs1 > abs2) {
+	    if (iter->second != value1_type())
+	      container.insert(*iter);
+	  } else {
+	    if (first->second != value2_type())
+	      container.insert(*first);
+	  }
+	}
+      }
+    }
+    
+    template <typename Container, typename Original, typename Iterator>
+    static inline
+    void intersect_absmin(Container& container, const Original& orig, Iterator first, Iterator last)
+    {
+      typedef typename Original::value_type::second_type                       value1_type;
+      typedef typename std::iterator_traits<Iterator>::value_type::second_type value2_type;
+      
+      for (/**/; first != last; ++ first) {
+	typename Original::const_iterator iter = orig.find(first->first);
+	
+	if (iter == orig.end()) continue;
+	if (iter->second == value1_type() || first->second == value2_type()) continue;
+	
+	const value1_type abs1 = (iter->second < value1_type()  ? - iter->second : iter->second);
+	const value2_type abs2 = (first->second < value2_type() ? - first->second : first->second);
+	
+	if (abs1 < abs2)
+	  container.insert(*iter);
+	else
+	  container.insert(*first);
       }
     }
     
@@ -872,7 +1005,48 @@ namespace cicada
     
     return *this; 
   }
+
+  template <typename T, typename A>
+  inline
+  FeatureVector<T,A>& FeatureVector<T,A>::intersect_absmax(const FeatureVectorCompact& x)
+  {
+    if (empty())
+      operator=(x);
+    else if (! x.empty()) {
+      vector_type vector_new;
+      initialize(vector_new);
+      vector_new.rehash(__vector.size());
+      
+      intersect_absmax(vector_new, __vector, x.begin(), x.end());
+      
+      __vector.swap(vector_new);
+    }
+    
+    return *this; 
+  }
   
+  template <typename T, typename A>
+  inline
+  FeatureVector<T,A>& FeatureVector<T,A>::intersect_absmin(const FeatureVectorCompact& x)
+  {
+    if (empty())
+      return *this;
+    
+    if (x.empty())
+      clear();
+    else {
+      vector_type vector_new;
+      initialize(vector_new);
+      vector_new.rehash(__vector.size());
+      
+      intersect_absmin(vector_new, __vector, x.begin(), x.end());
+      
+      __vector.swap(vector_new);
+    }
+    
+    return *this; 
+  }
+
 
   template <typename T, typename A>
   inline
