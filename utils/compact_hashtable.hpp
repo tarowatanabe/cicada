@@ -38,6 +38,8 @@ namespace utils
     typedef const _Tp* const_iterator;
     typedef       _Tp& reference;
     typedef const _Tp& const_reference;
+
+    typedef __compact_hashtable_bucket<_Tp,_Alloc> self_type;
     
     __compact_hashtable_bucket() : __first(0), __last(0) {}
     __compact_hashtable_bucket(size_type __n, const value_type& x)
@@ -72,7 +74,7 @@ namespace utils
 	allocator().deallocate(__first, std::distance(__first, __last));
       }
     }
-      
+    
     bool empty() const { return __first == __last; }
     size_type size() const { return std::distance(__first, __last); }
 
@@ -127,20 +129,27 @@ namespace utils
       }
     }
 
-    void assign(const_iterator first, const_iterator last)
+    void assign(const self_type& x)
     {
-      __assign_dispatch(first, last, boost::has_trivial_assign<value_type>());
+      if (x.empty()) {
+	self_type __bucket;
+	swap(__bucket);
+      } else if (size() != x.size()) {
+	self_type __bucket(x.begin(), x.end());
+	swap(__bucket);
+      } else
+	__assign_dispatch(x, boost::has_trivial_assign<value_type>());
     }
     
-    void __assign_dispatch(const_iterator first, const_iterator last, boost::true_type)
+    void __assign_dispatch(const self_type& x, boost::true_type)
     {
-      std::memcpy(__first, first, sizeof(value_type) * size());
+      std::memcpy(__first, x.__first, sizeof(value_type) * size());
     }
-
-    void __assign_dispatch(const_iterator first, const_iterator last, boost::false_type)
+    
+    void __assign_dispatch(const self_type& x, boost::false_type)
     {
       utils::destroy_range(__first, __last);
-      std::uninitialized_copy(first, last, __first);
+      std::uninitialized_copy(x.__first, x.__last, __first);
     }
     
   private:
@@ -311,17 +320,7 @@ namespace utils
     {
       if (this == &x) return;
       
-      // new bucket, then, swap
-      if (x.empty()) {
-	bucket_type __bucket_new;
-	__bucket.swap(__bucket_new);
-      } else if (__bucket.size() == x.__bucket.size()) {
-	// the same bucket size
-	__bucket.assign(x.__bucket.begin(), x.__bucket.end());
-      } else {
-	bucket_type __bucket_new(x.__bucket.begin(), x.__bucket.end());
-	__bucket.swap(__bucket_new);
-      }
+      __bucket.assign(x.__bucket);
       
       copy_value(__value_empty, x.__value_empty);
       copy_value(__value_deleted, x.__value_deleted);
