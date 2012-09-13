@@ -512,13 +512,13 @@ namespace cicada
       
       // currency
       
-      const UNumberFormatStyle unum_style[5] = {UNUM_CURRENCY,
-						UNUM_CURRENCY_ISO,
-						UNUM_CURRENCY_PLURAL,
-						UNUM_SCIENTIFIC};
-      const char* unum_name[5] = {"currency", "currency", "currency", "scientific"};
+      const UNumberFormatStyle unum_style[] = {UNUM_CURRENCY,
+					       UNUM_CURRENCY_ISO,
+					       UNUM_CURRENCY_PLURAL,
+					       UNUM_SCIENTIFIC};
+      const char* unum_name[] = {"currency", "currency", "currency", "scientific"};
       
-      for (int i = 0; i != 5; ++ i) {
+      for (int i = 0; i != sizeof(unum_style) / sizeof(UNumberFormatStyle) ; ++ i) {
 	UErrorCode status = U_ZERO_ERROR;
 	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, unum_style[i], status));
 	if (U_FAILURE(status))
