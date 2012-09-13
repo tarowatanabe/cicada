@@ -67,6 +67,7 @@ bin_PROGRAMS = \
 	cicada_filter_text \
 	cicada_filter_weights \
 	cicada_format_rbnf \
+	cicada_format_numfmt \
 	cicada_grammar_coarse \
 	cicada_grammar_learn \
 	cicada_index_cluster \
@@ -265,6 +266,9 @@ cicada_filter_weights_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_format_rbnf_SOURCES = cicada_format_rbnf.cpp
 cicada_format_rbnf_LDADD   = $(LIBUTILS) $(ICU_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_format_numfmt_SOURCES = cicada_format_numfmt.cpp
+cicada_format_numfmt_LDADD   = $(LIBUTILS) $(ICU_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_grammar_coarse_SOURCES = cicada_grammar_coarse.cpp
 cicada_grammar_coarse_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

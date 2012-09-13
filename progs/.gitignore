@@ -70,6 +70,7 @@ cicada_filter_terminal
 cicada_filter_text
 cicada_filter_weights
 cicada_format_rbnf
+cicada_format_numfmt
 cicada_grammar_coarse
 cicada_grammar_learn
 cicada_index_cluster
