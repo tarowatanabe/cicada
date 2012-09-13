@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include <unicode/curramt.h>
+#include <unicode/ucurr.h>
 #include <unicode/format.h>
 #include <unicode/numfmt.h>
 #include <unicode/rbnf.h>
@@ -81,32 +82,80 @@ namespace cicada
 	  std::string   generated;
 	
 	  phrase_unique_type uniques;
-	
-	  parser_set_type::const_iterator piter_end = parsers.end();
-	  for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
-	    const parser_type* parser = *piter;
-	    icu::Formattable   formattable;
-	    icu::ParsePosition pos(0);
-	  
-	    parser->parse(uphrase, formattable, pos);
-	  
-	    if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
-	  
-	    generator_set_type::const_iterator giter_end = generators.end();
-	    for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
-	      const generator_type* generator = *giter;
-	      UErrorCode    status(U_ZERO_ERROR);
-	    
-	      ugenerated.remove();
-	      generator->format(formattable, ugenerated, status);
-	    
-	      if (U_FAILURE(status)) continue;
-	    
-	      generated.clear();
-	      ugenerated.toUTF8String(generated);
-	      uniques.insert(generated);
 
-	      //std::cerr << name << ": " << generated << std::endl;
+	  if (currency) {
+	    parser_set_type::const_iterator piter_end = parsers.end();
+	    for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
+	      const parser_type* parser = *piter;
+	      icu::ParsePosition pos(0);
+	      
+	      std::auto_ptr<icu::CurrencyAmount> curr(parser->parseCurrency(uphrase, pos));
+	      
+	      if (! curr.get() || pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
+
+	      // check code!
+	      if (ucurr_getNumericCode(curr->getISOCurrency()) == 0) continue;
+
+	      const icu::Formattable& formattable = curr->getNumber();
+	      
+	      generator_set_type::const_iterator giter_end = generators.end();
+	      for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
+		generator_type* generator = const_cast<generator_type*>(*giter);
+		
+		UErrorCode status(U_ZERO_ERROR);
+		generator->setCurrency(curr->getISOCurrency(), status);
+		
+		if (U_FAILURE(status)) continue;
+		
+		ugenerated.remove();
+		
+		status = U_ZERO_ERROR;
+		generator->format(formattable, ugenerated, status);
+		
+		if (U_FAILURE(status)) continue;
+		
+		generated.clear();
+		ugenerated.toUTF8String(generated);
+		uniques.insert(generated);
+		
+		//std::cerr << name << ": " << generated << std::endl;
+	      }
+	    }	
+	  } else {
+	    parser_set_type::const_iterator piter_end = parsers.end();
+	    for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
+	      const parser_type* parser = *piter;
+	      icu::Formattable   formattable;
+	      icu::ParsePosition pos(0);
+	      
+	      parser->parse(uphrase, formattable, pos);
+	      
+	      if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
+	      
+	      generator_set_type::const_iterator giter_end = generators.end();
+	      for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
+		const generator_type* generator = *giter;
+		
+		UErrorCode status(U_ZERO_ERROR);
+		
+		ugenerated.remove();
+		generator->format(formattable, ugenerated, status);
+		
+		if (U_FAILURE(status)) continue;
+		
+		icu::Formattable   reparsed;
+		icu::ParsePosition pos(0);
+		
+		generator->parse(ugenerated, reparsed, pos);
+		
+		if (pos.getErrorIndex() >= 0 || pos.getIndex() != ugenerated.length() || reparsed != formattable) continue;
+		
+		generated.clear();
+		ugenerated.toUTF8String(generated);
+		uniques.insert(generated);
+		
+		//std::cerr << name << ": " << generated << std::endl;
+	      }
 	    }
 	  }
 	  
@@ -381,7 +430,10 @@ namespace cicada
       std::auto_ptr<icu::NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-
+      
+      // lenient parsing...
+      nf_source->setLenient(true);
+      
       sources["numbering"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       sources["cardinal"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       sources["any"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
@@ -458,21 +510,64 @@ namespace cicada
       targets["cardinal"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       targets["any"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       
+      // currency
+      
+      const UNumberFormatStyle curr_style[3] = {UNUM_CURRENCY, UNUM_CURRENCY_ISO, UNUM_CURRENCY_PLURAL};
+      
+      for (int i = 0; i != 3; ++ i) {
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, curr_style[i], status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	curr_source->setLenient(true);
+	
+	status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, curr_style[i], status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	sources["currency"].parsers.push_back(curr_source.release());
+	targets["currency"].generators.push_back(curr_target.release());
+      }
+      
 #if 0
-      // currently, we will disable currency parsing/generation
-      status = U_ZERO_ERROR;
-      std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createCurrencyInstance(locale_source, status));
-      if (U_FAILURE(status))
-	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
-      
-      status = U_ZERO_ERROR;
-      std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createCurrencyInstance(locale_target, status));
-      if (U_FAILURE(status))
-	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
-      
-      sources["currency"].parsers.push_back(curr_source.release());
-      targets["currency"].generators.push_back(curr_target.release());
+      // percent
+      {
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, UNUM_PERCENT, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	curr_source->setLenient(true);
+	
+	status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, UNUM_PERCENT, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	sources["percent"].parsers.push_back(curr_source.release());
+	targets["percent"].generators.push_back(curr_target.release());
+      }
 #endif
+      
+      // scientific
+      {
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, UNUM_SCIENTIFIC, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	curr_source->setLenient(true);
+	
+	status = U_ZERO_ERROR;
+	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, UNUM_SCIENTIFIC, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+	
+	sources["scientific"].parsers.push_back(curr_source.release());
+	targets["scientific"].generators.push_back(curr_target.release());
+      }
 
       // try match!
       impl_map_type::iterator siter_end = sources.end();
