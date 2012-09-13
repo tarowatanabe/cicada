@@ -107,11 +107,7 @@ namespace cicada
       void read(const path_type& path) { data.open(path); }
       void open(const path_type& path) { data.open(path); }
       void clear() { data.clear(); }
-
-      void populate()
-      {
-	data.populate();
-      }
+      void populate() { data.populate(); }
       
       bool empty() const { return data.empty(); }
       path_type path() const { return data.path(); }
