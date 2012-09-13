@@ -170,6 +170,12 @@ namespace cicada
       
       void open(const path_type& path);
       
+      void populate()
+      {
+	ids.populate();
+	positions.populate();
+      }
+
     public:
       id_type operator[](size_type pos) const { return index(pos); }
       id_type index(size_type pos) const { return (pos < offsets[1] ? id_type(pos) : ids[pos - offsets[1]]); }
@@ -700,6 +706,14 @@ namespace cicada
     void close() { clear(); }
     
     void open(const path_type& path);
+
+    void populate()
+    {
+      shard_set_type::iterator siter_end = __shards.end();
+      for (shard_set_type::iterator siter = __shards.begin(); siter != siter_end; ++ siter)
+	siter->populate();
+      __vocab.populate();
+    }
 
     bool is_open() const { return ! __shards.empty() && ! __path.empty(); }
     path_type path() const { return __path; }

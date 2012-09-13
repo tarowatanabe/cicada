@@ -107,6 +107,11 @@ namespace cicada
       void read(const path_type& path) { data.open(path); }
       void open(const path_type& path) { data.open(path); }
       void clear() { data.clear(); }
+
+      void populate()
+      {
+	data.populate();
+      }
       
       bool empty() const { return data.empty(); }
       path_type path() const { return data.path(); }
@@ -134,6 +139,12 @@ namespace cicada
       {
 	data.clear();
 	offset.clear();
+      }
+
+      void populate()
+      {
+	data.populate();
+	offset.populate();
       }
       
       utils::piece operator[](size_t i) const
@@ -193,6 +204,12 @@ namespace cicada
       
       void read(const path_type& path);
       void write(const path_type& file) const;
+
+      void populate()
+      {
+	score.populate();
+	quantized.populate();
+      }
       
       void clear()
       {
@@ -530,6 +547,27 @@ namespace cicada
     void read(const std::string& parameter);
     void write(const path_type& path) const;
 
+    void populate()
+    {
+      rule_db.populate();
+      source_db.populate();
+      target_db.populate();
+
+      for (size_t feature = 0; feature < score_db.size(); ++ feature)
+	score_db[feature].populate();
+
+      for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+	attr_db[attr].populate();
+      
+      feature_data.populate();
+      attribute_data.populate();
+      
+      feature_vocab.populate();
+      attribute_vocab.populate();
+      
+      vocab.populate();
+    }
+
     void read_keyed_text(const std::string& path);
     void read_text(const std::string& path);
     void read_binary(const std::string& path);
@@ -739,6 +777,10 @@ namespace cicada
     parameter_type::const_iterator citer = param.find("cache");
     if (citer != param.end())
       caching = utils::lexical_cast<bool>(citer->second);
+    
+    parameter_type::const_iterator piter = param.find("populate");
+    if (piter != param.end() && utils::lexical_cast<bool>(piter->second))
+      populate();
   }
   
   void GrammarStaticImpl::write(const path_type& file) const

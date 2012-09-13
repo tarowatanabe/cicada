@@ -143,6 +143,12 @@ namespace cicada
       }
     }
     void write(const path_type& path) const;
+
+    void populate()
+    {
+      if (__succinct_hash_mapped)
+	__succinct_hash_mapped->populate();
+    }
     
     id_type operator[](const symbol_type& word) const
     {

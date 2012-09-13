@@ -140,6 +140,16 @@ namespace cicada
     
     void open(const path_type& path);
     void close() { clear(); }
+    
+    void populate()
+    {
+      index_.populate();
+      count_.populate();
+      total_.populate();
+      positions_.populate();
+      vocab_.populate();
+    }
+
     void clear()
     {
       index_.clear();

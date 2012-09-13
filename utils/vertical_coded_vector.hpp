@@ -382,6 +382,12 @@ namespace utils
 	utils::filesystem::copy_files(*iter, file);
     }
     
+    void populate()
+    {
+      compressed.populate();
+      off.populate();
+    }
+    
   private:
     compressed_vector_type compressed;
     off_vector_type        off;

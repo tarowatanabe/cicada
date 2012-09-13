@@ -276,6 +276,14 @@ namespace succinctdb
       for (boost::filesystem::directory_iterator iter(path()); iter != iter_end; ++ iter)
 	utils::filesystem::copy_files(*iter, file);
     }
+
+    void populate()
+    {
+      bins.populate();
+      nexts.populate();
+      keys.populate();
+      offs.populate();
+    }
   
   private:
     bool equal_to(pos_type pos, const key_type* buf, size_type size) const

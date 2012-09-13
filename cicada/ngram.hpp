@@ -54,6 +54,13 @@ namespace cicada
       	: logprobs(), quantized(), maps(), offset(0) { open(path); }
       
       void open(const path_type& path);
+      
+      void populate()
+      {
+	logprobs.populate();
+	quantized.populate();
+      }
+
       path_type path() const { return (quantized.is_open() ? quantized.path().parent_path() : logprobs.path().parent_path()); }
       
       void close() { clear(); }
@@ -406,6 +413,22 @@ namespace cicada
     bool empty() const { return index.empty(); }
     
     void open(const path_type& path);
+
+    void populate()
+    {
+      index.populate();
+      
+      populate(logprobs.begin(), logprobs.end());
+      populate(backoffs.begin(), backoffs.end());
+      populate(logbounds.begin(), logbounds.end());
+    }
+
+    template <typename Iterator>
+    void populate(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first)
+	first->populate();
+    }
     
     void close() { clear(); }
     void clear()

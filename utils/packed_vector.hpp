@@ -492,6 +492,12 @@ namespace utils
 	utils::filesystem::copy_files(*iter, file);
     }
 
+    void populate()
+    {
+      __data.populate();
+      __index.populate();
+    }
+
   public:
     size_type         __size;
     data_vector_type  __data;

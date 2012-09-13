@@ -34,6 +34,7 @@ namespace cicada
 file-name: indexed grammar or plain text grammar\n\
 \tmax-span=[int] maximum span (<=0 for no-constraint)\n\
 \tkey-value=[true|false] store key-value format of features/attributes\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
 \tfeature0=[feature-name]\n\
 \tfeature1=[feature-name]\n\
 \t...\n\

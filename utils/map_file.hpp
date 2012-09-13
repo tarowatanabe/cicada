@@ -58,7 +58,24 @@ namespace utils
     
     off_type size() const { return filesize; }
     const boost::filesystem::path& path() const { return filename; }
-    
+  
+    void populate()
+    {
+      if (! mmapped || filesize <= 0) return;
+
+      const off_type page_size  = 4096;
+      const off_type block_size = page_size * 256;
+      
+      char buf[page_size];
+      
+      const byte_type* last = mmapped + filesize;
+      for (const byte_type* first = mmapped; first + block_size < last; first += block_size) {
+	const byte_type* begin = first + (random() & 0xff) * page_size;
+	
+	std::copy(begin, begin + page_size, buf);
+      }
+    }
+      
   private:
     void open(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
     {
@@ -108,8 +125,6 @@ namespace utils
 	mmapped = x;
       else
 	throw std::runtime_error(std::string("map_file::open() mmap()") + strerror(errno));
-
-      //populate();
     }
 
     void close()
@@ -124,23 +139,6 @@ namespace utils
       modifiable = false;
     }
 
-    void populate()
-    {
-      if (! mmapped || filesize <= 0) return;
-
-      const off_type page_size  = 4096;
-      const off_type block_size = page_size * 256;
-      
-      char buf[page_size];
-      
-      const byte_type* last = mmapped + filesize;
-      for (const byte_type* first = mmapped; first + block_size < last; first += block_size) {
-	const byte_type* begin = first + (random() & 0xff) * page_size;
-	
-	std::copy(begin, begin + page_size, buf);
-      }
-    }
-    
   private:
     byte_type* mmapped;
     
@@ -219,6 +217,12 @@ namespace utils
       pimpl.swap(x.pimpl);
     }
 
+    void populate()
+    {
+      if (pimpl)
+	pimpl->populate();
+    }
+    
   private:
     boost::shared_ptr<impl_type> pimpl;
   };

@@ -153,6 +153,12 @@ namespace cicada
   public:
     void open(const path_type& path);
     void write(const path_type& file) const;
+
+    void populate()
+    {
+      lexicon.populate();
+      vocab.populate();
+    }
     
     void close() { clear(); }
     void clear()

@@ -177,6 +177,12 @@ namespace cicada
   public:
     void open(const std::string& path);
     void write(const path_type& file) const;
+
+    void populate()
+    {
+      lexicon.populate();
+      vocab.populate();
+    }
     
     void close() { clear(); }
     void clear()

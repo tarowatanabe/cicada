@@ -515,6 +515,8 @@ namespace succinctdb
     void open(const path_type& path) { __impl.open(path); }
     void clear() { __impl.clear(); }
     void close() { __impl.close(); }
+
+    void populate() { __impl.populate(); }
     
     bool empty() const { return __impl.empty(); }
     size_type size() const { return __impl.size(); }
@@ -559,6 +561,8 @@ namespace succinctdb
     void open(const path_type& path) { __impl.open(path); }
     void clear() { __impl.clear(); }
     void close() { __impl.close(); }
+
+    void populate() { __impl.populate(); }
     
     bool empty() const { return __impl.empty(); }
     size_type size() const { return __impl.size(); }
@@ -684,6 +688,14 @@ namespace succinctdb
       // copy all...
       for (boost::filesystem::directory_iterator iter(path()); iter != iter_end; ++ iter)
 	utils::filesystem::copy_files(*iter, file);
+    }
+    
+    void populate()
+    {
+      positions.populate();
+      index_map.populate();
+      index.populate();
+      mapped.populate();
     }
     
     bool empty() const { return mapped.empty(); }

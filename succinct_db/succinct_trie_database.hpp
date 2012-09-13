@@ -406,6 +406,15 @@ namespace succinctdb
 	__offsets.write(rep.path("offset"));
       }
     }
+
+    void populate()
+    {
+      if (__succinct_trie)
+	__succinct_trie->populate();
+      
+      __mapped.populate();
+      __offsets.populate();
+    }
     
     void close() { __succinct_trie.reset(); __succinct_writer.reset(); __mapped.clear(); __offsets.clear(); }
     void clear() { close(); }

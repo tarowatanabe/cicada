@@ -256,7 +256,7 @@ namespace succinctdb
     typedef boost::filesystem::path path_type;
     
   private:
-    typedef succinct_trie_mapped<Key, Data, Alloc>     succinct_trie_type;
+    typedef succinct_trie_mapped<Key, Data, Alloc>    succinct_trie_type;
     typedef __succinct_trie_db_writer<Key,Data,Alloc> succinct_writer_type;
     
   public:
@@ -287,7 +287,13 @@ namespace succinctdb
       if (__succinct_trie)
 	__succinct_trie->write(file);
     }
-
+    
+    void populate()
+    {
+      if (__succinct_trie)
+	__succinct_trie->populate();
+    }
+    
     path_type path() const 
     {
       if (__succinct_trie)

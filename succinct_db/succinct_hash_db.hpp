@@ -194,6 +194,15 @@ namespace succinctdb
 	}
       }
     }
+
+    void populate()
+    {
+      if (__succinct_hash_mapped)
+	__succinct_hash_mapped->populate();
+      
+      if (__data_mapped)
+	__data_mapped->populate();
+    }
     
     pos_type insert(const key_type* buf, size_type buf_size, const data_type& data)
     {

@@ -52,6 +52,12 @@ namespace cicada
     void open(const path_type& path);
     void write(const path_type& path) const;
     path_type path() const { return clusters.path().parent_path(); }
+
+    void populate()
+    {
+      vocab.populate();
+      clusters.populate();
+    }
     
     symbol_type operator()(const symbol_type& word) const { return operator[](word); }
     symbol_type operator[](const symbol_type& word) const

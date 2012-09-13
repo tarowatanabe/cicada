@@ -356,7 +356,7 @@ namespace utils
     typedef typename _Alloc::template rebind<rank_high_type>::other  rank_high_allocator_type;
     typedef typename _Alloc::template rebind<rank_low_type>::other   rank_low_allocator_type;
     
-    typedef utils::map_file<block_type, block_allocator_type>  bit_block_type;
+    typedef utils::map_file<block_type, block_allocator_type>         bit_block_type;
     typedef utils::map_file<rank_high_type, rank_high_allocator_type> bit_rank_high_type;
     typedef utils::map_file<rank_low_type, rank_low_allocator_type>   bit_rank_low_type;
     
@@ -541,6 +541,13 @@ namespace utils
       // copy all...
       for (boost::filesystem::directory_iterator iter(path()); iter != iter_end; ++ iter)
 	utils::filesystem::copy_files(*iter, file);
+    }
+
+    void populate()
+    {
+      __blocks.populate();
+      __rank_high.populate();
+      __rank_low.populate();
     }
     
   public:

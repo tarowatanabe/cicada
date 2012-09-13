@@ -77,11 +77,14 @@ namespace cicada
       static const symbol_type::id_type id_star;
 
     public:
-      NGramPYPImpl(const path_type& __path, const int __order)
+      NGramPYPImpl(const path_type& __path, const int __order, const bool populate)
 	: ngram(&ngram_type::create(__path)),
 	  order(__order), no_bos_eos(false), skip_sgml_tag(false)
       {
 	order = utils::bithack::min(order, ngram->order());
+
+	if (populate)
+	  ngram->populate();
 	
 	initialize_cache();
 	
@@ -595,11 +598,13 @@ namespace cicada
 	throw std::runtime_error("is this really ngram feature function? " + parameter);
 
       path_type   path;
+      bool        populate = false;
       int         order = 3;
       bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
       
       path_type   coarse_path;
+      bool        coarse_populate;
       int         coarse_order = 0;
       
       std::string name;
@@ -607,6 +612,8 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
+	else if (utils::ipiece(piter->first) == "populate")
+	  populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
@@ -615,6 +622,8 @@ namespace cicada
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
+	else if (utils::ipiece(piter->first) == "coarse-populate")
+	  coarse_populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-order")
 	  coarse_order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
@@ -634,7 +643,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
+      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
       
       ngram_impl->no_bos_eos = no_bos_eos;
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
@@ -655,7 +664,7 @@ namespace cicada
 	  throw std::runtime_error("coarse order must be non-zero!");
 	
 	if (! coarse_path.empty()) {
-	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
+	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order, coarse_populate));
 
 	  ngram_impl->no_bos_eos = no_bos_eos;
 	  ngram_impl->skip_sgml_tag = skip_sgml_tag;

@@ -296,7 +296,7 @@ namespace cicada
 	max_span = utils::lexical_cast<int>(piter->second);
 	continue;
       }
-      
+
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
