@@ -515,9 +515,8 @@ namespace cicada
       const UNumberFormatStyle unum_style[5] = {UNUM_CURRENCY,
 						UNUM_CURRENCY_ISO,
 						UNUM_CURRENCY_PLURAL,
-						UNUM_PERCENT,
 						UNUM_SCIENTIFIC};
-      const char* unum_name[5] = {"currency", "currency", "currency", "percent", "scientific"};
+      const char* unum_name[5] = {"currency", "currency", "currency", "scientific"};
       
       for (int i = 0; i != 5; ++ i) {
 	UErrorCode status = U_ZERO_ERROR;
