@@ -512,61 +512,28 @@ namespace cicada
       
       // currency
       
-      const UNumberFormatStyle curr_style[3] = {UNUM_CURRENCY, UNUM_CURRENCY_ISO, UNUM_CURRENCY_PLURAL};
+      const UNumberFormatStyle unum_style[5] = {UNUM_CURRENCY,
+						UNUM_CURRENCY_ISO,
+						UNUM_CURRENCY_PLURAL,
+						UNUM_PERCENT,
+						UNUM_SCIENTIFIC};
+      const char* unum_name[5] = {"currency", "currency", "currency", "percent", "scientific"};
       
-      for (int i = 0; i != 3; ++ i) {
+      for (int i = 0; i != 5; ++ i) {
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, curr_style[i], status));
+	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, unum_style[i], status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
 	
 	curr_source->setLenient(true);
 	
 	status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, curr_style[i], status));
+	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, unum_style[i], status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
 	
-	sources["currency"].parsers.push_back(curr_source.release());
-	targets["currency"].generators.push_back(curr_target.release());
-      }
-      
-#if 0
-      // percent
-      {
-	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, UNUM_PERCENT, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-	
-	curr_source->setLenient(true);
-	
-	status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, UNUM_PERCENT, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-	
-	sources["percent"].parsers.push_back(curr_source.release());
-	targets["percent"].generators.push_back(curr_target.release());
-      }
-#endif
-      
-      // scientific
-      {
-	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, UNUM_SCIENTIFIC, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-	
-	curr_source->setLenient(true);
-	
-	status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, UNUM_SCIENTIFIC, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-	
-	sources["scientific"].parsers.push_back(curr_source.release());
-	targets["scientific"].generators.push_back(curr_target.release());
+	sources[unum_name[i]].parsers.push_back(curr_source.release());
+	targets[unum_name[i]].generators.push_back(curr_target.release());
       }
 
       // try match!
