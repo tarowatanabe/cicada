@@ -35,9 +35,11 @@ namespace cicada
 	     const std::string& locale_str_target)
       { initialize(path_source, path_target, locale_str_source, locale_str_target); }
       
-      Number(const Number& x);
-      Number& operator=(const Number& x);
       ~Number();
+
+    private:      
+      Number(const Number& x) {}
+      Number& operator=(const Number& x) { return *this; }
       
     public:
        virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const;

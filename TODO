@@ -164,3 +164,9 @@ Revise ngram-pyp so that we do not have to re-compute lower-order probabilities.
 Implement ADMM for potentially better parallel training
 
 # of crossed word alignment in synchronous rules
+
+
+rework of icu number formatter:
+  we will perform fine-graned control of:
+    use of matched rules
+    use of any rules...?

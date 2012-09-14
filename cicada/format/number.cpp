@@ -60,7 +60,7 @@ namespace cicada
       typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
       
     public:
-      NumberImpl() :currency(false){}
+      NumberImpl() : currency(false){}
       NumberImpl(const NumberImpl& x) { assign(x); }
       NumberImpl& operator=(const NumberImpl& x)
       {
@@ -247,8 +247,6 @@ namespace cicada
       
       return rbnf.release();
     }
-    
-    
     
     void Number::initialize(const path_type& path_source,
 			    const path_type& path_target,
@@ -598,25 +596,6 @@ namespace cicada
 	  pimpls.back()->currency = (siter->first == "currency");
 	}
       }
-    }
-    
-    Number::Number(const Number& x)
-      : pimpls()
-    {
-      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
-	pimpls.push_back(new impl_type(*(*iter)));
-    }
-    
-    Number& Number::operator=(const Number& x)
-    {
-      for (pimpl_set_type::iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter)
-	delete *iter;
-      pimpls.clear();
-
-      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
-	pimpls.push_back(new impl_type(*(*iter)));
-
-      return *this;
     }
 
     Number::~Number()

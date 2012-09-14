@@ -23,10 +23,11 @@ namespace cicada
     public:
       Date(const std::string& locale_str_source,
 	   const std::string& locale_str_target);
-      Date(const Date& x);
-      Date& operator=(const Date& x);
       ~Date();
-      
+
+    private:
+      Date(const Date& x) {}
+      Date& operator=(const Date& x) { return *this; }
     public:
        virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const;
       

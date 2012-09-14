@@ -222,6 +222,9 @@ namespace cicada
 	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
 	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
 	
+	date->setLenient(true);
+	time->setLenient(true);
+	
 	date->setCalendar(*calendar);
 	time->setCalendar(*calendar);
 	
@@ -242,25 +245,6 @@ namespace cicada
 	pimpls.back()->generators.swap(titer->second.generators);
 	pimpls.back()->name = siter->first;
       }
-    }
-    
-    Date::Date(const Date& x)
-      : pimpls()
-    {
-      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
-	pimpls.push_back(new impl_type(*(*iter)));
-    }
-    
-    Date& Date::operator=(const Date& x)
-    {
-      for (pimpl_set_type::iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter)
-	delete *iter;
-      pimpls.clear();
-
-      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
-	pimpls.push_back(new impl_type(*(*iter)));
-
-      return *this;
     }
 
     Date::~Date()

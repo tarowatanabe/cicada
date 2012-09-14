@@ -86,7 +86,6 @@ number: number format\n\
 	std::string locale_parser;
 	std::string locale_generator;
 	
-	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "locale-parser" || utils::ipiece(piter->first) == "locale-source")
 	    locale_parser = piter->second;
