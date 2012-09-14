@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <string>
-#include <set>
 #include <memory>
 #include <stdexcept>
 
@@ -63,45 +62,48 @@ namespace cicada
     public:
       const phrase_set_type& operator()(const phrase_type& input) const
       {
-	typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-
 	cache_type& cache = const_cast<cache_type&>(caches[hasher_type::operator()(input.begin(), input.end(), 0) & (caches.size() - 1)]);
 	if (cache.key != input) {
 	  icu::UnicodeString uphrase = icu::UnicodeString::fromUTF8(input);
 	  icu::UnicodeString ugenerated;
 	  std::string   generated;
 	  
-	  phrase_unique_type uniques;
-	
+	  cache.key = input;
+	  cache.value.clear();
+	  
 	  parser_set_type::const_iterator piter_end = parsers.end();
 	  for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
 	    const parser_type* parser = *piter;
 	    icu::Formattable   formattable;
 	    icu::ParsePosition pos(0);
-	  
+	    
 	    parser->parseObject(uphrase, formattable, pos);
-	  
+	    
 	    if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
-	  
+	    
 	    generator_set_type::const_iterator giter_end = generators.end();
 	    for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
 	      const generator_type* generator = *giter;
 	      UErrorCode status(U_ZERO_ERROR);
-	    
+	      
 	      ugenerated.remove();
 	      generator->format(formattable, ugenerated, status);
 	    
 	      if (U_FAILURE(status)) continue;
-	    
+	      
+	      icu::Formattable   reparsed;
+	      icu::ParsePosition pos(0);
+	      
+	      generator->parseObject(ugenerated, reparsed, pos);
+	      
+	      if (pos.getErrorIndex() >= 0 || pos.getIndex() != ugenerated.length() || reparsed != formattable) continue;
+	      
 	      generated.clear();
 	      ugenerated.toUTF8String(generated);
-	      uniques.insert(generated);
+	      
+	      cache.value.push_back(std::make_pair(generated, name));
 	    }
 	  }
-	  
-	  cache.key = input;
-	  cache.value.clear();
-	  cache.value.insert(cache.value.end(), uniques.begin(), uniques.end());
 	}
 	
 	return cache.value;
@@ -146,18 +148,13 @@ namespace cicada
     
     void Date::operator()(const phrase_type& phrase, phrase_set_type& generated) const
     {
-      typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-      
-      phrase_unique_type uniques;
+      generated.clear();
       
       for (pimpl_set_type::const_iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter) {
 	const phrase_set_type& results = (*iter)->operator()(phrase);
 	
-	uniques.insert(results.begin(), results.end());
+	generated.insert(generated.end(), results.begin(), results.end());
       }
-      
-      generated.clear();
-      generated.insert(generated.end(), uniques.begin(), uniques.end());
     }
 
     
@@ -179,10 +176,24 @@ namespace cicada
       impl_map_type sources;
       impl_map_type targets;
       
-      const icu::DateFormat::EStyle date_styles[4] = { icu::DateFormat::SHORT, icu::DateFormat::MEDIUM, icu::DateFormat::LONG, icu::DateFormat::FULL};
-      const char* names[4] = {"short", "medium", "long", "full"};
+      const icu::DateFormat::EStyle date_styles[8] = { icu::DateFormat::kShort,
+						       icu::DateFormat::kMedium,
+						       icu::DateFormat::kLong,
+						       icu::DateFormat::kFull,
+						       icu::DateFormat::kShortRelative,
+						       icu::DateFormat::kMediumRelative,
+						       icu::DateFormat::kLongRelative,
+						       icu::DateFormat::kFullRelative,};
+      const char* names[8] = {"short",
+			      "medium",
+			      "long",
+			      "full",
+			      "short-relative",
+			      "medium-relative",
+			      "long-relative",
+			      "full-relative"};
       
-      for (int i = 0; i != 4; ++ i) {
+      for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
 	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
 	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
 
@@ -193,7 +204,7 @@ namespace cicada
 	sources[std::string("time-") + names[i]].parsers.push_back(time.release());
       }
 
-      for (int i = 0; i != 4; ++ i) {
+      for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
 	targets[std::string("date-") + names[i]].generators.push_back(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
 	targets[std::string("time-") + names[i]].generators.push_back(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
       }

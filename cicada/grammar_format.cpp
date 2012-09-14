@@ -1,6 +1,8 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#include <map>
 
 #include <cicada/sentence.hpp>
 
@@ -31,21 +33,25 @@ namespace cicada
       
       if (! phrases.empty()) {
 	typedef cicada::Sentence phrase_type;
-	
-	feature_set_type features;
-	features[feature] = -1;
+	typedef std::map<std::string, feature_set_type, std::less<std::string>, std::allocator<std::pair<const std::string, feature_set_type> > > unique_set_type;
+
+	unique_set_type uniques;
+	format_type::phrase_set_type::const_iterator piter_end = phrases.end();
+	for (format_type::phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter)
+	  ++ uniques[piter->phrase][static_cast<const std::string&>(feature) + ":" + piter->tag];
 	
 	// construct source-side lhs from context
 	const phrase_type phrase_source = phrase_type(utils::piece(context));
 	const rule_ptr_type rule_source = rule_type::create(rule_type(non_terminal, phrase_source.begin(), phrase_source.end()));
 	
-	format_type::phrase_set_type::const_iterator piter_end = phrases.end();
-	for (format_type::phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	  // construct target-side lhs from *piter;
-	  const phrase_type phrase_target = phrase_type(utils::piece(*piter));
+	unique_set_type::iterator uiter_end = uniques.end();
+	for (unique_set_type::iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	  uiter->second[feature] = -1;
+	  
+	  const phrase_type phrase_target = phrase_type(utils::piece(uiter->first));
 	  const rule_ptr_type rule_target = rule_type::create(rule_type(non_terminal, phrase_target.begin(), phrase_target.end()));
 	  
-	  const_cast<base_type&>(static_cast<const base_type&>(*this)).insert(rule_source, rule_target, features);
+	  const_cast<base_type&>(static_cast<const base_type&>(*this)).insert(rule_source, rule_target, uiter->second);
 	}
 	
 	node_next = base_type::next(node, symbol);

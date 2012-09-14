@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__FORMAT__HPP__
@@ -17,7 +17,21 @@ namespace cicada
   {
   public:
     typedef std::string phrase_type;
-    typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
+    typedef std::string tag_type;
+    
+    struct phrase_tag_type
+    {
+      phrase_type phrase;
+      tag_type    tag;
+      
+      phrase_tag_type()
+	: phrase(), tag() {}
+      phrase_tag_type(const phrase_type& __phrase, const tag_type& __tag)
+	: phrase(__phrase), tag(__tag) {}
+      phrase_tag_type(const std::pair<phrase_type, tag_type>& x)
+	: phrase(x.first), tag(x.second) {}
+    };
+    typedef std::vector<phrase_tag_type, std::allocator<phrase_tag_type> > phrase_set_type;
 
   public:
     virtual ~Format() {}

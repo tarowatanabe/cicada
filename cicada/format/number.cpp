@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <string>
-#include <set>
 #include <memory>
 #include <stdexcept>
 
@@ -73,15 +72,14 @@ namespace cicada
     public:
       const phrase_set_type& operator()(const phrase_type& input) const
       {
-	typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-	
 	cache_type& cache = const_cast<cache_type&>(caches[hasher_type::operator()(input.begin(), input.end(), 0) & (caches.size() - 1)]);
 	if (cache.key != input) {
 	  icu::UnicodeString uphrase = icu::UnicodeString::fromUTF8(input);
 	  icu::UnicodeString ugenerated;
 	  std::string   generated;
-	
-	  phrase_unique_type uniques;
+	  
+	  cache.key = input;
+	  cache.value.clear();
 
 	  if (currency) {
 	    parser_set_type::const_iterator piter_end = parsers.end();
@@ -116,7 +114,8 @@ namespace cicada
 		
 		generated.clear();
 		ugenerated.toUTF8String(generated);
-		uniques.insert(generated);
+		
+		cache.value.push_back(std::make_pair(generated, name));
 		
 		//std::cerr << name << ": " << generated << std::endl;
 	      }
@@ -131,6 +130,8 @@ namespace cicada
 	      parser->parse(uphrase, formattable, pos);
 	      
 	      if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
+	      
+	      //std::cerr << "rbnf: " << (dynamic_cast<const icu::RuleBasedNumberFormat*>(parser) != 0) << std::endl;
 	      
 	      generator_set_type::const_iterator giter_end = generators.end();
 	      for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
@@ -152,16 +153,13 @@ namespace cicada
 		
 		generated.clear();
 		ugenerated.toUTF8String(generated);
-		uniques.insert(generated);
+		
+		cache.value.push_back(std::make_pair(generated, name));
 		
 		//std::cerr << name << ": " << generated << std::endl;
 	      }
 	    }
 	  }
-	  
-	  cache.key = input;
-	  cache.value.clear();
-	  cache.value.insert(cache.value.end(), uniques.begin(), uniques.end());
 	}
 	
 	return cache.value;
@@ -211,17 +209,13 @@ namespace cicada
     
     void Number::operator()(const phrase_type& phrase, phrase_set_type& generated) const
     {
-      typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
+      generated.clear();
       
-      phrase_unique_type uniques;
       for (pimpl_set_type::const_iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter) {
 	const phrase_set_type& results = (*iter)->operator()(phrase);
 	
-	uniques.insert(results.begin(), results.end());
+	generated.insert(generated.end(), results.begin(), results.end());
       }
-      
-      generated.clear();
-      generated.insert(generated.end(), uniques.begin(), uniques.end());
     }
 
     template <typename Format>

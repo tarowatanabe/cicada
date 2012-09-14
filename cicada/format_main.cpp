@@ -21,6 +21,6 @@ int main(int argc, char** argv)
     format(line, results);
     
     for (size_t i = 0; i != results.size(); ++ i)
-      std::cout << i << ": " << results[i] << std::endl;
+      std::cout << i << ": " << results[i].tag << " " << results[i].phrase << std::endl;
   }
 }
