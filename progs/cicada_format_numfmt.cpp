@@ -76,7 +76,11 @@ int main(int argc, char** argv)
     for (int style = 0; style != UNUM_FORMAT_STYLE_COUNT; ++ style) {
       UErrorCode status = U_ZERO_ERROR;  
       std::auto_ptr<icu::NumberFormat> format(icu::NumberFormat::createInstance(loc, UNumberFormatStyle(style), status));
-      if (U_FAILURE(status)) continue;
+      
+      if (U_FAILURE(status)) {
+	std::cerr << "no style: " << style << std::endl;
+	continue;
+      }
       
       formatters.push_back(std::make_pair(style, format.release()));
     }
