@@ -1,0 +1,28 @@
+month-day: MMMM d 
+month-day: MMM d
+month-day-week: EEEE, MMMM d
+month-day-week: EEE, MMMM d
+month-day-week: EEEE, MMM d
+month-day-week: EEE, MMM d
+year-month: MMMM, yyyy
+year-month: MMM, yyyy
+month: MMMM
+month: MMM
+year: yyyy
+year: 'in' yyyy
+year: 'year' yyyy
+day: d
+
+day-hour-minute: d, h:mm
+
+hour: hh 'o''clock'
+hour: 'at' hh
+
+minute: mm 'minutes'
+minute: mm
+
+second: ss 'seconds'
+second: ss
+
+hour-minute: h:mm
+hour-minute: h:mm a

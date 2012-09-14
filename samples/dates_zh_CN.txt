@@ -1,0 +1,24 @@
+day-week: dd'日'EEEE
+day-week: dd'号'EEEE
+month-day: M'月'dd'日'
+month-day: M'月'dd'号'
+month-day-week: M'月'dd'日'EEEE
+month-day-week: M'月'dd'号'EEEE
+year-month: yyyy'年'M'月'
+month: M'月'
+year: yyyy'年'
+year: yyyy'年胡'
+day: dd'日'
+
+day-hour-minute: dd'日'hh'时'mm'分'
+
+hour: hh'时'
+hour: hh'点'
+
+minute: mm'分'
+
+second: ss'秒'
+
+hour-minute: hh'时'mm'分'
+hour-minute: ahh'时'mm'分'
+

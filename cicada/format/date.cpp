@@ -2,6 +2,11 @@
 //  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+
 #include <vector>
 #include <string>
 #include <memory>
@@ -13,15 +18,19 @@
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
 #include <unicode/bytestream.h>
+#include <unicode/smpdtfmt.h>
 
 #include "date.hpp"
 
 #include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/array_power2.hpp"
+#include "utils/compress_stream.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/functional/hash.hpp>
-
+#include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 namespace cicada
 {
@@ -159,8 +168,10 @@ namespace cicada
     }
 
     
-    Date::Date(const std::string& locale_str_source,
-	       const std::string& locale_str_target)
+    void Date::initialize(const path_type& path_source,
+			  const path_type& path_target,
+			  const std::string& locale_str_source,
+			  const std::string& locale_str_target)
     {
       // pre-defined rule-set
       typedef utils::unordered_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
@@ -178,7 +189,7 @@ namespace cicada
       std::auto_ptr<icu::Calendar> calendar(icu::Calendar::createInstance(locale_source, status));
       if (U_FAILURE(status))
         throw std::runtime_error(std::string("Calendar::createInstance(): ") + u_errorName(status));
-
+      
       status = U_ZERO_ERROR;
       calendar->setTime(icu::Calendar::getNow(), status);
       if (U_FAILURE(status))
@@ -230,6 +241,81 @@ namespace cicada
 	
 	targets[std::string("date-") + names[i]].generators.push_back(date.release());
 	targets[std::string("time-") + names[i]].generators.push_back(time.release());
+      }
+      
+      // user-defined..
+      if (! path_source.empty() && ! path_target.empty()) {
+	if (! boost::filesystem::exists(path_source))
+	  throw std::runtime_error("no file? " + path_source.string());
+	
+	if (! boost::filesystem::exists(path_target))
+	  throw std::runtime_error("no file? " + path_target.string());
+	
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	
+	typedef std::string::const_iterator iter_type;
+	
+	qi::rule<iter_type, std::string()> rule_tag(qi::lexeme[+(standard::char_ - standard::space)]);
+	qi::rule<iter_type, std::string()> pattern_tag(qi::lexeme[+(standard::char_)]);
+	
+	{
+	  utils::compress_istream is(path_source);
+	  std::string line;
+	  
+	  while (std::getline(is, line)) {
+	    std::string::const_iterator iter(line.begin());
+	    std::string::const_iterator end(line.end());
+
+	    std::string tag;
+	    std::string pattern;
+	    
+	    if (! qi::parse(iter, end, rule_tag >> qi::omit[+standard::space] >> pattern_tag, tag, pattern))
+	      continue;
+	    
+	    boost::algorithm::trim(pattern);
+	    
+	    UErrorCode status = U_ZERO_ERROR;
+	    std::auto_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_source, status));
+	    if (U_FAILURE(status))
+	      throw std::runtime_error(std::string("SimpleDateFormat(): ") + u_errorName(status));
+	    
+	    
+	    date->setLenient(true);
+	    date->setCalendar(*calendar);
+	    
+	    sources[tag].parsers.push_back(date.release());
+	  }
+	}
+	
+	{
+	  utils::compress_istream is(path_target);
+	  std::string line;
+	  
+	  while (std::getline(is, line)) {
+	    std::string::const_iterator iter(line.begin());
+	    std::string::const_iterator end(line.end());
+
+	    std::string tag;
+	    std::string pattern;
+	    
+	    if (! qi::parse(iter, end, rule_tag >> qi::omit[+standard::space] >> pattern_tag, tag, pattern))
+	      continue;
+	    
+	    boost::algorithm::trim(pattern);
+	    
+	    UErrorCode status = U_ZERO_ERROR;
+	    std::auto_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_target, status));
+	    if (U_FAILURE(status))
+	      throw std::runtime_error(std::string("SimpleDateFormat(): ") + u_errorName(status));
+	    
+	    
+	    date->setLenient(true);
+	    date->setCalendar(*calendar);
+	    
+	    targets[tag].generators.push_back(date.release());
+	  }
+	}
       }
       
       // try match!
