@@ -38,7 +38,7 @@ namespace cicada
 	unique_set_type uniques;
 	format_type::phrase_set_type::const_iterator piter_end = phrases.end();
 	for (format_type::phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter)
-	  ++ uniques[piter->phrase][static_cast<const std::string&>(feature) + ":" + piter->tag];
+	  uniques[piter->phrase][static_cast<const std::string&>(feature) + ":" + piter->tag] = 1;
 	
 	// construct source-side lhs from context
 	const phrase_type phrase_source = phrase_type(utils::piece(context));

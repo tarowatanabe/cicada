@@ -347,6 +347,24 @@ namespace cicada
 	rbnf->setLenient(true);
 	sources["numbering"].parsers.push_back(rbnf.release());
       }
+
+      if (has_rbnf_rule_set(*rbnf_source, "numbering-year")) {
+	icu::UnicodeString rules(rules_rbnf_source);
+	
+	rules.findAndReplace("%spellout-numbering",  "%%spellout-numbering");
+	rules.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
+	rules.findAndReplace("%spellout-cardinal", "%%spellout-cardinal");
+	rules.findAndReplace("%%spellout-numbering-year",  "%spellout-numbering-year");
+
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	
+	rbnf->setLenient(true);
+	sources["numbering-year"].parsers.push_back(rbnf.release());
+      }
       
       // user defined rules for source side
       if (! path_source.empty()) {
@@ -355,7 +373,7 @@ namespace cicada
 	
 	icu::UnicodeString rules;
 	
-	utils::compress_istream is(path_target);
+	utils::compress_istream is(path_source);
 	std::string line;
 	while (std::getline(is, line)) {
 	  rules += icu::UnicodeString::fromUTF8(line);
@@ -417,6 +435,24 @@ namespace cicada
 	  rbnf->setLenient(true);
 	  sources["numbering"].parsers.push_back(rbnf.release());
 	}
+
+	if (has_rbnf_rule_set(*nf_rule, "numbering-year")) {
+	  icu::UnicodeString rules_local(rules);
+	
+	  rules_local.findAndReplace("%spellout-numbering",  "%%spellout-numbering");
+	  rules_local.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
+	  rules_local.findAndReplace("%spellout-cardinal", "%%spellout-cardinal");
+	  rules_local.findAndReplace("%%spellout-numbering-year",  "%spellout-numbering-year");
+
+	  UErrorCode status = U_ZERO_ERROR;
+	  UParseError perror;
+	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  if (U_FAILURE(status))
+	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	  
+	  rbnf->setLenient(true);
+	  sources["numbering-year"].parsers.push_back(rbnf.release());
+	}
       }
 
     
@@ -443,6 +479,8 @@ namespace cicada
 	
 	if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") < 0)
 	  targets["numbering"].generators.push_back(create_rbnf_instance(locale_target, uname));
+	else if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") >= 0)
+	  targets["numbering-year"].generators.push_back(create_rbnf_instance(locale_target, uname));	
 	else if (uname.indexOf("ordinal") >= 0)
 	  targets["ordinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
 	else if (uname.indexOf("cardinal") >= 0)
@@ -486,6 +524,8 @@ namespace cicada
 	  
 	  if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") < 0)
 	    targets["numbering"].generators.push_back(formatter.release());
+	  else if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") >= 0)
+	    targets["numbering-year"].generators.push_back(formatter.release());
 	  else if (uname.indexOf("ordinal") >= 0)
 	    targets["ordinal"].generators.push_back(formatter.release());
 	  else if (uname.indexOf("cardinal") >= 0)
@@ -503,6 +543,7 @@ namespace cicada
       targets["numbering"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       targets["cardinal"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       targets["any"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
+      targets["scientific"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       
       // currency
       

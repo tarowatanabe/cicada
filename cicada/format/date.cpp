@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include <unicode/calendar.h>
 #include <unicode/format.h>
 #include <unicode/datefmt.h>
 #include <unicode/unistr.h>
@@ -173,6 +174,16 @@ namespace cicada
       if (locale_target.isBogus())
 	throw std::runtime_error("invalid locale: " + locale_str_target);
       
+      UErrorCode status = U_ZERO_ERROR;
+      std::auto_ptr<icu::Calendar> calendar(icu::Calendar::createInstance(locale_source, status));
+      if (U_FAILURE(status))
+        throw std::runtime_error(std::string("Calendar::createInstance(): ") + u_errorName(status));
+
+      status = U_ZERO_ERROR;
+      calendar->setTime(icu::Calendar::getNow(), status);
+      if (U_FAILURE(status))
+        throw std::runtime_error(std::string("Calendar::setTime(): ") + u_errorName(status));
+      
       impl_map_type sources;
       impl_map_type targets;
       
@@ -196,17 +207,26 @@ namespace cicada
       for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
 	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
 	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
-
+	
 	date->setLenient(true);
 	time->setLenient(true);
+	
+	date->setCalendar(*calendar);
+	time->setCalendar(*calendar);
 	
 	sources[std::string("date-") + names[i]].parsers.push_back(date.release());
 	sources[std::string("time-") + names[i]].parsers.push_back(time.release());
       }
 
       for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
-	targets[std::string("date-") + names[i]].generators.push_back(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
-	targets[std::string("time-") + names[i]].generators.push_back(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
+	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
+	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
+	
+	date->setCalendar(*calendar);
+	time->setCalendar(*calendar);
+	
+	targets[std::string("date-") + names[i]].generators.push_back(date.release());
+	targets[std::string("time-") + names[i]].generators.push_back(time.release());
       }
       
       // try match!
