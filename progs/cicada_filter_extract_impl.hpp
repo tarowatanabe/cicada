@@ -89,18 +89,18 @@ struct RootCount
 struct PhrasePair
 {
   typedef std::string phrase_type;
+  typedef std::string alignment_set_type;
   typedef double count_type;
   typedef std::vector<count_type, std::allocator<count_type> > counts_type;
-  
+
   phrase_type source;
   phrase_type target;
+  alignment_set_type alignments;
   counts_type counts;
   counts_type counts_source;
   counts_type counts_target;
   double observed_source;
   double observed_target;
-  double lexicon_target_source;
-  double lexicon_source_target;
   
   PhrasePair()
     : source(), target(), counts(), counts_source(), counts_target() {}
@@ -109,13 +109,12 @@ struct PhrasePair
   {
     source.clear();
     target.clear();
+    alignments.clear();
     counts.clear();
     counts_source.clear();
     counts_target.clear();
     observed_source = 0;
     observed_target = 0;
-    lexicon_target_source = 0;
-    lexicon_source_target = 0;
   }
 
   friend
@@ -165,6 +164,7 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  PhrasePair,
 			  (PhrasePair::phrase_type, source)
 			  (PhrasePair::phrase_type, target)
+			  (PhrasePair::alignment_set_type, alignments)
 			  (PhrasePair::counts_type, counts)
 			  (PhrasePair::counts_type, counts_source)
 			  (PhrasePair::counts_type, counts_target)
@@ -230,8 +230,9 @@ struct PhrasePairParser
 {
   typedef PhrasePair phrase_pair_type;
   
-  typedef phrase_pair_type::phrase_type    phrase_type;
-  typedef phrase_pair_type::counts_type    counts_type;
+  typedef phrase_pair_type::phrase_type        phrase_type;
+  typedef phrase_pair_type::alignment_set_type alignment_set_type;
+  typedef phrase_pair_type::counts_type        counts_type;
   
   PhrasePairParser() : grammar() {}
   PhrasePairParser(const PhrasePairParser& x) : grammar() {}
@@ -245,18 +246,20 @@ struct PhrasePairParser
       namespace standard = boost::spirit::standard;
       
       phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      aligns %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
       counts %= +qi::double_;
       
       phrase_pair %= (phrase
 		      >> "|||" >> phrase
+		      >> "|||" >> aligns
 		      >> "|||" >> counts
 		      >> "|||" >> counts
 		      >> "|||" >> counts
-		      >> "|||" >> qi::double_ >> qi::double_
 		      >> "|||" >> qi::double_ >> qi::double_);
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
+    boost::spirit::qi::rule<Iterator, alignment_set_type(), boost::spirit::standard::space_type> aligns;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
@@ -295,8 +298,9 @@ struct PhrasePairGenerator
 {
   typedef PhrasePair phrase_pair_type;
   
-  typedef phrase_pair_type::phrase_type    phrase_type;
-  typedef phrase_pair_type::counts_type    counts_type;
+  typedef phrase_pair_type::phrase_type        phrase_type;
+  typedef phrase_pair_type::alignment_set_type alignment_set_type;
+  typedef phrase_pair_type::counts_type        counts_type;
   
   PhrasePairGenerator() : grammar() {}
   PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
@@ -313,10 +317,10 @@ struct PhrasePairGenerator
       counts %= double20 % ' ';
       phrase_pair %= (standard::string
 		      << " ||| " << standard::string
+		      << " ||| " << standard::string
 		      << " ||| " << counts
 		      << " ||| " << counts
 		      << " ||| " << counts
-		      << " ||| " << double20 << ' ' << double20
 		      << " ||| " << double20 << ' ' << double20);
     }
 
@@ -329,7 +333,6 @@ struct PhrasePairGenerator
     };
     
     boost::spirit::karma::real_generator<double, real_precision> double20;
-    
     boost::spirit::karma::rule<Iterator, counts_type()> counts;
     boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
   };
@@ -348,8 +351,6 @@ struct PhrasePairGenerator
   
   phrase_pair_generator<iterator_type> grammar;
 };
-
-
 
 
 struct ExtractRootPhrase
@@ -433,6 +434,78 @@ struct ExtractRootGHKM
   }
 };
 
+struct ExtractAlignment
+{
+  typedef cicada::Alignment alignment_type;
+  typedef std::vector<alignment_type, std::allocator<alignment_type> > alignment_set_type;
+  
+  template <typename Iterator>
+  struct align_parser : boost::spirit::qi::grammar<Iterator, alignment_set_type()>
+  {
+    align_parser() : align_parser::base_type(alignments)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      aligns %= (qi::int_ >> '-' >> qi::int_) % ',';
+      alignments %= qi::omit[*standard::space] >> -(aligns % (+standard::space)) >> qi::omit[*standard::space];
+    }
+    
+    boost::spirit::qi::rule<Iterator, alignment_type()>     aligns;
+    boost::spirit::qi::rule<Iterator, alignment_set_type()> alignments;
+  };
+
+  align_parser<std::string::const_iterator> parser;
+  
+  void operator()(const utils::piece& align, alignment_set_type& alignments)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    std::string::const_iterator iter(align.begin());
+    std::string::const_iterator end(align.end());
+    
+    alignments.clear();
+    
+    const bool result = qi::parse(iter, end, parser, alignments);
+    if (! result || iter != end)
+      throw std::runtime_error("invalid point format? " + align);
+  }
+};
+
+struct ExtractPhrase
+{
+  typedef cicada::Sentence  sentence_type;
+  
+  void operator()(const utils::piece& phrase, sentence_type& sentence)
+  {
+    sentence.assign(phrase);
+  }
+};
+
+struct ExtractSCFG
+{
+  typedef cicada::Sentence  sentence_type;
+  
+  void operator()(const utils::piece& phrase, sentence_type& sentence)
+  {
+    sentence.assign(phrase);
+    sentence.erase(sentence.begin());
+  }
+};
+
+struct ExtractGHKM
+{
+  typedef cicada::Sentence  sentence_type;
+  
+  void operator()(const utils::piece& phrase, sentence_type& sentence)
+  {
+    sentence.clear();
+    cicada::TreeRule(phrase).frontier(std::back_inserter(sentence));
+  }
+};
+
+
 struct LexiconModel
 {
   typedef cicada::Symbol word_type;
@@ -509,9 +582,13 @@ struct LexiconModel
 
 struct LexiconBase
 {
-  typedef cicada::Sentence sentence_type;
+  typedef cicada::Sentence  sentence_type;
+  typedef cicada::Alignment alignment_type;
 
   typedef LexiconModel lexicon_model_type;
+
+  typedef std::vector<int, std::allocator<int> > align_set_type;
+  typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
 
   LexiconBase(const lexicon_model_type& __lexicon_source_target,
 	      const lexicon_model_type& __lexicon_target_source)
@@ -520,8 +597,78 @@ struct LexiconBase
 
   const lexicon_model_type& lexicon_source_target;
   const lexicon_model_type& lexicon_target_source;
+
+  align_map_type aligns_source_impl;
+  align_map_type aligns_target_impl;
   
-  std::pair<double, double> noisy_or() const
+  std::pair<double, double> lexicon(const sentence_type& source,
+				    const sentence_type& target,
+				    const alignment_type& alignment) const
+  {
+    const size_t source_size = source.size();
+    const size_t target_size = target.size();
+
+    double lex_source_target = 1.0;
+    double lex_target_source = 1.0;
+
+    align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
+    align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
+
+    aligns_source.clear();
+    aligns_target.clear();
+
+    aligns_source.resize(source_size);
+    aligns_target.resize(target_size);
+
+    alignment_type::const_iterator aiter_end = alignment.end();
+    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+      if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
+	std::ostringstream os;
+	os << "invlaid alignemnt:"
+	   << " source: " << source 
+	   << " target: " << target
+	   << " alignment: " << alignment;
+	throw std::runtime_error(os.str());
+      }
+      
+      aligns_source[aiter->source].push_back(aiter->target);
+      aligns_target[aiter->target].push_back(aiter->source);
+    }
+
+    for (size_t trg = 0; trg != target_size; ++ trg) 
+      if (target[trg].is_terminal()) {
+	if (aligns_target[trg].empty())
+	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]);
+	else {
+	  double score = 0.0;
+	  align_set_type::const_iterator aiter_end = aligns_target[trg].end();
+	  for (align_set_type::const_iterator aiter = aligns_target[trg].begin(); aiter != aiter_end; ++ aiter)
+	    score += lexicon_source_target(source[*aiter], target[trg]);
+
+	  lex_source_target *= score / aligns_target[trg].size();
+	}
+      }
+    
+    for (size_t src = 0; src != source_size; ++ src) 
+      if (source[src].is_terminal()) {
+	if (aligns_source[src].empty())
+	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]);
+	else {
+	  double score = 0.0;
+	  align_set_type::const_iterator aiter_end = aligns_source[src].end();
+	  for (align_set_type::const_iterator aiter = aligns_source[src].begin(); aiter != aiter_end; ++ aiter)
+	    score += lexicon_target_source(target[*aiter], source[src]);
+	  
+	  lex_target_source *= score / aligns_source[src].size();
+	}
+      }
+    
+    return std::make_pair(std::max(lex_source_target, boost::numeric::bounds<double>::smallest()),
+			  std::max(lex_target_source, boost::numeric::bounds<double>::smallest()));
+  }
+  
+  std::pair<double, double> noisy_or(const sentence_type& source,
+				     const sentence_type& target) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
@@ -556,7 +703,8 @@ struct LexiconBase
     return std::make_pair(score_source_target, score_target_source);
   }
   
-  std::pair<double, double> model1() const
+  std::pair<double, double> model1(const sentence_type& source,
+				   const sentence_type& target) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
@@ -590,7 +738,9 @@ struct LexiconBase
     return std::make_pair(score_source_target, score_target_source);
   }
   
-  std::pair<double, double> insertion_deletion(const double threshold_insertion=0.01,
+  std::pair<double, double> insertion_deletion(const sentence_type& source,
+					       const sentence_type& target,
+					       const double threshold_insertion=0.01,
 					       const double threshold_deletion=0.01) const
   {
     const size_t source_size = source.size();
@@ -624,68 +774,8 @@ struct LexiconBase
     
     return std::make_pair(score_source_target, score_target_source);
   }
-  
-  sentence_type source;
-  sentence_type target;
 };
 
-struct LexiconPhrase : public LexiconBase
-{
-
-  LexiconPhrase(const lexicon_model_type& __lexicon_source_target,
-		const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-  }
-};
-
-struct LexiconSCFG : public LexiconBase
-{
-
-  LexiconSCFG(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-    source.erase(source.begin());
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-    target.erase(target.begin());
-  }
-};
-
-struct LexiconGHKM : public LexiconBase
-{
-
-  LexiconGHKM(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const utils::piece& phrase)
-  {
-    source.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(source));
-  }
-
-  void assign_target(const utils::piece& phrase)
-  {
-    target.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(target));
-  }
-};
 
 struct CrossBase
 {
@@ -696,7 +786,8 @@ struct CrossBase
 
   typedef std::vector<size_type, std::allocator<size_type> > position_type;
   
-  difference_type operator()()
+  difference_type operator()(const sentence_type& source,
+			     const sentence_type& target)
   {
     //
     // compute non-terminal alignment
@@ -755,43 +846,10 @@ struct CrossBase
     return - crossed;
   }
   
-  sentence_type source;
-  sentence_type target;
-  
   alignment_type alignment;
   position_type  position_source;
 };
 
-struct CrossSCFG : public CrossBase
-{
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-    source.erase(source.begin());
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-    target.erase(target.begin());
-  }
-
-};
-
-struct CrossGHKM : public CrossBase
-{
-  void assign_source(const utils::piece& phrase)
-  {
-    source.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(source));
-  }
-
-  void assign_target(const utils::piece& phrase)
-  {
-    target.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(target));
-  }
-};
 
 #endif
 

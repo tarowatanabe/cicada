@@ -727,7 +727,7 @@ class ExtractTree(Extract):
 
 class ExtractScore(Extract):
     
-    def __init__(self, cicada=None, lexicon=None,
+    def __init__(self, cicada=None,
                  model_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -769,8 +769,6 @@ class ExtractScore(Extract):
         
         command += " --input \"%s\"" %(self.counts)
         command += " --output \"%s\"" %(self.scores)
-        command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
-        command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)
         command += option
         command += " --max-malloc %g" %(max_malloc)
         
@@ -902,7 +900,7 @@ if options.first_step <= 5 and options.last_step >= 5:
     print "(5) extract phrase table finished @", time.ctime()
 
 if options.first_step <= 6 and options.last_step >= 6:
-    score = ExtractScore(cicada=cicada, lexicon=lexicon,
+    score = ExtractScore(cicada=cicada,
                          model_dir=options.model_dir,
                          phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
                          max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,

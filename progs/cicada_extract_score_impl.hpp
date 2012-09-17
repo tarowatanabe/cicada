@@ -149,7 +149,6 @@ public:
 
 };
 
-
 class PhrasePair
 {
 public:
@@ -422,232 +421,6 @@ struct ExtractRootGHKM
       throw std::runtime_error("no label?");
 
     return label;
-  }
-};
-
-struct LexiconModel
-{
-  typedef cicada::Symbol word_type;
-  typedef cicada::Vocab vocab_type;
-
-  typedef boost::filesystem::path path_type;
-
-
-
-  struct table_type
-  {
-    typedef utils::dense_hash_map<word_type, double, boost::hash<word_type> , std::equal_to<word_type> >::type __table_type;
-
-    table_type() : table() { table.set_empty_key(word_type()); }
-
-    __table_type table;
-  };
-
-  typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
-
-  LexiconModel() : smooth(1e-7), tables() {}
-  LexiconModel(const path_type& path) : smooth(), tables() { open(path); }
-
-  void open(const path_type& path)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
-    typedef boost::fusion::tuple<std::string, std::string, double> parsed_type;
-
-    qi::rule<std::string::const_iterator, std::string(), standard::space_type> word;
-    qi::rule<std::string::const_iterator, parsed_type(), standard::space_type> lexicon;
-
-    word %= qi::lexeme[+(standard::char_ - standard::space)];
-    lexicon %= word >> word >> qi::double_;
-
-    smooth = std::numeric_limits<double>::infinity();
-    tables.clear();
-
-    utils::compress_istream is(path, 1024 * 1024);
-    std::string line;
-    parsed_type parsed;
-
-    while (std::getline(is, line)) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-
-      boost::fusion::get<0>(parsed).clear();
-      boost::fusion::get<1>(parsed).clear();
-
-      const bool result = qi::phrase_parse(iter, end, lexicon, standard::space, parsed);
-      if (! result || iter != end) continue;
-
-
-      tables[word_type(boost::fusion::get<1>(parsed)).id()].table[boost::fusion::get<0>(parsed)] = boost::fusion::get<2>(parsed);
-
-      smooth = std::min(smooth, boost::fusion::get<2>(parsed));
-    }
-
-  }
-
-  double operator()(const word_type& source, const word_type& target) const
-  {
-    if (tables.exists(source.id())) {
-      const table_type& table = tables[source.id()];
-
-      table_type::__table_type::const_iterator iter = table.table.find(target);
-      return (iter != table.table.end() ? iter->second : smooth);
-    } else 
-      return smooth;
-  }
-
-  double smooth;
-  table_set_type tables;
-};
-
-struct LexiconBase
-{
-  typedef PhrasePair::point_type     point_type;
-  typedef PhrasePair::alignment_type alignment_type;
-
-  typedef cicada::Sentence sentence_type;
-
-  typedef std::vector<int, std::allocator<int> > align_set_type;
-  typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
-
-  typedef LexiconModel lexicon_model_type;
-
-  LexiconBase(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : lexicon_source_target(__lexicon_source_target),
-      lexicon_target_source(__lexicon_target_source) {}
-
-  const lexicon_model_type& lexicon_source_target;
-  const lexicon_model_type& lexicon_target_source;
-
-  align_map_type aligns_source_impl;
-  align_map_type aligns_target_impl;
-
-  sentence_type source;
-  sentence_type target;
-
-  std::pair<double, double> operator()(const alignment_type& alignment) const
-  {
-    const size_t source_size = source.size();
-    const size_t target_size = target.size();
-
-    double lex_source_target = 1.0;
-    double lex_target_source = 1.0;
-
-    align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
-    align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
-
-    aligns_source.clear();
-    aligns_target.clear();
-
-    aligns_source.resize(source_size);
-    aligns_target.resize(target_size);
-
-    alignment_type::const_iterator aiter_end = alignment.end();
-    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
-	std::ostringstream os;
-	os << "invlaid alignemnt:"
-	   << " source: " << source 
-	   << " target: " << target
-	   << " alignment: " << alignment;
-	throw std::runtime_error(os.str());
-      }
-      
-      aligns_source[aiter->source].push_back(aiter->target);
-      aligns_target[aiter->target].push_back(aiter->source);
-    }
-
-    for (size_t trg = 0; trg != target_size; ++ trg) 
-      if (target[trg].is_terminal()) {
-	if (aligns_target[trg].empty())
-	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]);
-	else {
-	  double score = 0.0;
-	  align_set_type::const_iterator aiter_end = aligns_target[trg].end();
-	  for (align_set_type::const_iterator aiter = aligns_target[trg].begin(); aiter != aiter_end; ++ aiter)
-	    score += lexicon_source_target(source[*aiter], target[trg]);
-
-	  lex_source_target *= score / aligns_target[trg].size();
-	}
-      }
-
-    for (size_t src = 0; src != source_size; ++ src) 
-      if (source[src].is_terminal()) {
-	if (aligns_source[src].empty())
-	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]);
-	else {
-	  double score = 0.0;
-	  align_set_type::const_iterator aiter_end = aligns_source[src].end();
-	  for (align_set_type::const_iterator aiter = aligns_source[src].begin(); aiter != aiter_end; ++ aiter)
-	    score += lexicon_target_source(target[*aiter], source[src]);
-
-	  lex_target_source *= score / aligns_source[src].size();
-	}
-      }
-
-    return std::make_pair(std::max(lex_source_target, boost::numeric::bounds<double>::smallest()),
-			  std::max(lex_target_source, boost::numeric::bounds<double>::smallest()));
-  }
-};
-
-struct LexiconPhrase : public LexiconBase
-{
-
-  LexiconPhrase(const lexicon_model_type& __lexicon_source_target,
-		const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-  }
-
-};
-
-struct LexiconSCFG : public LexiconBase
-{
-
-  LexiconSCFG(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-    source.erase(source.begin());
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-    target.erase(target.begin());
-  }
-};
-
-struct LexiconGHKM : public LexiconBase
-{
-
-  LexiconGHKM(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
-
-  void assign_source(const utils::piece& phrase)
-  {
-    source.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(source));
-  }
-
-  void assign_target(const utils::piece& phrase)
-  {
-    target.clear();
-    cicada::TreeRule(phrase).frontier(std::back_inserter(target));
   }
 };
 
@@ -2164,7 +1937,7 @@ struct PhrasePairScoreMapper
   }
 };
 
-template <typename ExtractRoot, typename Lexicon>
+template <typename ExtractRoot>
 struct PhrasePairScoreReducer
 {
   typedef PhrasePairScore map_reduce_type;
@@ -2182,6 +1955,8 @@ struct PhrasePairScoreReducer
   
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
   typedef map_reduce_type::modified_type    modified_type;
+
+  typedef phrase_pair_type::alignment_type alignment_type;
   
   typedef std::vector<phrase_pair_type, std::allocator<phrase_pair_type> > phrase_pair_set_type;
   typedef std::vector<modified_type, std::allocator<modified_type> > modified_set_type;
@@ -2196,12 +1971,10 @@ struct PhrasePairScoreReducer
   typedef PhrasePairModifiedParser    modified_parser_type;
   
   typedef ExtractRoot extract_root_type;
-  typedef Lexicon     lexicon_type;
   
   root_count_set_type& root_counts;
   
   extract_root_type extract_root;
-  lexicon_type      lexicon;
   
   const path_set_type& paths;
   queue_ptr_set_type& queues;
@@ -2210,14 +1983,12 @@ struct PhrasePairScoreReducer
   
   PhrasePairScoreReducer(root_count_set_type& __root_counts,
 			 const extract_root_type& __extract_root,
-			 const lexicon_type& __lexicon,
 			 const path_set_type& __paths,
 			 queue_ptr_set_type& __queues,
 			 std::ostream& __os,
 			 int __debug)
     : root_counts(__root_counts),
       extract_root(__extract_root),
-      lexicon(__lexicon),
       paths(__paths),
       queues(__queues),
       os(__os),
@@ -2246,8 +2017,7 @@ struct PhrasePairScoreReducer
   };
   
   boost::spirit::karma::real_generator<count_type, real_precision> double20;
-  
-  
+
   void dump_phrase_pair(const phrase_pair_set_type& counts, const modified_set_type& modified)
   {
     typedef std::vector<phrase_pair_set_type::const_iterator, std::allocator<phrase_pair_set_type::const_iterator> > iterators_type;
@@ -2279,8 +2049,6 @@ struct PhrasePairScoreReducer
       throw std::runtime_error("source/target size mismatch?");
     
     phrase_pair_type counts_pair;
-
-    lexicon.assign_source(counts.front().source);
     
     modified_set_type::const_iterator miter = modified.begin();
     
@@ -2289,58 +2057,45 @@ struct PhrasePairScoreReducer
       phrase_pair_set_type::const_iterator first = *iiter;
       phrase_pair_set_type::const_iterator last  = *(iiter + 1);
       
-      // compute lexical weights from [first, last)... we will take "max"
-      
       if (first->source != miter->source)
 	throw std::runtime_error("different source?") ;
       if (first->target != miter->target)
 	throw std::runtime_error("different source?") ;
       
+      const modified_type::counts_type& counts_target = miter->counts;
+      
       counts_pair.clear();
       
-      lexicon.assign_target(first->target);
+      os << first->source << " ||| " << first->target << " |||";
+
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
       
-      double lex_source_target = 0.0;
-      double lex_target_source = 0.0;
+      std::ostream_iterator<char> oiter(os);
       
       for (phrase_pair_set_type::const_iterator iter = first; iter != last; ++ iter) {
-	const std::pair<double, double> lex = lexicon(iter->alignment);
 	
-	lex_source_target = std::max(lex_source_target, lex.first);
-	lex_target_source = std::max(lex_target_source, lex.second);
+	if (! iter->alignment.empty())
+	  if (! karma::generate(oiter, ' ' << ((karma::int_ << '-' << karma::int_) % ','), iter->alignment))
+	    throw std::runtime_error("alignment generation failed");
 	
 	counts_pair.increment(iter->counts.begin(), iter->counts.end());
       }
       
-      const modified_type::counts_type& counts_target = miter->counts;
-      
-      os << first->source << " ||| " << first->target;
-      
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-
-      typedef std::ostream_iterator<char> iterator_type;
-
-      iterator_type iter(os);
-      
       // cont(LHS RHS)
-      if (! karma::generate(iter, " ||| " << -(double20 % ' '), counts_pair.counts))
+      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), counts_pair.counts))
 	throw std::runtime_error("generation failed");
       
       // count(LHS)
-      if (! karma::generate(iter, " ||| " << -(double20 % ' '), counts_source.counts))
+      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), counts_source.counts))
 	throw std::runtime_error("generation failed");
       
       // count(RHS)
-      if (! karma::generate(iter, " ||| " << -(double20 % ' '), boost::make_iterator_range(counts_target.begin(), counts_target.end() - 1)))
+      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), boost::make_iterator_range(counts_target.begin(), counts_target.end() - 1)))
 	throw std::runtime_error("generation failed");
       
       // observed(LHS) observed(RHS)
-      if (! karma::generate(iter, " ||| " << double20 << ' ' << double20, observed_source, counts_target.back()))
-	throw std::runtime_error("generation failed");
-      
-      // lex(rhs | lhs) lex(rhs | lhs)
-      if (! karma::generate(iter, " ||| " << double20 << ' ' << double20 << '\n', lex_target_source, lex_source_target))
+      if (! karma::generate(oiter, " ||| " << double20 << ' ' << double20 << '\n', observed_source, counts_target.back()))
 	throw std::runtime_error("generation failed");
     }
   }

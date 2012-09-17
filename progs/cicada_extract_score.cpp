@@ -47,9 +47,6 @@ struct greater_file_size
 path_set_type input_files;
 path_type output_file = "";
 
-path_type lexicon_source_target_file;
-path_type lexicon_target_source_file;
-
 bool score_phrase = false;
 bool score_scfg   = false;
 bool score_ghkm   = false;
@@ -66,12 +63,11 @@ template <typename Extractor>
 void reverse_counts(const path_map_type& modified_files,
 		    path_map_type& reversed_files,
 		    root_count_set_type& root_targets);
-template <typename Extractor, typename Lexicon>
+template <typename Extractor>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const path_map_type& reversed_files,
-		  root_count_set_type& root_sources,
-		  const Lexicon& lexicon);
+		  root_count_set_type& root_sources);
 
 void options(int argc, char** argv);
 
@@ -82,10 +78,6 @@ int main(int argc, char** argv)
 
     if (output_file.empty())
       throw std::runtime_error("no output file?");
-    if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
-      throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
-    if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
-      throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
 
     if (int(score_phrase) + score_scfg + score_ghkm != 1)
       throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
@@ -150,29 +142,23 @@ int main(int argc, char** argv)
 		<< "reverse counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
    
     // scoring...
-    const LexiconModel lexicon_source_target(lexicon_source_target_file);
-    const LexiconModel lexicon_target_source(lexicon_target_source_file);
-    
     utils::resource start_score;
     if (score_phrase)
-      score_counts<ExtractRootPhrase, LexiconPhrase>(output_file,
-						     counts_files,
-						     reversed_files,
-						     root_sources,
-						     LexiconPhrase(lexicon_source_target, lexicon_target_source));
+      score_counts<ExtractRootPhrase>(output_file,
+				      counts_files,
+				      reversed_files,
+				      root_sources);
       
     else if (score_scfg)
-      score_counts<ExtractRootSCFG, LexiconSCFG>(output_file,
-						 counts_files,
-						 reversed_files,
-						 root_sources,
-						 LexiconSCFG(lexicon_source_target, lexicon_target_source));
+      score_counts<ExtractRootSCFG>(output_file,
+				    counts_files,
+				    reversed_files,
+				    root_sources);
     else
-      score_counts<ExtractRootGHKM, LexiconGHKM>(output_file,
-						 counts_files,
-						 reversed_files,
-						 root_sources,
-						 LexiconGHKM(lexicon_source_target, lexicon_target_source));
+      score_counts<ExtractRootGHKM>(output_file,
+				    counts_files,
+				    reversed_files,
+				    root_sources);
     utils::resource end_score;
     if (debug)
       std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
@@ -207,17 +193,16 @@ int main(int argc, char** argv)
 }
 
 
-template <typename Extractor, typename Lexicon>
+template <typename Extractor>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const path_map_type& reversed_files,
-		  root_count_set_type& root_sources,
-		  const Lexicon& lexicon)
+		  root_count_set_type& root_sources)
 {
   typedef PhrasePairScore map_reduce_type;
   
   typedef PhrasePairScoreMapper             mapper_type;
-  typedef PhrasePairScoreReducer<Extractor, Lexicon> reducer_type;
+  typedef PhrasePairScoreReducer<Extractor> reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -259,7 +244,6 @@ void score_counts(const path_type& output_file,
     
     reducers.add_thread(new boost::thread(reducer_type(root_counts[shard],
 						       Extractor(),
-						       lexicon,
 						       reversed_files[shard],
 						       queues_reducer[shard],
 						       *ostreams[shard],
@@ -406,8 +390,6 @@ void options(int argc, char** argv)
   opts_config.add_options()
     ("input",                  po::value<path_set_type>(&input_files)->multitoken(), "input files")
     ("output",                 po::value<path_type>(&output_file),                   "output directory")
-    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),    "lexicon model for lex(target | source)")
-    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),    "lexicon model for lex(source | target)")
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")

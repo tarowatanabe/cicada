@@ -49,9 +49,10 @@ bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
 
-bool model1_mode = false;
-bool noisy_or_mode = false;
-bool insertion_deletion_mode = false;
+bool feature_lexicon_mode = false;
+bool feature_model1_mode = false;
+bool feature_noisy_or_mode = false;
+bool feature_insertion_deletion_mode = false;
 
 double threshold_insertion = 0.01;
 double threshold_deletion = 0.01;
