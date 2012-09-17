@@ -2075,9 +2075,8 @@ struct PhrasePairScoreReducer
       
       for (phrase_pair_set_type::const_iterator iter = first; iter != last; ++ iter) {
 	
-	if (! iter->alignment.empty())
-	  if (! karma::generate(oiter, ' ' << ((karma::int_ << '-' << karma::int_) % ','), iter->alignment))
-	    throw std::runtime_error("alignment generation failed");
+	if (! karma::generate(oiter, karma::lit(' ') << karma::lit('(') << -((karma::int_ << '-' << karma::int_) % ',') << karma::lit(')'), iter->alignment))
+	  throw std::runtime_error("alignment generation failed");
 	
 	counts_pair.increment(iter->counts.begin(), iter->counts.end());
       }

@@ -447,7 +447,7 @@ struct ExtractAlignment
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      aligns %= (qi::int_ >> '-' >> qi::int_) % ',';
+      aligns %= '(' >> -((qi::int_ >> '-' >> qi::int_) % ',') >> ')';
       alignments %= qi::omit[*standard::space] >> -(aligns % (+standard::space)) >> qi::omit[*standard::space];
     }
     
@@ -580,7 +580,7 @@ struct LexiconModel
   table_set_type tables;
 };
 
-struct LexiconBase
+struct Lexicon
 {
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
@@ -590,8 +590,8 @@ struct LexiconBase
   typedef std::vector<int, std::allocator<int> > align_set_type;
   typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
 
-  LexiconBase(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
+  Lexicon(const lexicon_model_type& __lexicon_source_target,
+	  const lexicon_model_type& __lexicon_target_source)
     : lexicon_source_target(__lexicon_source_target),
       lexicon_target_source(__lexicon_target_source) {}
 
@@ -777,7 +777,7 @@ struct LexiconBase
 };
 
 
-struct CrossBase
+struct Cross
 {
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
