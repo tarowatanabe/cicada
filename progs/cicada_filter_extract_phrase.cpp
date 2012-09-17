@@ -47,7 +47,8 @@ bool mode_target_only = false;
 
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
-bool feature_cross_mode = false;=
+bool feature_cross_mode = false;
+bool feature_unaligned_mode = false;
 
 bool feature_lexicon_mode = false;
 bool feature_model1_mode = false;
@@ -68,7 +69,6 @@ void process(std::istream& is,
 	     const Lexicon& lexicon);
 
 struct ScorerCICADA;
-struct ScorerCICADAReordering;
 struct ScorerMOSES;
 struct ScorerMOSESReordering;
 
@@ -133,12 +133,9 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
     
-    if (mode_cicada) {
-      if (mode_reordering)
-	process<ScorerCICADAReordering>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
-      else
-	process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
-    } else if (mode_moses) {
+    if (mode_cicada)
+      process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+    else if (mode_moses) {
       if (mode_reordering)
 	process<ScorerMOSESReordering>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
       else
@@ -152,7 +149,7 @@ int main(int argc, char** argv)
   return 0;
 }
 
-template <typename Scorer, typename Lexicon>
+template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_type& root_source,
@@ -176,7 +173,6 @@ void process(std::istream& is,
 
 struct ScorerCICADA
 {
-  
   struct real_precision : boost::spirit::karma::real_policies<double>
   {
     static unsigned int precision(double) 
@@ -189,10 +185,11 @@ struct ScorerCICADA
   
   ExtractPhrase    extract_phrase;
   ExtractAlignment extract_alignment;
+  Unaligned        unaligned;
   
   typedef ExtractPhrase::sentence_type         sentence_type;
-  typedef ExtractAlignmetn::alignment_type     alignment_type;
-  typedef ExtractAlignmetn::alignment_set_type alignment_set_type;
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
 
   sentence_type      source;
   sentence_type      target;
@@ -233,29 +230,48 @@ struct ScorerCICADA
     
     
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
-      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
-      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
-      
+      extract_phrase(phrase_pair.source, source);
+      extract_phrase(phrase_pair.target, target);
+    }
+    
+    if (feature_lexicon_mode || feature_unaligned_mode)
+      extract_alignment(phrase_pair.alignments, alignments);
+    
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      if (feature_lexicon_mode) {
+	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+
       if (feature_model1_mode) {
-	const std::pair<double, double> scores = lexicon.model1();
+	const std::pair<double, double> scores = lexicon.model1(source, target);
 	
 	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
 	  throw std::runtime_error("failed generation");
       }
       
       if (feature_noisy_or_mode) {
-	const std::pair<double, double> scores = lexicon.noisy_or();
+	const std::pair<double, double> scores = lexicon.noisy_or(source, target);
 	
 	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
 	  throw std::runtime_error("failed generation");
       }
       
       if (feature_insertion_deletion_mode) {
-	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
+	const std::pair<double, double> scores = lexicon.insertion_deletion(source, target, threshold_insertion, threshold_deletion);
 	
 	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
 	  throw std::runtime_error("failed generation");
       }
+    }
+
+    if (feature_unaligned_mode) {
+      const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
+      
+      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, scores.first, scores.second))
+	throw std::runtime_error("failed generation");
     }
     
     if (feature_type_mode) {
@@ -275,107 +291,14 @@ struct ScorerCICADA
 			    singleton, singleton_source, singleton_target))
 	throw std::runtime_error("failed generation");
     }
-        
-    os << '\n';
-  }
-};
-
-struct ScorerCICADAReordering
-{
-  struct real_precision : boost::spirit::karma::real_policies<double>
-  {
-    static unsigned int precision(double) 
-    { 
-      return 10;
-    }
-  };
-  
-  boost::spirit::karma::real_generator<double, real_precision> double10;
-
-  void operator()(const phrase_pair_type& phrase_pair,
-		  const root_count_type& root_source,
-		  const root_count_type& root_target,
-		  const Lexicon& lexicon,
-		  std::ostream& os)
-  {
-    namespace karma = boost::spirit::karma;
-    namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5)
-      throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
-      throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
-      throw std::runtime_error("target counts size do not match");
-
-    std::ostream_iterator<char> iter(os);
-
-    if (! karma::generate(iter, standard::string << " ||| " << standard::string << " |||", phrase_pair.source, phrase_pair.target))
-      throw std::runtime_error("failed generation");
-    
-    //os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
-    
-    const double& count = phrase_pair.counts.front();
-    const double& count_source = phrase_pair.counts_source.front();
-    const double& count_target = phrase_pair.counts_target.front();
-    
-    const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-    const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-
-    if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10,
-			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
-			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
-      throw std::runtime_error("failed generation");
-
-    if (feature_type_mode) {
-      const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
-      const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
+    if (! mode_reordering) 
+      os << '\n';
+    else {
+      // we will dump reordering table as "attributes"
       
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_type_source_target), std::log(prob_type_target_source)))
-	throw std::runtime_error("failed generation");
-    }
-    
-    if (feature_singleton_mode) {
-      const int singleton_source = phrase_pair.observed_source == 1;
-      const int singleton_target = phrase_pair.observed_target == 1;
-      const int singleton        = singleton_source && singleton_target;
+      os << " |||";
       
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_ << ' ' << karma::int_,
-			    singleton, singleton_source, singleton_target))
-	throw std::runtime_error("failed generation");
-    }
-
-    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
-      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
-      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
-      
-      if (model1_mode) {
-	const std::pair<double, double> scores = lexicon.model1();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (noisy_or_mode) {
-	const std::pair<double, double> scores = lexicon.noisy_or();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (insertion_deletion_mode) {
-	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-    }
-    
-    os << " |||";
-
-    // we will dump reordering table as "attributes"
-    {
-
       const phrase_pair_type::counts_type& counts = (mode_source_only 
 						     ? phrase_pair.counts_source
 						     : (mode_target_only
@@ -388,7 +311,7 @@ struct ScorerCICADAReordering
       const double count_next_mono   = counts[3];
       const double count_next_swap   = counts[4];
       const double count_next_others = count - (count_next_mono + count_next_swap);
-    
+      
       if (mode_monotonicity) {
 	if (mode_bidirectional) {
 	  const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
@@ -400,11 +323,6 @@ struct ScorerCICADAReordering
 				std::log(prob_prev_mono), std::log(prob_prev_others),
 				std::log(prob_next_mono), std::log(prob_next_others)))
 	    throw std::runtime_error("failed generation");
-#if 0
-	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others)
-	     << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_others)
-	     << '\n';
-#endif
 	} else {
 	  const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
 	  const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
@@ -412,8 +330,6 @@ struct ScorerCICADAReordering
 	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << '\n',
 				std::log(prob_prev_mono), std::log(prob_prev_others)))
 	    throw std::runtime_error("failed generation");
-	  
-	  //os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others) << '\n';
 	}
       } else {
 	if (mode_bidirectional) {
@@ -429,26 +345,20 @@ struct ScorerCICADAReordering
 				std::log(prob_prev_mono), std::log(prob_prev_swap), std::log(prob_prev_others),
 				std::log(prob_next_mono), std::log(prob_next_swap), std::log(prob_next_others)))
 	    throw std::runtime_error("failed generation");
-#if 0
-	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others)
-	     << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_swap) << ' ' << std::log(prob_next_others)
-	     << '\n';
-#endif
 	} else {
 	  const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
 	  const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
 	  const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
-	
+	  
 	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
 				std::log(prob_prev_mono), std::log(prob_prev_swap), std::log(prob_prev_others)))
 	    throw std::runtime_error("failed generation");
-	  
-	  //os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others) << '\n';
 	}
       }
     }
   }
 };
+
 
 struct ScorerMOSES
 {
@@ -462,6 +372,18 @@ struct ScorerMOSES
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
   
+  ExtractPhrase    extract_phrase;
+  ExtractAlignment extract_alignment;
+  Unaligned        unaligned;
+  
+  typedef ExtractPhrase::sentence_type         sentence_type;
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
+  
+  sentence_type      source;
+  sentence_type      target;
+  alignment_set_type alignments;
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
@@ -490,14 +412,75 @@ struct ScorerMOSES
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " |||"
 			  << ' ' << double10 << ' ' << double10
-			  << ' ' << double10 << ' ' << double10
 			  << ' ' << double10
 			  << '\n',
 			  phrase_pair.source, phrase_pair.target,
-			  prob_source_target, phrase_pair.lexicon_source_target,
-			  prob_target_source, phrase_pair.lexicon_target_source,
+			  prob_source_target, prob_target_source, 
 			  boost::math::constants::e<double>()))
       throw std::runtime_error("failed generation");
+    
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      extract_phrase(phrase_pair.source, source);
+      extract_phrase(phrase_pair.target, target);
+    }
+    
+    if (feature_lexicon_mode || feature_unaligned_mode)
+      extract_alignment(phrase_pair.alignments, alignments);
+    
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      if (feature_lexicon_mode) {
+	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+
+      if (feature_model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(source, target, threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+
+    if (feature_unaligned_mode) {
+      const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	throw std::runtime_error("failed generation");
+    }
+    
+    if (feature_type_mode) {
+      const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
+      const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, prob_type_source_target, prob_type_target_source))
+	throw std::runtime_error("failed generation");
+    }
+    
+    if (feature_singleton_mode) {
+      const int singleton_source = phrase_pair.observed_source == 1;
+      const int singleton_target = phrase_pair.observed_target == 1;
+      const int singleton        = singleton_source && singleton_target;
+      
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_ << ' ' << karma::int_,
+			    singleton, utils::mathop::exp(singleton_source), utils::mathop::exp(singleton_target)))
+	throw std::runtime_error("failed generation");
+    }
   }
 };
 
@@ -635,6 +618,7 @@ void options(int argc, char** argv)
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")
+    ("feature-unaligned",  po::bool_switch(&feature_unaligned_mode),  "unaligned features")
     
     ("feature-lexicon",            po::bool_switch(&feature_lexicon_mode),            "lexical weight feature (requires lexicon models)")
     ("feature-model1",             po::bool_switch(&feature_model1_mode),             "Model1 feature (requires lexicon models)")

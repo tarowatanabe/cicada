@@ -436,23 +436,26 @@ struct ExtractRootGHKM
 
 struct ExtractAlignment
 {
+  typedef std::pair<int, int> point_type;
   typedef cicada::Alignment alignment_type;
   typedef std::vector<alignment_type, std::allocator<alignment_type> > alignment_set_type;
   
   template <typename Iterator>
-  struct align_parser : boost::spirit::qi::grammar<Iterator, alignment_set_type()>
+  struct align_parser : boost::spirit::qi::grammar<Iterator, alignment_set_type(), boost::spirit::standard::space_type>
   {
     align_parser() : align_parser::base_type(alignments)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      aligns %= '(' >> -((qi::int_ >> '-' >> qi::int_) % ',') >> ')';
-      alignments %= qi::omit[*standard::space] >> -(aligns % (+standard::space)) >> qi::omit[*standard::space];
+      point %= qi::int_ >> '-' >> qi::int_;
+      aligns %= '(' >> *point >> ')';
+      alignments %= *aligns;
     }
-    
-    boost::spirit::qi::rule<Iterator, alignment_type()>     aligns;
-    boost::spirit::qi::rule<Iterator, alignment_set_type()> alignments;
+
+    boost::spirit::qi::rule<Iterator, point_type(), boost::spirit::standard::space_type> point;
+    boost::spirit::qi::rule<Iterator, alignment_type(), boost::spirit::standard::space_type> aligns;
+    boost::spirit::qi::rule<Iterator, alignment_set_type(), boost::spirit::standard::space_type> alignments;
   };
 
   align_parser<std::string::const_iterator> parser;
@@ -467,7 +470,7 @@ struct ExtractAlignment
     
     alignments.clear();
     
-    const bool result = qi::parse(iter, end, parser, alignments);
+    const bool result = qi::phrase_parse(iter, end, parser, standard::space, alignments);
     if (! result || iter != end)
       throw std::runtime_error("invalid point format? " + align);
   }
@@ -583,7 +586,9 @@ struct LexiconModel
 struct Lexicon
 {
   typedef cicada::Sentence  sentence_type;
-  typedef cicada::Alignment alignment_type;
+  
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
 
   typedef LexiconModel lexicon_model_type;
 
@@ -603,13 +608,32 @@ struct Lexicon
   
   std::pair<double, double> lexicon(const sentence_type& source,
 				    const sentence_type& target,
+				    const alignment_set_type& alignments) const
+  {
+    double lex_source_target = - std::numeric_limits<double>::infinity();
+    double lex_target_source = - std::numeric_limits<double>::infinity();
+    
+    alignment_set_type::const_iterator aiter_end = alignments.end();
+    for (alignment_set_type::const_iterator aiter = alignments.begin(); aiter != aiter_end; ++ aiter) {
+      const std::pair<double, double> lex = lexicon(source, target, *aiter);
+      
+      lex_source_target = std::max(lex_source_target, lex.first);
+      lex_target_source = std::max(lex_target_source, lex.second);
+    }
+    
+    return std::make_pair(lex_source_target == - std::numeric_limits<double>::infinity() ? 0.0 : lex_source_target,
+			  lex_target_source == - std::numeric_limits<double>::infinity() ? 0.0 : lex_target_source);
+  }
+  
+  std::pair<double, double> lexicon(const sentence_type& source,
+				    const sentence_type& target,
 				    const alignment_type& alignment) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
 
-    double lex_source_target = 1.0;
-    double lex_target_source = 1.0;
+    double lex_source_target = 0.0;
+    double lex_target_source = 0.0;
 
     align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
     align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
@@ -619,12 +643,12 @@ struct Lexicon
 
     aligns_source.resize(source_size);
     aligns_target.resize(target_size);
-
+    
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
       if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
 	std::ostringstream os;
-	os << "invlaid alignemnt:"
+	os << "invlaid alignment:"
 	   << " source: " << source 
 	   << " target: " << target
 	   << " alignment: " << alignment;
@@ -638,33 +662,32 @@ struct Lexicon
     for (size_t trg = 0; trg != target_size; ++ trg) 
       if (target[trg].is_terminal()) {
 	if (aligns_target[trg].empty())
-	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]);
+	  lex_source_target += utils::mathop::log(lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]));
 	else {
 	  double score = 0.0;
 	  align_set_type::const_iterator aiter_end = aligns_target[trg].end();
 	  for (align_set_type::const_iterator aiter = aligns_target[trg].begin(); aiter != aiter_end; ++ aiter)
 	    score += lexicon_source_target(source[*aiter], target[trg]);
 
-	  lex_source_target *= score / aligns_target[trg].size();
+	  lex_source_target += utils::mathop::log(score / aligns_target[trg].size());
 	}
       }
     
     for (size_t src = 0; src != source_size; ++ src) 
       if (source[src].is_terminal()) {
 	if (aligns_source[src].empty())
-	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]);
+	  lex_target_source += utils::mathop::log(lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]));
 	else {
 	  double score = 0.0;
 	  align_set_type::const_iterator aiter_end = aligns_source[src].end();
 	  for (align_set_type::const_iterator aiter = aligns_source[src].begin(); aiter != aiter_end; ++ aiter)
 	    score += lexicon_target_source(target[*aiter], source[src]);
 	  
-	  lex_target_source *= score / aligns_source[src].size();
+	  lex_target_source += utils::mathop::log(score / aligns_source[src].size());
 	}
       }
     
-    return std::make_pair(std::max(lex_source_target, boost::numeric::bounds<double>::smallest()),
-			  std::max(lex_target_source, boost::numeric::bounds<double>::smallest()));
+    return std::make_pair(lex_source_target, lex_target_source);
   }
   
   std::pair<double, double> noisy_or(const sentence_type& source,
@@ -776,15 +799,127 @@ struct Lexicon
   }
 };
 
+struct Unaligned
+{
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef cicada::Sentence sentence_type;
+
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
+  
+  typedef std::vector<int, std::allocator<int> > align_set_type;
+
+  std::pair<size_type, size_type> operator()(const sentence_type& source,
+					     const sentence_type& target,
+					     const alignment_set_type& alignments) const
+  {
+    size_type unaligned_source = size_type(-1);
+    size_type unaligned_target = size_type(-1);
+    
+    alignment_set_type::const_iterator aiter_end = alignments.end();
+    for (alignment_set_type::const_iterator aiter = alignments.begin(); aiter != aiter_end; ++ aiter) {
+      const std::pair<size_type, size_type> result = operator()(source, target, *aiter);
+      
+      unaligned_source = utils::bithack::min(unaligned_source, result.first);
+      unaligned_target = utils::bithack::min(unaligned_target, result.second);
+    }
+    
+    return std::make_pair(utils::bithack::branch(unaligned_source == size_type(-1), size_type(0), unaligned_source),
+			  utils::bithack::branch(unaligned_target == size_type(-1), size_type(0), unaligned_target));
+  }
+  
+  align_set_type aligns_source_impl;
+  align_set_type aligns_target_impl;
+  
+  std::pair<size_type, size_type> operator()(const sentence_type& source,
+					     const sentence_type& target,
+					     const alignment_type& alignment) const
+  {
+    const size_t source_size = source.size();
+    const size_t target_size = target.size();
+        
+    align_set_type& aligns_source = const_cast<align_set_type&>(aligns_source_impl);
+    align_set_type& aligns_target = const_cast<align_set_type&>(aligns_target_impl);
+
+    aligns_source.clear();
+    aligns_target.clear();
+
+    aligns_source.resize(source_size);
+    aligns_target.resize(target_size);
+
+    alignment_type::const_iterator aiter_end = alignment.end();
+    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+      if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
+	std::ostringstream os;
+	os << "invlaid alignment:"
+	   << " source: " << source 
+	   << " target: " << target
+	   << " alignment: " << alignment;
+	throw std::runtime_error(os.str());
+      }
+      
+      ++ aligns_source[aiter->source];
+      ++ aligns_target[aiter->target];
+    }
+    
+    size_type unaligned_target = 0;
+    size_type unaligned_source = 0;
+    
+    for (size_t src = 0; src != source_size; ++ src) 
+      if (source[src].is_terminal() && ! aligns_source[src])
+	++ unaligned_source;
+    
+    for (size_t trg = 0; trg != target_size; ++ trg) 
+      if (target[trg].is_terminal() && !aligns_target[trg]) 
+	++ unaligned_target;
+    
+    return std::make_pair(unaligned_source, unaligned_target);
+  }
+  
+};
 
 struct Cross
 {
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef cicada::Sentence sentence_type;
-  typedef cicada::Alignment alignment_type;
+
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > position_type;
+
+  difference_type operator()(const sentence_type& source,
+			     const sentence_type& target,
+			     const alignment_set_type& alignments)
+  {
+    difference_type crossed = boost::numeric::bounds<difference_type>::lowest();
+
+    alignment_set_type::const_iterator aiter_end = alignments.end();
+    for (alignment_set_type::const_iterator aiter = alignments.begin(); aiter != aiter_end; ++ aiter) {
+      const difference_type result = operator()(source, target, *aiter);
+      
+      crossed = utils::bithack::max(crossed, result);
+    }
+    
+    return crossed;
+  }
+  
+  difference_type operator()(const sentence_type& source,
+			     const sentence_type& target,
+			     const alignment_type& alignment)
+  {
+    difference_type crossed = 0;
+    
+    alignment_type::const_iterator aiter_end = alignment.end();
+    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end - 1; ++ aiter)
+      for (alignment_type::const_iterator niter = aiter + 1; niter != aiter_end; ++ niter)
+	crossed += ((aiter->source < niter->source && niter->target < aiter->target)
+		    || (niter->source < aiter->source && aiter->target < niter->target));
+    
+    return - crossed;
+  }
   
   difference_type operator()(const sentence_type& source,
 			     const sentence_type& target)

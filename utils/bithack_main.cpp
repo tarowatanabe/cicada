@@ -18,34 +18,56 @@ int main(int argc, char** argv)
   
   std::cout << utils::bithack::min(size_t(-56), size_t(72)) << std::endl;
   std::cout << utils::bithack::max(size_t(-56), size_t(72)) << std::endl;
-
+  
+  std::cout << "min/max 56 and 72" << std::endl;
+  
   std::cout << utils::bithack::min(56, 72) << std::endl;
   std::cout << utils::bithack::max(56, 72) << std::endl;
+
+  std::cout << "min/max 56 and highest" << std::endl;
 
   std::cout << utils::bithack::min(56, boost::numeric::bounds<int>::highest()) << std::endl;
   std::cout << utils::bithack::max(56, boost::numeric::bounds<int>::highest()) << std::endl;
 
+  std::cout << "min/max 56 and lowest" << std::endl;
+
   std::cout << utils::bithack::min(56, boost::numeric::bounds<int>::lowest()) << std::endl;
   std::cout << utils::bithack::max(56, boost::numeric::bounds<int>::lowest()) << std::endl;
 
+  std::cout << "min/max 56 and smallest" << std::endl;
+
+  std::cout << utils::bithack::min(56, boost::numeric::bounds<int>::smallest()) << std::endl;
+  std::cout << utils::bithack::max(56, boost::numeric::bounds<int>::smallest()) << std::endl;
+
+  std::cout << "int8_t abs 56 and -56" << std::endl;
+ 
   std::cout << int(utils::bithack::abs((int8_t) 56)) << std::endl;
   std::cout << int(utils::bithack::abs((int8_t) -56)) << std::endl;
 
+  std::cout << "int16_t abs 56 and -56" << std::endl;
+  
   std::cout << utils::bithack::abs((int16_t) 56) << std::endl;
   std::cout << utils::bithack::abs((int16_t) - 56) << std::endl;
+
+  std::cout << "int32_t abs 56 and -56" << std::endl;
 
   std::cout << utils::bithack::abs((int32_t) 56) << std::endl;
   std::cout << utils::bithack::abs((int32_t) - 56) << std::endl;
 
+  std::cout << "int64_t abs 56 and -56" << std::endl;
+  
   std::cout << utils::bithack::abs((int64_t) 56) << std::endl;
   std::cout << utils::bithack::abs((int64_t) - 56) << std::endl;
   
+  std::cout << "bits int8_t/int16_t/int32_t/int64_t 86" << std::endl;
 
   std::cout << utils::bithack::bit_count((int8_t) 86) << std::endl;
   std::cout << utils::bithack::bit_count((int16_t) 86) << std::endl;
   std::cout << utils::bithack::bit_count((int32_t) 86) << std::endl;
   std::cout << utils::bithack::bit_count((int64_t) 86) << std::endl;
   
+  std::cout << "significant bit 86" << std::endl;
+
   std::cout << utils::bithack::static_most_significant_bit<86>::result << std::endl;
   std::cout << utils::bithack::most_significant_bit((int8_t) 86) << std::endl;
   

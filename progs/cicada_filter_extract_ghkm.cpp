@@ -41,10 +41,12 @@ path_type lexicon_target_source_file;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
+bool feature_unaligned_mode = false;
 
-bool model1_mode = false;
-bool noisy_or_mode = false;
-bool insertion_deletion_mode = false;
+bool feature_lexicon_mode = false;
+bool feature_model1_mode = false;
+bool feature_noisy_or_mode = false;
+bool feature_insertion_deletion_mode = false;
 
 double threshold_insertion = 0.01;
 double threshold_deletion = 0.01;
@@ -54,7 +56,7 @@ double dirichlet_prior = 0.1;
 int buffer_size = 1024 * 1024;
 int debug = 0;
 
-template <typename Scorer, typename Lexicon>
+template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
@@ -77,7 +79,7 @@ int main(int argc, char** argv)
 
     bool read_lexicon = false;
     
-    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
 	throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
       if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
@@ -120,7 +122,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
     
-    process<ScorerCICADA, LexiconGHKM>(is, os, root_source, root_target, LexiconGHKM(lexicon_source_target, lexicon_target_source));
+    process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -129,7 +131,7 @@ int main(int argc, char** argv)
   return 0;
 }
 
-template <typename Scorer, typename Lexicon>
+template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
@@ -154,7 +156,6 @@ void process(std::istream& is,
 struct ScorerCICADA
 {
   ExtractRootGHKM root_extractor;
-  CrossGHKM       cross;
 
   struct real_precision : boost::spirit::karma::real_policies<double>
   {
@@ -165,6 +166,19 @@ struct ScorerCICADA
   };
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
+
+  ExtractPhrase    extract_phrase;
+  ExtractAlignment extract_alignment;
+  Unaligned        unaligned;
+  Cross            cross;
+  
+  typedef ExtractPhrase::sentence_type         sentence_type;
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
+
+  sentence_type      source;
+  sentence_type      target;
+  alignment_set_type alignments;
   
   template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
@@ -213,16 +227,61 @@ struct ScorerCICADA
     
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " |||"
-			  << ' ' << double10 << ' ' << double10
-			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10
+			  << ' ' << double10
 			  << ' ' << double10
 			  << ' ' << double10,
 			  phrase_pair.source, phrase_pair.target,
-			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
-			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source),
+			  std::log(prob_source_target), 
+			  std::log(prob_target_source), 
 			  std::log(prob_root_source),
 			  std::log(prob_root_target)))
       throw std::runtime_error("failed generation");
+    
+    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      extract_phrase(phrase_pair.source, source);
+      extract_phrase(phrase_pair.target, target);
+    }
+    
+    if (feature_lexicon_mode || feature_unaligned_mode)
+      extract_alignment(phrase_pair.alignments, alignments);
+
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      if (feature_lexicon_mode) {
+	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(source, target, threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+    
+    if (feature_unaligned_mode) {
+      const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	throw std::runtime_error("failed generation");
+    }
     
     if (feature_type_mode) {
       const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
@@ -242,39 +301,9 @@ struct ScorerCICADA
 	throw std::runtime_error("failed generation");
     }
     
-    if (feature_cross_mode) {
-      cross.assign_source(phrase_pair.source);
-      cross.assign_target(phrase_pair.target);
-      
-      if (! karma::generate(iter, ' ' << karma::int_, cross()))
+    if (feature_cross_mode)
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, cross(source, target), cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
-    }
-    
-    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
-      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
-      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
-      
-      if (model1_mode) {
-	const std::pair<double, double> scores = lexicon.model1();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (noisy_or_mode) {
-	const std::pair<double, double> scores = lexicon.noisy_or();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (insertion_deletion_mode) {
-	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-    }
     
     os << '\n';
   }
@@ -302,10 +331,12 @@ void options(int argc, char** argv)
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")
+    ("feature-unaligned",  po::bool_switch(&feature_unaligned_mode),  "unaligned features")
     
-    ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
-    ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
-    ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
+    ("feature-lexicon",            po::bool_switch(&feature_lexicon_mode),            "lexical weight feature (requires lexicon models)")
+    ("feature-model1",             po::bool_switch(&feature_model1_mode),             "Model1 feature (requires lexicon models)")
+    ("feature-noisy-or",           po::bool_switch(&feature_noisy_or_mode),           "noisy-or feature (requires lexicon models)")
+    ("feature-insertion-deletion", po::bool_switch(&feature_insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
     
     ("threshold-insertion", po::value<double>(&threshold_insertion)->default_value(threshold_insertion), "threshold for insertion")
     ("threshold-deletion",  po::value<double>(&threshold_deletion)->default_value(threshold_deletion),   "threshold for deletion")

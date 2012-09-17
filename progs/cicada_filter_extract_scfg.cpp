@@ -40,14 +40,15 @@ path_type lexicon_target_source_file;
 
 double dirichlet_prior = 0.1;
 
-bool feature_root_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
+bool feature_unaligned_mode = false;
 
-bool model1_mode = false;
-bool noisy_or_mode = false;
-bool insertion_deletion_mode = false;
+bool feature_lexicon_mode = false;
+bool feature_model1_mode = false;
+bool feature_noisy_or_mode = false;
+bool feature_insertion_deletion_mode = false;
 
 double threshold_insertion = 0.01;
 double threshold_deletion = 0.01;
@@ -55,7 +56,7 @@ double threshold_deletion = 0.01;
 int buffer_size = 1024 * 1024;
 int debug = 0;
 
-template <typename Scorer, typename Lexicon>
+template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
@@ -78,7 +79,7 @@ int main(int argc, char** argv)
 
     bool read_lexicon = false;
     
-    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
 	throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
       if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
@@ -121,7 +122,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
 
-    process<ScorerCICADA, LexiconSCFG>(is, os, root_source, root_target, LexiconSCFG(lexicon_source_target, lexicon_target_source));
+    process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -130,7 +131,7 @@ int main(int argc, char** argv)
   return 0;
 }
 
-template <typename Scorer, typename Lexicon>
+template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
@@ -155,7 +156,6 @@ void process(std::istream& is,
 struct ScorerCICADA
 {
   ExtractPhraseSCFG phrase_extractor;
-  CrossSCFG         cross;
   
   struct real_precision : boost::spirit::karma::real_policies<double>
   {
@@ -166,8 +166,20 @@ struct ScorerCICADA
   };
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
+
+  ExtractPhrase    extract_phrase;
+  ExtractAlignment extract_alignment;
+  Unaligned        unaligned;
+  Cross            cross;
   
-  template <typename Lexicon>
+  typedef ExtractPhrase::sentence_type         sentence_type;
+  typedef ExtractAlignment::alignment_type     alignment_type;
+  typedef ExtractAlignment::alignment_set_type alignment_set_type;
+
+  sentence_type      source;
+  sentence_type      target;
+  alignment_set_type alignments;
+  
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
@@ -197,39 +209,85 @@ struct ScorerCICADA
     if (phrase_source.first != phrase_target.first)
       throw std::runtime_error("synchronous-CFG, but different lhs?" + phrase_source.first + ' ' + phrase_target.first
 			       + " original: " + phrase_pair.source + ' ' + phrase_pair.target);
+    
+    
+    root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);
+    root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
+    
+    if (siter == root_count_source.end())
+      throw std::runtime_error("no root count for source: " + phrase_source.first);
+    if (titer == root_count_target.end())
+      throw std::runtime_error("no root count for target: " + phrase_target.first);
+    
+    if (siter->counts.size() != 1)
+      throw std::runtime_error("invalid root count for source: " + phrase_source.first);
+    if (titer->counts.size() != 1)
+      throw std::runtime_error("invalid root count for target: " + phrase_target.first);
+    
+    const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
+    const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
 
     std::ostream_iterator<char> iter(os);
     
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " ||| " << standard::string << " |||"
-			  << ' ' << double10 << ' ' << double10
-			  << ' ' << double10 << ' ' << double10,
+			  << ' ' << double10
+			  << ' ' << double10
+			  << ' ' << double10
+			  << ' ' << double10,
 			  phrase_source.first, phrase_source.second, phrase_target.second,
-			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
-			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
+			  std::log(prob_source_target),
+			  std::log(prob_target_source),
+			  std::log(prob_root_source),
+			  std::log(prob_root_target)
+			  ))
       throw std::runtime_error("failed generation");
     
-    if (feature_root_mode) {
-      root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);
-      root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
-      
-      if (siter == root_count_source.end())
-	throw std::runtime_error("no root count for source: " + phrase_source.first);
-      if (titer == root_count_target.end())
-	throw std::runtime_error("no root count for target: " + phrase_target.first);
-      
-      if (siter->counts.size() != 1)
-	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
-      if (titer->counts.size() != 1)
-	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
-      
-      const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
-      const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
-      
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_root_source), std::log(prob_root_target)))
-	throw std::runtime_error("failed generation");
+    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      extract_phrase(phrase_pair.source, source);
+      extract_phrase(phrase_pair.target, target);
     }
     
+    if (feature_lexicon_mode || feature_unaligned_mode)
+      extract_alignment(phrase_pair.alignments, alignments);
+
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      if (feature_lexicon_mode) {
+	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or(source, target);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (feature_insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(source, target, threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+    
+    if (feature_unaligned_mode) {
+      const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+	throw std::runtime_error("failed generation");
+    }
+
     if (feature_type_mode) {
       const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
       const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
@@ -248,40 +306,11 @@ struct ScorerCICADA
 	throw std::runtime_error("failed generation");
     }
 
-    if (feature_cross_mode) {
-      cross.assign_source(phrase_pair.source);
-      cross.assign_target(phrase_pair.target);
-      
-      if (! karma::generate(iter, ' ' << karma::int_, cross()))
+    if (feature_cross_mode)
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, cross(source, target), cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
-    }
     
-    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
-      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
-      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
-      
-      if (model1_mode) {
-	const std::pair<double, double> scores = lexicon.model1();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (noisy_or_mode) {
-	const std::pair<double, double> scores = lexicon.noisy_or();
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (insertion_deletion_mode) {
-	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-    }
-    
+
     os << '\n';
   }
 };
@@ -305,14 +334,15 @@ void options(int argc, char** argv)
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
-    ("feature-root",       po::bool_switch(&feature_root_mode),       "feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")
+    ("feature-unaligned",  po::bool_switch(&feature_unaligned_mode),  "unaligned features")
     
-    ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
-    ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
-    ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
+    ("feature-lexicon",            po::bool_switch(&feature_lexicon_mode),            "lexical weight feature (requires lexicon models)")
+    ("feature-model1",             po::bool_switch(&feature_model1_mode),             "Model1 feature (requires lexicon models)")
+    ("feature-noisy-or",           po::bool_switch(&feature_noisy_or_mode),           "noisy-or feature (requires lexicon models)")
+    ("feature-insertion-deletion", po::bool_switch(&feature_insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
     
     ("threshold-insertion", po::value<double>(&threshold_insertion)->default_value(threshold_insertion), "threshold for insertion")
     ("threshold-deletion",  po::value<double>(&threshold_deletion)->default_value(threshold_deletion),   "threshold for deletion")

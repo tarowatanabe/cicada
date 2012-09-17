@@ -331,7 +331,6 @@ class IndexSCFG:
     def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
-        self.filter += " --feature-root"
         self.cky = None
         self.grammar = "grammar"
         self.name = "scfg"
