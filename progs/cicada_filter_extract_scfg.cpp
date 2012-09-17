@@ -248,7 +248,7 @@ struct ScorerCICADA
       extract_phrase(phrase_pair.target, target);
     }
     
-    if (feature_lexicon_mode || feature_unaligned_mode)
+    if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
       extract_alignment(phrase_pair.alignments, alignments);
 
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {

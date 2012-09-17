@@ -186,6 +186,7 @@ struct ScorerCICADA
   ExtractPhrase    extract_phrase;
   ExtractAlignment extract_alignment;
   Unaligned        unaligned;
+  Cross            cross;
   
   typedef ExtractPhrase::sentence_type         sentence_type;
   typedef ExtractAlignment::alignment_type     alignment_type;
@@ -234,10 +235,10 @@ struct ScorerCICADA
       extract_phrase(phrase_pair.target, target);
     }
     
-    if (feature_lexicon_mode || feature_unaligned_mode)
+    if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
       extract_alignment(phrase_pair.alignments, alignments);
     
-    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (feature_lexicon_mode) {
 	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
 	
@@ -291,6 +292,10 @@ struct ScorerCICADA
 			    singleton, singleton_source, singleton_target))
 	throw std::runtime_error("failed generation");
     }
+    
+    if (feature_cross_mode)
+      if (! karma::generate(iter, ' ' << karma::int_, cross(source, target, alignments)))
+	throw std::runtime_error("failed generation");
     
     if (! mode_reordering) 
       os << '\n';
