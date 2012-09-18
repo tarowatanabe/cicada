@@ -34,6 +34,11 @@ opt_parser = OptionParser(
     make_option("--lexical-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
 
+    make_option("--lexical-source-target", default="", action="store", type="string",
+                metavar="LEXICON", help="lexicon for P(target | source) (default: ${lexical_dir}/lex.f2n)"),
+    make_option("--lexical-target-source", default="", action="store", type="string",
+                metavar="LEXICON", help="lexicon for P(source | target) (default: ${lexical_dir}/lex.n2f)"),
+
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
     
@@ -386,15 +391,17 @@ class Features:
             self.options += " --feature-unaligned"
 
 class Lexicon:
-    def __init__(self, lexical_dir="",
+    def __init__(self,
+                 lexicon_source_target="",
+                 lexicon_target_source="",
                  lexicon=None,
                  model1=None,
                  noisy_or=None,
                  insertion_deletion=None,
                  threshold_insertion=0.01,
                  threshold_deletion=0.01):
-        self.lexicon_source_target = compressed_file(os.path.join(lexical_dir, "lex.f2n"))
-        self.lexicon_target_source = compressed_file(os.path.join(lexical_dir, "lex.n2f"))
+        self.lexicon_source_target = compressed_file(lexicon_source_target)
+        self.lexicon_target_source = compressed_file(lexicon_target_source)
         
         self.lexicon  = lexicon
         self.model1   = model1
@@ -571,6 +578,8 @@ class Scores(UserList.UserList):
 
 (options, args) = opt_parser.parse_args()
 
+### setup defaults!
+
 if options.root_dir:
     if not os.path.exists(options.root_dir):
 	os.makedirs(options.root_dir)
@@ -579,6 +588,10 @@ if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:
     options.lexical_dir = options.model_dir
+if not options.lexical_source_target:
+    options.lexical_source_target = os.path.join(options.lexical_dir, "lex.f2n")
+if not options.lexical_target_source:
+    options.lexical_target_source = os.path.join(options.lexical_dir, "lex.n2f")
 
 cicada = CICADA(options.cicada_dir)
 
@@ -600,7 +613,8 @@ features = Features(root=options.feature_root,
                     singleton=options.feature_singleton,
                     cross=options.feature_cross,
                     unaligned=options.feature_unaligned)
-lexicon = Lexicon(lexical_dir=options.lexical_dir,
+lexicon = Lexicon(lexicon_source_target=options.lexicon_source_target,
+                  lexicon_target_source=options.lexicon_target_source,
                   lexicon=options.feature_lexicon,
                   model1=options.feature_model1,
                   noisy_or=options.feature_noisy_or,
