@@ -25,6 +25,7 @@
 ### fifth, erase unused files!
 ###
 
+me_abs=$0
 me=`basename $0`
 
 ### working dir..

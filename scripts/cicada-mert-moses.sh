@@ -9,6 +9,7 @@
 ### we assume PBSPro. If you want to apply this to other environgmnet, adjust 
 ### #PBS stuff and qsub related commands
 
+me_abs=$0
 me=`basename $0`
 
 ### working dir..

@@ -222,14 +222,6 @@ if test "$config" = "" -o ! -e "$config"; then
   exit 1
 fi
 
-
-if test "$cicada" = ""; then
-  cicada=`abs_path $me_abs`
-  if test -r $cicada; then
-    cicada=`dirname $cicada`
-  fi
-fi
-
 ## check cicada...
 cicadapath() {
   file=$1
