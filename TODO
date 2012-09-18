@@ -170,6 +170,3 @@ rework of icu number formatter:
   we will perform fine-graned control of:
     use of matched rules
     use of any rules...?
-
-Move lexical probabilities computation to filter-extract tools by preserving alignment informat
-   We will keep the "most frequent" alignment, and if multiple candidates exist, we dump "all"
