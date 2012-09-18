@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
 ### we assume PBSPro. If you want to apply this to other environgmnet, adjust 
