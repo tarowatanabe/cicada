@@ -225,6 +225,7 @@ struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
       ("-RSB-", ']')
       ("-LCB-", '{')
       ("-RCB-", '}')
+      ("-PLUS-", '+') // added for ATB
       ("\\/", '/')
       ("\\*", '*');
     
