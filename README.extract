@@ -14,6 +14,88 @@ a large "local" storage for efficient extraction. In NICT, you can exploit local
 
 export TMPDIR_SPEC=/export/tmp
 
+Usage: cicada-extract.py [options]
+
+Options:
+  --root-dir=DIRECTORY  root directory for outputs
+  --corpus-dir=PREFIX   corpus directory (default: ${root_dir}/corpus)
+  --model-dir=DIRECTORY
+                        model directory (default: ${root_dir}/model)
+  --alignment-dir=DIRECTORY
+                        alignment directory (default: ${model_dir})
+  --lexical-dir=DIRECTORY
+                        lexical transltion table directory (default:
+                        ${model_dir})
+  --f=FILE-OR-SUFFIX    source (or 'French')  language file or suffix
+  --e=FILE-OR-SUFFIX    target (or 'English') language file or suffix
+  --a=FILE-OR-SUFFIX    alignment file or suffix
+  --sf=FILE-OR-SUFFIX   source (or 'French')  span file or suffix
+  --se=FILE-OR-SUFFIX   target (or 'English') span file or suffix
+  --ff=FILE-OR-SUFFIX   source (or 'French')  forest file or suffix
+  --fe=FILE-OR-SUFFIX   target (or 'English') forest file or suffix
+  --corpus=CORPUS       bilingual trainging corpus prefix
+  --alignment=ALIGNMENT
+                        alignment methods (default: grow-diag-final-and)
+  --first-step=STEP     first step (default: 4)
+  --last-step=STEP      last step  (default: 6)
+  --lexicon-inverse     use inverse alignment
+  --lexicon-prior=PRIOR
+                        lexicon model prior (default: 0.1)
+  --lexicon-variational
+                        variational Bayes estimates
+  --lexicon-l0          L0 regularization
+  --lexicon-l0-alpha=LEXICON_L0_ALPHA
+                        L0 regularization parameter (default: 100)
+  --lexicon-l0-beta=LEXICON_L0_BETA
+                        L0 regularization parameter (default: 0.01)
+  --phrase              extract phrase
+  --scfg                extract SCFG
+  --ghkm                extract GHKM (tree-to-string)
+  --tree                extract tree-to-tree
+  --non-terminal=NON_TERMINAL
+                        default non-terminal for GHKM rule (default: [x])
+  --max-sentence-length=LENGTH
+                        maximum sentence size (default: 0 == no limit)
+  --max-span-source=LENGTH
+                        maximum source span size (default: 15)
+  --max-span-target=LENGTH
+                        maximum target span size (default: 15)
+  --min-hole-source=LENGTH
+                        minimum source hole size (default: 1)
+  --min-hole-target=LENGTH
+                        minimum target hole size (default: 1)
+  --max-length=LENGTH   maximum terminal length (default: 7)
+  --max-fertility=FERTILITY
+                        maximum terminal fertility (default: 4)
+  --max-nodes=NODES     maximum rule nodes (default: 15)
+  --max-height=HEIGHT   maximum rule height (default: 4)
+  --max-compose=COMPOSE
+                        maximum rule composition (default: 0)
+  --max-rank=RANK       maximum rule rank (default: 2)
+  --max-scope=SCOPE     maximum rule scope (default: 0)
+  --collapse-source     collapse source side for CKY parsing
+  --collapse-target     collapse target side for CKY parsing
+  --exhaustive          exhaustive extraction in SCFG, GHKM and Tree
+  --constrained         constrained extraction in SCFG, GHKM and Tree
+  --project             project non-terminal symbols in GHKM
+  --sentential          extract sentential rule
+  --max-malloc=MALLOC   maximum memory in GB (default: 8)
+  --cicada-dir=DIRECTORY
+                        cicada directory
+  --mpi-dir=DIRECTORY   MPI directory
+  --mpi=MPI             # of processes for MPI-based parallel processing.
+                        Identical to --np for mpirun
+  --mpi-host=HOSTS      list of hosts to run job. Identical to --host for
+                        mpirun
+  --mpi-host-file=FILE  host list file to run job. Identical to --hostfile for
+                        mpirun
+  --threads=THREADS     # of thrads for thread-based parallel processing
+  --pbs                 PBS for launching processes
+  --pbs-queue=NAME      PBS queue for launching processes (default: ltg)
+  --debug=DEBUG         
+  -h, --help            show this help message and exit
+
+
 Internally, cicada-extract.py calls following binaries:
 
 cicada_extract_phrase{,_mpi}
@@ -47,16 +129,19 @@ cicada_extract_tree{,_mpi}
 After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
 Which will output:
 
-lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) \
-    	||| lex(lhs | rhs) lex(rhs | lhs)
+lhs ||| rhs ||| alignments ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) 
 
-In addtion, we will dump root-source.gz and root-target.gz. root-source.gz contains:
+In addtion, we will dump root-joint.gz, root-source.gz and root-target.gz. root-joint.gz contains:
 
-root(lhs) ||| counts(root(lhs)) ||| observed(lhs,rhs) observed(lhs)
+root(lhs)root(rhs) ||| counts(root(lhs)root(rsh)) ||| observed(lhs, rhs)
+
+while root-source.gz looks like:
+
+root(lhs) ||| counts(root(lhs)) ||| observed(lhs)
 
 while root-target.gz looks like:
 
-root(rhs) ||| counts(root(rhs)) ||| observed(hs,rhs) observed(rhs)
+root(rhs) ||| counts(root(rhs)) ||| observed(rhs)
 
 You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
 to perform Dirichlet prior smoothing (default).
@@ -86,7 +171,7 @@ Remarks on SCFG: (I don't know the default for Joshua... any clues?)
 	--min-hole-target 1
 	--max-length 5
 	--max-fertility 0
-	--exhaustive
+	--exhaustive // exhaustively extract from all-possible phrases
 
 	The Hiero-style extraction from Chiang (2007) will be:
 
@@ -96,13 +181,34 @@ Remarks on SCFG: (I don't know the default for Joshua... any clues?)
 	--min-hole-target 1
 	--max-length 5(?)
 	--max-fertility 0
-	--constrained
+	--constrained // extract only from minimal phrases
 
 	Our default:
 
 	--max-span-source 15
-	--max-span-target 20
+	--max-span-target 15
 	--min-hole-source 1
 	--min-hole-target 1
 	--max-length 7
 	--max-fertility 4
+	//
+	// no --exhaustive, and no --constrained imply:
+	//   extract from all-possible phrases, but uses minimal phrases as "holes"
+	//
+
+Remarks on GHKM:
+	--max-nodes 15
+	--max-height 4
+	--max-compose 0 // no constraint for composition from minimal rules
+	--max-scope 0   // no constriant for maximum scopes
+	
+	// other options...	
+	--constrained  // even minimum rules should satisfy above max-constraints.
+	               // RECOMMENDED when extracting rules from "forest"
+	--exhaustive   // consider all possible attachment of unaligned words to any rules... NOT RECOMMENDED.
+	               // default will attach unaligned words to rules "closer to root"
+
+	--collapse-source
+	--collapse-target
+	               // treat source/target side as a "flat" rule. Recommended for string-to-x variant.
+	--project      // project non-terminals symbols from tree-side to string-side.

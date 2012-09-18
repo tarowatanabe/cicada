@@ -29,18 +29,10 @@ opt_parser = OptionParser(
     # output directory/filename prefix
     make_option("--root-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="root directory for outputs"),
-    make_option("--corpus-dir", default="", action="store", type="string",
-                metavar="PREFIX", help="corpus directory (default: ${root_dir}/corpus)"),
-    make_option("--giza-f2e", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})"),
-    make_option("--giza-e2f", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})"),
     make_option("--model-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
-    make_option("--alignment-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
     make_option("--lexical-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
+                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
 
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
@@ -587,8 +579,6 @@ if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:
     options.lexical_dir = options.model_dir
-if not options.alignment_dir:
-    options.alignment_dir = options.model_dir
 
 cicada = CICADA(options.cicada_dir)
 

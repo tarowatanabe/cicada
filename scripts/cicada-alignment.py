@@ -396,6 +396,11 @@ class AlignmentHeuristic:
         command = cicada.cicada_alignment
         command += " --source-target \"%s\"" %(compressed_file(giza.viterbi_source_target))
         command += " --target-source \"%s\"" %(compressed_file(giza.viterbi_target_source))
+
+        if os.path.exists(corpus.source_span):
+            command += " --span-source \"%s\"" %(corpus.source_span)
+        if os.path.exists(corpus.target_span):
+            command += " --span-target \"%s\"" %(corpus.target_span)
         
         self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
 
@@ -464,6 +469,11 @@ class AlignmentPosterior:
            
         command += " --source \"%s\"" %(corpus.source)
         command += " --target \"%s\"" %(corpus.target)
+
+        if os.path.exists(corpus.source_span):
+            command += " --span-source \"%s\"" %(corpus.source_span)
+        if os.path.exists(corpus.target_span):
+            command += " --span-target \"%s\"" %(corpus.target_span)
 
         if learn_hmm:
             command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))

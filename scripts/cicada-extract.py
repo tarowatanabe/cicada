@@ -31,7 +31,7 @@ opt_parser = OptionParser(
     make_option("--alignment-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
     make_option("--lexical-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
+                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
     
     ### source/target flags
     make_option("--f", default="", action="store", type="string",
