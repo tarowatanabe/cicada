@@ -274,27 +274,24 @@ class MPI:
 
 class CICADA:
     def __init__(self, dir=""):
-        self.bindirs = []
+        bindirs = []
         
         if not dir:
             dir = os.path.abspath(os.path.dirname(__file__))
-            if dir:
-                self.bindirs.append(dir)
-                
-                dir = os.path.dirname(dir)
-                if dir:
-                    self.bindirs.append(dir)
+            bindirs.append(dir)
+            parent = os.path.dirname(dir)
+            if parent:
+                dir = parent
+        else:
+            dir = os.path.realpath(dir)
+            if not os.path.exists(dir):
+                raise ValueError, dir + " does not exist"
+            bindirs.append(dir)
         
-	self.dir = dir
-	if not os.path.exists(self.dir):
-	    raise ValueError, self.dir + " does not exist"
-	self.dir = os.path.realpath(self.dir)
-        
-	for dir in ('bin', 'progs', 'scripts'): 
-	    bindir = os.path.join(self.dir, dir)
+	for subdir in ('bin', 'progs', 'scripts'): 
+	    bindir = os.path.join(dir, subdir)
 	    if os.path.exists(bindir) and os.path.isdir(bindir):
-		self.bindirs.append(bindir)
-        self.bindirs.append(self.dir)
+		bindirs.append(bindir)
 	
         for binprog in ('cicada_index_grammar',
                         'cicada_index_tree_grammar',
@@ -309,7 +306,7 @@ class CICADA:
                         ### launchers
                         ):
 	    
-	    for bindir in self.bindirs:
+	    for bindir in bindirs:
 		prog = os.path.join(bindir, binprog)
                 
                 if not os.path.exists(prog): continue
