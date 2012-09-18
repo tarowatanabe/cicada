@@ -370,7 +370,7 @@ class IndexTree:
 ## additional features...
 class Features:
     def __init__(self,
-                 root=None
+                 root=None,
                  types=None,
                  singleton=None,
                  cross=None,
@@ -395,7 +395,7 @@ class Features:
 
 class Lexicon:
     def __init__(self, lexical_dir="",
-                 lexicon=None
+                 lexicon=None,
                  model1=None,
                  noisy_or=None,
                  insertion_deletion=None,

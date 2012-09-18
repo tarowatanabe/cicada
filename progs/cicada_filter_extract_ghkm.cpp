@@ -180,12 +180,12 @@ struct ScorerCICADA
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
 
-  ExtractPhrase    extract_phrase;
+  ExtractGHKM      extract_phrase;
   ExtractAlignment extract_alignment;
   Unaligned        unaligned;
   Cross            cross;
   
-  typedef ExtractPhrase::sentence_type         sentence_type;
+  typedef ExtractGHKM::sentence_type           sentence_type;
   typedef ExtractAlignment::alignment_type     alignment_type;
   typedef ExtractAlignment::alignment_set_type alignment_set_type;
 
@@ -215,8 +215,10 @@ struct ScorerCICADA
     const double& count_source = phrase_pair.counts_source.front();
     const double& count_target = phrase_pair.counts_target.front();
     
-    const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-    const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
+    const double logprob_source_target = (std::log(dirichlet_prior + count)
+					  - std::log(dirichlet_prior * phrase_pair.observed_source + count_source));
+    const double logprob_target_source = (std::log(dirichlet_prior + count)
+					  - std::log(dirichlet_prior * phrase_pair.observed_target + count_target));
     
     std::ostream_iterator<char> iter(os);
     
@@ -224,8 +226,8 @@ struct ScorerCICADA
 			  standard::string << " ||| " << standard::string << " |||"
 			  << ' ' << double10 << ' ' << double10,
 			  phrase_pair.source, phrase_pair.target,
-			  std::log(prob_source_target), 
-			  std::log(prob_target_source)))
+			  logprob_source_target, 
+			  logprob_target_source))
       throw std::runtime_error("failed generation");
     
     if (feature_root_mode) {
@@ -276,8 +278,8 @@ struct ScorerCICADA
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (feature_lexicon_mode) {
 	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
 	  throw std::runtime_error("failed generation");
       }
       
@@ -306,15 +308,15 @@ struct ScorerCICADA
     if (feature_unaligned_mode) {
       const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
       
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, utils::mathop::exp(scores.first), utils::mathop::exp(scores.second)))
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
 	throw std::runtime_error("failed generation");
     }
     
     if (feature_type_mode) {
-      const double prob_type_source_target = 1.0 / phrase_pair.observed_source;
-      const double prob_type_target_source = 1.0 / phrase_pair.observed_target;
+      const double logprob_type_source_target = - std::log(phrase_pair.observed_source);
+      const double logprob_type_target_source = - std::log(phrase_pair.observed_target);
       
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, std::log(prob_type_source_target), std::log(prob_type_target_source)))
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, logprob_type_source_target, logprob_type_target_source))
 	throw std::runtime_error("failed generation");
     }
     
