@@ -255,12 +255,15 @@ class CICADA:
 	    
 	    for bindir in self.bindirs:
 		prog = os.path.join(bindir, binprog)
-		if os.path.exists(prog):
-		    setattr(self, binprog, prog)
-		    break
+                
+                if not os.path.exists(prog): continue
+                if os.path.isdir(prog): continue
+                
+                setattr(self, binprog, prog)
+                break
+
 	    if not hasattr(self, binprog):
 		raise ValueError, binprog + ' does not exist'
-
 
 (options, args) = opt_parser.parse_args()
 

@@ -199,13 +199,13 @@ cicadapath() {
   shift
   
   path=$cicada/$file
-  if test ! -e $path; then
+  if test ! -x $path -o -d $path; then
     path=$cicada/bin/$file
-    if test ! -e $path; then
+    if test ! -x $path -o -d $path; then
       path=$cicada/progs/$file
-      if test ! -e $path; then
+      if test ! -x $path -o -d $path; then
         path=$cicada/scripts/$file
-	if test ! -e $path; then
+	if test ! -x $path -o -d $path; then
 	  echo $file
 	  return 1
 	fi
