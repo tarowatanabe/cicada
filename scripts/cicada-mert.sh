@@ -316,6 +316,16 @@ if test "$qsub" = ""; then
   if test "$host_file" != ""; then
     mipnp="$mpinp --hostfile $host_file"
   fi
+
+  if test "$TMPDIR_SPEC" != ""; then
+    mpinp="$mpinp -x TMPDIR_SPEC"
+  fi
+  if test "$LD_LIBRARY_PATH" != ""; then
+    mpinp="$mpinp -x LD_LIBRARY_PATH"
+  fi
+  if test "$DYLD_LIBRARY_PATH" != ""; then
+    mpinp="$mpinp -x DYLD_LIBRARY_PATH"
+  fi
 fi
 
 argument() {
