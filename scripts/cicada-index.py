@@ -59,12 +59,15 @@ opt_parser = OptionParser(
     make_option("--reordering", default=None, action="store_true", help="reordering for phrase grammar"),
     
     ## additional feature functions
+    make_option("--feature-root",               default=None, action="store_true", help="generative probability"),
     make_option("--feature-type",               default=None, action="store_true", help="observation probability"),
     make_option("--feature-singleton",          default=None, action="store_true", help="singleton features"),
     make_option("--feature-cross",              default=None, action="store_true", help="cross features"),
-    make_option("--lexicon-model1",             default=None, action="store_true", help="compute Model1 features"),
-    make_option("--lexicon-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
-    make_option("--lexicon-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
+    make_option("--feature-unaligned",          default=None, action="store_true", help="unaligned features"),
+    make_option("--feature-lexicon",            default=None, action="store_true", help="compute Model1 features"),
+    make_option("--feature-model1",             default=None, action="store_true", help="compute Model1 features"),
+    make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
+    make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
     
     make_option("--threshold-insertion", default=0.01, action="store", type="float", help="threshold for insertion (default: 0.01)"),
     make_option("--threshold-deletion",  default=0.01, action="store", type="float", help="threshold for deletion (default: 0.01)"),
@@ -367,23 +370,32 @@ class IndexTree:
 ## additional features...
 class Features:
     def __init__(self,
+                 root=None
                  types=None,
                  singleton=None,
-                 cross=None):
-        self.types      = types
+                 cross=None,
+                 unaligned=None):
+        self.root      = root
+        self.types     = types
         self.singleton = singleton
         self.cross     = cross
+        self.unaligned = unaligned
         self.options = ""
         
+        if root:
+            self.options += " --feature-root"
         if types:
             self.options += " --feature-type"
         if singleton:
             self.options += " --feature-singleton"
         if cross:
             self.options += " --feature-cross"
+        if unaligned:
+            self.options += " --feature-unaligned"
 
 class Lexicon:
     def __init__(self, lexical_dir="",
+                 lexicon=None
                  model1=None,
                  noisy_or=None,
                  insertion_deletion=None,
@@ -391,7 +403,8 @@ class Lexicon:
                  threshold_deletion=0.01):
         self.lexicon_source_target = compressed_file(os.path.join(lexical_dir, "lex.f2n"))
         self.lexicon_target_source = compressed_file(os.path.join(lexical_dir, "lex.n2f"))
-
+        
+        self.lexicon  = lexicon
         self.model1   = model1
         self.noisy_or = noisy_or
         self.insertion_deletion = insertion_deletion
@@ -401,16 +414,18 @@ class Lexicon:
 
         self.options = ""
         
-        if model1 or noisy_or or insertion_deletion:
+        if lexicon or model1 or noisy_or or insertion_deletion:
             self.options += " --lexicon-source-target \"%s\"" %(self.lexicon_source_target)
             self.options += " --lexicon-target-source \"%s\"" %(self.lexicon_target_source)
-            
+
+            if lexicon:
+                self.options += " --feature-lexicon"
             if model1:
-                self.options += " --model1"
+                self.options += " --feature-model1"
             if noisy_or:
-                self.options += " --noisy-or"
+                self.options += " --feature-noisy-or"
             if insertion_deletion:
-                self.options += " --insertion-deletion"
+                self.options += " --feature-insertion-deletion"
                 self.options += " --threshold-insertion %.20g" %(self.threshold_insertion)
                 self.options += " --threshold-deletion %.20g" %(self.threshold_deletion)
 
@@ -424,6 +439,7 @@ class Index(UserString.UserString):
                  input="",
                  output="",
                  name="",
+                 root_joint="",
                  root_source="",
                  root_target="",
                  prior=0.1,
@@ -436,6 +452,8 @@ class Index(UserString.UserString):
             raise ValueError, "no input? %s" %(input)
         if not output:
             raise ValueError, "no output? %s" %(output)
+        if not root_joint:
+            raise ValueError, "no root count? %s" %(root_joint)
         if not root_source:
             raise ValueError, "no root source? %s" %(root_source)
         if not root_target:
@@ -456,6 +474,7 @@ class Index(UserString.UserString):
             command += " | "
             command += indexer.filter
             command += " --dirichlet-prior %g" %(prior)
+            command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             if feats:
@@ -470,6 +489,7 @@ class Index(UserString.UserString):
 
             command = indexer.filter
             command += " --dirichlet-prior %g" %(prior)
+            command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             if feats:
@@ -519,16 +539,20 @@ class Scores(UserList.UserList):
         output = indexer.index
 
         path_files = os.path.join(prefix, 'files');
+        path_root_joint  = os.path.join(prefix, 'root-joint.gz')
         path_root_source = os.path.join(prefix, 'root-source.gz')
         path_root_target = os.path.join(prefix, 'root-target.gz')
         
         if not os.path.exists(path_files):
             raise ValueError, "no path to files: %s" %(path_files)
+        if not os.path.exists(path_root_joint):
+            raise ValueError, "no path to root-joint: %s" %(path_root_joint)
         if not os.path.exists(path_root_source):
             raise ValueError, "no path to root-source: %s" %(path_root_source)
         if not os.path.exists(path_root_target):
             raise ValueError, "no path to root-target: %s" %(path_root_target)
         
+        self.root_joint  = path_root_joint
         self.root_source = path_root_source
         self.root_target = path_root_target
         
@@ -581,13 +605,16 @@ else:
     raise ValueError, "no indexer?"
 
 scores = Scores(indexer)
-features = Features(types=options.feature_type,
+features = Features(root=options.feature_root,
+                    types=options.feature_type,
                     singleton=options.feature_singleton,
-                    cross=options.feature_cross)
+                    cross=options.feature_cross,
+                    unaligned=options.feature_unaligned)
 lexicon = Lexicon(lexical_dir=options.lexical_dir,
-                  model1=options.lexicon_model1,
-                  noisy_or=options.lexicon_noisy_or,
-                  insertion_deletion=options.lexicon_insertion_deletion,
+                  lexicon=options.feature_lexicon,
+                  model1=options.feature_model1,
+                  noisy_or=options.feature_noisy_or,
+                  insertion_deletion=options.feature_insertion_deletion,
                   threshold_insertion=options.threshold_insertion,
                   threshold_deletion=options.threshold_deletion)
 
@@ -605,6 +632,7 @@ if options.pbs:
                       input=score.input,
                       output=score.output,
                       name=score.name,
+                      root_joint=scores.root_joint,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
                       prior=options.prior,
@@ -631,6 +659,7 @@ elif options.mpi:
                       feats=features,
                       input=score.input,
                       output=score.output,
+                      root_joint=scores.root_joint,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
                       prior=options.prior,
@@ -652,6 +681,7 @@ else:
                       feats=features,
                       input=score.input,
                       output=score.output,
+                      root_joint=scores.root_joint,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
                       prior=options.prior,

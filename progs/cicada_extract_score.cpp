@@ -67,6 +67,7 @@ template <typename Extractor>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const path_map_type& reversed_files,
+		  root_count_set_type& root_joint,
 		  root_count_set_type& root_sources);
 
 void options(int argc, char** argv);
@@ -116,6 +117,7 @@ int main(int argc, char** argv)
     // modify counts...
     path_map_type modified_files;
     path_map_type reversed_files;
+    root_count_set_type root_joint;
     root_count_set_type root_sources;
     root_count_set_type root_targets;
     
@@ -147,17 +149,20 @@ int main(int argc, char** argv)
       score_counts<ExtractRootPhrase>(output_file,
 				      counts_files,
 				      reversed_files,
+				      root_joint,
 				      root_sources);
       
     else if (score_scfg)
       score_counts<ExtractRootSCFG>(output_file,
 				    counts_files,
 				    reversed_files,
+				    root_joint,
 				    root_sources);
     else
       score_counts<ExtractRootGHKM>(output_file,
 				    counts_files,
 				    reversed_files,
+				    root_joint,
 				    root_sources);
     utils::resource end_score;
     if (debug)
@@ -167,14 +172,20 @@ int main(int argc, char** argv)
     // finally, dump files, root-sources and root-targets...
     {
       utils::compress_ostream os_file(output_file / "files");
+      utils::compress_ostream os_joint(output_file / "root-joint.gz");
       utils::compress_ostream os_src(output_file / "root-source.gz");
       utils::compress_ostream os_trg(output_file / "root-target.gz");
       
+      os_joint.precision(20);
       os_src.precision(20);
       os_trg.precision(20);
-
+      
       for (int shard = 0; shard != threads; ++ shard)
 	os_file << (utils::lexical_cast<std::string>(shard) + ".gz") << '\n';
+
+      root_count_set_type::const_iterator jiter_end = root_joint.end();
+      for (root_count_set_type::const_iterator jiter = root_joint.begin(); jiter != jiter_end; ++ jiter)
+	os_joint << *jiter << '\n';
       
       root_count_set_type::const_iterator siter_end = root_sources.end();
       for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
@@ -197,6 +208,7 @@ template <typename Extractor>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const path_map_type& reversed_files,
+		  root_count_set_type& root_joint,
 		  root_count_set_type& root_sources)
 {
   typedef PhrasePairScore map_reduce_type;
@@ -224,6 +236,7 @@ void score_counts(const path_type& output_file,
     mapped_files[i % threads].push_back(counts_files[i]);
   
   root_count_map_type root_counts(threads);
+  root_count_map_type joint_counts(threads);
     
   queue_ptr_map_type   queues_mapper(threads, queue_ptr_set_type(threads));
   queue_ptr_map_type   queues_reducer(threads, queue_ptr_set_type(threads));
@@ -242,7 +255,8 @@ void score_counts(const path_type& output_file,
     
     ostreams[shard].reset(new utils::compress_ostream(path, 1024 * 1024));
     
-    reducers.add_thread(new boost::thread(reducer_type(root_counts[shard],
+    reducers.add_thread(new boost::thread(reducer_type(joint_counts[shard],
+						       root_counts[shard],
 						       Extractor(),
 						       reversed_files[shard],
 						       queues_reducer[shard],
@@ -260,15 +274,23 @@ void score_counts(const path_type& output_file,
   mappers.join_all();
   reducers.join_all();
   
-  // merge root_sources...
+  // merge root_joint and root_sources...
   for (size_t shard = 0; shard != root_counts.size(); ++ shard) {
+    root_count_set_type::const_iterator jiter_end = joint_counts[shard].end();
+    for (root_count_set_type::const_iterator jiter = joint_counts[shard].begin(); jiter != jiter_end; ++ jiter) {
+      std::pair<root_count_set_type::iterator, bool> result = root_joint.insert(*jiter);
+      if (! result.second) {
+	const_cast<root_count_type&>(*result.first).increment(jiter->counts.begin(), jiter->counts.end());
+	const_cast<root_count_type&>(*result.first).observed += jiter->observed;
+      }
+    }
+    
     root_count_set_type::const_iterator citer_end = root_counts[shard].end();
     for (root_count_set_type::const_iterator citer = root_counts[shard].begin(); citer != citer_end; ++ citer) {
       std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(*citer);
       if (! result.second) {
 	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
-	const_cast<root_count_type&>(*result.first).observed_joint += citer->observed_joint;
-	const_cast<root_count_type&>(*result.first).observed       += citer->observed;
+	const_cast<root_count_type&>(*result.first).observed += citer->observed;
       }
     }
   }
@@ -329,8 +351,7 @@ void reverse_counts(const path_map_type& modified_files,
       std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(*citer);
       if (! result.second) {
 	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
-	const_cast<root_count_type&>(*result.first).observed_joint += citer->observed_joint;
-	const_cast<root_count_type&>(*result.first).observed       += citer->observed;
+	const_cast<root_count_type&>(*result.first).observed += citer->observed;
       }
     }
   }

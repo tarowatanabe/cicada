@@ -32,6 +32,7 @@ typedef LexiconModel lexicon_model_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
+path_type root_joint_file;
 path_type root_source_file;
 path_type root_target_file;
 
@@ -40,6 +41,7 @@ path_type lexicon_target_source_file;
 
 double dirichlet_prior = 0.1;
 
+bool feature_root_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
@@ -59,6 +61,7 @@ int debug = 0;
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
 	     const Lexicon& lexicon);
@@ -72,6 +75,8 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
+    if (! boost::filesystem::exists(root_joint_file))
+      throw std::runtime_error("no root count file");
     if (! boost::filesystem::exists(root_source_file))
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
@@ -90,8 +95,10 @@ int main(int argc, char** argv)
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
 
+    root_count_set_type root_joint;
     root_count_set_type root_source;
     root_count_set_type root_target;
+    root_joint.set_empty_key(root_count_type());
     root_source.set_empty_key(root_count_type());
     root_target.set_empty_key(root_count_type());
 
@@ -107,6 +114,11 @@ int main(int argc, char** argv)
       root_count_type root_count;
       RootCountParser parser;
       std::string line;
+
+      utils::compress_istream is_joint(root_joint_file);
+      while (std::getline(is_joint, line))
+	if (parser(line, root_count))
+	  root_joint.insert(root_count);
       
       utils::compress_istream is_source(root_source_file);
       while (std::getline(is_source, line))
@@ -122,7 +134,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
 
-    process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+    process<ScorerCICADA>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -134,6 +146,7 @@ int main(int argc, char** argv)
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
 	     const Lexicon& lexicon)
@@ -149,7 +162,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, root_joint, root_source, root_target, lexicon, os);
   }
 }
 
@@ -181,6 +194,7 @@ struct ScorerCICADA
   alignment_set_type alignments;
   
   void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_set_type& root_count_joint,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
 		  const Lexicon& lexicon,
@@ -210,38 +224,49 @@ struct ScorerCICADA
       throw std::runtime_error("synchronous-CFG, but different lhs?" + phrase_source.first + ' ' + phrase_target.first
 			       + " original: " + phrase_pair.source + ' ' + phrase_pair.target);
     
-    
-    root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);
-    root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
-    
-    if (siter == root_count_source.end())
-      throw std::runtime_error("no root count for source: " + phrase_source.first);
-    if (titer == root_count_target.end())
-      throw std::runtime_error("no root count for target: " + phrase_target.first);
-    
-    if (siter->counts.size() != 1)
-      throw std::runtime_error("invalid root count for source: " + phrase_source.first);
-    if (titer->counts.size() != 1)
-      throw std::runtime_error("invalid root count for target: " + phrase_target.first);
-    
-    const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
-    const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
-
     std::ostream_iterator<char> iter(os);
     
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " ||| " << standard::string << " |||"
-			  << ' ' << double10
-			  << ' ' << double10
-			  << ' ' << double10
-			  << ' ' << double10,
+			  << ' ' << double10 << ' ' << double10,
 			  phrase_source.first, phrase_source.second, phrase_target.second,
 			  std::log(prob_source_target),
-			  std::log(prob_target_source),
-			  std::log(prob_root_source),
-			  std::log(prob_root_target)
-			  ))
+			  std::log(prob_target_source)))
       throw std::runtime_error("failed generation");
+    
+    if (feature_root_mode) {
+      root_count_set_type::const_iterator jiter = root_count_joint.find(phrase_source.first + phrase_target.first);
+      root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);
+      root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
+      
+      if (jiter == root_count_joint.end())
+	throw std::runtime_error("no root count: " + phrase_source.first + phrase_target.first);
+      if (siter == root_count_source.end())
+	throw std::runtime_error("no root count for source: " + phrase_source.first);
+      if (titer == root_count_target.end())
+	throw std::runtime_error("no root count for target: " + phrase_target.first);
+      
+      if (jiter->counts.size() != 1)
+	throw std::runtime_error("invalid root count: " + phrase_source.first + phrase_target.first);
+      if (siter->counts.size() != 1)
+	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
+      if (titer->counts.size() != 1)
+	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
+      
+      const double logprob_root = (std::log(dirichlet_prior + count)
+				   - std::log(dirichlet_prior * jiter->observed + jiter->counts.front()));
+      const double logprob_root_source = (std::log(dirichlet_prior + count_source)
+					  - std::log(dirichlet_prior * siter->observed + siter->counts.front()));
+      const double logprob_root_target = (std::log(dirichlet_prior + count_target)
+					  - std::log(dirichlet_prior * titer->observed + titer->counts.front()));
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
+			    logprob_root,
+			    logprob_root_source,
+			    logprob_root_target))
+	throw std::runtime_error("failed generation");
+    }
+
     
     if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
@@ -326,6 +351,7 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
+    ("root-joint",  po::value<path_type>(&root_joint_file),  "root count file")
     ("root-source", po::value<path_type>(&root_source_file), "root source file")
     ("root-target", po::value<path_type>(&root_target_file), "root target file")
 
@@ -334,6 +360,7 @@ void options(int argc, char** argv)
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
+    ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")

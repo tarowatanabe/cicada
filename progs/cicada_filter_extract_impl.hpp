@@ -39,7 +39,6 @@ struct RootCount
   label_type  label;
   counts_type counts;
   
-  double observed_joint;
   double observed;
   
   RootCount() : label(), counts() {}
@@ -49,7 +48,6 @@ struct RootCount
   {
     label.clear();
     counts.clear();
-    observed_joint = 0;
     observed = 0;
   }
   
@@ -156,7 +154,6 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  RootCount,
 			  (RootCount::label_type,  label)
 			  (RootCount::counts_type, counts)
-			  (RootCount::count_type,  observed_joint)
 			  (RootCount::count_type, observed)
 			  )
 
@@ -194,7 +191,7 @@ struct RootCountParser
       
       label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
       counts %= +qi::double_;
-      root_count %= label >> "|||" >> counts >> "|||" >> qi::double_ >> qi::double_;
+      root_count %= label >> "|||" >> counts >> "|||" >> qi::double_;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
@@ -838,16 +835,16 @@ struct Unaligned
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
-        
+    
     align_set_type& aligns_source = const_cast<align_set_type&>(aligns_source_impl);
     align_set_type& aligns_target = const_cast<align_set_type&>(aligns_target_impl);
-
+    
     aligns_source.clear();
     aligns_target.clear();
-
+    
     aligns_source.resize(source_size);
     aligns_target.resize(target_size);
-
+    
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
       if (aiter->source >= static_cast<int>(source_size) || aiter->target >= static_cast<int>(target_size)) {
@@ -863,16 +860,16 @@ struct Unaligned
       ++ aligns_target[aiter->target];
     }
     
-    size_type unaligned_target = 0;
     size_type unaligned_source = 0;
+    size_type unaligned_target = 0;
     
     for (size_t src = 0; src != source_size; ++ src) 
-      if (source[src].is_terminal() && ! aligns_source[src])
-	++ unaligned_source;
+      if (source[src].is_terminal())
+	unaligned_source += (aligns_source[src] == 0);
     
     for (size_t trg = 0; trg != target_size; ++ trg) 
-      if (target[trg].is_terminal() && !aligns_target[trg]) 
-	++ unaligned_target;
+      if (target[trg].is_terminal())
+	unaligned_target += (aligns_target[trg] == 0);
     
     return std::make_pair(unaligned_source, unaligned_target);
   }
@@ -890,27 +887,29 @@ struct Cross
 
   typedef std::vector<size_type, std::allocator<size_type> > position_type;
 
-  difference_type operator()(const sentence_type& source,
-			     const sentence_type& target,
-			     const alignment_set_type& alignments)
+  size_type operator()(const sentence_type& source,
+		       const sentence_type& target,
+		       const alignment_set_type& alignments)
   {
-    difference_type crossed = boost::numeric::bounds<difference_type>::lowest();
-
+    size_type crossed(size_type(-1));
+    
     alignment_set_type::const_iterator aiter_end = alignments.end();
     for (alignment_set_type::const_iterator aiter = alignments.begin(); aiter != aiter_end; ++ aiter) {
-      const difference_type result = operator()(source, target, *aiter);
+      const size_type result = operator()(source, target, *aiter);
       
-      crossed = utils::bithack::max(crossed, result);
+      crossed = utils::bithack::min(crossed, result);
     }
     
-    return crossed;
+    return utils::bithack::branch(crossed == size_type(-1), size_type(0), crossed);
   }
   
-  difference_type operator()(const sentence_type& source,
-			     const sentence_type& target,
-			     const alignment_type& alignment)
+  size_type operator()(const sentence_type& source,
+		       const sentence_type& target,
+		       const alignment_type& alignment)
   {
-    difference_type crossed = 0;
+    if (alignment.empty()) return 0;
+
+    size_type crossed = 0;
     
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end - 1; ++ aiter)
@@ -918,11 +917,11 @@ struct Cross
 	crossed += ((aiter->source < niter->source && niter->target < aiter->target)
 		    || (niter->source < aiter->source && aiter->target < niter->target));
     
-    return - crossed;
+    return crossed;
   }
   
-  difference_type operator()(const sentence_type& source,
-			     const sentence_type& target)
+  size_type operator()(const sentence_type& source,
+		       const sentence_type& target)
   {
     //
     // compute non-terminal alignment
@@ -978,7 +977,7 @@ struct Cross
 	crossed += ((aiter->source < niter->source && niter->target < aiter->target)
 		    || (niter->source < aiter->source && aiter->target < niter->target));
     
-    return - crossed;
+    return crossed;
   }
   
   alignment_type alignment;

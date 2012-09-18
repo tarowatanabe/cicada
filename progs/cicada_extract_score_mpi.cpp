@@ -71,6 +71,7 @@ template <typename Extractor>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
 			  const path_set_type& reversed_files,
+			  root_count_set_type& root_joint,
 			  root_count_set_type& root_sources);
 
 template <typename Extractor>
@@ -122,6 +123,7 @@ int main(int argc, char** argv)
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
       
       path_set_type reversed_files;
+      root_count_set_type root_joint;
       root_count_set_type root_sources;
       
       if (mpi_rank == 0)
@@ -151,33 +153,46 @@ int main(int argc, char** argv)
 	score_counts_reducer<ExtractRootPhrase>(comm_parent,
 						output_file,
 						reversed_files,
+						root_joint,
 						root_sources);
       else if (score_scfg)
 	score_counts_reducer<ExtractRootSCFG>(comm_parent,
 					      output_file,
 					      reversed_files,
+					      root_joint,
 					      root_sources);
       else
 	score_counts_reducer<ExtractRootGHKM>(comm_parent,
 					      output_file,
 					      reversed_files,
+					      root_joint,
 					      root_sources);
       utils::resource end_score;
       if (debug && mpi_rank == 0)
 	std::cerr << "score counts reducer cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
-
+      
+      reduce_root_counts(root_joint);
+      
+      MPI::COMM_WORLD.Barrier();
+      
       reduce_root_counts(root_sources);
-            
+      
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
 	utils::compress_ostream os_file(output_file / "files");
+	utils::compress_ostream os_joint(output_file / "root-joint.gz");
 	utils::compress_ostream os_src(output_file / "root-source.gz");
 	
+	os_joint.precision(20);
 	os_src.precision(20);
 	
 	for (int shard = 0; shard != mpi_size; ++ shard)
 	  os_file << (utils::lexical_cast<std::string>(shard) + ".gz") << '\n';
+
+	root_count_set_type::const_iterator jiter_end = root_joint.end();
+	for (root_count_set_type::const_iterator jiter = root_joint.begin(); jiter != jiter_end; ++ jiter)
+	  os_joint << *jiter << '\n';
 	
 	root_count_set_type::const_iterator siter_end = root_sources.end();
 	for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
@@ -415,8 +430,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
 	std::pair<root_count_set_type::iterator, bool> result = root_counts.insert(root_count);
 	if (! result.second) {
 	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
-	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
+	  const_cast<root_count_type&>(*result.first).observed += root_count.observed;
 	}
       }
     }
@@ -553,6 +567,7 @@ template <typename Extractor>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
 			  const path_set_type& reversed_files,
+			  root_count_set_type& root_joint,
 			  root_count_set_type& root_sources)
 {
   typedef boost::iostreams::filtering_istream istream_type;
@@ -599,7 +614,8 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(root_sources,
+  reducer.add_thread(new boost::thread(reducer_type(root_joint,
+						    root_sources,
 						    Extractor(),
 						    reversed_files,
 						    queues,

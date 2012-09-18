@@ -28,6 +28,7 @@ typedef LexiconModel lexicon_model_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
+path_type root_joint_file;
 path_type root_source_file;
 path_type root_target_file;
 
@@ -45,6 +46,7 @@ bool mode_bidirectional = false;
 bool mode_source_only = false;
 bool mode_target_only = false;
 
+bool feature_root_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
@@ -64,6 +66,7 @@ int debug = 0;
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const root_count_type& root_joint,
 	     const root_count_type& root_source,
 	     const root_count_type& root_target,
 	     const Lexicon& lexicon);
@@ -78,7 +81,9 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
-    
+
+    if (! boost::filesystem::exists(root_joint_file))
+      throw std::runtime_error("no root count file");
     if (! boost::filesystem::exists(root_source_file))
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
@@ -106,9 +111,10 @@ int main(int argc, char** argv)
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
     
+    root_count_type root_joint;
     root_count_type root_source;
     root_count_type root_target;
-    
+
     lexicon_model_type lexicon_source_target;
     lexicon_model_type lexicon_target_source;
 
@@ -116,30 +122,41 @@ int main(int argc, char** argv)
       lexicon_source_target.open(lexicon_source_target_file);
       lexicon_target_source.open(lexicon_target_source_file);
     }
-
+    
     {
       RootCountParser parser;
       std::string line;
+
+      utils::compress_istream is_joint(root_joint_file);
+      while (std::getline(is_joint, line))
+        if (parser(line, root_joint)) break;
       
       utils::compress_istream is_source(root_source_file);
       while (std::getline(is_source, line))
-	if (parser(line, root_source)) break;
+        if (parser(line, root_source)) break;
       
       utils::compress_istream is_target(root_target_file);
       while (std::getline(is_target, line))
-	if (parser(line, root_target)) break;
+        if (parser(line, root_target)) break;
+
+      if (root_joint.counts.empty())
+	throw std::runtime_error("invalid counts");
+      if (root_source.counts.empty())
+	throw std::runtime_error("invalid source counts");
+      if (root_target.counts.empty())
+	throw std::runtime_error("invalid target counts");
     }
 
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
     
     if (mode_cicada)
-      process<ScorerCICADA>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+      process<ScorerCICADA>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
     else if (mode_moses) {
       if (mode_reordering)
-	process<ScorerMOSESReordering>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+	process<ScorerMOSESReordering>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
       else
-	process<ScorerMOSES>(is, os, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+	process<ScorerMOSES>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
     }
   }
   catch (std::exception& err) {
@@ -152,6 +169,7 @@ int main(int argc, char** argv)
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const root_count_type& root_joint,
 	     const root_count_type& root_source,
 	     const root_count_type& root_target,
 	     const Lexicon& lexicon)
@@ -167,7 +185,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, root_joint, root_source, root_target, lexicon, os);
   }
 }
 
@@ -197,6 +215,7 @@ struct ScorerCICADA
   alignment_set_type alignments;
   
   void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_type& root_joint,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  const Lexicon& lexicon,
@@ -229,6 +248,18 @@ struct ScorerCICADA
 			  std::log(prob_target_source)))
       throw std::runtime_error("failed generation");
     
+    if (feature_root_mode) {
+      const double logprob_root = (std::log(dirichlet_prior + count)
+				   - std::log(dirichlet_prior * root_joint.observed + root_joint.counts.front()));
+      const double logprob_root_source = (std::log(dirichlet_prior + count_source)
+					  - std::log(dirichlet_prior * root_source.observed + root_source.counts.front()));
+      const double logprob_root_target = (std::log(dirichlet_prior + count_target)
+					  - std::log(dirichlet_prior * root_target.observed + root_target.counts.front()));
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
+			    logprob_root, logprob_root_source, logprob_root_target))
+	throw std::runtime_error("failed generation");
+    }
     
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
@@ -390,6 +421,7 @@ struct ScorerMOSES
   alignment_set_type alignments;
 
   void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_type& root_joint,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  const Lexicon& lexicon,
@@ -424,6 +456,20 @@ struct ScorerMOSES
 			  boost::math::constants::e<double>()))
       throw std::runtime_error("failed generation");
     
+    
+    if (feature_root_mode) {
+      const double prob_root = ((dirichlet_prior + count)
+				/ (dirichlet_prior * root_joint.observed + root_joint.counts.front()));
+      const double prob_root_source = ((dirichlet_prior + count_source)
+				       / (dirichlet_prior * root_source.observed + root_source.counts.front()));
+      const double prob_root_target = ((dirichlet_prior + count_target)
+				       / (dirichlet_prior * root_target.observed + root_target.counts.front()));
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
+			    prob_root, prob_root_source, prob_root_target))
+	throw std::runtime_error("failed generation");
+    }
+        
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
@@ -502,6 +548,7 @@ struct ScorerMOSESReordering
   boost::spirit::karma::real_generator<double, real_precision> double10;
 
   void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_type& root_joint,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  const Lexicon& lexicon,
@@ -603,6 +650,7 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
+    ("root-joint",  po::value<path_type>(&root_joint_file),  "root count file")
     ("root-source", po::value<path_type>(&root_source_file), "root source file")
     ("root-target", po::value<path_type>(&root_target_file), "root target file")
 
@@ -620,6 +668,7 @@ void options(int argc, char** argv)
     ("source-only",   po::bool_switch(&mode_source_only),   "source only")
     ("target-only",   po::bool_switch(&mode_target_only),   "target only")
 
+    ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")

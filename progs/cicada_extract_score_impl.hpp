@@ -71,17 +71,15 @@ public:
   label_type  label;
   counts_type counts;
 
-  double observed_joint;
   double observed;
 
-  RootCount(const label_type& __label) : label(__label), counts(), observed_joint(0), observed(0) {}
-  RootCount() : label(), counts(), observed_joint(0), observed(0) {}
+  RootCount(const label_type& __label) : label(__label), counts(), observed(0) {}
+  RootCount() : label(), counts(), observed(0) {}
 
   void clear()
   {
     label.clear();
     counts.clear();
-    observed_joint = 0;
     observed = 0;
   }
 
@@ -90,7 +88,6 @@ public:
     label.swap(x.label);
     counts.swap(x.counts);
 
-    std::swap(observed_joint, x.observed_joint);
     std::swap(observed, x.observed);
   }
 
@@ -110,7 +107,7 @@ public:
   {
     os << x.label << " ||| ";
     std::copy(x.counts.begin(), x.counts.end(), std::ostream_iterator<double>(os, " "));
-    os << "||| " << x.observed_joint << ' ' << x.observed;
+    os << "||| " << x.observed;
 
     return os;
   }
@@ -344,7 +341,6 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  RootCount,
 			  (RootCount::label_type, label)
 			  (RootCount::counts_type, counts)
-			  (double, observed_joint)
 			  (double, observed)
 			  )
 
@@ -435,14 +431,6 @@ struct RootCountParser
   RootCountParser() : grammar() {}
   RootCountParser(const RootCountParser& x) : grammar() {}
 
-#if 0
-  class double_base64_type : public std::string
-  {
-  public:
-    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
-  };
-#endif
-
   template <typename Iterator>
   struct root_count_parser : boost::spirit::qi::grammar<Iterator, root_count_type(), boost::spirit::standard::space_type>
   {
@@ -458,7 +446,7 @@ struct RootCountParser
       count %= 'B' >> count_base64 | qi::double_;
 
       counts %= +count;
-      root_count %= label >> "|||" >> counts >> "|||" >> count >> count;
+      root_count %= label >> "|||" >> counts >> "|||" >> count;
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
@@ -513,8 +501,6 @@ struct RootCountGenerator
 
     os << " |||";
     os << " B";
-    utils::encode_base64(root_count.observed_joint, std::ostream_iterator<char>(os));
-    os << " B";
     utils::encode_base64(root_count.observed, std::ostream_iterator<char>(os));
 
     return os;
@@ -531,14 +517,6 @@ struct PhrasePairParser
 
   PhrasePairParser() : grammar() {}
   PhrasePairParser(const PhrasePairParser& x) : grammar() {}
-
-#if 0
-  class double_base64_type : public std::string
-  {
-  public:
-    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
-  };
-#endif
 
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -637,14 +615,6 @@ struct PhrasePairModifiedParser
 
   PhrasePairModifiedParser() : grammar() {}
   PhrasePairModifiedParser(const PhrasePairModifiedParser& x) : grammar() {}
-
-#if 0
-  class double_base64_type : public std::string
-  {
-  public:
-    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
-  };
-#endif
 
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -1386,13 +1356,10 @@ struct PhrasePairReverseMapper
 	// increment root_observed(lhs)
 	riter = root_counts.insert(extract_root(modified.source)).first;
 	const_cast<root_count_type&>(*riter).increment(modified.counts.begin(), modified.counts.end());
-	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	const_cast<root_count_type&>(*riter).observed += 1;
 	
       } else if (curr.target != modified.target) {
-	// increment root_observed(lhs, rhs)
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	
 	modified.target.swap(curr.target);
 	modified.increment(curr.counts.begin(), curr.counts.end());
@@ -1972,6 +1939,7 @@ struct PhrasePairScoreReducer
   
   typedef ExtractRoot extract_root_type;
   
+  root_count_set_type& joint_counts;
   root_count_set_type& root_counts;
   
   extract_root_type extract_root;
@@ -1981,13 +1949,15 @@ struct PhrasePairScoreReducer
   std::ostream& os;
   int debug;
   
-  PhrasePairScoreReducer(root_count_set_type& __root_counts,
+  PhrasePairScoreReducer(root_count_set_type& __joint_counts,
+			 root_count_set_type& __root_counts,
 			 const extract_root_type& __extract_root,
 			 const path_set_type& __paths,
 			 queue_ptr_set_type& __queues,
 			 std::ostream& __os,
 			 int __debug)
-    : root_counts(__root_counts),
+    : joint_counts(__joint_counts),
+      root_counts(__root_counts),
       extract_root(__extract_root),
       paths(__paths),
       queues(__queues),
@@ -2182,8 +2152,9 @@ struct PhrasePairScoreReducer
     phrase_pair_set_type counts;
     modified_set_type    modified;
 
+    root_count_set_type::iterator jiter;
     root_count_set_type::iterator riter;
-    
+        
     while (! pqueue.empty()) {
       buffer_queue_type* buffer_queue(pqueue.top());
       pqueue.pop();
@@ -2203,11 +2174,15 @@ struct PhrasePairScoreReducer
 	  phrase_pair_set_type(counts).swap(counts);
 	  modified_set_type(modified).swap(modified);
 	}
+
+	// increment root_observed(lhs+rhs)
+	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*jiter).observed += 1;
 	
 	// increment root_observed(lhs)
 	riter = root_counts.insert(extract_root(curr.source)).first;
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	const_cast<root_count_type&>(*riter).observed += 1;
 	
 	counts.push_back(curr);
@@ -2235,9 +2210,12 @@ struct PhrasePairScoreReducer
 	  throw std::runtime_error("target mismatch? " + counts.back().target + " modified: " + modified.back().target);
 	
       } else if (counts.back().target != curr.target) {
-	// increment root_observed(lhs, rhs)
+	// increment root_observed(lhs+rhs)
+	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*jiter).observed += 1;
+	
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	
 	counts.push_back(curr);
 	
@@ -2264,9 +2242,11 @@ struct PhrasePairScoreReducer
 	  throw std::runtime_error("target mismatch? " + counts.back().target + " modified: " + modified.back().target);
 	
       } else if (counts.back().alignment != curr.alignment) {
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	counts.push_back(curr);
       } else {
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	counts.back().increment(curr.counts.begin(), curr.counts.end());
       }
