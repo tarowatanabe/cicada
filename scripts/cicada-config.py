@@ -41,7 +41,8 @@ opt_parser = OptionParser(
     make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
     
     ### feature functions
-    make_option("--ngram", default=[], action="append", type="string", help="ngram feature"),
+    make_option("--feature-ngram", default=[], action="append", type="string", help="ngram feature"),
+    
 
     ## operations...
     
@@ -122,11 +123,14 @@ def non_terminal(x, index=0):
 options.goal = non_terminal(options.goal)
 options.glue = non_terminal(options.glue)
 
+print "# goal for parsing/composition"
 print "goal = %s" %(options.goal)
 print
 
 if options.grammar:
-    print "# grammar"
+    print "#"
+    print "# grammar. For details, see \"cicada --grammar-list\""
+    print "#"
     for indexed in options.grammar:
         grammar = Grammar(grammar_dir=indexed)
         
@@ -162,7 +166,9 @@ if options.insertion or options.deletion:
     print
 
 if options.tree_grammar:
-    print "# tree-grammar"
+    print "#"
+    print "# tree-grammar. For details see \"cicada --tree-grammar-list\""
+    print "#"
     for indexed in options.tree_grammar:
         grammar = TreeGrammar(grammar_dir=indexed)
     
@@ -176,8 +182,11 @@ if options.fallback:
 
 ### feature-functions
 
+print "#"
+print "# feature functions. For details see \"cicada --feature-function-list\""
+print "#"
 print "# ngram feature. If you have multiple ngrams, you should modify name"
-for ngram in options.ngram:
+for ngram in options.feature_ngram:
     print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
 print "feature-function = word-penalty"
 print "feature-function = rule-penalty"
@@ -187,34 +196,54 @@ print "# feature-function = rule-shape"
 print
 
 ### inputs
-print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,directory}"
+print "#"
+print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency,directory}"
+print "#"
+
 if options.scfg:
     print "input-sentence = true"
+    print "# or, "
+    print "# input-lattice = true"
 elif options.phrase:
     print "input-sentence = true"
+    print "# or, "
+    print "# input-lattice = true"
 elif options.tree:
     print "input-forest = true"
 elif options.tree_cky:
     print "input-sentence = true"
+    print "# or, "
+    print "# input-lattice = true"
 print
 
 ### operations
 
-
-print "# operations"
+print "#"
+print "# operations. For details, see \"cicada --operation-list\""
+print "#"
 if options.scfg:
+    print "# for SCFG translation"
     print "operation = compose-cky"
+    print "# alternative"
+    print "# operation = parse-cky:size=1024,weights={weight file}"
 elif options.phrase:
     print "operation = compose-phrase"
 elif options.tree:
     print "operation = compose-tree"
+    print "# alternative"
+    print "# operation = parse-tree:size=1024,weights={weight file}"
 elif options.tree_cky:
     print "operation = compose-tree-cky"
+    print "# alternative"
+    print "# operation = parse-tree-cky:size=1024,weights={weight file}"
 else:
     raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
+
 print "operation = push-bos-eos"
+print "# cube pruning! (for compose-tree/parse-tree, larger cube-size, like 1000, is better)"
 print "operation = apply:prune=true,size=200,${weights}"
 print "operation = remove-bos-eos:forest=true"
 
+print "# for output"
 print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
 print
