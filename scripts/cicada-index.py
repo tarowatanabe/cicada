@@ -34,9 +34,9 @@ opt_parser = OptionParser(
     make_option("--lexical-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
 
-    make_option("--lexical-source-target", default="", action="store", type="string",
+    make_option("--lexicon-source-target", default="", action="store", type="string",
                 metavar="LEXICON", help="lexicon for P(target | source) (default: ${lexical_dir}/lex.f2n)"),
-    make_option("--lexical-target-source", default="", action="store", type="string",
+    make_option("--lexicon-target-source", default="", action="store", type="string",
                 metavar="LEXICON", help="lexicon for P(source | target) (default: ${lexical_dir}/lex.n2f)"),
 
     ## smoothing...
@@ -599,10 +599,10 @@ if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:
     options.lexical_dir = options.model_dir
-if not options.lexical_source_target:
-    options.lexical_source_target = os.path.join(options.lexical_dir, "lex.f2n")
-if not options.lexical_target_source:
-    options.lexical_target_source = os.path.join(options.lexical_dir, "lex.n2f")
+if not options.lexicon_source_target:
+    options.lexicon_source_target = os.path.join(options.lexical_dir, "lex.f2n")
+if not options.lexicon_target_source:
+    options.lexicon_target_source = os.path.join(options.lexical_dir, "lex.n2f")
 
 cicada = CICADA(options.cicada_dir)
 
