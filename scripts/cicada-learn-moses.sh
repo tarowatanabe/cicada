@@ -261,6 +261,23 @@ while test $# -gt 0 ; do
   esac
 done
 
+abs_path() {
+  dir__=$1
+  "cd" "$dir__"
+  if test "$?" = "0"; then
+    /bin/pwd
+    "cd" -  &>/dev/null
+  fi
+}
+
+if test "$cicada" = ""; then
+  cicada=`dirname $me_abs`
+  cicada=`abs_path $cicada`
+  if test -r $cicada; then
+    cicada=`dirname $cicada`
+  fi
+fi
+
 if test "$devset" = "" -o ! -e "$devset"; then
   echo "specify development data" >&2
   exit 1
@@ -271,10 +288,6 @@ if test "$refset" = "" -o ! -e "$refset"; then
 fi
 if test "$config" = "" -o ! -e "$config"; then
   echo "specify config file" >&2
-  exit 1
-fi
-if test "$cicada" = ""; then
-  echo "no cicada dir?" >&2
   exit 1
 fi
 if test "$moses" = "" -o ! -x "$moses"; then

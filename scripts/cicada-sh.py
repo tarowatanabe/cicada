@@ -227,16 +227,22 @@ class MPI:
 
 class CICADA:
     def __init__(self, dir=""):
-
-	self.dir = dir	
-	if not dir: return
-	
+        self.bindirs = []
+        
+        if not dir:
+            dir = os.path.abspath(os.path.dirname(__file__))
+            if dir:
+                self.bindirs.append(dir)
+                
+                dir = os.path.dirname(dir)
+                if dir:
+                    self.bindirs.append(dir)
+        
+	self.dir = dir
 	if not os.path.exists(self.dir):
 	    raise ValueError, self.dir + " does not exist"
-	
 	self.dir = os.path.realpath(self.dir)
-        
-	self.bindirs = []
+
 	for dir in ('bin', 'progs', 'scripts'): 
 	    bindir = os.path.join(self.dir, dir)
 	    if os.path.exists(bindir) and os.path.isdir(bindir):
