@@ -202,18 +202,12 @@ print "#"
 
 if options.scfg:
     print "input-sentence = true"
-    print "# or, "
-    print "# input-lattice = true"
 elif options.phrase:
     print "input-sentence = true"
-    print "# or, "
-    print "# input-lattice = true"
 elif options.tree:
     print "input-forest = true"
 elif options.tree_cky:
     print "input-sentence = true"
-    print "# or, "
-    print "# input-lattice = true"
 print
 
 ### operations
@@ -222,28 +216,33 @@ print "#"
 print "# operations. For details, see \"cicada --operation-list\""
 print "#"
 if options.scfg:
-    print "# for SCFG translation"
+    print "# SCFG translation"
     print "operation = compose-cky"
-    print "# alternative"
-    print "# operation = parse-cky:size=1024,weights={weight file}"
 elif options.phrase:
+    print "# phrase translation"
     print "operation = compose-phrase"
 elif options.tree:
+    print "# tree-to-{string,tree} translation"
     print "operation = compose-tree"
-    print "# alternative"
-    print "# operation = parse-tree:size=1024,weights={weight file}"
 elif options.tree_cky:
+    print "# string-to-{string,tree} translation"
     print "operation = compose-tree-cky"
-    print "# alternative"
-    print "# operation = parse-tree-cky:size=1024,weights={weight file}"
 else:
     raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
+print
 
+print "# annotate <s> and </s>"
 print "operation = push-bos-eos"
-print "# cube pruning! (for compose-tree/parse-tree, larger cube-size, like 1000, is better)"
-print "operation = apply:prune=true,size=200,${weights}"
-print "operation = remove-bos-eos:forest=true"
+print
 
-print "# for output"
+print "# cube-pruning"
+print "operation = apply:prune=true,size=200,${weights}"
+print
+
+print "# remove <s> and </s>"
+print "operation = remove-bos-eos:forest=true"
+print
+
+print "# for output. kbest=0 implies forest output, otherwise, kbest outputs"
 print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
 print

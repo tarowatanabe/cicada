@@ -497,11 +497,11 @@ qsubwrapper() {
       if test "$TMPDIR_SPEC" != ""; then
         echo "export TMPDIR_SPEC=$TMPDIR_SPEC"
       fi
-      if test "$TMPDIR" != ""; then
-        echo "export TMPDIR=$TMPDIR"
-      fi
       if test "$LD_LIBRARY_PATH" != ""; then
         echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+      fi
+      if test "$DYLD_LIBRARY_PATH" != ""; then
+        echo "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
       fi
 
       echo "cd $workingdir"

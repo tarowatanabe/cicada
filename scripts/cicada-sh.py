@@ -93,14 +93,6 @@ class PBS:
     def __init__(self, queue="", workingdir=os.getcwd()):
         self.queue = queue
         self.workingdir = workingdir
-        self.tmpdir = None
-        self.tmpdir_spec = None
-
-        if os.environ.has_key('TMPDIR'):
-            self.tmpdir = os.environ['TMPDIR']
-
-        if os.environ.has_key('TMPDIR_SPEC'):
-            self.tmpdir_spec = os.environ['TMPDIR_SPEC']
 
         self.workers = []
 
@@ -133,12 +125,14 @@ class PBS:
                 pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
         else:
             pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
-        
-        # setup TMPDIR and TMPDIR_SPEC
-        if self.tmpdir:
-            pipe.write("export TMPDIR=%s\n" %(self.tmpdir))
-        if self.tmpdir_spec:
-            pipe.write("export TMPDIR_SPEC=%s\n" %(self.tmpdir_spec))
+
+        # setup variables
+        if os.environ.has_key('TMPDIR_SPEC'):
+            pipe.write("export TMPDIR_SPEC=%s\n" %(os.environ['TMPDIR_SPEC']))
+        if os.environ.has_key('LD_LIBRARY_PATH'):
+            pipe.write("export LD_LIBRARY_PATH=%s\n" %(os.environ['LD_LIBRARY_PATH']))
+        if os.environ.has_key('DYLD_LIBRARY_PATH'):
+            pipe.write("export DYLD_LIBRARY_PATH=%s\n" %(os.environ['DYLD_LIBRARY_PATH']))
             
         pipe.write("cd \"%s\"\n" %(self.workingdir))
         
@@ -209,6 +203,13 @@ class MPI:
             command += ' --host %s' %(self.hosts)
         elif self.hosts_file:
             command += ' --hostfile %s' %(self.hosts_file)
+
+        if os.environ.has_key('TMPDIR_SPEC'):
+            mpirun += ' -x TMPDIR_SPEC'
+        if os.environ.has_key('LD_LIBRARY_PATH'):
+            mpirun += ' -x LD_LIBRARY_PATH'
+        if os.environ.has_key('DYLD_LIBRARY_PATH'):
+            mpirun += ' -x DYLD_LIBRARY_PATH'
 
         command += " %s" %(cicada.mpish)
         command += " --debug"
