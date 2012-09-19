@@ -170,3 +170,5 @@ rework of icu number formatter:
   we will perform fine-graned control of:
     use of matched rules
     use of any rules...?
+
+Better sharing python code... HOW?
