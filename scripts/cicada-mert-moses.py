@@ -12,7 +12,6 @@ import os, os.path
 import string
 import re
 import subprocess
-import cStringIO
 
 from optparse import OptionParser, make_option
 
@@ -22,8 +21,8 @@ opt_parser = OptionParser(
     # output directory/filename prefix
     make_option("--root-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="root directory for outputs"),
-    make_option("--prefix", default="learn", action="store", type="string",
-                metavar="PREFIX", help="prefix for outputs (default: learn)"),
+    make_option("--prefix", default="mert", action="store", type="string",
+                metavar="PREFIX", help="prefix for outputs (default: mert)"),
 
     
     make_option("--devset", default="", action="store", type="string",
@@ -41,29 +40,29 @@ opt_parser = OptionParser(
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
     
-    make_option("--C", default=1e-5, action="store", type="float",
-                metavar="C", help="hyperparameter (default: 1e-5)"),
-    make_option("--regularize-l1", action="store_true",
-                metavar="REGULARIZER", help="L1 regularization"),
-    make_option("--regularize-l2", action="store_true",
-                metavar="REGULARIZER", help="L2 regularization"),
-    make_option("--cube-size", default=400, action="store", type="int",
-                metavar="SIZE", help="cube size for oracle computation (default: 400)"),
+    make_option("--bound-lower", default="", action="store", type="string",
+                metavar="FILE", help="lower bounds for weights"),
+    make_option("--bound-upper", default="", action="store", type="string",
+                metavar="FILE", help="upper bounds for weights"),
+    make_option("--parameter-lower", default=-1.0, action="store", type="float",
+                help="lower parameter value (default: -1)"),
+    make_option("--parameter-upper", default=1.0, action="store", type="float",
+                help="upper parameter value (default: 1)"),
+    make_option("--mert-options", default='', action="store", type="string",
+                help="other MERT options"),
+
+    make_option("--direction", default=8, action="store", type="int",
+                help="# of random directions"),
+    make_option("--restart", default=2, action="store", type="int",
+                help="# of random restarts"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
-    make_option("--learn", default="xbleu", action="store", type="string",
-                metavar="LEARN", help="learning algorithms from [lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp, mcp, xbleu] (default: xbleu)"),
-    make_option("--learn-options", default="", action="store", type="string",
-                metavar="OPTION", help="additional learning options"),
-    
     make_option("--kbest", default=0, action="store", type="int",
                 metavar="KBEST", help="kbest size (default: 0)"),
     make_option("--forest", default=None, action="store_true",
                 help="forest based learning"),
-    make_option("--merge", default=None, action="store_true",
-                help="perform kbest merging"),
-    make_option("--interpolate", default=0.0, action="store", type="float",
-                help="perform weights interpolation"),
+    make_option("--iterative", default=None, action="store_true",
+                help="perform iterative learning"),
         
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -341,17 +340,12 @@ class CICADA:
 	
         for binprog in ('cicada',
                         'cicada_mpi',
-                        'cicada_learn',
-                        'cicada_learn_mpi',
-                        'cicada_learn_kbest',
-                        'cicada_learn_kbest_mpi',
-                        'cicada_oracle',
-                        'cicada_oracle_mpi',
-                        'cicada_oracle_kbest',
-                        'cicada_oracle_kbest_mpi',
+                        'cicada_mert',
+                        'cicada_mert_mpi',
+                        'cicada_mert_kbest',
+                        'cicada_mert_kbest_mpi',
                         'cicada_eval',
-                        'cicada_filter_config',
-                        'cicada_filter_weights',):
+                        'cicada_filter_config',):
 	    
 	    for bindir in bindirs:
 		prog = os.path.join(bindir, binprog)
@@ -365,18 +359,6 @@ class CICADA:
 	    if not hasattr(self, binprog):
 		raise ValueError, binprog + ' does not exist'
 
-def learn_algorithms(command):
-    
-    pattern = re.compile(r"\s+--learn-(\S+)\s*")
-
-    algs = []
-    
-    for line in cStringIO.StringIO(subprocess.check_output([command, "--help"])):
-        result = pattern.search(line)
-        if result:
-            algs.append(result.group(1))
-    return algs
-    
 
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -390,15 +372,6 @@ if __name__ == '__main__':
         if not os.path.exists(options.root_dir):
             os.makedirs(options.root_dir)
     
-    ### regularizer
-    regularizer = "--regularize-l2"
-    if options.regularize_l1 and options.regularize_l2:
-        raise ValueError, "we do not support both L1 and L2 regularizers"
-    if options.regularize_l1:
-        regularizer = "--regularize-l1"
-    if options.regularize_l2:
-        regularizer = "--regularize-l2"
-
     ### cicada
     cicada = CICADA(dir=options.cicada_dir)
     
@@ -430,52 +403,24 @@ if __name__ == '__main__':
         options.kbest = 0
     if options.forest and options.kbest > 0:
         raise ValueError, "forest-mode or kbest-mode?"
-
-    ## kbest or forest oracle..
-    cicada_oracle     = cicada.cicada_oracle
-    cicada_oracle_mpi = cicada.cicada_oracle_mpi
-    if not options.forest:
-        cicada_oracle     = cicada.cicada_oracle_kbest
-        cicada_oracle_mpi = cicada.cicada_oracle_kbest_mpi
-
-    learn_forest     = learn_algorithms(cicada.cicada_learn)
-    learn_kbest      = learn_algorithms(cicada.cicada_learn_kbest)
-    learn_forest_mpi = learn_algorithms(cicada.cicada_learn_mpi)
-    learn_kbest_mpi  = learn_algorithms(cicada.cicada_learn_kbest_mpi)
-
-    learn_mpi        = None
-    cicada_learn     = None
-    cicada_learn_mpi = None
     
+    cicada_mert     = None
+    cicada_mert_mpi = None
     if options.forest:
-        if options.learn not in learn_forest or options.learn not in learn_forest_mpi:
-            raise ValueError, "%s is not supported by forest learner" %(options.learn)
-
-        if not mpi and options.learn not in learn_forest:
-            raise ValueError, "%s is not supported by non-mpi-forest learner" %(options.learn)
-
-        cicada_learn     = cicada.cicada_learn
-        cicada_learn_mpi = cicada.cicada_learn_mpi
-        
-        if mpi and options.learn in learn_forest_mpi:
-            learn_mpi = 1
-
+        cicada_mert     = cicada.cicada_mert
+        cicada_mert_mpi = cicada.cicada_mert_mpi
     else:
-        if options.learn not in learn_kbest or options.learn not in learn_kbest_mpi:
-            raise ValueError, "learner %s is not supported by kbest learner" %(options.learn)
-        
-        if not mpi and options.learn not in learn_kbest:
-            raise ValueError, "%s is not supported by non-mpi-kbest learner" %(options.learn)
+        cicada_mert     = cicada.cicada_mert_kbest
+        cicada_mert_mpi = cicada.cicada_mert_kbest_mpi
 
-        cicada_learn     = cicada.cicada_learn_kbest
-        cicada_learn_mpi = cicada.cicada_learn_kbest_mpi
+    if options.bound_lower:
+        if not os.path.exists(options.bound_lower):
+            raise ValueError, "no lower-bound file? %s" %(options.bound_lower)
 
-        if mpi and options.learn in learn_kbest_mpi:
-            learn_mpi = 1
+    if options.bound_upper:
+        if not os.path.exists(options.bound_upper):
+            raise ValueError, "no upper-bound file? %s" %(options.bound_upper)
 
-    interpolate = None
-    if options.interpolate > 0.0 and options.interpolate < 1.0:
-        interpolate = 1
 
     weights_config = 'weights-one=true'
     if options.weights:
@@ -486,21 +431,17 @@ if __name__ == '__main__':
     
     weiset = []
     tstset = []
-    orcset = []
     
     for iter in range(1, options.iteration_first):
         prefix = options.prefix + ".%d" %(iter)
 
         weights = os.path.join(options.root_dir, prefix + ".weights")
         decoded = os.path.join(options.root_dir, prefix + ".forest")
-        oracle  = os.path.join(options.root_dir, prefix + ".forest.oracle")
         if not options.forest:
             decoded = os.path.join(options.root_dir, prefix + ".kbest")
-            oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
         
         weiset.append(weights)
         tstset.append(decoded)
-        orcset.append(oracle)
 
     for iter in range(options.iteration_first, options.iteration+1):
         print "iteration: %d" %(iter)
@@ -509,20 +450,16 @@ if __name__ == '__main__':
         prefix = options.prefix + ".%d" %(iter)
         
         weights       = os.path.join(options.root_dir, prefix + ".weights")
-        weights_learn = os.path.join(options.root_dir, prefix + ".weights.learn")
         if len(weiset) > 0:
             weights_config = 'weights=%s' %(weiset[-1])
         
         decoded = os.path.join(options.root_dir, prefix + ".forest")
-        oracle  = os.path.join(options.root_dir, prefix + ".forest.oracle")
         if not options.forest:
             decoded = os.path.join(options.root_dir, prefix + ".kbest")
-            oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
         onebest = os.path.join(options.root_dir, prefix + ".1best")
         
         weiset.append(weights)
         tstset.append(decoded)
-        orcset.append(oracle) 
         
         config = os.path.join(options.root_dir, prefix + ".config")
         mteval = os.path.join(options.root_dir, prefix + ".eval")
@@ -601,112 +538,64 @@ if __name__ == '__main__':
                              Option('--output', Quoted(mteval)),
                              Option('--scorer', options.scorer)))
         
-        print "oracle %s @ %s" %(oracle, time.ctime())
-        
-        ### set up the oracle to compute...
-        oracle_tstset = Option('--tstset', Quoted(decoded))
-        if options.merge:
-            oracle_tstset = Option('--tstset', ' '.join(map(lambda x: str(Quoted(x)), tstset)))
-
-        oracle_cube_size = ''
-        oracle_forest = ''
-        if options.forest:
-            oracle_cube_size = Option('--cube-size', options.cube_size)
-            oracle_forest = Option('--forest')
-                    
-        if mpi:
-            qsub.mpirun(Program(cicada_oracle_mpi,
-                                Option('--refset', Quoted(options.refset)),
-                                oracle_tstset,
-                                Option('--output', Quoted(oracle)),
-                                Option('--scorer', options.scorer),
-                                oracle_cube_size,
-                                oracle_forest,
-                                Option('--directory'),
-                                Option('--debug')),
-                        name="oracle",
-                        memory=options.max_malloc,
-                        threads=options.threads,
-                        logfile=Quoted(oracle+'.log'))
-        else:
-            qsub.run(Program(cicada_oracle,
-                             Option('--refset', Quoted(options.refset)),
-                             oracle_tstset,
-                             Option('--output', Quoted(oracle)),
-                             Option('--scorer', options.scorer),
-                             oracle_cube_size,
-                             oracle_forest,
-                             Option('--directory'),
-                             Option('--threads', options.threads),
-                             Option('--debug'),),
-                     name="oracle",
-                     memory=options.max_malloc,
-                     threads=options.threads,
-                     logfile=Quoted(oracle+'.log'))
-        
-        print "learn %s @ %s" %(weights, time.ctime())
+        print "mert %s @ %s" %(weights, time.ctime())
 
         ### training data, oracle data
-        learn_input  = Option('--input', ' '.join(map(lambda x: str(Quoted(x)), tstset)))
-        learn_oracle = Option('--oracle', ' '.join(map(lambda x: str(Quoted(x)), orcset)))
-        learn_unite  = ''
-        if options.merge:
-            learn_oracle = Option('--oracle', Quoted(oracle))
-            learn_unite  = Option('--unite')
+        mert_tstset  = Option('--tstset', ' '.join(map(lambda x: str(Quoted(x)), tstset)))
         
-        learn_weights = ''
+        mert_weights = ''
         if len(weiset) > 1:
-            learn_weights = Option('--weights', Quoted(weiset[-2]))
+            mert_weights = Option('--feature-weights', ' '.join(map(lambda x: str(Quoted(x)), weiset[:-1])))
             
-        # if we interpolate, first, generate weights_learn then, dump...
-        learn_output = Option('--output', Quoted(weights))
-        if interpolate and len(weiset) > 1:
-            learn_output = Option('--output', Quoted(weights_learn))
+        mert_lower = ''
+        mert_upper = ''
 
-        learn_algorithm = Option('--learn-' + options.learn)
+        if options.bound_lower:
+            mert_lower = Option('--bound-lower', Quoted(options.bound_lower))
 
-        if learn_mpi and mpi:
-            qsub.mpirun(Program(cicada_learn_mpi,
-                                learn_input,
-                                learn_oracle,
-                                Option('--refset', options.refset),
-                                Option('--scorer', options.scorer),
-                                learn_unite,
-                                learn_output,
-                                learn_weights,
-                                learn_algorithm,
-                                options.learn_options,
-                                Option('--C', options.C),
-                                Option(regularizer),
+        if options.bound_upper:
+            mert_upper = Option('--bound-upper', Quoted(options.bound_upper))
+
+        if mpi:
+            qsub.mpirun(Program(cicada_mert_mpi,
+                                mert_tstset,
+                                mert_weights,
+                                Option('--refset', Quoted(options.refset)),
+                                Option('--scorer', Quoted(options.scorer)),
+                                Option('--output', Quoted(weights)),
+                                Option('--samples-directions', options.direction),
+                                Option('--samples-restarts', options.restart),
+                                Option('--value-lower', options.parameter_lower),
+                                Option('--value-upper', options.parameter_upper),
+                                mert_lower,
+                                mert_upper,
+                                Option('--normalize-l1'),
+                                Option('--initial-average'),
+                                options.mert_options,
                                 Option('--debug', 2),),
-                        name="learn",
+                        name="mert",
                         memory=options.max_malloc,
                         threads=options.threads,
                         logfile=Quoted(weights+'.log'))
         else:
-            qsub.run(Program(cicada_learn,
-                             learn_input,
-                             learn_oracle,
-                             Option('--refset', options.refset),
-                             Option('--scorer', options.scorer),
-                             learn_unite,
-                             learn_output,
-                             learn_weights,
-                             learn_algorithm,
-                             options.learn_options,
-                             Option('--C', options.C),
-                             Option(regularizer),
+            qsub.run(Program(cicada_mert,
+                             mert_tstset,
+                             mert_weights,
+                             Option('--refset', Quoted(options.refset)),
+                             Option('--scorer', Quoted(options.scorer)),
+                             Option('--output', Quoted(weights)),
+                             Option('--samples-directions', options.direction),
+                             Option('--samples-restarts', options.restart),
+                             Option('--value-lower', options.parameter_lower),
+                             Option('--value-upper', options.parameter_upper),
+                             mert_lower,
+                             mert_upper,
+                             Option('--normalize-l1'),
+                             Option('--initial-average'),
+                             options.mert_options,
                              Option('--threads', options.threads),
                              Option('--debug', 2),),
-                     name="learn",
+                     name="mert",
                      memory=options.max_malloc,
                      threads=options.threads,
                      logfile=Quoted(weights+'.log'))
-            
-        if interpolate:
-            print "interpolate %s @ %s" %(weights, time.ctime())
-            
-            qsub.run(Program(cicada.cicada_filter_weights,
-                             Option('--output', Quoted(weights)),
-                             Option(weiset[-2] + ":scale=%g" %(1.0 - options.interpolate)),
-                             Option(weights_learn + ":scale=%g" %(options.interpolate))))

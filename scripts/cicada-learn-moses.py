@@ -12,7 +12,6 @@ import os, os.path
 import string
 import re
 import subprocess
-import cStringIO
 
 from optparse import OptionParser, make_option
 
@@ -365,18 +364,6 @@ class CICADA:
 	    if not hasattr(self, binprog):
 		raise ValueError, binprog + ' does not exist'
 
-def learn_algorithms(command):
-    
-    pattern = re.compile(r"\s+--learn-(\S+)\s*")
-
-    algs = []
-    
-    for line in cStringIO.StringIO(subprocess.check_output([command, "--help"])):
-        result = pattern.search(line)
-        if result:
-            algs.append(result.group(1))
-    return algs
-    
 
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -437,11 +424,17 @@ if __name__ == '__main__':
     if not options.forest:
         cicada_oracle     = cicada.cicada_oracle_kbest
         cicada_oracle_mpi = cicada.cicada_oracle_kbest_mpi
-
-    learn_forest     = learn_algorithms(cicada.cicada_learn)
-    learn_kbest      = learn_algorithms(cicada.cicada_learn_kbest)
-    learn_forest_mpi = learn_algorithms(cicada.cicada_learn_mpi)
-    learn_kbest_mpi  = learn_algorithms(cicada.cicada_learn_kbest_mpi)
+    
+    ### learning algorithms
+    ### cicada_learn:           lbfgs, sgd, xbleu
+    ### cicada_learn_kbest:     lbfgs, xbleu, linear, svm
+    ### cicada_learn_mpi:       lbfgs, sgd, xbleu, mira, nherd, arow, cw, pegasos
+    ### cicada_learn_kbest_mpi: lbfgs, sgd, xbleu, mira, nherd, arow, cw, pegasos, cp, mcp
+    
+    learn_forest     = ('lbfgs', 'sgd', 'xbleu')
+    learn_kbest      = ('lbfgs', 'xbleu', 'linear', 'svm')
+    learn_forest_mpi = ('lbfgs', 'sgd', 'xbleu', 'mira', 'nherd', 'arow', 'cw', 'pegasos')
+    learn_kbest_mpi  = ('lbfgs', 'sgd', 'xbleu', 'mira', 'nherd', 'arow', 'cw', 'pegasos', 'cp', 'mcp')
 
     learn_mpi        = None
     cicada_learn     = None
