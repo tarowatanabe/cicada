@@ -30,8 +30,12 @@ opt_parser = OptionParser(
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
 
+    make_option("--moses", default="", action="store", type="string",
+                metavar="MOSES", help="moses binary"),
     make_option("--config", default="", action="store", type="string",
-                metavar="CONFIG", help="cicada config file"),
+                metavar="CONFIG", help="moses config file"),
+    make_option("--options", default="", action="store", type="string",
+                metavar="OPTIONS", help="moses options"),
 
     make_option("--iteration", default=10, action="store", type="int",
                 metavar="ITERATION", help="# of iterations (default: 10)"),
@@ -59,8 +63,10 @@ opt_parser = OptionParser(
                 metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
     make_option("--kbest", default=0, action="store", type="int",
                 metavar="KBEST", help="kbest size (default: 0)"),
-    make_option("--forest", default=None, action="store_true",
-                help="forest based learning"),
+    make_options("--bias-features", default="", action="store", type="string",
+                 help="bias features"),
+    make_options("--bias-weight", default=-1.0, action="store", type="float",
+                 help="bias weight"),
     make_option("--iterative", default=None, action="store_true",
                 help="perform iterative learning"),
         
@@ -345,7 +351,9 @@ class CICADA:
                         'cicada_mert_kbest',
                         'cicada_mert_kbest_mpi',
                         'cicada_eval',
-                        'cicada_filter_config',):
+                        'cicada_filter_config',
+                        'cicada_filter_config_moses',
+                        'cicada_filter_kbest_moses',):
 	    
 	    for bindir in bindirs:
 		prog = os.path.join(bindir, binprog)
@@ -366,7 +374,11 @@ if __name__ == '__main__':
     ### dump to stderr
     stdout = sys.stdout
     sys.stdout = sys.stderr
-    
+
+    ### config
+    if not os.path.exists(options.config):
+        raise ValueError, "no config file: %s" %(options.config) 
+   
     ### root-dir
     if options.root_dir:
         if not os.path.exists(options.root_dir):
@@ -397,22 +409,10 @@ if __name__ == '__main__':
     if options.iteration_first > options.iteration:
         raise ValueError, "invalid iterations"
 
-    ### defaults to forest...
-    if not options.forest and options.kbest <= 0:
-        options.forest = 1
-        options.kbest = 0
-    if options.forest and options.kbest > 0:
-        raise ValueError, "forest-mode or kbest-mode?"
+    ## check kbests
+    if options.kbest <= 0:
+        raise ValueError, "invalid kbest"
     
-    cicada_mert     = None
-    cicada_mert_mpi = None
-    if options.forest:
-        cicada_mert     = cicada.cicada_mert
-        cicada_mert_mpi = cicada.cicada_mert_mpi
-    else:
-        cicada_mert     = cicada.cicada_mert_kbest
-        cicada_mert_mpi = cicada.cicada_mert_kbest_mpi
-
     if options.bound_lower:
         if not os.path.exists(options.bound_lower):
             raise ValueError, "no lower-bound file? %s" %(options.bound_lower)
@@ -421,13 +421,18 @@ if __name__ == '__main__':
         if not os.path.exists(options.bound_upper):
             raise ValueError, "no upper-bound file? %s" %(options.bound_upper)
 
-
-    weights_config = 'weights-one=true'
+    ### how to handle this...!
+    weights_config = ''
     if options.weights:
         if not os.path.exists(options.weights):
-            raise ValueError, "no initial weights %s" %(options.weights)
+            raise ValueError, "no initiali weights? %s" %(options.weights)
+        weights_config = options.weights
+    else:
+        weights_config = os.path.join(options.root_dir, options.prefix + ".init.weights")
         
-        weights_config = "weights=%s" %(optins.weights)
+        qsub.run(Program(cicada.cicada_filter_config_moses),
+                 Option('--input', options.config),
+                 Option('--output', weights_config))
     
     weiset = []
     tstset = []
@@ -437,8 +442,6 @@ if __name__ == '__main__':
 
         weights = os.path.join(options.root_dir, prefix + ".weights")
         decoded = os.path.join(options.root_dir, prefix + ".forest")
-        if not options.forest:
-            decoded = os.path.join(options.root_dir, prefix + ".kbest")
         
         weiset.append(weights)
         tstset.append(decoded)
@@ -449,14 +452,12 @@ if __name__ == '__main__':
         ## setup output files
         prefix = options.prefix + ".%d" %(iter)
         
-        weights       = os.path.join(options.root_dir, prefix + ".weights")
-        if len(weiset) > 0:
-            weights_config = 'weights=%s' %(weiset[-1])
+        weights = os.path.join(options.root_dir, prefix + ".weights")
         
-        decoded = os.path.join(options.root_dir, prefix + ".forest")
-        if not options.forest:
-            decoded = os.path.join(options.root_dir, prefix + ".kbest")
-        onebest = os.path.join(options.root_dir, prefix + ".1best")
+        if len(weiset) > 0:
+            weights_config = weiset[-1]
+        
+        decoded = os.path.join(options.root_dir, prefix + ".kbest")
         
         weiset.append(weights)
         tstset.append(decoded)
@@ -466,77 +467,49 @@ if __name__ == '__main__':
         
         print "generate config file %s @ %s" %(config, time.ctime())
         
-        qsub.run(Program(cicada.cicada_filter_config,
+        config_bias_features = ''
+        config_bias_weight   =  ''
+        if options.bias_features:
+            config_bias_features = Option('--bias-features', options.bias_features)
+            config_bias_weight   = Option('--bias-weight', options.bias_weight)
+
+        qsub.run(Program(cicada.cicada_filter_config_moses,
                          Option('--weights', weights_config),
-                         Option('--kbest', options.kbest),
-                         Option('--file', "directory=%s" %(decoded)),
+                         config_bias_features,
+                         config_bias_weight,
                          Option('--input', Quoted(options.config)),
                          Option('--output', Quoted(config))))
         
-        print "decode %s @ %s" %(decoded, time.ctime())
+        print "moses %s @ %s" %(decoded, time.ctime())
         
-        if mpi:
-            qsub.mpirun(Program(cicada.cicada_mpi,
-                                Option('--input', Quoted(options.devset)),
-                                Option('--config', Quoted(config)),
-                                Option('--debug')),
-                        name="decode",
-                        memory=options.max_malloc,
-                        threads=options.threads,
-                        logfile=Quoted(decoded+'.log'))
-        else:
-            qsub.run(Program(cicada.cicada,
-                             Option('--input', Quoted(options.devset)),
-                             Option('--config', Quoted(config)),
-                             Option('--threads', options.threads),
-                             Option('--debug')),
-                     name="decode",
+        moses_erase_features = ''
+        if options.bias_features:
+            moses_erase_features = Option('--erase-features', options.bias_features)
+        
+        qsub.wrapper(Program(options.moses,
+                             Option('-input-file', Quoted(options.devset)),
+                             Option('-config', Quoted(config)),
+                             options.options,
+                             Option('-n-best-list', "- %d distinct" %(options.kbest)),
+                             Option('-thread', options.thread),
+                             '|',
+                             cicada.cicada_filter_kbest_moses,
+                             Option('--output', Quoted(decoded)),
+                             Option('--directory')
+                             moses_erase_ferures,),
+                     name="moses",
                      memory=options.max_malloc,
                      threads=options.threads,
                      logfile=Quoted(decoded+'.log'))
+
         
-        if options.forest:
-            print "1best %s @ %s" %(onebest, time.ctime())
-                
-            if mpi:
-                qsub.mpirun(Program(cicada.cicada_mpi,
-                                    Option('--input', Quoted(decoded)),
-                                    Option('--input-forest'),
-                                    Option('--input-directory'),
-                                    Option('--operation', 'output:kbest=1,%s,file=%s' %(weights_config, onebest)),
-                                    Option('--debug')),
-                            name="onebest",
-                            memory=options.max_malloc,
-                            threads=options.threads,
-                            logfile=Quoted(onebest+'.log'))
-            else:
-                qsub.run(Program(cicada.cicada,
-                                 Option('--input', Quoted(decoded)),
-                                 Option('--input-forest'),
-                                 Option('--input-directory'),
-                                 Option('--operation', 'output:kbest=1,%s,file=%s' %(weights_config, onebest)),
-                                 Option('--threads', options.threads),
-                                 Option('--debug')),
-                         name="onebest",
-                         memory=options.max_malloc,
-                         threads=options.threads,
-                         logfile=Quoted(onebest+'.log'))
-            
-            print "evaluate %s @ %s" %(mteval, time.ctime())
-            
-            qsub.run(Program(cicada.cicada_eval,
-                             Option('--refset', Quoted(options.refset)),
-                             Option('--tstset', Quoted(onebest)),
-                             Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
-        else:
-            print "evaluate %s @ %s" %(mteval, time.ctime())
-            
-            qsub.run(Program(cicada.cicada_eval,
-                             Option('--refset', Quoted(options.refset)),
-                             Option('--tstset', Quoted(decoded)),
-                             Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+        print "evaluate %s @ %s" %(mteval, time.ctime())
+        
+        qsub.run(Program(cicada.cicada_eval,
+                         Option('--refset', Quoted(options.refset)),
+                         Option('--tstset', Quoted(decoded)),
+                         Option('--output', Quoted(mteval)),
+                         Option('--scorer', options.scorer)))
         
         print "mert %s @ %s" %(weights, time.ctime())
 
@@ -546,7 +519,7 @@ if __name__ == '__main__':
         mert_weights = ''
         if len(weiset) > 1:
             mert_weights = Option('--feature-weights', ' '.join(map(lambda x: str(Quoted(x)), weiset[:-1])))
-            
+        
         mert_lower = ''
         mert_upper = ''
 
@@ -557,7 +530,7 @@ if __name__ == '__main__':
             mert_upper = Option('--bound-upper', Quoted(options.bound_upper))
 
         if mpi:
-            qsub.mpirun(Program(cicada_mert_mpi,
+            qsub.mpirun(Program(cicada.cicada_mert_kbest_mpi,
                                 mert_tstset,
                                 mert_weights,
                                 Option('--refset', Quoted(options.refset)),
@@ -578,7 +551,7 @@ if __name__ == '__main__':
                         threads=options.threads,
                         logfile=Quoted(weights+'.log'))
         else:
-            qsub.run(Program(cicada_mert,
+            qsub.run(Program(cicada.cicada_mert_kbest,
                              mert_tstset,
                              mert_weights,
                              Option('--refset', Quoted(options.refset)),

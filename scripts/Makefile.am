@@ -7,14 +7,18 @@ dist_bin_SCRIPTS = \
 	cicada-filter-non-terminal.py \
 	cicada-filter-penntreebank.py \
 	cicada-index.py \
-	cicada-learn.sh \
 	cicada-learn.py \
-	cicada-learn-moses.sh \
-	cicada-maxent.sh \
+	cicada-learn-moses.py \
 	cicada-maxent.py \
-	cicada-mert.sh \
 	cicada-mert.py \
-	cicada-mert-moses.sh \
-	cicada-moses.sh \
-	cicada-qsub.sh \
+	cicada-mert-moses.py \
 	cicada-sh.py
+
+noinst_SCRIPTS = \
+	cicada-learn-moses.sh \
+	cicada-learn.sh \
+	cicada-maxent.sh \
+	cicada-mert-moses.sh \
+	cicada-mert.sh \
+	cicada-moses.sh \
+	cicada-qsub.sh

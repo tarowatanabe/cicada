@@ -367,6 +367,10 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
     
+    ### config
+    if not os.path.exists(options.config):
+        raise ValueError, "no config file: %s" %(options.config)
+
     ### root-dir
     if options.root_dir:
         if not os.path.exists(options.root_dir):

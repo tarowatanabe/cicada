@@ -35,7 +35,7 @@ opt_parser = OptionParser(
     make_option("--config", default="", action="store", type="string",
                 metavar="CONFIG", help="moses config file"),
     make_option("--options", default="", action="store", type="string",
-                metavar="CONFIG", help="moses options"),
+                metavar="OPTIONS", help="moses options"),
 
     make_option("--iteration", default=10, action="store", type="int",
                 metavar="ITERATION", help="# of iterations (default: 10)"),
