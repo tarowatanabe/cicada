@@ -132,6 +132,53 @@ def compressed_file(file):
 	    return base
     return file
 
+class Quoted:
+    def __init__(self, arg):
+        self.arg = arg
+        
+    def __str__(self):
+        return '"' + str(self.arg) + '"'
+
+class Option:
+    def __init__(self, arg, value=None):
+        self.arg = arg
+        self.value = value
+
+    def __str__(self,):
+        option = self.arg
+        
+        if self.value is not None:
+            if isinstance(self.value, int):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, long):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, float):
+                option += " %.20g" %(self.value)
+            else:
+                option += " %s" %(str(self.value))
+        return option
+
+class Program:
+    def __init__(self, *args, **keywords):
+        if len(args) < 1:
+            raise ValueError, "invalid arg for Program"
+        
+        self.name = args[0]
+        self.args = []
+
+        for arg in args[1:]:
+            self.__iadd__(arg)
+
+    def __str__(self,):
+        command = self.name
+        for arg in self.args:
+            command += ' ' + str(arg)
+        return command
+    
+    def __iadd__(self, other):
+        self.args.append(other)
+        return self
+
 class QSUB(multiprocessing.Process):
     def __init__(self, command=""):
         

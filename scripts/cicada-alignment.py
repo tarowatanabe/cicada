@@ -131,6 +131,122 @@ def compressed_file(file):
 	    return base
     return file
 
+class Quoted:
+    def __init__(self, arg):
+        self.arg = arg
+        
+    def __str__(self):
+        return '"' + str(self.arg) + '"'
+
+class Option:
+    def __init__(self, arg, value=None):
+        self.arg = arg
+        self.value = value
+
+    def __str__(self,):
+        option = self.arg
+        
+        if self.value is not None:
+            if isinstance(self.value, int):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, long):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, float):
+                option += " %.20g" %(self.value)
+            else:
+                option += " %s" %(str(self.value))
+        return option
+
+            
+class Program:
+    def __init__(self, *args, **keywords):
+        if len(args) < 1:
+            raise ValueError, "invalid arg for Program"
+        
+        self.name = args[0]
+        self.args = []
+
+        for arg in args[1:]:
+            self.__iadd__(arg)
+
+    def __str__(self,):
+        command = self.name
+        for arg in self.args:
+            command += ' ' + str(arg)
+        return command
+    
+    def __iadd__(self, other):
+        self.args.append(other)
+        return self
+
+class PBS:
+    def __init__(self, queue=""):
+        self.queue = queue
+        self.pbs = 'pbs'
+
+    def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
+        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
+
+        pipe = popen.stdin
+        
+        pipe.write("#!/bin/sh\n")
+        pipe.write("#PBS -N %s\n" %(name))
+        pipe.write("#PBS -W block=true\n")
+        pipe.write("#PBS -e /dev/null\n")
+        pipe.write("#PBS -o /dev/null\n")
+        
+        if self.queue:
+            pipe.write("#PBS -q %s\n" %(self.queue))
+
+        mem=""
+        if memory > 0.0:
+            if memory < 1.0:
+                amount = int(memory * 1000)
+                if amout > 0:
+                    mem=":mem=%dmb" %(amount)
+                else:
+                    amount = int(memory * 1000 * 1000)
+                    if amount > 0:
+                        mem=":mem=%dkb" %(amount)
+            else:
+                mem=":mem=%dgb" %(int(memory))
+        
+        if mpi:
+            pipe.write("#PBS -l select=%d:ncpus=%d:mpiprocs=1%s\n" %(mpi.number, threads, mem))
+        else:
+            pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
+        
+        # setup variables
+        if os.environ.has_key('TMPDIR_SPEC'):
+            pipe.write("export TMPDIR_SPEC=%s\n" %(os.environ['TMPDIR_SPEC']))
+        if os.environ.has_key('LD_LIBRARY_PATH'):
+            pipe.write("export LD_LIBRARY_PATH=%s\n" %(os.environ['LD_LIBRARY_PATH']))
+        if os.environ.has_key('DYLD_LIBRARY_PATH'):
+            pipe.write("export DYLD_LIBRARY_PATH=%s\n" %(os.environ['DYLD_LIBRARY_PATH']))
+        
+        pipe.write("if test \"$PBS_O_WORKDIR\" != \"\"; then\n")
+        pipe.write("  cd $PBS_O_WORKDIR\n")
+        pipe.write("fi\n")
+
+        prefix = ''
+        if mpi:
+            prefix = mpi.mpirun
+            if os.environ.has_key('TMPDIR_SPEC'):
+                prefix += ' -x TMPDIR_SPEC'
+            if os.environ.has_key('LD_LIBRARY_PATH'):
+                prefix += ' -x LD_LIBRARY_PATH'
+            if os.environ.has_key('DYLD_LIBRARY_PATH'):
+                prefix += ' -x DYLD_LIBRARY_PATH'
+            prefix += ' '
+        
+        suffix = ''
+        if logfile:
+            suffix = " 2> %s" %(logfile)
+        
+        pipe.write(prefix + command + suffix + '\n')
+        
+        pipe.close()
+        popen.wait()
 
 class CICADA:
     def __init__(self, dir=""):
