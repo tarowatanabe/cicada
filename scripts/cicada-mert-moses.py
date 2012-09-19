@@ -43,6 +43,8 @@ opt_parser = OptionParser(
                 metavar="ITERATION", help="The first iteration (default: 1)"),
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
+    make_option('--weights-default', default=None, action="store_true",
+                help="initial weights from moses.ini"),
     
     make_option("--bound-lower", default="", action="store", type="string",
                 metavar="FILE", help="lower bounds for weights"),
@@ -61,11 +63,11 @@ opt_parser = OptionParser(
                 help="# of random restarts"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
-    make_option("--kbest", default=0, action="store", type="int",
+    make_option("--kbest", default=1000, action="store", type="int",
                 metavar="KBEST", help="kbest size (default: 0)"),
-    make_options("--bias-features", default="", action="store", type="string",
+    make_option("--bias-features", default="", action="store", type="string",
                  help="bias features"),
-    make_options("--bias-weight", default=-1.0, action="store", type="float",
+    make_option("--bias-weight", default=-1.0, action="store", type="float",
                  help="bias weight"),
     make_option("--iterative", default=None, action="store_true",
                 help="perform iterative learning"),
@@ -153,21 +155,11 @@ class Option:
 
             
 class Program:
-    def __init__(self, *args, **keywords):
-        if len(args) < 1:
-            raise ValueError, "invalid arg for Program"
-        
-        self.name = args[0]
-        self.args = []
-
-        for arg in args[1:]:
-            self.__iadd__(arg)
+    def __init__(self, *args):
+        self.args = args[:]
 
     def __str__(self,):
-        command = self.name
-        for arg in self.args:
-            command += ' ' + str(arg)
-        return command
+        return ' '.join(map(str, self.args))
     
     def __iadd__(self, other):
         self.args.append(other)
@@ -375,6 +367,8 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
 
+    print "for moses options, we will recommend: -beam-threshold 0 -translation-option-threshold 0 -early-discarding-threshold 0"
+
     ### config
     if not os.path.exists(options.config):
         raise ValueError, "no config file: %s" %(options.config) 
@@ -423,16 +417,23 @@ if __name__ == '__main__':
 
     ### how to handle this...!
     weights_config = ''
+    if options.weights and options.weights_default:
+        raise ValueError, "both --weights and --weights-default?"
+
     if options.weights:
         if not os.path.exists(options.weights):
             raise ValueError, "no initiali weights? %s" %(options.weights)
         weights_config = options.weights
-    else:
-        weights_config = os.path.join(options.root_dir, options.prefix + ".init.weights")
+    elif options.weights_default:
+        weights_config = os.path.join(options.root_dir, options.prefix + ".0.weights")
         
-        qsub.run(Program(cicada.cicada_filter_config_moses),
-                 Option('--input', options.config),
-                 Option('--output', weights_config))
+        qsub.run(Program(cicada.cicada_filter_config_moses,
+                         Option('--input', options.config),
+                         Option('--output', weights_config)))
+    else:
+        weights_config = os.path.join(options.root_dir, options.prefix + ".0.weights")
+        
+        open(weights_config, 'w').close()
     
     weiset = []
     tstset = []
@@ -441,7 +442,7 @@ if __name__ == '__main__':
         prefix = options.prefix + ".%d" %(iter)
 
         weights = os.path.join(options.root_dir, prefix + ".weights")
-        decoded = os.path.join(options.root_dir, prefix + ".forest")
+        decoded = os.path.join(options.root_dir, prefix + ".kbest")
         
         weiset.append(weights)
         tstset.append(decoded)
@@ -486,21 +487,23 @@ if __name__ == '__main__':
         if options.bias_features:
             moses_erase_features = Option('--erase-features', options.bias_features)
         
-        qsub.wrapper(Program(options.moses,
-                             Option('-input-file', Quoted(options.devset)),
-                             Option('-config', Quoted(config)),
-                             options.options,
-                             Option('-n-best-list', "- %d distinct" %(options.kbest)),
-                             Option('-thread', options.thread),
-                             '|',
-                             cicada.cicada_filter_kbest_moses,
-                             Option('--output', Quoted(decoded)),
-                             Option('--directory')
-                             moses_erase_ferures,),
-                     name="moses",
-                     memory=options.max_malloc,
-                     threads=options.threads,
-                     logfile=Quoted(decoded+'.log'))
+        qsub.run(Program('(',
+                         options.moses,
+                         Option('-input-file', Quoted(options.devset)),
+                         Option('-config', Quoted(config)),
+                         options.options,
+                         Option('-n-best-list', "- %d distinct" %(options.kbest)),
+                         Option('-threads', options.threads),
+                         '|',
+                         cicada.cicada_filter_kbest_moses,
+                         Option('--output', Quoted(decoded)),
+                         Option('--directory'),
+                         moses_erase_features,
+                         ')',),
+                 name="moses",
+                 memory=options.max_malloc,
+                 threads=options.threads,
+                 logfile=Quoted(decoded+'.log'))
 
         
         print "evaluate %s @ %s" %(mteval, time.ctime())
@@ -520,6 +523,10 @@ if __name__ == '__main__':
         if len(weiset) > 1:
             mert_weights = Option('--feature-weights', ' '.join(map(lambda x: str(Quoted(x)), weiset[:-1])))
         
+        mert_iterative = ''
+        if options.iterative:
+            mert_iterative = Option('--iterative')
+
         mert_lower = ''
         mert_upper = ''
 
@@ -542,6 +549,7 @@ if __name__ == '__main__':
                                 Option('--value-upper', options.parameter_upper),
                                 mert_lower,
                                 mert_upper,
+                                mert_iterative,
                                 Option('--normalize-l1'),
                                 Option('--initial-average'),
                                 options.mert_options,
@@ -563,6 +571,7 @@ if __name__ == '__main__':
                              Option('--value-upper', options.parameter_upper),
                              mert_lower,
                              mert_upper,
+                             mert_iterative,
                              Option('--normalize-l1'),
                              Option('--initial-average'),
                              options.mert_options,

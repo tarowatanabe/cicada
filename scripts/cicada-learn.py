@@ -146,23 +146,12 @@ class Option:
                 option += " %s" %(str(self.value))
         return option
 
-            
 class Program:
-    def __init__(self, *args, **keywords):
-        if len(args) < 1:
-            raise ValueError, "invalid arg for Program"
-        
-        self.name = args[0]
-        self.args = []
-
-        for arg in args[1:]:
-            self.__iadd__(arg)
+    def __init__(self, *args):
+        self.args = args[:]
 
     def __str__(self,):
-        command = self.name
-        for arg in self.args:
-            command += ' ' + str(arg)
-        return command
+        return ' '.join(map(str, self.args))
     
     def __iadd__(self, other):
         self.args.append(other)
@@ -488,6 +477,12 @@ if __name__ == '__main__':
             raise ValueError, "no initial weights %s" %(options.weights)
         
         weights_config = "weights=%s" %(optins.weights)
+    else:
+        weights_file = os.path.join(options.root_dir, options.prefix + ".0.weights")
+        
+        open(weights_file, 'w').close()
+
+        weights_config = "weights=%s" %(weights_file)
     
     weiset = []
     tstset = []
