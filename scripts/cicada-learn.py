@@ -274,6 +274,7 @@ class MPI:
                 
     def run(self, command, logfile=None):
         mpirun = self.mpirun
+        
         if self.number > 0:
             mpirun += ' --np %d' %(self.number)
         if self.hosts:

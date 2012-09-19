@@ -144,9 +144,9 @@ class QSUB(multiprocessing.Process):
         
 class PBS:
     ### rewrite this by threads!
-    def __init__(self, queue="", workingdir=os.getcwd()):
+    def __init__(self, queue=""):
         self.queue = queue
-        self.workingdir = workingdir
+        self.qsub = 'qsub'
 
         self.workers = []
 
@@ -165,14 +165,21 @@ class PBS:
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
-            
+        
+        mem=""
         if memory > 0.0:
             if memory < 1.0:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
+                amount = int(memory * 1000)
+                if amout > 0:
+                    mem=":mem=%dmb" %(amount)
+                else:
+                    amount = int(memory * 1000 * 1000)
+                    if amount > 0:
+                        mem=":mem=%dkb" %(amount)
             else:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
-        else:
-            pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
+                mem=":mem=%dgb" %(int(memory))
+
+        pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
         
         # setup variables
         if os.environ.has_key('TMPDIR_SPEC'):
@@ -182,10 +189,12 @@ class PBS:
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             pipe.write("export DYLD_LIBRARY_PATH=%s\n" %(os.environ['DYLD_LIBRARY_PATH']))
             
-        pipe.write("cd \"%s\"\n" %(self.workingdir))
+        pipe.write("if test \"$PBS_O_WORKDIR\" != \"\"; then\n")
+        pipe.write("  cd $PBS_O_WORKDIR\n")
+        pipe.write("fi\n")
         
         if logfile:
-            pipe.write("%s >& %s\n" %(command, logfile))
+            pipe.write("%s 2> %s\n" %(command, logfile))
         else:
             pipe.write("%s\n" %(command))
 
@@ -245,9 +254,9 @@ class MPI:
                 setattr(self, binprog, binprog)
         
         command = self.mpirun
+        
         if self.number > 0:
             command += ' --np %d' %(self.number)
-            
         if self.hosts:
             command += ' --host %s' %(self.hosts)
         elif self.hosts_file:
@@ -259,7 +268,7 @@ class MPI:
             mpirun += ' -x LD_LIBRARY_PATH'
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             mpirun += ' -x DYLD_LIBRARY_PATH'
-
+        
         command += " %s" %(cicada.mpish)
         command += " --debug"
         

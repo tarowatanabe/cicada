@@ -180,9 +180,9 @@ def compressed_file(file):
     return file
 
 class PBS:
-    def __init__(self, queue="", workingdir=os.getcwd()):
+    def __init__(self, queue=""):
         self.queue = queue
-        self.workingdir = workingdir
+        self.pbs = 'pbs'
 
     def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
@@ -192,33 +192,29 @@ class PBS:
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -W block=true\n")
-        
-        if logfile:
-            pipe.write("#PBS -e %s\n" %(logfile))
-        else:
-            pipe.write("#PBS -e /dev/null\n")
+        pipe.write("#PBS -e /dev/null\n")
         pipe.write("#PBS -o /dev/null\n")
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
 
+        mem=""
+        if memory > 0.0:
+            if memory < 1.0:
+                amount = int(memory * 1000)
+                if amout > 0:
+                    mem=":mem=%dmb" %(amount)
+                else:
+                    amount = int(memory * 1000 * 1000)
+                    if amount > 0:
+                        mem=":mem=%dkb" %(amount)
+            else:
+                mem=":mem=%dgb" %(int(memory))
+        
         if mpi:
-            if memory > 0.0:
-                if memory < 1.0:
-                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dmb\n" %(mpi.number, int(memory * 1000)))
-                else:
-                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dgb\n" %(mpi.number, int(memory)))
-            else:
-                pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1\n" %(mpi.number))
-                
+            pipe.write("#PBS -l select=%d:ncpus=%d:mpiprocs=1%s\n" %(mpi.number, threads, mem))
         else:
-            if memory > 0.0:
-                if memory < 1.0:
-                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
-                else:
-                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
-            else:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
+            pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
         
         # setup variables
         if os.environ.has_key('TMPDIR_SPEC'):
@@ -228,12 +224,26 @@ class PBS:
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             pipe.write("export DYLD_LIBRARY_PATH=%s\n" %(os.environ['DYLD_LIBRARY_PATH']))
         
-        pipe.write("cd \"%s\"\n" %(self.workingdir))
+        pipe.write("if test \"$PBS_O_WORKDIR\" != \"\"; then\n")
+        pipe.write("  cd $PBS_O_WORKDIR\n")
+        pipe.write("fi\n")
 
+        prefix = ''
         if mpi:
-            pipe.write("%s %s\n" %(mpi.mpirun, command))
-        else:
-            pipe.write("%s\n" %(command))
+            prefix = mpi.mpirun
+            if os.environ.has_key('TMPDIR_SPEC'):
+                prefix += ' -x TMPDIR_SPEC'
+            if os.environ.has_key('LD_LIBRARY_PATH'):
+                prefix += ' -x LD_LIBRARY_PATH'
+            if os.environ.has_key('DYLD_LIBRARY_PATH'):
+                prefix += ' -x DYLD_LIBRARY_PATH'
+            prefix += ' '
+        
+        suffix = ''
+        if logfile:
+            suffix = " 2> %s" %(logfile)
+        
+        pipe.write(prefix + command + suffix + '\n')
         
         pipe.close()
         popen.wait()
@@ -271,10 +281,9 @@ class MPI:
             else:
                 setattr(self, binprog, binprog)
                 
-    def run(self, command):
+    def run(self, command, logfile=None):
         mpirun = self.mpirun
-        #if self.dir:
-        #    mpirun += ' --prefix %s' %(self.dir)
+        
         if self.number > 0:
             mpirun += ' --np %d' %(self.number)
         if self.hosts:
@@ -291,6 +300,9 @@ class MPI:
 
 	mpirun += ' ' + command
 
+        if logfile:
+            mpirun += " 2> %s" %(logfile)
+            
 	run_command(mpirun)
 
 
