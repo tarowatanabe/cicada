@@ -220,7 +220,14 @@ class PBS:
 
         prefix = ''
         if mpi:
-            prefix = mpi.mpirun + ' '
+            prefix = mpi.mpirun
+            if os.environ.has_key('TMPDIR_SPEC'):
+                prefix += ' -x TMPDIR_SPEC'
+            if os.environ.has_key('LD_LIBRARY_PATH'):
+                prefix += ' -x LD_LIBRARY_PATH'
+            if os.environ.has_key('DYLD_LIBRARY_PATH'):
+                prefix += ' -x DYLD_LIBRARY_PATH'
+            prefix += ' '
         
         suffix = ''
         if logfile:
@@ -527,7 +534,7 @@ if __name__ == '__main__':
         if mpi:
             qsub.mpirun(Program(cicada.cicada_mpi,
                                 Option('--input', Quoted(options.devset)),
-                                Option('--config', config),
+                                Option('--config', Quoted(config)),
                                 Option('--debug')),
                         name="decode",
                         memory=options.max_malloc,
@@ -536,7 +543,7 @@ if __name__ == '__main__':
         else:
             qsub.run(Program(cicada.cicada,
                              Option('--input', Quoted(options.devset)),
-                             Option('--config', config),
+                             Option('--config', Quoted(config)),
                              Option('--threads', options.threads),
                              Option('--debug')),
                      name="decode",
