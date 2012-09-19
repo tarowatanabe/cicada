@@ -2726,8 +2726,12 @@ struct TaskUnique
 	     hypothesis_map_type& __kbests)
     : queue(__queue), kbests(__kbests) {}
 
+#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+#endif
+  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
+		   std::allocator<hypothesis_type> > hypothesis_unique_type;
 
   void operator()()
   {
@@ -3302,12 +3306,13 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("kbest",   po::value<path_set_type>(&kbest_path)->multitoken(),   "kbest path")
-    ("oracle",  po::value<path_set_type>(&oracle_path)->multitoken(),  "oracle kbest path")
-    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
-    ("weights", po::value<path_type>(&weights_path),                   "initial parameter")
+    ("kbest",           po::value<path_set_type>(&kbest_path)->multitoken(),           "kbest path(s)")
+    ("input",           po::value<path_set_type>(&kbest_path)->multitoken(),           "input path(s) (an alias for --kbest)")
+    ("oracle",          po::value<path_set_type>(&oracle_path)->multitoken(),          "oracle kbest path")
+    ("refset",          po::value<path_set_type>(&refset_files)->multitoken(),         "reference set file(s)")
+    ("weights",         po::value<path_type>(&weights_path),                           "initial parameter")
     ("weights-history", po::value<path_set_type>(&weights_history_path)->multitoken(), "parameter history")
-    ("output",  po::value<path_type>(&output_path),                    "output parameter")
+    ("output",          po::value<path_type>(&output_path),                            "output parameter")
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
 

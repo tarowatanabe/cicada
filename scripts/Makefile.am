@@ -8,9 +8,12 @@ dist_bin_SCRIPTS = \
 	cicada-filter-penntreebank.py \
 	cicada-index.py \
 	cicada-learn.sh \
+	cicada-learn.py \
 	cicada-learn-moses.sh \
 	cicada-maxent.sh \
+	cicada-maxent.py \
 	cicada-mert.sh \
+	cicada-mert.py \
 	cicada-mert-moses.sh \
 	cicada-moses.sh \
 	cicada-qsub.sh \

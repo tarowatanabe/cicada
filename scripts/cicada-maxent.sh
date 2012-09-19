@@ -190,12 +190,30 @@ abs_path() {
   fi
 }
 
+cicada_paths=()
 if test "$cicada" = ""; then
   cicada=`dirname $me_abs`
   cicada=`abs_path $cicada`
-  if test -r $cicada; then
-    cicada=`dirname $cicada`
+  
+  cicada_paths=("${cicada_paths[@]}" $cicada)
+  
+  dir=`dirname $cicada`
+  for subdir in "bin" "progs" "scripts"; do
+    if test -d $dir/$subdir; then
+      cicada_paths=("${cicada_paths[@]}" $dir/$subdir)
+    fi
+  done
+else
+  if test ! -d $cicada; then
+    echo "no cicada directory?" >&2
+    exit 1
   fi
+  cicada_paths=("${cicada_paths[@]}" $cicada)
+  for subdir in "bin" "progs" "scripts"; do
+    if test -d $cicada/$subdir; then
+      cicada_paths=("${cicada_paths[@]}" $cicada/$subdir)
+    fi
+  done
 fi
 
 if test "$devset" = "" -o ! -e "$devset"; then
@@ -224,23 +242,17 @@ fi
 cicadapath() {
   file=$1
   shift
-  
-  path=$cicada/$file
-  if test ! -x $path -o -d $path; then
-    path=$cicada/bin/$file
-    if test ! -x $path -o -d $path; then
-      path=$cicada/progs/$file
-      if test ! -x $path -o -d $path; then
-        path=$cicada/scripts/$file
-	if test ! -x $path -o -d $path; then
-	  echo $file
-	  return 1
-	fi
-      fi
+
+  for path in ${cicada_paths[*]}; do
+    fullpath=$path/$file
+    if test -x $fullpath -a ! -d $fullpath; then
+	echo $fullpath
+	return 0
     fi
-  fi
-  echo $path
-  return 0
+  done
+  
+  echo $file
+  return 1
 }
 
 cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_learn cicada_learn_mpi"

@@ -9,6 +9,7 @@
 // 1 |||  reference translation for source sentence 1
 //
 
+#include <set>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -102,10 +103,16 @@ int main(int argc, char ** argv)
     hypothesis_map_type hypotheses(scorers.size());
     read_tstset(tstset_files, hypotheses);
 
+    if (debug)
+      std::cerr << "initialize statistics" << std::endl;
+
     initialize_score(hypotheses, scorers);
     
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
+
+    if (debug)
+      std::cerr << "starting oracle computation" << std::endl;
     
     oracle_map_type oracles(scorers.size());
     const double objective = compute_oracles(scorers, hypotheses, oracles, generator);
@@ -393,9 +400,13 @@ struct TaskInit
 	   const scorer_document_type& __scorers)
     : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
 
+  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
+		   std::allocator<hypothesis_type> > hypothesis_unique_type;
+#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
-
+#endif
+  
   void operator()()
   {
     hypothesis_unique_type uniques;
@@ -410,7 +421,7 @@ struct TaskInit
       
       hypotheses[id].clear();
       hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
-      
+
       hypotheses[id].reserve(uniques.size());
       hypotheses[id].insert(hypotheses[id].end(), uniques.begin(), uniques.end());
       
@@ -430,15 +441,15 @@ void initialize_score(hypothesis_map_type& hypotheses,
 {
   typedef TaskInit task_type;
   typedef task_type::queue_type queue_type;
-
   queue_type queue;
-  
+
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(queue, hypotheses, scorers)));
   
   for (size_t id = 0; id != hypotheses.size(); ++ id)
-    queue.push(id);
+    if (! hypotheses[id].empty())
+      queue.push(id);
   
   for (int i = 0; i < threads; ++ i)
     queue.push(-1);

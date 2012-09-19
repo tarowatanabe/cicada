@@ -15,6 +15,7 @@
 #include <string>
 #include <stdexcept>
 #include <numeric>
+#include <set>
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
@@ -695,8 +696,12 @@ struct TaskInit
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
+  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
+		   std::allocator<hypothesis_type> > hypothesis_unique_type;
+#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+#endif
 
   TaskInit(queue_type&                 __queue,
 	   hypothesis_map_type&        __hypotheses,

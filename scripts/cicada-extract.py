@@ -157,9 +157,12 @@ stdout = sys.stdout
 sys.stdout = sys.stderr
 
 def run_command(command):
-    retcode = subprocess.Popen(command, shell=True).wait()
-    if retcode < 0:
-        raise ValueError, "cannnot run? " + command
+    try:
+        retcode = subprocess.call(command, shell=True)
+        if retcode:
+            sys.exit(retcode)
+    except:
+        raise ValueError, "subprocess.call failed: %s" %(command)
 
 def compressed_file(file):
     if not file:

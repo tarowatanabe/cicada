@@ -968,7 +968,7 @@ struct Cross
     // compute crossing...
     //
     
-    difference_type crossed = 0;
+    size_type crossed = 0;
     
     // check whether niter crossed agains aiter...
     alignment_type::const_iterator aiter_end = alignment.end();

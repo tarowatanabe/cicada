@@ -346,8 +346,8 @@ struct ScorerCICADA
     
     if (feature_unaligned_mode) {
       const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
-      
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+
+      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, scores.first, scores.second))
 	throw std::runtime_error("failed generation");
     }
 
@@ -370,7 +370,7 @@ struct ScorerCICADA
     }
 
     if (feature_cross_mode)
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, cross(source, target), cross(source, target, alignments)))
+      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, cross(source, target), cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
     
 
@@ -488,8 +488,8 @@ struct ScorerCICADA
     
     if (feature_unaligned_mode) {
       const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
-      
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, scores.first, scores.second))
 	throw std::runtime_error("failed generation");
     }
 

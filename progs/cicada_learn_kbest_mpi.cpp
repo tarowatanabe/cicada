@@ -4568,8 +4568,12 @@ double optimize_mert(const scorer_document_type& scorers,
 
 void unique_kbest(hypothesis_map_type& kbests)
 {
+#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+#endif
+  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
+		   std::allocator<hypothesis_type> > hypothesis_unique_type;
   
   hypothesis_unique_type uniques;
   
@@ -5152,6 +5156,7 @@ void options(int argc, char** argv)
   po::options_description opts_command("command line options");
   opts_command.add_options()
     ("kbest",           po::value<path_set_type>(&kbest_path)->multitoken(),           "kbest path")
+    ("input",           po::value<path_set_type>(&kbest_path)->multitoken(),           "input path(s) (an alias for --kbest)")
     ("oracle",          po::value<path_set_type>(&oracle_path)->multitoken(),          "oracle kbest path")
     ("refset",          po::value<path_set_type>(&refset_files)->multitoken(),         "reference set file(s)")
     ("weights",         po::value<path_type>(&weights_path),                           "initial parameter")
