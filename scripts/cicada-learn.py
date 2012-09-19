@@ -384,12 +384,16 @@ if __name__ == '__main__':
     ### dump to stderr
     stdout = sys.stdout
     sys.stdout = sys.stderr
+
+    ### config
+    if not os.path.exists(options.config):
+        raise ValueError, "no config file: %s" %(options.config)
     
     ### root-dir
     if options.root_dir:
         if not os.path.exists(options.root_dir):
             os.makedirs(options.root_dir)
-    
+
     ### regularizer
     regularizer = "--regularize-l2"
     if options.regularize_l1 and options.regularize_l2:

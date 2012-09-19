@@ -16,7 +16,7 @@ namespace utils
 	    typename Hash=boost::hash<Tp>,
 	    typename Pred=std::equal_to<Tp>,
 	    typename Alloc=std::allocator<Tp > >
-  class compact_map 
+  class compact_set
   {
   public:
     typedef Tp value_type;
@@ -44,8 +44,8 @@ namespace utils
       : impl(__size) {}
 
   public:
-    void assign(const compact_map& x) { impl.assign(x.impl); }
-    void swap(compact_map& x) { impl.swap(x.impl); }
+    void assign(const compact_set& x) { impl.assign(x.impl); }
+    void swap(compact_set& x) { impl.swap(x.impl); }
 
   public:
     const_iterator begin() const { return impl.begin(); }

@@ -12,6 +12,7 @@ import os, os.path
 import string
 import re
 import subprocess
+import cStringIO
 
 from optparse import OptionParser, make_option
 
@@ -23,15 +24,18 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="root directory for outputs"),
     make_option("--prefix", default="learn", action="store", type="string",
                 metavar="PREFIX", help="prefix for outputs (default: learn)"),
-
     
     make_option("--devset", default="", action="store", type="string",
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
-
+    
+    make_option("--moses", default="", action="store", type="string",
+                metavar="MOSES", help="moses binary"),
     make_option("--config", default="", action="store", type="string",
-                metavar="CONFIG", help="cicada config file"),
+                metavar="CONFIG", help="moses config file"),
+    make_option("--options", default="", action="store", type="string",
+                metavar="CONFIG", help="moses options"),
 
     make_option("--iteration", default=10, action="store", type="int",
                 metavar="ITERATION", help="# of iterations (default: 10)"),
@@ -55,10 +59,12 @@ opt_parser = OptionParser(
     make_option("--learn-options", default="", action="store", type="string",
                 metavar="OPTION", help="additional learning options"),
     
-    make_option("--kbest", default=0, action="store", type="int",
-                metavar="KBEST", help="kbest size (default: 0)"),
-    make_option("--forest", default=None, action="store_true",
-                help="forest based learning"),
+    make_option("--kbest", default=100, action="store", type="int",
+                metavar="KBEST", help="kbest size (default: 100)"),
+    make_options("--bias-features", default="", action="store", type="string",
+                 help="bias features"),
+    make_options("--bias-weight", default=-1.0, action="store", type="float",
+                 help="bias weight"),
     make_option("--merge", default=None, action="store_true",
                 help="perform kbest merging"),
     make_option("--interpolate", default=0.0, action="store", type="float",
@@ -340,16 +346,14 @@ class CICADA:
 	
         for binprog in ('cicada',
                         'cicada_mpi',
-                        'cicada_learn',
-                        'cicada_learn_mpi',
                         'cicada_learn_kbest',
                         'cicada_learn_kbest_mpi',
-                        'cicada_oracle',
-                        'cicada_oracle_mpi',
                         'cicada_oracle_kbest',
                         'cicada_oracle_kbest_mpi',
                         'cicada_eval',
                         'cicada_filter_config',
+                        'cicada_filter_config_moses',
+                        'cicada_filter_kbest_moses',
                         'cicada_filter_weights',):
 	    
 	    for bindir in bindirs:
@@ -364,6 +368,18 @@ class CICADA:
 	    if not hasattr(self, binprog):
 		raise ValueError, binprog + ' does not exist'
 
+def learn_algorithms(command):
+    
+    pattern = re.compile(r"\s+--learn-(\S+)\s*")
+
+    algs = []
+    
+    for line in cStringIO.StringIO(subprocess.check_output([command, "--help"])):
+        result = pattern.search(line)
+        if result:
+            algs.append(result.group(1))
+    return algs
+    
 
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -372,6 +388,10 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
     
+    ### config
+    if not os.path.exists(options.config):
+        raise ValueError, "no config file: %s" %(options.config)
+
     ### root-dir
     if options.root_dir:
         if not os.path.exists(options.root_dir):
@@ -412,70 +432,38 @@ if __name__ == '__main__':
         raise ValueError, "invalid iterations"
 
     ### defaults to forest...
-    if not options.forest and options.kbest <= 0:
-        options.forest = 1
-        options.kbest = 0
-    if options.forest and options.kbest > 0:
-        raise ValueError, "forest-mode or kbest-mode?"
+    if options.kbest <= 0:
+        raise ValueError, "invalid kbest"
 
-    ## kbest or forest oracle..
-    cicada_oracle     = cicada.cicada_oracle
-    cicada_oracle_mpi = cicada.cicada_oracle_mpi
-    if not options.forest:
-        cicada_oracle     = cicada.cicada_oracle_kbest
-        cicada_oracle_mpi = cicada.cicada_oracle_kbest_mpi
-    
-    ### learning algorithms
-    ### cicada_learn:           lbfgs, sgd, xbleu
-    ### cicada_learn_kbest:     lbfgs, xbleu, linear, svm
-    ### cicada_learn_mpi:       lbfgs, sgd, xbleu, mira, nherd, arow, cw, pegasos
-    ### cicada_learn_kbest_mpi: lbfgs, sgd, xbleu, mira, nherd, arow, cw, pegasos, cp, mcp
-    
-    learn_forest     = ('lbfgs', 'sgd', 'xbleu')
-    learn_kbest      = ('lbfgs', 'xbleu', 'linear', 'svm')
-    learn_forest_mpi = ('lbfgs', 'sgd', 'xbleu', 'mira', 'nherd', 'arow', 'cw', 'pegasos')
-    learn_kbest_mpi  = ('lbfgs', 'sgd', 'xbleu', 'mira', 'nherd', 'arow', 'cw', 'pegasos', 'cp', 'mcp')
-
+    learn_kbest      = learn_algorithms(cicada.cicada_learn_kbest)
+    learn_kbest_mpi  = learn_algorithms(cicada.cicada_learn_kbest_mpi)
     learn_mpi        = None
-    cicada_learn     = None
-    cicada_learn_mpi = None
     
-    if options.forest:
-        if options.learn not in learn_forest or options.learn not in learn_forest_mpi:
-            raise ValueError, "%s is not supported by forest learner" %(options.learn)
-
-        if not mpi and options.learn not in learn_forest:
-            raise ValueError, "%s is not supported by non-mpi-forest learner" %(options.learn)
-
-        cicada_learn     = cicada.cicada_learn
-        cicada_learn_mpi = cicada.cicada_learn_mpi
+    if options.learn not in learn_kbest or options.learn not in learn_kbest_mpi:
+        raise ValueError, "learner %s is not supported by kbest learner" %(options.learn)
         
-        if mpi and options.learn in learn_forest_mpi:
-            learn_mpi = 1
+    if not mpi and options.learn not in learn_kbest:
+        raise ValueError, "%s is not supported by non-mpi-kbest learner" %(options.learn)
 
-    else:
-        if options.learn not in learn_kbest or options.learn not in learn_kbest_mpi:
-            raise ValueError, "learner %s is not supported by kbest learner" %(options.learn)
-        
-        if not mpi and options.learn not in learn_kbest:
-            raise ValueError, "%s is not supported by non-mpi-kbest learner" %(options.learn)
-
-        cicada_learn     = cicada.cicada_learn_kbest
-        cicada_learn_mpi = cicada.cicada_learn_kbest_mpi
-
-        if mpi and options.learn in learn_kbest_mpi:
-            learn_mpi = 1
+    if mpi and options.learn in learn_kbest_mpi:
+        learn_mpi = 1
 
     interpolate = None
     if options.interpolate > 0.0 and options.interpolate < 1.0:
         interpolate = 1
-
-    weights_config = 'weights-one=true'
+            
+    ### how to handle this...!
+    weights_init = ''
     if options.weights:
         if not os.path.exists(options.weights):
-            raise ValueError, "no initial weights %s" %(options.weights)
+            raise ValueError, "no initiali weights? %s" %(options.weights)
+        weights_init = options.weights
+    else:
+        weights_init = os.path.join(options.root_dir, options.prefix + ".init.weights")
         
-        weights_config = "weights=%s" %(optins.weights)
+        qsub.run(Program(cicada.cicada_filter_config_moses),
+                 Option('--input', options.config),
+                 Option('--output', weights_init))
     
     weiset = []
     tstset = []
@@ -485,11 +473,8 @@ if __name__ == '__main__':
         prefix = options.prefix + ".%d" %(iter)
 
         weights = os.path.join(options.root_dir, prefix + ".weights")
-        decoded = os.path.join(options.root_dir, prefix + ".forest")
-        oracle  = os.path.join(options.root_dir, prefix + ".forest.oracle")
-        if not options.forest:
-            decoded = os.path.join(options.root_dir, prefix + ".kbest")
-            oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
+        decoded = os.path.join(options.root_dir, prefix + ".kbest")
+        oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
         
         weiset.append(weights)
         tstset.append(decoded)
@@ -503,15 +488,14 @@ if __name__ == '__main__':
         
         weights       = os.path.join(options.root_dir, prefix + ".weights")
         weights_learn = os.path.join(options.root_dir, prefix + ".weights.learn")
-        if len(weiset) > 0:
-            weights_config = 'weights=%s' %(weiset[-1])
         
-        decoded = os.path.join(options.root_dir, prefix + ".forest")
-        oracle  = os.path.join(options.root_dir, prefix + ".forest.oracle")
-        if not options.forest:
-            decoded = os.path.join(options.root_dir, prefix + ".kbest")
-            oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
-        onebest = os.path.join(options.root_dir, prefix + ".1best")
+        if len(weiset) > 0:
+            weights_config = weiset[-1]
+        else:
+            weights_config = weights_init
+        
+        decoded = os.path.join(options.root_dir, prefix + ".kbest")
+        oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
         
         weiset.append(weights)
         tstset.append(decoded)
@@ -521,78 +505,49 @@ if __name__ == '__main__':
         mteval = os.path.join(options.root_dir, prefix + ".eval")
         
         print "generate config file %s @ %s" %(config, time.ctime())
+
+        config_bias_features = ''
+        config_bias_weight   =  ''
+        if options.bias_features:
+            config_bias_features = Option('--bias-features', options.bias_features)
+            config_bias_weight   = Option('--bias-weight', options.bias_weight)
         
-        qsub.run(Program(cicada.cicada_filter_config,
+        qsub.run(Program(cicada.cicada_filter_config_moses,
                          Option('--weights', weights_config),
-                         Option('--kbest', options.kbest),
-                         Option('--file', "directory=%s" %(decoded)),
+                         config_bias_features,
+                         config_bias_weight,
                          Option('--input', Quoted(options.config)),
                          Option('--output', Quoted(config))))
         
-        print "decode %s @ %s" %(decoded, time.ctime())
+        print "moses %s @ %s" %(decoded, time.ctime())
         
-        if mpi:
-            qsub.mpirun(Program(cicada.cicada_mpi,
-                                Option('--input', Quoted(options.devset)),
-                                Option('--config', Quoted(config)),
-                                Option('--debug')),
-                        name="decode",
-                        memory=options.max_malloc,
-                        threads=options.threads,
-                        logfile=Quoted(decoded+'.log'))
-        else:
-            qsub.run(Program(cicada.cicada,
-                             Option('--input', Quoted(options.devset)),
-                             Option('--config', Quoted(config)),
-                             Option('--threads', options.threads),
-                             Option('--debug')),
-                     name="decode",
+        moses_erase_features = ''
+        if options.bias_features:
+            moses_erase_features = Option('--erase-features', options.bias_features)
+        
+        qsub.wrapper(Program(options.moses,
+                             Option('-input-file', Quoted(options.devset)),
+                             Option('-config', Quoted(config)),
+                             options.options,
+                             Option('-n-best-list', "- %d distinct" %(options.kbest)),
+                             Option('-thread', options.thread),
+                             '|',
+                             cicada.cicada_filter_kbest_moses,
+                             Option('--output', Quoted(decoded)),
+                             Option('--directory')
+                             moses_erase_ferures,),
+                     name="moses",
                      memory=options.max_malloc,
                      threads=options.threads,
                      logfile=Quoted(decoded+'.log'))
         
-        if options.forest:
-            print "1best %s @ %s" %(onebest, time.ctime())
-                
-            if mpi:
-                qsub.mpirun(Program(cicada.cicada_mpi,
-                                    Option('--input', Quoted(decoded)),
-                                    Option('--input-forest'),
-                                    Option('--input-directory'),
-                                    Option('--operation', 'output:kbest=1,%s,file=%s' %(weights_config, onebest)),
-                                    Option('--debug')),
-                            name="onebest",
-                            memory=options.max_malloc,
-                            threads=options.threads,
-                            logfile=Quoted(onebest+'.log'))
-            else:
-                qsub.run(Program(cicada.cicada,
-                                 Option('--input', Quoted(decoded)),
-                                 Option('--input-forest'),
-                                 Option('--input-directory'),
-                                 Option('--operation', 'output:kbest=1,%s,file=%s' %(weights_config, onebest)),
-                                 Option('--threads', options.threads),
-                                 Option('--debug')),
-                         name="onebest",
-                         memory=options.max_malloc,
-                         threads=options.threads,
-                         logfile=Quoted(onebest+'.log'))
-            
-            print "evaluate %s @ %s" %(mteval, time.ctime())
-            
-            qsub.run(Program(cicada.cicada_eval,
-                             Option('--refset', Quoted(options.refset)),
-                             Option('--tstset', Quoted(onebest)),
-                             Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
-        else:
-            print "evaluate %s @ %s" %(mteval, time.ctime())
-            
-            qsub.run(Program(cicada.cicada_eval,
-                             Option('--refset', Quoted(options.refset)),
-                             Option('--tstset', Quoted(decoded)),
-                             Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+        print "evaluate %s @ %s" %(mteval, time.ctime())
+        
+        qsub.run(Program(cicada.cicada_eval,
+                         Option('--refset', Quoted(options.refset)),
+                         Option('--tstset', Quoted(decoded)),
+                         Option('--output', Quoted(mteval)),
+                         Option('--scorer', options.scorer)))
         
         print "oracle %s @ %s" %(oracle, time.ctime())
         
@@ -601,20 +556,12 @@ if __name__ == '__main__':
         if options.merge:
             oracle_tstset = Option('--tstset', ' '.join(map(lambda x: str(Quoted(x)), tstset)))
 
-        oracle_cube_size = ''
-        oracle_forest = ''
-        if options.forest:
-            oracle_cube_size = Option('--cube-size', options.cube_size)
-            oracle_forest = Option('--forest')
-                    
         if mpi:
             qsub.mpirun(Program(cicada_oracle_mpi,
                                 Option('--refset', Quoted(options.refset)),
                                 oracle_tstset,
                                 Option('--output', Quoted(oracle)),
                                 Option('--scorer', options.scorer),
-                                oracle_cube_size,
-                                oracle_forest,
                                 Option('--directory'),
                                 Option('--debug')),
                         name="oracle",
@@ -627,8 +574,6 @@ if __name__ == '__main__':
                              oracle_tstset,
                              Option('--output', Quoted(oracle)),
                              Option('--scorer', options.scorer),
-                             oracle_cube_size,
-                             oracle_forest,
                              Option('--directory'),
                              Option('--threads', options.threads),
                              Option('--debug'),),
@@ -659,7 +604,7 @@ if __name__ == '__main__':
         learn_algorithm = Option('--learn-' + options.learn)
 
         if learn_mpi and mpi:
-            qsub.mpirun(Program(cicada_learn_mpi,
+            qsub.mpirun(Program(cicada.cicada_learn_kbest_mpi,
                                 learn_input,
                                 learn_oracle,
                                 Option('--refset', options.refset),
@@ -677,7 +622,7 @@ if __name__ == '__main__':
                         threads=options.threads,
                         logfile=Quoted(weights+'.log'))
         else:
-            qsub.run(Program(cicada_learn,
+            qsub.run(Program(cicada.cicada_learn_kbest,
                              learn_input,
                              learn_oracle,
                              Option('--refset', options.refset),
