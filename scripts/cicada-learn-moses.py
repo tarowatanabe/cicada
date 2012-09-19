@@ -431,7 +431,7 @@ if __name__ == '__main__':
     if options.iteration_first > options.iteration:
         raise ValueError, "invalid iterations"
 
-    ### defaults to forest...
+    ## check kbests
     if options.kbest <= 0:
         raise ValueError, "invalid kbest"
 
@@ -453,17 +453,17 @@ if __name__ == '__main__':
         interpolate = 1
             
     ### how to handle this...!
-    weights_init = ''
+    weights_config = ''
     if options.weights:
         if not os.path.exists(options.weights):
             raise ValueError, "no initiali weights? %s" %(options.weights)
-        weights_init = options.weights
+        weights_config = options.weights
     else:
-        weights_init = os.path.join(options.root_dir, options.prefix + ".init.weights")
+        weights_config = os.path.join(options.root_dir, options.prefix + ".init.weights")
         
         qsub.run(Program(cicada.cicada_filter_config_moses),
                  Option('--input', options.config),
-                 Option('--output', weights_init))
+                 Option('--output', weights_config))
     
     weiset = []
     tstset = []
@@ -491,8 +491,6 @@ if __name__ == '__main__':
         
         if len(weiset) > 0:
             weights_config = weiset[-1]
-        else:
-            weights_config = weights_init
         
         decoded = os.path.join(options.root_dir, prefix + ".kbest")
         oracle  = os.path.join(options.root_dir, prefix + ".kbest.oracle")
