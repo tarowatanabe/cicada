@@ -233,6 +233,29 @@ class PBS:
         pipe.close()
         popen.wait()
 
+class QSub:
+    def __init__(self, mpi=None, pbs=None):
+        self.mpi = mpi
+        self.pbs = pbs
+        
+    def run(self, command, name="name", memory=0.0, threads=1, logfile=None):
+        if self.pbs:
+            self.pbs.run(str(command), name=name, memory=memory, threads=threads, logfile=logfile)
+        else:
+            if logfile:
+                run_command(str(command) + " 2> %s" %(logfile))
+            else:
+                run_command(str(command))
+    
+    def mpirun(self, command, name="name", memory=0.0, threads=1, logfile=None):
+        if not self.mpi:
+            raise ValueError, "no mpi?"
+
+        if self.pbs:
+            self.pbs.run(str(command), name=name, memory=memory, mpi=self.mpi, logfile=logfile)
+        else:
+            self.mpi.run(str(command), logfile=logfile)
+
 class CICADA:
     def __init__(self, dir=""):
         bindirs = []
