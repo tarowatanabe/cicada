@@ -120,7 +120,8 @@ bin_PROGRAMS = \
 	mpimap \
 	mpish \
 	mpipe \
-	thrsh
+	thrsh \
+	thrpe
 
 noinst_DATA = .gitignore
 
@@ -454,3 +455,7 @@ mpipe_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
 thrsh_SOURCES = thrsh.cpp
 thrsh_CPPFLAGS = $(AM_CPPFLAGS)
 thrsh_LDADD   = $(boost_LDADD) $(perftools_LDADD)
+
+thrpe_SOURCES = thrpe.cpp
+thrpe_CPPFLAGS = $(AM_CPPFLAGS)
+thrpe_LDADD   = $(boost_LDADD) $(perftools_LDADD)

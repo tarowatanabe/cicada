@@ -27,3 +27,12 @@ mpimap [list of command files]
        (--even option to evenly split lines.)
 	
 
+Its thread variant:
+
+thrsh [list of files or use stdin]
+      Similar to mpish, but uses threads to run multiple processes
+
+thrpe --command [command]
+      Similar to mpipe, but uses threads to run multiple processes
+
+

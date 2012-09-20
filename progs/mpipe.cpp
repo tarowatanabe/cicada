@@ -1,6 +1,6 @@
 // -*- encoding: utf-8 -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <cstdio>
@@ -29,9 +29,10 @@
 
 struct MapReduce
 {
-  typedef std::pair<int, std::string> value_type;
+  typedef size_t id_type;
+  typedef std::pair<id_type, std::string> value_type;
   typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
-  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_id_type;
+  typedef utils::lockfree_list_queue<id_type, std::allocator<id_type> > queue_id_type;
 
   typedef utils::subprocess subprocess_type;
 };
@@ -51,6 +52,7 @@ struct Mapper
 {
   typedef MapReduce map_reduce_type;
   
+  typedef map_reduce_type::id_type         id_type;
   typedef map_reduce_type::value_type      value_type;
   typedef map_reduce_type::queue_type      queue_type;
   typedef map_reduce_type::queue_id_type   queue_id_type;
@@ -74,14 +76,14 @@ struct Mapper
     
     while (1) {
       queue.pop_swap(value);
-      if (value.first < 0) break;
+      if (value.first == id_type(-1)) break;
       
       queue_id.push(value.first);
       
       os << value.second << '\n';
     }
     
-    queue_id.push(-1);
+    queue_id.push(id_type(-1));
   }
 
   queue_type&      queue;
@@ -93,6 +95,7 @@ struct Reducer
 {
   typedef MapReduce map_reduce_type;
   
+  typedef map_reduce_type::id_type         id_type;
   typedef map_reduce_type::value_type      value_type;
   typedef map_reduce_type::queue_type      queue_type;
   typedef map_reduce_type::queue_id_type   queue_id_type;
@@ -116,7 +119,7 @@ struct Reducer
         
     while (1) {
       queue_id.pop(value.first);
-      if (value.first < 0) break;
+      if (value.first == id_type(-1)) break;
       
       if (! std::getline(is, value.second))
 	throw std::runtime_error("invalid lines?");
@@ -124,7 +127,7 @@ struct Reducer
       queue.push_swap(value);
     }
     
-    value.first = -1;
+    value.first  = id_type(-1);
     value.second = std::string();
     
     queue.push_swap(value);
@@ -139,6 +142,7 @@ struct Consumer
 {
   typedef MapReduce map_reduce_type;
   
+  typedef map_reduce_type::id_type         id_type;
   typedef map_reduce_type::value_type      value_type;
   typedef map_reduce_type::queue_type      queue_type;
 
@@ -156,7 +160,7 @@ struct Consumer
       ++ value.first;
     }
     
-    value.first = -1;
+    value.first = id_type(-1);
     value.second = std::string();
     
     queue.push_swap(value);
@@ -169,7 +173,8 @@ struct Consumer
 struct Dumper
 {
   typedef MapReduce map_reduce_type;
-  
+ 
+  typedef map_reduce_type::id_type         id_type;
   typedef map_reduce_type::value_type      value_type;
   typedef map_reduce_type::queue_type      queue_type;
   
@@ -182,18 +187,18 @@ struct Dumper
 
   void operator()()
   {
-    typedef std::map<int, std::string, std::less<int>, std::allocator<std::pair<const int, std::string> > > value_set_type;
+    typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > value_set_type;
 
     value_type value;
     value_set_type values;
     
-    int curr = 0;
+    id_type curr = 0;
 
     int consumed_size = 0;
     
     while (1) {
       queue.pop_swap(value);
-      if (value.first < 0) {
+      if (value.first == id_type(-1)) {
 	++ consumed_size;
 	if (consumed_size == mpi_size)
 	  break;
@@ -236,19 +241,13 @@ enum {
 inline
 void tokenize(const std::string& buffer, MapReduce::value_type& value)
 {
-#if 0
-  boost::iostreams::filtering_istream is_buffer;
-  is_buffer.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
-  
-  is_buffer >> value.first;
-  std::getline(is_buffer, value.second);
-#endif
+  typedef MapReduce::id_type id_type;
   
   std::string::const_iterator iter = buffer.begin();
 
   for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
   
-  value.first = utils::lexical_cast<int>(buffer.substr(0, iter - buffer.begin()));
+  value.first = utils::lexical_cast<id_type>(buffer.substr(0, iter - buffer.begin()));
   value.second = buffer.substr(iter + 1 - buffer.begin());
 }
 
@@ -301,6 +300,7 @@ int main(int argc, char** argv)
 
     typedef MapReduce map_reduce_type;
       
+    typedef map_reduce_type::id_type         id_type;
     typedef map_reduce_type::value_type      value_type;
     typedef map_reduce_type::queue_type      queue_type;
     typedef map_reduce_type::queue_id_type   queue_id_type;
@@ -333,7 +333,6 @@ int main(int argc, char** argv)
       boost::thread mapper(mapper_type(queue_send, queue_id, subprocess));
       boost::thread reducer(reducer_type(queue_recv, queue_id, subprocess));
       
-      
       typedef utils::mpi_ostream        ostream_type;
       typedef utils::mpi_istream_simple istream_type;
 
@@ -358,13 +357,12 @@ int main(int argc, char** argv)
       int non_found_iter = 0;
       
       if (even) {
-	
-	int id = 0;
+	id_type id = 0;
 
-	while (value.first >= 0) {
+	while (value.first != id_type(-1)) {
 	  bool found = false;
 
-	  if ((id % mpi_size == 0 ? queue_send.empty() : ostream[id % mpi_size]->test()) && queue_is.pop(value, true) && value.first >= 0) {
+	  if ((id % mpi_size == 0 ? queue_send.empty() : ostream[id % mpi_size]->test()) && queue_is.pop(value, true) && value.first != id_type(-1)) {
 	    const int rank = value.first % mpi_size;
 	    
 	    if (rank == 0)
@@ -394,19 +392,19 @@ int main(int argc, char** argv)
 	}
 	
       } else {
-	while (value.first >= 0) {
+	while (value.first != id_type(-1)) {
 	  bool found = false;
 	  
-	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
-	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
+	  for (int rank = 1; rank < mpi_size && value.first != id_type(-1); ++ rank)
+	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first != id_type(-1)) {
 	      ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
 	    
 	      found = true;
 	    }
 	
-	  if (queue_send.empty() && queue_is.pop(value, true) && value.first >= 0) {
+	  if (queue_send.empty() && queue_is.pop(value, true) && value.first != id_type(-1)) {
 	    queue_send.push(value);
-	  
+	    
 	    found = true;
 	  }
 	
@@ -418,7 +416,7 @@ int main(int argc, char** argv)
 	      
 		queue_recv.push_swap(value_recv);
 	      } else {
-		queue_recv.push(std::make_pair(-1, std::string()));
+		queue_recv.push(std::make_pair(id_type(-1), std::string()));
 		istream[rank].reset();
 	      }
 	    
@@ -434,7 +432,7 @@ int main(int argc, char** argv)
       for (;;) {
 	bool found = false;
 
-	if (! terminated && queue_send.push(std::make_pair(-1, std::string()), true)) {
+	if (! terminated && queue_send.push(std::make_pair(id_type(-1), std::string()), true)) {
 	  terminated = true;
 	  found = true;
 	}
@@ -459,7 +457,7 @@ int main(int argc, char** argv)
 	      
 	      queue_recv.push_swap(value_recv);
 	    } else {
-	      queue_recv.push(std::make_pair(-1, std::string()));
+	      queue_recv.push(std::make_pair(id_type(-1), std::string()));
 	      istream[rank].reset();
 	    }
 		
@@ -508,7 +506,7 @@ int main(int argc, char** argv)
 	  if (is->read(line))
 	    tokenize(line, value);
 	  else {
-	    value.first = -1;
+	    value.first  = id_type(-1);
 	    value.second = std::string();
 	    
 	    is.reset();
@@ -521,7 +519,7 @@ int main(int argc, char** argv)
 	
 	if (! terminated) {
 	  if (os && os->test() && queue_recv.pop_swap(value, true)) {
-	    if (value.first < 0)
+	    if (value.first == id_type(-1))
 	      terminated = true;
 	    else
 	      os->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
@@ -629,7 +627,7 @@ int getoptions(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("command", po::value<std::string>(&command),                              "command")
-    ("even",   po::bool_switch(&even),                                          "evenly split data")
+    ("even",   po::bool_switch(&even),                                         "evenly split data")
     ("debug",  po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
@@ -639,9 +637,8 @@ int getoptions(int argc, char** argv)
   po::notify(vm);
   
   if (vm.count("help")) {
-    
     if (mpi_rank == 0)
-      std::cout << argv[0] << " [options] [file(s) listing shell commands]" << '\n' << desc << '\n';
+      std::cout << argv[0] << " [options]" << '\n' << desc << '\n';
     return 1;
   }
   
