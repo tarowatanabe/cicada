@@ -83,6 +83,43 @@ def compressed_file(file):
 	    return base
     return file
 
+class Quoted:
+    def __init__(self, arg):
+        self.arg = arg
+        
+    def __str__(self):
+        return '"' + str(self.arg) + '"'
+
+class Option:
+    def __init__(self, arg, value=None):
+        self.arg = arg
+        self.value = value
+
+    def __str__(self,):
+        option = self.arg
+        
+        if self.value is not None:
+            if isinstance(self.value, int):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, long):
+                option += " %d" %(self.value)
+            elif isinstance(self.value, float):
+                option += " %.20g" %(self.value)
+            else:
+                option += " %s" %(str(self.value))
+        return option
+
+class Program:
+    def __init__(self, *args):
+        self.args = args[:]
+
+    def __str__(self,):
+        return ' '.join(map(str, self.args))
+    
+    def __iadd__(self, other):
+        self.args.append(other)
+        return self
+
 class QSUB(multiprocessing.Process):
     def __init__(self, command=""):
         multiprocessing.Process.__init__(self)
@@ -93,9 +130,9 @@ class QSUB(multiprocessing.Process):
         popen.communicate(self.command)
         
 class PBS:
-    def __init__(self, queue="", workingdir=os.getcwd()):
+    def __init__(self, queue=""):
         self.queue = queue
-        self.workingdir = workingdir
+        self.qsub = 'qsub'
 
         self.workers = []
 
@@ -111,7 +148,7 @@ class PBS:
         pipe.write("#PBS -e /dev/null\n")
         pipe.write("#PBS -o /dev/null\n")
         pipe.write("#PBS -W block=true\n")
-
+        
         if after:
             pipe.write("#PBS -W depend=after:%s\n" %(after))
 
@@ -120,14 +157,16 @@ class PBS:
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
-            
-        if memory > 0.0:
-            if memory < 1.0:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
-            else:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
-        else:
-            pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
+
+        mem = ""
+        if memory >= 1.0:
+            mem=":mem=%dgb" %(int(memory))
+        elif memory >= 0.001:
+            mem=":mem=%dmb" %(int(amount * 1000))
+        elif memory >= 0.000001:
+            mem=":mem=%dkb" %(int(amount * 1000 * 1000))
+
+        pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
 
         # setup variables
         if os.environ.has_key('TMPDIR_SPEC'):
@@ -137,12 +176,16 @@ class PBS:
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             pipe.write("export DYLD_LIBRARY_PATH=%s\n" %(os.environ['DYLD_LIBRARY_PATH']))
             
-        pipe.write("cd \"%s\"\n" %(self.workingdir))
-        
+        pipe.write("if test \"$PBS_O_WORKDIR\" != \"\"; then\n")
+        pipe.write("  cd $PBS_O_WORKDIR\n")
+        pipe.write("fi\n")
+
+        prefix = ''
+        suffix = ''
         if logfile:
-            pipe.write("%s >& %s\n" %(command, logfile))
-        else:
-            pipe.write("%s\n" %(command))
+            suffix = " 2> %s" %(logfile)
+        
+        pipe.write(prefix + command + suffix + '\n')
 
         self.workers.append(QSUB(pipe.getvalue()))
         self.workers[-1].start()

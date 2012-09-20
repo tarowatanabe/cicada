@@ -164,18 +164,13 @@ class PBS:
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
             
-        mem=""
-        if memory > 0.0:
-            if memory < 1.0:
-                amount = int(memory * 1000)
-                if amout > 0:
-                    mem=":mem=%dmb" %(amount)
-                else:
-                    amount = int(memory * 1000 * 1000)
-                    if amount > 0:
-                        mem=":mem=%dkb" %(amount)
-            else:
-                mem=":mem=%dgb" %(int(memory))
+        mem = ""
+        if memory >= 1.0:
+            mem=":mem=%dgb" %(int(memory))
+        elif memory >= 0.001:
+            mem=":mem=%dmb" %(int(amount * 1000))
+        elif memory >= 0.000001:
+            mem=":mem=%dkb" %(int(amount * 1000 * 1000))
 
         if mpi:
             pipe.write("#PBS -l select=%d:ncpus=%d:mpiprocs=1%s\n" %(mpi.number, threads, mem))

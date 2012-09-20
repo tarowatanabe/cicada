@@ -205,27 +205,17 @@ class Option:
                 option += " %s" %(str(self.value))
         return option
 
-            
 class Program:
-    def __init__(self, *args, **keywords):
-        if len(args) < 1:
-            raise ValueError, "invalid arg for Program"
-        
-        self.name = args[0]
-        self.args = []
-
-        for arg in args[1:]:
-            self.__iadd__(arg)
+    def __init__(self, *args):
+        self.args = args[:]
 
     def __str__(self,):
-        command = self.name
-        for arg in self.args:
-            command += ' ' + str(arg)
-        return command
+        return ' '.join(map(str, self.args))
     
     def __iadd__(self, other):
         self.args.append(other)
         return self
+
 
 class PBS:
     def __init__(self, queue=""):
@@ -246,18 +236,13 @@ class PBS:
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
 
-        mem=""
-        if memory > 0.0:
-            if memory < 1.0:
-                amount = int(memory * 1000)
-                if amout > 0:
-                    mem=":mem=%dmb" %(amount)
-                else:
-                    amount = int(memory * 1000 * 1000)
-                    if amount > 0:
-                        mem=":mem=%dkb" %(amount)
-            else:
-                mem=":mem=%dgb" %(int(memory))
+        mem = ""
+        if memory >= 1.0:
+            mem=":mem=%dgb" %(int(memory))
+        elif memory >= 0.001:
+            mem=":mem=%dmb" %(int(amount * 1000))
+        elif memory >= 0.000001:
+            mem=":mem=%dkb" %(int(amount * 1000 * 1000))
         
         if mpi:
             pipe.write("#PBS -l select=%d:ncpus=%d:mpiprocs=1%s\n" %(mpi.number, threads, mem))
@@ -353,6 +338,28 @@ class MPI:
             
 	run_command(mpirun)
 
+class QSub:
+    def __init__(self, mpi=None, pbs=None):
+        self.mpi = mpi
+        self.pbs = pbs
+        
+    def run(self, command, name="name", memory=0.0, threads=1, logfile=None):
+        if self.pbs:
+            self.pbs.run(str(command), name=name, memory=memory, threads=threads, logfile=logfile)
+        else:
+            if logfile:
+                run_command(str(command) + " 2> %s" %(logfile))
+            else:
+                run_command(str(command))
+    
+    def mpirun(self, command, name="name", memory=0.0, threads=1, logfile=None):
+        if not self.mpi:
+            raise ValueError, "no mpi?"
+
+        if self.pbs:
+            self.pbs.run(str(command), name=name, memory=memory, mpi=self.mpi, logfile=logfile)
+        else:
+            self.mpi.run(str(command), logfile=logfile)
 
 class CICADA:
     def __init__(self, dir=""):

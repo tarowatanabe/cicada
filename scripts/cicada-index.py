@@ -159,21 +159,11 @@ class Option:
         return option
 
 class Program:
-    def __init__(self, *args, **keywords):
-        if len(args) < 1:
-            raise ValueError, "invalid arg for Program"
-        
-        self.name = args[0]
-        self.args = []
-
-        for arg in args[1:]:
-            self.__iadd__(arg)
+    def __init__(self, *args):
+        self.args = args[:]
 
     def __str__(self,):
-        command = self.name
-        for arg in self.args:
-            command += ' ' + str(arg)
-        return command
+        return ' '.join(map(str, self.args))
     
     def __iadd__(self, other):
         self.args.append(other)
@@ -213,18 +203,13 @@ class PBS:
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
         
-        mem=""
-        if memory > 0.0:
-            if memory < 1.0:
-                amount = int(memory * 1000)
-                if amout > 0:
-                    mem=":mem=%dmb" %(amount)
-                else:
-                    amount = int(memory * 1000 * 1000)
-                    if amount > 0:
-                        mem=":mem=%dkb" %(amount)
-            else:
-                mem=":mem=%dgb" %(int(memory))
+        mem = ""
+        if memory >= 1.0:
+            mem=":mem=%dgb" %(int(memory))
+        elif memory >= 0.001:
+            mem=":mem=%dmb" %(int(amount * 1000))
+        elif memory >= 0.000001:
+            mem=":mem=%dkb" %(int(amount * 1000 * 1000))
 
         pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
         
