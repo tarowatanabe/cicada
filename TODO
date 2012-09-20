@@ -147,9 +147,6 @@ Revise syntactic alignment:
   Allow arbitrary sub-tree alignment by a CFG-style sub-tree transformation
   Paired with "phrases" in the target side.
 
-
-BUGFIX for atomicop: use of fetch_and_add for Mac OSX...
-
 An analysis tool based on error metrics?
  Compute an error metric, i.e. BLEU, and visualize matched portions (such as ngrams, alignment etc.)
  TOOD: API?
@@ -158,17 +155,12 @@ Mixture PYP-LM:
  We employ multi-floor CRP for representing mixture of multiple LM.
  Multiple: surface, prefix-4 and suffix-4! (+ class-LM or +POS-LM?)
 
-
 Revise ngram-pyp so that we do not have to re-compute lower-order probabilities...
 
 Implement ADMM for potentially better parallel training
 
-# of crossed word alignment in synchronous rules
-
-
-rework of icu number formatter:
-  we will perform fine-graned control of:
-    use of matched rules
-    use of any rules...?
-
 Better sharing python code... HOW?
+
+mpipe is buggy under mac osx... this is probaly because of the interaction between
+openmpi and fork() with unmanagable file descriptors etc. The bug is clearly exhibited by
+the difference of the # of lines read and the actual read from stdin!
