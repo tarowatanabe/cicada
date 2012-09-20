@@ -149,21 +149,20 @@ struct Consumer
   Consumer(queue_type& __queue,
 	   std::istream& __is)
     : queue(__queue),
-      is(__is) {}
+      is(__is)
+  {}
   
   void operator()()
   {
-    value_type value(0, std::string());
+    id_type id = 0;
+    std::string line;
     
-    while (std::getline(is, value.second)) {
-      queue.push(value);
-      ++ value.first;
+    while (std::getline(is, line)) {
+      queue.push(std::make_pair(id, line));
+      ++ id;
     }
     
-    value.first = id_type(-1);
-    value.second = std::string();
-    
-    queue.push_swap(value);
+    queue.push(std::make_pair(id_type(-1), std::string()));
   }
   
   queue_type&   queue;
@@ -223,7 +222,7 @@ struct Merger
       values.erase(values.begin());
       ++ curr;
     }
-    
+
     if (! values.empty()) {
       std::cerr << "invalid lines: expected: " << curr << " current: " << values.begin()->first << std::endl;
       
@@ -331,7 +330,7 @@ int main(int argc, char** argv)
 
       boost::thread consumer(consumer_type(queue_is, is));
       boost::thread merger(merger_type(queue_recv, os, mpi_size));
-      
+
       boost::thread mapper(mapper_type(queue_send, queue_id, subprocess));
       boost::thread reducer(reducer_type(queue_recv, queue_id, subprocess));
       
@@ -570,8 +569,6 @@ int main(int argc, char** argv)
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
     }
-
-    MPI::COMM_WORLD.Barrier();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << argv[0] << " "<< err.what() << std::endl;
