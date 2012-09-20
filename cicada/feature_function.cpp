@@ -91,7 +91,7 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
 \tfeature=attribute name mapping\n\
-lexicon: lexicon model feature\n\
+lexicon: lexicon model feature based on P(target-sentence | source-sentence)\n\
 \tfile=lexicon model file\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\

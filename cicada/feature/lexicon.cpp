@@ -235,7 +235,7 @@ namespace cicada
       const parameter_type param(parameter);
       
       if (utils::ipiece(param.name()) != "lexicon")
-	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
+	throw std::runtime_error("this is not a lexicon feature: " + parameter);
 
       std::string path;
       

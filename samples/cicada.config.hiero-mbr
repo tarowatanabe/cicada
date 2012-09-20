@@ -48,7 +48,7 @@ operation = remove-bos-eos:forest=true
 operation = expected-ngram:${weights},scale=1.2,order=4
 
 ### second, compute expected-bleu
-operation apply:exact=true,feature="bleu-expected:order=4"
+operation = apply:exact=true,feature="bleu-expected:order=4"
 
 ### output: here, we will compute based on the weights.mbr
 #operation = output:${file},kbest=${kbest},${weights}

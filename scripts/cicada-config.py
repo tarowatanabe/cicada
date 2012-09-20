@@ -42,6 +42,7 @@ opt_parser = OptionParser(
     
     ### feature functions
     make_option("--feature-ngram", default=[], action="append", type="string", help="ngram feature"),
+    make_option("--feature-lexicon", default="", action="store", type="string", help="lexicon feature"),
     
 
     ## operations...
@@ -184,10 +185,19 @@ if __name__ == '__main__':
     print "#"
     print "# feature functions. For details see \"cicada --feature-function-list\""
     print "#"
-    print "# ngram feature. If you have multiple ngrams, you should modify name"
-    for ngram in options.feature_ngram:
-        print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
-        
+
+    if options.feature_ngram:
+        print "# ngram feature. If you have multiple ngrams, you should modify name"
+        print "# no-boe-eos=true implies that the forest is explicitly annotated with <s> and </s>."
+        for ngram in options.feature_ngram:
+            print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
+        print
+    
+    if options.feature_lexicon:
+        print "# lexicon feature computes P(target-sentence | source-sentence) based on model1/viterbi/noisy-or"
+        print "feature-function = lexicon: lexicon=%s" %(options.feature_lexicon)
+        print
+
     print "feature-function = word-penalty"
     print "feature-function = rule-penalty"
     print "# feature-function = arity-penalty"
@@ -231,7 +241,7 @@ if __name__ == '__main__':
         raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
     print
 
-    print "# annotate <s> and </s>"
+    print "# annotate <s> and </s> to the forest"
     print "operation = push-bos-eos"
     print
 
@@ -242,7 +252,22 @@ if __name__ == '__main__':
     print "# remove <s> and </s>"
     print "operation = remove-bos-eos:forest=true"
     print
-
-    print "# for output. kbest=0 implies forest output, otherwise, kbest outputs"
+    
+    print "# non-MBR decoding, and output forest or kbests"
+    print "# kbest=0 implies forest output, otherwise, kbest outputs"
     print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
     print
+
+    print "# MBR decoding"
+    print "# First, collect expected ngrams"
+    print "# operation = expected-ngram:${weights},scale=1.2,order=4"
+    print
+    print "# Second, compute expected-BLEU"
+    print "# Here, we simply add bleu-expected feature w/o pruning"
+    print "# operation = apply:exact=true,feature=\"bleu-expected:order=4\""
+    print
+    print "# Third, output!"
+    print "# The weight file, \"weights.mbr\" should contains a single line: \"bleu-expected 1\""
+    print "# so that the bleu-expected feature is used to compute k-best!"
+    print "# operation = output:${file},kbest=${kbest},unique=true,weights=weights.mbr"
+    print 
