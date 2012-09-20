@@ -493,9 +493,9 @@ class Giza:
         command += " --l0-beta %g" %(l0_beta)
         
         self.p0 = p0
-        self.prior_lexicon = prior_lexicon
-        self.prior_alignment = prior_alignment
-        self.smooth_lexicon = smooth_lexicon
+        self.prior_lexicon    = prior_lexicon
+        self.prior_alignment  = prior_alignment
+        self.smooth_lexicon   = smooth_lexicon
         self.smooth_alignment = smooth_alignment
         
         command += " --p0 %.20g" %(p0)

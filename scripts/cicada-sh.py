@@ -251,11 +251,11 @@ class MPI:
             command += ' --hostfile %s' %(self.hosts_file)
 
         if os.environ.has_key('TMPDIR_SPEC'):
-            mpirun += ' -x TMPDIR_SPEC'
+            command += ' -x TMPDIR_SPEC'
         if os.environ.has_key('LD_LIBRARY_PATH'):
-            mpirun += ' -x LD_LIBRARY_PATH'
+            command += ' -x LD_LIBRARY_PATH'
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
-            mpirun += ' -x DYLD_LIBRARY_PATH'
+            command += ' -x DYLD_LIBRARY_PATH'
 
         command += " %s" %(cicada.mpish)
         command += " --debug"
