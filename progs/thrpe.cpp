@@ -239,8 +239,12 @@ int main(int argc, char** argv)
     boost::thread_group reducers;
     std::vector<map_reduce_type::queue_id_type, std::allocator<map_reduce_type::queue_id_type> > queues(threads);
 
-    utils::compress_istream is(input_file);
-    utils::compress_ostream os(output_file);
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+    
+    utils::compress_istream is(input_file, 1024 * 1024);
+    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
     std::auto_ptr<boost::thread> merger(new boost::thread(merger_type(queue_reducer, os, threads)));
     
