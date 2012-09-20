@@ -98,6 +98,10 @@ opt_parser = OptionParser(
     make_option("--threads", default=2, action="store", type="int",
                 help="# of thrads for thread-based parallel processing"),
 
+    ## max-malloc
+    make_option("--max-malloc", default=8, action="store", type="float",
+                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
+    ## PBS
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",

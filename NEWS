@@ -1,5 +1,6 @@
 2012-x-x
-Bugfix: kbest-based (mert) learner core dump! The reason is the incorrect hash value computation for compact-feature-vector!
+Bugfix: kbest-based (mert) learner/oracle computer core dump!
+	The reason is the incorrect hash value computation for compact-feature-vector.
 INCOMPATIBLE: The feature-vector is re-implemented by a privately implemented compact-hashtable.
 	      Thus, the element is not "sorted" but randomly inserted in the vector.
 INCOMPATIBLE: phrase extraction now explicitly enumerate all the corners for lexical reordering computation
@@ -8,6 +9,8 @@ INCOMPATIBLE: lexical weights are now computed by cicada_filter_extract_{phrase,
 	      then, cicada-index.py to add additional features and to perform indexing.
 New: added more features:# of unaligned words, # of cross for terimnals, and generative probabilities
      (P(pair | root(pair)), P(source | root(source)), P(target | root(target)))
+New: bash-based learning scripts are re-implemented by equivalent, better python codes for better readability.
+     Check cicada-{learn,mert}{,-moses}.py, not *.sh equivalents.
 
 2012-9-6
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)
