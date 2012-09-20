@@ -2726,12 +2726,8 @@ struct TaskUnique
 	     hypothesis_map_type& __kbests)
     : queue(__queue), kbests(__kbests) {}
 
-#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
-#endif
-  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
-		   std::allocator<hypothesis_type> > hypothesis_unique_type;
 
   void operator()()
   {

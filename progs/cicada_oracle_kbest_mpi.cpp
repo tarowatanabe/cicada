@@ -533,8 +533,8 @@ double compute_oracles(const scorer_document_type& scorers,
 void initialize_score(hypothesis_map_type& hypotheses,
 		      const scorer_document_type& scorers)
 {
-  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
-		   std::allocator<hypothesis_type> > hypothesis_unique_type;
+  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
   
   hypothesis_unique_type uniques;
 

@@ -85,7 +85,7 @@ size_t hash_value(hypothesis_type const& x)
 {
   typedef utils::hashmurmur<size_t> hasher_type;
   
-  return hasher_type()(x.sentence.begin(), x.sentence.end(), hasher_type()(x.features.begin(), x.features.end(), 0));
+  return hasher_type()(x.sentence.begin(), x.sentence.end(), hash_value(x.features));
 }
 
 inline

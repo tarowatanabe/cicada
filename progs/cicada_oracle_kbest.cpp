@@ -9,8 +9,6 @@
 // 1 |||  reference translation for source sentence 1
 //
 
-#include <set>
-
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -400,8 +398,9 @@ struct TaskInit
 	   const scorer_document_type& __scorers)
     : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
 
-  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
-		   std::allocator<hypothesis_type> > hypothesis_unique_type;
+
+  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
   
   void operator()()
   {
