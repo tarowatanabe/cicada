@@ -105,10 +105,6 @@ class TreeGrammar(UserList.UserList):
             
             self.append("tree-grammar = " + path)
 
-(options, args) = opt_parser.parse_args()
-
-### grammars
-
 def non_terminal(x, index=0):
     if not x:
         raise ValueError, "no non-terminal? %s"  %(x)
@@ -119,130 +115,134 @@ def non_terminal(x, index=0):
     else:
         return '[' + x[1:-1] + ',' + str(index) + ']'
 
+if __name__ == '__main__':
+    (options, args) = opt_parser.parse_args()
 
-options.goal = non_terminal(options.goal)
-options.glue = non_terminal(options.glue)
+    ### grammars
+    options.goal = non_terminal(options.goal)
+    options.glue = non_terminal(options.glue)
 
-print "# goal for parsing/composition"
-print "goal = %s" %(options.goal)
-print
+    print "# goal for parsing/composition"
+    print "goal = %s" %(options.goal)
+    print
 
-if options.grammar:
+    if options.grammar:
+        print "#"
+        print "# grammar. For details, see \"cicada --grammar-list\""
+        print "#"
+        for indexed in options.grammar:
+            grammar = Grammar(grammar_dir=indexed)
+            
+            for transducer in grammar:
+                print transducer
+        print
+
+    if options.straight or options.invert:
+    
+        straight = "false"
+        invert = "false"
+
+        if options.straight:
+            straight = "true"
+        if options.invert:
+            invert = "true"
+        print "# straight glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
+                                                               non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                               non_terminal(options.goal, 1), non_terminal(options.glue, 2))
+        print "# inverted glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
+                                                               non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                               non_terminal(options.glue, 2), non_terminal(options.goal, 1))
+        print "grammar = glue:goal=%s,non-terminal=%s,straight=%s,invert=%s" %(options.goal, options.glue, straight, invert)
+        print
+
+    if options.insertion or options.deletion:
+        if options.insertion:
+            print "# insertion grammar %s ||| terminal ||| terminal" %(options.glue)
+            print "grammar = insertion:non-terminal=%s" %(options.glue)
+        if options.deletion:
+            print "# deletion grammar %s ||| terminal ||| <epsilon>" %(options.glue)
+            print "grammar = deletion:non-terminal=%s" %(options.glue)
+        print
+
+    if options.tree_grammar:
+        print "#"
+        print "# tree-grammar. For details see \"cicada --tree-grammar-list\""
+        print "#"
+        for indexed in options.tree_grammar:
+            grammar = TreeGrammar(grammar_dir=indexed)
+    
+            for transducer in grammar:
+                print transducer
+        print
+
+    if options.fallback:
+        print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
+        print
+
+    ### feature-functions
+
     print "#"
-    print "# grammar. For details, see \"cicada --grammar-list\""
+    print "# feature functions. For details see \"cicada --feature-function-list\""
     print "#"
-    for indexed in options.grammar:
-        grammar = Grammar(grammar_dir=indexed)
+    print "# ngram feature. If you have multiple ngrams, you should modify name"
+    for ngram in options.feature_ngram:
+        print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
         
-        for transducer in grammar:
-            print transducer
+    print "feature-function = word-penalty"
+    print "feature-function = rule-penalty"
+    print "# feature-function = arity-penalty"
+    print "# feature-function = glue-tree-penalty"
+    print "# feature-function = rule-shape"
     print
 
-if options.straight or options.invert:
-    
-    straight = "false"
-    invert = "false"
-
-    if options.straight:
-        straight = "true"
-    if options.invert:
-        invert = "true"
-    print "# straight glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
-                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2),
-                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2))
-    print "# inverted glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
-                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2),
-                                                           non_terminal(options.glue, 2), non_terminal(options.goal, 1))
-    print "grammar = glue:goal=%s,non-terminal=%s,straight=%s,invert=%s" %(options.goal, options.glue, straight, invert)
-    print
-
-if options.insertion or options.deletion:
-    if options.insertion:
-        print "# insertion grammar %s ||| terminal ||| terminal" %(options.glue)
-        print "grammar = insertion:non-terminal=%s" %(options.glue)
-    if options.deletion:
-        print "# deletion grammar %s ||| terminal ||| <epsilon>" %(options.glue)
-        print "grammar = deletion:non-terminal=%s" %(options.glue)
-    print
-
-if options.tree_grammar:
+    ### inputs
     print "#"
-    print "# tree-grammar. For details see \"cicada --tree-grammar-list\""
+    print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency,directory}"
     print "#"
-    for indexed in options.tree_grammar:
-        grammar = TreeGrammar(grammar_dir=indexed)
     
-        for transducer in grammar:
-            print transducer
+    if options.scfg:
+        print "input-sentence = true"
+    elif options.phrase:
+        print "input-sentence = true"
+    elif options.tree:
+        print "input-forest = true"
+    elif options.tree_cky:
+        print "input-sentence = true"
     print
 
-if options.fallback:
-    print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
+    ### operations
+
+    print "#"
+    print "# operations. For details, see \"cicada --operation-list\""
+    print "#"
+    if options.scfg:
+        print "# SCFG translation"
+        print "operation = compose-cky"
+    elif options.phrase:
+        print "# phrase translation"
+        print "operation = compose-phrase"
+    elif options.tree:
+        print "# tree-to-{string,tree} translation"
+        print "operation = compose-tree"
+    elif options.tree_cky:
+        print "# string-to-{string,tree} translation"
+        print "operation = compose-tree-cky"
+    else:
+        raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
     print
 
-### feature-functions
+    print "# annotate <s> and </s>"
+    print "operation = push-bos-eos"
+    print
 
-print "#"
-print "# feature functions. For details see \"cicada --feature-function-list\""
-print "#"
-print "# ngram feature. If you have multiple ngrams, you should modify name"
-for ngram in options.feature_ngram:
-    print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
-print "feature-function = word-penalty"
-print "feature-function = rule-penalty"
-print "# feature-function = arity-penalty"
-print "# feature-function = glue-tree-penalty"
-print "# feature-function = rule-shape"
-print
+    print "# cube-pruning"
+    print "operation = apply:prune=true,size=200,${weights}"
+    print
 
-### inputs
-print "#"
-print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency,directory}"
-print "#"
+    print "# remove <s> and </s>"
+    print "operation = remove-bos-eos:forest=true"
+    print
 
-if options.scfg:
-    print "input-sentence = true"
-elif options.phrase:
-    print "input-sentence = true"
-elif options.tree:
-    print "input-forest = true"
-elif options.tree_cky:
-    print "input-sentence = true"
-print
-
-### operations
-
-print "#"
-print "# operations. For details, see \"cicada --operation-list\""
-print "#"
-if options.scfg:
-    print "# SCFG translation"
-    print "operation = compose-cky"
-elif options.phrase:
-    print "# phrase translation"
-    print "operation = compose-phrase"
-elif options.tree:
-    print "# tree-to-{string,tree} translation"
-    print "operation = compose-tree"
-elif options.tree_cky:
-    print "# string-to-{string,tree} translation"
-    print "operation = compose-tree-cky"
-else:
-    raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
-print
-
-print "# annotate <s> and </s>"
-print "operation = push-bos-eos"
-print
-
-print "# cube-pruning"
-print "operation = apply:prune=true,size=200,${weights}"
-print
-
-print "# remove <s> and </s>"
-print "operation = remove-bos-eos:forest=true"
-print
-
-print "# for output. kbest=0 implies forest output, otherwise, kbest outputs"
-print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
-print
+    print "# for output. kbest=0 implies forest output, otherwise, kbest outputs"
+    print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
+    print

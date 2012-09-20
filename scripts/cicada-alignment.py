@@ -108,10 +108,6 @@ opt_parser = OptionParser(
     ])
 
 
-### dump to stderr
-stdout = sys.stdout
-sys.stdout = sys.stderr
-
 def run_command(command):
     try:
         retcode = subprocess.call(command, shell=True)
@@ -718,117 +714,120 @@ class Aligner:
         fp.write(" \"$@\"")
         #run_command(self.command)
 
-(options, args) = opt_parser.parse_args()
+if __name__ == '__main__':
+    (options, args) = opt_parser.parse_args()
 
-if options.root_dir:
-    if not os.path.exists(options.root_dir):
-	os.makedirs(options.root_dir)
+    ### dump to stderr
+    stdout = sys.stdout
+    sys.stdout = sys.stderr
 
-if not options.corpus_dir:
-    options.corpus_dir = os.path.join(options.root_dir, "corpus")
-if not options.model_dir:
-    options.model_dir = os.path.join(options.root_dir, "model")
-if not options.alignment_dir:
-    options.alignment_dir = options.model_dir
+    if options.root_dir:
+        if not os.path.exists(options.root_dir):
+            os.makedirs(options.root_dir)
 
-cicada = CICADA(options.cicada_dir)
+    if not options.corpus_dir:
+        options.corpus_dir = os.path.join(options.root_dir, "corpus")
+    if not options.model_dir:
+        options.model_dir = os.path.join(options.root_dir, "model")
+    if not options.alignment_dir:
+        options.alignment_dir = options.model_dir
 
-pbs = None
-if options.pbs:
-    pbs = PBS(queue=options.pbs_queue)
+    cicada = CICADA(options.cicada_dir)
 
-corpus = Corpus(corpus_dir=options.corpus_dir,
-                corpus=options.corpus,
-                f=options.f,
-                e=options.e,
-                a=options.a,
-                sf=options.sf,
-                se=options.se,
-                ff=options.ff,
-                fe=options.fe)
+    pbs = None
+    if options.pbs:
+        pbs = PBS(queue=options.pbs_queue)
 
-if not options.giza_f2e:
-    options.giza_f2e = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.source_tag, corpus.target_tag))
-if not options.giza_e2f:
-    options.giza_e2f = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.target_tag, corpus.source_tag))
+    corpus = Corpus(corpus_dir=options.corpus_dir,
+                    corpus=options.corpus,
+                    f=options.f,
+                    e=options.e,
+                    a=options.a,
+                    sf=options.sf,
+                    se=options.se,
+                    ff=options.ff,
+                    fe=options.fe)
 
-prepare = Prepare(cicada=cicada,
-                  corpus=corpus,
-                  cluster=options.cluster,
-                  iteration=options.iteration_cluster,
-                  threads=options.threads,
-                  debug=options.debug)
+    if not options.giza_f2e:
+        options.giza_f2e = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.source_tag, corpus.target_tag))
+    if not options.giza_e2f:
+        options.giza_e2f = os.path.join(options.root_dir, "giza.%s-%s" %(corpus.target_tag, corpus.source_tag))
 
-if options.first_step <= 1 and options.last_step >= 1:
-    print "(1) preparing corpus started  @", time.ctime()
-    prepare.run()
-    print "(1) preparing corpus finished @", time.ctime()
-
-giza = Giza(cicada=cicada,
-            corpus=corpus,
-            cluster=prepare,
-            dir_source_target=options.giza_e2f,
-            dir_target_source=options.giza_f2e,
-            prefix_source_target=corpus.target_tag+'-'+corpus.source_tag,
-            prefix_target_source=corpus.source_tag+'-'+corpus.target_tag,
-            iteration_model1=options.iteration_model1,
-            iteration_hmm=options.iteration_hmm,
-            prior_lexicon=options.prior_lexicon,
-            prior_alignment=options.prior_alignment,
-            smooth_lexicon=options.smooth_lexicon,
-            smooth_alignment=options.smooth_alignment,
-            p0=options.p0,
-            symmetric=options.symmetric,
-            posterior=options.posterior,
-            variational=options.variational,
-            l0=options.l0,
-            l0_alpha=options.l0_alpha,
-            l0_beta=options.l0_beta,
-            threads=options.threads,
-            debug=options.debug)
-
-## run giza++ in two directions
-if options.first_step <= 2 and options.last_step >= 2:
-    
-    # dump aligner...
-    aligner = Aligner(cicada=cicada,
-                      cluster=prepare,
-                      giza=giza,
-                      alignment_dir=options.alignment_dir,
+    prepare = Prepare(cicada=cicada,
+                      corpus=corpus,
+                      cluster=options.cluster,
+                      iteration=options.iteration_cluster,
                       threads=options.threads,
                       debug=options.debug)
     
-    aligner_path = os.path.join(options.alignment_dir, "aligner.sh")
-    aligner.run(open(aligner_path, 'w'))
-    os.chmod(aligner_path, os.stat(aligner_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    
-    print "(2) running giza started  @", time.ctime()
-    giza.run()
-    print "(2) running giza finished @", time.ctime()
-    
-    
-alignment=None
-if "posterior" in options.alignment:
-    alignment = AlignmentPosterior(cicada=cicada,
-                                   corpus=corpus,
-                                   cluster=prepare,
-                                   giza=giza,
-                                   alignment_dir=options.alignment_dir,
-                                   alignment=options.alignment,
-                                   threads=options.threads,
-                                   debug=options.debug)
-else:
-    alignment = AlignmentHeuristic(cicada=cicada,
-                                   corpus=corpus,
-                                   cluster=prepare,
-                                   giza=giza,
-                                   alignment_dir=options.alignment_dir,
-                                   alignment=options.alignment,
-                                   threads=options.threads,
-                                   debug=options.debug)
+    if options.first_step <= 1 and options.last_step >= 1:
+        print "(1) preparing corpus started  @", time.ctime()
+        prepare.run()
+        print "(1) preparing corpus finished @", time.ctime()
 
-if options.first_step <= 3 and options.last_step >= 3:
-    print "(3) generate word alignment started  @", time.ctime()
-    alignment.run()
-    print "(3) generate word alignment finished @", time.ctime()
+    giza = Giza(cicada=cicada,
+                corpus=corpus,
+                cluster=prepare,
+                dir_source_target=options.giza_e2f,
+                dir_target_source=options.giza_f2e,
+                prefix_source_target=corpus.target_tag+'-'+corpus.source_tag,
+                prefix_target_source=corpus.source_tag+'-'+corpus.target_tag,
+                iteration_model1=options.iteration_model1,
+                iteration_hmm=options.iteration_hmm,
+                prior_lexicon=options.prior_lexicon,
+                prior_alignment=options.prior_alignment,
+                smooth_lexicon=options.smooth_lexicon,
+                smooth_alignment=options.smooth_alignment,
+                p0=options.p0,
+                symmetric=options.symmetric,
+                posterior=options.posterior,
+                variational=options.variational,
+                l0=options.l0,
+                l0_alpha=options.l0_alpha,
+                l0_beta=options.l0_beta,
+                threads=options.threads,
+                debug=options.debug)
+
+    ## run giza++ in two directions
+    if options.first_step <= 2 and options.last_step >= 2:
+        # dump aligner...
+        aligner = Aligner(cicada=cicada,
+                          cluster=prepare,
+                          giza=giza,
+                          alignment_dir=options.alignment_dir,
+                          threads=options.threads,
+                          debug=options.debug)
+    
+        aligner_path = os.path.join(options.alignment_dir, "aligner.sh")
+        aligner.run(open(aligner_path, 'w'))
+        os.chmod(aligner_path, os.stat(aligner_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        
+        print "(2) running giza started  @", time.ctime()
+        giza.run()
+        print "(2) running giza finished @", time.ctime()
+    
+    alignment=None
+    if "posterior" in options.alignment:
+        alignment = AlignmentPosterior(cicada=cicada,
+                                       corpus=corpus,
+                                       cluster=prepare,
+                                       giza=giza,
+                                       alignment_dir=options.alignment_dir,
+                                       alignment=options.alignment,
+                                       threads=options.threads,
+                                       debug=options.debug)
+    else:
+        alignment = AlignmentHeuristic(cicada=cicada,
+                                       corpus=corpus,
+                                       cluster=prepare,
+                                       giza=giza,
+                                       alignment_dir=options.alignment_dir,
+                                       alignment=options.alignment,
+                                       threads=options.threads,
+                                       debug=options.debug)
+
+    if options.first_step <= 3 and options.last_step >= 3:
+        print "(3) generate word alignment started  @", time.ctime()
+        alignment.run()
+        print "(3) generate word alignment finished @", time.ctime()
 

@@ -105,10 +105,6 @@ opt_parser = OptionParser(
     ])
 
 
-### dump to stderr
-stdout = sys.stdout
-sys.stdout = sys.stderr
-
 def run_command(command):
     try:
         retcode = subprocess.call(command, shell=True)
@@ -627,125 +623,130 @@ class Scores(UserList.UserList):
 
             self.append(Score(path, os.path.join(output, root + '.bin'), root))
             
+if __name__ == '__main__':
+    (options, args) = opt_parser.parse_args()
 
-(options, args) = opt_parser.parse_args()
+    ### dump to stderr
+    stdout = sys.stdout
+    sys.stdout = sys.stderr
 
-### setup defaults!
-
-if options.root_dir:
-    if not os.path.exists(options.root_dir):
-	os.makedirs(options.root_dir)
-
-if not options.model_dir:
-    options.model_dir = os.path.join(options.root_dir, "model")
-if not options.lexical_dir:
-    options.lexical_dir = options.model_dir
-if not options.lexicon_source_target:
-    options.lexicon_source_target = os.path.join(options.lexical_dir, "lex.f2n")
-if not options.lexicon_target_source:
-    options.lexicon_target_source = os.path.join(options.lexical_dir, "lex.n2f")
-
-cicada = CICADA(options.cicada_dir)
-
-indexer = None
-if options.phrase:
-    indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
-elif options.scfg:
-    indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
-elif options.ghkm:
-    indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
-elif options.tree:
-    indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
-else:
-    raise ValueError, "no indexer?"
-
-scores = Scores(indexer)
-features = Features(root=options.feature_root,
-                    types=options.feature_type,
-                    singleton=options.feature_singleton,
-                    cross=options.feature_cross,
-                    unaligned=options.feature_unaligned)
-lexicon = Lexicon(lexicon_source_target=options.lexicon_source_target,
-                  lexicon_target_source=options.lexicon_target_source,
-                  lexicon=options.feature_lexicon,
-                  model1=options.feature_model1,
-                  noisy_or=options.feature_noisy_or,
-                  insertion_deletion=options.feature_insertion_deletion,
-                  threshold_insertion=options.threshold_insertion,
-                  threshold_deletion=options.threshold_deletion)
-
-fp = open(os.path.join(indexer.index, "files"), 'w')
-
-if options.pbs:
-    # we use pbs to run jobs
-    pbs = PBS(queue=options.pbs_queue)
+    ### setup defaults!
     
-    for score in scores:
-        index = Index(cicada=cicada,
-                      indexer=indexer,
-                      lexicon=lexicon,
-                      feats=features,
-                      input=score.input,
-                      output=score.output,
-                      name=score.name,
-                      root_joint=scores.root_joint,
-                      root_source=scores.root_source,
-                      root_target=scores.root_target,
-                      prior=options.prior,
-                      kbest=options.kbest,
-                      quantize=options.quantize,
-                      features=options.feature,
-                      attributes=options.attribute)
+    if options.root_dir:
+        if not os.path.exists(options.root_dir):
+            os.makedirs(options.root_dir)
 
-        fp.write(os.path.basename(score.output)+'\n')
+    if not options.model_dir:
+        options.model_dir = os.path.join(options.root_dir, "model")
+    if not options.lexical_dir:
+        options.lexical_dir = options.model_dir
+    if not options.lexicon_source_target:
+        options.lexicon_source_target = os.path.join(options.lexical_dir, "lex.f2n")
+    if not options.lexicon_target_source:
+        options.lexicon_target_source = os.path.join(options.lexical_dir, "lex.n2f")
 
-        pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
+    cicada = CICADA(options.cicada_dir)
+
+    indexer = None
+    if options.phrase:
+        indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+    elif options.scfg:
+        indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+    elif options.ghkm:
+        indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+    elif options.tree:
+        indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+    else:
+        raise ValueError, "no indexer?"
+
+    scores = Scores(indexer)
+    features = Features(root=options.feature_root,
+                        types=options.feature_type,
+                        singleton=options.feature_singleton,
+                        cross=options.feature_cross,
+                        unaligned=options.feature_unaligned)
+    lexicon = Lexicon(lexicon_source_target=options.lexicon_source_target,
+                      lexicon_target_source=options.lexicon_target_source,
+                      lexicon=options.feature_lexicon,
+                      model1=options.feature_model1,
+                      noisy_or=options.feature_noisy_or,
+                      insertion_deletion=options.feature_insertion_deletion,
+                      threshold_insertion=options.threshold_insertion,
+                      threshold_deletion=options.threshold_deletion)
     
-elif options.mpi:
-    mpi = MPI(cicada=cicada,
-              dir=options.mpi_dir,
-              hosts=options.mpi_host,
-              hosts_file=options.mpi_host_file,
-              number=options.mpi)
+    fp = open(os.path.join(indexer.index, "files"), 'w')
+
+    if options.pbs:
+        # we use pbs to run jobs
+        pbs = PBS(queue=options.pbs_queue)
+    
+        for score in scores:
+            index = Index(cicada=cicada,
+                          indexer=indexer,
+                          lexicon=lexicon,
+                          feats=features,
+                          input=score.input,
+                          output=score.output,
+                          name=score.name,
+                          root_joint=scores.root_joint,
+                          root_source=scores.root_source,
+                          root_target=scores.root_target,
+                          prior=options.prior,
+                          kbest=options.kbest,
+                          quantize=options.quantize,
+                          features=options.feature,
+                          attributes=options.attribute)
+            
+            fp.write(os.path.basename(score.output)+'\n')
+            
+            pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
+    
+    elif options.mpi:
+        mpi = MPI(cicada=cicada,
+                  dir=options.mpi_dir,
+                  hosts=options.mpi_host,
+                  hosts_file=options.mpi_host_file,
+                  number=options.mpi)
         
-    for score in scores:
-        index = Index(cicada=cicada,
-                      indexer=indexer,
-                      lexicon=lexicon,
-                      feats=features,
-                      input=score.input,
-                      output=score.output,
-                      root_joint=scores.root_joint,
-                      root_source=scores.root_source,
-                      root_target=scores.root_target,
-                      prior=options.prior,
-                      kbest=options.kbest,
-                      quantize=options.quantize,
-                      features=options.feature,
-                      attributes=options.attribute)
+        for score in scores:
+            index = Index(cicada=cicada,
+                          indexer=indexer,
+                          lexicon=lexicon,
+                          feats=features,
+                          input=score.input,
+                          output=score.output,
+                          root_joint=scores.root_joint,
+                          root_source=scores.root_source,
+                          root_target=scores.root_target,
+                          prior=options.prior,
+                          kbest=options.kbest,
+                          quantize=options.quantize,
+                          features=options.feature,
+                          attributes=options.attribute)
 
-        fp.write(os.path.basename(score.output)+'\n')
+            fp.write(os.path.basename(score.output)+'\n')
 
-        mpi.run(command=index)
-else:
-    threads = Threads(cicada=cicada, threads=options.threads)
+            mpi.run(command=index)
     
-    for score in scores:
-        index = Index(cicada=cicada,
-                      indexer=indexer,
-                      lexicon=lexicon,
-                      feats=features,
-                      input=score.input,
-                      output=score.output,
-                      root_joint=scores.root_joint,
-                      root_source=scores.root_source,
-                      root_target=scores.root_target,
-                      prior=options.prior,
-                      kbest=options.kbest,
-                      quantize=options.quantize,
-                      features=options.feature,
-                      attributes=options.attribute)
+    else:
+        threads = Threads(cicada=cicada, threads=options.threads)
+    
+        for score in scores:
+            index = Index(cicada=cicada,
+                          indexer=indexer,
+                          lexicon=lexicon,
+                          feats=features,
+                          input=score.input,
+                          output=score.output,
+                          root_joint=scores.root_joint,
+                          root_source=scores.root_source,
+                          root_target=scores.root_target,
+                          prior=options.prior,
+                          kbest=options.kbest,
+                          quantize=options.quantize,
+                          features=options.feature,
+                          attributes=options.attribute)
         
-        fp.write(os.path.basename(score.output)+'\n')
+            fp.write(os.path.basename(score.output)+'\n')
 
-        threads.run(command=index)
+            threads.run(command=index)

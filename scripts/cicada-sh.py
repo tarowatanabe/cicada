@@ -309,34 +309,40 @@ class CICADA:
 	    if not hasattr(self, binprog):
 		raise ValueError, binprog + ' does not exist'
 
-(options, args) = opt_parser.parse_args()
+if __name__ == '__main__':
+    (options, args) = opt_parser.parse_args()
 
-if options.pbs:
-    # we use pbs to run jobs
-    pbs = PBS(queue=options.pbs_queue)
+    if options.pbs:
+        # we use pbs to run jobs
+        pbs = PBS(queue=options.pbs_queue)
     
-    for line in sys.stdin:
-        line = line.strip()
-        if line:
-            pbs.run(command=line, threads=options.threads, memory=options.max_malloc, after=options.pbs_after, before=options.pbs_before)
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                pbs.run(command=line,
+                        threads=options.threads,
+                        memory=options.max_malloc,
+                        after=options.pbs_after,
+                        before=options.pbs_before)
 
-elif options.mpi:
-    cicada = CICADA(options.cicada_dir)
-    mpi = MPI(cicada=cicada,
-              dir=options.mpi_dir,
-              hosts=options.mpi_host,
-              hosts_file=options.mpi_host_file,
-              number=options.mpi)
+    elif options.mpi:
+        cicada = CICADA(options.cicada_dir)
+        mpi = MPI(cicada=cicada,
+                  dir=options.mpi_dir,
+                  hosts=options.mpi_host,
+                  hosts_file=options.mpi_host_file,
+                  number=options.mpi)
     
-    for line in sys.stdin:
-        line = line.strip()
-        if line:
-            mpi.run(command=line)
-else:
-    cicada = CICADA(options.cicada_dir)
-    threads = Threads(cicada=cicada, threads=options.threads)
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                mpi.run(command=line)
     
-    for line in sys.stdin:
-        line = line.strip()
-        if line:
-            threads.run(command=line)
+    else:
+        cicada = CICADA(options.cicada_dir)
+        threads = Threads(cicada=cicada, threads=options.threads)
+    
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                threads.run(command=line)

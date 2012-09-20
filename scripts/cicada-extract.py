@@ -152,10 +152,6 @@ opt_parser = OptionParser(
     ])
 
 
-### dump to stderr
-stdout = sys.stdout
-sys.stdout = sys.stderr
-
 def run_command(command):
     try:
         retcode = subprocess.call(command, shell=True)
@@ -863,129 +859,132 @@ class ExtractScore(Extract):
 
         self.command = command
 
+if __name__ == '__main__':
+    (options, args) = opt_parser.parse_args()
 
-(options, args) = opt_parser.parse_args()
+    ### dump to stderr
+    stdout = sys.stdout
+    sys.stdout = sys.stderr
 
-if options.root_dir:
-    if not os.path.exists(options.root_dir):
-	os.makedirs(options.root_dir)
+    if options.root_dir:
+        if not os.path.exists(options.root_dir):
+            os.makedirs(options.root_dir)
 
-if not options.model_dir:
-    options.model_dir = os.path.join(options.root_dir, "model")
-if not options.lexical_dir:
-    options.lexical_dir = options.model_dir
-if not options.alignment_dir:
-    options.alignment_dir = options.model_dir
+    if not options.model_dir:
+        options.model_dir = os.path.join(options.root_dir, "model")
+    if not options.lexical_dir:
+        options.lexical_dir = options.model_dir
+    if not options.alignment_dir:
+        options.alignment_dir = options.model_dir
 
-cicada = CICADA(options.cicada_dir)
+    cicada = CICADA(options.cicada_dir)
 
-mpi = None
-if options.mpi_host or options.mpi_host_file or options.mpi > 0:
-    mpi = MPI(dir=options.mpi_dir,
-              hosts=options.mpi_host,
-              hosts_file=options.mpi_host_file,
-              number=options.mpi)
+    mpi = None
+    if options.mpi_host or options.mpi_host_file or options.mpi > 0:
+        mpi = MPI(dir=options.mpi_dir,
+                  hosts=options.mpi_host,
+                  hosts_file=options.mpi_host_file,
+                  number=options.mpi)
+        
+    pbs = None
+    if options.pbs:
+        pbs = PBS(queue=options.pbs_queue)
 
-pbs = None
-if options.pbs:
-    pbs = PBS(queue=options.pbs_queue)
+    corpus = Corpus(corpus=options.corpus,
+                    f=options.f,
+                    e=options.e,
+                    a=options.a,
+                    sf=options.sf,
+                    se=options.se,
+                    ff=options.ff,
+                    fe=options.fe)
 
-corpus = Corpus(corpus=options.corpus,
-                f=options.f,
-                e=options.e,
-                a=options.a,
-                sf=options.sf,
-                se=options.se,
-                ff=options.ff,
-                fe=options.fe)
+    alignment = Alignment(corpus=corpus, alignment_dir=options.alignment_dir, alignment=options.alignment)
 
-alignment = Alignment(corpus=corpus, alignment_dir=options.alignment_dir, alignment=options.alignment)
+    lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
+                      lexical_dir=options.lexical_dir,
+                      prior=options.lexicon_prior,
+                      variational=options.lexicon_variational,
+                      l0=options.lexicon_l0,
+                      l0_alpha=options.lexicon_l0_alpha,
+                      l0_beta=options.lexicon_l0_beta,
+                      inverse=options.lexicon_inverse,
+                      threads=options.threads, mpi=mpi, pbs=pbs,
+                      debug=options.debug)
 
-lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
-                  lexical_dir=options.lexical_dir,
-                  prior=options.lexicon_prior,
-                  variational=options.lexicon_variational,
-                  l0=options.lexicon_l0,
-                  l0_alpha=options.lexicon_l0_alpha,
-                  l0_beta=options.lexicon_l0_beta,
-                  inverse=options.lexicon_inverse,
-                  threads=options.threads, mpi=mpi, pbs=pbs,
-                  debug=options.debug)
+    if options.first_step <= 4 and options.last_step >= 4:
+        print "(4) generate lexical translation table started  @", time.ctime()
+        lexicon.run()
+        print "(4) generate lexical translation table finished @", time.ctime()
 
-if options.first_step <= 4 and options.last_step >= 4:
-    print "(4) generate lexical translation table started  @", time.ctime()
-    lexicon.run()
-    print "(4) generate lexical translation table finished @", time.ctime()
+    if options.first_step <= 5 and options.last_step >= 5:
+        extract = None
+        if options.phrase:
+            extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
+                                    model_dir=options.model_dir,
+                                    max_length=options.max_length,
+                                    max_fertility=options.max_fertility,
+                                    max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                                    debug=options.debug)
+        elif options.scfg:
+            extract = ExtractSCFG(cicada=cicada, corpus=corpus, alignment=alignment,
+                                  model_dir=options.model_dir,
+                                  max_length=options.max_length,
+                                  max_fertility=options.max_fertility,
+                                  max_span_source=options.max_span_source,
+                                  max_span_target=options.max_span_target,
+                                  min_hole_source=options.min_hole_source,
+                                  min_hole_target=options.min_hole_target,
+                                  max_rank=options.max_rank,
+                                  exhaustive=options.exhaustive,
+                                  constrained=options.constrained,
+                                  sentential=options.sentential,
+                                  max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                                  debug=options.debug)
+        elif options.ghkm:
+            extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
+                                  model_dir=options.model_dir,
+                                  non_terminal=options.non_terminal,
+                                  max_sentence_length=options.max_sentence_length,
+                                  max_nodes=options.max_nodes,
+                                  max_height=options.max_height,
+                                  max_compose=options.max_compose,
+                                  max_scope=options.max_scope,
+                                  collapse_source=options.collapse_source,
+                                  collapse_target=options.collapse_target,
+                                  exhaustive=options.exhaustive,
+                                  constrained=options.constrained,
+                                  project=options.project,
+                                  max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                                  debug=options.debug)
+        elif options.tree:
+            extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
+                                  model_dir=options.model_dir,
+                                  max_sentence_length=options.max_sentence_length,
+                                  max_nodes=options.max_nodes,
+                                  max_height=options.max_height,
+                                  max_compose=options.max_compose,
+                                  max_scope=options.max_scope,
+                                  collapse_source=options.collapse_source,
+                                  collapse_target=options.collapse_target,
+                                  exhaustive=options.exhaustive,
+                                  constrained=options.constrained,
+                                  max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                                  debug=options.debug)
+        else:
+            raise ValueError, "no count type?"
 
-if options.first_step <= 5 and options.last_step >= 5:
-    extract = None
-    if options.phrase:
-        extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
-                                model_dir=options.model_dir,
-                                max_length=options.max_length,
-                                max_fertility=options.max_fertility,
-                                max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                                debug=options.debug)
-    elif options.scfg:
-        extract = ExtractSCFG(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              max_length=options.max_length,
-                              max_fertility=options.max_fertility,
-                              max_span_source=options.max_span_source,
-                              max_span_target=options.max_span_target,
-                              min_hole_source=options.min_hole_source,
-                              min_hole_target=options.min_hole_target,
-                              max_rank=options.max_rank,
-                              exhaustive=options.exhaustive,
-                              constrained=options.constrained,
-                              sentential=options.sentential,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    elif options.ghkm:
-        extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              non_terminal=options.non_terminal,
-                              max_sentence_length=options.max_sentence_length,
-                              max_nodes=options.max_nodes,
-                              max_height=options.max_height,
-                              max_compose=options.max_compose,
-                              max_scope=options.max_scope,
-                              collapse_source=options.collapse_source,
-                              collapse_target=options.collapse_target,
-                              exhaustive=options.exhaustive,
-                              constrained=options.constrained,
-                              project=options.project,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    elif options.tree:
-        extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              max_sentence_length=options.max_sentence_length,
-                              max_nodes=options.max_nodes,
-                              max_height=options.max_height,
-                              max_compose=options.max_compose,
-                              max_scope=options.max_scope,
-                              collapse_source=options.collapse_source,
-                              collapse_target=options.collapse_target,
-                              exhaustive=options.exhaustive,
-                              constrained=options.constrained,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    else:
-        raise ValueError, "no count type?"
+        print "(5) extract phrase table started @", time.ctime()
+        extract.run()
+        print "(5) extract phrase table finished @", time.ctime()
 
-    print "(5) extract phrase table started @", time.ctime()
-    extract.run()
-    print "(5) extract phrase table finished @", time.ctime()
-
-if options.first_step <= 6 and options.last_step >= 6:
-    score = ExtractScore(cicada=cicada,
-                         model_dir=options.model_dir,
-                         phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
-                         max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                         debug=options.debug)
+    if options.first_step <= 6 and options.last_step >= 6:
+        score = ExtractScore(cicada=cicada,
+                             model_dir=options.model_dir,
+                             phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
+                             max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                             debug=options.debug)
     
-    print "(6) score phrase table started @", time.ctime()
-    score.run()
-    
-    print "(6) score phrase table finished @", time.ctime()
+        print "(6) score phrase table started @", time.ctime()
+        score.run()
+        print "(6) score phrase table finished @", time.ctime()
