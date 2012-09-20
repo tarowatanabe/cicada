@@ -378,6 +378,10 @@ if __name__ == '__main__':
     sys.stdout = sys.stderr
 
     print "for moses options, we will recommend: -beam-threshold 0 -translation-option-threshold 0 -early-discarding-threshold 0"
+
+    ### moses
+    if not os.path.exists(options.moses):
+        raise ValueError, "no moses?: %s" %(options.moses)
     
     ### config
     if not os.path.exists(options.config):

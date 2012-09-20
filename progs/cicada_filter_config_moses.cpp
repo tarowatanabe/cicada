@@ -86,6 +86,9 @@ int main(int argc, char** argv)
     
     if (weights_file.empty()) {
       // we will extract feature value!
+      //
+      // the mapping was taken from moses/src/Parameter.cpp
+      //
       
       feature_map_type feature_map;
       feature_map["weight-d"]          = "d";
