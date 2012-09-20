@@ -12,6 +12,7 @@ dist_bin_SCRIPTS = \
 	cicada-maxent.py \
 	cicada-mert.py \
 	cicada-mert-moses.py \
+	cicada-pipe.py \
 	cicada-sh.py
 
 noinst_SCRIPTS = \
