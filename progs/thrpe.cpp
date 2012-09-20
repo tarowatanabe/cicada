@@ -231,8 +231,8 @@ int main(int argc, char** argv)
     for (size_t shard = 0; shard != subprocess.size(); ++ shard)
       subprocess[shard].reset(new map_reduce_type::subprocess_type(command));
     
-    map_reduce_type::queue_type queue_mapper(threads);
-    map_reduce_type::queue_type queue_reducer(threads);
+    map_reduce_type::queue_type queue_mapper(threads * 1024);
+    map_reduce_type::queue_type queue_reducer;
     
     boost::thread_group mappers;
     boost::thread_group reducers;
