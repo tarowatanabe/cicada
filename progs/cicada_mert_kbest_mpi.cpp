@@ -948,14 +948,9 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 void initialize_score(hypothesis_map_type& hypotheses,
 		      const scorer_document_type& scorers)
 {
-  typedef std::set<hypothesis_type, std::less<hypothesis_type>,
-		   std::allocator<hypothesis_type> > hypothesis_unique_type;
-
-#if 0
   typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
-#endif
-
+  
   hypothesis_unique_type uniques;
 
   for (size_t id = 0; id != hypotheses.size(); ++ id)
