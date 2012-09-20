@@ -337,7 +337,7 @@ if __name__ == '__main__':
         qsub.mpirun(Program(cicada.mpipe,
                             Option('--input', options.input),
                             Option('--output', options.output),
-                            Option('--command', options.command))
+                            Option('--command', options.command)),
                     name="cicada-pipe",
                     memory=options.max_malloc,
                     threads=options.threads,
@@ -347,7 +347,7 @@ if __name__ == '__main__':
                          Option('--input', options.input),
                          Option('--output', options.output),
                          Option('--command', options.command),
-                         Option('--threads', options.threads))
+                         Option('--threads', options.threads)),
                  name="cicada-pipe",
                  memory=options.max_malloc,
                  threads=options.threads,

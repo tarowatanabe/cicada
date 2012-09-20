@@ -170,7 +170,7 @@ struct Consumer
   std::istream& is;
 };
 
-struct Dumper
+struct Merger
 {
   typedef MapReduce map_reduce_type;
  
@@ -178,7 +178,7 @@ struct Dumper
   typedef map_reduce_type::value_type      value_type;
   typedef map_reduce_type::queue_type      queue_type;
   
-  Dumper(queue_type& __queue,
+  Merger(queue_type& __queue,
 	 std::ostream& __os,
 	 const int __mpi_size)
     : queue(__queue),
@@ -193,7 +193,6 @@ struct Dumper
     value_set_type values;
     
     id_type curr = 0;
-
     int consumed_size = 0;
     
     while (1) {
@@ -219,13 +218,17 @@ struct Dumper
       }
     }
     
-    if (! values.empty() && curr != values.begin()->first) {
-      throw std::runtime_error("invalid id: expected: " + utils::lexical_cast<std::string>(curr) + " current: " + utils::lexical_cast<std::string>(values.begin()->first));
+    while (! values.empty() && values.begin()->first == curr) {
+      os << values.begin()->second << '\n';
+      values.erase(values.begin());
+      ++ curr;
     }
     
-    value_set_type::const_iterator viter_end = values.end();
-    for (value_set_type::const_iterator viter = values.begin(); viter != viter_end; ++ viter)
-      os << viter->second << '\n';
+    if (! values.empty()) {
+      std::cerr << "invalid lines: expected: " << curr << " current: " << values.begin()->first << std::endl;
+      
+      throw std::runtime_error("invalid id: expected: " + utils::lexical_cast<std::string>(curr) + " current: " + utils::lexical_cast<std::string>(values.begin()->first));
+    }
   }
   
   queue_type&   queue;
@@ -278,7 +281,6 @@ path_type input_file = "-";
 path_type output_file = "-";
 std::string command;
 
-bool even = false;
 int debug = 0;
 
 int getoptions(int argc, char** argv);
@@ -310,7 +312,7 @@ int main(int argc, char** argv)
     typedef Reducer reducer_type;
     
     typedef Consumer consumer_type;
-    typedef Dumper   dumper_type;
+    typedef Merger   merger_type;
     
     if (mpi_rank == 0) {
       subprocess_type subprocess(command);
@@ -328,7 +330,7 @@ int main(int argc, char** argv)
       utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
 
       boost::thread consumer(consumer_type(queue_is, is));
-      boost::thread dumper(dumper_type(queue_recv, os, mpi_size));
+      boost::thread merger(merger_type(queue_recv, os, mpi_size));
       
       boost::thread mapper(mapper_type(queue_send, queue_id, subprocess));
       boost::thread reducer(reducer_type(queue_recv, queue_id, subprocess));
@@ -356,84 +358,48 @@ int main(int argc, char** argv)
       
       int non_found_iter = 0;
       
-      if (even) {
-	id_type id = 0;
-
-	while (value.first != id_type(-1)) {
-	  bool found = false;
-
-	  if ((id % mpi_size == 0 ? queue_send.empty() : ostream[id % mpi_size]->test()) && queue_is.pop(value, true) && value.first != id_type(-1)) {
-	    const int rank = value.first % mpi_size;
-	    
-	    if (rank == 0)
-	      queue_send.push(value);
-	    else
-	      ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
-	    
-	    ++ id;
-	    
-	    found = true;
-	  }
-	  
-	  // reduce...
-	  for (int rank = 1; rank < mpi_size; ++ rank)
-	    if (istream[rank] && istream[rank]->test()) {
-	      if (istream[rank]->read(line)) {
-		tokenize(line, value_recv);
-		
-		queue_recv.push_swap(value_recv);
-	      } else
-		istream[rank].reset();
-	      
-	      found = true;
-	    }
-	  
-	  non_found_iter = loop_sleep(found, non_found_iter);
-	}
+      while (value.first != id_type(-1)) {
+	bool found = false;
 	
-      } else {
-	while (value.first != id_type(-1)) {
-	  bool found = false;
-	  
-	  for (int rank = 1; rank < mpi_size && value.first != id_type(-1); ++ rank)
-	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first != id_type(-1)) {
-	      ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
-	    
-	      found = true;
-	    }
-	
-	  if (queue_send.empty() && queue_is.pop(value, true) && value.first != id_type(-1)) {
-	    queue_send.push(value);
+	for (int rank = 1; rank < mpi_size && value.first != id_type(-1); ++ rank)
+	  if (ostream[rank]->test() && queue_is.pop(value, true) && value.first != id_type(-1)) {
+	    ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
 	    
 	    found = true;
 	  }
 	
-	  // reduce...
-	  for (int rank = 1; rank < mpi_size; ++ rank)
-	    if (istream[rank] && istream[rank]->test()) {
-	      if (istream[rank]->read(line)) {
-		tokenize(line, value_recv);
-	      
-		queue_recv.push_swap(value_recv);
-	      } else {
-		queue_recv.push(std::make_pair(id_type(-1), std::string()));
-		istream[rank].reset();
-	      }
-	    
-	      found = true;
-	    }
+	if (queue_send.empty() && queue_is.pop(value, true) && value.first != id_type(-1)) {
+	  queue_send.push(value);
 	  
-	  non_found_iter = loop_sleep(found, non_found_iter);
+	  found = true;
 	}
+	
+	// reduce...
+	for (int rank = 1; rank < mpi_size; ++ rank)
+	  if (istream[rank] && istream[rank]->test()) {
+	    if (istream[rank]->read(line)) {
+	      tokenize(line, value_recv);
+	      
+	      queue_recv.push_swap(value_recv);
+	    } else {
+	      queue_recv.push(std::make_pair(id_type(-1), std::string()));
+	      istream[rank].reset();
+	    }
+	    
+	    found = true;
+	  }
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
       }
       
       bool terminated = false;
-
+      
       for (;;) {
 	bool found = false;
-
+	
 	if (! terminated && queue_send.push(std::make_pair(id_type(-1), std::string()), true)) {
 	  terminated = true;
+	  
 	  found = true;
 	}
 	
@@ -448,7 +414,6 @@ int main(int argc, char** argv)
 	    found = true;
 	  }
 	
-	
 	// reduce...
 	for (int rank = 1; rank < mpi_size; ++ rank)
 	  if (istream[rank] && istream[rank]->test()) {
@@ -460,7 +425,7 @@ int main(int argc, char** argv)
 	      queue_recv.push(std::make_pair(id_type(-1), std::string()));
 	      istream[rank].reset();
 	    }
-		
+	    
 	    found = true;
 	  }
 	
@@ -472,11 +437,10 @@ int main(int argc, char** argv)
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
       
-      
       mapper.join();
       reducer.join();
       consumer.join();
-      dumper.join();
+      merger.join();
     } else {
       subprocess_type subprocess(command);
       
@@ -606,6 +570,8 @@ int main(int argc, char** argv)
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
     }
+
+    MPI::COMM_WORLD.Barrier();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << argv[0] << " "<< err.what() << std::endl;
@@ -627,7 +593,6 @@ int getoptions(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("command", po::value<std::string>(&command),                              "command")
-    ("even",   po::bool_switch(&even),                                         "evenly split data")
     ("debug",  po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   

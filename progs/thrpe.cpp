@@ -32,7 +32,6 @@ path_type input_file = "-";
 path_type output_file = "-";
 std::string command;
 int threads = 1;
-bool even = false;
 int debug = 0;
 
 struct MapReduce
@@ -284,7 +283,6 @@ int getoptions(int argc, char** argv)
     ("input",   po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",  po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("command", po::value<std::string>(&command),                               "command")
-    ("even",    po::bool_switch(&even),                                         "evenly split data")
     
     ("threads", po::value<int>(&threads),                                       "# of threads")
     
