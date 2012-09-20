@@ -30,8 +30,8 @@ operation = compose-tree
 ### marker pushing
 operation = push-bos-eos
 
-### feature application by cube-pruning (histograph size = 200)
-operation = apply:prune=true,size=200,${weights}
+### feature application by cube-pruning (histograph size = 1000)
+operation = apply:prune=true,size=1000,${weights}
 
 ### density pruning: # of hyperedges of a forest <= # of hyperedges of viterbi tree * density-size
 ### this is optional: may be required for MERT
