@@ -205,18 +205,17 @@ int getoptions(int argc, char** argv)
     ("learn-arow",   po::bool_switch(&learn_arow),    "Adaptive-Regularization")
     ("learn-linear", po::bool_switch(&learn_linear),  "liblinear algorithm")
     ("solver",       po::value<int>(&linear_solver),  "liblinear solver type (default: 1)\n"
-     " 0: L2-regularized logistic regression (primal)\n"
-     " 1: L2-regularized L2-loss support vector classification (dual)\n"
-     " 2: L2-regularized L2-loss support vector classification (primal)\n"
-     " 3: L2-regularized L1-loss support vector classification (dual)\n"
-     " 5: L1-regularized L2-loss support vector classification\n"
-     " 6: L1-regularized logistic regression\n"
-     " 7: L2-regularized logistic regression (dual)"
-     "11: L2-regularized L2-loss epsilon support vector regression (primal)\n"
-     "12: L2-regularized L2-loss epsilon support vector regression (dual)\n"
-     "13: L2-regularized L1-loss epsilon support vector regression (dual)\n"
+     " 0: \tL2-regularized logistic regression (primal)\n"
+     " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
+     " 2: \tL2-regularized L2-loss support vector classification (primal)\n"
+     " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
+     " 5: \tL1-regularized L2-loss support vector classification\n"
+     " 6: \tL1-regularized logistic regression\n"
+     " 7: \tL2-regularized logistic regression (dual)\n"
+     "11: \tL2-regularized L2-loss epsilon support vector regression (primal)\n"
+     "12: \tL2-regularized L2-loss epsilon support vector regression (dual)\n"
+     "13: \tL2-regularized L1-loss epsilon support vector regression (dual)\n"
      )
-
     
     ("max-iteration", po::value<int>(&max_iteration),  "maximum iteration")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-norm (only for logistic-loss, maxent/SGD")
