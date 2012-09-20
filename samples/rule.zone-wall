@@ -1,2 +1,4 @@
 [x] ||| <zone> [x,1] </zone> ||| [x,1] ||| zone-penalty=-1
+[x] ||| <zone> [x,1]         ||| [x,1] ||| zone-fragment-penalty=-1
+[x] |||        [x,1] </zone> ||| [x,1] ||| zone-fragment-penalty=-1
 [s] ||| [s,1] <wall/> [x,2] ||| [s,1] [x,2] ||| wall-penalty=-1
