@@ -63,6 +63,8 @@ opt_parser = OptionParser(
     
     make_option("--kbest", default=100, action="store", type="int",
                 metavar="KBEST", help="kbest size (default: 100)"),
+    make_option("--kbest-distinct", default=None, action="store_true",
+                help="distinct kbest generation"),
     make_option("--bias-features", default="", action="store", type="string",
                  help="bias features"),
     make_option("--bias-weight", default=-1.0, action="store", type="float",
@@ -519,12 +521,16 @@ if __name__ == '__main__':
         if options.bias_features:
             moses_erase_features = Option('--erase-features', options.bias_features)
         
+        moses_kbest = Option('-n-best-list', "- %d" %(options.kbest))
+        if options.kbest_distinct:
+            moses_kbest = Option('-n-best-list', "- %d distinct" %(options.kbest))
+
         qsub.run(Program('(',
                          options.moses,
                          Option('-input-file', Quoted(options.devset)),
                          Option('-config', Quoted(config)),
                          options.options,
-                         Option('-n-best-list', "- %d distinct" %(options.kbest)),
+                         moses_kbest,
                          Option('-threads', options.threads),
                          '|',
                          cicada.cicada_filter_kbest_moses,
