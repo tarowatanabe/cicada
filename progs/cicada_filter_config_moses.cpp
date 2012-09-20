@@ -207,7 +207,7 @@ int main(int argc, char** argv)
 	    feat = miter->second;
 	
 	  weight_set_type& weights = feature_weights[feat];
-	  if (pos >= weights.size())
+	  if (pos >= static_cast<int>(weights.size()))
 	    weights.resize(pos + 1);
 	  weights[pos] = value;
 	}
@@ -243,7 +243,7 @@ int main(int argc, char** argv)
 	    feat = miter->second;
 	
 	  weight_set_type& weights = feature_weights[feat];
-	  if (pos >= weights.size())
+	  if (pos >= static_cast<int>(weights.size()))
 	    weights.resize(pos + 1);
 	  weights[pos] = value;
 	}
