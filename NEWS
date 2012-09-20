@@ -1,4 +1,5 @@
 2012-x-x
+Bugfix: kbest-based (mert) learner core dump! The reason is the incorrect hash value computation for compact-feature-vector!
 INCOMPATIBLE: The feature-vector is re-implemented by a privately implemented compact-hashtable.
 	      Thus, the element is not "sorted" but randomly inserted in the vector.
 INCOMPATIBLE: phrase extraction now explicitly enumerate all the corners for lexical reordering computation
