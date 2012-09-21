@@ -353,9 +353,13 @@ class Corpus:
 
 class Cluster:
 
-    def __init__(self, cicada=None, corpus="", name="", cluster=64, iteration=64, threads=8, debug=0):
+    def __init__(self, cicada=None, corpus="", name="", cluster=64, iteration=64, threads=8, mpi=None, pbs=None, debug=0):
         
         self.cicada  = cicada
+        
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
         
         command = cicada.cicada_cluster_word
         
@@ -374,11 +378,14 @@ class Cluster:
         self.cluster = name
     
     def run(self):
-        run_command(self.command)
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="cluster",
+                                             logfile=self.cluster+'.log')
 
 class Prepare:
     
-    def __init__(self, cicada=None, corpus=None, cluster=64, iteration=64, threads=8, debug=0):
+    def __init__(self, cicada=None, corpus=None, cluster=64, iteration=64, threads=8, mpi=None, pbs=None, debug=0):
         
         if not os.path.exists(corpus.corpus_dir):
             os.makedirs(corpus.corpus_dir)
@@ -390,6 +397,8 @@ class Prepare:
                               cluster=cluster,
                               iteration=iteration,
                               threads=threads,
+                              mpi=mpi,
+                              pbs=pbs,
                               debug=debug)
         
         self.target = Cluster(cicada=cicada,
@@ -398,6 +407,8 @@ class Prepare:
                               cluster=cluster,
                               iteration=iteration,
                               threads=threads,
+                              mpi=mpi,
+                              pbs=pbs,
                               debug=debug)
     
     def run(self):
@@ -428,8 +439,14 @@ class Giza:
                  l0_alpha=10,
                  l0_beta=0.5,
                  threads=8,
+                 mpi=None,
+                 pbs=None,
                  debug=0):
 
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
+        
         if not os.path.exists(dir_source_target):
             os.makedirs(dir_source_target)
         if not os.path.exists(dir_target_source):
@@ -515,7 +532,10 @@ class Giza:
         self.command = command
 
     def run(self):
-        run_command(self.command)
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="giza",
+                                             logfile="alignment-giza.log")
 
 class AlignmentHeuristic:
 
@@ -527,7 +547,13 @@ class AlignmentHeuristic:
                  alignment_dir="",
                  alignment="grow-diag-final-and",
                  threads=8,
+                 mpi=None,
+                 pbs=None,
                  debug=0):
+
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
 
         if not os.path.exists(alignment_dir):
             os.makedirs(alignment_dir)
@@ -579,7 +605,10 @@ class AlignmentHeuristic:
         self.command = command
 
     def run(self):
-        run_command(self.command)
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="align-heu",
+                                             logfile="alignment-heuristic.log")
 
 
 class AlignmentPosterior:
@@ -592,7 +621,13 @@ class AlignmentPosterior:
                  alignment_dir="",
                  alignment="grow-diag-final-and",
                  threads=8,
+                 mpi=None,
+                 pbs=None,
                  debug=0):
+
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
 
         if not os.path.exists(alignment_dir):
             os.makedirs(alignment_dir)
@@ -662,7 +697,10 @@ class AlignmentPosterior:
         self.command = command
 
     def run(self):
-        run_command(self.command)
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="align-post",
+                                             logfile="alignment-posterior.log")
 
 class Aligner:
 
@@ -739,7 +777,6 @@ class Aligner:
         fp.write("exec ")
         fp.write(self.command)
         fp.write(" \"$@\"")
-        #run_command(self.command)
 
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -785,6 +822,7 @@ if __name__ == '__main__':
                       cluster=options.cluster,
                       iteration=options.iteration_cluster,
                       threads=options.threads,
+                      pbs=pbs,
                       debug=options.debug)
     
     if options.first_step <= 1 and options.last_step >= 1:
@@ -813,6 +851,7 @@ if __name__ == '__main__':
                 l0_alpha=options.l0_alpha,
                 l0_beta=options.l0_beta,
                 threads=options.threads,
+                pbs=pbs,
                 debug=options.debug)
 
     ## run giza++ in two directions
@@ -842,6 +881,7 @@ if __name__ == '__main__':
                                        alignment_dir=options.alignment_dir,
                                        alignment=options.alignment,
                                        threads=options.threads,
+                                       pbs=pbs,
                                        debug=options.debug)
     else:
         alignment = AlignmentHeuristic(cicada=cicada,
@@ -851,6 +891,7 @@ if __name__ == '__main__':
                                        alignment_dir=options.alignment_dir,
                                        alignment=options.alignment,
                                        threads=options.threads,
+                                       pbs=pbs,
                                        debug=options.debug)
 
     if options.first_step <= 3 and options.last_step >= 3:
