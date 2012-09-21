@@ -43,9 +43,8 @@ $me [options] cicada-program args
   --hostfile, --host-file   MPI host file
   -q, --queue               PBS queue                (default: $queue)
   -n, --np                  # of processes to run    (default: $np)
-  --nc                      # of cores to run        (default: $nc)
+  -c,--nc                   # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
-  -m                        forced MPI execution
   --log, --logfile, -l      logfile
   --out, --outfile, -o      stdout file
   --threads,-t              threading option
@@ -76,7 +75,7 @@ while test $# -gt 0; do
     test $# = 1 && eval "$exit_missing_arg"
     np=$2
     shift; shift ;;
-  --nc )
+  --nc | -c )
     test $# = 1 && eval "$exit_missing_arg"
     nc=$2
     shift; shift ;;

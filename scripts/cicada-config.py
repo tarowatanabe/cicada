@@ -117,6 +117,9 @@ def non_terminal(x, index=0):
         return '[' + x[1:-1] + ',' + str(index) + ']'
 
 if __name__ == '__main__':
+    
+    opt_parser.disable_interspersed_args()
+    
     (options, args) = opt_parser.parse_args()
 
     ### grammars

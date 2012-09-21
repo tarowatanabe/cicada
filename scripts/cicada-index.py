@@ -225,7 +225,7 @@ class PBS:
             pipe.write("%s 2> %s\n" %(command, logfile))
         else:
             pipe.write("%s\n" %(command))
-
+            
         self.workers.append(QSUB(pipe.getvalue()))
         self.workers[-1].start();
 
@@ -244,8 +244,11 @@ class Threads:
         self.pipe.close()
         self.popen.wait()
 
-    def run(self, command=""):
-        self.pipe.write("%s\n" %(command))
+    def run(self, command="", logfile=None):
+        if logfile:
+            self.pipe.write("%s 2> %s\n" %(command, logfile))
+        else:
+            self.pipe.write("%s\n" %(command))
         self.pipe.flush()
 
 class MPI:
@@ -291,11 +294,11 @@ class MPI:
             command += ' --hostfile %s' %(self.hosts_file)
 
         if os.environ.has_key('TMPDIR_SPEC'):
-            mpirun += ' -x TMPDIR_SPEC'
+            command += ' -x TMPDIR_SPEC'
         if os.environ.has_key('LD_LIBRARY_PATH'):
-            mpirun += ' -x LD_LIBRARY_PATH'
+            command += ' -x LD_LIBRARY_PATH'
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
-            mpirun += ' -x DYLD_LIBRARY_PATH'
+            command += ' -x DYLD_LIBRARY_PATH'
         
         command += " %s" %(cicada.mpish)
         command += " --debug"
@@ -307,8 +310,11 @@ class MPI:
         self.pipe.close()
         self.popen.wait()
         
-    def run(self, command=""):
-        self.pipe.write("%s\n" %(command))
+    def run(self, command="", logfile=None):
+        if logfile:
+            self.pipe.write("%s 2> %s\n" %(command, logfile))
+        else:
+            self.pipe.write("%s\n" %(command))
         self.pipe.flush()
 
 
@@ -726,7 +732,7 @@ if __name__ == '__main__':
 
             fp.write(os.path.basename(score.output)+'\n')
 
-            mpi.run(command=index)
+            mpi.run(command=index, logfile=index.logfile)
     
     else:
         threads = Threads(cicada=cicada, threads=options.threads)
@@ -749,4 +755,4 @@ if __name__ == '__main__':
         
             fp.write(os.path.basename(score.output)+'\n')
 
-            threads.run(command=index)
+            threads.run(command=index, logfile=index.logfile)

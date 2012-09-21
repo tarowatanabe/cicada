@@ -3,7 +3,7 @@
 #  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 ### a wrapper script (similar to phrase-extract in moses)
-### we support only "extraction" meaning only step 5 and 6
+### we support "lexicon construction" and "phrase/rule extraction" meaning only step 4 through 6
 ### TODO: use argparse for command-lines...?
 
 import threading
@@ -59,7 +59,6 @@ opt_parser = OptionParser(
     # alignment method
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
                 help="alignment methods (default: grow-diag-final-and)"),
-    
     
     # steps
     make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: 4)"),
@@ -447,12 +446,15 @@ class Lexicon:
                  l0_alpha=10,
                  l0_beta=0.5,
                  inverse=None,
+                 max_malloc=4,
                  threads=4, mpi=None, pbs=None,
                  debug=None):
         self.threads = threads
         self.mpi = mpi
         self.pbs = pbs
         
+        self.max_malloc = max_malloc
+
         self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
         self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
         self.makedirs = lexical_dir
@@ -498,12 +500,13 @@ class Lexicon:
 
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
-        
-        if self.pbs:
-            self.pbs.run(command=self.command, threads=self.threads, name="lexicon", memory=8, logfile="lexicon.log")
-        else:
-            run_command(self.command)
 
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="lexicon",
+                                             memory=self.max_malloc,
+                                             logfile="extract-lexicon.log")
+        
         self.source_target = compressed_file(self.source_target)
         self.target_source = compressed_file(self.target_source)
 
@@ -532,16 +535,12 @@ class Extract:
         if not self.name:
             self.name = "extract"
 
+        qsub = QSub(mpi=self.mpi, pbs=self.pbs)
+
         if self.mpi:
-            if self.pbs:
-                self.pbs.run(command=self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
-            else:
-                self.mpi.run(self.command)
+            qsub.mpirun(self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
         else:
-            if self.pbs:
-                self.pbs.run(command=self.command, threads=self.threads, name="extract", memory=self.max_malloc, logfile=self.logfile)
-            else:
-                run_command(self.command)
+            qsub.run(self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
 
 class ExtractPhrase(Extract):
     
