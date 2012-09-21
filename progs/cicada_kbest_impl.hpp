@@ -79,6 +79,14 @@ struct hypothesis_type
   double           loss;
 };
 
+inline
+void swap(hypothesis_type& x, hypothesis_type& y)
+{
+  x.sentence.swap(y.sentence);
+  x.features.swap(y.features);
+  x.score.swap(y.score);
+  std::swap(x.loss, y.loss);
+}
 
 inline
 size_t hash_value(hypothesis_type const& x)
