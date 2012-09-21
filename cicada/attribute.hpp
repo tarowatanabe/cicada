@@ -38,6 +38,7 @@ namespace cicada
     typedef attribute_type::size_type              size_type;
     typedef attribute_type::difference_type        difference_type;
     
+    typedef attribute_type::value_type             value_type;
     typedef attribute_type::const_iterator         const_iterator;
     typedef attribute_type::const_reverse_iterator const_reverse_iterator;
     typedef attribute_type::const_reference        const_reference;

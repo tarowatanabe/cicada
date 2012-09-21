@@ -51,17 +51,21 @@
 typedef boost::filesystem::path path_type;
 
 typedef size_t size_type;
-typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
-typedef std::pair<std::string, double> feature_type;
-typedef std::vector<feature_type, std::allocator<feature_type> > features_type;
+typedef cicada::Symbol  word_type;
+typedef cicada::Feature feature_type;
+typedef std::pair<feature_type, double> feature_value_type;
+
+typedef std::vector<word_type, std::allocator<word_type> > tokens_type;
+typedef std::pair<feature_type, double> feature_value_type;
+typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
 typedef boost::fusion::tuple<size_type, tokens_type, features_type> kbest_type;
+
+typedef utils::unordered_set<feature_type, boost::hash<feature_type>, std::equal_to<feature_type>,
+			     std::allocator<feature_type> >::type feature_unique_type;
+typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
 
 struct hypothesis_type
 {
-  typedef cicada::Symbol  word_type;
-  typedef cicada::Feature feature_type;
-  typedef std::pair<feature_type, double> feature_value_type;
-  
   typedef utils::simple_vector<word_type, std::allocator<word_type> >                   sentence_type;
   typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
   
@@ -99,11 +103,14 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    word    %= qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))];
+    
+    tokens  %= *word;
     remains %= *qi::lexeme[+(standard::char_ - standard::space)];
     
-    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
-    features %= -(feature % (+standard::space));
+    feature_value %= feature >> '=' >> qi::double_;
+    features %= -(feature_value % (+standard::space));
     
     kbest %= size >> "|||" >> tokens >> "|||" >> features >> -("|||" >> remains) >> (qi::eol | qi::eoi);
   }
@@ -111,10 +118,13 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   typedef boost::spirit::standard::blank_type blank_type;
   
   boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
+  
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type> word;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
   
-  boost::spirit::qi::rule<Iterator, feature_type(), blank_type>  feature;
-  boost::spirit::qi::rule<Iterator, features_type(), blank_type> features;
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type>        feature;
+  boost::spirit::qi::rule<Iterator, feature_value_type(), blank_type> feature_value;
+  boost::spirit::qi::rule<Iterator, features_type(), blank_type>      features;
 
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
   
@@ -189,8 +199,7 @@ path_type output_file = "-";
 
 std::string filter;
 
-bool id_mode = false;
-bool features_mode = false;
+feature_list_type features_removes;
 
 // alternative mode...
 bool merge_mode = false;
@@ -207,6 +216,8 @@ int main(int argc, char** argv)
 
     if (int(merge_mode) + lattice_mode + (! filter.empty()) > 1)
       throw std::runtime_error("you can either --{merge, lattice} or --filter");
+    
+    feature_unique_type removes(features_removes.begin(), features_removes.end());
     
     if (merge_mode) {
       typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
@@ -227,6 +238,7 @@ int main(int argc, char** argv)
       kbest_type kbest;
 
       hypothesis_map_type hypotheses;
+      features_type features_removed;
       
       while (iter != iter_end) {
 	boost::fusion::get<1>(kbest).clear();
@@ -235,6 +247,17 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
+
+	if (! removes.empty()) {
+	  features_removed.clear();
+	    
+	  features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	  for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+	    if (removes.find(fiter->first) == removes.end())
+	      features_removed.push_back(*fiter);
+	  
+	  boost::fusion::get<2>(kbest).swap(features_removed);
+	}
 	
 	const size_t& id = boost::fusion::get<0>(kbest);
 	
@@ -257,7 +280,9 @@ int main(int argc, char** argv)
 	  if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os << " ||| ";
-	  if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hiter->features))
+	  if (! karma::generate(std::ostream_iterator<char>(os),
+				-((standard::string << '=' << double20) % ' '),
+				hiter->features))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os << '\n';
 	}
@@ -283,6 +308,7 @@ int main(int argc, char** argv)
       iter_type iter_end;
       
       kbest_type kbest;
+      features_type features_removed;
 
       size_t id = size_t(-1);
       hypothesis_set_type hypotheses;
@@ -294,6 +320,17 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
+	
+	if (! removes.empty()) {
+	  features_removed.clear();
+	  
+	  features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	  for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+	    if (removes.find(fiter->first) == removes.end())
+	      features_removed.push_back(*fiter);
+	  
+	  boost::fusion::get<2>(kbest).swap(features_removed);
+	}
 	
 	if (boost::fusion::get<0>(kbest) != id) {
 	  
@@ -363,6 +400,7 @@ int main(int argc, char** argv)
       iter_type iter_end;
       
       kbest_type kbest;
+      features_type features_removed;
       
       task_type::subprocess_type subprocess(filter);
       task_type::queue_type      queue;
@@ -385,9 +423,20 @@ int main(int argc, char** argv)
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  const tokens_type& tokens = boost::fusion::get<1>(kbest);
+	  if (! removes.empty()) {
+	    features_removed.clear();
+	    
+	    features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	    for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+	      if (removes.find(fiter->first) == removes.end())
+		features_removed.push_back(*fiter);
+	    
+	    boost::fusion::get<2>(kbest).swap(features_removed);
+	  }
 	  
-	  if (! karma::generate(std::ostream_iterator<char>(os_filter), -(standard::string % ' '), tokens))
+	  if (! karma::generate(std::ostream_iterator<char>(os_filter),
+				-(standard::string % ' '),
+				boost::fusion::get<1>(kbest)))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os_filter << '\n';
 	  
@@ -421,6 +470,7 @@ int main(int argc, char** argv)
       iter_type iter_end;
       
       kbest_type kbest;
+      features_type features_removed;
       
       while (iter != iter_end) {
 	boost::fusion::get<1>(kbest).clear();
@@ -430,13 +480,24 @@ int main(int argc, char** argv)
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
       
+	if (! removes.empty()) {
+	  features_removed.clear();
+	  
+	  features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	  for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+	    if (removes.find(fiter->first) == removes.end())
+	      features_removed.push_back(*fiter);
+	  
+	  boost::fusion::get<2>(kbest).swap(features_removed);
+	}
+	
 	os << boost::fusion::get<0>(kbest) << " ||| ";
-      
+	
 	if (! karma::generate(std::ostream_iterator<char>(os),
 			      -(standard::string % ' '),
 			      boost::fusion::get<1>(kbest)))
 	  throw std::runtime_error("tokens generation failed...?");
-	  
+	
 	os << " ||| ";
 	if (! karma::generate(std::ostream_iterator<char>(os),
 			      -((standard::string << '=' << double20) % ' '),
@@ -466,6 +527,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output")
     
     ("filter", po::value<std::string>(&filter), "filter for sentences")
+    ("feature-remove", po::value<feature_list_type>(&features_removes)->multitoken(), "remove featureso")
 
     ("merge",    po::bool_switch(&merge_mode),    "merge features")
     ("lattice",  po::bool_switch(&lattice_mode),  "output merged lattice")
