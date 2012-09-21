@@ -204,6 +204,7 @@ feature_list_type features_removes;
 // alternative mode...
 bool merge_mode = false;
 bool lattice_mode = false;
+bool directory_mode = false;
 
 int debug = 0;
 
@@ -218,6 +219,10 @@ int main(int argc, char** argv)
       throw std::runtime_error("you can either --{merge, lattice} or --filter");
     
     feature_unique_type removes(features_removes.begin(), features_removes.end());
+    
+    const bool directory_input_mode = (boost::filesystem::exists(input_file)
+				       && boost::filesystem::is_directory(input_file));
+    const bool directory_output_mode = directory_mode;
     
     if (merge_mode) {
       typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
@@ -529,8 +534,9 @@ void options(int argc, char** argv)
     ("filter", po::value<std::string>(&filter), "filter for sentences")
     ("feature-remove", po::value<feature_list_type>(&features_removes)->multitoken(), "remove featureso")
 
-    ("merge",    po::bool_switch(&merge_mode),    "merge features")
-    ("lattice",  po::bool_switch(&lattice_mode),  "output merged lattice")
+    ("merge",     po::bool_switch(&merge_mode),     "merge features")
+    ("lattice",   po::bool_switch(&lattice_mode),   "output merged lattice")
+    ("directory", po::bool_switch(&directory_mode), "output in directory")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
