@@ -531,11 +531,11 @@ class Giza:
         
         self.command = command
 
-    def run(self):
+    def run(self, logfile):
         QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
                                              threads=self.threads,
                                              name="giza",
-                                             logfile="alignment-giza.log")
+                                             logfile=logfile)
 
 class AlignmentHeuristic:
 
@@ -608,7 +608,7 @@ class AlignmentHeuristic:
         QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
                                              threads=self.threads,
                                              name="align-heu",
-                                             logfile="alignment-heuristic.log")
+                                             logfile=self.alignment+'.log')
 
 
 class AlignmentPosterior:
@@ -700,7 +700,7 @@ class AlignmentPosterior:
         QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
                                              threads=self.threads,
                                              name="align-post",
-                                             logfile="alignment-posterior.log")
+                                             logfile=self.alignment+'.log')
 
 class Aligner:
 
@@ -869,7 +869,7 @@ if __name__ == '__main__':
         os.chmod(aligner_path, os.stat(aligner_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         
         print "(2) running giza started  @", time.ctime()
-        giza.run()
+        giza.run(os.path.join(options.alignment_dir, 'giza.log'))
         print "(2) running giza finished @", time.ctime()
     
     alignment=None
