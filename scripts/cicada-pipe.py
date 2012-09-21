@@ -72,7 +72,7 @@ def run_command(command):
         if retcode:
             sys.exit(retcode)
     except:
-        raise ValueError, "subprocess.call failed: %s" %(comman)
+        raise ValueError, "subprocess.call failed: %s" %(command)
 
 def compressed_file(file):
     if not file:
