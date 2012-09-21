@@ -501,11 +501,13 @@ class Lexicon:
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
 
+        logfile = os.path.join(self.makedirs, "extract-lexicon.log")
+
         QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
                                              threads=self.threads,
                                              name="lexicon",
                                              memory=self.max_malloc,
-                                             logfile=os.path.join(self.makedirs, "lexicon.log"))
+                                             logfile=logfile)
         
         self.source_target = compressed_file(self.source_target)
         self.target_source = compressed_file(self.target_source)
