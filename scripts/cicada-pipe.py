@@ -177,12 +177,12 @@ class PBS:
         if mpi:
             prefix = mpi.mpirun
 
-            #if os.environ.has_key('TMPDIR_SPEC'):
-            #    prefix += ' -x TMPDIR_SPEC'
-            #if os.environ.has_key('LD_LIBRARY_PATH'):
-            #    prefix += ' -x LD_LIBRARY_PATH'
-            #if os.environ.has_key('DYLD_LIBRARY_PATH'):
-            #    prefix += ' -x DYLD_LIBRARY_PATH'
+            if os.environ.has_key('TMPDIR_SPEC'):
+                prefix += ' -x TMPDIR_SPEC'
+            if os.environ.has_key('LD_LIBRARY_PATH'):
+                prefix += ' -x LD_LIBRARY_PATH'
+            if os.environ.has_key('DYLD_LIBRARY_PATH'):
+                prefix += ' -x DYLD_LIBRARY_PATH'
             prefix += ' '
         
         suffix = ''
