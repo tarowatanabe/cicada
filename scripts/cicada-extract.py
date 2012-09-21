@@ -505,7 +505,7 @@ class Lexicon:
                                              threads=self.threads,
                                              name="lexicon",
                                              memory=self.max_malloc,
-                                             logfile="extract-lexicon.log")
+                                             logfile=os.path.join(self.makedirs, "lexicon.log"))
         
         self.source_target = compressed_file(self.source_target)
         self.target_source = compressed_file(self.target_source)
@@ -535,12 +535,14 @@ class Extract:
         if not self.name:
             self.name = "extract"
 
+        logfile = os.path.join(self.makedirs, self.logfile)
+
         qsub = QSub(mpi=self.mpi, pbs=self.pbs)
 
         if self.mpi:
-            qsub.mpirun(self.command, name=self.name, memory=self.max_malloc, logfile=self.logfile)
+            qsub.mpirun(self.command, name=self.name, memory=self.max_malloc, logfile=logfile)
         else:
-            qsub.run(self.command, name=self.name, memory=self.max_malloc, logfile=self.logfile)
+            qsub.run(self.command, name=self.name, memory=self.max_malloc, logfile=logfile)
 
 class ExtractPhrase(Extract):
     
