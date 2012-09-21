@@ -538,9 +538,9 @@ class Extract:
         qsub = QSub(mpi=self.mpi, pbs=self.pbs)
 
         if self.mpi:
-            qsub.mpirun(self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
+            qsub.mpirun(self.command, name=self.name, memory=self.max_malloc, logfile=self.logfile)
         else:
-            qsub.run(self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
+            qsub.run(self.command, name=self.name, memory=self.max_malloc, logfile=self.logfile)
 
 class ExtractPhrase(Extract):
     
