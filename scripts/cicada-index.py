@@ -380,6 +380,7 @@ class IndexPhrase:
         self.counts = os.path.join(model_dir, "phrase-counts")
         self.scores = os.path.join(model_dir, "phrase-score")
         self.index  = os.path.join(model_dir, "phrase-index")
+        self.base   = model_dir
         
 class IndexSCFG:
     def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
@@ -392,6 +393,7 @@ class IndexSCFG:
         self.counts = os.path.join(model_dir, "scfg-counts")
         self.scores = os.path.join(model_dir, "scfg-score")
         self.index  = os.path.join(model_dir, "scfg-index")
+        self.base   = model_dir
 
 class IndexGHKM:
     def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
@@ -404,7 +406,7 @@ class IndexGHKM:
         self.counts = os.path.join(model_dir, "ghkm-counts")
         self.scores = os.path.join(model_dir, "ghkm-score")
         self.index  = os.path.join(model_dir, "ghkm-index")
-
+        self.base   = model_dir
 
 class IndexTree:
     def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
@@ -417,6 +419,7 @@ class IndexTree:
         self.counts = os.path.join(model_dir, "tree-counts")
         self.scores = os.path.join(model_dir, "tree-score")
         self.index  = os.path.join(model_dir, "tree-index")
+        self.base   = model_dir
 
 ## additional features...
 class Features:
@@ -513,7 +516,7 @@ class Index(UserString.UserString):
             raise ValueError, "no root target? %s" %(root_target)
         
         self.name    = "index-" + indexer.name
-        self.logfile = "index-" + indexer.name + "." + name + ".log"
+        self.logfile = os.path.join(indexer.base, "index-" + indexer.name + "." + name + ".log")
         
         command = ""
 
@@ -721,6 +724,7 @@ if __name__ == '__main__':
                           feats=features,
                           input=score.input,
                           output=score.output,
+                          name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
                           root_target=scores.root_target,
@@ -744,6 +748,7 @@ if __name__ == '__main__':
                           feats=features,
                           input=score.input,
                           output=score.output,
+                          name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
                           root_target=scores.root_target,
