@@ -235,7 +235,6 @@ class Threads:
         
         command = "%s" %(cicada.thrsh)
         command += " --threads %d" %(threads)
-        command += " --debug"
         
         self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
@@ -301,7 +300,6 @@ class MPI:
             command += ' -x DYLD_LIBRARY_PATH'
         
         command += " %s" %(cicada.mpish)
-        command += " --debug"
         
         self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
@@ -707,6 +705,8 @@ if __name__ == '__main__':
                           attributes=options.attribute)
             
             fp.write(os.path.basename(score.output)+'\n')
+
+            print str(index), '2> %s'%(index.logfile)
             
             pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
     
@@ -736,6 +736,8 @@ if __name__ == '__main__':
 
             fp.write(os.path.basename(score.output)+'\n')
 
+            print str(index), '2> %s'%(index.logfile)
+
             mpi.run(command=index, logfile=index.logfile)
     
     else:
@@ -759,5 +761,7 @@ if __name__ == '__main__':
                           attributes=options.attribute)
         
             fp.write(os.path.basename(score.output)+'\n')
+
+            print str(index), '2> %s'%(index.logfile)
 
             threads.run(command=index, logfile=index.logfile)

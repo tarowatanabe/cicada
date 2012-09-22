@@ -1,0 +1,9 @@
+* Error when launching MPI applications
+
+	This is usually caused by whether remote nodes are "reachable"
+	without typing "password." In your everyday life, if you ssh to
+	a node, and always required password, this may be a "big" trouble 
+	for MPI applications. See http://www.open-mpi.org/faq/?category=rsh
+	for how to set up your ssh. Also, http://www.funtoo.org/wiki/Keychain
+	good starting point to set up ssh with the "keychain" utility
+	under Linux.
