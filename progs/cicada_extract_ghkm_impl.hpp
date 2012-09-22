@@ -703,21 +703,24 @@ struct ExtractGHKM
 
 	//std::cerr << rule_pair.source << " ||| " << rule_pair.target << std::endl;
 	
+	// no equality check since, derivation_edges_new are used for "composition"
+	// thus, if internal == max_nodes, this cannnot be composed with others!
+	// similarly, if compose == max_compose, this cannot be composed with others!
 	if ((max_height <= 0 || edge_composed.height <= max_height)
 	    && (max_nodes <= 0 || edge_composed.internal < max_nodes)
 	    && (max_compose <= 0 || edge_composed.compose < max_compose))
 	  derivation_edges_new.push_back(edge_composed);
 	
 	// push-successor...
-
+	
 	const derivation_edge_type& edge = *(item->edge);
 	
 	candidate_type query(item->j);
 	index_set_type& j = query.j;
 	query.edge = item->edge;
-
+	
 	//std::cerr << "edge: " << edge.tails.size() << std::endl;
-	  
+	
 	for (size_t i = 0; i != j.size(); ++ i) 
 	  if (! derivations[edge.tails[i]].edges.empty()) {
 	    ++ j[i];

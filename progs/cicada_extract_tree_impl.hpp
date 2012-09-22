@@ -567,6 +567,9 @@ struct ExtractTree
 	  if (item->edge_composed.compose == 1 || ((max_height <= 0 || edge_composed.height <= max_height) && (max_nodes <= 0 || edge_composed.internal <= max_nodes))) {
 	    derivations_new[id].edges.push_back(edge_composed);
 	    
+	    // no equality check since, derivation_edges_new are used for "composition"
+	    // thus, if internal == max_nodes, this cannnot be composed with others!
+	    // similarly, if compose == max_compose, this cannot be composed with others!
 	    if ((max_height <= 0 || edge_composed.height <= max_height)
 		&& (max_nodes <= 0 || edge_composed.internal < max_nodes)
 		&& (max_compose <= 0 || edge_composed.compose < max_compose))
