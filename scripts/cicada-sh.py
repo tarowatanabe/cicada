@@ -111,7 +111,7 @@ class Option:
 
 class Program:
     def __init__(self, *args):
-        self.args = args[:]
+        self.args = list(args[:])
 
     def __str__(self,):
         return ' '.join(map(str, self.args))
