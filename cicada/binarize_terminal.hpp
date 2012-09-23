@@ -139,7 +139,6 @@ namespace cicada
     }
     
   private:
-    
     node_chart_type   node_chart;
     label_chart_type  label_chart;
     
