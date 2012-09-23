@@ -227,8 +227,6 @@ struct ScorerCICADA
   sentence_type      target;
   alignment_set_type alignments;
   
-  
-  
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_joint,
 		  const root_count_set_type& root_count_source,
@@ -304,75 +302,8 @@ struct ScorerCICADA
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
     }
-
     
-    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
-      extract_phrase(phrase_pair.source, source);
-      extract_phrase(phrase_pair.target, target);
-    }
-    
-    if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
-      extract_alignment(phrase_pair.alignments, alignments);
-
-    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
-      if (feature_lexicon_mode) {
-	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (feature_model1_mode) {
-	const std::pair<double, double> scores = lexicon.model1(source, target);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (feature_noisy_or_mode) {
-	const std::pair<double, double> scores = lexicon.noisy_or(source, target);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-      
-      if (feature_insertion_deletion_mode) {
-	const std::pair<double, double> scores = lexicon.insertion_deletion(source, target, threshold_insertion, threshold_deletion);
-	
-	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
-	  throw std::runtime_error("failed generation");
-      }
-    }
-    
-    if (feature_unaligned_mode) {
-      const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
-
-      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, scores.first, scores.second))
-	throw std::runtime_error("failed generation");
-    }
-
-    if (feature_type_mode) {
-      const double logprob_type_source_target = - std::log(phrase_pair.observed_source);
-      const double logprob_type_target_source = - std::log(phrase_pair.observed_target);
-      
-      if (! karma::generate(iter, ' ' << double10 << ' ' << double10, logprob_type_source_target, logprob_type_target_source))
-	throw std::runtime_error("failed generation");
-    }
-
-    if (feature_singleton_mode) {
-      const int singleton_source = phrase_pair.observed_source == 1;
-      const int singleton_target = phrase_pair.observed_target == 1;
-      const int singleton        = singleton_source && singleton_target;
-      
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_ << ' ' << karma::int_,
-			    singleton, singleton_source, singleton_target))
-	throw std::runtime_error("failed generation");
-    }
-
-    if (feature_cross_mode)
-      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, cross(source, target), cross(source, target, alignments)))
-	throw std::runtime_error("failed generation");
-    
+    operator()(phrase_pair, lexicon, os);
 
     os << '\n';
   }
@@ -446,8 +377,21 @@ struct ScorerCICADA
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
     }
-
     
+    operator()(phrase_pair, lexicon, os);
+    
+    os << '\n';
+  }
+
+  void operator()(const phrase_pair_type& phrase_pair,
+		  const Lexicon& lexicon,
+		  std::ostream& os)
+  {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
+    std::ostream_iterator<char> iter(os);
+
     if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
@@ -489,7 +433,7 @@ struct ScorerCICADA
     if (feature_unaligned_mode) {
       const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
 
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, scores.first, scores.second))
+      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, scores.first, scores.second))
 	throw std::runtime_error("failed generation");
     }
 
@@ -512,11 +456,8 @@ struct ScorerCICADA
     }
 
     if (feature_cross_mode)
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, cross(source, target), cross(source, target, alignments)))
+      if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, cross(source, target), cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
-    
-
-    os << '\n';
   }
 
 };
