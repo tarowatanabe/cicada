@@ -109,6 +109,9 @@ namespace cicada
 	      
 	      terminal = *riter;
 	    }
+
+	  //if (terminal == symbol_type())
+	  //  throw std::runtime_error("invalid dependency structure");
 	  
 	  // check if we need to binarize...
 	  if (tails_left.size() <= 1 && tails_right.size() <= 1) continue;
