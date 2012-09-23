@@ -28,6 +28,9 @@ namespace cicada
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
 
+    typedef std::vector<tails_type, std::allocator<tails_type> > tails_map_type;
+    typedef std::vector<rhs_type, std::allocator<rhs_type> > rhs_map_type;
+
     typedef rule_type::symbol_set_type                 symbol_set_type;
     typedef hypergraph_type::edge_type::node_set_type  tail_set_type;
 
@@ -45,8 +48,7 @@ namespace cicada
     typedef utils::unordered_map<binarized_type, hypergraph_type::id_type, binarized_hash, std::equal_to<binarized_type>,
 				 std::allocator<std::pair<const binarized_type, hypergraph_type::id_type> > >::type binarized_map_type;
 
-    binarized_map_type binarized_left;
-    binarized_map_type binarized_right;
+    binarized_map_type binarized;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -55,19 +57,15 @@ namespace cicada
       
       if (! source.is_valid()) return;
       
-      symbol_type terminal;
-      rhs_type    rhs_left;
-      rhs_type    rhs_right;
-      tails_type  tails_left;
-      tails_type  tails_right;
-
+      rhs_map_type   rhs;
+      tails_map_type tails;
+      
       rhs_type   rhs_new;
       tails_type tails_new;
       
       removed_type removed(source.edges.size(), false);
-
-      binarized_left.clear();
-      binarized_right.clear();
+      
+      binarized.clear();
       
       hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -79,68 +77,73 @@ namespace cicada
 	  
 	  if (edge_source.tails.size() <= 1) continue;
 	  
-	  terminal = symbol_type();
-	  rhs_left.clear();
-	  rhs_right.clear();
-	  tails_left.clear();
-	  tails_right.clear();
+	  rhs.clear();
+	  tails.clear();
 	  
-	  int non_terminal_pos = 0;
-	  
-	  rule_type::symbol_set_type::const_iterator riter_end = edge_source.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator riter = edge_source.rule->rhs.begin(); riter != riter_end; ++ riter)
-	    if (riter->is_non_terminal()) {
-	      const int __non_terminal_index = riter->non_terminal_index();
-	      const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0,
-								    non_terminal_pos,
-								    __non_terminal_index - 1);
-	      ++ non_terminal_pos;
-	      
-	      if (terminal == symbol_type()) {
-		rhs_left.push_back(riter->non_terminal());
-		tails_left.push_back(edge_source.tails[non_terminal_index]);
+	  {
+	    enum {
+	      NONE = 0,
+	      TERMINAL = 1,
+	      NON_TERMINAL = 2,
+	    };
+	    
+	    int mode = NONE;
+	    int non_terminal_pos = 0;
+	    
+	    rule_type::symbol_set_type::const_iterator riter_end = edge_source.rule->rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator riter = edge_source.rule->rhs.begin(); riter != riter_end; ++ riter)
+	      if (riter->is_non_terminal()) {
+		const int __non_terminal_index = riter->non_terminal_index();
+		const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0,
+								      non_terminal_pos,
+								      __non_terminal_index - 1);
+		++ non_terminal_pos;
+		
+		if (mode == NONE || mode == TERMINAL) {
+		  rhs.push_back(rhs_type());
+		  tails.push_back(tails_type());
+		}
+		mode = NON_TERMINAL;
+		
+		rhs.back().push_back(riter->non_terminal());
+		tails.back().push_back(edge_source.tails[non_terminal_index]);
 	      } else {
-		rhs_right.push_back(riter->non_terminal());
-		tails_right.push_back(edge_source.tails[non_terminal_index]);
+		if (mode == NONE || mode == NON_TERMINAL) {
+		  rhs.push_back(rhs_type());
+		  tails.push_back(tails_type());
+		}
+		mode = TERMINAL;
+		
+		rhs.back().push_back(*riter);
 	      }
-	    } else {
-	      if (terminal != symbol_type())
-		throw std::runtime_error("invalid dependency structure");
-	      
-	      terminal = *riter;
-	    }
-
-	  //if (terminal == symbol_type())
-	  //  throw std::runtime_error("invalid dependency structure");
+	  }
 	  
-	  // check if we need to binarize...
-	  if (tails_left.size() <= 1 && tails_right.size() <= 1) continue;
-
 	  const symbol_type& lhs = edge_source.rule->lhs;
 	  
 	  rhs_new.clear();
 	  tails_new.clear();
 	  
-	  if (! tails_left.empty()) {
-	    if (tails_left.size() == 1) {
-	      rhs_new.push_back(rhs_left.front());
-	      tails_new.push_back(tails_left.front());
+	  tails_map_type::const_iterator titer = tails.begin();
+	  rhs_map_type::const_iterator riter_begin = rhs.begin();
+	  rhs_map_type::const_iterator riter_end   = rhs.end();
+	  for (rhs_map_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter, ++ titer) {
+	    if (titer->empty())
+	      rhs_new.insert(rhs_new.end(), riter->begin(), riter->end());
+	    else if (titer->size() == 1) {
+	      rhs_new.push_back(riter->front());
+	      tails_new.push_back(titer->front());
 	    } else {
-	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize_left(lhs, rhs_left, tails_left, target);
+	      symbol_type lhs_new;
+	      if (rhs.size() == 1)
+		lhs_new = '[' + lhs.non_terminal_strip() + "^]"; // no terminals
+	      else if (riter == riter_begin)
+		lhs_new = '[' + lhs.non_terminal_strip() + "^L]"; // left
+	      else if (riter + 1 == riter_end)
+		lhs_new = '[' + lhs.non_terminal_strip() + "^R]"; // right
+	      else
+		lhs_new = '[' + lhs.non_terminal_strip() + "^M]"; // middle
 	      
-	      rhs_new.push_back(result.first);
-	      tails_new.push_back(result.second);
-	    }
-	  }
-	  
-	  rhs_new.push_back(terminal);
-	  
-	  if (! tails_right.empty()) {
-	    if (tails_right.size() == 1) {
-	      rhs_new.push_back(rhs_right.front());
-	      tails_new.push_back(tails_right.front());
-	    } else {
-	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize_right(lhs, rhs_right, tails_right, target);
+	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(lhs_new, *riter, *titer, target);
 	      
 	      rhs_new.push_back(result.first);
 	      tails_new.push_back(result.second);
@@ -168,84 +171,70 @@ namespace cicada
       target.swap(graph_removed);
     }
 
-  private:    
-    std::pair<symbol_type, hypergraph_type::id_type> binarize_left(const symbol_type& lhs,
-								   const rhs_type& rhs,
-								   const tails_type& tails,
-								   hypergraph_type& target)
+  private:
+    node_chart_type   node_chart;
+    label_chart_type  label_chart;
+    
+    std::pair<symbol_type, hypergraph_type::id_type> binarize(const symbol_type& lhs,
+							      const rhs_type& rhs,
+							      const tails_type& tails,
+							      hypergraph_type& target)
     {
-      // proceed in a left-to-right order, and construct...
-      const symbol_type lhs_left = "[" + lhs.non_terminal_strip() + "^L]";
+      typedef size_t size_type;
       
-      symbol_set_type rhs_binarized(2, rhs.front());
-      tail_set_type   tails_binarized(2, tails.front());
+      const size_type child_size = rhs.size();
+
+      label_chart.clear();
+      label_chart.resize(child_size + 1, lhs);
       
-      rhs_type::const_iterator riter_end = rhs.end();
-      tails_type::const_iterator titer = tails.begin() + 1;
-      for (rhs_type::const_iterator riter = rhs.begin() + 1; riter != riter_end; ++ riter, ++ titer) {
-	rhs_binarized.back() = *riter;
-	tails_binarized.back() = *titer;
-	
-	std::pair<binarized_map_type::iterator, bool> result = binarized_left.insert(std::make_pair(binarized_type(lhs_left,
-														   tails_binarized),
-												  0));
-	if (result.second) {
-	  const hypergraph_type::id_type node_id = target.add_node().id;
-	  
-	  hypergraph_type::edge_type& edge_new = target.add_edge(tails_binarized.begin(), tails_binarized.end());
-	  
-	  edge_new.rule = rule_type::create(rule_type(lhs_left, rhs_binarized.begin(), rhs_binarized.end()));
-	  
-	  target.connect_edge(edge_new.id, node_id);
-	  
-	  result.first->second = edge_new.id;
-	}
-	
-	rhs_binarized.front() = lhs_left;
-	tails_binarized.front() = target.edges[result.first->second].head;
+      node_chart.clear();
+      node_chart.resize(child_size + 1, hypergraph_type::invalid);
+      
+      for (size_type i = 0; i != child_size; ++ i) {
+	label_chart(i, i + 1) = rhs[i];
+	node_chart(i, i + 1)  = tails[i];
       }
       
-      return std::make_pair(rhs_binarized.front(), tails_binarized.front());
+      symbol_set_type rhs_binarized(2);
+      tail_set_type   tails_binarized(2);
+  
+      for (size_type length = 2; length <= child_size; ++ length)
+	for (size_type first = 0; first + length <= child_size; ++ first) {
+	  const size_type last = first + length;
+	  
+	  hypergraph_type::id_type& head = node_chart(first, last);
+	  
+	  for (size_t middle = first + 1; middle != last; ++ middle) {
+	    // [first, middle) and [middle, last)
+	    
+	    rhs_binarized.front() = label_chart(first, middle);
+	    rhs_binarized.back()  = label_chart(middle, last);
+	    
+	    tails_binarized.front() = node_chart(first, middle);
+	    tails_binarized.back()  = node_chart(middle, last);
+	    
+	    std::pair<binarized_map_type::iterator, bool> result = binarized.insert(std::make_pair(binarized_type(lhs,
+														  tails_binarized),
+												   0));
+	    if (result.second) {
+	      if (head == hypergraph_type::invalid)
+		head = target.add_node().id;
+	      
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails_binarized.begin(), tails_binarized.end());
+	      
+	      edge_new.rule = rule_type::create(rule_type(lhs, rhs_binarized.begin(), rhs_binarized.end()));
+	      
+	      target.connect_edge(edge_new.id, head);
+	      
+	      result.first->second = edge_new.id;
+	    } else
+	      head = target.edges[result.first->second].head;
+	  }
+	}
+      
+      return std::make_pair(label_chart(0, child_size), node_chart(0, child_size));
     }
     
-    std::pair<symbol_type, hypergraph_type::id_type> binarize_right(const symbol_type& lhs,
-								    const rhs_type& rhs,
-								    const tails_type& tails,
-								    hypergraph_type& target)
-    {
-      const symbol_type lhs_right = "[" + lhs.non_terminal_strip() + "^R]";
-      
-      symbol_set_type rhs_binarized(2, rhs.back());
-      tail_set_type   tails_binarized(2, tails.back());
-      
-      rhs_type::const_reverse_iterator riter_end = rhs.rend();
-      tails_type::const_reverse_iterator titer = tails.rbegin() + 1;
-      for (rhs_type::const_reverse_iterator riter = rhs.rbegin() + 1; riter != riter_end; ++ riter, ++ titer) {
-	rhs_binarized.front() = *riter;
-	tails_binarized.front() = *titer;
-	
-	std::pair<binarized_map_type::iterator, bool> result = binarized_right.insert(std::make_pair(binarized_type(lhs_right,
-														    tails_binarized),
-												   0));
-	
-	if (result.second) {
-	  const hypergraph_type::id_type node_id = target.add_node().id;
-	  
-	  hypergraph_type::edge_type& edge_new = target.add_edge(tails_binarized.begin(), tails_binarized.end());
-	  
-	  edge_new.rule = rule_type::create(rule_type(lhs_right, rhs_binarized.begin(), rhs_binarized.end()));
-	  
-	  target.connect_edge(edge_new.id, node_id);
-	  
-	  result.first->second = edge_new.id;
-	}
-	
-	rhs_binarized.back() = lhs_right;
-	tails_binarized.back() = target.edges[result.first->second].head;
-      }
-      
-      return std::make_pair(rhs_binarized.back(), tails_binarized.back());
-    }
   };
 
   inline

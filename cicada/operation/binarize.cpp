@@ -19,7 +19,7 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : order(-1), left(false), right(false), all(false), terminal(false), cyk(false), dependency(false), dependency_all(false),
+      : order(-1), left(false), right(false), all(false), terminal(false), cyk(false), dependency(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -46,22 +46,20 @@ namespace cicada
 	    cyk = true;
 	  else if (dir == "dep" || dir == "dependency")
 	    dependency = true;
-	  else if (dir == "dep-all" || dir == "dependency-all")
-	    dependency_all = true;
 	  else
 	    throw std::runtime_error("unuspported direction: " + parameter);
 	} else
 	  std::cerr << "WARNING: unsupported parameter for binarize: " << piter->first << "=" << piter->second << std::endl;
       }
 
-      if (int(left) + right + all + terminal + cyk + dependency + dependency_all == 0)
+      if (int(left) + right + all + terminal + cyk + dependency == 0)
 	throw std::runtime_error("what direction? left, right, all, terminal, cyk,  dependency, or dependency-all?");
       
-      if (int(left) + right + all + terminal + cyk + dependency + dependency_all > 1)
+      if (int(left) + right + all + terminal + cyk + dependency > 1)
 	throw std::runtime_error("we do not binarization in many directions!");
 
       name = (std::string("binarize-")
-	      + (left ? "left" : (right ? "right" : (all ? "all" : (terminal ? "terminal" : (cyk ? "cyk" : (dependency ? "dependency" : "dependency-all")))))));
+	      + (left ? "left" : (right ? "right" : (all ? "all" : (terminal ? "terminal" : (cyk ? "cyk" : "dependency"))))));
     }
 
     void Binarize::operator()(data_type& data) const
@@ -87,8 +85,6 @@ namespace cicada
 	cicada::binarize_cyk(data.hypergraph, binarized, order);
       else if (dependency)
 	cicada::binarize_dependency(data.hypergraph, binarized);
-      else if (dependency_all)
-	cicada::binarize_dependency_all(data.hypergraph, binarized);
       else
 	throw std::runtime_error("unsupported direction!");
     
