@@ -295,6 +295,11 @@ class QSub:
         self.pbs = pbs
         
     def run(self, command, name="name", memory=0.0, threads=1, logfile=None):
+        if logfile:
+            print str(command), '2> %s' %(logfile)
+        else:
+            print str(command)
+
         if self.pbs:
             self.pbs.run(str(command), name=name, memory=memory, threads=threads, logfile=logfile)
         else:
@@ -306,6 +311,11 @@ class QSub:
     def mpirun(self, command, name="name", memory=0.0, threads=1, logfile=None):
         if not self.mpi:
             raise ValueError, "no mpi?"
+
+        if logfile:
+            print str(command), '2> %s' %(logfile)
+        else:
+            print str(command)
 
         if self.pbs:
             self.pbs.run(str(command), name=name, memory=memory, mpi=self.mpi, logfile=logfile)
