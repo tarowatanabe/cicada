@@ -29,6 +29,7 @@ namespace cicada
       bool all;
       bool terminal;
       bool cyk;
+      bool dependency;
   
       int debug;
     };

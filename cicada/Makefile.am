@@ -327,6 +327,7 @@ binarize.hpp \
 binarize_all.hpp \
 binarize_base.hpp \
 binarize_cyk.hpp \
+binarize_dependency.hpp \
 binarize_left.hpp \
 binarize_right.hpp \
 binarize_terminal.hpp \

@@ -7,10 +7,12 @@
 #define __CICADA__BINARIZE__HPP__ 1
 
 #include <cicada/binarize_base.hpp>
+
+#include <cicada/binarize_all.hpp>
 #include <cicada/binarize_cyk.hpp>
+#include <cicada/binarize_dependency.hpp>
 #include <cicada/binarize_left.hpp>
 #include <cicada/binarize_right.hpp>
-#include <cicada/binarize_all.hpp>
 #include <cicada/binarize_terminal.hpp>
 
 #endif

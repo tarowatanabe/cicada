@@ -72,7 +72,7 @@ apply: feature application\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\
 binarize: perform binarization (monolingual tree)\n\
-\tdirection=[left|right|all|terminal|cyk|cky] binarization direction\n\
+\tdirection=[left|right|all|terminal|cyk|cky|dep|dependency] binarization direction\n\
 \torder=binarization order (default: -1 == all context)\n\
 clear: clear data structure\n\
 \tforest=[true|false] clear forest\n\
