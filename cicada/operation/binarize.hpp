@@ -27,7 +27,6 @@ namespace cicada
       bool left;
       bool right;
       bool all;
-      bool terminal;
       bool cyk;
       bool dependency;
   

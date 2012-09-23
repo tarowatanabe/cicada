@@ -13,6 +13,5 @@
 #include <cicada/binarize_dependency.hpp>
 #include <cicada/binarize_left.hpp>
 #include <cicada/binarize_right.hpp>
-#include <cicada/binarize_terminal.hpp>
 
 #endif

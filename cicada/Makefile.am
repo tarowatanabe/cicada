@@ -330,7 +330,6 @@ binarize_cyk.hpp \
 binarize_dependency.hpp \
 binarize_left.hpp \
 binarize_right.hpp \
-binarize_terminal.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
 compose.hpp \
