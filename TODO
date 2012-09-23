@@ -166,3 +166,5 @@ openmpi and fork() with unmanagable file descriptors etc. The bug is clearly exh
 the difference of the # of lines read and the actual read from stdin!
 
 cicada_filter_kbest to support {file,directory}-to-{file,directory}
+
+terminal binarization with all-direction?
