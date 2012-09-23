@@ -227,8 +227,12 @@ namespace cicada
 	      target.connect_edge(edge_new.id, head);
 	      
 	      result.first->second = edge_new.id;
-	    } else
-	      head = target.edges[result.first->second].head;
+	    } else {
+	      if (head == hypergraph_type::invalid)
+		head = target.edges[result.first->second].head;
+	      else if (head != target.edges[result.first->second].head)
+		throw std::runtime_error("invalid binarized edge");
+	    }
 	  }
 	}
       

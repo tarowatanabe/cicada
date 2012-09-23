@@ -42,7 +42,6 @@ struct node_type
   int pos;
   int head;
   
-  symbol_type cat;
   terminal_set_type terminals;
 };
 typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
@@ -61,6 +60,13 @@ struct equal_pos
 
 typedef std::vector<int, std::allocator<int> > dependency_type;
 typedef std::vector<int, std::allocator<int> > offset_set_type;
+
+typedef std::vector<int, std::allocator<int> > index_set_type;
+typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_map_type;
+
+typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
+typedef sentence_type phrase_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -83,11 +89,17 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file);
 
-    node_set_type   nodes;
-    dependency_type dependency;
-    offset_set_type offsets;
- 
-    hypergraph_type graph;
+    node_set_type     nodes;
+    dependency_type   dependency;
+    offset_set_type   offsets;
+    terminal_set_type terminals;
+
+    hypergraph_type     hypergraph;
+    dependency_map_type dependency_map;
+    node_map_type       node_map;
+    tail_set_type       tails;
+    phrase_type         non_terminals;
+    phrase_type         phrase;
     
     std::string line;
     tokens_type tokens;
@@ -115,7 +127,6 @@ int main(int argc, char** argv)
 	if (tokens.front() != "EOS")
 	  throw std::runtime_error("invalid cabocha F1 format: no EOS: " + utils::lexical_cast<std::string>(lineno));
 	
-	
 	if (leaf_mode) {
 	  bool initial = true;
 	  node_set_type::const_iterator niter_end = nodes.end();
@@ -135,10 +146,11 @@ int main(int argc, char** argv)
 	    }
 	  }
 	  os << '\n';
-	} else if (dependency_mode) {
+	} else {
 	  // we will convert bunsetsu dependency into word-dependency...
 	  dependency.clear();
 	  offsets.clear();
+	  terminals.clear();
 	  
 	  node_set_type::const_iterator niter_end = nodes.end();
 	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
@@ -153,6 +165,8 @@ int main(int argc, char** argv)
 	      } else 
 		dependency.push_back(head_pos + 1);
 	    }
+	    
+	    terminals.insert(terminals.end(), niter->terminals.begin(), niter->terminals.end());
 	  }
 	  
 	  //
@@ -174,148 +188,123 @@ int main(int argc, char** argv)
 	    }
 	  }
 
-	  if (! dependency.empty()) {
-	    std::copy(dependency.begin(), dependency.end() - 1, std::ostream_iterator<int>(os, " "));
-	    os << dependency.back();
-	  }
-	  os << '\n';
-	} else {
-	  graph.clear();
-
-	  std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
-	  std::vector<symbol_type, std::allocator<symbol_type> > symbols;
-	
-	  // handle terminals...
-	  node_set_type::iterator niter_end = nodes.end();
-	  for (node_set_type::iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	    
-	    hypergraph_type::node_type& head = graph.add_node();
-	    
-	    niter->id = head.id;
-	    tails.clear();
-	    symbols.clear();
-
-	    if (head_mode) {
-	      int pos = 0;
-	      terminal_set_type::const_iterator titer_end = niter->terminals.end();
-	      for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
-		
-		hypergraph_type::node_type& node = graph.add_node();
-		
-		tails.push_back(node.id);
-		if (pos != niter->head)
-		  symbols.push_back('[' + titer->second + ']');
-		else
-		  symbols.push_back('[' + titer->second + "*]");
-		
-		hypergraph_type::edge_type& edge = graph.add_edge();
-		edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
-		graph.connect_edge(edge.id, node.id);
-	      }
-	    } else {
-	      terminal_set_type::const_iterator titer_end = niter->terminals.end();
-	      for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer) {
-		
-		hypergraph_type::node_type& node = graph.add_node();
-		
-		tails.push_back(node.id);
-		symbols.push_back('[' + titer->second + ']');
-		
-		hypergraph_type::edge_type& edge = graph.add_edge();
-		edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
-		graph.connect_edge(edge.id, node.id);
-	      }
+	  if (dependency_mode) {
+	    if (! dependency.empty()) {
+	      std::copy(dependency.begin(), dependency.end() - 1, std::ostream_iterator<int>(os, " "));
+	      os << dependency.back();
 	    }
+	    os << '\n';
+	  } else {
+	    hypergraph.clear();
 	    
-	    if (pos_mode)
-	      niter->cat = '[' + niter->terminals[niter->head].second + ']';
-	    else
-	      niter->cat = __non_terminal;
-	    
-	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule = rule_type::create(rule_type(niter->cat, symbols.begin(), symbols.end()));
-	    graph.connect_edge(edge.id, head.id);
-	  }
-	  
-	  // handle dependency...
-	  // start from root...
-	  
-	  node_set_type::const_iterator niter = std::find_if(nodes.begin(), nodes.end(), equal_pos(-1));
-	  if (niter == nodes.end())
-	    throw std::runtime_error("invalid nodes!");
-	  
-	  // breadth first search...
-	  typedef std::deque<std::pair<int, int>, std::allocator<std::pair<int, int> > > queue_type;
-
-	  hypergraph_type::node_type& root = graph.add_node();
-	  graph.goal = root.id;
-
-	  queue_type queue;
-	  queue.push_back(std::make_pair(root.id, niter - nodes.begin()));
-	  
-	  while (! queue.empty()) {
-	    const int parent_id = queue.front().first;
-	    const int node_id = queue.front().second;
-	    queue.pop_front();
-
-	    symbol_type symbol_head;
-	    
-	    tails.clear();
-	    symbols.clear();
-	    for (int id = 0; id < static_cast<int>(nodes.size()); ++ id) {
-	      if (nodes[id].pos == node_id) {
-		tails.push_back(graph.add_node().id);
-		symbols.push_back(pos_mode ? nodes[id].cat : __non_terminal);
+	    if (dependency.empty())
+	      os << hypergraph << '\n';
+	    else {
+	      dependency_map.clear();
+	      dependency_map.resize(dependency.size() + 1);
+	      
+	      node_map.clear();
+	      node_map.resize(dependency.size() + 1, hypergraph_type::invalid); 
+	      
+	      non_terminals.clear();
+	      non_terminals.push_back(__goal);
+	      
+	      for (size_t i = 0; i != dependency.size(); ++ i) {
+		dependency_map[dependency[i]].push_back(i + 1);
 		
-		queue.push_back(std::make_pair(tails.back(), id));
-	      } else if (id == node_id) {
-		tails.push_back(nodes[id].id);
-		symbols.push_back(pos_mode ? nodes[id].cat : __non_terminal);
+		if (pos_mode)
+		  non_terminals.push_back('[' + terminals[i].second + ']');
+		else
+		  non_terminals.push_back(__non_terminal);
+	      }
+	      
+	      if (! dependency_map[0].empty()) {
+		tails.clear();
+		phrase.clear();
 		
-		if (head_mode) {
-		  hypergraph_type::edge_type& edge = graph.edges[graph.nodes[nodes[id].id].edges.front()];
+		for (size_t i = 0; i != dependency_map[0].size(); ++ i) {
+		  const int antecedent = dependency_map[0][i];
 		  
-		  edge.rule = rule_type::create(rule_type(edge.rule->rhs.front(), edge.rule->rhs));
+		  if (node_map[antecedent] == hypergraph_type::invalid)
+		    node_map[antecedent] = hypergraph.add_node().id;
 		  
-		  symbols.back() = edge.rule->lhs;
+		  tails.push_back(node_map[antecedent]);
+		  phrase.push_back(non_terminals[antecedent]);
 		}
 		
-		symbol_head = symbols.back();
+		if (node_map[0] == hypergraph_type::invalid)
+		  node_map[0] = hypergraph.add_node().id;
+		
+		hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+		edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(non_terminals[0], phrase.begin(), phrase.end()));
+		
+		hypergraph.connect_edge(edge.id, node_map[0]);
+		hypergraph.goal = node_map[0];
 	      }
+	      
+	      for (size_t id = 1; id != dependency_map.size(); ++ id) {
+		tails.clear();
+		phrase.clear();
+		
+		index_set_type::const_iterator iiter_begin = dependency_map[id].begin();
+		index_set_type::const_iterator iiter_end   = dependency_map[id].end();
+		index_set_type::const_iterator iiter_lex   = std::lower_bound(iiter_begin, iiter_end, id);
+		
+		for (index_set_type::const_iterator iiter = iiter_begin; iiter != iiter_lex; ++ iiter) {
+		  const size_t antecedent = *iiter;
+		  
+		  if (node_map[antecedent] == hypergraph_type::invalid)
+		    node_map[antecedent] = hypergraph.add_node().id;
+		  
+		  tails.push_back(node_map[antecedent]);
+		  phrase.push_back(non_terminals[antecedent]);
+		}
+		
+		if (head_mode) {
+		  // create a new node and edge to terminal(s)!
+		  
+		  const symbol_type lhs = '[' + non_terminals[id].non_terminal_strip() + "*]";
+		  tails.push_back(hypergraph.add_node().id);
+		  phrase.push_back(lhs);
+		  
+		  hypergraph_type::edge_type& edge = hypergraph.add_edge();
+		  edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, terminals[id - 1].first)));
+		  
+		  hypergraph.connect_edge(edge.id, tails.back());
+		} else
+		  phrase.push_back(terminals[id - 1].first);
+		
+		for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
+		  const size_t antecedent = *iiter;
+		  
+		  if (node_map[antecedent] == hypergraph_type::invalid)
+		    node_map[antecedent] = hypergraph.add_node().id;
+		  
+		  tails.push_back(node_map[antecedent]);
+		  phrase.push_back(non_terminals[antecedent]);
+		}
+		
+		if (node_map[id] == hypergraph_type::invalid)
+		  node_map[id] = hypergraph.add_node().id;
+		
+		const symbol_type& lhs = non_terminals[id];
+			       
+		hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+		edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, phrase.begin(), phrase.end()));
+		
+		hypergraph.connect_edge(edge.id, node_map[id]);
+	      }
+	      
+	      if (! hypergraph.nodes.empty() && hypergraph.is_valid())
+		hypergraph.topologically_sort();
+	      
+	      os << hypergraph << '\n';
 	    }
-	    
-	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule = rule_type::create(rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal
-						    ? symbol_head
-						    : (pos_mode ? nodes[node_id].cat : __non_terminal),
-						    symbols.begin(), symbols.end()));
-	    graph.connect_edge(edge.id, parent_id);
 	  }
-	  
-	  if (! graph.nodes.empty() && graph.goal != hypergraph_type::invalid) {
-	    hypergraph_type::edge_type& edge_goal = graph.edges[graph.nodes[graph.goal].edges.front()];
-	    
-	    // add one-more...
-	    tails.clear();
-	    tails.push_back(graph.goal);
-	    
-	    graph.goal = graph.add_node().id;
-	    
-	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule = rule_type::create(rule_type(__goal, rule_type::symbol_set_type(1, edge_goal.rule->lhs)));
-	    graph.connect_edge(edge.id, graph.goal);
-	    
-	    graph.topologically_sort();
-
-	  }
-
-	  os << graph << '\n';
 	}
 	
 	nodes.clear();
 	// end of processing...
-	
-	// we will dump!
 	
       } else if (tokens.size() == 5) {
 	if (tokens.front() != "*")
