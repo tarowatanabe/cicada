@@ -38,8 +38,9 @@ namespace cicada
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
 
     ComposeDependencyTree(const symbol_type& __goal,
-			  const symbol_type& __non_terminal)
-      : goal(__goal), non_terminal(__non_terminal) {}
+			  const symbol_type& __non_terminal,
+			  const bool __head_mode=false)
+      : goal(__goal), non_terminal(__non_terminal), head_mode(__head_mode) {}
 
     void operator()(const lattice_type& lattice,
 		    const dependency_type& dependency,
@@ -119,7 +120,17 @@ namespace cicada
 	}
 	
 	// head
-	rhs.push_back(lattice[id - 1].front().label);
+	if (head_mode) {
+	  const symbol_type lhs = '[' + non_terminal.non_terminal_strip() + "*]";
+	  tails.push_back(graph.add_node().id);
+	  rhs.push_back(lhs);
+	  
+	  hypergraph_type::edge_type& edge = graph.add_edge();
+	  edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, lattice[id - 1].front().label)));
+	  
+	  graph.connect_edge(edge.id, tails.back());
+	} else
+	  rhs.push_back(lattice[id - 1].front().label);
 	
 	// right...
 	for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
@@ -150,12 +161,13 @@ namespace cicada
     
     const symbol_type goal;
     const symbol_type non_terminal;
+    const bool head_mode;
   };
   
   inline
-  void compose_dependency_tree(const Lattice& lattice, const Dependency& dependency, HyperGraph& graph, const Symbol goal="[s]", const Symbol non_terminal="[x]")
+  void compose_dependency_tree(const Lattice& lattice, const Dependency& dependency, HyperGraph& graph, const Symbol goal="[s]", const Symbol non_terminal="[x]", const bool head_mode=false)
   {
-    ComposeDependencyTree composer(goal, non_terminal);
+    ComposeDependencyTree composer(goal, non_terminal, head_mode);
     composer(lattice, dependency, graph);
   }
 
