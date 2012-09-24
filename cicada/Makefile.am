@@ -341,6 +341,7 @@ compose_dependency_arc_eager.hpp \
 compose_dependency_degree2.hpp \
 compose_dependency_hybrid.hpp \
 compose_dependency_top_down.hpp \
+compose_dependency_tree.hpp \
 compose_earley.hpp \
 compose_grammar.hpp \
 compose_phrase.hpp \
