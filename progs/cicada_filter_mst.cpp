@@ -1,7 +1,7 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
-// from conll dependency to hypergraph conversion...
+// from MST dependency to hypergraph conversion...
 //
 // we may use POS or semantic-role as our label...
 //
@@ -39,88 +39,72 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 
-struct conll_type
+struct mst_type
 {
   typedef size_t size_type;
-  typedef boost::variant<size_type, std::string> phead_type;
+  typedef std::string label_type;
+  
 
-  struct visitor_phead : public boost::static_visitor<size_type>
+  typedef std::vector<label_type, std::allocator<label_type> > label_set_type;
+  typedef std::vector<size_type, std::allocator<size_type> >   position_set_type;
+  
+  
+  label_set_type words;
+  label_set_type poss;
+  label_set_type labels;
+  position_set_type positions;
+
+  bool verify() const
   {
-    size_type operator()(const size_type& x) const { return x; }
-    size_type operator()(const std::string& x) const { return size_type(-1); }
-  };
-
-  size_type   id;
-  std::string form;
-  std::string lemma;
-  std::string cpostag;
-  std::string postag;
-  std::string feats;
-  size_type   head;
-  std::string deprel;
-  phead_type  phead;
-  std::string pdeprel;
-
-  conll_type() {}
-  conll_type(const size_type&   __id,
-	     const std::string& __form,
-	     const std::string& __lemma,
-	     const std::string& __cpostag,
-	     const std::string& __postag,
-	     const std::string& __feats,
-	     const size_type&   __head,
-	     const std::string& __deprel,
-	     const phead_type&  __phead,
-	     const std::string& __pdeprel)
-    : id(__id),
-      form(__form),
-      lemma(__lemma),
-      cpostag(__cpostag),
-      feats(__feats),
-      head(__head),
-      deprel(__deprel),
-      phead(__phead),
-      pdeprel(__pdeprel) {}
+    return words.size() == poss.size() && words.size() == labels.size() && words.size() == positions.size();
+  }
+  
+  void clear()
+  {
+    words.clear();
+    poss.clear();
+    labels.clear();
+    positions.clear();
+  }
 };
 
 BOOST_FUSION_ADAPT_STRUCT(
-			  conll_type,
-			  (conll_type::size_type,   id)
-			  (std::string, form)
-			  (std::string, lemma)
-			  (std::string, cpostag)
-			  (std::string, postag)
-			  (std::string, feats)
-			  (conll_type::size_type, head)
-			  (std::string, deprel)
-			  (conll_type::phead_type, phead)
-			  (std::string, pdeprel)
+			  mst_type,
+			  (mst_type::label_set_type,    words)
+			  (mst_type::label_set_type,    poss)
+			  (mst_type::label_set_type,    labels)
+			  (mst_type::position_set_type, positions)
 			  )
 
-typedef std::vector<conll_type, std::allocator<conll_type> > conll_set_type;
-
 template <typename Iterator>
-struct conll_parser : boost::spirit::qi::grammar<Iterator, conll_set_type(), boost::spirit::standard::blank_type>
+struct mst_parser : boost::spirit::qi::grammar<Iterator, mst_type(), boost::spirit::standard::blank_type>
 {
-  conll_parser() : conll_parser::base_type(conlls)
+  mst_parser() : mst_parser::base_type(mst)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
     token %= qi::lexeme[+(standard::char_ - standard::space)];
+    labels %= (+token);
     
-    conll  %= size >> token >> token >> token >> token >> token >> size >> token >> (size | token) >> token >> qi::eol;
-    conlls %= *conll >> qi::eol;
+    positions %= (+qi::int_);
+    
+    mst %= (labels >> qi::eol
+	    >> labels >> qi::eol
+	    >> labels >> qi::eol
+	    >> positions >> qi::eol
+	    >> (qi::eol || qi::eoi));
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
   
-  boost::spirit::qi::uint_parser<conll_type::size_type, 10, 1, -1>            size;
-  boost::spirit::qi::rule<Iterator, std::string(), blank_type>    token;
-  boost::spirit::qi::rule<Iterator, conll_type(), blank_type>     conll;
-  boost::spirit::qi::rule<Iterator, conll_set_type(), blank_type> conlls;
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type> token;
+  boost::spirit::qi::rule<Iterator, mst_type::label_set_type(), blank_type> labels;
+  boost::spirit::qi::rule<Iterator, mst_type::position_set_type(), blank_type> positions;
   
+  boost::spirit::qi::rule<Iterator, mst_type(), blank_type> mst;
 };
+
 
 typedef boost::filesystem::path path_type;
 typedef cicada::HyperGraph hypergraph_type;
@@ -129,14 +113,12 @@ typedef cicada::Vocab      vocab_type;
 typedef cicada::Symbol     word_type;
 typedef cicada::Symbol     symbol_type;
 
-typedef std::vector<conll_type::size_type, std::allocator<conll_type::size_type> > index_set_type;
+typedef std::vector<mst_type::size_type, std::allocator<mst_type::size_type> > index_set_type;
 typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_type;
 
 typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
 typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
 typedef sentence_type phrase_type;
-
-typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -148,8 +130,6 @@ bool pos_mode = false;
 bool relation_mode = false;
 bool leaf_mode = false;
 bool dependency_mode = false;
-bool projective_mode = false;
-bool split_mode = false;
 
 int debug = 0;
 
@@ -172,9 +152,9 @@ int main(int argc, char** argv)
     utils::compress_ostream os(output_file);
     is.unsetf(std::ios::skipws);
     
-    conll_parser<iter_type> parser;
+    mst_parser<iter_type> parser;
     
-    conll_set_type conlls;
+    mst_type        mst;
     hypergraph_type hypergraph;
     dependency_type dependency;
     node_map_type   node_map;
@@ -191,39 +171,41 @@ int main(int argc, char** argv)
     tail_set_type   tails;
     phrase_type     phrase;
     phrase_type     non_terminals;
-    tokens_type     tokens;
     
     std::string line;
     iter_type iter(is);
     iter_type iter_end;
-
+    
     int num = 0;
-    while (iter != iter_end) {
+    for (;;) {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
       if (debug)
 	std::cerr << "parsing: " << num << std::endl;
       
-      conlls.clear();
+      mst.clear();
       
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conlls))
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, mst))
 	throw std::runtime_error("parsing failed");
+
+      if (! mst.verify())
+	throw std::runtime_error("invalid mst format");
       
       if (debug >= 2)
-	std::cerr << "size: " << conlls.size() << std::endl;
-
+	std::cerr << "size: " << mst.words.size() << std::endl;
+      
       ++ num;
       
       if (leaf_mode) {
-	if (! conlls.empty()) {
+	if (! mst.words.empty()) {
 	  if (pos_mode) {
-	    conll_set_type::const_iterator citer_end = conlls.end();
-	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
-	      os << citer->form << "|[" << citer->cpostag << "] ";
-	    os << conlls.back().form << "|[" << conlls.back().cpostag << ']';
+	    for (size_t i = 0; i != mst.words.size() - 1; ++ i)
+	      os << mst.words[i] << "|[" << mst.labels[i] << "] ";
+	    os << mst.words.back() << "|[" << mst.labels.back() << ']';
 	  } else {
-	    conll_set_type::const_iterator citer_end = conlls.end();
-	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
-	      os << citer->form << ' ';
-	    os << conlls.back().form;
+	    std::copy(mst.words.begin(), mst.words.end() - 1, std::ostream_iterator<mst_type::label_type>(os, " "));
+	    os << mst.words.back();
 	  }
 	}
 	os << '\n';
@@ -232,28 +214,9 @@ int main(int argc, char** argv)
       }
       
       if (dependency_mode) {
-	if (! conlls.empty()) {
-	  if (projective_mode) {
-	    conll_set_type::const_iterator citer_end = conlls.end();
-	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer) {
-	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	      if (head == conll_type::size_type(-1))
-		throw std::runtime_error("invalid projective head");
-	      
-	      os << head << ' ';
-	    }
-	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), conlls.back().phead);
-	    if (head == conll_type::size_type(-1))
-	      throw std::runtime_error("invalid projective head");
-	    
-	    os << head;
-	    
-	  } else {
-	    conll_set_type::const_iterator citer_end = conlls.end();
-	    for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
-	      os << citer->head << ' ';
-	    os << conlls.back().head;
-	  }
+	if (! mst.words.empty()) {
+	  std::copy(mst.positions.begin(), mst.positions.end() - 1, std::ostream_iterator<mst_type::size_type>(os, " "));
+	  os << mst.positions.back();
 	}
 	os << '\n';
 	
@@ -263,46 +226,29 @@ int main(int argc, char** argv)
       
       hypergraph.clear();
       
-      if (conlls.empty()) {
+      if (mst.words.empty()) {
 	os << hypergraph << '\n';
 	continue;
       }
       
       dependency.clear();
-      dependency.resize(conlls.size() + 1);
+      dependency.resize(mst.words.size() + 1);
 
       node_map.clear();
-      node_map.resize(conlls.size() + 1, hypergraph_type::invalid);
-
+      node_map.resize(mst.words.size() + 1, hypergraph_type::invalid);
+      
       non_terminals.clear();
       non_terminals.push_back(__goal);
       
-      conll_set_type::const_iterator citer_end = conlls.end();
-      for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer) {
-	if (projective_mode) {
-	  const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	  if (head == conll_type::size_type(-1))
-	    throw std::runtime_error("invalid projective head");
-	  
-	  dependency[head].push_back(citer->id);
-	  
-	  if (pos_mode)
-	    non_terminals.push_back('[' + citer->cpostag + ']');
-	  else if (relation_mode)
-	    non_terminals.push_back('[' + citer->pdeprel + ']');
-	  else
-	    non_terminals.push_back(__non_terminal);
-	  
-	} else {
-	  dependency[citer->head].push_back(citer->id);
-	  
-	  if (pos_mode)
-	    non_terminals.push_back('[' + citer->cpostag + ']');
-	  else if (relation_mode)
-	    non_terminals.push_back('[' + citer->deprel + ']');
-	  else
-	    non_terminals.push_back(__non_terminal);
-	}
+      for (size_t i = 0; i != mst.words.size(); ++ i) {
+	dependency[mst.positions[i]].push_back(i + 1);
+	
+	if (pos_mode)
+	  non_terminals.push_back('[' + mst.poss[i] + ']');
+	else if (relation_mode)
+	  non_terminals.push_back('[' + mst.labels[i] + ']');
+	else
+	  non_terminals.push_back(__non_terminal);
       }
       
       if (! dependency[0].empty()) {
@@ -355,34 +301,11 @@ int main(int argc, char** argv)
 	  phrase.push_back(lhs);
 	  
 	  hypergraph_type::edge_type& edge = hypergraph.add_edge();
-	  edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, conlls[id - 1].form)));
+	  edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, mst.words[id - 1])));
 	  
 	  hypergraph.connect_edge(edge.id, tails.back());
-	} else {
-	  if (split_mode && conlls[id - 1].form.size() > 1) {
-	    // split multi word expression by '_'
-	    
-	    tokens.clear();
-	    boost::algorithm::split(tokens, conlls[id - 1].form, boost::is_any_of("_"));
-	    
-	    if (tokens.size() == 1)
-	      phrase.push_back(conlls[id - 1].form);
-	    else {
-	      bool has_empty = false;
-	      tokens_type::const_iterator titer_end = tokens.end();
-	      for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end && ! has_empty; ++ titer)
-		if (titer->empty())
-		  has_empty = true;
-	      
-	      if (has_empty)
-		phrase.push_back(conlls[id - 1].form);
-	      else
-		phrase.insert(phrase.end(), tokens.begin(), tokens.end());
-	      
-	    }
-	  } else
-	    phrase.push_back(conlls[id - 1].form);
-	}
+	} else
+	  phrase.push_back(mst.words[id - 1]);
 	
 	for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
 	  const size_t antecedent = *iiter;
@@ -436,8 +359,6 @@ void options(int argc, char** argv)
     ("relation",   po::bool_switch(&relation_mode),   "use relation as non-terminal")
     ("leaf",       po::bool_switch(&leaf_mode),       "collect leaf nodes only")
     ("dependency", po::bool_switch(&dependency_mode), "collect dependency only")
-    ("projective", po::bool_switch(&projective_mode), "use projective filed for dependency")
-    ("split",      po::bool_switch(&split_mode),      "split multi word expression")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         

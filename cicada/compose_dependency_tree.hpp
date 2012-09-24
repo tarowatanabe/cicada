@@ -45,7 +45,6 @@ namespace cicada
 		    const dependency_type& dependency,
 		    hypergraph_type& graph)
     {
-      
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
       typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
       

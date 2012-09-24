@@ -63,6 +63,7 @@ cicada_filter_kbest_moses
 cicada_filter_charniak
 cicada_filter_conll
 cicada_filter_dependency
+cicada_filter_mst
 cicada_filter_penntreebank
 cicada_filter_pialign
 cicada_filter_refset
