@@ -11,6 +11,7 @@ New: added more features:# of unaligned words, # of cross for terimnals, and gen
      (P(pair | root(pair)), P(source | root(source)), P(target | root(target)))
 New: bash-based learning scripts are re-implemented by equivalent, better python codes for better readability.
      Check cicada-{learn,mert}{,-moses}.py, not *.sh equivalents.
+Deprecated: bash based scripts
 
 2012-9-6
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)

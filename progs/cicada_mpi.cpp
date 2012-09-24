@@ -379,6 +379,62 @@ void synchronize()
   }
 }
 
+template <typename Tp, typename Alloc=std::allocator<Tp> >
+struct single_queue
+{
+  typedef utils::lockfree_list_queue<Tp, Alloc > queue_type;
+  
+  single_queue(size_t size=0) : queue(1), busy(0) {}
+  
+  bool empty() { return ! utils::atomicop::fetch_and_add(busy, int(0)) && queue.empty(); } 
+  void ready() { busy = 0; }
+
+  void wait_empty()
+  {
+    queue.wait_empty();
+    
+    for (;;) {
+      for (int i = 0; i < 50; ++ i) {
+	if (empty())
+	  return;
+	else
+	  boost::thread::yield();
+      }
+      
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    }
+  }
+
+  void push(const Tp& x)
+  {
+    busy = 1;
+    queue.push(x);
+  }
+  
+  void push_swap(Tp& x)
+  {
+    busy = 1;
+    queue.push_swap(x);
+  }
+  
+  void pop(Tp& x)
+  {
+    queue.pop(x);
+  }
+  
+  void pop_swap(Tp& x)
+  {
+    queue.pop_swap(x);
+  }
+  
+private:
+  queue_type queue;
+  int busy;
+};
+
 struct MapStdout
 {
   typedef std::pair<std::string, bool> value_type;
@@ -427,9 +483,11 @@ struct MapStdout
 
 struct TaskStdout
 {
+  typedef single_queue<std::string, std::allocator<std::string> > queue_single_type;
+  //typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_single_type;
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
 
-  TaskStdout(queue_type&   __queue_is,
+  TaskStdout(queue_single_type&   __queue_is,
 	     queue_type&   __queue_os,
 	     operation_set_type& __operations)
     : queue_is(__queue_is),
@@ -450,6 +508,8 @@ struct TaskStdout
 	  operations(line);
       } else
 	operations(line);
+
+      queue_is.ready();
       
       queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
@@ -459,8 +519,8 @@ struct TaskStdout
     queue_os.push(std::string());
   }
   
-  queue_type&   queue_is;
-  queue_type&   queue_os;
+  queue_single_type& queue_is;
+  queue_type&        queue_os;
   operation_set_type& operations;
 };
 
@@ -547,10 +607,8 @@ void cicada_stdout(operation_set_type& operations)
   
   typedef TaskStdout   task_type;
   
-  typedef task_type::queue_type queue_type;
-  
-  queue_type queue_is(1);
-  queue_type queue_os;
+  task_type::queue_single_type queue_is(1);
+  task_type::queue_type        queue_os;
   
   boost::thread thread(task_type(queue_is, queue_os, operations));
   
@@ -641,11 +699,15 @@ void cicada_stdout(operation_set_type& operations)
 	  
 	  found = true;
 	}
-      
+
       // termination condition!
       if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
 	  && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
-	  && queue_is.push(std::string(), true)) break;
+	  && queue_is.empty()) {
+	queue_is.push(std::string());
+	
+	break;
+      }
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
@@ -703,7 +765,8 @@ void cicada_stdout(operation_set_type& operations)
 
 struct Task
 {
-  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  typedef single_queue<std::string, std::allocator<std::string> > queue_type;
+  //typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
 
   Task(queue_type&   __queue,
        operation_set_type& __operations)
@@ -725,6 +788,8 @@ struct Task
 	  operations(line);
       } else
 	operations(line);
+
+      queue.ready();
     }
     
     operations.clear();
@@ -830,7 +895,9 @@ void cicada_process(operation_set_type& operations)
     while (1) {
       bool found = false;
       
-      if (! terminated && queue.push(std::string(), true)) {
+      if (! terminated && queue.empty()) {
+	queue.push(std::string());
+	
 	terminated = true;
 	found = true;
       }
@@ -860,6 +927,7 @@ void cicada_process(operation_set_type& operations)
       queue.wait_empty();
       is.ready();
     }
+    queue.wait_empty();
     queue.push(std::string());
   }
   

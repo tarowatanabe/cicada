@@ -115,6 +115,17 @@ namespace detail
 	  for (span_set_type::const_iterator siter = spans_target.begin(); siter != siter_end; ++ siter)
 	    prune_target(siter->first, siter->last) = false;
 	}
+	
+	for (int pos = 0; pos <= source_size; ++ pos) {
+	  prune_source(pos, pos) = false;
+	  if (pos != source_size)
+	    prune_source(pos, pos + 1) = false;
+	}
+	for (int pos = 0; pos <= target_size; ++ pos) {
+	  prune_target(pos, pos) = false;
+	  if (pos != target_size)
+	    prune_target(pos, pos + 1) = false;
+	}
       }
       
       bool operator()(const int source_first, const int source_last,

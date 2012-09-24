@@ -22,6 +22,7 @@
 #include <utils/mpi_stream.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
+#include <utils/rwticket.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type> path_set_type;
@@ -58,9 +59,12 @@ struct Task
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
   
   queue_type& queue;
+  int& busy;
   
-  Task(queue_type& __queue)
-    : queue(__queue) {}
+  Task(queue_type& __queue,
+       int& __busy)
+    : queue(__queue),
+      busy(__busy) {}
 
   void operator()()
   {
@@ -71,6 +75,8 @@ struct Task
       if (command.empty()) break;
       
       run_command(command);
+      
+      busy = 0;
     }
   }
 };
@@ -127,7 +133,8 @@ int main(int argc, char** argv)
       MPI::COMM_WORLD.Barrier();
       
       queue_type queue(1);
-      std::auto_ptr<thread_type> thread(new thread_type(task_type(queue)));
+      int busy = 0;
+      std::auto_ptr<thread_type> thread(new thread_type(task_type(queue, busy)));
 
       if (input_files.empty())
 	input_files.push_back("-");
@@ -159,19 +166,21 @@ int main(int argc, char** argv)
 	      found = true;
 	    }
 	  
-	  if (queue.empty() && std::getline(is, command)) {
+	  if (! utils::atomicop::fetch_and_add(busy, int(0)) && queue.empty() && std::getline(is, command)) {
 	    boost::algorithm::trim(command);
 	    
 	    if (! command.empty()) {
 	      if (debug)
 		std::cerr << "rank: " << mpi_rank << " " << command << std::endl;
 	      
+	      busy = 1;
+	      
 	      queue.push(command);
 	      
 	      found = true;
 	    }
 	  }
-
+	  
 	  non_found_iter = loop_sleep(found, non_found_iter);
 	}
       }
