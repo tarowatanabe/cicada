@@ -193,6 +193,23 @@ struct Task
   }
 };
 
+inline
+void prepare_directory(const boost::filesystem::path& path)
+{
+  if (! boost::filesystem::exists(path))
+    boost::filesystem::create_directories(path);
+  else if (! boost::filesystem::is_directory(path)) {
+    utils::filesystem::remove_all(path);
+    boost::filesystem::create_directories(path);
+  }
+  
+  boost::filesystem::directory_iterator iter_end;
+  for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter)
+    utils::filesystem::remove_all(*iter);  
+  
+  ::sync();
+}
+
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -225,71 +242,143 @@ int main(int argc, char** argv)
     const bool directory_output_mode = directory_mode;
     
     if (merge_mode) {
+      namespace qi = boost::spirit::qi;
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      
       typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 				   std::allocator<hypothesis_type> >::type hypothesis_set_type;
       typedef std::deque<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
 
       typedef boost::spirit::istream_iterator iter_type;
-      
-      utils::compress_istream is(input_file, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
-
-      boost::spirit::karma::real_generator<double, real_precision20> double20;
-      
-      kbest_parser<iter_type> parser;
-      iter_type iter(is);
-      iter_type iter_end;
-      
-      kbest_type kbest;
 
       hypothesis_map_type hypotheses;
+      
+      kbest_parser<iter_type> parser;
+      karma::real_generator<double, real_precision20> double20;
+      
+      
+      kbest_type kbest;
       features_type features_removed;
       
-      while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
-      
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	  if (iter != iter_end)
-	    throw std::runtime_error("kbest parsing failed");
-
-	if (! removes.empty()) {
-	  features_removed.clear();
-	    
-	  features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
-	  for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
-	    if (removes.find(fiter->first) == removes.end())
-	      features_removed.push_back(*fiter);
+      if (directory_input_mode) {
+	for (size_t i = 0; /**/; ++ i) {
+	  const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
 	  
-	  boost::fusion::get<2>(kbest).swap(features_removed);
+	  const path_type path_input = input_file / file_name;
+	  
+	  if (! boost::filesystem::exists(path_input)) break;
+	  
+	  utils::compress_istream is(path_input, 1024 * 1024);
+	  is.unsetf(std::ios::skipws);
+	  
+	  iter_type iter(is);
+	  iter_type iter_end;
+	  
+	  while (iter != iter_end) {
+	    boost::fusion::get<1>(kbest).clear();
+	    boost::fusion::get<2>(kbest).clear();
+	    
+	    if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	      if (iter != iter_end)
+		throw std::runtime_error("kbest parsing failed");
+	  
+	    if (! removes.empty()) {
+	      features_removed.clear();
+	      
+	      features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	      for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+		if (removes.find(fiter->first) == removes.end())
+		  features_removed.push_back(*fiter);
+	    
+	      boost::fusion::get<2>(kbest).swap(features_removed);
+	    }
+	  
+	    const size_t& id = boost::fusion::get<0>(kbest);
+
+	    if (id != i)
+	      throw std::runtime_error("invalid directory input format");
+	    
+	    if (id >= hypotheses.size())
+	      hypotheses.resize(id + 1);
+	    
+	    hypotheses[id].insert(hypothesis_type(kbest));
+	  }	  
 	}
+      } else {
+	utils::compress_istream is(input_file, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	if (id >= hypotheses.size())
-	  hypotheses.resize(id + 1);
-	
-	hypotheses[id].insert(hypothesis_type(kbest));
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  if (! removes.empty()) {
+	    features_removed.clear();
+	    
+	    features_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
+	    for (features_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
+	      if (removes.find(fiter->first) == removes.end())
+		features_removed.push_back(*fiter);
+	    
+	    boost::fusion::get<2>(kbest).swap(features_removed);
+	  }
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id >= hypotheses.size())
+	    hypotheses.resize(id + 1);
+	  
+	  hypotheses[id].insert(hypothesis_type(kbest));
+	}
       }
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
-      
-      for (size_t id = 0; id != hypotheses.size(); ++ id) {
-	namespace karma = boost::spirit::karma;
-	namespace standard = boost::spirit::standard;
+      if (directory_output_mode) {
+	prepare_directory(output_file);
 	
-	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
-	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
-	  os << id << " ||| ";
+	for (size_t id = 0; id != hypotheses.size(); ++ id) {
+	  const std::string file_name = utils::lexical_cast<std::string>(id) + ".gz";
 	  
-	  if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
-	    throw std::runtime_error("tokens generation failed...?");
-	  os << " ||| ";
-	  if (! karma::generate(std::ostream_iterator<char>(os),
-				-((standard::string << '=' << double20) % ' '),
-				hiter->features))
-	    throw std::runtime_error("tokens generation failed...?");
-	  os << '\n';
+	  utils::compress_ostream os(output_file / file_name, 1024 * 1024);
+	  
+	  hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	  for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	    os << id << " ||| ";
+	    
+	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
+	      throw std::runtime_error("tokens generation failed...?");
+	    os << " ||| ";
+	    if (! karma::generate(std::ostream_iterator<char>(os),
+				  -((standard::string << '=' << double20) % ' '),
+				  hiter->features))
+	      throw std::runtime_error("tokens generation failed...?");
+	    os << '\n';
+	  }
+	}
+      } else {
+	utils::compress_ostream os(output_file, 1024 * 1024);
+	
+	for (size_t id = 0; id != hypotheses.size(); ++ id) {
+	  hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	  for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	    os << id << " ||| ";
+	    
+	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
+	      throw std::runtime_error("tokens generation failed...?");
+	    os << " ||| ";
+	    if (! karma::generate(std::ostream_iterator<char>(os),
+				  -((standard::string << '=' << double20) % ' '),
+				  hiter->features))
+	      throw std::runtime_error("tokens generation failed...?");
+	    os << '\n';
+	  }
 	}
       }
       

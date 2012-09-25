@@ -1,3 +1,4 @@
+// -*- mode: c++ -*-
 //
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //

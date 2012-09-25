@@ -119,7 +119,6 @@ struct conll_parser : boost::spirit::qi::grammar<Iterator, conll_set_type(), boo
   boost::spirit::qi::rule<Iterator, std::string(), blank_type>    token;
   boost::spirit::qi::rule<Iterator, conll_type(), blank_type>     conll;
   boost::spirit::qi::rule<Iterator, conll_set_type(), blank_type> conlls;
-  
 };
 
 typedef boost::filesystem::path path_type;
