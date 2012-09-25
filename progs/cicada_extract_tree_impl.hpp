@@ -522,6 +522,33 @@ struct ExtractTree
       }
     };
     
+    void clear()
+    {
+      derivations.clear();
+      derivation_set_type(derivations).swap(derivations);
+      
+      range_map.clear();
+      range_map_type(range_map).swap(range_map);
+      
+      ranges.clear();
+      range_set_type(ranges).swap(ranges);
+      
+      spans.clear();
+      complements.clear();
+      span_set_type(spans).swap(spans);
+      span_set_type(complements).swap(complements);
+      
+      span_edges.clear();
+      range_set_type(span_edges).swap(span_edges);
+      
+      admissibles.clear();
+      admissible_set_type(admissibles).swap(admissibles);
+      
+      alignment_map.clear();
+      alignment_map_type(alignment_map).swap(alignment_map);
+    }
+    
+    
     void construct_subtrees(const hypergraph_type& graph, const int max_nodes, const int max_height, const int max_compose)
     {
       typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
@@ -1320,6 +1347,7 @@ struct ExtractTree
 	      const int __max_height,
 	      const int __max_compose,
 	      const int __max_scope,
+	      const double __cutoff,
 	      const bool __exhaustive, 
 	      const bool __constrained,
 	      const bool __inverse,
@@ -1329,6 +1357,7 @@ struct ExtractTree
       max_height(__max_height),
       max_compose(__max_compose),
       max_scope(__max_scope),
+      cutoff(__cutoff),
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
@@ -1341,6 +1370,9 @@ struct ExtractTree
   int max_height;
   int max_compose;
   int max_scope;
+  
+  double cutoff;
+
   bool exhaustive;
   bool constrained;
   bool inverse;
@@ -1352,6 +1384,13 @@ struct ExtractTree
   
   derivation_graph_type graph_source;
   derivation_graph_type graph_target;
+
+  void clear()
+  {
+    graph_source.clear();
+    graph_target.clear();
+    
+  }
   
   template <typename Dumper>
   void operator()(const hypergraph_type& source,
@@ -1550,9 +1589,11 @@ struct ExtractTree
 	  
 	  rule_pair.count = edge_source.count * edge_target.count;
 	  
-	  std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair);
-	  if (! result.second)
-	    const_cast<rule_pair_type&>(*(result.first)).count += rule_pair.count;
+	  if (rule_pair.count >= cutoff) {
+	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair);
+	    if (! result.second)
+	      const_cast<rule_pair_type&>(*(result.first)).count += rule_pair.count;
+	  }
 	}
       }
       
@@ -1751,6 +1792,7 @@ struct Task
        const int max_height,
        const int max_compose,
        const int max_scope,
+       const double cutoff,
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
@@ -1759,7 +1801,7 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, collapse_source, collapse_target),
+      extractor(max_nodes, max_height, max_compose, max_scope, cutoff, exhaustive, constrained, inverse, collapse_source, collapse_target),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
@@ -1778,6 +1820,9 @@ struct Task
       
       dump(rule_pairs);
       rule_pairs.clear();
+      
+      if (utils::malloc_stats::used() > malloc_threshold) 
+	rule_pair_set_type(rule_pairs).swap(rule_pairs);
     }
 
     typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;
@@ -1838,13 +1883,18 @@ struct Task
     rule_pair_set_type rule_pairs;
     
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
+
+    const int iter_mask = (1 << 4) - 1;
     
-    for (;;) {
+    for (int iter = 0;/**/; ++ iter) {
       queue.pop_swap(bitext);
       
       if (! bitext.source.is_valid()) break;
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs, dumper);
+      
+      if ((iter & iter_mask) == iter_mask)
+	extractor.clear();
     }
     
     dumper.dump(rule_pairs);

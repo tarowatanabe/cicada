@@ -105,6 +105,8 @@ opt_parser = OptionParser(
                 metavar="RANK", help="maximum rule rank (default: 2)"),
     make_option("--max-scope", default=0, action="store", type="int",
                 metavar="SCOPE", help="maximum rule scope (default: 0)"),
+    make_option("--cutoff", default=1e-7, action="store", type="float",
+                help="cutoff counts"),
     make_option("--collapse-source", default=None, action="store_true",
                 help="collapse source side for CKY parsing"),
     make_option("--collapse-target", default=None, action="store_true",
@@ -670,6 +672,7 @@ class ExtractGHKM(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
+                 cutoff=1e-7,
                  collapse_source=None,
                  collapse_target=None,
                  exhaustive=None,
@@ -731,6 +734,8 @@ class ExtractGHKM(Extract):
         command += " --max-height %d"  %(max_height)
         command += " --max-compose %d" %(max_compose)
         command += " --max-scope %d"   %(max_scope)
+
+        command += " --cutoff %.20g" %(cutoff)
         
         if collapse_source:
             command += " --collapse-source"
@@ -760,6 +765,7 @@ class ExtractTree(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
+                 cutoff=1e-7,
                  collapse_source=None,
                  collapse_target=None,
                  exhaustive=None,
@@ -791,6 +797,8 @@ class ExtractTree(Extract):
         command += " --max-height %d"  %(max_height)
         command += " --max-compose %d" %(max_compose)
         command += " --max-scope %d"   %(max_scope)
+        
+        command += " --cutoff %.20g" %(cutoff)
         
         if collapse_source:
             command += " --collapse-source"
@@ -963,6 +971,7 @@ if __name__ == '__main__':
                                   max_height=options.max_height,
                                   max_compose=options.max_compose,
                                   max_scope=options.max_scope,
+                                  cutoff=options.cutoff,
                                   collapse_source=options.collapse_source,
                                   collapse_target=options.collapse_target,
                                   exhaustive=options.exhaustive,
@@ -978,6 +987,7 @@ if __name__ == '__main__':
                                   max_height=options.max_height,
                                   max_compose=options.max_compose,
                                   max_scope=options.max_scope,
+                                  cutoff=options.cutoff,
                                   collapse_source=options.collapse_source,
                                   collapse_target=options.collapse_target,
                                   exhaustive=options.exhaustive,

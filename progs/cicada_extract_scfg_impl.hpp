@@ -1262,6 +1262,9 @@ struct Task
       
       dump(rule_pairs);
       rule_pairs.clear();
+      
+      if (utils::malloc_stats::used() > malloc_threshold) 
+	rule_pair_set_type(rule_pairs).swap(rule_pairs);
     }
 
     typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;

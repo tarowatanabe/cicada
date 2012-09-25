@@ -44,6 +44,7 @@ int max_nodes = 15;
 int max_height = 3;
 int max_compose = 0;
 int max_scope = 0;
+double cutoff = 1e-7;
 bool exhaustive = false;
 bool constrained = false;
 bool inverse = false;
@@ -111,6 +112,7 @@ int main(int argc, char** argv)
     queue_type queue(queue_size);
     task_type task(queue, output_file, non_terminal,
 		   max_sentence_length, max_nodes, max_height, max_compose, max_scope,
+		   cutoff,
 		   exhaustive, constrained, inverse, swap_source_target, project_non_terminal, collapse_source, collapse_target,
 		   max_malloc);
     boost::thread worker(boost::ref(task));
@@ -315,6 +317,8 @@ void options(int argc, char** argv)
     ("max-height",          po::value<int>(&max_height)->default_value(max_height),   "maximum height of a rule")
     ("max-compose",         po::value<int>(&max_compose)->default_value(max_compose), "maximum composed rule")
     ("max-scope",           po::value<int>(&max_scope)->default_value(max_scope),     "maximum scope")
+    
+    ("cutoff", po::value<double>(&cutoff)->default_value(cutoff), "cutoff count")
     
     ("exhaustive",      po::bool_switch(&exhaustive),            "exhausive extraction")
     ("constrained",     po::bool_switch(&constrained),           "constrained minimum extraction")

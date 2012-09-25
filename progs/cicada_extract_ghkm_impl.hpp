@@ -470,6 +470,7 @@ struct ExtractGHKM
 	      const int __max_height,
 	      const int __max_compose,
 	      const int __max_scope,
+	      const double __cutoff,
 	      const bool __exhaustive,
 	      const bool __constrained,
 	      const bool __inverse,
@@ -483,6 +484,7 @@ struct ExtractGHKM
       max_height(__max_height),
       max_compose(__max_compose),
       max_scope(__max_scope),
+      cutoff(__cutoff),
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
@@ -499,6 +501,8 @@ struct ExtractGHKM
   int max_height;
   int max_compose;
   int max_scope;
+
+  double cutoff;
   
   bool exhaustive;
   bool constrained;
@@ -796,10 +800,12 @@ struct ExtractGHKM
 	rule_pair_list_type::iterator liter_end = rule_list.end();
 	for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
 	  liter->count *= factor;
-	  
-	  std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
-	  if (! result.second)
-	    const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
+
+	  if (liter->count >= cutoff) {
+	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
+	    if (! result.second)
+	      const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
+	  }
 	}
       }
       rule_pairs_local.clear();
@@ -1745,6 +1751,7 @@ struct Task
        const int max_height,
        const int max_compose,
        const int max_scope,
+       const double cutoff,
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
@@ -1755,7 +1762,7 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, swap, project, collapse_source, collapse_target),
+      extractor(non_terminal, max_sentence_length, max_nodes, max_height, max_compose, max_scope, cutoff, exhaustive, constrained, inverse, swap, project, collapse_source, collapse_target),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
@@ -1774,6 +1781,9 @@ struct Task
       
       dump(rule_pairs);
       rule_pairs.clear();
+
+      if (utils::malloc_stats::used() > malloc_threshold) 
+	rule_pair_set_type(rule_pairs).swap(rule_pairs);
     }
     
     typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;
@@ -1834,6 +1844,8 @@ struct Task
     rule_pair_set_type rule_pairs;
     
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
+
+    const int iter_mask = (1 << 4) - 1;
     
     for (int iter = 0;/**/; ++ iter) {
       queue.pop_swap(bitext);
@@ -1842,8 +1854,7 @@ struct Task
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs, dumper);
       
-      // shrink-wrap every 16 iterations...
-      if (iter & 0x15 == 0x15)
+      if ((iter & iter_mask) == iter_mask)
 	extractor.clear();
     }
     
