@@ -3,7 +3,9 @@ The hypergraph format is a-bit complicated, and most people will not want to
 edit by yourself (including me).
 A convenience tool exists, 
 
-filter_penntreebank and filter_cabocha to convert from penn-treebank or cabocha output into hypergraph format.
+cicada_filter_penntreebank and cicada_filter_dependency
+
+to convert from penn-treebank or dependency structures into hypergraph format.
 
 PennTreebank filter was tested on output from stanford parser, thus, may not work on raw treebank file.
 If you need support contact me.
@@ -47,29 +49,40 @@ options:
   --debug [=arg(=1)]    debug level
   --help                help message
 
-Cabocha supports only the latest version, 0.60pre4 (probably)
+Dependency outputs are transformed by cicada_filter_dependency with --hypergraph option.
+Head words are split into different hyperedge (--head) or incorporated into an existing edge (default).
+The input is either MST (--mst), CoNLL (--conll) or Cabocha (--cabocha), and by default w/o --hypergraph option, 
+the tool output dependency information in a single line:
 
-cicada_filter_cabocha [options]
+sentence ||| POSs ||| dependency
+
+where POSs is a sequence of either POS (by default) or dependency relation (--relation).
+The tool (will) supports projection of source-side dependency into target-side via word alignment (TODO!).
+
+cicada_filter_dependency [options]
 options:
-  --input arg (=-)      input file
-  --output arg (=-)     output
-  --leaf                collect leaf nodes only
-  --help                help message
-
-Similarly we can transform CONLL dependency format into hypergraph.
-
-cicada_filter_conll [options]
-options:
-  --input arg (=-)          input file
-  --output arg (=-)         output
+  --input arg               input file(s)
+  --output arg (="-")       output file
+  --source arg              source file(s)
+  --target arg              target file(s)
+  --alignment arg           alignment file(s)
+  --dependency arg          dependency file(s)
+  --list arg                list file
+  --list-source arg         source list file
+  --list-target arg         target list file
+  --list-alignment arg      alignment list file
+  --list-dependency arg     dependency list file
   --goal arg (=[s])         goal symbol
   --non-terminal arg (=[x]) non-terminal symbol
-  --pos                     use pos as non-terminal
-  --relation                use relation as non-terminal
-  --leaf                    collect leaf nodes only
-  --projective              use projective filed for dependency
-  --split                   split multi word expression
-  --debug [=arg(=1)]        debug level
+  --bilingual               project source dependency into target dependency
+  --mst                     tranform MST dependency
+  --conll                   tranform CoNLL dependency
+  --cabocha                 tranform Cabocha dependency
+  --forest                  tranform FOREST dependency
+  --projective              project into projective dependency
+  --relation                assing relation to POS
+  --hypergraph              output as a hypergraph
+  --head                    output hypergraph with explicit head
   --help                    help message
 
 You can merge multiple hypergraphs in one by:

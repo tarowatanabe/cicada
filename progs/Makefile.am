@@ -48,7 +48,6 @@ bin_PROGRAMS = \
 	cicada_extract_tree_mpi \
 	cicada_filter_alignment \
 	cicada_filter_bitext \
-	cicada_filter_cabocha \
 	cicada_filter_config \
 	cicada_filter_config_moses \
 	cicada_filter_extract \
@@ -58,9 +57,7 @@ bin_PROGRAMS = \
 	cicada_filter_kbest \
 	cicada_filter_kbest_moses \
 	cicada_filter_charniak \
-	cicada_filter_conll \
 	cicada_filter_dependency \
-	cicada_filter_mst \
 	cicada_filter_penntreebank \
 	cicada_filter_pialign \
 	cicada_filter_refset \
@@ -209,14 +206,8 @@ cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boo
 cicada_filter_charniak_SOURCES = cicada_filter_charniak.cpp
 cicada_filter_charniak_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_filter_conll_SOURCES = cicada_filter_conll.cpp
-cicada_filter_conll_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
 cicada_filter_dependency_SOURCES = cicada_filter_dependency.cpp
 cicada_filter_dependency_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_mst_SOURCES = cicada_filter_mst.cpp
-cicada_filter_mst_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
 cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -235,9 +226,6 @@ cicada_filter_bitext_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftoo
 
 cicada_filter_text_SOURCES = cicada_filter_text.cpp
 cicada_filter_text_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
-cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_config_SOURCES = cicada_filter_config.cpp
 cicada_filter_config_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
