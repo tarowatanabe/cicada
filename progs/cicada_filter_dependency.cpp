@@ -38,6 +38,8 @@
 
 #include <cicada/alignment.hpp>
 #include <cicada/dependency.hpp>
+#include <cicada/sentence.hpp>
+#include <cicada/hypergraph.hpp>
 
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
@@ -47,6 +49,7 @@
 
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency dependency_type;
+typedef cicada::HyperGraph hypergraph_type;
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -69,8 +72,6 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
   boost::spirit::qi::rule<Iterator, sentence_type(), blank_type> tokens;
 };
 
-
-
 path_set_type input_files;
 path_set_type source_files;
 path_set_type target_files;
@@ -83,6 +84,9 @@ path_type list_target_file;
 path_type list_alignment_file;
 path_type list_dependency_file;
 
+std::string goal = "[s]";
+std::string non_terminal = "[x]";
+
 bool bilingual_mode = false;
 bool mst_mode = false;
 bool conll_mode = false;
@@ -91,12 +95,15 @@ bool forest_mode = false;
 
 bool projective_mode = false;
 bool relation_mode = false;
+bool hypergraph_mode = false;
+bool head_mode = false;
 
 // dependency output
 path_type output_file = "-";
 
 void read_list(const path_type& path, path_set_type& files);
 void options(int argc, char** argv);
+
 
 template <typename Dep>
 void apply(const path_set_type& files, const path_type& output)
@@ -120,7 +127,30 @@ int main(int argc, char** argv)
     if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + forest_mode > 1)
       throw std::runtime_error("one of bilingual/mst/conll mode");
     
-    if (bilingual_mode) {
+    if (mst_mode) {
+      read_list(list_file, input_files);
+      if (input_files.empty())
+	input_files.push_back("-");
+      
+      apply<MST>(input_files, output_file);
+    } else if (conll_mode) {
+      read_list(list_file, input_files);
+      if (input_files.empty())
+	input_files.push_back("-");
+      
+      apply<CoNLL>(input_files, output_file);
+    } else if (cabocha_mode) {
+      read_list(list_file, input_files);
+      if (input_files.empty())
+	input_files.push_back("-");
+      
+      apply<Cabocha>(input_files, output_file);
+    } else if (forest_mode) {
+      read_list(list_file, input_files);
+      if (input_files.empty())
+	input_files.push_back("-");
+
+    } else if (bilingual_mode) {
       read_list(list_source_file, source_files);
       read_list(list_target_file, target_files);
       read_list(list_alignment_file, alignment_files);
@@ -209,29 +239,6 @@ int main(int argc, char** argv)
 	  os << projected << '\n';
 	}
       }
-    } else if (mst_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<MST>(input_files, output_file);
-    } else if (conll_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<CoNLL>(input_files, output_file);
-    } else if (cabocha_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<Cabocha>(input_files, output_file);
-    } else if (forest_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
     } else
       throw std::runtime_error("one of bilingual|mst|conll|cabocha|forest?");
   }
@@ -258,6 +265,149 @@ void read_list(const path_type& path, path_set_type& files)
     files.push_back(file);
   }
 }
+
+struct Transform
+{
+  typedef size_t size_type;
+
+  typedef cicada::Sentence   sentence_type;
+  typedef cicada::Dependency dependency_type;
+  typedef cicada::Rule       rule_type;
+  typedef cicada::Symbol     symbol_type;
+
+  typedef std::vector<size_type, std::allocator<size_type> > index_set_type;
+  typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_map_type;
+  
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
+  typedef sentence_type rhs_type;
+  
+  dependency_map_type dependency_map;
+  node_map_type       node_map;
+  tail_set_type       tails;
+  rhs_type            rhs;
+  
+  const symbol_type goal;
+  const bool head_mode;
+
+  // assign here for faster memory access!
+  sentence_type   sentence;
+  sentence_type   pos;
+  dependency_type dependency;
+  hypergraph_type hypergraph;
+
+  Transform(const symbol_type& __goal,
+	    const bool __head_mode)
+    : goal(__goal),
+      head_mode(__head_mode) {} 
+
+  void clear()
+  {
+    sentence.clear();
+    pos.clear();
+    dependency.clear();
+    hypergraph.clear();
+  }
+  
+  void operator()()
+  {
+    if (sentence.size() != pos.size() || sentence.size() != dependency.size())
+      throw std::runtime_error("invalid transformaiton");
+    
+    hypergraph.clear();
+    
+    if (sentence.empty()) return;
+    
+    dependency_map.clear();
+    dependency_map.resize(dependency.size() + 1);
+    
+    node_map.clear();
+    node_map.resize(dependency.size() + 1, hypergraph_type::invalid); 
+    
+    for (size_type i = 0; i != dependency.size(); ++ i)
+      dependency_map[dependency[i]].push_back(i + 1);
+    
+    if (dependency_map.front().empty())
+      throw std::runtime_error("invalid dependency structure without root");
+    
+    tails.clear();
+    rhs.clear();
+    
+    index_set_type::const_iterator iiter_end = dependency_map.front().end();
+    for (index_set_type::const_iterator iiter = dependency_map.front().begin(); iiter != iiter_end; ++ iiter) {
+      const size_type antecedent = *iiter;
+      
+      if (node_map[antecedent] == hypergraph_type::invalid)
+	node_map[antecedent] = hypergraph.add_node().id;
+      
+      tails.push_back(node_map[antecedent]);
+      rhs.push_back(pos[antecedent - 1]);
+    }
+    
+    if (node_map[0] == hypergraph_type::invalid)
+      node_map[0] = hypergraph.add_node().id;
+
+    hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+    edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(goal, rhs.begin(), rhs.end()));
+    
+    hypergraph.connect_edge(edge.id, node_map[0]);
+    hypergraph.goal = node_map[0];
+    
+    for (size_t id = 1; id != dependency_map.size(); ++ id) {
+      tails.clear();
+      rhs.clear();
+      
+      index_set_type::const_iterator iiter_begin = dependency_map[id].begin();
+      index_set_type::const_iterator iiter_end   = dependency_map[id].end();
+      index_set_type::const_iterator iiter_lex   = std::lower_bound(iiter_begin, iiter_end, id);
+      
+      for (index_set_type::const_iterator iiter = iiter_begin; iiter != iiter_lex; ++ iiter) {
+	const size_type antecedent = *iiter;
+	
+	if (node_map[antecedent] == hypergraph_type::invalid)
+	  node_map[antecedent] = hypergraph.add_node().id;
+	
+	tails.push_back(node_map[antecedent]);
+	rhs.push_back(pos[antecedent - 1]);
+      }
+      
+      if (head_mode) {
+	const symbol_type lhs = '[' + pos[id - 1].non_terminal_strip() + "*]";
+	tails.push_back(hypergraph.add_node().id);
+	rhs.push_back(lhs);
+	
+	hypergraph_type::edge_type& edge = hypergraph.add_edge();
+	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, sentence[id - 1])));
+	
+	hypergraph.connect_edge(edge.id, tails.back());
+      } else
+	rhs.push_back(sentence[id - 1]);
+      
+      for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
+	const size_type antecedent = *iiter;
+	
+	if (node_map[antecedent] == hypergraph_type::invalid)
+	  node_map[antecedent] = hypergraph.add_node().id;
+	
+	tails.push_back(node_map[antecedent]);
+	rhs.push_back(pos[antecedent - 1]);
+      }
+      
+      if (node_map[id] == hypergraph_type::invalid)
+	node_map[id] = hypergraph.add_node().id;
+      
+      const symbol_type& lhs = pos[id - 1];
+		
+      hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+      edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, rhs.begin(), rhs.end()));
+      
+      hypergraph.connect_edge(edge.id, node_map[id]);
+    }
+
+    if (! hypergraph.nodes.empty() && hypergraph.is_valid())
+      hypergraph.topologically_sort();
+  }
+};
 
 struct mst_type
 {
@@ -340,6 +490,8 @@ struct MST
     
     mst_parser<iiter_type> parser;
     mst_type mst;
+
+    Transform transform(goal, head_mode);
     
     path_set_type::const_iterator fiter_end = files.end();
     for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
@@ -349,7 +501,7 @@ struct MST
       iiter_type iter(is);
       iiter_type iter_end;
 
-      for (;;) {
+      while (iter != iter_end) {
 	mst.clear();
 	
 	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, mst))
@@ -357,21 +509,42 @@ struct MST
 	
 	if (! mst.verify())
 	  throw std::runtime_error("invalid mst format");
-	
-	if (relation_mode) {
-	  if (! karma::generate(oiter, (-(standard::string % ' ')
-					<< " ||| " << -(standard::string % ' ')
-					<< " ||| " << -(karma::int_ % ' ')
-					<< '\n'),
-				mst.words, mst.labels, mst.positions))
-	    throw std::runtime_error("generation failed");
-	  else
+
+	if (hypergraph_mode) {
+	  transform.clear();
+	  transform.sentence.assign(mst.words.begin(), mst.words.end());
+	  
+	  if (relation_mode) {
+	    mst_type::label_set_type::const_iterator liter_end = mst.labels.end();
+	    for (mst_type::label_set_type::const_iterator liter = mst.labels.begin(); liter != liter_end; ++ liter)
+	      transform.pos.push_back('[' + *liter + ']');
+	  } else {
+	    mst_type::label_set_type::const_iterator liter_end = mst.poss.end();
+	    for (mst_type::label_set_type::const_iterator liter = mst.poss.begin(); liter != liter_end; ++ liter)
+	      transform.pos.push_back('[' + *liter + ']');	    
+	  }
+	  
+	  transform.dependency.assign(mst.positions.begin(), mst.positions.end());
+	  
+	  transform();
+	  
+	  os << transform.hypergraph << '\n';
+	} else {
+	  if (relation_mode) {
 	    if (! karma::generate(oiter, (-(standard::string % ' ')
 					  << " ||| " << -(standard::string % ' ')
 					  << " ||| " << -(karma::int_ % ' ')
 					  << '\n'),
-				  mst.words, mst.poss, mst.positions))
+				  mst.words, mst.labels, mst.positions))
 	      throw std::runtime_error("generation failed");
+	    else
+	      if (! karma::generate(oiter, (-(standard::string % ' ')
+					    << " ||| " << -(standard::string % ' ')
+					    << " ||| " << -(karma::int_ % ' ')
+					    << '\n'),
+				    mst.words, mst.poss, mst.positions))
+		throw std::runtime_error("generation failed");
+	  }
 	}
       }
     }
@@ -478,6 +651,8 @@ struct CoNLL
     conll_parser<iiter_type> parser;
     conll_set_type conll;
     
+    Transform transform(goal, head_mode);
+
     path_set_type::const_iterator fiter_end = files.end();
     for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
       utils::compress_istream is(*fiter, 1024 * 1024);
@@ -486,43 +661,70 @@ struct CoNLL
       iiter_type iter(is);
       iiter_type iter_end;
       
-      for (;;) {
+      while (iter != iter_end) {
 	conll.clear();
 	
 	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conll))
 	  throw std::runtime_error("parsing failed");
-	
-	conll_set_type::const_iterator citer_end = conll.end();
-	for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	  os << citer->form << ' ';
-	os << "||| ";
-	
-	if (relation_mode) {
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << citer->pdeprel << ' ';
-	} else {
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << citer->cpostag << ' ';
-	}
-	os << "|||";
-	
-	if (projective_mode) {
+
+	if (hypergraph_mode) {
+	  transform.clear();
+	  
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
-	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	    if (head == conll_type::size_type(-1))
-	      throw std::runtime_error("invalid projective head");
+	    transform.sentence.push_back(citer->form);
 	    
-	    os << ' ' << head;
+	    if (relation_mode)
+	      transform.pos.push_back('[' + citer->deprel + ']');
+	    else
+	      transform.pos.push_back('[' + citer->cpostag + ']');
+	    
+	    if (projective_mode) {
+	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	      if (head == conll_type::size_type(-1))
+		throw std::runtime_error("invalid projective head");
+	      
+	      transform.dependency.push_back(head);
+	    } else
+	      transform.dependency.push_back(citer->head);
 	  }
+	  
+	  transform();
+	  
+	  os << transform.hypergraph << '\n';
 	} else {
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << ' ' << citer->head;
+	    os << citer->form << ' ';
+	  os << "||| ";
+	  
+	  if (relation_mode) {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << citer->deprel << ' ';
+	  } else {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << citer->cpostag << ' ';
+	  }
+	  os << "|||";
+	  
+	  if (projective_mode) {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	      if (head == conll_type::size_type(-1))
+		throw std::runtime_error("invalid projective head");
+	      
+	      os << ' ' << head;
+	    }
+	  } else {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << ' ' << citer->head;
+	  }
+	  os << '\n';
 	}
-	os << '\n';
       }
     }
   }
@@ -547,7 +749,6 @@ struct Cabocha
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
   typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
   
-  typedef std::vector<int, std::allocator<int> > dependency_type;
   typedef std::vector<int, std::allocator<int> > offset_set_type;
 
   void operator()(const path_set_type& files, const path_type& output)
@@ -565,6 +766,8 @@ struct Cabocha
     
     std::string line;
     tokens_type tokens;
+
+    Transform transform(goal, head_mode);
     
     path_set_type::const_iterator fiter_end = files.end();
     for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
@@ -623,16 +826,32 @@ struct Cabocha
 	    }
 	  }
 	  
-	  terminal_set_type::const_iterator titer_end = terminals.end();
-	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	    os << titer->first << ' ';
-	  os << "||| ";
-	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	    os << titer->second << ' ';
-	  os << "||| ";
-
-	  if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
-	    throw std::runtime_error("generation failed");
+	  if (hypergraph_mode) {
+	    transform.clear();
+	    
+	    terminal_set_type::const_iterator titer_end = terminals.end();
+	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer) {
+	      transform.sentence.push_back(titer->first);
+	      transform.pos.push_back('[' + titer->second + ']');
+	    }
+	    
+	    transform.dependency.assign(dependency.begin(), dependency.end());
+	    
+	    transform();
+	    
+	    os << transform.hypergraph << '\n';
+	  } else {
+	    terminal_set_type::const_iterator titer_end = terminals.end();
+	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	      os << titer->first << ' ';
+	    os << "||| ";
+	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	      os << titer->second << ' ';
+	    os << "||| ";
+	    
+	    if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
+	      throw std::runtime_error("generation failed");
+	  }
 	  
 	} else if (tokens.size() == 5) {
 	  if (tokens.front() != "*")
@@ -683,7 +902,9 @@ void options(int argc, char** argv)
     ("list-target",     po::value<path_type>(&list_target_file),     "target list file")
     ("list-alignment",  po::value<path_type>(&list_alignment_file),  "alignment list file")
     ("list-dependency", po::value<path_type>(&list_dependency_file), "dependency list file")
-    
+
+    ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
+    ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
     ("bilingual",  po::bool_switch(&bilingual_mode),  "project source dependency into target dependency")
     ("mst",        po::bool_switch(&mst_mode),        "tranform MST dependency")
@@ -692,6 +913,8 @@ void options(int argc, char** argv)
     ("forest",     po::bool_switch(&forest_mode),     "tranform FOREST dependency")
     ("projective", po::bool_switch(&projective_mode), "project into projective dependency")
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
+    ("hypergraph", po::bool_switch(&hypergraph_mode), "output as a hypergraph")
+    ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
             
     ("help", "help message");
   
