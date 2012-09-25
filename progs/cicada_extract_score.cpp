@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_extract_score_impl.hpp"
@@ -56,19 +56,22 @@ int    threads = 1;
 
 int debug = 0;
 
+template <typename Extractor>
+void source_counts(const path_set_type& counts_files,
+		   path_set_type& source_files,
+		   root_count_set_type& root_joint,
+		   root_count_set_type& root_sources);
 
-void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files);
+void reverse_counts(const path_set_type& counts_files,
+		   path_map_type& reversed_files);
 template <typename Extractor>
-void reverse_counts(const path_map_type& modified_files,
-		    path_map_type& reversed_files,
-		    root_count_set_type& root_targets);
-template <typename Extractor>
+void target_counts(const path_map_type& reversed_files,
+		   path_map_type& target_files,
+		   root_count_set_type& root_targets);
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
-		  const path_map_type& reversed_files,
-		  root_count_set_type& root_joint,
-		  root_count_set_type& root_sources);
+		  const path_set_type& source_files,
+		  const path_map_type& target_files);
 
 void options(int argc, char** argv);
 
@@ -114,56 +117,51 @@ int main(int argc, char** argv)
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
     
-    // modify counts...
-    path_map_type modified_files;
+    // reverse counts...
+    path_set_type source_files;
     path_map_type reversed_files;
+    path_map_type target_files;
     root_count_set_type root_joint;
     root_count_set_type root_sources;
     root_count_set_type root_targets;
     
-    utils::resource start_modify;
-    modify_counts(counts_files, modified_files);
-    utils::resource end_modify;
-    
-    if (debug)
-      std::cerr << "modify counts cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		<< "modify counts user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
-    
-    
-    utils::resource start_index;
+    utils::resource start_source;
     if (score_phrase)
-      reverse_counts<ExtractRootPhrase>(modified_files, reversed_files, root_targets);
+      source_counts<ExtractRootPhrase>(counts_files, source_files, root_joint, root_sources);
     else if (score_scfg)
-      reverse_counts<ExtractRootSCFG>(modified_files, reversed_files, root_targets);
+      source_counts<ExtractRootSCFG>(counts_files, source_files, root_joint, root_sources);
     else
-      reverse_counts<ExtractRootGHKM>(modified_files, reversed_files, root_targets);
-    utils::resource end_index;
- 
+      source_counts<ExtractRootGHKM>(counts_files, source_files, root_joint, root_sources);
+    utils::resource end_source;
+    
     if (debug)
-      std::cerr << "reverse counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
-		<< "reverse counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
+      std::cerr << "source counts cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
+		<< "source counts user time: " << end_source.user_time() - start_source.user_time() << std::endl;
+    
+    utils::resource start_reverse;
+    reverse_counts(counts_files, reversed_files);
+    utils::resource end_reverse;
+    
+    if (debug)
+      std::cerr << "reverse counts cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
+		<< "reverse counts user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
+    
+    utils::resource start_target;
+    if (score_phrase)
+      target_counts<ExtractRootPhrase>(reversed_files, target_files, root_targets);
+    else if (score_scfg)
+      target_counts<ExtractRootSCFG>(reversed_files, target_files, root_targets);
+    else
+      target_counts<ExtractRootGHKM>(reversed_files, target_files, root_targets);
+    utils::resource end_target;
+    
+    if (debug)
+      std::cerr << "target counts cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
+		<< "target counts user time: " << end_target.user_time() - start_target.user_time() << std::endl;
    
     // scoring...
     utils::resource start_score;
-    if (score_phrase)
-      score_counts<ExtractRootPhrase>(output_file,
-				      counts_files,
-				      reversed_files,
-				      root_joint,
-				      root_sources);
-      
-    else if (score_scfg)
-      score_counts<ExtractRootSCFG>(output_file,
-				    counts_files,
-				    reversed_files,
-				    root_joint,
-				    root_sources);
-    else
-      score_counts<ExtractRootGHKM>(output_file,
-				    counts_files,
-				    reversed_files,
-				    root_joint,
-				    root_sources);
+    score_counts(output_file, counts_files, source_files, target_files);
     utils::resource end_score;
     if (debug)
       std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
@@ -204,17 +202,15 @@ int main(int argc, char** argv)
 }
 
 
-template <typename Extractor>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
-		  const path_map_type& reversed_files,
-		  root_count_set_type& root_joint,
-		  root_count_set_type& root_sources)
+		  const path_set_type& source_files,
+		  const path_map_type& target_files)
 {
   typedef PhrasePairScore map_reduce_type;
   
-  typedef PhrasePairScoreMapper             mapper_type;
-  typedef PhrasePairScoreReducer<Extractor> reducer_type;
+  typedef PhrasePairScoreMapper  mapper_type;
+  typedef PhrasePairScoreReducer reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -225,8 +221,10 @@ void score_counts(const path_type& output_file,
   typedef utils::compress_ostream ostream_type;
   typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
   typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
-  
-  if (static_cast<int>(reversed_files.size()) != threads)
+
+  if (static_cast<int>(source_files.size()) != threads)
+    throw std::runtime_error("# of threads differ");  
+  if (static_cast<int>(target_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
   
   prepare_directory(output_file);
@@ -235,9 +233,6 @@ void score_counts(const path_type& output_file,
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
   
-  root_count_map_type root_counts(threads);
-  root_count_map_type joint_counts(threads);
-    
   queue_ptr_map_type   queues_mapper(threads, queue_ptr_set_type(threads));
   queue_ptr_map_type   queues_reducer(threads, queue_ptr_set_type(threads));
   ostream_ptr_set_type ostreams(threads);
@@ -255,10 +250,8 @@ void score_counts(const path_type& output_file,
     
     ostreams[shard].reset(new utils::compress_ostream(path, 1024 * 1024));
     
-    reducers.add_thread(new boost::thread(reducer_type(joint_counts[shard],
-						       root_counts[shard],
-						       Extractor(),
-						       reversed_files[shard],
+    reducers.add_thread(new boost::thread(reducer_type(source_files[shard],
+						       target_files[shard],
 						       queues_reducer[shard],
 						       *ostreams[shard],
 						       debug)));
@@ -273,50 +266,29 @@ void score_counts(const path_type& output_file,
   
   mappers.join_all();
   reducers.join_all();
-  
-  // merge root_joint and root_sources...
-  for (size_t shard = 0; shard != root_counts.size(); ++ shard) {
-    root_count_set_type::const_iterator jiter_end = joint_counts[shard].end();
-    for (root_count_set_type::const_iterator jiter = joint_counts[shard].begin(); jiter != jiter_end; ++ jiter) {
-      std::pair<root_count_set_type::iterator, bool> result = root_joint.insert(*jiter);
-      if (! result.second) {
-	const_cast<root_count_type&>(*result.first).increment(jiter->counts.begin(), jiter->counts.end());
-	const_cast<root_count_type&>(*result.first).observed += jiter->observed;
-      }
-    }
-    
-    root_count_set_type::const_iterator citer_end = root_counts[shard].end();
-    for (root_count_set_type::const_iterator citer = root_counts[shard].begin(); citer != citer_end; ++ citer) {
-      std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(*citer);
-      if (! result.second) {
-	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
-	const_cast<root_count_type&>(*result.first).observed += citer->observed;
-      }
-    }
-  }
 }
 
 
 template <typename Extractor>
-void reverse_counts(const path_map_type& modified_files,
-		    path_map_type& reversed_files,
-		    root_count_set_type& root_targets)
+void target_counts(const path_map_type& reversed_files,
+		   path_map_type& target_files,
+		   root_count_set_type& root_targets)
 {
-  typedef PhrasePairReverse map_reduce_type;
+  typedef PhrasePairTarget map_reduce_type;
   
-  typedef PhrasePairReverseMapper<Extractor>  mapper_type;
-  typedef PhrasePairReverseReducer            reducer_type;
+  typedef PhrasePairTargetMapper<Extractor>  mapper_type;
+  typedef PhrasePairTargetReducer            reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
-  if (static_cast<int>(modified_files.size()) != threads)
+  if (static_cast<int>(reversed_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
 
-  reversed_files.clear();
-  reversed_files.reserve(threads);
-  reversed_files.resize(threads);
+  target_files.clear();
+  target_files.reserve(threads);
+  target_files.resize(threads);
   
   queue_ptr_set_type  queues(threads);
   root_count_map_type root_counts(threads);
@@ -328,14 +300,14 @@ void reverse_counts(const path_map_type& modified_files,
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
 						       utils::tempfile::tmp_dir(),
-						       reversed_files[shard],
+						       target_files[shard],
 						       threads,
 						       max_malloc,
 						       debug)));
   
   boost::thread_group mappers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(modified_files[shard],
+    mappers.add_thread(new boost::thread(mapper_type(reversed_files[shard],
 						     queues,
 						     root_counts[shard],
 						     max_malloc,
@@ -357,13 +329,94 @@ void reverse_counts(const path_map_type& modified_files,
   }
 }
 
-void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files)
+template <typename Extractor>
+void source_counts(const path_set_type& counts_files,
+		   path_set_type& source_files,
+		   root_count_set_type& root_joint,
+		   root_count_set_type& root_sources)
 {
-  typedef PhrasePairModify map_reduce_type;
+  typedef PhrasePairSource map_reduce_type;
   
-  typedef PhrasePairModifyMapper  mapper_type;
-  typedef PhrasePairModifyReducer reducer_type;
+  typedef PhrasePairSourceMapper             mapper_type;
+  typedef PhrasePairSourceReducer<Extractor> reducer_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef std::vector<queue_ptr_set_type, std::allocator<queue_ptr_set_type> > queue_ptr_map_type;
+  
+  path_map_type mapped_files(threads);
+  for (size_t i = 0; i != counts_files.size(); ++ i)
+    mapped_files[i % threads].push_back(counts_files[i]);
+
+  source_files.clear();
+  source_files.reserve(threads);
+  source_files.resize(threads);
+  
+  root_count_map_type joint_counts(threads);
+  root_count_map_type source_counts(threads);
+  
+  queue_ptr_map_type   queues_mapper(threads, queue_ptr_set_type(threads));
+  queue_ptr_map_type   queues_reducer(threads, queue_ptr_set_type(threads));
+
+  // construct queue matrix...
+  for (int i = 0; i != threads; ++ i)
+    for (int j = 0; j != threads; ++ j) {
+      queues_mapper[i][j].reset(new queue_type(1024));
+      queues_reducer[j][i] = queues_mapper[i][j];
+    }
+  
+  boost::thread_group reducers;
+  for (int shard = 0; shard != threads; ++ shard)
+    reducers.add_thread(new boost::thread(reducer_type(queues_reducer[shard],
+						       utils::tempfile::tmp_dir(),
+						       source_files[shard],
+						       joint_counts[shard],
+						       source_counts[shard],
+						       max_malloc,
+						       debug)));
+  boost::thread_group mappers;
+  for (int shard = 0; shard != threads; ++ shard)
+    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						     queues_mapper[shard],
+						     max_malloc,
+						     debug)));
+  
+  
+  mappers.join_all();
+  reducers.join_all();
+  
+  // merge root_joint and root_sources...
+  for (size_t shard = 0; shard != source_counts.size(); ++ shard) {
+    root_count_set_type::const_iterator jiter_end = joint_counts[shard].end();
+    for (root_count_set_type::const_iterator jiter = joint_counts[shard].begin(); jiter != jiter_end; ++ jiter) {
+      std::pair<root_count_set_type::iterator, bool> result = root_joint.insert(*jiter);
+      if (! result.second) {
+	const_cast<root_count_type&>(*result.first).increment(jiter->counts.begin(), jiter->counts.end());
+	const_cast<root_count_type&>(*result.first).observed += jiter->observed;
+      }
+    }
+    
+    root_count_set_type::const_iterator citer_end = source_counts[shard].end();
+    for (root_count_set_type::const_iterator citer = source_counts[shard].begin(); citer != citer_end; ++ citer) {
+      std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(*citer);
+      if (! result.second) {
+	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
+	const_cast<root_count_type&>(*result.first).observed += citer->observed;
+      }
+    }
+  }
+}
+
+
+void reverse_counts(const path_set_type& counts_files,
+		    path_map_type& reversed_files)
+{
+  typedef PhrasePairReverse map_reduce_type;
+  
+  typedef PhrasePairReverseMapper  mapper_type;
+  typedef PhrasePairReverseReducer reducer_type;
 
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -373,9 +426,9 @@ void modify_counts(const path_set_type& counts_files,
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
   
-  modified_files.clear();
-  modified_files.reserve(threads);
-  modified_files.resize(threads);
+  reversed_files.clear();
+  reversed_files.reserve(threads);
+  reversed_files.resize(threads);
 
   queue_ptr_set_type  queues(threads);
   
@@ -386,7 +439,7 @@ void modify_counts(const path_set_type& counts_files,
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
 						       utils::tempfile::tmp_dir(),
-						       modified_files[shard],
+						       reversed_files[shard],
 						       threads,
 						       max_malloc,
 						       debug)));

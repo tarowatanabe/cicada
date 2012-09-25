@@ -242,7 +242,7 @@ public:
 
 };
 
-class PhrasePairModified
+class PhrasePairSimple
 {
 public:
   typedef PhrasePair phrase_pair_type;
@@ -253,8 +253,8 @@ public:
   phrase_type    target;
   counts_type    counts;
 
-  PhrasePairModified() : source(), target(), counts() {}
-  PhrasePairModified(const phrase_type& __source, const phrase_type& __target, const counts_type& __counts)
+  PhrasePairSimple() : source(), target(), counts() {}
+  PhrasePairSimple(const phrase_type& __source, const phrase_type& __target, const counts_type& __counts)
     : source(__source), target(__target), counts(__counts) {}
 
   void clear()
@@ -264,7 +264,7 @@ public:
     counts.clear();
   }
 
-  void swap(PhrasePairModified& x)
+  void swap(PhrasePairSimple& x)
   {
     source.swap(x.source);
     target.swap(x.target);
@@ -282,7 +282,7 @@ public:
   }
 
   friend
-  size_t  hash_value(PhrasePairModified const& x)
+  size_t  hash_value(PhrasePairSimple const& x)
   {
     typedef utils::hashmurmur<size_t> hasher_type;
 
@@ -291,30 +291,100 @@ public:
 
 
   friend
-  bool operator==(const PhrasePairModified& x, const PhrasePairModified& y) 
+  bool operator==(const PhrasePairSimple& x, const PhrasePairSimple& y) 
   {
     return x.source == y.source && x.target == y.target;
   }
 
   friend
-  bool operator!=(const PhrasePairModified& x, const PhrasePairModified& y) 
+  bool operator!=(const PhrasePairSimple& x, const PhrasePairSimple& y) 
   {
     return x.source != y.source || x.target != y.target;
   }
 
   friend
-  bool operator<(const PhrasePairModified& x, const PhrasePairModified& y)
+  bool operator<(const PhrasePairSimple& x, const PhrasePairSimple& y)
   {
     return (x.source < y.source || (!(y.source < x.source) && x.target < y.target));
   }
 
   friend
-  bool operator>(const PhrasePairModified& x, const PhrasePairModified& y)
+  bool operator>(const PhrasePairSimple& x, const PhrasePairSimple& y)
   {
     return y < x;
   }
-
 };
+
+class PhraseCount
+{
+public:
+  typedef PhrasePair phrase_pair_type;
+  typedef phrase_pair_type::phrase_type phrase_type;
+  typedef phrase_pair_type::counts_type counts_type;
+
+  phrase_type    phrase;
+  counts_type    counts;
+
+  PhraseCount() : phrase(), counts() {}
+  PhraseCount(const phrase_type& __phrase, const counts_type& __counts)
+    : phrase(__phrase), counts(__counts) {}
+
+  void clear()
+  {
+    phrase.clear();
+    counts.clear();
+  }
+
+  void swap(PhraseCount& x)
+  {
+    phrase.swap(x.phrase);
+    counts.swap(x.counts);
+  }
+
+  template <typename Iterator>
+  void increment(Iterator first, Iterator last)
+  {
+    const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
+
+    //counts.reserve(size_max);
+    counts.resize(size_max, 0.0);
+    std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
+  }
+
+  friend
+  size_t  hash_value(PhraseCount const& x)
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    return hasher_type()(x.phrase.begin(), x.phrase.end(), 0);
+  }
+
+
+  friend
+  bool operator==(const PhraseCount& x, const PhraseCount& y) 
+  {
+    return x.phrase == y.phrase;
+  }
+
+  friend
+  bool operator!=(const PhraseCount& x, const PhraseCount& y) 
+  {
+    return x.phrase != y.phrase;
+  }
+
+  friend
+  bool operator<(const PhraseCount& x, const PhraseCount& y)
+  {
+    return x.phrase < y.phrase;
+  }
+
+  friend
+  bool operator>(const PhraseCount& x, const PhraseCount& y)
+  {
+    return y < x;
+  }
+};
+
 
 namespace std
 {
@@ -331,10 +401,17 @@ namespace std
   }
 
   inline
-  void swap(PhrasePairModified& x, PhrasePairModified& y)
+  void swap(PhrasePairSimple& x, PhrasePairSimple& y)
   {
     x.swap(y);
   }
+
+  inline
+  void swap(PhraseCount& x, PhraseCount& y)
+  {
+    x.swap(y);
+  }
+
 };
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -357,10 +434,15 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  (PhrasePair::counts_type, counts)
 			  )
 BOOST_FUSION_ADAPT_STRUCT(
-			  PhrasePairModified,
-			  (PhrasePairModified::phrase_type, source)
-			  (PhrasePairModified::phrase_type, target)
-			  (PhrasePairModified::counts_type, counts)
+			  PhrasePairSimple,
+			  (PhrasePairSimple::phrase_type, source)
+			  (PhrasePairSimple::phrase_type, target)
+			  (PhrasePairSimple::counts_type, counts)
+			  )
+BOOST_FUSION_ADAPT_STRUCT(
+			  PhraseCount,
+			  (PhrasePairSimple::phrase_type, phrase)
+			  (PhrasePairSimple::counts_type, counts)
 			  )
 
 struct ExtractRootPhrase
@@ -606,15 +688,15 @@ struct PhrasePairGenerator
 };
 
 
-struct PhrasePairModifiedParser
+struct PhrasePairSimpleParser
 {
-  typedef PhrasePairModified phrase_pair_type;
+  typedef PhrasePairSimple phrase_pair_type;
 
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
 
-  PhrasePairModifiedParser() : grammar() {}
-  PhrasePairModifiedParser(const PhrasePairModifiedParser& x) : grammar() {}
+  PhrasePairSimpleParser() : grammar() {}
+  PhrasePairSimpleParser(const PhrasePairSimpleParser& x) : grammar() {}
 
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -641,38 +723,38 @@ struct PhrasePairModifiedParser
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
 
-bool operator()(std::istream& is, phrase_pair_type& phrase_pair)
-{
-  phrase_pair.clear();
-
-  std::string line;
-  if (! getline(is, line)) return false;
-
-  return operator()(line, phrase_pair);
-}
-
-bool operator()(const std::string& line, phrase_pair_type& phrase_pair)
-{
-  phrase_pair.clear();
-
-  std::string::const_iterator iter = line.begin();
-  std::string::const_iterator end = line.end();
-
-  const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, phrase_pair);
-  if (result && iter == end)
-    return true;
-  else {
-    std::cerr << "WARNING: parsing failed: " << line << std::endl;
-    return false;
+  bool operator()(std::istream& is, phrase_pair_type& phrase_pair)
+  {
+    phrase_pair.clear();
+    
+    std::string line;
+    if (! getline(is, line)) return false;
+    
+    return operator()(line, phrase_pair);
   }
-}
-
-phrase_pair_parser<std::string::const_iterator> grammar;
+  
+  bool operator()(const std::string& line, phrase_pair_type& phrase_pair)
+  {
+    phrase_pair.clear();
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, phrase_pair);
+    if (result && iter == end)
+      return true;
+    else {
+      std::cerr << "WARNING: parsing failed: " << line << std::endl;
+      return false;
+    }
+  }
+  
+  phrase_pair_parser<std::string::const_iterator> grammar;
 };
 
-struct PhrasePairModifiedGenerator
+struct PhrasePairSimpleGenerator
 {
-  typedef PhrasePairModified phrase_pair_type;
+  typedef PhrasePairSimple phrase_pair_type;
 
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
@@ -692,8 +774,482 @@ struct PhrasePairModifiedGenerator
 };
 
 
+struct PhraseCountParser
+{
+  typedef PhraseCount phrase_count_type;
+  
+  typedef phrase_count_type::phrase_type    phrase_type;
+  typedef phrase_count_type::counts_type    counts_type;
+  
+  PhraseCountParser() : grammar() {}
+  PhraseCountParser(const PhraseCountParser& x) : grammar() {}
+  
+  template <typename Iterator>
+  struct phrase_count_parser : boost::spirit::qi::grammar<Iterator, phrase_count_type(), boost::spirit::standard::space_type>
+  {
+    phrase_count_parser() : phrase_count_parser::base_type(phrase_count)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      
+      counts %= +('B' >> count_base64 | qi::double_);
+      phrase_count %= phrase >> "|||" >> counts;
+    }
+
+    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
+    utils::double_base64_parser<Iterator> count_base64;
+    boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
+    boost::spirit::qi::rule<Iterator, phrase_count_type(), boost::spirit::standard::space_type> phrase_count;
+  };
+
+  bool operator()(std::istream& is, phrase_count_type& phrase_count)
+  {
+    phrase_count.clear();
+    
+    std::string line;
+    if (! getline(is, line)) return false;
+    
+    return operator()(line, phrase_count);
+  }
+  
+  bool operator()(const std::string& line, phrase_count_type& phrase_count)
+  {
+    phrase_count.clear();
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, phrase_count);
+    
+    if (result && iter == end)
+      return true;
+    else {
+      std::cerr << "WARNING: parsing failed: " << line << std::endl;
+      return false;
+    }
+  }
+  
+  phrase_count_parser<std::string::const_iterator> grammar;
+};
+
+struct PhraseCountGenerator
+{
+  typedef PhraseCount phrase_count_type;
+  
+  typedef phrase_count_type::phrase_type    phrase_type;
+  typedef phrase_count_type::counts_type    counts_type;
+
+  std::ostream& operator()(std::ostream& os, const phrase_count_type& phrase_count) const
+  {
+    os << phrase_count.phrase << " |||";
+
+    counts_type::const_iterator citer_end = phrase_count.counts.end();
+    for (counts_type::const_iterator citer = phrase_count.counts.begin(); citer != citer_end; ++ citer) {
+      os << " B";
+      utils::encode_base64(*citer, std::ostream_iterator<char>(os));
+    }
+
+    return os;
+  }
+};
+
+// compute observation counts for source-side
+struct PhrasePairSource
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef uint64_t                           hash_value_type;
+  typedef utils::hashmurmur<hash_value_type> hasher_type;
+
+  typedef boost::filesystem::path                            path_type;
+  typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+
+  typedef RootCount        root_count_type;
+  typedef PhrasePair       phrase_pair_type;
+  typedef PhraseCount      phrase_count_type;
+  typedef PhrasePairSimple simple_type;
+
+  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+  
+  typedef utils::lockfree_list_queue<simple_type, std::allocator<simple_type> > queue_type;
+  
+  typedef boost::shared_ptr<queue_type> queue_ptr_type;
+  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
+};
+
+struct PhrasePairSourceMapper
+{
+  typedef PhrasePairSource map_reduce_type;
+
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
+
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::simple_type      simple_type;
+
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef PhrasePairParser phrase_pair_parser_type;
+  
+  hasher_type             hasher;
+  phrase_pair_parser_type phrase_pair_parser;
+
+  path_set_type paths;
+  queue_ptr_set_type& queues;
+  double max_malloc;
+  int    debug;
+  
+  PhrasePairSourceMapper(const path_set_type& __paths,
+			 queue_ptr_set_type& __queues,
+			 const double __max_malloc,
+			 const int __debug)
+    : paths(__paths),
+      queues(__queues),
+      max_malloc(__max_malloc),
+      debug(__debug) {}
+  
+    template <typename Tp>
+  struct greater_buffer
+  {
+    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+  };
+
+  template <typename Counts>
+  void read_phrase_pair(std::istream& is, Counts& counts)
+  {
+    std::string line;
+    phrase_pair_type phrase_pair;
+
+    while (counts.size() < 256 && std::getline(is, line)) {
+      if (! phrase_pair_parser(line, phrase_pair)) continue;
+      
+      if (counts.empty() || counts.back().source != phrase_pair.source)
+	counts.push_back(simple_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
+	counts.push_back(simple_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
+      } else
+	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
+    }
+  }
+  
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+
+    if (non_found_iter >= 64) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+
+      non_found_iter = 0;
+    }
+    return non_found_iter;
+  }
+  
+  void operator()()
+  {
+    typedef utils::compress_istream         istream_type;
+    typedef boost::shared_ptr<istream_type> istream_ptr_type;
+    typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+
+    typedef std::deque<simple_type, std::allocator<simple_type> > buffer_type;
+    typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
+    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+
+    pqueue_type pqueue;
+
+    istream_ptr_set_type   istreams(paths.size());
+    buffer_stream_set_type buffer_streams(paths.size());
+
+    size_t pos = 0;
+    path_set_type::const_iterator piter_end = paths.end();
+    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
+      if (! boost::filesystem::exists(*piter))
+	throw std::runtime_error("no file? " + piter->string());
+
+      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
+      
+      buffer_stream_type* buffer_stream = &buffer_streams[pos];
+      buffer_stream->second = &(*istreams[pos]);
+      
+      read_phrase_pair(*istreams[pos], buffer_stream->first);
+      
+      if (! buffer_stream->first.empty())
+	pqueue.push(buffer_stream);
+    }
+    
+    simple_type counts;
+
+    int iter = 0;
+    const int iteration_mask = (1 << 4) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
+    int non_found_iter = 0;
+    
+    while (! pqueue.empty()) {
+      buffer_stream_type* buffer_stream(pqueue.top());
+      pqueue.pop();
+      
+      simple_type& curr = buffer_stream->first.front();
+      
+      if (counts != curr) {
+	if (! counts.counts.empty()) {
+	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
+	  queues[shard]->push_swap(counts);
+	}
+	
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+
+	counts.swap(curr);
+      } else
+	counts.increment(curr.counts.begin(), curr.counts.end());
+      
+      buffer_stream->first.pop_front();
+      
+      if (buffer_stream->first.empty())
+	read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
+      
+      if (! buffer_stream->first.empty())
+	pqueue.push(buffer_stream);
+    }
+    
+    if (! counts.counts.empty()) {
+      const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
+      queues[shard]->push_swap(counts);
+    }
+    
+    // termination...
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    counts.clear();
+    
+    while (1) {
+      bool found = false;
+      
+      for (size_t shard = 0; shard != queues.size(); ++ shard) 
+	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+	  counts.clear();
+	  
+	  terminated[shard] = true;
+	  found = true;
+	}
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+  }
+};
+
+template <typename ExtractRoot>
+struct PhrasePairSourceReducer
+{
+  typedef PhrasePairSource map_reduce_type;
+  
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
+
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+
+  typedef map_reduce_type::phrase_count_type phrase_count_type;
+  typedef map_reduce_type::simple_type       simple_type;
+  
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+  
+  typedef PhraseCountParser    phrase_count_parser_type;
+  typedef PhraseCountGenerator phrase_count_generator_type;
+  
+  typedef ExtractRoot extract_root_type;
+  
+  phrase_count_parser_type    parser;
+  phrase_count_generator_type generator;
+
+  queue_ptr_set_type& queues;
+  
+  path_type      prefix;
+  path_type&     path;
+  
+  root_count_set_type& joint_counts;
+  root_count_set_type& root_counts;
+  
+  extract_root_type extract_root;
+  
+  double              max_malloc;
+  int                 debug;
+  
+  PhrasePairSourceReducer(queue_ptr_set_type&  __queues,
+			  const path_type&     __prefix,
+			  path_type&           __path,
+			  root_count_set_type& __joint_counts,
+			  root_count_set_type& __root_counts,
+			  const double __max_malloc,
+			  const int    __debug)
+    : queues(__queues),
+      prefix(__prefix),
+      path(__path),
+      joint_counts(__joint_counts),
+      root_counts(__root_counts),
+      max_malloc(__max_malloc),
+      debug(__debug) {}
+  
+  template <typename Tp>
+  struct greater_buffer
+  {
+    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
+    {
+      return x->first > y->first;
+    }
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->first > y->first;
+    }
+  };
+  
+  void operator()()
+  {
+    typedef std::pair<simple_type, queue_type*> buffer_queue_type;
+    typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_queue_type*, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
+    
+    pqueue_type pqueue;
+    std::vector<buffer_queue_type, std::allocator<buffer_queue_type> > buffer_queues(queues.size());
+    
+    {
+      size_t pos = 0;
+      for (queue_ptr_set_type::iterator qiter = queues.begin(); qiter != queues.end(); ++ qiter, ++ pos) {
+	queue_ptr_type& queue = *qiter;
+	
+	buffer_queue_type* buffer_queue = &buffer_queues[pos];
+	
+	queue->pop_swap(buffer_queue->first);
+	buffer_queue->second = &(*queue);
+	
+	if (! buffer_queue->first.source.empty())
+	  pqueue.push(buffer_queue);
+      }
+    }
+    
+    {
+      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.source.XXXXXX");
+      utils::tempfile::insert(counts_file_tmp);
+      const path_type counts_file = counts_file_tmp.string() + ".gz";
+      utils::tempfile::insert(counts_file);
+      
+      path = counts_file;
+    }
+    
+    utils::compress_ostream os(path, 1024 * 1024);
+    simple_type counts;
+    size_type observed = 0;
+    
+    root_count_set_type::iterator jiter;
+    root_count_set_type::iterator riter;
+    
+    while (! pqueue.empty()) {
+      buffer_queue_type* buffer_queue(pqueue.top());
+      pqueue.pop();
+      
+      simple_type& curr = buffer_queue->first;
+      
+      if (curr.source != counts.source) {
+	if (observed) {
+	  counts.counts.push_back(observed);
+	  
+	  generator(os, phrase_count_type(counts.source, counts.counts)) << '\n';
+	}
+	
+	// increment root_observed(lhs+rhs)
+	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*jiter).observed += 1;
+	
+	// increment root_observed(lhs)
+	riter = root_counts.insert(extract_root(curr.source)).first;
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*riter).observed += 1;
+	
+	counts.swap(curr);
+	observed = 1;
+      } else if (curr.target != counts.target) {
+	// increment root_observed(lhs+rhs)
+	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*jiter).observed += 1;
+	
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	
+	counts.target.swap(curr.target);
+	counts.increment(curr.counts.begin(), curr.counts.end());
+	
+	observed += 1;
+      } else {
+	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	
+	counts.increment(curr.counts.begin(), curr.counts.end());
+      }
+      
+      buffer_queue->second->pop_swap(buffer_queue->first);
+      if (! buffer_queue->first.source.empty())
+	pqueue.push(buffer_queue);
+    }
+    
+    if (observed) {
+      counts.counts.push_back(observed);
+      
+      generator(os, phrase_count_type(counts.source, counts.counts)) << '\n';
+    }
+    
+  }
+};
+
 // modify counts... simply map from source to target, and collect counts
-struct PhrasePairModify
+struct PhrasePairReverse
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
@@ -706,11 +1262,11 @@ struct PhrasePairModify
 
   typedef RootCount          root_count_type;
   typedef PhrasePair         phrase_pair_type;
-  typedef PhrasePairModified modified_type;
+  typedef PhrasePairSimple simple_type;
 
-  typedef utils::chunk_vector<modified_type, 4096 / sizeof(modified_type), std::allocator<modified_type> >  modified_set_type;
+  typedef utils::chunk_vector<simple_type, 4096 / sizeof(simple_type), std::allocator<simple_type> >  simple_set_type;
 
-  typedef utils::lockfree_list_queue<modified_type, std::allocator<modified_type> > queue_type;
+  typedef utils::lockfree_list_queue<simple_type, std::allocator<simple_type> > queue_type;
 
   typedef boost::shared_ptr<queue_type> queue_ptr_type;
   typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
@@ -718,9 +1274,9 @@ struct PhrasePairModify
 
 };
 
-struct PhrasePairModifyMapper
+struct PhrasePairReverseMapper
 {
-  typedef PhrasePairModify map_reduce_type;
+  typedef PhrasePairReverse map_reduce_type;
 
   typedef map_reduce_type::size_type       size_type;
   typedef map_reduce_type::difference_type difference_type;
@@ -733,9 +1289,8 @@ struct PhrasePairModifyMapper
 
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
 
-  typedef map_reduce_type::modified_type     modified_type;
-  typedef map_reduce_type::modified_set_type modified_set_type;
-
+  typedef map_reduce_type::simple_type     simple_type;
+  
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
@@ -750,10 +1305,10 @@ struct PhrasePairModifyMapper
   double max_malloc;
   int    debug;
 
-  PhrasePairModifyMapper(const path_set_type& __paths,
-			 queue_ptr_set_type& __queues,
-			 const double __max_malloc,
-			 const int __debug)
+  PhrasePairReverseMapper(const path_set_type& __paths,
+			  queue_ptr_set_type& __queues,
+			  const double __max_malloc,
+			  const int __debug)
     : paths(__paths),
       queues(__queues),
       max_malloc(__max_malloc),
@@ -783,10 +1338,10 @@ struct PhrasePairModifyMapper
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
       if (counts.empty() || counts.back().source != phrase_pair.source)
-	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
+	counts.push_back(simple_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
       else if (counts.back().target != phrase_pair.target) {
 	phrase_pair.source = counts.back().source;
-	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
+	counts.push_back(simple_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
       } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
@@ -812,14 +1367,13 @@ struct PhrasePairModifyMapper
     return non_found_iter;
   }
 
-
   void operator()()
   {
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
     typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
 
-    typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
+    typedef std::deque<simple_type, std::allocator<simple_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
     typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
@@ -847,7 +1401,7 @@ struct PhrasePairModifyMapper
 	pqueue.push(buffer_stream);
     }
     
-    modified_type counts;
+    simple_type counts;
 
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
@@ -859,7 +1413,7 @@ struct PhrasePairModifyMapper
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
       
-      modified_type& curr = buffer_stream->first.front();
+      simple_type& curr = buffer_stream->first.front();
       
       if (counts != curr) {
 	if (! counts.counts.empty()) {
@@ -920,606 +1474,34 @@ struct PhrasePairModifyMapper
   }
 };
 
-struct PhrasePairModifyReducer
-{
-  typedef PhrasePairModify map_reduce_type;
-  
-  typedef map_reduce_type::size_type       size_type;
-  typedef map_reduce_type::difference_type difference_type;
-
-  typedef map_reduce_type::hash_value_type hash_value_type;
-  typedef map_reduce_type::hasher_type     hasher_type;
-  
-  typedef map_reduce_type::path_type     path_type;
-  typedef map_reduce_type::path_set_type path_set_type;
-
-  typedef map_reduce_type::modified_type     modified_type;
-  
-  typedef map_reduce_type::queue_type         queue_type;
-  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
-  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
-  
-  typedef PhrasePairModifiedParser    modified_parser_type;
-  typedef PhrasePairModifiedGenerator modified_generator_type;
-
-  typedef utils::unordered_set<modified_type, boost::hash<modified_type>, std::equal_to<modified_type>,
-			       std::allocator<modified_type> >::type modified_unique_type;
-  
-  modified_parser_type    parser;
-  modified_generator_type generator;
-
-  queue_type&    queue;
-  path_type      prefix;
-  path_set_type& paths;
-  
-  int            shard_size;
-  double         max_malloc;
-  int            debug;
-  
-  PhrasePairModifyReducer(queue_type&    __queue,
-			  const path_type& __prefix,
-			  path_set_type& __paths,
-			  const int      __shard_size,
-			  const double   __max_malloc,
-			  const int      __debug)
-    : queue(__queue),
-      prefix(__prefix),
-      paths(__paths),
-      shard_size(__shard_size),
-      max_malloc(__max_malloc),
-      debug(__debug) {}
-
-  struct less_file_size
-  {
-    bool operator()(const path_type& x, const path_type& y) const
-    {
-      return boost::filesystem::file_size(x) < boost::filesystem::file_size(y);
-    }
-  };
-
-
-  // merge counts from two streams into os..
-  void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
-  {
-    modified_type modified1;
-    modified_type modified2;
-    
-    bool parsed1 = parser(is1, modified1);
-    bool parsed2 = parser(is2, modified2);
-    
-    while (parsed1 && parsed2) {
-      if (modified1 < modified2) {
-	generator(os, modified1) << '\n';
-	parsed1 = parser(is1, modified1);
-      } else if (modified2 < modified1) {
-	generator(os, modified2) << '\n';
-	parsed2 = parser(is2, modified2);
-      } else {
-	modified1.increment(modified2.counts.begin(), modified2.counts.end());
-	generator(os, modified1) << '\n';
-	
-	parsed1 = parser(is1, modified1);
-	parsed2 = parser(is2, modified2);
-      }
-    }
-    
-    // dump remaining...
-    while (parsed1) {
-      generator(os, modified1) << '\n';
-      parsed1 = parser(is1, modified1);
-    }
-    
-    while (parsed2) {
-      generator(os, modified2) << '\n';
-      parsed2 = parser(is2, modified2);
-    }
-  }
-  
-  
-  // merge from smallest files...
-  void merge_counts(path_set_type& paths)
-  {
-    if (paths.size() <= 128) return;
-
-    while (paths.size() > 128) {
-      
-      // sort according to the file-size...
-      std::sort(paths.begin(), paths.end(), less_file_size());
-      
-      const path_type file1 = paths.front();
-      paths.erase(paths.begin());
-      
-      const path_type file2 = paths.front();
-      paths.erase(paths.begin());
-      
-      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.modified.XXXXXX");
-      utils::tempfile::insert(counts_file_tmp);
-      const path_type counts_file = counts_file_tmp.string() + ".gz";
-      utils::tempfile::insert(counts_file);
-      
-      paths.push_back(counts_file);
-      {
-	utils::compress_istream is1(file1, 1024 * 1024);
-	utils::compress_istream is2(file2, 1024 * 1024);
-	
-	utils::compress_ostream os(counts_file, 1024 * 1024);
-	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
-	
-	merge_counts(is1, is2, os);
-      }
-      
-      boost::filesystem::remove(file1);
-      boost::filesystem::remove(file2);
-      
-      utils::tempfile::erase(file1);
-      utils::tempfile::erase(file2);
-    }
-  }
-  
-
-  template <typename Tp>
-  struct less_ptr
-  {
-    bool operator()(const Tp* x, const Tp* y) const
-    {
-      return *x < *y;
-    }
-  };
-  
-  void dump_counts(path_set_type& paths, const modified_unique_type& counts)
-  {
-    // sort...!
-    typedef std::vector<const modified_type*, std::allocator<const modified_type*> > sorted_type;
-    
-    // sorting...
-    sorted_type sorted(counts.size());
-    {
-      sorted_type::iterator siter = sorted.begin();
-      modified_unique_type::const_iterator citer_end = counts.end();
-      for (modified_unique_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ siter)
-	*siter = &(*citer);
-    }
-    std::sort(sorted.begin(), sorted.end(), less_ptr<modified_type>());
-    
-    // tempfile...
-    const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.modified.XXXXXX");
-    utils::tempfile::insert(counts_file_tmp);
-    const path_type counts_file = counts_file_tmp.string() + ".gz";
-    utils::tempfile::insert(counts_file);
-    
-    paths.push_back(counts_file);
-
-    // final dump!
-    utils::compress_ostream os(counts_file, 1024 * 1024);
-    os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
-    
-    sorted_type::const_iterator siter_end = sorted.end();
-    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-      generator(os, *(*siter)) << '\n';
-  }
-  
-  void operator()()
-  {
-    modified_type    modified;
-    modified_unique_type counts;
-
-    int num_termination = 0;
-    
-    size_type min_counts_size = 0;
-    const size_type iteration_mask = (1 << 5) - 1;
-    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
-    
-    for (size_type iteration = 0; /**/; ++ iteration) {
-      modified.clear();
-      queue.pop_swap(modified);
-      
-      if (modified.source.empty()) {
-	++ num_termination;
-	
-	if (num_termination == shard_size)
-	  break;
-	else
-	  continue;
-      }
-      
-      std::pair<modified_unique_type::iterator, bool> result = counts.insert(modified);
-      if (! result.second)
-	const_cast<modified_type&>(*result.first).increment(modified.counts.begin(), modified.counts.end());
-      
-      if (((iteration & iteration_mask) == iteration_mask)
-	  && ! counts.empty()
-	  && (! min_counts_size || counts.size() > min_counts_size)
-	  && (utils::malloc_stats::used() > malloc_threshold)) {
-	if (! min_counts_size)
-	  min_counts_size = counts.size() >> 1;
-	    
-	dump_counts(paths, counts);
-	counts.clear();
-	modified_unique_type(counts).swap(counts);
-      }
-    }
-    
-    if (! counts.empty()) {
-      dump_counts(paths, counts);
-      counts.clear();
-      modified_unique_type(counts).swap(counts);
-    }
-    
-    merge_counts(paths);
-  }
-};
-
-struct PhrasePairReverse
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef double count_type;
-  
-  typedef uint64_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
-  
-  typedef boost::filesystem::path                            path_type;
-  typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
-  
-  typedef PhrasePair         phrase_pair_type;
-  typedef phrase_pair_type::phrase_type phrase_type;
-  typedef RootCount          root_count_type;
-  typedef PhrasePairModified modified_type;
-  
-  typedef utils::chunk_vector<modified_type, 4096 / sizeof(modified_type), std::allocator<modified_type> > modified_set_type;
-
-  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
-  
-  typedef utils::lockfree_list_queue<modified_type, std::allocator<modified_type> > queue_type;
-  
-  typedef boost::shared_ptr<queue_type> queue_ptr_type;
-  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
-};
-
-template <typename ExtractRoot>
-struct PhrasePairReverseMapper
-{
-  typedef PhrasePairReverse map_reduce_type;
-  
-  typedef map_reduce_type::size_type       size_type;
-  typedef map_reduce_type::difference_type difference_type;
-  
-  typedef map_reduce_type::count_type  count_type;
-  
-  typedef map_reduce_type::hash_value_type hash_value_type;
-  typedef map_reduce_type::hasher_type     hasher_type;
-  
-  typedef map_reduce_type::path_type     path_type;
-  typedef map_reduce_type::path_set_type path_set_type;
-  
-  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
-  typedef map_reduce_type::phrase_type      phrase_type;
-  typedef map_reduce_type::modified_type    modified_type;
-
-  typedef map_reduce_type::modified_set_type modified_set_type;
-    
-  typedef map_reduce_type::queue_type         queue_type;
-  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
-  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
-
-  typedef map_reduce_type::root_count_type     root_count_type;
-  typedef map_reduce_type::root_count_set_type root_count_set_type;
-
-  typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
-
-  typedef PhrasePairModifiedParser    modified_parser_type;
-  typedef PhrasePairModifiedGenerator modified_generator_type;
-  
-  typedef ExtractRoot extract_root_type;
-  
-  hasher_type hasher;
-  
-  extract_root_type extract_root;
-  
-  path_set_type paths;
-  queue_ptr_set_type& queues;
-  root_count_set_type& root_counts;
-  
-  double max_malloc;
-  int    debug;
-  
-  PhrasePairReverseMapper(const path_set_type& __paths,
-			  queue_ptr_set_type& __queues,
-			  root_count_set_type& __root_counts,
-			  const double __max_malloc,
-			  const int __debug)
-    : paths(__paths),
-      queues(__queues),
-      root_counts(__root_counts),
-      max_malloc(__max_malloc),
-      debug(__debug) {}
-
-  
-  template <typename Tp>
-  struct greater_buffer
-  {
-    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
-    {
-      return x->first.front() > y->first.front();
-    }
-    
-    bool operator()(const Tp* x, const Tp* y) const
-    {
-      return x->first.front() > y->first.front();
-    }
-  };
-
-  modified_parser_type    parser;
-  modified_generator_type generator;
-
-  template <typename Counts>
-  void read_phrase_pair(std::istream& is, Counts& counts)
-  {
-    std::string line;
-    modified_type phrase_pair;
-    
-    while (counts.size() < 256 && std::getline(is, line)) {
-      if (! parser(line, phrase_pair)) continue;
-      
-      if (counts.empty() || counts.back().source != phrase_pair.source)
-	counts.push_back(phrase_pair);
-      else if (counts.back().target != phrase_pair.target) {
-	phrase_pair.source = counts.back().source;
-	counts.push_back(phrase_pair);
-      } else
-	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
-    }
-  }
-  
-  void operator()()
-  {
-    typedef utils::compress_istream         istream_type;
-    typedef boost::shared_ptr<istream_type> istream_ptr_type;
-    typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
-    
-    typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
-    typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
-    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
-    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
-
-    pqueue_type            pqueue;
-    istream_ptr_set_type   istreams(paths.size());
-    buffer_stream_set_type buffer_streams(paths.size());
-    
-    size_t pos = 0;
-    for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
-      if (! boost::filesystem::exists(*piter))
-	throw std::runtime_error("no file? " + piter->string());
-      
-      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
-      
-      buffer_stream_type* buffer_stream = &buffer_streams[pos];
-      buffer_stream->second = &(*istreams[pos]);
-      
-      read_phrase_pair(*istreams[pos], buffer_stream->first);
-      
-      if (! buffer_stream->first.empty())
-	pqueue.push(buffer_stream);
-    }
-    
-    // modified_set_type counts;
-    phrase_set_type   phrases;
-    modified_type     modified;
-    count_type        observed(0);
-    
-    root_count_set_type::iterator riter;
-    
-    int iter = 0;
-    const int iteration_mask = (1 << 4) - 1;
-    const int iteration_mask_long = (1 << 10) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-    bool malloc_full = false;
-    int non_found_iter = 0;
-
-    while (! pqueue.empty()) {
-      buffer_stream_type* buffer_stream(pqueue.top());
-      pqueue.pop();
-      
-      modified_type& curr = buffer_stream->first.front();
-      
-      if (curr.source != modified.source) {
-	
-	if (! phrases.empty()) {
-	  if (observed != phrases.size())
-	    throw std::runtime_error("invalid observation count");
-
-	  modified.counts.push_back(observed);
-	  
-	  phrase_set_type::const_iterator piter_end = phrases.end();
-	  for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	    const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
-	    
-	    queues[shard]->push(modified_type(*piter, modified.source, modified.counts));
-	  }
-
-	  phrases.clear();
-	}
-	
-#if 0
-	if (! counts.empty()) {
-	  // dump counts... but we use the counts from modified and additional observed...
-	  // this observed is the same as counts.size()!
-	  
-	  modified.counts.push_back(observed);
-	  
-	  modified_set_type::iterator citer_end = counts.end();
-	  for (modified_set_type::iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-	    citer->source.swap(citer->target);
-	    citer->counts = modified.counts;
-	    
-	    const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
-	    queues[shard]->push_swap(*citer);
-	    citer->clear();
-	  }
-	  
-	  counts.clear();
-	}
-#endif
-	if ((iter & iteration_mask_long) == iteration_mask_long)
-	  phrase_set_type(phrases).swap(phrases);
-
-	if ((iter & iteration_mask) == iteration_mask)
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	
-	++ iter;
-	
-	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
-	
-	modified.swap(curr);
-	
-	//counts.push_back(modified);
-	//counts.back().counts.clear();
-	phrases.push_back(modified.target);
-	
-	observed = 1;
-	
-	// increment root_observed(lhs)
-	riter = root_counts.insert(extract_root(modified.source)).first;
-	const_cast<root_count_type&>(*riter).increment(modified.counts.begin(), modified.counts.end());
-	const_cast<root_count_type&>(*riter).observed += 1;
-	
-      } else if (curr.target != modified.target) {
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	
-	modified.target.swap(curr.target);
-	modified.increment(curr.counts.begin(), curr.counts.end());
-	
-	//counts.push_back(modified);
-	//counts.back().counts.clear();
-	phrases.push_back(modified.target);
-	
-	observed += 1;
-      } else {
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	modified.increment(curr.counts.begin(), curr.counts.end());
-      }
-      
-      buffer_stream->first.pop_front();
-      
-      if (buffer_stream->first.empty())
-	read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
-      
-      if (! buffer_stream->first.empty())
-	pqueue.push(buffer_stream);
-    }
-    
-    if (! phrases.empty()) {
-      if (observed != phrases.size())
-	throw std::runtime_error("invalid observation count");
-      
-      modified.counts.push_back(observed);
-      
-      phrase_set_type::const_iterator piter_end = phrases.end();
-      for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
-	
-	queues[shard]->push(modified_type(*piter, modified.source, modified.counts));
-      }
-      
-      phrases.clear();
-      phrase_set_type(phrases).swap(phrases);
-    }
-    
-#if 0
-    if (! counts.empty()) {
-      modified.counts.push_back(observed);
-      
-      modified_set_type::iterator citer_end = counts.end();
-      for (modified_set_type::iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-	citer->source.swap(citer->target);
-	citer->counts = modified.counts;
-	
-	const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
-	queues[shard]->push_swap(*citer);
-	citer->clear();
-      }
-      
-      counts.clear();
-    }
-#endif
-
-    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
-    modified.clear();
-
-    for (;;) {
-      bool found = false;
-      
-      for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
-	  modified.clear();
-	  
-	  terminated[shard] = true;
-	  found = true;
-	}
-      
-      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
-      
-      non_found_iter = loop_sleep(found, non_found_iter);
-    }
-  }
-  
-  inline
-  int loop_sleep(bool found, int non_found_iter)
-  {
-    if (! found) {
-      boost::thread::yield();
-      ++ non_found_iter;
-    } else
-      non_found_iter = 0;
-    
-    if (non_found_iter >= 64) {
-      struct timespec tm;
-      tm.tv_sec = 0;
-      tm.tv_nsec = 2000001;
-      nanosleep(&tm, NULL);
-    
-      non_found_iter = 0;
-    }
-    return non_found_iter;
-  }
-};
-
-
 struct PhrasePairReverseReducer
 {
   typedef PhrasePairReverse map_reduce_type;
   
   typedef map_reduce_type::size_type       size_type;
   typedef map_reduce_type::difference_type difference_type;
-  
-  typedef map_reduce_type::count_type  count_type;
-  
+
   typedef map_reduce_type::hash_value_type hash_value_type;
   typedef map_reduce_type::hasher_type     hasher_type;
   
   typedef map_reduce_type::path_type     path_type;
   typedef map_reduce_type::path_set_type path_set_type;
-  
-  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
-  typedef map_reduce_type::modified_type    modified_type;
 
-  typedef map_reduce_type::modified_set_type modified_set_type;
-    
+  typedef map_reduce_type::simple_type     simple_type;
+  
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
-
-  typedef map_reduce_type::root_count_type     root_count_type;
-  typedef map_reduce_type::root_count_set_type root_count_set_type;
-
-  typedef PhrasePairModifiedParser    modified_parser_type;
-  typedef PhrasePairModifiedGenerator modified_generator_type;
-
-  modified_parser_type    parser;
-  modified_generator_type generator;
   
+  typedef PhrasePairSimpleParser    simple_parser_type;
+  typedef PhrasePairSimpleGenerator simple_generator_type;
+
+  typedef utils::unordered_set<simple_type, boost::hash<simple_type>, std::equal_to<simple_type>,
+			       std::allocator<simple_type> >::type simple_unique_type;
+  
+  simple_parser_type    parser;
+  simple_generator_type generator;
+
   queue_type&    queue;
   path_type      prefix;
   path_set_type& paths;
@@ -1540,7 +1522,6 @@ struct PhrasePairReverseReducer
       shard_size(__shard_size),
       max_malloc(__max_malloc),
       debug(__debug) {}
-  
 
   struct less_file_size
   {
@@ -1554,39 +1535,40 @@ struct PhrasePairReverseReducer
   // merge counts from two streams into os..
   void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
   {
-    modified_type modified1;
-    modified_type modified2;
+    simple_type simple1;
+    simple_type simple2;
     
-    bool parsed1 = parser(is1, modified1);
-    bool parsed2 = parser(is2, modified2);
+    bool parsed1 = parser(is1, simple1);
+    bool parsed2 = parser(is2, simple2);
     
     while (parsed1 && parsed2) {
-      if (modified1 < modified2) {
-	generator(os, modified1) << '\n';
-	parsed1 = parser(is1, modified1);
-      } else if (modified2 < modified1) {
-	generator(os, modified2) << '\n';
-	parsed2 = parser(is2, modified2);
+      if (simple1 < simple2) {
+	generator(os, simple1) << '\n';
+	parsed1 = parser(is1, simple1);
+      } else if (simple2 < simple1) {
+	generator(os, simple2) << '\n';
+	parsed2 = parser(is2, simple2);
       } else {
-	modified1.increment(modified2.counts.begin(), modified2.counts.end());
-	generator(os, modified1) << '\n';
+	simple1.increment(simple2.counts.begin(), simple2.counts.end());
+	generator(os, simple1) << '\n';
 	
-	parsed1 = parser(is1, modified1);
-	parsed2 = parser(is2, modified2);
+	parsed1 = parser(is1, simple1);
+	parsed2 = parser(is2, simple2);
       }
     }
     
     // dump remaining...
     while (parsed1) {
-      generator(os, modified1) << '\n';
-      parsed1 = parser(is1, modified1);
+      generator(os, simple1) << '\n';
+      parsed1 = parser(is1, simple1);
     }
     
     while (parsed2) {
-      generator(os, modified2) << '\n';
-      parsed2 = parser(is2, modified2);
+      generator(os, simple2) << '\n';
+      parsed2 = parser(is2, simple2);
     }
   }
+  
   
   // merge from smallest files...
   void merge_counts(path_set_type& paths)
@@ -1637,24 +1619,551 @@ struct PhrasePairReverseReducer
       return *x < *y;
     }
   };
-
-  void dump_counts(path_set_type& paths, const modified_set_type& counts)
+  
+  void dump_counts(path_set_type& paths, const simple_unique_type& counts)
   {
     // sort...!
-    typedef std::vector<const modified_type*, std::allocator<const modified_type*> > sorted_type;
+    typedef std::vector<const simple_type*, std::allocator<const simple_type*> > sorted_type;
     
     // sorting...
     sorted_type sorted(counts.size());
     {
       sorted_type::iterator siter = sorted.begin();
-      modified_set_type::const_iterator citer_end = counts.end();
-      for (modified_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ siter)
+      simple_unique_type::const_iterator citer_end = counts.end();
+      for (simple_unique_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ siter)
 	*siter = &(*citer);
     }
-    std::sort(sorted.begin(), sorted.end(), less_ptr<modified_type>());
+    std::sort(sorted.begin(), sorted.end(), less_ptr<simple_type>());
     
     // tempfile...
     const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.reversed.XXXXXX");
+    utils::tempfile::insert(counts_file_tmp);
+    const path_type counts_file = counts_file_tmp.string() + ".gz";
+    utils::tempfile::insert(counts_file);
+    
+    paths.push_back(counts_file);
+
+    // final dump!
+    utils::compress_ostream os(counts_file, 1024 * 1024);
+    os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      generator(os, *(*siter)) << '\n';
+  }
+  
+  void operator()()
+  {
+    simple_type        reversed;
+    simple_unique_type counts;
+
+    int num_termination = 0;
+    
+    size_type min_counts_size = 0;
+    const size_type iteration_mask = (1 << 5) - 1;
+    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
+    
+    for (size_type iteration = 0; /**/; ++ iteration) {
+      reversed.clear();
+      queue.pop_swap(reversed);
+      
+      if (reversed.source.empty()) {
+	++ num_termination;
+	
+	if (num_termination == shard_size)
+	  break;
+	else
+	  continue;
+      }
+      
+      std::pair<simple_unique_type::iterator, bool> result = counts.insert(reversed);
+      if (! result.second)
+	const_cast<simple_type&>(*result.first).increment(reversed.counts.begin(), reversed.counts.end());
+      
+      if (((iteration & iteration_mask) == iteration_mask)
+	  && ! counts.empty()
+	  && (! min_counts_size || counts.size() > min_counts_size)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	if (! min_counts_size)
+	  min_counts_size = counts.size() >> 1;
+	    
+	dump_counts(paths, counts);
+	counts.clear();
+	simple_unique_type(counts).swap(counts);
+      }
+    }
+    
+    if (! counts.empty()) {
+      dump_counts(paths, counts);
+      counts.clear();
+      simple_unique_type(counts).swap(counts);
+    }
+    
+    merge_counts(paths);
+  }
+};
+
+struct PhrasePairTarget
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef double count_type;
+  
+  typedef uint64_t                           hash_value_type;
+  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  
+  typedef boost::filesystem::path                            path_type;
+  typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+  
+  typedef PhrasePair         phrase_pair_type;
+  typedef phrase_pair_type::phrase_type phrase_type;
+  typedef RootCount          root_count_type;
+  typedef PhrasePairSimple simple_type;
+  
+  typedef utils::chunk_vector<simple_type, 4096 / sizeof(simple_type), std::allocator<simple_type> > simple_set_type;
+
+  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+  
+  typedef utils::lockfree_list_queue<simple_type, std::allocator<simple_type> > queue_type;
+  
+  typedef boost::shared_ptr<queue_type> queue_ptr_type;
+  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
+};
+
+template <typename ExtractRoot>
+struct PhrasePairTargetMapper
+{
+  typedef PhrasePairTarget map_reduce_type;
+  
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
+  
+  typedef map_reduce_type::count_type  count_type;
+  
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+  
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::phrase_type      phrase_type;
+  typedef map_reduce_type::simple_type    simple_type;
+
+  typedef map_reduce_type::simple_set_type simple_set_type;
+    
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
+
+  typedef PhrasePairSimpleParser    simple_parser_type;
+  typedef PhrasePairSimpleGenerator simple_generator_type;
+  
+  typedef ExtractRoot extract_root_type;
+  
+  hasher_type hasher;
+  
+  extract_root_type extract_root;
+  
+  path_set_type paths;
+  queue_ptr_set_type& queues;
+  root_count_set_type& root_counts;
+  
+  double max_malloc;
+  int    debug;
+  
+  PhrasePairTargetMapper(const path_set_type& __paths,
+			 queue_ptr_set_type& __queues,
+			 root_count_set_type& __root_counts,
+			 const double __max_malloc,
+			 const int __debug)
+    : paths(__paths),
+      queues(__queues),
+      root_counts(__root_counts),
+      max_malloc(__max_malloc),
+      debug(__debug) {}
+
+  
+  template <typename Tp>
+  struct greater_buffer
+  {
+    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+  };
+
+  simple_parser_type    parser;
+  simple_generator_type generator;
+
+  template <typename Counts>
+  void read_phrase_pair(std::istream& is, Counts& counts)
+  {
+    std::string line;
+    simple_type phrase_pair;
+    
+    while (counts.size() < 256 && std::getline(is, line)) {
+      if (! parser(line, phrase_pair)) continue;
+      
+      if (counts.empty() || counts.back().source != phrase_pair.source)
+	counts.push_back(phrase_pair);
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
+	counts.push_back(phrase_pair);
+      } else
+	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
+    }
+  }
+  
+  void operator()()
+  {
+    typedef utils::compress_istream         istream_type;
+    typedef boost::shared_ptr<istream_type> istream_ptr_type;
+    typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+    
+    typedef std::deque<simple_type, std::allocator<simple_type> > buffer_type;
+    typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
+    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+
+    pqueue_type            pqueue;
+    istream_ptr_set_type   istreams(paths.size());
+    buffer_stream_set_type buffer_streams(paths.size());
+    
+    size_t pos = 0;
+    for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
+      if (! boost::filesystem::exists(*piter))
+	throw std::runtime_error("no file? " + piter->string());
+      
+      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
+      
+      buffer_stream_type* buffer_stream = &buffer_streams[pos];
+      buffer_stream->second = &(*istreams[pos]);
+      
+      read_phrase_pair(*istreams[pos], buffer_stream->first);
+      
+      if (! buffer_stream->first.empty())
+	pqueue.push(buffer_stream);
+    }
+    
+    phrase_set_type phrases;
+    simple_type     counts;
+    count_type      observed(0);
+    
+    root_count_set_type::iterator riter;
+    
+    int iter = 0;
+    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask_long = (1 << 10) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
+    int non_found_iter = 0;
+
+    while (! pqueue.empty()) {
+      buffer_stream_type* buffer_stream(pqueue.top());
+      pqueue.pop();
+      
+      simple_type& curr = buffer_stream->first.front();
+      
+      if (curr.source != counts.source) {
+	
+	if (! phrases.empty()) {
+	  if (observed != phrases.size())
+	    throw std::runtime_error("invalid observation count");
+
+	  counts.counts.push_back(observed);
+	  
+	  phrase_set_type::const_iterator piter_end = phrases.end();
+	  for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	    const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	    
+	    queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
+	  }
+
+	  phrases.clear();
+	}
+	
+	if ((iter & iteration_mask_long) == iteration_mask_long)
+	  phrase_set_type(phrases).swap(phrases);
+
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	
+	++ iter;
+	
+	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	
+	counts.swap(curr);
+	
+	phrases.push_back(counts.target);
+	observed = 1;
+	
+	// increment root_observed(lhs)
+	riter = root_counts.insert(extract_root(counts.source)).first;
+	const_cast<root_count_type&>(*riter).increment(counts.counts.begin(), counts.counts.end());
+	const_cast<root_count_type&>(*riter).observed += 1;
+	
+      } else if (curr.target != counts.target) {
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	
+	counts.target.swap(curr.target);
+	counts.increment(curr.counts.begin(), curr.counts.end());
+	
+	phrases.push_back(counts.target);
+	observed += 1;
+      } else {
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	counts.increment(curr.counts.begin(), curr.counts.end());
+      }
+      
+      buffer_stream->first.pop_front();
+      
+      if (buffer_stream->first.empty())
+	read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
+      
+      if (! buffer_stream->first.empty())
+	pqueue.push(buffer_stream);
+    }
+    
+    if (! phrases.empty()) {
+      if (observed != phrases.size())
+	throw std::runtime_error("invalid observation count");
+      
+      counts.counts.push_back(observed);
+      
+      phrase_set_type::const_iterator piter_end = phrases.end();
+      for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	
+	queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
+      }
+      
+      phrases.clear();
+      phrase_set_type(phrases).swap(phrases);
+    }
+    
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    counts.clear();
+
+    for (;;) {
+      bool found = false;
+      
+      for (size_t shard = 0; shard != queues.size(); ++ shard) 
+	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+	  counts.clear();
+	  
+	  terminated[shard] = true;
+	  found = true;
+	}
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+  }
+  
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+    
+    if (non_found_iter >= 64) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
+  }
+};
+
+
+struct PhrasePairTargetReducer
+{
+  typedef PhrasePairTarget map_reduce_type;
+  
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
+  
+  typedef map_reduce_type::count_type  count_type;
+  
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+  
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::simple_type    simple_type;
+
+  typedef map_reduce_type::simple_set_type simple_set_type;
+    
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef PhrasePairSimpleParser    simple_parser_type;
+  typedef PhrasePairSimpleGenerator simple_generator_type;
+
+  simple_parser_type    parser;
+  simple_generator_type generator;
+  
+  queue_type&    queue;
+  path_type      prefix;
+  path_set_type& paths;
+  
+  int            shard_size;
+  double         max_malloc;
+  int            debug;
+  
+  PhrasePairTargetReducer(queue_type&    __queue,
+			  const path_type& __prefix,
+			  path_set_type& __paths,
+			  const int      __shard_size,
+			  const double   __max_malloc,
+			  const int      __debug)
+    : queue(__queue),
+      prefix(__prefix),
+      paths(__paths),
+      shard_size(__shard_size),
+      max_malloc(__max_malloc),
+      debug(__debug) {}
+  
+
+  struct less_file_size
+  {
+    bool operator()(const path_type& x, const path_type& y) const
+    {
+      return boost::filesystem::file_size(x) < boost::filesystem::file_size(y);
+    }
+  };
+
+
+  // merge counts from two streams into os..
+  void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
+  {
+    simple_type simple1;
+    simple_type simple2;
+    
+    bool parsed1 = parser(is1, simple1);
+    bool parsed2 = parser(is2, simple2);
+    
+    while (parsed1 && parsed2) {
+      if (simple1 < simple2) {
+	generator(os, simple1) << '\n';
+	parsed1 = parser(is1, simple1);
+      } else if (simple2 < simple1) {
+	generator(os, simple2) << '\n';
+	parsed2 = parser(is2, simple2);
+      } else {
+	simple1.increment(simple2.counts.begin(), simple2.counts.end());
+	generator(os, simple1) << '\n';
+	
+	parsed1 = parser(is1, simple1);
+	parsed2 = parser(is2, simple2);
+      }
+    }
+    
+    // dump remaining...
+    while (parsed1) {
+      generator(os, simple1) << '\n';
+      parsed1 = parser(is1, simple1);
+    }
+    
+    while (parsed2) {
+      generator(os, simple2) << '\n';
+      parsed2 = parser(is2, simple2);
+    }
+  }
+  
+  // merge from smallest files...
+  void merge_counts(path_set_type& paths)
+  {
+    if (paths.size() <= 128) return;
+
+    while (paths.size() > 128) {
+      
+      // sort according to the file-size...
+      std::sort(paths.begin(), paths.end(), less_file_size());
+      
+      const path_type file1 = paths.front();
+      paths.erase(paths.begin());
+      
+      const path_type file2 = paths.front();
+      paths.erase(paths.begin());
+      
+      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.target.XXXXXX");
+      utils::tempfile::insert(counts_file_tmp);
+      const path_type counts_file = counts_file_tmp.string() + ".gz";
+      utils::tempfile::insert(counts_file);
+      
+      paths.push_back(counts_file);
+      {
+	utils::compress_istream is1(file1, 1024 * 1024);
+	utils::compress_istream is2(file2, 1024 * 1024);
+	
+	utils::compress_ostream os(counts_file, 1024 * 1024);
+	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+	
+	merge_counts(is1, is2, os);
+      }
+      
+      boost::filesystem::remove(file1);
+      boost::filesystem::remove(file2);
+      
+      utils::tempfile::erase(file1);
+      utils::tempfile::erase(file2);
+    }
+  }
+  
+
+  template <typename Tp>
+  struct less_ptr
+  {
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return *x < *y;
+    }
+  };
+
+  void dump_counts(path_set_type& paths, const simple_set_type& counts)
+  {
+    // sort...!
+    typedef std::vector<const simple_type*, std::allocator<const simple_type*> > sorted_type;
+    
+    // sorting...
+    sorted_type sorted(counts.size());
+    {
+      sorted_type::iterator siter = sorted.begin();
+      simple_set_type::const_iterator citer_end = counts.end();
+      for (simple_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ siter)
+	*siter = &(*citer);
+    }
+    std::sort(sorted.begin(), sorted.end(), less_ptr<simple_type>());
+    
+    // tempfile...
+    const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.target.XXXXXX");
     utils::tempfile::insert(counts_file_tmp);
     const path_type counts_file = counts_file_tmp.string() + ".gz";
     utils::tempfile::insert(counts_file);
@@ -1674,8 +2183,8 @@ struct PhrasePairReverseReducer
   {
     // we already know that the entries are uniqued through the previous map-reduce!
     
-    modified_type modified;
-    modified_set_type counts;
+    simple_type     target;
+    simple_set_type counts;
     
     int num_termination = 0;
     
@@ -1684,10 +2193,10 @@ struct PhrasePairReverseReducer
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
-      modified.clear();
-      queue.pop_swap(modified);
+      target.clear();
+      queue.pop_swap(target);
       
-      if (modified.source.empty()) {
+      if (target.source.empty()) {
 	++ num_termination;
 	
 	if (num_termination == shard_size)
@@ -1696,7 +2205,7 @@ struct PhrasePairReverseReducer
 	  continue;
       }
       
-      counts.push_back(modified);
+      counts.push_back(target);
       
       if (((iteration & iteration_mask) == iteration_mask)
 	  && ! counts.empty()
@@ -1733,14 +2242,14 @@ struct PhrasePairScore
   typedef boost::filesystem::path                            path_type;
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-  typedef PhrasePair         phrase_pair_type;
-  typedef PhrasePairModified modified_type;
-  typedef RootCount          root_count_type;
+  typedef PhrasePair       phrase_pair_type;
+  typedef PhrasePairSimple simple_type;
+  typedef RootCount        root_count_type;
+  typedef PhraseCount      phrase_count_type;
   
   typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
   
   typedef utils::lockfree_list_queue<phrase_pair_type, std::allocator<phrase_pair_type> > queue_type;
-  
   
   typedef boost::shared_ptr<queue_type> queue_ptr_type;
   typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
@@ -1763,7 +2272,7 @@ struct PhrasePairScoreMapper
   typedef map_reduce_type::path_set_type path_set_type;
   
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
-  typedef map_reduce_type::modified_type    modified_type;
+  typedef map_reduce_type::simple_type    simple_type;
     
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -1951,7 +2460,6 @@ struct PhrasePairScoreMapper
   }
 };
 
-template <typename ExtractRoot>
 struct PhrasePairScoreReducer
 {
   typedef PhrasePairScore map_reduce_type;
@@ -1967,46 +2475,35 @@ struct PhrasePairScoreReducer
   typedef map_reduce_type::path_type     path_type;
   typedef map_reduce_type::path_set_type path_set_type;
   
-  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
-  typedef map_reduce_type::modified_type    modified_type;
+  typedef map_reduce_type::phrase_pair_type  phrase_pair_type;
+  typedef map_reduce_type::phrase_count_type phrase_count_type;
+  typedef map_reduce_type::simple_type       simple_type;
 
   typedef phrase_pair_type::alignment_type alignment_type;
   
   typedef std::vector<phrase_pair_type, std::allocator<phrase_pair_type> > phrase_pair_set_type;
-  typedef std::vector<modified_type, std::allocator<modified_type> > modified_set_type;
+  typedef std::vector<simple_type, std::allocator<simple_type> > simple_set_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;  
 
-  typedef map_reduce_type::root_count_type     root_count_type;
-  typedef map_reduce_type::root_count_set_type root_count_set_type;
-
-  typedef PhrasePairModifiedParser    modified_parser_type;
+  typedef PhrasePairSimpleParser    simple_parser_type;
+  typedef PhraseCountParser         phrase_parser_type;
   
-  typedef ExtractRoot extract_root_type;
-  
-  root_count_set_type& joint_counts;
-  root_count_set_type& root_counts;
-  
-  extract_root_type extract_root;
-  
-  const path_set_type& paths;
+  const path_type&     path_source;
+  const path_set_type& path_targets;
   queue_ptr_set_type& queues;
   std::ostream& os;
   int debug;
   
-  PhrasePairScoreReducer(root_count_set_type& __joint_counts,
-			 root_count_set_type& __root_counts,
-			 const extract_root_type& __extract_root,
-			 const path_set_type& __paths,
+  PhrasePairScoreReducer(const path_type& __path_source,
+			 const path_set_type& __path_targets,
 			 queue_ptr_set_type& __queues,
 			 std::ostream& __os,
 			 int __debug)
-    : joint_counts(__joint_counts),
-      root_counts(__root_counts),
-      extract_root(__extract_root),
-      paths(__paths),
+    : path_source(__path_source),
+      path_targets(__path_targets),
       queues(__queues),
       os(__os),
       debug(__debug) {}
@@ -2025,6 +2522,20 @@ struct PhrasePairScoreReducer
     }
   };
 
+  template <typename Tp>
+  struct greater_stream
+  {
+    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->first.front() > y->first.front();
+    }
+  };
+
   struct real_precision : boost::spirit::karma::real_policies<count_type>
   {
     static unsigned int precision(double) 
@@ -2034,98 +2545,70 @@ struct PhrasePairScoreReducer
   };
   
   boost::spirit::karma::real_generator<count_type, real_precision> double20;
-
-  void dump_phrase_pair(const phrase_pair_set_type& counts, const modified_set_type& modified)
+  
+  void dump_phrase_pair(const phrase_pair_set_type& counts, const phrase_count_type& source, const simple_type& target)
   {
-    typedef std::vector<phrase_pair_set_type::const_iterator, std::allocator<phrase_pair_set_type::const_iterator> > iterators_type;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    // counts are grouped by source/target
+    
+    const phrase_count_type::counts_type& counts_source = source.counts;
+    const simple_type::counts_type&       counts_target = target.counts;
 
-    // counts are grouped by source
+    os << target.source << " ||| " << target.target << " |||";
     
-    //
-    // compute source counts and merged counts (ignoring difference of word alignment)
-    //
-    phrase_pair_type counts_source;
-    count_type       observed_source(0);
-    
-    iterators_type iterators;
-    
-    phrase_pair_set_type::const_iterator citer_end = counts.end();
-    for (phrase_pair_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-      counts_source.increment(citer->counts.begin(), citer->counts.end());
-      
-      if (counts_source.target != citer->target) {
-	iterators.push_back(citer);
-	
-	observed_source += 1;
-	counts_source.target = citer->target;
-      }
-    }
-    iterators.push_back(citer_end);
-
-    if (modified.size() != iterators.size() - 1)
-      throw std::runtime_error("source/target size mismatch?");
+    std::ostream_iterator<char> oiter(os);
     
     phrase_pair_type counts_pair;
     
-    modified_set_type::const_iterator miter = modified.begin();
-    
-    iterators_type::const_iterator iiter_end = iterators.end() - 1;
-    for (iterators_type::const_iterator iiter = iterators.begin(); iiter != iiter_end; ++ iiter, ++ miter) {
-      phrase_pair_set_type::const_iterator first = *iiter;
-      phrase_pair_set_type::const_iterator last  = *(iiter + 1);
+    phrase_pair_set_type::const_iterator citer_end = counts.end();
+    for (phrase_pair_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
       
-      if (first->source != miter->source)
-	throw std::runtime_error("different source?") ;
-      if (first->target != miter->target)
-	throw std::runtime_error("different source?") ;
+      if (citer->source != source.phrase || citer->source != target.source)
+	throw std::runtime_error("different source?");
+      if (citer->target != target.target)
+	throw std::runtime_error("different target?");
       
-      const modified_type::counts_type& counts_target = miter->counts;
+      if (! karma::generate(oiter, (karma::lit(' ') << karma::lit('(')
+				    << -((karma::int_ << '-' << karma::int_) % ' ')
+				    << karma::lit(')')),
+			    citer->alignment))
+	throw std::runtime_error("alignment generation failed");
       
-      counts_pair.clear();
-      
-      os << first->source << " ||| " << first->target << " |||";
-
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      
-      std::ostream_iterator<char> oiter(os);
-      
-      for (phrase_pair_set_type::const_iterator iter = first; iter != last; ++ iter) {
-	
-	if (! karma::generate(oiter, karma::lit(' ') << karma::lit('(') << -((karma::int_ << '-' << karma::int_) % ' ') << karma::lit(')'), iter->alignment))
-	  throw std::runtime_error("alignment generation failed");
-	
-	counts_pair.increment(iter->counts.begin(), iter->counts.end());
-      }
-      
-      // cont(LHS RHS)
-      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), counts_pair.counts))
-	throw std::runtime_error("generation failed");
-      
-      // count(LHS)
-      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), counts_source.counts))
-	throw std::runtime_error("generation failed");
-      
-      // count(RHS)
-      if (! karma::generate(oiter, " ||| " << -(double20 % ' '), boost::make_iterator_range(counts_target.begin(), counts_target.end() - 1)))
-	throw std::runtime_error("generation failed");
-      
-      // observed(LHS) observed(RHS)
-      if (! karma::generate(oiter, " ||| " << double20 << ' ' << double20 << '\n', observed_source, counts_target.back()))
-	throw std::runtime_error("generation failed");
+      counts_pair.increment(citer->counts.begin(), citer->counts.end());
     }
+    
+    // cont(LHS RHS)
+    if (! karma::generate(oiter, " ||| " << -(double20 % ' '), counts_pair.counts))
+      throw std::runtime_error("generation failed");
+    
+    // count(LHS)
+    if (! karma::generate(oiter, " ||| " << -(double20 % ' '),
+			  boost::make_iterator_range(counts_source.begin(), counts_source.end() - 1)))
+      throw std::runtime_error("generation failed");
+    
+    // count(RHS)
+    if (! karma::generate(oiter, " ||| " << -(double20 % ' '),
+			  boost::make_iterator_range(counts_target.begin(), counts_target.end() - 1)))
+      throw std::runtime_error("generation failed");
+    
+    // observed(LHS) observed(RHS)
+    if (! karma::generate(oiter, " ||| " << double20 << ' ' << double20 << '\n', counts_source.back(), counts_target.back()))
+      throw std::runtime_error("generation failed");
   }
-
-  modified_parser_type    modified_parser;
+  
+  simple_parser_type simple_parser;
+  phrase_parser_type phrase_parser;
 
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
     std::string line;
-    modified_type phrase_pair;
+    simple_type phrase_pair;
     
     while (counts.size() < 256 && std::getline(is, line)) {
-      if (! modified_parser(line, phrase_pair)) continue;
+      if (! simple_parser(line, phrase_pair)) continue;
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
@@ -2134,6 +2617,22 @@ struct PhrasePairScoreReducer
 	counts.push_back(phrase_pair);
       } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
+    }
+  }
+  
+  template <typename Counts>
+  void read_phrase(std::istream& is, Counts& counts)
+  {
+    std::string line;
+    phrase_count_type phrase;
+    
+    while (counts.size() < 256 && std::getline(is, line)) {
+      if (! phrase_parser(line, phrase)) continue;
+      
+      if (counts.empty() || counts.back().phrase != phrase.phrase)
+	counts.push_back(phrase);
+      else
+	counts.back().increment(phrase.counts.begin(), phrase.counts.end());
     }
   }
   
@@ -2147,21 +2646,23 @@ struct PhrasePairScoreReducer
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
     typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
     
-    typedef std::deque<modified_type, std::allocator<modified_type> > modified_buffer_type;
-    typedef std::pair<modified_buffer_type, istream_type*> buffer_stream_type;
+    typedef std::deque<simple_type, std::allocator<simple_type> > simple_buffer_type;
+    typedef std::pair<simple_buffer_type, istream_type*> buffer_stream_type;
     typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     
-    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > modified_pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_type*, modified_pqueue_base_type, greater_buffer<buffer_stream_type> > modified_pqueue_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > simple_pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, simple_pqueue_base_type, greater_stream<buffer_stream_type> > simple_pqueue_type;
+
+    typedef std::deque<phrase_count_type, std::allocator<phrase_count_type> > phrase_buffer_type;
     
     os.precision(20);
     
     pqueue_type pqueue;
     std::vector<buffer_queue_type, std::allocator<buffer_queue_type> > buffer_queues(queues.size());
-
-    modified_pqueue_type   mqueue;
-    istream_ptr_set_type   istreams(paths.size());
-    buffer_stream_set_type buffer_streams(paths.size());
+    
+    simple_pqueue_type     queue_target;
+    istream_ptr_set_type   istreams(path_targets.size());
+    buffer_stream_set_type buffer_streams(path_targets.size());
     
     {
       size_t pos = 0;
@@ -2180,7 +2681,7 @@ struct PhrasePairScoreReducer
 
     {
       size_t pos = 0;
-      for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
+      for (path_set_type::const_iterator piter = path_targets.begin(); piter != path_targets.end(); ++ piter, ++ pos) {
 	if (! boost::filesystem::exists(*piter))
 	  throw std::runtime_error("no file? " + piter->string());
 	
@@ -2192,16 +2693,19 @@ struct PhrasePairScoreReducer
 	read_phrase_pair(*istreams[pos], buffer_stream->first);
 	
 	if (! buffer_stream->first.empty())
-	  mqueue.push(buffer_stream);
+	  queue_target.push(buffer_stream);
       }
     }
+
+    utils::compress_istream is_source(path_source, 1024 * 1024);
+    phrase_buffer_type buffer_source;
+    
+    read_phrase(is_source, buffer_source);
     
     phrase_pair_set_type counts;
-    modified_set_type    modified;
-
-    root_count_set_type::iterator jiter;
-    root_count_set_type::iterator riter;
-        
+    phrase_count_type    source;
+    simple_type          target;
+    
     while (! pqueue.empty()) {
       buffer_queue_type* buffer_queue(pqueue.top());
       pqueue.pop();
@@ -2209,38 +2713,36 @@ struct PhrasePairScoreReducer
       phrase_pair_type& curr = buffer_queue->first;
       
       if (counts.empty() || counts.back().source != curr.source) {
+	
 	if (! counts.empty()) {
 	  if (debug >= 4)
 	    std::cerr << "score count reducer: " << counts.size() << std::endl;
 	  
-	  dump_phrase_pair(counts, modified);
+	  dump_phrase_pair(counts, source, target);
 	  
 	  counts.clear();
-	  modified.clear();
-	  
-	  phrase_pair_set_type(counts).swap(counts);
-	  modified_set_type(modified).swap(modified);
 	}
-
-	// increment root_observed(lhs+rhs)
-	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
-	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*jiter).observed += 1;
-	
-	// increment root_observed(lhs)
-	riter = root_counts.insert(extract_root(curr.source)).first;
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).observed += 1;
 	
 	counts.push_back(curr);
 	
-	if (mqueue.empty())
-	  throw std::runtime_error("modified counts and phrase pair do not match");
+	// next source..
+	if (buffer_source.empty())
+	  throw std::runtime_error("source counts and phrase pair do not match");
 	
-	buffer_stream_type* buffer_stream(mqueue.top());
-	mqueue.pop();
+	source.swap(buffer_source.front());
+	buffer_source.pop_front();
 	
-	modified.push_back(buffer_stream->first.front());
+	if (buffer_source.empty())
+	  read_phrase(is_source, buffer_source);
+	
+	// next target...
+	if (queue_target.empty())
+	  throw std::runtime_error("target counts and phrase pair do not match");
+	
+	buffer_stream_type* buffer_stream(queue_target.top());
+	queue_target.pop();
+	
+	target.swap(buffer_stream->first.front());
 	
 	buffer_stream->first.pop_front();
 	
@@ -2248,31 +2750,34 @@ struct PhrasePairScoreReducer
 	  read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
 	
 	if (! buffer_stream->first.empty())
-	  mqueue.push(buffer_stream);
-
-	if (counts.back().source != modified.back().source)
-	  throw std::runtime_error("source mismatch? " + counts.back().source + " modified: " + modified.back().source);
+	  queue_target.push(buffer_stream);
 	
-	if (counts.back().target != modified.back().target)
-	  throw std::runtime_error("target mismatch? " + counts.back().target + " modified: " + modified.back().target);
+	if (counts.back().source != target.source)
+	  throw std::runtime_error("source mismatch? " + counts.back().source + " target: " + target.source);
+	
+	if (counts.back().target != target.target)
+	  throw std::runtime_error("target mismatch? " + counts.back().target + " target: " + target.target);
 	
       } else if (counts.back().target != curr.target) {
-	// increment root_observed(lhs+rhs)
-	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
-	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*jiter).observed += 1;
-	
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	if (! counts.empty()) {
+	  if (debug >= 4)
+	    std::cerr << "score count reducer: " << counts.size() << std::endl;
+	  
+	  dump_phrase_pair(counts, source, target);
+	  
+	  counts.clear();
+	}
 	
 	counts.push_back(curr);
 	
-	if (mqueue.empty())
-	  throw std::runtime_error("modified counts and phrase pair do not match: sharing the same source");
+	// next target...
+	if (queue_target.empty())
+	  throw std::runtime_error("simple counts and phrase pair do not match: sharing the same source");
 	
-	buffer_stream_type* buffer_stream(mqueue.top());
-	mqueue.pop();
+	buffer_stream_type* buffer_stream(queue_target.top());
+	queue_target.pop();
 	
-	modified.push_back(buffer_stream->first.front());
+	target.swap(buffer_stream->first.front());
 	
 	buffer_stream->first.pop_front();
 	
@@ -2280,37 +2785,32 @@ struct PhrasePairScoreReducer
 	  read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
 	
 	if (! buffer_stream->first.empty())
-	  mqueue.push(buffer_stream);
+	  queue_target.push(buffer_stream);
 	
-	if (counts.back().source != modified.back().source)
-	  throw std::runtime_error("source mismatch? " + counts.back().source + " modified: " + modified.back().source);
+	if (counts.back().source != target.source)
+	  throw std::runtime_error("source mismatch? " + counts.back().source + " simple: " + target.source);
 	
-	if (counts.back().target != modified.back().target)
-	  throw std::runtime_error("target mismatch? " + counts.back().target + " modified: " + modified.back().target);
+	if (counts.back().target != target.target)
+	  throw std::runtime_error("target mismatch? " + counts.back().target + " simple: " + target.target);
 	
-      } else if (counts.back().alignment != curr.alignment) {
-	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+      } else if (counts.back().alignment != curr.alignment)
 	counts.push_back(curr);
-      } else {
-	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
-	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+      else
 	counts.back().increment(curr.counts.begin(), curr.counts.end());
-      }
       
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
 	pqueue.push(buffer_queue);
     }
     
-    if (! mqueue.empty())
-      throw std::runtime_error("queue is empty but modified-queue is not empty!");
+    if (! queue_target.empty())
+      throw std::runtime_error("queue is empty but queue-target is not empty!");
     
     if (! counts.empty()) {
       if (debug >= 4)
 	std::cerr << "score count reducer: " << counts.size() << std::endl;
       
-      dump_phrase_pair(counts, modified);
+      dump_phrase_pair(counts, source, target);
     }
   }
   

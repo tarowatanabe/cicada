@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_extract_score_impl.hpp"
@@ -67,25 +67,31 @@ int debug = 0;
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files);
-template <typename Extractor>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
-			  const path_set_type& reversed_files,
-			  root_count_set_type& root_joint,
-			  root_count_set_type& root_sources);
+			  const path_type& source_file,
+			  const path_set_type& target_files);
+
+void source_counts_mapper(utils::mpi_intercomm& reducer,
+			  const path_set_type& counts_files);
+template <typename Extractor>
+void source_counts_reducer(utils::mpi_intercomm& mapper,
+			   path_type& source_file,
+			   root_count_set_type& root_joint,
+			   root_count_set_type& root_source);
 
 template <typename Extractor>
+void target_counts_mapper(utils::mpi_intercomm& reducer,
+			  const path_set_type& counts_files,
+			  root_count_set_type& root_counts);
+void target_counts_reducer(utils::mpi_intercomm& mapper,
+			   path_set_type& target_files);
+
 void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 			   const path_set_type& counts_files,
-			   root_count_set_type& root_counts);
+			   path_set_type& reversed_files);
 void reverse_counts_reducer(utils::mpi_intercomm& mapper,
-			    path_set_type& reversed_files);
-
-void modify_counts_mapper(utils::mpi_intercomm& reducer,
-			  const path_set_type& counts_files,
-			  path_set_type& modified_files);
-void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   const path_type& output_file);
+			    const path_type& output_file);
 
 void synchronize_mapper(utils::mpi_intercomm& reducer);
 void synchronize_reducer(utils::mpi_intercomm& mapper);
@@ -122,52 +128,50 @@ int main(int argc, char** argv)
     if (MPI::Comm::Get_parent() != MPI::COMM_NULL) {
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
       
-      path_set_type reversed_files;
+      path_type     source_file;
+      path_set_type target_files;
       root_count_set_type root_joint;
       root_count_set_type root_sources;
+      
+      utils::resource start_source;
+      if (score_phrase)
+	source_counts_reducer<ExtractRootPhrase>(comm_parent, source_file, root_joint, root_sources);
+      else if (score_scfg)
+	source_counts_reducer<ExtractRootSCFG>(comm_parent, source_file, root_joint, root_sources);
+      else
+	source_counts_reducer<ExtractRootGHKM>(comm_parent, source_file, root_joint, root_sources);
+      utils::resource end_source;
+      
+      if (debug && mpi_rank == 0)
+	std::cerr << "source counts reducer cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
+		  << "source counts reducer user time: " << end_source.user_time() - start_source.user_time() << std::endl;
       
       if (mpi_rank == 0)
 	prepare_directory(output_file);
       
       MPI::COMM_WORLD.Barrier();
       
-      utils::resource start_modify;
-      modify_counts_reducer(comm_parent, output_file);
-      utils::resource end_modify;
-      
-      if (debug && mpi_rank == 0)
-	std::cerr << "modify counts reducer cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		  << "modify counts reducer user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
-      
       utils::resource start_reverse;
-      reverse_counts_reducer(comm_parent, reversed_files);
+      reverse_counts_reducer(comm_parent, output_file);
       utils::resource end_reverse;
       
       if (debug && mpi_rank == 0)
 	std::cerr << "reverse counts reducer cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
 		  << "reverse counts reducer user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
       
+      utils::resource start_target;
+      target_counts_reducer(comm_parent, target_files);
+      utils::resource end_target;
+      
+      if (debug && mpi_rank == 0)
+	std::cerr << "target counts reducer cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
+		  << "target counts reducer user time: " << end_target.user_time() - start_target.user_time() << std::endl;
+      
       // scoring...
       utils::resource start_score;
-      if (score_phrase)
-	score_counts_reducer<ExtractRootPhrase>(comm_parent,
-						output_file,
-						reversed_files,
-						root_joint,
-						root_sources);
-      else if (score_scfg)
-	score_counts_reducer<ExtractRootSCFG>(comm_parent,
-					      output_file,
-					      reversed_files,
-					      root_joint,
-					      root_sources);
-      else
-	score_counts_reducer<ExtractRootGHKM>(comm_parent,
-					      output_file,
-					      reversed_files,
-					      root_joint,
-					      root_sources);
+      score_counts_reducer(comm_parent, output_file, source_file, target_files);
       utils::resource end_score;
+      
       if (debug && mpi_rank == 0)
 	std::cerr << "score counts reducer cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
@@ -255,33 +259,41 @@ int main(int argc, char** argv)
       
       if (debug && mpi_rank == 0)
 	std::cerr << "count files: " << counts_files.size() << std::endl;
-
-      path_set_type modified_files;
-      root_count_set_type root_targets;
       
-      utils::resource start_modify;
-      modify_counts_mapper(comm_child, counts_files, modified_files);
-      utils::resource end_modify;
+      utils::resource start_source;
+      source_counts_mapper(comm_child, counts_files);
+      utils::resource end_source;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "modify counts mapper cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		  << "modify counts mapper user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
+	std::cerr << "source counts mapper cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
+		  << "source counts mapper user time: " << end_source.user_time() - start_source.user_time() << std::endl;
+      
+      path_set_type reversed_files;
+      root_count_set_type root_targets;
       
       utils::resource start_reverse;
-      if (score_phrase)
-	reverse_counts_mapper<ExtractRootPhrase>(comm_child, modified_files, root_targets);
-      else if (score_scfg)
-	reverse_counts_mapper<ExtractRootSCFG>(comm_child, modified_files, root_targets);
-      else
-	reverse_counts_mapper<ExtractRootGHKM>(comm_child, modified_files, root_targets);
+      reverse_counts_mapper(comm_child, counts_files, reversed_files);
       utils::resource end_reverse;
       
       if (debug && mpi_rank == 0)
 	std::cerr << "reverse counts mapper cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
 		  << "reverse counts mapper user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
       
-      // remove all the modified files
-      for (path_set_type::const_iterator miter = modified_files.begin(); miter != modified_files.end(); ++ miter) {
+      utils::resource start_target;
+      if (score_phrase)
+	target_counts_mapper<ExtractRootPhrase>(comm_child, reversed_files, root_targets);
+      else if (score_scfg)
+	target_counts_mapper<ExtractRootSCFG>(comm_child, reversed_files, root_targets);
+      else
+	target_counts_mapper<ExtractRootGHKM>(comm_child, reversed_files, root_targets);
+      utils::resource end_target;
+      
+      if (debug && mpi_rank == 0)
+	std::cerr << "target counts mapper cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
+		  << "target counts mapper user time: " << end_target.user_time() - start_target.user_time() << std::endl;
+      
+      // remove all the reversed files
+      for (path_set_type::const_iterator miter = reversed_files.begin(); miter != reversed_files.end(); ++ miter) {
 	boost::filesystem::remove(*miter);
 	utils::tempfile::erase(*miter);
 
@@ -325,8 +337,9 @@ int main(int argc, char** argv)
 
 enum {
   root_count_tag = 2000,
-  modified_tag,
-  reversed_tag,
+  reverse_tag,
+  source_tag,
+  target_tag,
   phrase_pair_tag,
   file_tag,
   notify_tag,
@@ -447,7 +460,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
 }
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
-			  const path_set_type& counts_files)
+			 const path_set_type& counts_files)
 {
   typedef boost::iostreams::filtering_ostream ostream_type;
   typedef utils::mpi_device_sink              odevice_type;
@@ -563,12 +576,10 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   mapper.join_all();
 }
 
-template <typename Extractor>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
-			  const path_set_type& reversed_files,
-			  root_count_set_type& root_joint,
-			  root_count_set_type& root_sources)
+			  const path_type& source_file,
+			  const path_set_type& target_files)
 {
   typedef boost::iostreams::filtering_istream istream_type;
   typedef utils::mpi_device_source            idevice_type;
@@ -581,7 +592,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
 
   typedef PhrasePairScore map_reduce_type;
   
-  typedef PhrasePairScoreReducer<Extractor> reducer_type;
+  typedef PhrasePairScoreReducer reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -614,10 +625,8 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(root_joint,
-						    root_sources,
-						    Extractor(),
-						    reversed_files,
+  reducer.add_thread(new boost::thread(reducer_type(source_file,
+						    target_files,
 						    queues,
 						    os,
 						    debug)));
@@ -658,10 +667,233 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   reducer.join_all();
 }
 
+void source_counts_mapper(utils::mpi_intercomm& reducer,
+			  const path_set_type& counts_files)
+{
+  typedef boost::iostreams::filtering_ostream ostream_type;
+  typedef utils::mpi_device_sink              odevice_type;
+  
+  typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
+  typedef boost::shared_ptr<odevice_type> odevice_ptr_type;
+
+  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
+  typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
+  
+  typedef PhrasePairSource       map_reduce_type;
+  typedef PhrasePairSourceMapper mapper_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+  
+  typedef map_reduce_type::simple_type simple_type;
+  
+  typedef PhrasePairSimpleGenerator simple_generator_type;
+  
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  static const size_t buffer_size     = 1024 * 1024 * 4;
+  static const size_t buffer_size_max = buffer_size << 4;
+  static const size_t queue_size      = 1024 * 8;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  path_set_type mapped_files;
+  for (size_t i = 0; i != counts_files.size(); ++ i)
+    if (static_cast<int>(i % mpi_size) == mpi_rank)
+      mapped_files.push_back(counts_files[i]);
+  
+  ostream_ptr_set_type stream(mpi_size);
+  odevice_ptr_set_type device(mpi_size);
+  queue_ptr_set_type   queues(mpi_size);
+  
+  boost::mt19937 gen;
+  gen.seed(utils::random_seed());
+  boost::random_number_generator<boost::mt19937> rgen(gen);
+  
+  rank_set_type ranks(mpi_size);
+  
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    device[rank].reset(new odevice_type(reducer.comm, rank, source_tag, buffer_size, false, true));
+    
+    stream[rank].reset(new ostream_type());
+    stream[rank]->push(boost::iostreams::zlib_compressor());
+    stream[rank]->push(*device[rank], buffer_size);
+    stream[rank]->precision(20);
+    
+    queues[rank].reset(new queue_type(queue_size));
+    
+    ranks[rank] = rank;
+  }
+  
+  if (debug >= 2)
+    std::cerr << "source counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
+  
+  boost::thread mapper(mapper_type(mapped_files, queues, max_malloc, debug));
+  
+  simple_type simple;
+  simple_generator_type generator;
+  
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+  
+  int non_found_iter = 0;
+  for (;;) {
+    bool found = false;
+    
+    rank_set_type::const_iterator riter_end = ranks.end();
+    for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
+      const int rank = *riter;
+      
+      if (stream[rank] && device[rank]) {
+	
+	if (device[rank]->test() && device[rank]->flush(true))
+	  found = true;
+	
+	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true)) {
+	    found = true;
+	    
+	    if (! simple.source.empty())
+	      generator(*stream[rank], simple) << '\n';
+	    else {
+	      stream[rank].reset();
+	      break;
+	    }
+	  }
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	  if (queues[rank]->pop_swap(simple, true)) {
+	    if (! simple.source.empty())
+	      generator(*stream[rank], simple) << '\n';
+	    else 
+	      stream[rank].reset();
+	    
+	    found = true;
+	  }
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(simple, true)) {
+	    if (! simple.source.empty())
+	      generator(*stream[rank], simple) << '\n';
+	    else 
+	      stream[rank].reset();
+	  }
+	}
+      }
+    }
+    
+    if (found)
+      std::random_shuffle(ranks.begin(), ranks.end(), rgen);
+    
+    found |= utils::mpi_terminate_devices(stream, device);
+    
+    if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+  
+  mapper.join();
+}
+
 template <typename Extractor>
-void reverse_counts_mapper(utils::mpi_intercomm& reducer,
-			   const path_set_type& counts_files,
-			   root_count_set_type& root_counts)
+void source_counts_reducer(utils::mpi_intercomm& mapper,
+			   path_type& source_file,
+			   root_count_set_type& root_joint,
+			   root_count_set_type& root_source)
+{
+  typedef boost::iostreams::filtering_istream istream_type;
+  typedef utils::mpi_device_source            idevice_type;
+  
+  typedef boost::shared_ptr<istream_type> istream_ptr_type;
+  typedef boost::shared_ptr<idevice_type> idevice_ptr_type;
+  
+  typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+  typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
+  
+  typedef PhrasePairSource                   map_reduce_type;
+  typedef PhrasePairSourceReducer<Extractor> reducer_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+  
+  typedef map_reduce_type::simple_type     simple_type;
+
+  typedef PhrasePairSimpleParser simple_parser_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  const size_t queue_size  = 1024 * 64;
+  const size_t buffer_size = 1024 * 1024 * 4;
+  
+  istream_ptr_set_type stream(mpi_size);
+  idevice_ptr_set_type device(mpi_size);
+  queue_ptr_set_type   queues(mpi_size);
+  
+  boost::mt19937 gen;
+  gen.seed(utils::random_seed());
+  boost::random_number_generator<boost::mt19937> rgen(gen);
+  
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    device[rank].reset(new idevice_type(mapper.comm, rank, source_tag, buffer_size));
+    stream[rank].reset(new istream_type());
+    
+    queues[rank].reset(new queue_type(queue_size));
+    
+    stream[rank]->push(boost::iostreams::zlib_decompressor());
+    stream[rank]->push(*device[rank]);
+  }
+  
+  queue_type queue(queue_size);
+  boost::thread reducer(reducer_type(queues,
+				     utils::tempfile::tmp_dir(),
+				     source_file,
+				     root_joint,
+				     root_source,
+				     max_malloc,
+				     debug));
+  
+  simple_type        source;
+  simple_parser_type parser;
+  std::string line;
+  
+  int non_found_iter = 0;
+  for (;;) {
+    bool found = false;
+    
+    for (int rank = 0; rank < mpi_size; ++ rank)
+      while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
+	if (std::getline(*stream[rank], line)) {
+	  
+	  if (parser(line, source))
+	    queues[rank]->push_swap(source);
+	  else
+	    std::cerr << "failed phrase-pair-simple parsing: " << line << std::endl;
+	} else {
+	  source.clear();
+	  queues[rank]->push_swap(source);
+	  
+	  stream[rank].reset();
+	  device[rank].reset();
+	}
+	
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+      break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+  
+  reducer.join();
+}
+
+
+template <typename Extractor>
+void target_counts_mapper(utils::mpi_intercomm& reducer,
+			  const path_set_type& counts_files,
+			  root_count_set_type& root_counts)
 {
   typedef boost::iostreams::filtering_ostream ostream_type;
   typedef utils::mpi_device_sink              odevice_type;
@@ -672,17 +904,17 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
   typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
 
-  typedef PhrasePairReverse map_reduce_type;
+  typedef PhrasePairTarget map_reduce_type;
   
-  typedef PhrasePairReverseMapper<Extractor>  mapper_type;
+  typedef PhrasePairTargetMapper<Extractor>  mapper_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
   
-  typedef map_reduce_type::modified_type     modified_type;
+  typedef map_reduce_type::simple_type     simple_type;
   
-  typedef PhrasePairModifiedGenerator modified_generator_type;
+  typedef PhrasePairSimpleGenerator simple_generator_type;
   
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
@@ -704,7 +936,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   rank_set_type ranks(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, buffer_size, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, target_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
     stream[rank]->push(boost::iostreams::zlib_compressor());
@@ -717,12 +949,12 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   }
   
   if (debug >= 2)
-    std::cerr << "reverse counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
+    std::cerr << "target counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
   
   boost::thread mapper(mapper_type(counts_files, queues, root_counts, max_malloc, debug));
   
-  modified_type modified;
-  modified_generator_type generator;
+  simple_type target;
+  simple_generator_type generator;
   
   const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
@@ -740,29 +972,29 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(modified, true)) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(target, true)) {
 	    found = true;
 	    
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	    if (! target.source.empty())
+	      generator(*stream[rank], target) << '\n';
 	    else {
 	      stream[rank].reset();
 	      break;
 	    }
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
-	  if (queues[rank]->pop_swap(modified, true)) {
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	  if (queues[rank]->pop_swap(target, true)) {
+	    if (! target.source.empty())
+	      generator(*stream[rank], target) << '\n';
 	    else 
 	      stream[rank].reset();
 	    
 	    found = true;
 	  }
 	} else if (utils::malloc_stats::used() < malloc_threshold) {
-	  if (queues[rank]->pop_swap(modified, true)) {
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	  if (queues[rank]->pop_swap(target, true)) {
+	    if (! target.source.empty())
+	      generator(*stream[rank], target) << '\n';
 	    else 
 	      stream[rank].reset();
 	  }
@@ -783,8 +1015,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   mapper.join();
 }
 
-void reverse_counts_reducer(utils::mpi_intercomm& mapper,
-			    path_set_type& reversed_files)
+void target_counts_reducer(utils::mpi_intercomm& mapper,
+			   path_set_type& target_files)
 {
   typedef boost::iostreams::filtering_istream istream_type;
   typedef utils::mpi_device_source            idevice_type;
@@ -795,18 +1027,18 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
   
-  typedef PhrasePairReverse map_reduce_type;
+  typedef PhrasePairTarget map_reduce_type;
   
-  typedef PhrasePairReverseReducer reducer_type;
+  typedef PhrasePairTargetReducer reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
   
-  typedef map_reduce_type::modified_type     modified_type;
-  typedef map_reduce_type::modified_set_type modified_set_type;
+  typedef map_reduce_type::simple_type     simple_type;
+  typedef map_reduce_type::simple_set_type simple_set_type;
   
-  typedef PhrasePairModifiedParser modified_parser_type;
+  typedef PhrasePairSimpleParser simple_parser_type;
 
   typedef std::vector<int, std::allocator<int> > rank_set_type;
 
@@ -826,7 +1058,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   rank_set_type ranks(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, buffer_size));
+    device[rank].reset(new idevice_type(mapper.comm, rank, target_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::zlib_decompressor());
@@ -836,12 +1068,12 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   }
   
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
+  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, debug));
   
-  modified_type     modified;
-  modified_set_type modified_saved;
+  simple_type     target;
+  simple_set_type target_saved;
   
-  modified_parser_type parser;
+  simple_parser_type parser;
   std::string line;
   
   int non_found_iter = 0;
@@ -854,14 +1086,14 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, modified)) {
-	    if (! queue.push_swap(modified, true)) {
-	      modified_saved.push_back(modified);
+	  if (parser(line, target)) {
+	    if (! queue.push_swap(target, true)) {
+	      target_saved.push_back(target);
 	      non_found_iter = loop_sleep(false, non_found_iter);
 	      break;
 	    }
 	  } else
-	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
+	    std::cerr << "failed simple phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
@@ -874,26 +1106,26 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
-    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
-      modified_saved.pop_back();
+    while (! target_saved.empty() && queue.push_swap(target_saved.back(), true)) {
+      target_saved.pop_back();
       found = true;
     }
     
-    if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (target_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  modified.clear();
-  queue.push_swap(modified);
+  target.clear();
+  queue.push_swap(target);
   
   reducer.join();
 }
 
-void modify_counts_mapper(utils::mpi_intercomm& reducer,
-			  const path_set_type& counts_files,
-			  path_set_type& modified_files)
+void reverse_counts_mapper(utils::mpi_intercomm& reducer,
+			   const path_set_type& counts_files,
+			   path_set_type& reversed_files)
 {
   typedef boost::iostreams::filtering_ostream ostream_type;
   typedef utils::mpi_device_sink              odevice_type;
@@ -904,18 +1136,18 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
   typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
 
-  typedef PhrasePairModify map_reduce_type;
+  typedef PhrasePairReverse map_reduce_type;
   
-  typedef PhrasePairModifyMapper  mapper_type;
+  typedef PhrasePairReverseMapper  mapper_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
-  typedef map_reduce_type::modified_type     modified_type;
-  typedef map_reduce_type::modified_set_type modified_set_type;
+  typedef map_reduce_type::simple_type     simple_type;
+  typedef map_reduce_type::simple_set_type simple_set_type;
 
-  typedef PhrasePairModifiedGenerator modified_generator_type;
+  typedef PhrasePairSimpleGenerator simple_generator_type;
   
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
@@ -942,7 +1174,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   rank_set_type ranks(mpi_size);
 
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, buffer_size, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, reverse_tag, buffer_size, false, true));
     
     stream[rank].reset(new ostream_type());
     stream[rank]->push(boost::iostreams::zlib_compressor());
@@ -955,13 +1187,13 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   }
 
   if (debug >= 2)
-    std::cerr << "modify counts: rank: " << mpi_rank << " files: " << mapped_files.size() << std::endl;
+    std::cerr << "reverse counts: rank: " << mpi_rank << " files: " << mapped_files.size() << std::endl;
 
   boost::thread_group mapper;
   mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
-  modified_type           modified;
-  modified_generator_type generator;
+  simple_type           reversed;
+  simple_generator_type generator;
 
   const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
 
@@ -979,29 +1211,29 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(modified, true)) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(reversed, true)) {
 	    found = true;
 	    
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	    if (! reversed.source.empty())
+	      generator(*stream[rank], reversed) << '\n';
 	    else {
 	      stream[rank].reset();
 	      break;
 	    }
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
-	  if (queues[rank]->pop_swap(modified, true)) {
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	  if (queues[rank]->pop_swap(reversed, true)) {
+	    if (! reversed.source.empty())
+	      generator(*stream[rank], reversed) << '\n';
 	    else
 	      stream[rank].reset();
 	    
 	    found = true;
 	  }
 	} else if (utils::malloc_stats::used() < malloc_threshold) {
-	  if (queues[rank]->pop_swap(modified, true)) {
-	    if (! modified.source.empty())
-	      generator(*stream[rank], modified) << '\n';
+	  if (queues[rank]->pop_swap(reversed, true)) {
+	    if (! reversed.source.empty())
+	      generator(*stream[rank], reversed) << '\n';
 	    else
 	      stream[rank].reset();
 	  }
@@ -1021,7 +1253,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   
   mapper.join_all();
   
-  // receive modified files from the reducer sharing the same rank
+  // receive reversed files from the reducer sharing the same rank
   boost::iostreams::filtering_istream is;
   is.push(utils::mpi_device_source(reducer.comm, mpi_rank, file_tag, 4096));
   
@@ -1030,9 +1262,9 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     const path_type path(line);
     
     if (! boost::filesystem::exists(path))
-      throw std::runtime_error("no modified counts? " + line);
+      throw std::runtime_error("no reversed counts? " + line);
     
-    modified_files.push_back(path);
+    reversed_files.push_back(path);
     utils::tempfile::insert(path);
     
     const path_type tmp_file = path.parent_path() / path.stem();
@@ -1041,8 +1273,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   }
 }
 
-void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   const path_type& output_file)
+void reverse_counts_reducer(utils::mpi_intercomm& mapper,
+			    const path_type& output_file)
 {
   typedef utils::repository repository_type;
 
@@ -1055,18 +1287,18 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
   
-  typedef PhrasePairModify map_reduce_type;
+  typedef PhrasePairReverse map_reduce_type;
   
-  typedef PhrasePairModifyReducer reducer_type;
+  typedef PhrasePairReverseReducer reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
-  typedef map_reduce_type::modified_type     modified_type;
-  typedef map_reduce_type::modified_set_type modified_set_type;
+  typedef map_reduce_type::simple_type     simple_type;
+  typedef map_reduce_type::simple_set_type simple_set_type;
   
-  typedef PhrasePairModifiedParser modified_parser_type;
+  typedef PhrasePairSimpleParser simple_parser_type;
 
   typedef std::vector<int, std::allocator<int> > rank_set_type;
 
@@ -1076,7 +1308,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   const size_t queue_size  = mpi_size * 1024 * 8;
   const size_t buffer_size = 1024 * 1024 * 4;
   
-  path_set_type modified_files;
+  path_set_type reversed_files;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
@@ -1088,7 +1320,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   rank_set_type ranks(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, buffer_size));
+    device[rank].reset(new idevice_type(mapper.comm, rank, reverse_tag, buffer_size));
     
     stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::zlib_decompressor());
@@ -1100,12 +1332,12 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   queue_type queue(queue_size);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, modified_files, 1, max_malloc, debug)));
+  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, debug)));
   
-  modified_type     modified;
-  modified_set_type modified_saved;
+  simple_type     reversed;
+  simple_set_type reversed_saved;
   
-  modified_parser_type parser;
+  simple_parser_type parser;
   std::string line;
   
   int non_found_iter = 0;
@@ -1118,14 +1350,14 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, modified)) {
-	    if (! queue.push_swap(modified, true)) {
-	      modified_saved.push_back(modified);
+	  if (parser(line, reversed)) {
+	    if (! queue.push_swap(reversed, true)) {
+	      reversed_saved.push_back(reversed);
 	      non_found_iter = loop_sleep(false, non_found_iter);
 	      break;
 	    }
 	  } else
-	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
+	    std::cerr << "failed reversed phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
@@ -1138,32 +1370,32 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
     
-    while (! modified_saved.empty() && queue.push_swap(modified_saved.back(), true)) {
-      modified_saved.pop_back();
+    while (! reversed_saved.empty() && queue.push_swap(reversed_saved.back(), true)) {
+      reversed_saved.pop_back();
       found = true;
     }
     
-    if (modified_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (reversed_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  modified.clear();
-  queue.push_swap(modified);
+  reversed.clear();
+  queue.push_swap(reversed);
   
   reducer.join_all();
   
   {
-    // send modified files to mapper sharing the same rank
+    // send reversed files to mapper sharing the same rank
     boost::iostreams::filtering_ostream os;
     os.push(utils::mpi_device_sink(mapper.comm, mpi_rank, file_tag, 4096));
     
-    for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter)
+    for (path_set_type::const_iterator fiter = reversed_files.begin(); fiter != reversed_files.end(); ++ fiter)
       os << fiter->string() << '\n';
   }
   
-  for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter) {
+  for (path_set_type::const_iterator fiter = reversed_files.begin(); fiter != reversed_files.end(); ++ fiter) {
     utils::tempfile::erase(*fiter);
     
     const path_type tmp_file = fiter->parent_path() / fiter->stem();
