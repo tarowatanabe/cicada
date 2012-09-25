@@ -115,6 +115,7 @@ void apply(const path_set_type& files, const path_type& output)
 struct MST;
 struct CoNLL;
 struct Cabocha;
+struct Forest;
 
 int main(int argc, char** argv)
 {
@@ -149,7 +150,8 @@ int main(int argc, char** argv)
       read_list(list_file, input_files);
       if (input_files.empty())
 	input_files.push_back("-");
-
+      
+      apply<Forest>(input_files, output_file);
     } else if (bilingual_mode) {
       read_list(list_source_file, source_files);
       read_list(list_target_file, target_files);
@@ -880,6 +882,16 @@ struct Cabocha
 	  throw std::runtime_error("invalid cabocha F1 format: # of columns do not match");
       }
     }
+  }
+};
+
+struct Forest
+{
+  
+  void operator()(const path_set_type& files, const path_type& output)
+  {
+    
+    
   }
 };
 

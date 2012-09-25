@@ -1163,6 +1163,7 @@ struct PhrasePairReverse
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
   
   typedef PhrasePair         phrase_pair_type;
+  typedef phrase_pair_type::phrase_type phrase_type;
   typedef RootCount          root_count_type;
   typedef PhrasePairModified modified_type;
   
@@ -1193,6 +1194,7 @@ struct PhrasePairReverseMapper
   typedef map_reduce_type::path_set_type path_set_type;
   
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::phrase_type      phrase_type;
   typedef map_reduce_type::modified_type    modified_type;
 
   typedef map_reduce_type::modified_set_type modified_set_type;
@@ -1203,6 +1205,8 @@ struct PhrasePairReverseMapper
 
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
 
   typedef PhrasePairModifiedParser    modified_parser_type;
   typedef PhrasePairModifiedGenerator modified_generator_type;
@@ -1300,7 +1304,8 @@ struct PhrasePairReverseMapper
 	pqueue.push(buffer_stream);
     }
     
-    modified_set_type counts;
+    // modified_set_type counts;
+    phrase_set_type   phrases;
     modified_type     modified;
     count_type        observed(0);
     
@@ -1308,6 +1313,7 @@ struct PhrasePairReverseMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask_long = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     int non_found_iter = 0;
@@ -1320,6 +1326,23 @@ struct PhrasePairReverseMapper
       
       if (curr.source != modified.source) {
 	
+	if (! phrases.empty()) {
+	  if (observed != phrases.size())
+	    throw std::runtime_error("invalid observation count");
+
+	  modified.counts.push_back(observed);
+	  
+	  phrase_set_type::const_iterator piter_end = phrases.end();
+	  for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	    const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	    
+	    queues[shard]->push(modified_type(*piter, modified.source, modified.counts));
+	  }
+
+	  phrases.clear();
+	}
+	
+#if 0
 	if (! counts.empty()) {
 	  // dump counts... but we use the counts from modified and additional observed...
 	  // this observed is the same as counts.size()!
@@ -1338,6 +1361,9 @@ struct PhrasePairReverseMapper
 	  
 	  counts.clear();
 	}
+#endif
+	if ((iter & iteration_mask_long) == iteration_mask_long)
+	  phrase_set_type(phrases).swap(phrases);
 
 	if ((iter & iteration_mask) == iteration_mask)
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
@@ -1348,8 +1374,9 @@ struct PhrasePairReverseMapper
 	
 	modified.swap(curr);
 	
-	counts.push_back(modified);
-	counts.back().counts.clear();
+	//counts.push_back(modified);
+	//counts.back().counts.clear();
+	phrases.push_back(modified.target);
 	
 	observed = 1;
 	
@@ -1364,8 +1391,9 @@ struct PhrasePairReverseMapper
 	modified.target.swap(curr.target);
 	modified.increment(curr.counts.begin(), curr.counts.end());
 	
-	counts.push_back(modified);
-	counts.back().counts.clear();
+	//counts.push_back(modified);
+	//counts.back().counts.clear();
+	phrases.push_back(modified.target);
 	
 	observed += 1;
       } else {
@@ -1382,6 +1410,24 @@ struct PhrasePairReverseMapper
 	pqueue.push(buffer_stream);
     }
     
+    if (! phrases.empty()) {
+      if (observed != phrases.size())
+	throw std::runtime_error("invalid observation count");
+      
+      modified.counts.push_back(observed);
+      
+      phrase_set_type::const_iterator piter_end = phrases.end();
+      for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	
+	queues[shard]->push(modified_type(*piter, modified.source, modified.counts));
+      }
+      
+      phrases.clear();
+      phrase_set_type(phrases).swap(phrases);
+    }
+    
+#if 0
     if (! counts.empty()) {
       modified.counts.push_back(observed);
       
@@ -1397,6 +1443,7 @@ struct PhrasePairReverseMapper
       
       counts.clear();
     }
+#endif
 
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     modified.clear();
