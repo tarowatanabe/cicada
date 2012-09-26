@@ -11,6 +11,7 @@
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/random.hpp>
 
 #include <utils/filesystem.hpp>
 #include <utils/resource.hpp>
@@ -20,6 +21,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/random_seed.hpp"
 
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Alignment alignment_type;
@@ -126,9 +128,17 @@ int main(int argc, char** argv)
       
       typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
       typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
+
+      typedef std::vector<int, std::allocator<int> > rank_set_type;
       
+      boost::mt19937 gen;
+      gen.seed(utils::random_seed());
+      boost::random_number_generator<boost::mt19937> rgen(gen);
+
       ostream_ptr_set_type stream(mpi_size);
       odevice_ptr_set_type device(mpi_size);
+      
+      rank_set_type ranks(mpi_size - 1);
       
       for (int rank = 1; rank < mpi_size; ++ rank) {
 	stream[rank].reset(new ostream_type());
@@ -136,6 +146,8 @@ int main(int argc, char** argv)
 	
 	stream[rank]->push(boost::iostreams::zlib_compressor());
 	stream[rank]->push(*device[rank]);
+
+	ranks[rank - 1] = rank;
       }
 
       utils::resource start_extract;
@@ -151,8 +163,9 @@ int main(int argc, char** argv)
       while (is_src && is_trg && is_alg) {
 	bool found = false;
 	
-	for (int rank = 1; rank != mpi_size && is_src && is_trg && is_alg; ++ rank) 
-	  if (device[rank]->test() && device[rank]->flush(true) == 0) {
+	rank_set_type::const_iterator riter_end = ranks.end();
+	for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end && is_src && is_trg && is_alg; ++ riter)
+	  if (device[*riter]->test() && device[*riter]->flush(true) == 0) {
 	    
 	    while (is_src && is_trg && is_alg) {
 	      is_src >> bitext.source;
@@ -164,7 +177,7 @@ int main(int argc, char** argv)
 	    
 	    if (! is_src || ! is_trg || ! is_alg) break;
 	    
-	    *stream[rank] << bitext << '\n';
+	    *stream[*riter] << bitext << '\n';
 	    ++ num_samples;
 	    if (debug) {
 	      if (num_samples % 10000 == 0)
@@ -174,8 +187,11 @@ int main(int argc, char** argv)
 	    }
 	    found = true;
 	  }
+
+	if (found)
+	  std::random_shuffle(ranks.begin(), ranks.end(), rgen);
 	
-	if (! found && is_src && is_trg && is_alg && queue.size() < queue_size) {
+	if (! found && is_src && is_trg && is_alg && queue.size() < (queue_size >> 1)) {
 	  while (is_src && is_trg && is_alg) {
 	    is_src >> bitext.source;
 	    is_trg >> bitext.target;
@@ -220,7 +236,7 @@ int main(int argc, char** argv)
 	
 	// flush streams...
 	for (int rank = 1; rank != mpi_size; ++ rank)
-	  if (stream[rank] && device[rank]->test()) {
+	  if (stream[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
 	    stream[rank].reset();
 	    found = true;
 	  }

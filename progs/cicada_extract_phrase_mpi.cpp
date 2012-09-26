@@ -209,7 +209,7 @@ int main(int argc, char** argv)
 	
 	// flush streams...
 	for (int rank = 1; rank != mpi_size; ++ rank)
-	  if (stream[rank] && device[rank]->test()) {
+	  if (stream[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
 	    stream[rank].reset();
 	    found = true;
 	  }

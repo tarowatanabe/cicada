@@ -97,7 +97,6 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -182,7 +181,6 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -276,7 +274,6 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -346,7 +343,6 @@ public:
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
-    //counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -523,8 +519,6 @@ struct RootCountParser
 
       label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
 
-      //token %= qi::lexeme[+(standard::char_ - standard::space)];
-      //count_base64 %= token;
       count %= 'B' >> count_base64 | qi::double_;
 
       counts %= +count;
@@ -532,8 +526,6 @@ struct RootCountParser
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
-    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     utils::double_base64_parser<Iterator> count_base64;
     boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
@@ -612,9 +604,6 @@ struct PhrasePairParser
       point %= qi::int_ >> '-' >> qi::int_;
       alignment %= *point;
       
-      //token %= qi::lexeme[+(standard::char_ - standard::space)];
-      //count_base64 %= token;
-
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> alignment >> "|||" >> counts;
     }
@@ -625,8 +614,6 @@ struct PhrasePairParser
     boost::spirit::qi::rule<Iterator, alignment_type(), boost::spirit::standard::space_type> alignment;
     
     utils::double_base64_parser<Iterator> count_base64;
-    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
@@ -707,17 +694,12 @@ struct PhrasePairSimpleParser
       namespace standard = boost::spirit::standard;
 
       phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
-      
-      //token %= qi::lexeme[+(standard::char_ - standard::space)];
-      //count_base64 %= token;
 
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> counts;
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
-    //boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
-    //boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     utils::double_base64_parser<Iterator> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
