@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     if (mpi_rank == 0) 
       prepare_directory(output_file);
 
-    static const size_t queue_size = 64;
+    static const size_t queue_size = 32;
     
     queue_type queue(queue_size);
     task_type task(queue, output_file, max_nodes, max_height, max_compose, max_scope,
@@ -140,8 +140,8 @@ int main(int argc, char** argv)
 	stream[rank].reset(new ostream_type());
 	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	stream[rank]->push(boost::iostreams::zlib_compressor());
-	stream[rank]->push(*device[rank]);
+	stream[rank]->push(boost::iostreams::zlib_compressor(), 256);
+	stream[rank]->push(*device[rank], 256);
 	
 	ranks[rank - 1] = rank;
       }
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
 	if (found)
 	  std::random_shuffle(ranks.begin(), ranks.end(), rgen);
 	
-	if (! found && is_src && is_trg && is_alg && queue.size() < (queue_size >> 1)) {
+	if (! found && is_src && is_trg && is_alg && queue.size() < queue_size) {
 	  while (is_src && is_trg && is_alg) {
 	    is_src >> bitext.source;
 	    is_trg >> bitext.target;
@@ -252,8 +252,8 @@ int main(int argc, char** argv)
       
     } else {
       boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::zlib_decompressor());
-      stream.push(utils::mpi_device_source(0, bitext_tag, 4096));
+      stream.push(boost::iostreams::zlib_decompressor(), 256);
+      stream.push(utils::mpi_device_source(0, bitext_tag, 4096), 256);
       
       bitext_type bitext;
       
