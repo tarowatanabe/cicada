@@ -810,8 +810,11 @@ struct ExtractGHKM
       }
       rule_pairs_local.clear();
 
-      if ((id & id_mask) == id_mask)
+      if ((id & id_mask) == id_mask) {
 	dumper(rule_pairs);
+	
+	rule_pair_set_local_type(rule_pairs_local).swap(rule_pairs_local);
+      }
       
       //std::cerr << "dumped" << std::endl;
     }

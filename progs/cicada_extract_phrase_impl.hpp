@@ -582,6 +582,9 @@ struct Task
       if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
 	dump(phrase_pairs);
 	phrase_pairs.clear();
+	
+	if (utils::malloc_stats::used() > malloc_threshold)
+	  phrase_pair_set_type(phrase_pairs).swap(phrase_pairs);
       }
     }
     

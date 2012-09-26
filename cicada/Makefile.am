@@ -267,6 +267,7 @@ operation/permute.hpp \
 operation/posterior.hpp \
 operation/prune.hpp \
 operation/push_bos_eos.hpp \
+operation/push_head.hpp \
 operation/push_weights.hpp \
 operation/remove_annotation.hpp \
 operation/remove_bos_eos.hpp \
@@ -297,6 +298,7 @@ operation/permute.cpp \
 operation/posterior.cpp \
 operation/prune.cpp \
 operation/push_bos_eos.cpp \
+operation/push_head.cpp \
 operation/push_weights.cpp \
 operation/remove_annotation.cpp \
 operation/remove_bos_eos.cpp \
@@ -407,6 +409,7 @@ prune_density.hpp \
 prune_edge.hpp \
 prune_kbest.hpp \
 push_bos_eos.hpp \
+push_head.hpp \
 push_weights.hpp \
 push_weights_frontier.hpp \
 push_weights_left.hpp \

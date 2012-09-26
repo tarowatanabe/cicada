@@ -11,7 +11,10 @@ New: added more features:# of unaligned words, # of cross for terimnals, and gen
      (P(pair | root(pair)), P(source | root(source)), P(target | root(target)))
 New: bash-based learning scripts are re-implemented by equivalent, better python codes for better readability.
      Check cicada-{learn,mert}{,-moses}.py, not *.sh equivalents.
+New: added cutoff threshold for ghkm/tree extraction to prune out rare elementary trees in advance.
 Deprecated: bash based scripts
+Deprecated: dependency structure filters: cicada_filter_{conll,mst,cabocha} and are merged into cicada_filter_dependency
+Removed terminal-binarization and re-wrote as dependency-binarization
 Better parallelization by cicada{,_mpi} with more balanced input/output
 
 2012-9-6
