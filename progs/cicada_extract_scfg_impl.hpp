@@ -1328,6 +1328,7 @@ struct Task
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
     
     for (;;) {
+      bitext.clear();
       queue.pop_swap(bitext);
       
       if (bitext.source.empty()) break;

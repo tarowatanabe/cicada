@@ -573,6 +573,7 @@ struct Task
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     
     for (int iter = 0;/**/; ++ iter) {
+      bitext.clear();
       queue.pop_swap(bitext);
       
       if (bitext.source.empty()) break;

@@ -1851,6 +1851,7 @@ struct Task
     const int iter_mask = (1 << 4) - 1;
     
     for (int iter = 0;/**/; ++ iter) {
+      bitext.clear();
       queue.pop_swap(bitext);
       
       if (! bitext.source.is_valid()) break;
