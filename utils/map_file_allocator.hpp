@@ -297,7 +297,7 @@ namespace utils
     
     template<typename _Tp1, typename _Alloc1=std::allocator<_Tp1>, size_t _Threshold1=size_t(1) * 1024 * 1024 * 1024>
     struct rebind
-    { typedef map_file_allocator<_Tp1, _Alloc1, _Threshold1> other; };
+    { typedef map_file_allocator<_Tp1, _Alloc1, _Threshold> other; };
     
   public:
     map_file_allocator() throw() { }

@@ -61,6 +61,7 @@
 #include <utils/double_base64_parser.hpp>
 #include <utils/double_base64_generator.hpp>
 #include <utils/dense_hash_map.hpp>
+#include <utils/map_file_allocator.hpp>
 
 class RootCount
 {
@@ -1741,6 +1742,12 @@ struct PhrasePairTargetMapper
 
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  static const size_type map_alloc_size = 4ull * 1024 * 1024 * 1024;
+  
+  typedef utils::map_file_allocator<phrase_type,
+				    std::allocator<phrase_type>,
+				    map_alloc_size > phrase_set_allocator_type;
 
   typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
 
