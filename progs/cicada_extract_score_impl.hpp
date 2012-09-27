@@ -1743,13 +1743,78 @@ struct PhrasePairTargetMapper
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
 
-  static const size_type map_alloc_size = 4ull * 1024 * 1024 * 1024;
-  
-  typedef utils::map_file_allocator<phrase_type,
-				    std::allocator<phrase_type>,
-				    map_alloc_size > phrase_set_allocator_type;
+  struct PhraseSet
+  {
+    typedef uint32_t length_type;
+    typedef char     char_type;
+    
+    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
+    typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
+    
+    struct const_iterator
+    {
+      const_iterator(typename buffer_type::const_iterator  __biter,
+		     typename lengths_type::const_iterator __liter)
+	: biter(__biter), liter(__liter) {}
 
-  typedef std::vector<phrase_type, std::allocator<phrase_type> > phrase_set_type;
+      std::string operator*() const
+      {
+	return std::string(biter, biter + *liter);
+      }
+      
+      const_iterator& operator++()
+      {
+	biter += *liter;
+	++ liter;
+	return *this;
+      }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y)
+      {
+	return x.biter == y.biter && x.liter == y.liter;
+      }
+      
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y)
+      {
+	return x.biter != y.biter || x.liter != y.liter;
+      }
+      
+      typename buffer_type::const_iterator  biter;
+      typename lengths_type::const_iterator liter;
+    };
+    
+    void clear()
+    {
+      buffer.clear();
+      lengths.clear();
+    }
+    
+    bool empty() const { return lengths.empty(); }
+    size_t size() const { return lengths.size(); }
+
+    void swap(PhraseSet& x)
+    {
+      buffer.swap(x.buffer);
+      lengths.swap(x.lengths);
+    }
+    
+    void push_back(const std::string& x)
+    {
+      buffer.insert(buffer.end(), x.begin(), x.end());
+      lengths.push_back(x.size());
+    }
+
+    const_iterator begin() const { return const_iterator(buffer.begin(), lengths.begin()); }
+    const_iterator end() const { return const_iterator(buffer.end(), lengths.end()); }
+    
+    
+    buffer_type  buffer;
+    lengths_type lengths;
+  };
+
+  typedef PhraseSet phrase_set_type;
 
   typedef PhrasePairSimpleParser    simple_parser_type;
   typedef PhrasePairSimpleGenerator simple_generator_type;
@@ -1874,11 +1939,17 @@ struct PhrasePairTargetMapper
 
 	  counts.counts.push_back(observed);
 	  
-	  phrase_set_type::const_iterator piter_end = phrases.end();
-	  for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	    const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	  typename phrase_set_type::const_iterator piter_end = phrases.end();
+	  for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	    const std::string phrase = *piter;
 	    
-	    queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
+	    const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
+	    
+	    queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
+	    
+	    //const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	    
+	    //queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
 	  }
 
 	  phrases.clear();
@@ -1932,11 +2003,17 @@ struct PhrasePairTargetMapper
       
       counts.counts.push_back(observed);
       
-      phrase_set_type::const_iterator piter_end = phrases.end();
-      for (phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+      typename phrase_set_type::const_iterator piter_end = phrases.end();
+      for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	const std::string phrase = *piter;
 	
-	queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
+	const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
+	
+	queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
+	
+	//const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
+	
+	//queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
       }
       
       phrases.clear();
