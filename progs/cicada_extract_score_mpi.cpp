@@ -542,7 +542,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true)) {
+	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true); ++ i) {
 	    found = true;
 	    
 	    if (! phrase_pair.source.empty())
@@ -760,7 +760,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true)) {
+	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true); ++ i) {
 	    found = true;
 	    
 	    if (! simple.source.empty())
@@ -981,7 +981,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(target, true)) {
+	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(target, true); ++ i) {
 	    found = true;
 	    
 	    if (! target.source.empty())
@@ -1220,7 +1220,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(reversed, true)) {
+	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(reversed, true); ++ i) {
 	    found = true;
 	    
 	    if (! reversed.source.empty())
