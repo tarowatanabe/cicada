@@ -525,6 +525,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   boost::thread_group mapper;
   mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
+
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
   int non_found_iter = 0;
   for (;;) {
@@ -558,6 +560,13 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	      stream[rank].reset();
 	    
 	    found = true;
+	  }
+	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	  if (queues[rank]->pop_swap(phrase_pair, true)) {
+	    if (! phrase_pair.source.empty())
+	      generator(*stream[rank], phrase_pair) << '\n';
+	    else
+	      stream[rank].reset();
 	  }
 	}
       }

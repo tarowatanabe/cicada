@@ -34,5 +34,10 @@ int main(int argc, char** argv)
       std::cerr << "encoded size differ" << std::endl;
   }
   
-  std::cerr << "encoded size: " << encoded_size << std::endl;
+  //std::cerr << "encoded size: " << encoded_size << std::endl;
+  
+  std::string encoded;
+  while (std::cin >> encoded)
+    std::cout << "double: " << utils::decode_base64<double>(encoded) << std::endl;
+  
 }
