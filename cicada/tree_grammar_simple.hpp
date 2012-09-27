@@ -58,6 +58,7 @@ namespace cicada
     {
       rules.set_empty_key(graph_rule_ptr_type());
       features["tree-insertion-penalty"] = -1.0;
+      attributes["insertion"] = attribute_set_type::int_type(1);
     }
     
     transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarFallback(*this)); }
