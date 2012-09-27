@@ -486,7 +486,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
 
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 4;
+  static const size_t buffer_size_max = buffer_size << 3;
   static const size_t queue_size      = 1024 * 8;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -540,9 +540,9 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
-
+	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true); ++ i) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true)) {
 	    found = true;
 	    
 	    if (! phrase_pair.source.empty())
@@ -702,7 +702,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 4;
+  static const size_t buffer_size_max = buffer_size << 3;
   static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -760,7 +760,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	  found = true;
 	
 	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
-	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true); ++ i) {
+	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true)) {
 	    found = true;
 	    
 	    if (! simple.source.empty())
@@ -928,7 +928,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 4;
+  static const size_t buffer_size_max = buffer_size << 3;
   static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -1161,7 +1161,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 4;
+  static const size_t buffer_size_max = buffer_size << 3;
   static const size_t queue_size      = 1024 * 8;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
