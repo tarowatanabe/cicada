@@ -1098,11 +1098,16 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
+
+    const size_t target_saved_size = target_saved.size();
     
     while (! target_saved.empty() && queue.push_swap(target_saved.back(), true)) {
       target_saved.pop_back();
       found = true;
     }
+    
+    if (target_saved_size && target_saved.empty())
+      simple_set_type(target_saved).swap(target_saved);
     
     if (target_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
@@ -1354,11 +1359,16 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
+
+    const size_t reversed_saved_size = reversed_saved.size();
     
     while (! reversed_saved.empty() && queue.push_swap(reversed_saved.back(), true)) {
       reversed_saved.pop_back();
       found = true;
     }
+    
+    if (reversed_saved_size && reversed_saved.empty())
+      simple_set_type(reversed_saved).swap(reversed_saved);
     
     if (reversed_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
