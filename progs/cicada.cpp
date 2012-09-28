@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -7,6 +7,7 @@
 #include <string>
 #include <stdexcept>
 #include <unistd.h>
+#include <cstdlib>
 
 #include "cicada_impl.hpp"
 #include "cicada_output_impl.hpp"
@@ -24,6 +25,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/bithack.hpp"
+#include "utils/random_seed.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
@@ -131,6 +133,9 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(1, threads);
 
+    // random number seed
+    ::srandom(utils::random_seed());
+    
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
     if (debug)
