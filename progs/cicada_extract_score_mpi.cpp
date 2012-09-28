@@ -1074,17 +1074,17 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, target)) {
 	    if (! queue.push_swap(target, true)) {
 	      target_saved.push_back(target);
-	      non_found_iter = loop_sleep(false, non_found_iter);
 	      break;
-	    }
+	    } else
+	      found = true;
 	  } else
 	    std::cerr << "failed simple phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
+	  
+	  found = true;
 	}
-	
-	found = true;
       }
     }
     
@@ -1100,7 +1100,7 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (target_saved_size && target_saved.empty())
       simple_set_type(target_saved).swap(target_saved);
-    
+        
     if (target_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
@@ -1335,17 +1335,17 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (parser(line, reversed)) {
 	    if (! queue.push_swap(reversed, true)) {
 	      reversed_saved.push_back(reversed);
-	      non_found_iter = loop_sleep(false, non_found_iter);
 	      break;
-	    }
+	    } else
+	      found = true;
 	  } else
 	    std::cerr << "failed reversed phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
+	  
+	  found = true;
 	}
-	
-	found = true;
       }
     }
     
