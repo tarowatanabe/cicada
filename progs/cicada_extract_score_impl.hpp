@@ -1753,7 +1753,8 @@ struct PhrasePairTargetMapper
     typedef uint32_t length_type;
     typedef char     char_type;
 
-    typedef utils::map_file_allocator<char_type, std::allocator<char_type>, 4ull * 1024 * 1024 * 1024>  char_alloc_type;
+    //typedef utils::map_file_allocator<char_type, std::allocator<char_type>, 4ull * 1024 * 1024 * 1024>  char_alloc_type;
+    typedef std::allocator<char_type> char_alloc_type;
     
     typedef std::vector<char_type, char_alloc_type > buffer_type;
     typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
