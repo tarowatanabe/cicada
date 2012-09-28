@@ -91,11 +91,12 @@ bool bilingual_mode = false;
 bool mst_mode = false;
 bool conll_mode = false;
 bool cabocha_mode = false;
-bool forest_mode = false;
+bool khayashi_mode = false;
+bool khayashi_forest_mode = false;
 
 bool projective_mode = false;
 bool relation_mode = false;
-bool hypergraph_mode = false;
+bool forest_mode = false;
 bool head_mode = false;
 
 // dependency output
@@ -115,18 +116,19 @@ void apply(const path_set_type& files, const path_type& output)
 struct MST;
 struct CoNLL;
 struct Cabocha;
-struct Forest;
+struct KHayashi;
+struct KHayashiForest;
 
 int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
     
-    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + forest_mode == 0)
-      throw std::runtime_error("one of bilingual/mst/conll mode");
+    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
+      throw std::runtime_error("one of bilingual/mst/conll/khayashi/khayashi-forest mode");
 
-    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + forest_mode > 1)
-      throw std::runtime_error("one of bilingual/mst/conll mode");
+    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
+      throw std::runtime_error("one of bilingual/mst/conll/khayashi/khayashi-forest mode");
     
     if (mst_mode) {
       read_list(list_file, input_files);
@@ -146,12 +148,18 @@ int main(int argc, char** argv)
 	input_files.push_back("-");
       
       apply<Cabocha>(input_files, output_file);
-    } else if (forest_mode) {
+    } else if (khayashi_mode) {
       read_list(list_file, input_files);
       if (input_files.empty())
 	input_files.push_back("-");
       
-      apply<Forest>(input_files, output_file);
+      apply<KHayashi>(input_files, output_file);
+    } else if (khayashi_forest_mode) {
+      read_list(list_file, input_files);
+      if (input_files.empty())
+	input_files.push_back("-");
+      
+      apply<KHayashiForest>(input_files, output_file);
     } else if (bilingual_mode) {
       read_list(list_source_file, source_files);
       read_list(list_target_file, target_files);
@@ -512,7 +520,7 @@ struct MST
 	if (! mst.verify())
 	  throw std::runtime_error("invalid mst format");
 
-	if (hypergraph_mode) {
+	if (forest_mode) {
 	  transform.clear();
 	  transform.sentence.assign(mst.words.begin(), mst.words.end());
 	  
@@ -669,7 +677,7 @@ struct CoNLL
 	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conll))
 	  throw std::runtime_error("parsing failed");
 
-	if (hypergraph_mode) {
+	if (forest_mode) {
 	  transform.clear();
 	  
 	  conll_set_type::const_iterator citer_end = conll.end();
@@ -828,7 +836,7 @@ struct Cabocha
 	    }
 	  }
 	  
-	  if (hypergraph_mode) {
+	  if (forest_mode) {
 	    transform.clear();
 	    
 	    terminal_set_type::const_iterator titer_end = terminals.end();
@@ -885,9 +893,202 @@ struct Cabocha
   }
 };
 
-struct Forest
+struct khayashi_type
 {
+  typedef size_t size_type;
+  typedef std::string label_type;
   
+  typedef std::vector<label_type, std::allocator<label_type> > label_set_type;
+  typedef std::vector<size_type, std::allocator<size_type> >   position_set_type;
+  
+  
+  label_set_type words;
+  label_set_type poss;
+  position_set_type positions;
+  
+  
+  bool verify() const
+  {
+    return words.size() == poss.size() && words.size() == positions.size();
+  }
+  
+  void clear()
+  {
+    words.clear();
+    poss.clear();
+    positions.clear();
+  }
+};
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  khayashi_type,
+			  (khayashi_type::label_set_type,    words)
+			  (khayashi_type::label_set_type,    poss)
+			  (khayashi_type::position_set_type, positions)
+			  )
+
+
+struct KHayashi
+{
+
+  template <typename Iterator>
+  struct khayashi_parser : boost::spirit::qi::grammar<Iterator, khayashi_type(), boost::spirit::standard::blank_type>
+  {
+    khayashi_parser() : khayashi_parser::base_type(khayashi)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      words %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      poss  %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      positions %= +qi::int_;
+      
+      khayashi %= (words >> "|||" >> poss >> qi::eol
+		   >> positions >> qi::eol
+		   >> qi::omit[*(positions >> qi::eol)]
+		   >> (qi::eol || qi::eoi));
+    }
+    
+    typedef boost::spirit::standard::blank_type blank_type;
+    
+    boost::spirit::qi::rule<Iterator, std::string(), blank_type> token;
+    boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> words;
+    boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> poss;
+    boost::spirit::qi::rule<Iterator, khayashi_type::position_set_type(), blank_type> positions;
+    
+    boost::spirit::qi::rule<Iterator, khayashi_type(), blank_type> khayashi;
+  };
+  
+  void operator()(const path_set_type& files, const path_type& output)
+  {
+    typedef boost::spirit::istream_iterator iiter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    std::ostream_iterator<char> oiter(os);
+    
+    khayashi_parser<iiter_type> parser;
+    khayashi_type khayashi;
+
+    Transform transform(goal, head_mode);
+    
+    path_set_type::const_iterator fiter_end = files.end();
+    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iiter_type iter(is);
+      iiter_type iter_end;
+
+      while (iter != iter_end) {
+	khayashi.clear();
+	
+	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, khayashi))
+	  throw std::runtime_error("parsing failed");
+	
+	if (! khayashi.verify())
+	  throw std::runtime_error("invalid khayashi format");
+
+	if (forest_mode) {
+	  transform.clear();
+	  transform.sentence.assign(khayashi.words.begin(), khayashi.words.end());
+	  
+	  khayashi_type::label_set_type::const_iterator liter_end = khayashi.poss.end();
+	  for (khayashi_type::label_set_type::const_iterator liter = khayashi.poss.begin(); liter != liter_end; ++ liter)
+	    transform.pos.push_back('[' + *liter + ']');	    
+	  
+	  transform.dependency.assign(khayashi.positions.begin(), khayashi.positions.end());
+	  
+	  transform();
+	  
+	  os << transform.hypergraph << '\n';
+	} else {
+	  if (! karma::generate(oiter, (-(standard::string % ' ')
+					<< " ||| " << -(standard::string % ' ')
+					<< " ||| " << -(karma::int_ % ' ')
+					<< '\n'),
+				khayashi.words, khayashi.poss, khayashi.positions))
+	    throw std::runtime_error("generation failed");
+	}
+      }
+    }
+  }
+};
+
+struct khayashi_forest_type
+{
+  typedef size_t  size_type;
+  typedef int32_t id_type;
+  typedef int32_t action_type;
+  typedef double  score_type;
+  
+  typedef std::string label_type;
+  typedef std::vector<label_type, std::allocator<label_type> > label_set_type;
+  
+  
+  struct edge_type
+  {
+    id_type node1;
+    id_type node2;
+    action_type action;
+    score_type  score;
+  };
+
+  typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
+  
+  struct node_type
+  {
+    id_type id;
+    id_type first;
+    id_type last;
+    id_type parent;
+    id_type child_left;
+    id_type child_right;
+    id_type child_left2;
+    id_type child_right2;
+    
+    edge_set_type edges;
+  };
+
+  typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
+  
+  label_set_type words;
+  label_set_type poss;
+  node_set_type  nodes;
+};
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  khayashi_forest_type::edge_type,
+			  (khayashi_forest_type::id_type,     node1)
+			  (khayashi_forest_type::id_type,     node2)
+			  (khayashi_forest_type::action_type, action)
+			  (khayashi_forest_type::score_type,  score)
+			  )
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  khayashi_forest_type::node_type,
+			  (khayashi_forest_type::id_type,     id)
+			  (khayashi_forest_type::id_type,     first)
+			  (khayashi_forest_type::id_type,     last)
+			  (khayashi_forest_type::id_type,     parent)
+			  (khayashi_forest_type::id_type,     child_left)
+			  (khayashi_forest_type::id_type,     child_right)
+			  (khayashi_forest_type::id_type,     child_left2)
+			  (khayashi_forest_type::id_type,     child_right2)
+			  (khayashi_forest_type::edge_set_type, edges)
+			  )
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  khayashi_forest_type,
+			  (khayashi_forest_type::label_set_type, words)
+			  (khayashi_forest_type::label_set_type, poss)
+			  (khayashi_forest_type::node_set_type, nodes)
+			  )
+struct KHayashiForest
+{
   void operator()(const path_set_type& files, const path_type& output)
   {
     
@@ -918,14 +1119,16 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
-    ("bilingual",  po::bool_switch(&bilingual_mode),  "project source dependency into target dependency")
-    ("mst",        po::bool_switch(&mst_mode),        "tranform MST dependency")
-    ("conll",      po::bool_switch(&conll_mode),      "tranform CoNLL dependency")
-    ("cabocha",    po::bool_switch(&cabocha_mode),    "tranform Cabocha dependency")
-    ("forest",     po::bool_switch(&forest_mode),     "tranform FOREST dependency")
+    ("bilingual",       po::bool_switch(&bilingual_mode),       "project source dependency into target dependency")
+    ("mst",             po::bool_switch(&mst_mode),             "tranform MST dependency")
+    ("conll",           po::bool_switch(&conll_mode),           "tranform CoNLL dependency")
+    ("cabocha",         po::bool_switch(&cabocha_mode),         "tranform Cabocha dependency")
+    ("khayashi",        po::bool_switch(&khayashi_mode),        "tranform KHayashi dependency")
+    ("khayashi-forest", po::bool_switch(&khayashi_forest_mode), "tranform KHayashi Forest dependency")
+    
     ("projective", po::bool_switch(&projective_mode), "project into projective dependency")
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
-    ("hypergraph", po::bool_switch(&hypergraph_mode), "output as a hypergraph")
+    ("forest",     po::bool_switch(&forest_mode),     "output as a forest")
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
             
     ("help", "help message");

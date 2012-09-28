@@ -78,10 +78,9 @@ options:
   --mst                     tranform MST dependency
   --conll                   tranform CoNLL dependency
   --cabocha                 tranform Cabocha dependency
-  --forest                  tranform FOREST dependency
   --projective              project into projective dependency
   --relation                assing relation to POS
-  --hypergraph              output as a hypergraph
+  --forest                  output as a forest
   --head                    output hypergraph with explicit head
   --help                    help message
 
