@@ -25,6 +25,11 @@
 #include <boost/tokenizer.hpp>
 #include <boost/range.hpp>
 
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
+#include <boost/iostreams/device/array.hpp>
+
 #include <string>
 #include <vector>
 #include <set>
@@ -1732,7 +1737,7 @@ struct PhrasePairTargetMapper
   
   typedef map_reduce_type::phrase_pair_type phrase_pair_type;
   typedef map_reduce_type::phrase_type      phrase_type;
-  typedef map_reduce_type::simple_type    simple_type;
+  typedef map_reduce_type::simple_type      simple_type;
 
   typedef map_reduce_type::simple_set_type simple_set_type;
     
@@ -1747,8 +1752,10 @@ struct PhrasePairTargetMapper
   {
     typedef uint32_t length_type;
     typedef char     char_type;
+
+    typedef utils::map_file_allocator<char_type, std::allocator<char_type>, 4ull * 1024 * 1024 * 1024>  char_alloc_type;
     
-    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
+    typedef std::vector<char_type, char_alloc_type > buffer_type;
     typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
     
     struct const_iterator
@@ -1808,7 +1815,6 @@ struct PhrasePairTargetMapper
 
     const_iterator begin() const { return const_iterator(buffer.begin(), lengths.begin()); }
     const_iterator end() const { return const_iterator(buffer.end(), lengths.end()); }
-    
     
     buffer_type  buffer;
     lengths_type lengths;
@@ -1920,7 +1926,6 @@ struct PhrasePairTargetMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
-    const int iteration_mask_long = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     int non_found_iter = 0;
@@ -1946,20 +1951,20 @@ struct PhrasePairTargetMapper
 	    const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
 	    
 	    queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
-	    
-	    //const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
-	    
-	    //queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
 	  }
 
 	  phrases.clear();
 	}
 	
-	if ((iter & iteration_mask_long) == iteration_mask_long)
-	  phrase_set_type(phrases).swap(phrases);
-
-	if ((iter & iteration_mask) == iteration_mask)
+	if ((iter & iteration_mask) == iteration_mask) {
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	  
+	  if (malloc_full) {
+	    phrase_set_type(phrases).swap(phrases);
+	    
+	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	  }
+	}
 	
 	++ iter;
 	
@@ -2010,15 +2015,15 @@ struct PhrasePairTargetMapper
 	const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
 	
 	queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
-	
-	//const int shard = hasher(piter->begin(), piter->end(), 0) % queues.size();
-	
-	//queues[shard]->push(simple_type(*piter, counts.source, counts.counts));
       }
       
       phrases.clear();
       phrase_set_type(phrases).swap(phrases);
     }
+    
+    //
+    // map-merged files by inversing
+    //
     
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     counts.clear();

@@ -762,23 +762,15 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
-	  if (queues[rank]->pop_swap(simple, true)) {
-	    if (! simple.source.empty())
-	      generator(*stream[rank], simple) << '\n';
-	    else 
-	      stream[rank].reset();
-	    
-	    found = true;
-	  }
-	} else if (utils::malloc_stats::used() < malloc_threshold) {
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max
+		   || utils::malloc_stats::used() < malloc_threshold) {
 	  if (queues[rank]->pop_swap(simple, true)) {
 	    if (! simple.source.empty())
 	      generator(*stream[rank], simple) << '\n';
 	    else 
 	      stream[rank].reset();
 	  }
-	}
+	} 
       }
     }
     
