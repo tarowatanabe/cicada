@@ -1156,6 +1156,8 @@ struct khayashi_forest_type
     id_type child_right2;
     
     edge_set_type edges;
+
+    bool is_terminal() const { return edges.empty(); }
   };
 
   typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
@@ -1265,14 +1267,17 @@ struct KHayashiForest
     typedef cicada::Rule       rule_type;
     typedef cicada::Symbol     symbol_type;
     typedef cicada::Feature    feature_type;
+    typedef cicada::Attribute  attribute_type;
     
     typedef std::pair<hypergraph_type::id_type, hypergraph_type::id_type> node_id_type;
     typedef std::vector<node_id_type, std::allocator<node_id_type> > node_id_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > goal_id_set_type;
-    
 
     const feature_type feature("depdency-parse");
+
+    //const attribute_type attr_dependency_head("dependency-head");
+    //const attribute_type attr_dependency_dependent("dependency-dependent");
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
@@ -1329,9 +1334,10 @@ struct KHayashiForest
 	  for (khayashi_forest_type::node_set_type::const_iterator niter = khayashi.nodes.begin(); niter != niter_end; ++ niter) {
 	    const khayashi_forest_type::node_type& node = *niter;
 	    
-	    if (node.edges.empty()) {
+	    if (node.is_terminal()) {
+	      // we will remove terminal sharing code, since we need to differentiate head and dependent...??
+	      
 	      if (terminals[node.parent].first == hypergraph_type::invalid) {
-		
 		const hypergraph_type::id_type head_id = hypergraph.add_node().id;
 		const hypergraph_type::id_type node_id = hypergraph.add_node().id;
 		
@@ -1349,8 +1355,6 @@ struct KHayashiForest
 		hypergraph_type::edge_type& edge = hypergraph.add_edge();
 		
 		edge.rule = rule_type::create(rule_type(labels[head_id], rule_type::symbol_set_type(1, khayashi.words[node.parent])));
-		
-		edge.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
 		
 		hypergraph.connect_edge(edge.id, head_id);
 		
@@ -1384,9 +1388,16 @@ struct KHayashiForest
 	      for (khayashi_forest_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 		const khayashi_forest_type::node_type& node1 = khayashi.nodes[eiter->node1 - 1];
 		const khayashi_forest_type::node_type& node2 = khayashi.nodes[eiter->node2 - 1];
+
+		if (node1.is_terminal())
+		  tails[0] = utils::bithack::branch(node.parent == node1.parent, nodes[node1.id].first, nodes[node1.id].second);
+		else
+		  tails[0] = utils::bithack::branch(node.parent != node1.parent, nodes[node1.id].first, nodes[node1.id].second);
 		
-		tails[0] = utils::bithack::branch(node.parent != node1.parent, nodes[node1.id].first, nodes[node1.id].second);
-		tails[1] = utils::bithack::branch(node.parent != node2.parent, nodes[node2.id].first, nodes[node2.id].second);
+		if (node2.is_terminal())
+		  tails[1] = utils::bithack::branch(node.parent == node2.parent, nodes[node2.id].first, nodes[node2.id].second);
+		else
+		  tails[1] = utils::bithack::branch(node.parent != node2.parent, nodes[node2.id].first, nodes[node2.id].second);
 		
 		rhs[0] = labels[tails[0]];
 		rhs[1] = labels[tails[1]];
@@ -1400,13 +1411,6 @@ struct KHayashiForest
 		edge1.features[feature] = eiter->score;
 		edge2.features[feature] = eiter->score;
 
-		edge1.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
-		edge1.attributes["dependency-child1"] = hypergraph_type::attribute_set_type::int_type(eiter->node1);
-		edge1.attributes["dependency-child2"] = hypergraph_type::attribute_set_type::int_type(eiter->node2);
-		edge2.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
-		edge2.attributes["dependency-child1"] = hypergraph_type::attribute_set_type::int_type(eiter->node1);
-		edge2.attributes["dependency-child2"] = hypergraph_type::attribute_set_type::int_type(eiter->node2);
-		
 		hypergraph.connect_edge(edge1.id, node_id);
 		hypergraph.connect_edge(edge2.id, binary_id);
 	      }
