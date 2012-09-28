@@ -135,16 +135,20 @@ int main(int argc, char** argv)
     utils::resource end_source;
     
     if (debug)
-      std::cerr << "source counts cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
-		<< "source counts user time: " << end_source.user_time() - start_source.user_time() << std::endl;
+      std::cerr << "source counts"
+		<< " cpu time:  " << end_source.cpu_time() - start_source.cpu_time()
+		<< " user time: " << end_source.user_time() - start_source.user_time()
+		<< std::endl;
     
     utils::resource start_reverse;
     reverse_counts(counts_files, reversed_files);
     utils::resource end_reverse;
     
     if (debug)
-      std::cerr << "reverse counts cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
-		<< "reverse counts user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
+      std::cerr << "reverse counts"
+		<< " cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time()
+		<< " user time: " << end_reverse.user_time() - start_reverse.user_time()
+		<< std::endl;
     
     utils::resource start_target;
     if (score_phrase)
@@ -156,16 +160,20 @@ int main(int argc, char** argv)
     utils::resource end_target;
     
     if (debug)
-      std::cerr << "target counts cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
-		<< "target counts user time: " << end_target.user_time() - start_target.user_time() << std::endl;
-   
+      std::cerr << "target counts"
+		<< " cpu time:  " << end_target.cpu_time() - start_target.cpu_time()
+		<< " user time: " << end_target.user_time() - start_target.user_time()
+		<< std::endl;
+    
     // scoring...
     utils::resource start_score;
     score_counts(output_file, counts_files, source_files, target_files);
     utils::resource end_score;
     if (debug)
-      std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
-		<< "score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+      std::cerr << "score counts"
+		<< " cpu time:  " << end_score.cpu_time() - start_score.cpu_time()
+		<< " user time: " << end_score.user_time() - start_score.user_time()
+		<< std::endl;
     
     // finally, dump files, root-sources and root-targets...
     {

@@ -247,8 +247,10 @@ int main(int argc, char** argv)
       utils::resource end_extract;
 
       if (debug)
-	std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
-		  << "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
+	std::cerr << "extract counts"
+		  << " cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time()
+		  << " user time: " << end_extract.user_time() - start_extract.user_time()
+		  << std::endl;
       
     } else {
       boost::iostreams::filtering_istream stream;

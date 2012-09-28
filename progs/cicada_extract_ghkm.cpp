@@ -129,8 +129,10 @@ int main(int argc, char** argv)
     utils::resource end_extract;
     
     if (debug)
-      std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
-		<< "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
+      std::cerr << "extract counts"
+		<< " cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time()
+		<< " user time: " << end_extract.user_time() - start_extract.user_time()
+		<< std::endl;
     
     utils::compress_ostream os(output_file / "files");
     for (int i = 0; i != threads; ++ i) {

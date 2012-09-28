@@ -143,8 +143,10 @@ int main(int argc, char** argv)
       utils::resource end_source;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "source counts reducer cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
-		  << "source counts reducer user time: " << end_source.user_time() - start_source.user_time() << std::endl;
+	std::cerr << "source counts reducer"
+		  << " cpu time:  " << end_source.cpu_time() - start_source.cpu_time() 
+		  << " user time: " << end_source.user_time() - start_source.user_time()
+		  << std::endl;
       
       if (mpi_rank == 0)
 	prepare_directory(output_file);
@@ -156,16 +158,20 @@ int main(int argc, char** argv)
       utils::resource end_reverse;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "reverse counts reducer cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
-		  << "reverse counts reducer user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
+	std::cerr << "reverse counts reducer"
+		  << " cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time()
+		  << " user time: " << end_reverse.user_time() - start_reverse.user_time()
+		  << std::endl;
       
       utils::resource start_target;
       target_counts_reducer(comm_parent, target_files);
       utils::resource end_target;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "target counts reducer cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
-		  << "target counts reducer user time: " << end_target.user_time() - start_target.user_time() << std::endl;
+	std::cerr << "target counts reducer"
+		  << " cpu time:  " << end_target.cpu_time() - start_target.cpu_time()
+		  << " user time: " << end_target.user_time() - start_target.user_time()
+		  << std::endl;
       
       // scoring...
       utils::resource start_score;
@@ -173,8 +179,10 @@ int main(int argc, char** argv)
       utils::resource end_score;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "score counts reducer cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
-		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+	std::cerr << "score counts reducer"
+		  << " cpu time:  " << end_score.cpu_time() - start_score.cpu_time()
+		  << " user time: " << end_score.user_time() - start_score.user_time()
+		  << std::endl;
       
       reduce_root_counts(root_joint);
       
@@ -265,8 +273,10 @@ int main(int argc, char** argv)
       utils::resource end_source;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "source counts mapper cpu time:  " << end_source.cpu_time() - start_source.cpu_time() << std::endl
-		  << "source counts mapper user time: " << end_source.user_time() - start_source.user_time() << std::endl;
+	std::cerr << "source counts mapper"
+		  << " cpu time:  " << end_source.cpu_time() - start_source.cpu_time()
+		  << " user time: " << end_source.user_time() - start_source.user_time()
+		  << std::endl;
       
       path_set_type reversed_files;
       root_count_set_type root_targets;
@@ -276,8 +286,10 @@ int main(int argc, char** argv)
       utils::resource end_reverse;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "reverse counts mapper cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
-		  << "reverse counts mapper user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
+	std::cerr << "reverse counts mapper"
+		  << " cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time()
+		  << " user time: " << end_reverse.user_time() - start_reverse.user_time()
+		  << std::endl;
       
       utils::resource start_target;
       if (score_phrase)
@@ -289,8 +301,10 @@ int main(int argc, char** argv)
       utils::resource end_target;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "target counts mapper cpu time:  " << end_target.cpu_time() - start_target.cpu_time() << std::endl
-		  << "target counts mapper user time: " << end_target.user_time() - start_target.user_time() << std::endl;
+	std::cerr << "target counts mapper"
+		  << " cpu time:  " << end_target.cpu_time() - start_target.cpu_time()
+		  << " user time: " << end_target.user_time() - start_target.user_time()
+		  << std::endl;
       
       // remove all the reversed files
       for (path_set_type::const_iterator miter = reversed_files.begin(); miter != reversed_files.end(); ++ miter) {
@@ -309,8 +323,10 @@ int main(int argc, char** argv)
       utils::resource end_score;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "score counts mapper cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
-		  << "score counts mapper user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+	std::cerr << "score counts mapper"
+		  << " cpu time:  " << end_score.cpu_time() - start_score.cpu_time()
+		  << " user time: " << end_score.user_time() - start_score.user_time()
+		  << std::endl;
 
       reduce_root_counts(root_targets);
       
