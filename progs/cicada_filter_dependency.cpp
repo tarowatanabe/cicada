@@ -40,6 +40,8 @@
 #include <cicada/dependency.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/sort_topologically.hpp>
+#include <cicada/debinarize.hpp>
 
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
@@ -96,6 +98,8 @@ bool khayashi_forest_mode = false;
 
 bool projective_mode = false;
 bool relation_mode = false;
+bool unescape_mode = false;
+bool normalize_mode = false;
 bool forest_mode = false;
 bool head_mode = false;
 
@@ -105,12 +109,82 @@ path_type output_file = "-";
 void read_list(const path_type& path, path_set_type& files);
 void options(int argc, char** argv);
 
-
 template <typename Dep>
 void apply(const path_set_type& files, const path_type& output)
 {
   Dep dep;
   dep(files, output);
+}
+
+template <typename Iterator>
+struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+{
+  terminal_parser() : terminal_parser::base_type(terminal)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    escape_char.add
+      ("-LRB-", '(')
+      ("-RRB-", ')')
+      ("-LSB-", '[')
+      ("-RSB-", ']')
+      ("-LCB-", '{')
+      ("-RCB-", '}')
+      ("-PLUS-", '+') // added for ATB
+      ("\\/", '/')
+      ("\\*", '*');
+    
+    terminal %= +(escape_char | standard::char_);
+  }
+  
+  boost::spirit::qi::symbols<char, char> escape_char;
+  boost::spirit::qi::rule<Iterator, std::string()> terminal;
+};
+
+std::string unescape(const std::string& word)
+{
+  namespace qi = boost::spirit::qi;
+  
+  static terminal_parser<std::string::const_iterator> parser;
+  
+  std::string::const_iterator iter = word.begin();
+  std::string::const_iterator iter_end = word.end();
+  
+  std::string terminal;
+  
+  if (! qi::parse(iter, iter_end, parser, terminal) || iter != iter_end)
+    throw std::runtime_error("terminal parsing failed?");
+  
+  return terminal;
+}
+
+template <typename Iterator>
+void unescape(Iterator first, Iterator last)
+{
+  for (/**/; first != last; ++ first)
+    *first = unescape(*first);
+}
+
+std::string normalize(const std::string& pos)
+{
+  if (pos.size() == 1) {
+    switch (pos[0]) {
+    case '.' : return "PERIOD";
+    case ',' : return "COMMA";
+    case ':' : return "COLON";
+    case ';' : return "SEMICOLON";
+    }
+    return pos;
+  } else
+    return pos;
+}
+
+template <typename Iterator>
+void normalize(Iterator first, Iterator last)
+{
+  for (/**/; first != last; ++ first)
+    *first = normalize(*first);
 }
 
 struct MST;
@@ -520,6 +594,16 @@ struct MST
 	if (! mst.verify())
 	  throw std::runtime_error("invalid mst format");
 
+	if (unescape_mode)
+	  unescape(mst.words.begin(), mst.words.end());
+
+	if (normalize_mode) {
+	  if (relation_mode)
+	    normalize(mst.labels.begin(), mst.labels.end());
+	  else
+	    normalize(mst.poss.begin(), mst.poss.end());
+	}
+
 	if (forest_mode) {
 	  transform.clear();
 	  transform.sentence.assign(mst.words.begin(), mst.words.end());
@@ -676,6 +760,22 @@ struct CoNLL
 	
 	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conll))
 	  throw std::runtime_error("parsing failed");
+
+	if (normalize_mode || unescape_mode) {
+	  conll_set_type::iterator citer_end = conll.end();
+	  for (conll_set_type::iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+
+	    if (unescape_mode)
+	      citer->form = unescape(citer->form);
+
+	    if (normalize_mode) {
+	      if (relation_mode)
+		citer->deprel = normalize(citer->deprel);
+	      else
+		citer->cpostag = normalize(citer->cpostag);
+	    }
+	  }
+	}
 
 	if (forest_mode) {
 	  transform.clear();
@@ -951,7 +1051,6 @@ struct KHayashi
     
     typedef boost::spirit::standard::blank_type blank_type;
     
-    boost::spirit::qi::rule<Iterator, std::string(), blank_type> token;
     boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> words;
     boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> poss;
     boost::spirit::qi::rule<Iterator, khayashi_type::position_set_type(), blank_type> positions;
@@ -992,6 +1091,12 @@ struct KHayashi
 	if (! khayashi.verify())
 	  throw std::runtime_error("invalid khayashi format");
 
+	if (unescape_mode)
+	  unescape(khayashi.words.begin(), khayashi.words.end());
+	
+	if (normalize_mode)
+	  normalize(khayashi.poss.begin(), khayashi.poss.end());
+
 	if (forest_mode) {
 	  transform.clear();
 	  transform.sentence.assign(khayashi.words.begin(), khayashi.words.end());
@@ -1022,7 +1127,7 @@ struct khayashi_forest_type
 {
   typedef size_t  size_type;
   typedef int32_t id_type;
-  typedef int32_t action_type;
+  typedef int32_t head_type;
   typedef double  score_type;
   
   typedef std::string label_type;
@@ -1031,10 +1136,10 @@ struct khayashi_forest_type
   
   struct edge_type
   {
-    id_type node1;
-    id_type node2;
-    action_type action;
-    score_type  score;
+    id_type    node1;
+    id_type    node2;
+    head_type  head;
+    score_type score;
   };
 
   typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
@@ -1054,6 +1159,18 @@ struct khayashi_forest_type
   };
 
   typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
+
+  bool verify() const
+  {
+    return words.size() == poss.size();
+  }
+
+  void clear()
+  {
+    words.clear();
+    poss.clear();
+    nodes.clear();
+  }
   
   label_set_type words;
   label_set_type poss;
@@ -1062,10 +1179,10 @@ struct khayashi_forest_type
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  khayashi_forest_type::edge_type,
-			  (khayashi_forest_type::id_type,     node1)
-			  (khayashi_forest_type::id_type,     node2)
-			  (khayashi_forest_type::action_type, action)
-			  (khayashi_forest_type::score_type,  score)
+			  (khayashi_forest_type::id_type,    node1)
+			  (khayashi_forest_type::id_type,    node2)
+			  (khayashi_forest_type::head_type,  head)
+			  (khayashi_forest_type::score_type, score)
 			  )
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -1089,10 +1206,236 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  )
 struct KHayashiForest
 {
+  template <typename Iterator>
+  struct khayashi_parser : boost::spirit::qi::grammar<Iterator, khayashi_forest_type()>
+  {
+    khayashi_parser() : khayashi_parser::base_type(khayashi)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      words %= (+(standard::char_ - standard::space) - "|||") % (+standard::blank);
+      poss  %= (+(standard::char_ - standard::space) - "|||") % (+standard::blank);
+      
+      edge %= (qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::lit("|||")
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::double_
+	       >> qi::omit[*standard::blank >> qi::eol]);
+      
+      node %= (qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_ >> qi::lit('-') >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::lit("|||")
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[+standard::blank] >> qi::int_
+	       >> qi::omit[*qi::blank >> qi::eol]
+	       >> *edge);
+      
+      khayashi %= (qi::omit[*standard::blank] >> words >> qi::omit[+standard::blank]
+		   >> qi::lit("|||")
+		   >>  qi::omit[+standard::blank] >> poss >> qi::omit[*standard::blank >> qi::eol]
+		   >> *node
+		   >> qi::omit[qi::eol]);
+    }
+    
+    boost::spirit::qi::rule<Iterator, khayashi_forest_type::label_set_type()> words;
+    boost::spirit::qi::rule<Iterator, khayashi_forest_type::label_set_type()> poss;
+    
+    boost::spirit::qi::rule<Iterator, khayashi_forest_type::edge_type()> edge;
+    boost::spirit::qi::rule<Iterator, khayashi_forest_type::node_type()> node;
+    
+    boost::spirit::qi::rule<Iterator, khayashi_forest_type()> khayashi;
+  };
+
   void operator()(const path_set_type& files, const path_type& output)
   {
+    typedef boost::spirit::istream_iterator iiter_type;
     
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
+    typedef size_t size_type;
     
+    typedef cicada::Sentence   sentence_type;
+    typedef cicada::Rule       rule_type;
+    typedef cicada::Symbol     symbol_type;
+    typedef cicada::Feature    feature_type;
+    
+    typedef std::pair<hypergraph_type::id_type, hypergraph_type::id_type> node_id_type;
+    typedef std::vector<node_id_type, std::allocator<node_id_type> > node_id_set_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > goal_id_set_type;
+    
+
+    const feature_type feature("depdency-parse");
+    
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    std::ostream_iterator<char> oiter(os);
+    
+    khayashi_parser<iiter_type> parser;
+    khayashi_forest_type khayashi;
+
+    hypergraph_type hypergraph;
+    node_id_set_type nodes;
+    node_id_set_type terminals;
+    label_set_type   labels;
+    goal_id_set_type goals;
+
+    path_set_type::const_iterator fiter_end = files.end();
+    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iiter_type iter(is);
+      iiter_type iter_end;
+
+      while (iter != iter_end) {
+	khayashi.clear();
+	hypergraph.clear();
+	
+	if (! qi::parse(iter, iter_end, parser, khayashi))
+	  throw std::runtime_error("parsing failed");
+
+	if (! khayashi.verify())
+	  throw std::runtime_error("invalid khayashi forest format");
+	
+	if (unescape_mode)
+	  unescape(khayashi.words.begin(), khayashi.words.end());
+	
+	if (normalize_mode)
+	  normalize(khayashi.poss.begin(), khayashi.poss.end());
+	
+	if (khayashi.nodes.empty())
+	  os << hypergraph << '\n';
+	else {
+	  nodes.clear();
+	  nodes.resize(khayashi.nodes.size() + 1, std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
+	  
+	  terminals.clear();
+	  terminals.resize(khayashi.words.size(), std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
+	  
+	  labels.clear();
+	  goals.clear();
+	  
+	  rule_type::symbol_set_type rhs(2);
+	  hypergraph_type::edge_type::node_set_type tails(2);
+	  
+	  khayashi_forest_type::node_set_type::const_iterator niter_end = khayashi.nodes.end();
+	  for (khayashi_forest_type::node_set_type::const_iterator niter = khayashi.nodes.begin(); niter != niter_end; ++ niter) {
+	    const khayashi_forest_type::node_type& node = *niter;
+	    
+	    if (node.edges.empty()) {
+	      if (terminals[node.parent].first == hypergraph_type::invalid) {
+		
+		const hypergraph_type::id_type head_id = hypergraph.add_node().id;
+		const hypergraph_type::id_type node_id = hypergraph.add_node().id;
+		
+		terminals[node.parent].first  = head_id;
+		terminals[node.parent].second = node_id;
+		
+		if (head_id >= labels.size())
+		  labels.resize(head_id + 1);		
+		if (node_id >= labels.size())
+		  labels.resize(node_id + 1);
+		
+		labels[head_id] = '[' + khayashi.poss[node.parent] + "*]";
+		labels[node_id] = '[' + khayashi.poss[node.parent] + ']';
+		
+		hypergraph_type::edge_type& edge = hypergraph.add_edge();
+		
+		edge.rule = rule_type::create(rule_type(labels[head_id], rule_type::symbol_set_type(1, khayashi.words[node.parent])));
+		
+		edge.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
+		
+		hypergraph.connect_edge(edge.id, head_id);
+		
+		hypergraph_type::edge_type& edge2 = hypergraph.add_edge(&head_id, (&head_id) + 1);
+		
+		edge2.rule = rule_type::create(rule_type(labels[node_id], rule_type::symbol_set_type(1, labels[head_id])));
+		
+		hypergraph.connect_edge(edge2.id, node_id);
+	      }
+	      
+	      nodes[node.id] = terminals[node.parent];
+	    } else {
+	      const hypergraph_type::id_type node_id   = hypergraph.add_node().id;
+	      const hypergraph_type::id_type binary_id = hypergraph.add_node().id;
+	      
+	      nodes[node.id].first = node_id;
+	      nodes[node.id].second = binary_id;
+	      
+	      if (node_id >= labels.size())
+		labels.resize(node_id + 1);
+	      if (binary_id >= labels.size())
+		labels.resize(binary_id + 1);
+	      
+	      labels[node_id]   = '[' + khayashi.poss[node.parent] + ']';
+	      labels[binary_id] = '[' + khayashi.poss[node.parent] + "^]";
+
+	      if (node.first == 0 && node.last == static_cast<int>(khayashi.words.size()))
+		goals.push_back(node_id);
+	      
+	      khayashi_forest_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	      for (khayashi_forest_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+		const khayashi_forest_type::node_type& node1 = khayashi.nodes[eiter->node1 - 1];
+		const khayashi_forest_type::node_type& node2 = khayashi.nodes[eiter->node2 - 1];
+		
+		tails[0] = utils::bithack::branch(node.parent != node1.parent, nodes[node1.id].first, nodes[node1.id].second);
+		tails[1] = utils::bithack::branch(node.parent != node2.parent, nodes[node2.id].first, nodes[node2.id].second);
+		
+		rhs[0] = labels[tails[0]];
+		rhs[1] = labels[tails[1]];
+		
+		hypergraph_type::edge_type& edge1 = hypergraph.add_edge(tails.begin(), tails.end());
+		hypergraph_type::edge_type& edge2 = hypergraph.add_edge(tails.begin(), tails.end());
+		
+		edge1.rule = rule_type::create(rule_type(labels[node_id], rhs));
+		edge2.rule = rule_type::create(rule_type(labels[binary_id], rhs));
+		
+		edge1.features[feature] = eiter->score;
+		edge2.features[feature] = eiter->score;
+
+		edge1.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
+		edge1.attributes["dependency-child1"] = hypergraph_type::attribute_set_type::int_type(eiter->node1);
+		edge1.attributes["dependency-child2"] = hypergraph_type::attribute_set_type::int_type(eiter->node2);
+		edge2.attributes["dependency-node"] = hypergraph_type::attribute_set_type::int_type(node.id);
+		edge2.attributes["dependency-child1"] = hypergraph_type::attribute_set_type::int_type(eiter->node1);
+		edge2.attributes["dependency-child2"] = hypergraph_type::attribute_set_type::int_type(eiter->node2);
+		
+		hypergraph.connect_edge(edge1.id, node_id);
+		hypergraph.connect_edge(edge2.id, binary_id);
+	      }
+	    }
+	  }
+	  
+	  if (! goals.empty()) {
+	    hypergraph.goal = hypergraph.add_node().id;
+
+	    goal_id_set_type::const_iterator giter_end = goals.end();
+	    for (goal_id_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
+	      const hypergraph_type::id_type tail = *giter;
+	      
+	      hypergraph_type::edge_type& edge = hypergraph.add_edge(&tail, (&tail) + 1);
+	      
+	      edge.rule = rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, labels[tail])));
+	      
+	      hypergraph.connect_edge(edge.id, hypergraph.goal);
+	    }
+	    
+	    cicada::topologically_sort(hypergraph);
+	    
+	    cicada::debinarize(hypergraph);
+	  }
+	  
+	  os << hypergraph << '\n';
+	}
+      }
+    }
   }
 };
 
@@ -1128,6 +1471,8 @@ void options(int argc, char** argv)
     
     ("projective", po::bool_switch(&projective_mode), "project into projective dependency")
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
+    ("unescape",   po::bool_switch(&unescape_mode),   "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("normalize",  po::bool_switch(&normalize_mode),  "normalize category, such as [,] [.] etc.")
     ("forest",     po::bool_switch(&forest_mode),     "output as a forest")
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
             
