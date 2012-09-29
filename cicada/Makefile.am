@@ -273,6 +273,7 @@ operation/remove_annotation.hpp \
 operation/remove_bos_eos.hpp \
 operation/remove_epsilon.hpp \
 operation/remove_feature.hpp \
+operation/remove_head.hpp \
 operation/remove_sgml_tag.hpp \
 operation/remove_unary.hpp \
 operation/sort_tail.hpp \
@@ -304,6 +305,7 @@ operation/remove_annotation.cpp \
 operation/remove_bos_eos.cpp \
 operation/remove_epsilon.cpp \
 operation/remove_feature.cpp \
+operation/remove_head.cpp \
 operation/remove_sgml_tag.cpp \
 operation/remove_unary.cpp \
 operation/sort_tail.cpp \

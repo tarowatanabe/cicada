@@ -35,6 +35,7 @@
 #include "operation/remove_bos_eos.hpp"
 #include "operation/remove_epsilon.hpp"
 #include "operation/remove_feature.hpp"
+#include "operation/remove_head.hpp"
 #include "operation/remove_sgml_tag.hpp"
 #include "operation/remove_unary.hpp"
 #include "operation/sort_tail.hpp"
@@ -248,6 +249,7 @@ remove-epsilon: remove epsilon\n\
 \tforest=[true|false] remove epsilon for forest\n\
 remove-feature: remove feature(s)\n\
 \tfeature=[feature name] feature name for removal\n\
+remove-head: remove head nodes from forest\n\
 remove-sgml-tag: remove sgml tag(s)\n\
 \tlattice=[true|false] remove sgml tag(s) for lattice\n\
 \tforest=[true|false] remove sgml tag(s) for forest\n\
@@ -382,6 +384,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
       else if (param_name == "remove-feature")
 	operations.push_back(operation_ptr_type(new operation::RemoveFeature(*piter, debug)));
+      else if (param_name == "remove-head")
+	operations.push_back(operation_ptr_type(new operation::RemoveHead(*piter, debug)));
       else if (param_name == "remove-sgml-tag")
 	operations.push_back(operation_ptr_type(new operation::RemoveSGMLTag(*piter, debug)));
       else if (param_name == "remove-unary")
