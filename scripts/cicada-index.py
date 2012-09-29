@@ -61,6 +61,9 @@ opt_parser = OptionParser(
     make_option("--feature-singleton",          default=None, action="store_true", help="singleton features"),
     make_option("--feature-cross",              default=None, action="store_true", help="cross features"),
     make_option("--feature-unaligned",          default=None, action="store_true", help="unaligned features"),
+    make_option("--feature-internal",           default=None, action="store_true", help="internal features"),
+    make_option("--feature-height",             default=None, action="store_true", help="height features"),
+
     make_option("--feature-lexicon",            default=None, action="store_true", help="compute Model1 features"),
     make_option("--feature-model1",             default=None, action="store_true", help="compute Model1 features"),
     make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
@@ -426,12 +429,17 @@ class Features:
                  types=None,
                  singleton=None,
                  cross=None,
-                 unaligned=None):
+                 unaligned=None,
+                 internal=None,
+                 height=None):
         self.root      = root
         self.types     = types
         self.singleton = singleton
         self.cross     = cross
         self.unaligned = unaligned
+        self.internal  = internal
+        self.height    = height
+
         self.options = ""
         
         if root:
@@ -444,6 +452,10 @@ class Features:
             self.options += " --feature-cross"
         if unaligned:
             self.options += " --feature-unaligned"
+        if internal:
+            self.options += " --feature-internal"
+        if height:
+            self.options += " --feature-height"
 
 class Lexicon:
     def __init__(self,
@@ -671,7 +683,9 @@ if __name__ == '__main__':
                         types=options.feature_type,
                         singleton=options.feature_singleton,
                         cross=options.feature_cross,
-                        unaligned=options.feature_unaligned)
+                        unaligned=options.feature_unaligned,
+                        internal=options.feature_internal,
+                        height=options.feature_height)
     lexicon = Lexicon(lexicon_source_target=options.lexicon_source_target,
                       lexicon_target_source=options.lexicon_target_source,
                       lexicon=options.feature_lexicon,

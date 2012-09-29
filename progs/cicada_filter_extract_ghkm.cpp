@@ -45,6 +45,9 @@ bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
 bool feature_unaligned_mode = false;
 
+bool feature_internal_mode = false;
+bool feature_height_mode = false;
+
 bool feature_lexicon_mode = false;
 bool feature_model1_mode = false;
 bool feature_noisy_or_mode = false;
@@ -189,6 +192,13 @@ struct ScorerCICADA
   typedef ExtractAlignment::alignment_type     alignment_type;
   typedef ExtractAlignment::alignment_set_type alignment_set_type;
 
+  typedef cicada::TreeRule tree_rule_type;
+
+  phrase_pair_type::phrase_type phrase_source;
+  
+  tree_rule_type rule_source;
+  tree_rule_type rule_target;
+
   sentence_type      source;
   sentence_type      target;
   alignment_set_type alignments;
@@ -267,13 +277,30 @@ struct ScorerCICADA
       
     }
     
+    if (feature_internal_mode || feature_height_mode
+	|| feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+      if (phrase_source != phrase_pair.source)
+	rule_source.assign(phrase_pair.source);
+      
+      rule_target.assign(phrase_pair.target);
+    }
+
+    
     if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
-      extract_phrase(phrase_pair.source, source);
-      extract_phrase(phrase_pair.target, target);
+      if (phrase_source != phrase_pair.source) {
+	source.clear();
+	rule_source.frontier(std::back_inserter(source));
+      }
+      
+      target.clear();
+      rule_target.frontier(std::back_inserter(target));
     }
     
     if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
       extract_alignment(phrase_pair.alignments, alignments);
+
+    // assign!
+    phrase_source = phrase_pair.source;
 
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (feature_lexicon_mode) {
@@ -334,6 +361,24 @@ struct ScorerCICADA
       if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, cross(source, target), cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
     
+    if (feature_internal_mode) {
+      const int internal_source = rule_source.size_internal();
+      const int internal_target = rule_target.size_internal();
+      
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, internal_source, internal_target))
+	throw std::runtime_error("failed generation");
+    }
+    
+    if (feature_height_mode) {
+      // since depth include the root-label, remove it
+      const int heigth_source = rule_source.depth() - 1;
+      const int heigth_target = rule_target.depth() - 1;
+      
+      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_, heigth_source, heigth_target))
+	throw std::runtime_error("failed generation");
+    }
+
+    
     os << '\n';
   }
 };
@@ -363,6 +408,10 @@ void options(int argc, char** argv)
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")
     ("feature-unaligned",  po::bool_switch(&feature_unaligned_mode),  "unaligned features")
+
+    ("feature-internal",   po::bool_switch(&feature_internal_mode),   "internal features")
+    ("feature-height",     po::bool_switch(&feature_height_mode),     "height features")
+    
     
     ("feature-lexicon",            po::bool_switch(&feature_lexicon_mode),            "lexical weight feature (requires lexicon models)")
     ("feature-model1",             po::bool_switch(&feature_model1_mode),             "Model1 feature (requires lexicon models)")
