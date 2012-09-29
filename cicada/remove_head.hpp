@@ -22,7 +22,7 @@ namespace cicada
       {
 	if (! x.is_non_terminal()) return false;
 	
-	const symbol_type& non_terminal = x.non_terminal();
+	const symbol_type non_terminal = x.non_terminal();
 	
 	return non_terminal[non_terminal.size() - 2] == '*';
       }
