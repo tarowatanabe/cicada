@@ -14,11 +14,11 @@ namespace cicada
 
   namespace detail
   {
-    typedef cicada::Vocab vocab_type;
-    typedef vocab_type::symbol_type symbol_type;
-    
     struct remove_sgml_tag
     {
+      typedef cicada::Vocab vocab_type;
+      typedef vocab_type::symbol_type symbol_type;
+      
       bool operator()(const symbol_type& x) const
       {
 	return (x != vocab_type::BOS && x != vocab_type::EOS && x.is_sgml_tag()) || x == vocab_type::EPSILON;
@@ -27,6 +27,9 @@ namespace cicada
 
     struct remove_sgml_tag_all
     {
+      typedef cicada::Vocab vocab_type;
+      typedef vocab_type::symbol_type symbol_type;
+
       bool operator()(const symbol_type& x) const
       {
 	return x.is_sgml_tag() || x == vocab_type::EPSILON;

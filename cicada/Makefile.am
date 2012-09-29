@@ -422,6 +422,8 @@ query_tree_cky.hpp \
 remove_annotation.hpp \
 remove_bos_eos.hpp \
 remove_epsilon.hpp \
+remove_head.hpp \
+remove_non_terminal.hpp \
 remove_sgml_tag.hpp \
 remove_symbol.hpp \
 remove_unary.hpp \

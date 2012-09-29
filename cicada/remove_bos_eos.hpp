@@ -14,11 +14,11 @@ namespace cicada
 
   namespace detail
   {
-    typedef cicada::Vocab vocab_type;
-    typedef vocab_type::symbol_type symbol_type;
-    
     struct remove_bos_eos
     {
+      typedef cicada::Vocab vocab_type;
+      typedef vocab_type::symbol_type symbol_type;
+
       bool operator()(const symbol_type& x) const
       {
 	return x == vocab_type::BOS || x == vocab_type::EOS || x == vocab_type::EPSILON;

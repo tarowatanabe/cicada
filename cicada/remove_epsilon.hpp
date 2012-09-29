@@ -13,11 +13,11 @@ namespace cicada
 {
   namespace detail
   {
-    typedef cicada::Vocab vocab_type;
-    typedef vocab_type::symbol_type symbol_type;
-    
     struct remove_epsilon
     {
+      typedef cicada::Vocab vocab_type;
+      typedef vocab_type::symbol_type symbol_type;
+
       bool operator()(const symbol_type& x) const
       {
 	return x == vocab_type::EPSILON;

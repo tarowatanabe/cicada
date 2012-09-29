@@ -42,6 +42,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
 #include <cicada/debinarize.hpp>
+#include <cicada/remove_non_terminal.hpp>
 
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
@@ -1253,6 +1254,20 @@ struct KHayashiForest
     boost::spirit::qi::rule<Iterator, khayashi_forest_type()> khayashi;
   };
 
+  struct remove_nodes
+  {
+    typedef cicada::Symbol     symbol_type;
+
+    bool operator()(const symbol_type& x) const
+    {
+      if (! x.is_non_terminal()) return false;
+      
+      const symbol_type& non_terminal = x.non_terminal();
+      
+      return (non_terminal[non_terminal.size() - 2] == '*') || x.binarized();
+    }
+  };
+
   void operator()(const path_set_type& files, const path_type& output)
   {
     typedef boost::spirit::istream_iterator iiter_type;
@@ -1433,7 +1448,10 @@ struct KHayashiForest
 	    
 	    cicada::topologically_sort(hypergraph);
 	    
-	    cicada::debinarize(hypergraph);
+	    if (head_mode)
+	      cicada::debinarize(hypergraph);
+	    else
+	      cicada::remove_non_terminal(hypergraph, remove_nodes());
 	  }
 	  
 	  os << hypergraph << '\n';

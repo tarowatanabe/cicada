@@ -3,43 +3,9 @@
 //  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__DEBINARIZE__HPP__
-#define __CICADA__DEBINARIZE__HPP__ 1
+#ifndef __CICADA__REMOVE_NON_TERMINAL__HPP__
+#define __CICADA__REMOVE_NON_TERMINAL__HPP__ 1
 
-#include <cicada/vocab.hpp>
-#include <cicada/remove_non_terminal.hpp>
-
-namespace cicada
-{
-  namespace detail
-  {
-    struct debinarize
-    {
-      typedef cicada::Vocab           vocab_type;
-      typedef vocab_type::symbol_type symbol_type;
-      
-      bool operator()(const symbol_type& x) const
-      {
-	return x.binarized();
-      }
-    };
-  };
-  
-  inline
-  void debinarize(HyperGraph& graph)
-  {
-    cicada::remove_non_terminal(graph, detail::debinarize());
-  }
-  
-  inline
-  void debinarize(const HyperGraph& source, HyperGraph& target)
-  {
-    cicada::remove_non_terminal(source, target, detail::debinarize());
-  }
-  
-};
-
-#if 0
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
@@ -52,7 +18,7 @@ namespace cicada
 
 namespace cicada
 {
-  struct Debinarize
+  struct RemoveNonTerminal
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
@@ -66,7 +32,6 @@ namespace cicada
     typedef hypergraph_type::feature_set_type   feature_set_type;
     typedef hypergraph_type::attribute_set_type attribute_set_type;
 
-    typedef std::vector<bool, std::allocator<bool> > binarized_type;
     typedef std::vector<bool, std::allocator<bool> > removed_type;
 
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
@@ -85,7 +50,8 @@ namespace cicada
       const removed_type& removed;
      };
     
-    void operator()(const hypergraph_type& source, hypergraph_type& target)
+    template <typename Remover>
+    void operator()(const hypergraph_type& source, hypergraph_type& target, Remover remover)
     {
       // debinarization by stripping off the ^ from syntactic categories...
 
@@ -96,11 +62,11 @@ namespace cicada
       
       // bottom-up topological order to find binarised antecedents...
             
-      removed_type removed(target.edges.size(), false);
-      binarized_type binarized(target.nodes.size(), false);
-      bool is_binarized = false;
+      removed_type remove_edges(target.edges.size(), false);
+      removed_type remove_nodes(target.nodes.size(), false);
+      bool is_remove_nodes = false;
       
-      // first, check whether it is binarized!
+      // first, check whether it is remove_nodes!
       hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
@@ -111,18 +77,18 @@ namespace cicada
 	const hypergraph_type::edge_type& edge = target.edges[node.edges.front()];
 	const symbol_type& lhs = edge.rule->lhs;
 	
-	if (lhs.binarized()) {
-	  binarized[node.id] = true;
+	if (remover(lhs)) {
+	  remove_nodes[node.id] = true;
 	  
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-	    removed[*eiter] = true;
+	    remove_edges[*eiter] = true;
 	  
-	  is_binarized = true;
+	  is_remove_nodes = true;
 	}
       }
       
-      if (! is_binarized) return;
+      if (! is_remove_nodes) return;
 
       tail_set_type tails;
       rhs_type      rhs;
@@ -134,7 +100,7 @@ namespace cicada
 	for (size_type e = 0; e != edges_size; ++ e) {
 	  const hypergraph_type::edge_type& edge = target.edges[node.edges[e]];
 	  
-	  // search for antecedent nodes, and seek the binarized label..
+	  // search for antecedent nodes, and seek the remove_nodes label..
 	  // if found, try merge! 
 	  // it is like apply-exact to form new edges....
 	  
@@ -143,16 +109,16 @@ namespace cicada
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);
 	  
-	  bool found_binarized = false;
+	  bool found_remove_nodes = false;
 	  
 	  for (size_type i = 0; i != edge.tails.size(); ++ i) {
-	    found_binarized |= binarized[edge.tails[i]];
-	    j_ends[i] = utils::bithack::branch(binarized[edge.tails[i]], target.nodes[edge.tails[i]].edges.size(), size_type(0));
+	    found_remove_nodes |= remove_nodes[edge.tails[i]];
+	    j_ends[i] = utils::bithack::branch(remove_nodes[edge.tails[i]], target.nodes[edge.tails[i]].edges.size(), size_type(0));
 	  }
 	  
-	  if (! found_binarized) continue;
+	  if (! found_remove_nodes) continue;
 	  
-	  removed[edge.id] = true;
+	  remove_edges[edge.id] = true;
 	  
 	  for (;;) {
 	    tails.clear();
@@ -185,7 +151,7 @@ namespace cicada
 		      const int index = utils::bithack::branch(__index <= 0, pos, __index - 1);
 		      ++ pos;
 		      
-		      invalid |= binarized[edge_antecedent.tails[index]];
+		      invalid |= remove_nodes[edge_antecedent.tails[index]];
 		      tails.push_back(edge_antecedent.tails[index]);
 		      
 		      rhs.push_back(aiter->non_terminal());
@@ -208,10 +174,10 @@ namespace cicada
 	      
 	      target.connect_edge(edge_new.id, edge.head);
 
-	      if (removed.size() < target.edges.size())
-		removed.resize(target.edges.size(), false);
+	      if (remove_edges.size() < target.edges.size())
+		remove_edges.resize(target.edges.size(), false);
 	      
-	      removed[edge_new.id] = binarized[edge.head];
+	      remove_edges[edge_new.id] = remove_nodes[edge.head];
 	    }
 	    
 	    // proceed to the next...
@@ -229,36 +195,36 @@ namespace cicada
 	}
       }
 
-      removed.resize(target.edges.size(), false);
+      remove_edges.resize(target.edges.size(), false);
       
       //target.topologically_sort();
       
       hypergraph_type sorted;
-      topologically_sort(target, sorted, filter_edge(removed), true);
+      topologically_sort(target, sorted, filter_edge(remove_edges), true);
       target.swap(sorted);
     }
     
   };
 
 
-  
+  template <typename Remover>
   inline
-  void debinarize(const HyperGraph& source, HyperGraph& target)
+  void remove_non_terminal(const HyperGraph& source, HyperGraph& target, Remover remover)
   {
-    Debinarize debinarizer;
+    RemoveNonTerminal remove_non_terminal;
     
-    debinarizer(source, target);
+    remove_non_terminal(source, target, remover);
   }
   
+  template <typename Remover>
   inline
-  void debinarize(HyperGraph& source)
+  void remove_non_terminal(HyperGraph& source, Remover remover)
   {
     HyperGraph target;
-    debinarize(source, target);
+    remove_non_terminal(source, target, remover);
     source.swap(target);
   }
 
 };
-#endif
 
 #endif
