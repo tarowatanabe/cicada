@@ -262,6 +262,10 @@ int main(int argc, char** argv)
       if (target_files.size() != dependency_files.size())
 	throw std::runtime_error("# of dependency files do not match");
       
+      const bool flush_output = (output_file == "-"
+				 || (boost::filesystem::exists(output_file)
+				     && ! boost::filesystem::is_regular_file(output_file)));
+      
       utils::compress_ostream os(output_file, 1024 * 1024);
       
       typedef boost::spirit::istream_iterator iiter_type;
@@ -312,6 +316,8 @@ int main(int argc, char** argv)
 	  
 	  if (source_size == 0 || target_size == 0) {
 	    os << '\n';
+	    if (flush_output)
+	      os << std::flush;
 	    continue;
 	  };
 	  
@@ -322,6 +328,8 @@ int main(int argc, char** argv)
 	  
 	  
 	  os << projected << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	}
       }
     } else
@@ -569,6 +577,10 @@ struct MST
     namespace qi = boost::spirit::qi;
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
+
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
@@ -624,6 +636,8 @@ struct MST
 	  transform();
 	  
 	  os << transform.hypergraph << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	} else {
 	  if (relation_mode) {
 	    if (! karma::generate(oiter, (-(standard::string % ' ')
@@ -640,6 +654,9 @@ struct MST
 				    mst.words, mst.poss, mst.positions))
 		throw std::runtime_error("generation failed");
 	  }
+
+	  if (flush_output)
+	    os << std::flush;
 	}
       }
     }
@@ -739,6 +756,10 @@ struct CoNLL
     namespace qi = boost::spirit::qi;
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
+
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
@@ -803,6 +824,8 @@ struct CoNLL
 	  transform();
 	  
 	  os << transform.hypergraph << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	} else {
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
@@ -835,6 +858,8 @@ struct CoNLL
 	      os << ' ' << citer->head;
 	  }
 	  os << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	}
       }
     }
@@ -868,6 +893,10 @@ struct Cabocha
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+
     utils::compress_ostream os(output_file, 1024 * 1024);
 
     node_set_type nodes;
@@ -951,6 +980,8 @@ struct Cabocha
 	    transform();
 	    
 	    os << transform.hypergraph << '\n';
+	    if (flush_output)
+	      os << std::flush;
 	  } else {
 	    terminal_set_type::const_iterator titer_end = terminals.end();
 	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
@@ -962,6 +993,9 @@ struct Cabocha
 	    
 	    if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
 	      throw std::runtime_error("generation failed");
+	    
+	    if (flush_output)
+	      os << std::flush;
 	  }
 	  
 	} else if (tokens.size() == 5) {
@@ -1067,6 +1101,10 @@ struct KHayashi
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
@@ -1111,6 +1149,8 @@ struct KHayashi
 	  transform();
 	  
 	  os << transform.hypergraph << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
@@ -1118,6 +1158,9 @@ struct KHayashi
 					<< '\n'),
 				khayashi.words, khayashi.poss, khayashi.positions))
 	    throw std::runtime_error("generation failed");
+	  
+	  if (flush_output)
+	    os << std::flush;
 	}
       }
     }
@@ -1294,6 +1337,10 @@ struct KHayashiForest
     //const attribute_type attr_dependency_head("dependency-head");
     //const attribute_type attr_dependency_dependent("dependency-dependent");
     
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
@@ -1330,9 +1377,11 @@ struct KHayashiForest
 	if (normalize_mode)
 	  normalize(khayashi.poss.begin(), khayashi.poss.end());
 	
-	if (khayashi.nodes.empty())
+	if (khayashi.nodes.empty()) {
 	  os << hypergraph << '\n';
-	else {
+	  if (flush_output)
+	    os << std::flush;
+	} else {
 	  nodes.clear();
 	  nodes.resize(khayashi.nodes.size() + 1, std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
 	  
@@ -1455,6 +1504,8 @@ struct KHayashiForest
 	  }
 	  
 	  os << hypergraph << '\n';
+	  if (flush_output)
+	    os << std::flush;
 	}
       }
     }
