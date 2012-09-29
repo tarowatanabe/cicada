@@ -464,11 +464,15 @@ int main(int argc, char** argv)
 
     typedef boost::spirit::istream_iterator iter_type;
 
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+    
     utils::compress_istream is(input_file, 1024 * 1024);
     is.unsetf(std::ios::skipws);
     
-    utils::compress_ostream os(output_file);
-
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    
     boost::shared_ptr<utils::compress_istream> ms;
 
     if (! map_file.empty()) {
@@ -579,6 +583,10 @@ int main(int argc, char** argv)
 	  os << '\n';
 	} else
 	  os << '\n';
+	
+	if (flush_output)
+	  os << std::flush;
+
       } else if (span) {
 	spans.clear();
 	
@@ -620,6 +628,10 @@ int main(int argc, char** argv)
 	  
 	  os << '\n';
 	}
+	
+	if (flush_output)
+	  os << std::flush;
+
       } else {
 	graph.clear();
 	
@@ -662,6 +674,9 @@ int main(int argc, char** argv)
 	  if (! skip_invalid || graph.is_valid())
 	    os << graph << '\n';
 	}
+	
+	if (flush_output)
+	  os << std::flush;
       }
     }
   }
