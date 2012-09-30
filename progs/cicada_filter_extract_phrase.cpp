@@ -261,7 +261,7 @@ struct ScorerCICADA
 	throw std::runtime_error("failed generation");
     }
     
-    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
     }
@@ -269,7 +269,7 @@ struct ScorerCICADA
     if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
       extract_alignment(phrase_pair.alignments, alignments);
     
-    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (feature_lexicon_mode) {
 	const std::pair<double, double> scores = lexicon.lexicon(source, target, alignments);
 	
@@ -411,6 +411,7 @@ struct ScorerMOSES
   ExtractPhrase    extract_phrase;
   ExtractAlignment extract_alignment;
   Unaligned        unaligned;
+  Cross            cross;
   
   typedef ExtractPhrase::sentence_type         sentence_type;
   typedef ExtractAlignment::alignment_type     alignment_type;
@@ -449,8 +450,7 @@ struct ScorerMOSES
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " |||"
 			  << ' ' << double10 << ' ' << double10
-			  << ' ' << double10
-			  << '\n',
+			  << ' ' << double10,
 			  phrase_pair.source, phrase_pair.target,
 			  prob_source_target, prob_target_source, 
 			  boost::math::constants::e<double>()))
@@ -470,12 +470,12 @@ struct ScorerMOSES
 	throw std::runtime_error("failed generation");
     }
         
-    if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
     }
     
-    if (feature_lexicon_mode || feature_unaligned_mode)
+    if (feature_cross_mode || feature_lexicon_mode || feature_unaligned_mode)
       extract_alignment(phrase_pair.alignments, alignments);
     
     if (feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
@@ -528,10 +528,16 @@ struct ScorerMOSES
       const int singleton_target = phrase_pair.observed_target == 1;
       const int singleton        = singleton_source && singleton_target;
       
-      if (! karma::generate(iter, ' ' << karma::int_ << ' ' << karma::int_ << ' ' << karma::int_,
-			    singleton, utils::mathop::exp(singleton_source), utils::mathop::exp(singleton_target)))
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
+			    utils::mathop::exp(singleton), utils::mathop::exp(singleton_source), utils::mathop::exp(singleton_target)))
 	throw std::runtime_error("failed generation");
     }
+    
+    if (feature_cross_mode)
+      if (! karma::generate(iter, ' ' << double10, utils::mathop::exp(cross(source, target, alignments))))
+	throw std::runtime_error("failed generation");
+    
+    os << '\n';
   }
 };
 

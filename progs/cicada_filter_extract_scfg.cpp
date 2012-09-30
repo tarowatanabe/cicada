@@ -41,6 +41,9 @@ path_type lexicon_target_source_file;
 
 double dirichlet_prior = 0.1;
 
+bool mode_cicada = false;
+bool mode_moses = false;
+
 bool feature_root_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
@@ -89,6 +92,11 @@ int main(int argc, char** argv)
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
+
+    if (mode_cicada && mode_moses)
+      throw std::runtime_error("specify either --{cicada,moses} (default to cicada)");
+    if (int(mode_cicada) + mode_moses == 0)
+      mode_cicada = true;
 
     bool read_lexicon = false;
     
@@ -392,7 +400,7 @@ struct ScorerCICADA
 
     std::ostream_iterator<char> iter(os);
 
-    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
     }
@@ -432,7 +440,7 @@ struct ScorerCICADA
     
     if (feature_unaligned_mode) {
       const std::pair<size_t, size_t> scores = unaligned(source, target, alignments);
-
+      
       if (! karma::generate(iter, ' ' << karma::uint_ << ' ' << karma::uint_, scores.first, scores.second))
 	throw std::runtime_error("failed generation");
     }
@@ -481,7 +489,10 @@ void options(int argc, char** argv)
     ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
-    
+
+    ("cicada",   po::bool_switch(&mode_cicada),   "output in cicada format")
+    ("moses",    po::bool_switch(&mode_moses),    "output in moses format")
+        
     ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")

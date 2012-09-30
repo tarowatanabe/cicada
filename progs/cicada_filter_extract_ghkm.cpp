@@ -274,11 +274,10 @@ struct ScorerCICADA
 			    logprob_root_source,
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
-      
     }
     
     if (feature_internal_mode || feature_height_mode
-	|| feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+	|| feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (phrase_source != phrase_pair.source)
 	rule_source.assign(phrase_pair.source);
       
@@ -286,7 +285,7 @@ struct ScorerCICADA
     }
 
     
-    if (feature_cross_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
+    if (feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       if (phrase_source != phrase_pair.source) {
 	source.clear();
 	rule_source.frontier(std::back_inserter(source));
