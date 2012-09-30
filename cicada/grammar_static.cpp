@@ -538,7 +538,7 @@ namespace cicada
     path_type path() const { return rule_db.path().parent_path(); }
     bool is_open() const { return ! score_db.empty(); }
 
-
+    void binarize();
     void quantize();
     void read(const std::string& parameter);
     void write(const path_type& path) const;
@@ -643,6 +643,19 @@ namespace cicada
       score.write(rep.path("score"));
   }
   
+  void GrammarStaticImpl::binarize()
+  {
+    
+    for (size_t feature = 0; feature < score_db.size(); ++ feature)
+      if (score_db[feature].score.is_open()) {
+	
+      }
+    
+    for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+      if (attr_db[attr].score.is_open()) {
+	
+      }
+  }
 
   void GrammarStaticImpl::quantize()
   {
