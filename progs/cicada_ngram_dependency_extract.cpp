@@ -15,6 +15,9 @@
 // output format:
 //
 // counts/
+//   vocab.gz
+//   vocab_cs.gz
+//
 //   root/
 //     counts-xxx.gz
 //     ...
@@ -27,7 +30,7 @@
 //   left-sibling/
 //     counts-xxx.gz
 //     ...
-//     left.idx
+//     left-sibling.idx
 //
 //   right/
 //     counts-xxx.gz
@@ -37,5 +40,5 @@
 //   right-sibling/
 //     counts-xxx.gz
 //     ...
-//     right.idx
+//     right-sibling.idx
 //
