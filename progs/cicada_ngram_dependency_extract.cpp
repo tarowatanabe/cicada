@@ -6,6 +6,8 @@
 // dependency ngram language model learning... actually, this will collect counts only
 //
 
+#include "cicada_ngram_dependency_extract_impl.hpp"
+
 #include <iostream>
 #include <sstream>
 
@@ -19,10 +21,9 @@
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/thread.hpp>
 
 #include <utils/compress_stream.hpp>
-
-#include "cicada_ngram_dependency_extract_impl.hpp"
 
 typedef DependencyCounts::path_type     path_type;
 typedef DependencyCounts::path_set_type path_set_type;

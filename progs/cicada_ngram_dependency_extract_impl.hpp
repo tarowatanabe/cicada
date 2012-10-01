@@ -568,11 +568,11 @@ struct DependencyCounts
     //
     // crate index files...
     //
-    create_files(path / "root" / "files.idx",       counts_paths.root);
-    create_files(path / "left" / "files.idx",       counts_paths.left);
-    create_files(path / "right" / "files.idx",      counts_paths.right);
-    create_files(path / "left-head" / "files.idx",  counts_paths.left_head);
-    create_files(path / "right-head" / "files.idx", counts_paths.right_head);
+    create_files(path / "root" / "root.idx",       counts_paths.root);
+    create_files(path / "left" / "left.idx",       counts_paths.left);
+    create_files(path / "right" / "right.idx",      counts_paths.right);
+    create_files(path / "left-head" / "left-head.idx",  counts_paths.left_head);
+    create_files(path / "right-head" / "right-lead.idx", counts_paths.right_head);
   }
 
   struct TaskFile

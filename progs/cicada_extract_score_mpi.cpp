@@ -1046,12 +1046,12 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  const size_t queue_size  = mpi_size * 1024 * 8;
+  const size_t queue_size  = mpi_size * 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
-
+  
   boost::mt19937 gen;
   gen.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> rgen(gen);
@@ -1072,7 +1072,6 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, debug));
   
   simple_type     target;
-  simple_set_type target_saved;
   
   simple_parser_type parser;
   std::string line;
@@ -1085,39 +1084,25 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
     for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
       const int rank = *riter;
       
-      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, target)) {
-	    if (! queue.push_swap(target, true)) {
-	      target_saved.push_back(target);
-	      break;
-	    } else
-	      found = true;
-	  } else
+	  if (parser(line, target))
+	    queue.push_swap(target);
+	  else
 	    std::cerr << "failed simple phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
-	  
-	  found = true;
 	}
+	
+	found = true;
       }
     }
     
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
-
-    const size_t target_saved_size = target_saved.size();
-    
-    while (! target_saved.empty() && queue.push_swap(target_saved.back(), true)) {
-      target_saved.pop_back();
-      found = true;
-    }
-    
-    if (target_saved_size && target_saved.empty())
-      simple_set_type(target_saved).swap(target_saved);
         
-    if (target_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
@@ -1303,7 +1288,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  const size_t queue_size  = mpi_size * 1024 * 8;
+  const size_t queue_size  = mpi_size * 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   path_set_type reversed_files;
@@ -1333,7 +1318,6 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, debug)));
   
   simple_type     reversed;
-  simple_set_type reversed_saved;
   
   simple_parser_type parser;
   std::string line;
@@ -1346,39 +1330,25 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end; ++ riter) {
       const int rank = *riter;
       
-      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test(); ++ i) {
+      for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, reversed)) {
-	    if (! queue.push_swap(reversed, true)) {
-	      reversed_saved.push_back(reversed);
-	      break;
-	    } else
-	      found = true;
-	  } else
+	  if (parser(line, reversed))
+	    queue.push_swap(reversed);
+	  else
 	    std::cerr << "failed reversed phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
-	  
-	  found = true;
 	}
+
+	found = true;
       }
     }
     
     if (found)
       std::random_shuffle(ranks.begin(), ranks.end(), rgen);
-
-    const size_t reversed_saved_size = reversed_saved.size();
     
-    while (! reversed_saved.empty() && queue.push_swap(reversed_saved.back(), true)) {
-      reversed_saved.pop_back();
-      found = true;
-    }
-    
-    if (reversed_saved_size && reversed_saved.empty())
-      simple_set_type(reversed_saved).swap(reversed_saved);
-    
-    if (reversed_saved.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
