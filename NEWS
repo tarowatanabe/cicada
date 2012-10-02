@@ -7,12 +7,13 @@ INCOMPATIBLE: phrase extraction now explicitly enumerate all the corners for lex
 INCOMPATIBLE: lexical weights are now computed by cicada_filter_extract_{phrase,scfg,ghkm}, not during extraction
 	      for flexible feature function computation. Thus, cicada-extract.py simply extract rules with counts,
 	      then, cicada-index.py to add additional features and to perform indexing.
+INCOMPATIBLE: Use bitvector for features which takes only binary or single values
 New: added more features:# of unaligned words, # of cross for terimnals, and generative probabilities
      (P(pair | root(pair)), P(source | root(source)), P(target | root(target)))
 New: bash-based learning scripts are re-implemented by equivalent, better python codes for better readability.
      Check cicada-{learn,mert}{,-moses}.py, not *.sh equivalents.
 New: added cutoff threshold for ghkm/tree extraction to prune out rare elementary trees in advance.
-New: added remove-head for removing nodes with '*' as non-temrinal
+New: added remove-head for removing nodes with '*' as non-temrinal, and re-implemented debinarize which shares the same code
 Deprecated: bash based scripts
 Deprecated: dependency structure filters: cicada_filter_{conll,mst,cabocha} and are merged into cicada_filter_dependency
 Removed terminal-binarization and re-wrote as dependency-binarization
