@@ -189,6 +189,9 @@ class PBS:
 
         self.workers.append(QSUB(pipe.getvalue()))
         self.workers[-1].start()
+        
+        # sleep for safety...
+        time.sleep(5)
 
 class Threads:
     
@@ -324,8 +327,6 @@ if __name__ == '__main__':
                         memory=options.max_malloc,
                         after=options.pbs_after,
                         before=options.pbs_before)
-                time.sleep(1)
-
     elif options.mpi:
         cicada = CICADA(options.cicada_dir)
         mpi = MPI(cicada=cicada,
