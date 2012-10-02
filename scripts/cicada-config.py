@@ -205,6 +205,7 @@ if __name__ == '__main__':
     print "feature-function = rule-penalty"
     print "# feature-function = arity-penalty"
     print "# feature-function = glue-tree-penalty"
+    print "# feature-function = non-latin-penalty"
     print "# feature-function = rule-shape"
     print
 
