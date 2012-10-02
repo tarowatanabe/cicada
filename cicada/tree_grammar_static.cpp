@@ -36,6 +36,8 @@
 #include "utils/piece.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/json_string_parser.hpp"
+#include "utils/succinct_vector.hpp"
+
 
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
@@ -199,6 +201,7 @@ namespace cicada
     public:
       typedef utils::map_file<score_type, std::allocator<score_type> >                     score_set_type;
       typedef utils::packed_vector_mapped<quantized_type, std::allocator<quantized_type> > quantized_set_type;
+      typedef utils::succinct_vector_mapped<>                                              binarized_set_type;
       typedef boost::array<score_type, 256>                                                score_map_type;
       
       ScoreSet() {}
@@ -211,38 +214,47 @@ namespace cicada
       {
 	score.populate();
 	quantized.populate();
+	binarized.populate();
       }
       
       void clear()
       {
 	score.clear();
 	quantized.clear();
+	binarized.clear();
       }
       void close() { clear(); }
 
       score_type operator[](size_type pos) const
       {
-	return (quantized.is_open()
-		? maps[quantized[pos]]
-		: score[pos]);
+	return (binarized.is_open()
+		? maps[binarized[pos]]
+		: (quantized.is_open()
+		   ? maps[quantized[pos]]
+		   : score[pos]));
       }
       
       path_type path() const
       {
-	return (quantized.is_open()
-		? quantized.path().parent_path()
-		: score.path().parent_path());
+	return (binarized.is_open()
+		? binarized.path().parent_path()
+		: (quantized.is_open()
+		   ? quantized.path().parent_path()
+		   : score.path().parent_path()));
       }
-      bool empty() const { return quantized.empty() && score.empty(); }
+      bool empty() const { return quantized.empty() && binarized.empty() && score.empty(); }
       size_type size() const
       {
-	return (quantized.is_open()
-		? quantized.size()
-		: score.size());
+	return (binarized.is_open()
+		? binarized.size()
+		: (quantized.is_open()
+		   ? quantized.size()
+		   : score.size()));
       }
       
       score_set_type     score;
       quantized_set_type quantized;
+      binarized_set_type binarized;
       score_map_type     maps;
     };
     
@@ -531,6 +543,7 @@ namespace cicada
     path_type path() const { return rule_db.path().parent_path(); }
     bool is_open() const { return ! score_db.empty(); }
     
+    void binarize();
     void quantize();
     void read(const std::string& parameter);
     void write(const path_type& path) const;
@@ -601,8 +614,18 @@ namespace cicada
     clear();
 
     repository_type rep(path, repository_type::read);
-    
-    if (boost::filesystem::exists(rep.path("quantized"))) {
+
+    if (boost::filesystem::exists(rep.path("binarized"))) {
+      binarized.open(rep.path("binarized"));
+      
+      const path_type score_map_file = rep.path("score-map");
+      
+      if (! boost::filesystem::exists(score_map_file))
+	throw std::runtime_error(std::string("no map file? ") + score_map_file.string());
+      
+      std::ifstream is(score_map_file.string().c_str());
+      is.read((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
+    } else if (boost::filesystem::exists(rep.path("quantized"))) {
       quantized.open(rep.path("quantized"));
       
       const path_type score_map_file = rep.path("score-map");
@@ -612,7 +635,7 @@ namespace cicada
       
       std::ifstream is(score_map_file.string().c_str());
       is.read((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
-    } else
+    } else if (boost::filesystem::exists(rep.path("score")))
       score.open(rep.path("score"));
   }
   
@@ -629,8 +652,137 @@ namespace cicada
       
       std::ofstream os(rep.path("score-map").string().c_str());
       os.write((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
-    } else
+    }
+
+    if (binarized.is_open()) {
+      binarized.write(rep.path("binarized"));
+      
+      std::ofstream os(rep.path("score-map").string().c_str());
+      os.write((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
+    }
+    
+    if (score.is_open())
       score.write(rep.path("score"));
+  }
+  
+  void TreeGrammarStaticImpl::binarize()
+  {
+    typedef std::map<score_type, size_type, std::less<score_type>,
+		     std::allocator<std::pair<const score_type, size_type> > > counts_type;
+    
+    typedef utils::succinct_vector<> bit_vector_type;
+    
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    for (size_t feature = 0; feature < score_db.size(); ++ feature)
+      if (score_db[feature].score.is_open()) {
+	
+	counts_type counts;
+	
+	score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
+	for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end && counts.size() <= 2; ++ liter)
+	  ++ counts[*liter];
+	
+	if (counts.size() > 2 || counts.empty()) continue;
+	
+	// we perform binarization!
+
+	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.binary.XXXXXX");
+	utils::tempfile::insert(path);
+
+	bit_vector_type bits;
+	
+	bits.set(score_db.size() - 1, false);
+	
+	if (counts.size() == 1) // we have a single value only!
+	  score_db[feature].maps[0] = counts.begin()->first;
+	else {
+	  counts_type::const_iterator citer1 = counts.begin();
+	  counts_type::const_iterator citer2 = counts.begin();
+	  ++ citer2;
+	  
+	  if (citer1->second > citer2->second) {
+	    score_db[feature].maps[0] = citer1->first;
+	    score_db[feature].maps[1] = citer2->first;
+	  } else {
+	    score_db[feature].maps[0] = citer2->first;
+	    score_db[feature].maps[1] = citer1->first;
+	  }
+	  
+	  size_t pos = 0;
+	  score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
+	  for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter, ++ pos)
+	    if (*liter == score_db[feature].maps[1])
+	      bits.set(pos, true);
+	}
+	
+	bits.write(path);
+	
+	::sync();
+	
+	while (! score_set_type::binarized_set_type::exists(path))
+	  boost::thread::yield();
+	
+	utils::tempfile::permission(path);
+	
+	score_db[feature].binarized.open(path);
+	score_db[feature].score.clear();
+      }
+    
+    for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+      if (attr_db[attr].score.is_open()) {
+
+	counts_type counts;
+	
+	score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
+	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end && counts.size() <= 2; ++ liter)
+	  ++ counts[*liter];
+	
+	if (counts.size() > 2 || counts.empty()) continue;
+	
+	// we perform binarization!
+
+	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.attr.binary.XXXXXX");
+	utils::tempfile::insert(path);
+	
+	bit_vector_type bits;
+	
+	bits.set(attr_db.size() - 1, false);
+	
+	if (counts.size() == 1) // we have a single value only!
+	  attr_db[attr].maps[0] = counts.begin()->first;
+	else {
+	  counts_type::const_iterator citer1 = counts.begin();
+	  counts_type::const_iterator citer2 = counts.begin();
+	  ++ citer2;
+	  
+	  if (citer1->second > citer2->second) {
+	    attr_db[attr].maps[0] = citer1->first;
+	    attr_db[attr].maps[1] = citer2->first;
+	  } else {
+	    attr_db[attr].maps[0] = citer2->first;
+	    attr_db[attr].maps[1] = citer1->first;
+	  }
+	  
+	  size_t pos = 0;
+	  score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
+	  for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter, ++ pos)
+	    if (*liter == attr_db[attr].maps[1])
+	      bits.set(pos, true);
+	}
+	
+	bits.write(path);
+	
+	::sync();
+	
+	while (! score_set_type::binarized_set_type::exists(path))
+	  boost::thread::yield();
+	
+	utils::tempfile::permission(path);
+	
+	attr_db[attr].binarized.open(path);
+	attr_db[attr].score.clear();
+      }
   }
 
   void TreeGrammarStaticImpl::quantize()
@@ -1758,6 +1910,9 @@ namespace cicada
       if (attribute_names[attribute] == attribute_type())
 	attribute_names[attribute] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(attribute);
     }
+    
+    // perform binarization, if possible!
+    binarize();
   }
   
 

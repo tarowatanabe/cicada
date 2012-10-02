@@ -220,23 +220,29 @@ namespace cicada
       
       score_type operator[](size_type pos) const
       {
-	return (quantized.is_open()
-		? maps[quantized[pos]]
-		: score[pos]);
+	return (binarized.is_open()
+		? maps[binarized[pos]]
+		: (quantized.is_open()
+		   ? maps[quantized[pos]]
+		   : score[pos]));
       }
       
       path_type path() const
       {
-	return (quantized.is_open()
-		? quantized.path().parent_path()
-		: score.path().parent_path());
+	return (binarized.is_open()
+		? binarized.path().parent_path()
+		: (quantized.is_open()
+		   ? quantized.path().parent_path()
+		   : score.path().parent_path()));
       }
       bool empty() const { return quantized.empty() && binarized.empty() && score.empty(); }
       size_type size() const
       {
-	return (quantized.is_open()
-		? quantized.size()
-		: score.size());
+	return (binarized.is_open()
+		? binarized.size()
+		: (quantized.is_open()
+		   ? quantized.size()
+		   : score.size()));
       }
       
       score_set_type     score;
@@ -693,18 +699,15 @@ namespace cicada
 
 	bit_vector_type bits;
 	
-	if (counts.size() == 1) {
-	  // we have a single value only!
-	  
+	bits.set(score_db.size() - 1, false);
+	
+	if (counts.size() == 1) // we have a single value only!
 	  score_db[feature].maps[0] = counts.begin()->first;
-	  
-	  bits.set(score_db.size() - 1, false);
-	  
-	} else {
+	else {
 	  counts_type::const_iterator citer1 = counts.begin();
 	  counts_type::const_iterator citer2 = counts.begin();
 	  ++ citer2;
-
+	  
 	  if (citer1->second > citer2->second) {
 	    score_db[feature].maps[0] = citer1->first;
 	    score_db[feature].maps[1] = citer2->first;
@@ -712,8 +715,6 @@ namespace cicada
 	    score_db[feature].maps[0] = citer2->first;
 	    score_db[feature].maps[1] = citer1->first;
 	  }
-	  
-	  bits.set(score_db.size() - 1, false);
 	  
 	  size_t pos = 0;
 	  score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
@@ -732,7 +733,7 @@ namespace cicada
 	utils::tempfile::permission(path);
 	
 	score_db[feature].binarized.open(path);
-	//score_db[feature].score.clear();
+	score_db[feature].score.clear();
       }
     
     for (size_t attr = 0; attr < attr_db.size(); ++ attr)
@@ -753,18 +754,15 @@ namespace cicada
 	
 	bit_vector_type bits;
 	
-	if (counts.size() == 1) {
-	  // we have a single value only!
-	  
+	bits.set(attr_db.size() - 1, false);
+	
+	if (counts.size() == 1) // we have a single value only!
 	  attr_db[attr].maps[0] = counts.begin()->first;
-	  
-	  bits.set(attr_db.size() - 1, false);
-	  
-	} else {
+	else {
 	  counts_type::const_iterator citer1 = counts.begin();
 	  counts_type::const_iterator citer2 = counts.begin();
 	  ++ citer2;
-
+	  
 	  if (citer1->second > citer2->second) {
 	    attr_db[attr].maps[0] = citer1->first;
 	    attr_db[attr].maps[1] = citer2->first;
@@ -772,8 +770,6 @@ namespace cicada
 	    attr_db[attr].maps[0] = citer2->first;
 	    attr_db[attr].maps[1] = citer1->first;
 	  }
-	  
-	  bits.set(attr_db.size() - 1, false);
 	  
 	  size_t pos = 0;
 	  score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
@@ -792,7 +788,7 @@ namespace cicada
 	utils::tempfile::permission(path);
 	
 	attr_db[attr].binarized.open(path);
-	//attr_db[attr].score.clear();
+	attr_db[attr].score.clear();
       }
   }
 
@@ -1844,9 +1840,9 @@ namespace cicada
       
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
-
+      
       const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
-
+      
       parameter_type::const_iterator piter = param.find(name);
       if (piter != param.end())
 	attribute_names[attribute] = attribute_type(piter->second);
@@ -1855,6 +1851,9 @@ namespace cicada
       if (attribute_names[attribute] == attribute_type())
 	attribute_names[attribute] = std::string("rule-table-") + utils::lexical_cast<std::string>(attribute);
     }
+    
+    // perform binarization, if possible!
+    binarize();
   }
   
   
