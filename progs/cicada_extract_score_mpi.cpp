@@ -659,7 +659,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     for (int rank = 0; rank < mpi_size; ++ rank)
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
 	if (std::getline(*stream[rank], line)) {
-	  
 	  if (parser(line, phrase_pair))
 	    queues[rank]->push_swap(phrase_pair);
 	  else
@@ -873,7 +872,6 @@ void source_counts_reducer(utils::mpi_intercomm& mapper,
     for (int rank = 0; rank < mpi_size; ++ rank)
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
 	if (std::getline(*stream[rank], line)) {
-	  
 	  if (parser(line, source))
 	    queues[rank]->push_swap(source);
 	  else

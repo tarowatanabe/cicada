@@ -163,6 +163,9 @@ namespace cicada
       typedef node_map_type::const_iterator const_iterator;
 
       NodeMap() : node_map() { node_map.set_empty_key(symbol_type()); }
+
+      size_t size() const { return node_map.size(); }
+      bool empty() const { return node_map.empty(); }
       
       std::pair<iterator, bool> insert(const value_type& x) { return node_map.insert(x); }
       
@@ -187,7 +190,8 @@ namespace cicada
 	grammar(__grammar),
 	yield_source(__yield_source),
 	attr_internal_node("internal-node"),
-	attr_source_root("source-root")
+	attr_source_root("source-root"),
+	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
 					      rule_type::symbol_set_type(1, goal.non_terminal())));
@@ -199,12 +203,16 @@ namespace cicada
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       graph_out.clear();
-      node_map.clear();
       
       if (! graph_in.is_valid()) return;
       
+      node_map.clear();
       node_map.reserve(graph_in.nodes.size());
       node_map.resize(graph_in.nodes.size());
+
+      node_map_phrase.clear();
+      node_map_phrase.reserve(graph_in.nodes.size());
+      node_map_phrase.resize(graph_in.nodes.size());
       
       phrase_map.clear();
       phrase_map.reserve(graph_in.nodes.size());
@@ -225,6 +233,31 @@ namespace cicada
 	  match_phrase(id, graph_in, graph_out);
       }
       
+      if (! grammar.empty()) {
+	// connect all the node_map_phrase with node_map
+	
+	for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
+	  if (! node_map_phrase[id].empty() && ! node_map[id].empty()) {
+	    const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
+	    
+	    node_map_type::const_iterator piter_end = node_map[id].end();
+	    for (node_map_type::const_iterator piter = node_map[id].begin(); piter != piter_end; ++ piter) {
+	      node_map_type::const_iterator citer_end = node_map_phrase[id].end();
+	      for (node_map_type::const_iterator citer = node_map_phrase[id].begin(); citer != citer_end; ++ citer) {
+		
+		hypergraph_type::edge_type& edge = graph_out.add_edge(&citer->second, (&citer->second) + 1);
+		
+		edge.rule = rule_type::create(rule_type(piter->first, rule_type::symbol_set_type(1, citer->first)));
+		
+		edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
+		edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
+		
+		graph_out.connect_edge(edge.id, piter->second);
+	      }
+	    }
+	  }
+      }
+      
       // goal node... the goal must be mapped goal...
       node_map_type::const_iterator niter = node_map[graph_in.goal].find(goal.non_terminal());
       if (niter != node_map[graph_in.goal].end()) {
@@ -240,6 +273,7 @@ namespace cicada
       }
       
       node_map.clear();
+      node_map_phrase.clear();
       
       if (graph_out.is_valid())
 	graph_out.topologically_sort();
@@ -323,22 +357,6 @@ namespace cicada
 	    
 	    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
 	    
-	    if (node_map[id].find(rule->lhs) == node_map[id].end()) {
-	      // we will try all the combination of lhs in node_map[id]
-	      
-	      node_map_type::const_iterator liter_end = node_map[id].end();
-	      for (node_map_type::const_iterator liter = node_map[id].begin(); liter != liter_end; ++ liter) {
-		hypergraph_type::edge_type& edge = graph_out.add_edge();
-		edge.rule = rule_type::create(rule_type(liter->first, rule->rhs.begin(), rule->rhs.end()));
-		edge.features = riter->features;
-		edge.attributes = riter->attributes;
-		
-		edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
-		
-		graph_out.connect_edge(edge.id, liter->second);
-	      }
-	    }
-	    
 	    hypergraph_type::edge_type& edge = graph_out.add_edge();
 	    edge.rule = rule;
 	    edge.features = riter->features;
@@ -346,7 +364,7 @@ namespace cicada
 	    
 	    edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 	    
-	    std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
+	    std::pair<node_map_type::iterator, bool> result = node_map_phrase[id].insert(std::make_pair(edge.rule->lhs, 0));
 	    if (result.second)
 	      result.first->second = graph_out.add_node().id;
 	    
@@ -651,6 +669,7 @@ namespace cicada
     }
 
     node_map_set_type node_map;
+    node_map_set_type node_map_phrase;
     
     phrase_map_type phrase_map;
     
@@ -670,6 +689,7 @@ namespace cicada
     
     attribute_type attr_internal_node;
     attribute_type attr_source_root;
+    attribute_type attr_glue_tree;
   };
   
   
