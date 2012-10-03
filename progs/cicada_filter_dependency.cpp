@@ -75,22 +75,13 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
   boost::spirit::qi::rule<Iterator, sentence_type(), blank_type> tokens;
 };
 
-path_set_type input_files;
-path_set_type source_files;
-path_set_type target_files;
-path_set_type alignment_files;
-path_set_type dependency_files;
-
-path_type list_file;
-path_type list_source_file;
-path_type list_target_file;
-path_type list_alignment_file;
-path_type list_dependency_file;
+path_type input_file = "-";
+path_type output_file = "-";
+path_type map_file;
 
 std::string goal = "[s]";
 std::string non_terminal = "[x]";
 
-bool bilingual_mode = false;
 bool mst_mode = false;
 bool conll_mode = false;
 bool cabocha_mode = false;
@@ -104,17 +95,13 @@ bool normalize_mode = false;
 bool forest_mode = false;
 bool head_mode = false;
 
-// dependency output
-path_type output_file = "-";
-
-void read_list(const path_type& path, path_set_type& files);
 void options(int argc, char** argv);
 
 template <typename Dep>
-void apply(const path_set_type& files, const path_type& output)
+void apply(const path_type& file, const path_type& map, const path_type& output)
 {
   Dep dep;
-  dep(files, output);
+  dep(file, map, output);
 }
 
 template <typename Iterator>
@@ -199,141 +186,24 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
-    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
-      throw std::runtime_error("one of bilingual/mst/conll/khayashi/khayashi-forest mode");
+    if (int(mst_mode) + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
+      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest mode");
 
-    if (int(bilingual_mode) + mst_mode + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
-      throw std::runtime_error("one of bilingual/mst/conll/khayashi/khayashi-forest mode");
+    if (int(mst_mode) + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
+      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest mode");
     
-    if (mst_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<MST>(input_files, output_file);
-    } else if (conll_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<CoNLL>(input_files, output_file);
-    } else if (cabocha_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<Cabocha>(input_files, output_file);
-    } else if (khayashi_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<KHayashi>(input_files, output_file);
-    } else if (khayashi_forest_mode) {
-      read_list(list_file, input_files);
-      if (input_files.empty())
-	input_files.push_back("-");
-      
-      apply<KHayashiForest>(input_files, output_file);
-    } else if (bilingual_mode) {
-      read_list(list_source_file, source_files);
-      read_list(list_target_file, target_files);
-      read_list(list_alignment_file, alignment_files);
-      read_list(list_dependency_file, dependency_files);
-      
-      if (source_files.empty())
-	source_files.push_back("-");
-      if (target_files.empty())
-	target_files.push_back("-");
-      if (alignment_files.empty())
-	alignment_files.push_back("-");
-      if (dependency_files.empty())
-	dependency_files.push_back("-");
-      
-      if (source_files.size() != target_files.size())
-	throw std::runtime_error("# of files do not match");
-      
-      if (source_files.size() != alignment_files.size())
-	throw std::runtime_error("# of alignment files do not match");
-      if (target_files.size() != alignment_files.size())
-	throw std::runtime_error("# of alignment files do not match");
-      if (source_files.size() != dependency_files.size())
-	throw std::runtime_error("# of dependency files do not match");
-      if (target_files.size() != dependency_files.size())
-	throw std::runtime_error("# of dependency files do not match");
-      
-      const bool flush_output = (output_file == "-"
-				 || (boost::filesystem::exists(output_file)
-				     && ! boost::filesystem::is_regular_file(output_file)));
-      
-      utils::compress_ostream os(output_file, 1024 * 1024);
-      
-      typedef boost::spirit::istream_iterator iiter_type;
-      
-      sentence_parser<iiter_type>    parser;
-      
-      for (size_t i = 0; i != source_files.size(); ++ i) {
-	utils::compress_istream is_src(source_files[i], 1024 * 1024);
-	utils::compress_istream is_trg(target_files[i], 1024 * 1024);
-	utils::compress_istream is_align(alignment_files[i], 1024 * 1024);
-	utils::compress_istream is_dep(dependency_files[i], 1024 * 1024);
-	
-	is_src.unsetf(std::ios::skipws);
-	is_trg.unsetf(std::ios::skipws);
-	
-	iiter_type siter(is_src);
-	iiter_type titer(is_trg);
-	iiter_type siter_end;
-	iiter_type titer_end;
-	
-	sentence_type   source;
-	sentence_type   target;
-	alignment_type  alignment;
-	dependency_type dependency;
-	dependency_type projected;
-	
-	for (size_t line_no = 0; siter != siter_end && titer != titer_end; ++ line_no) {
-	  source.clear();
-	  target.clear();
-	  alignment.clear();
-	  dependency.clear();
-	  
-	  if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
-	    throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
-	  if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
-	    throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
-	  
-	  if (! (is_align >> alignment))
-	    throw std::runtime_error("no alignment?");
-	  if (! (is_dep >> dependency))
-	    throw std::runtime_error("no dependency?");
-	  
-	  const int source_size = source.size();
-	  const int target_size = target.size();
-	  
-	  if (source_size != static_cast<int>(dependency.size()))
-	    throw std::runtime_error("source size do not match with dependency size at # " + utils::lexical_cast<std::string>(line_no));
-	  
-	  if (source_size == 0 || target_size == 0) {
-	    os << '\n';
-	    if (flush_output)
-	      os << std::flush;
-	    continue;
-	  };
-	  
-	  projected.clear();
-	  projected.resize(target_size, -1);
-	  
-	  // perform projection....
-	  
-	  
-	  os << projected << '\n';
-	  if (flush_output)
-	    os << std::flush;
-	}
-      }
-    } else
-      throw std::runtime_error("one of bilingual|mst|conll|cabocha|forest?");
+    if (mst_mode)
+      apply<MST>(input_file, map_file, output_file);
+    else if (conll_mode)
+      apply<CoNLL>(input_file, map_file, output_file);
+    else if (cabocha_mode)
+      apply<Cabocha>(input_file, map_file, output_file);
+    else if (khayashi_mode)
+      apply<KHayashi>(input_file, map_file, output_file);
+    else if (khayashi_forest_mode)
+      apply<KHayashiForest>(input_file, map_file, output_file);
+    else
+      throw std::runtime_error("one of mst|conll|cabocha|forest?");
   }
   catch(std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -342,22 +212,49 @@ int main(int argc, char** argv)
   return 0;
 }
 
-
-void read_list(const path_type& path, path_set_type& files)
+struct MapFile
 {
-  if (path.empty()) return;
-  if (path != "-" && ! boost::filesystem::exists(path))
-    throw std::runtime_error("no file? " + path.string());
+  typedef std::vector<std::string, std::allocator<std::string> > sentence_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+  typedef sentence_parser<iterator_type> parser_type;
   
-  utils::compress_istream is(path);
-  std::string file;
-  while (std::getline(is, file)) {
-    if (file.empty()) continue;
-    if (! boost::filesystem::exists(file))
-      throw std::runtime_error("no file? " + file);
-    files.push_back(file);
+  MapFile(const path_type& path) : is(0), sentence(), iter(), iter_end()
+  {
+    if (! path.empty()) {
+      if (path != "-" && ! boost::filesystem::exists(path))
+	throw std::runtime_error("invalid map file? " + path.string());
+      
+      is = new utils::compress_istream(path, 1024 * 1024);
+      is->unsetf(std::ios::skipws);
+      
+      iter = iterator_type(*is);
+    }
   }
-}
+  ~MapFile() { if (is) { delete is; } }
+
+  operator bool() const { return is != 0; }
+  
+  const sentence_type& operator()()
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    sentence.clear();
+    if (iter != iter_end)
+      if (! qi::phrase_parse(iter, iter_end, parser, standard::blank, sentence))
+	throw std::runtime_error("parsing failed");
+    
+    return sentence;
+  }
+  
+  std::istream* is;
+  sentence_type sentence;
+  
+  parser_type   parser;
+  iterator_type iter;
+  iterator_type iter_end;
+};
+
 
 struct Transform
 {
@@ -570,7 +467,7 @@ struct MST
   };
 
   
-  void operator()(const path_set_type& files, const path_type& output)
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
   {
     typedef boost::spirit::istream_iterator iiter_type;
     
@@ -581,83 +478,91 @@ struct MST
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
+
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
+    MapFile mapper(map);
+    
     mst_parser<iiter_type> parser;
     mst_type mst;
-
+    
     Transform transform(goal, head_mode);
     
-    path_set_type::const_iterator fiter_end = files.end();
-    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
+    while (iter != iter_end) {
+      mst.clear();
       
-      iiter_type iter(is);
-      iiter_type iter_end;
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, mst))
+	throw std::runtime_error("parsing failed");
 
-      while (iter != iter_end) {
-	mst.clear();
+      if (mapper) {
+	const sentence_type& mapped = mapper();
 	
-	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, mst))
-	  throw std::runtime_error("parsing failed");
+	if (mapped.size() != mst.words.size())
+	  throw std::runtime_error("mst size and mapped size differ");
 	
-	if (! mst.verify())
-	  throw std::runtime_error("invalid mst format");
+	mst.words.assign(mapped.begin(), mapped.end());
+      }
+      
+      if (! mst.verify())
+	throw std::runtime_error("invalid mst format");
+      
+      if (unescape_mode)
+	unescape(mst.words.begin(), mst.words.end());
+      
+      if (normalize_mode) {
+	if (relation_mode)
+	  normalize(mst.labels.begin(), mst.labels.end());
+	else
+	  normalize(mst.poss.begin(), mst.poss.end());
+      }
 
-	if (unescape_mode)
-	  unescape(mst.words.begin(), mst.words.end());
-
-	if (normalize_mode) {
-	  if (relation_mode)
-	    normalize(mst.labels.begin(), mst.labels.end());
-	  else
-	    normalize(mst.poss.begin(), mst.poss.end());
-	}
-
-	if (forest_mode) {
-	  transform.clear();
-	  transform.sentence.assign(mst.words.begin(), mst.words.end());
+      if (forest_mode) {
+	transform.clear();
+	transform.sentence.assign(mst.words.begin(), mst.words.end());
 	  
-	  if (relation_mode) {
-	    mst_type::label_set_type::const_iterator liter_end = mst.labels.end();
-	    for (mst_type::label_set_type::const_iterator liter = mst.labels.begin(); liter != liter_end; ++ liter)
-	      transform.pos.push_back('[' + *liter + ']');
-	  } else {
-	    mst_type::label_set_type::const_iterator liter_end = mst.poss.end();
-	    for (mst_type::label_set_type::const_iterator liter = mst.poss.begin(); liter != liter_end; ++ liter)
-	      transform.pos.push_back('[' + *liter + ']');	    
-	  }
-	  
-	  transform.dependency.assign(mst.positions.begin(), mst.positions.end());
-	  
-	  transform();
-	  
-	  os << transform.hypergraph << '\n';
-	  if (flush_output)
-	    os << std::flush;
+	if (relation_mode) {
+	  mst_type::label_set_type::const_iterator liter_end = mst.labels.end();
+	  for (mst_type::label_set_type::const_iterator liter = mst.labels.begin(); liter != liter_end; ++ liter)
+	    transform.pos.push_back('[' + *liter + ']');
 	} else {
-	  if (relation_mode) {
+	  mst_type::label_set_type::const_iterator liter_end = mst.poss.end();
+	  for (mst_type::label_set_type::const_iterator liter = mst.poss.begin(); liter != liter_end; ++ liter)
+	    transform.pos.push_back('[' + *liter + ']');	    
+	}
+	  
+	transform.dependency.assign(mst.positions.begin(), mst.positions.end());
+	  
+	transform();
+	  
+	os << transform.hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	if (relation_mode) {
+	  if (! karma::generate(oiter, (-(standard::string % ' ')
+					<< " ||| " << -(standard::string % ' ')
+					<< " ||| " << -(karma::int_ % ' ')
+					<< '\n'),
+				mst.words, mst.labels, mst.positions))
+	    throw std::runtime_error("generation failed");
+	  else
 	    if (! karma::generate(oiter, (-(standard::string % ' ')
 					  << " ||| " << -(standard::string % ' ')
 					  << " ||| " << -(karma::int_ % ' ')
 					  << '\n'),
-				  mst.words, mst.labels, mst.positions))
+				  mst.words, mst.poss, mst.positions))
 	      throw std::runtime_error("generation failed");
-	    else
-	      if (! karma::generate(oiter, (-(standard::string % ' ')
-					    << " ||| " << -(standard::string % ' ')
-					    << " ||| " << -(karma::int_ % ' ')
-					    << '\n'),
-				    mst.words, mst.poss, mst.positions))
-		throw std::runtime_error("generation failed");
-	  }
-
-	  if (flush_output)
-	    os << std::flush;
 	}
+
+	if (flush_output)
+	  os << std::flush;
       }
     }
   }
@@ -749,7 +654,7 @@ struct CoNLL
   };
 
   
-  void operator()(const path_set_type& files, const path_type& output)
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
   {
     typedef boost::spirit::istream_iterator iiter_type;
     
@@ -760,107 +665,117 @@ struct CoNLL
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
+
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
+    MapFile mapper(map);
+
     conll_parser<iiter_type> parser;
     conll_set_type conll;
     
     Transform transform(goal, head_mode);
 
-    path_set_type::const_iterator fiter_end = files.end();
-    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
-      
-      iiter_type iter(is);
-      iiter_type iter_end;
-      
-      while (iter != iter_end) {
-	conll.clear();
+    while (iter != iter_end) {
+      conll.clear();
 	
-	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conll))
-	  throw std::runtime_error("parsing failed");
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conll))
+	throw std::runtime_error("parsing failed");
+      
+      if (mapper) {
+	const sentence_type& mapped = mapper();
 
-	if (normalize_mode || unescape_mode) {
-	  conll_set_type::iterator citer_end = conll.end();
-	  for (conll_set_type::iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+	if (mapped.size() != conll.size())
+	  throw std::runtime_error("conll size and mapped size differ");
+	
+	for (size_t i = 0; i != mapped.size(); ++ i)
+	  conll[i].form = mapped[i];
+      }
 
-	    if (unescape_mode)
-	      citer->form = unescape(citer->form);
 
-	    if (normalize_mode) {
-	      if (relation_mode)
-		citer->deprel = normalize(citer->deprel);
-	      else
-		citer->cpostag = normalize(citer->cpostag);
-	    }
+      if (normalize_mode || unescape_mode) {
+	conll_set_type::iterator citer_end = conll.end();
+	for (conll_set_type::iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+
+	  if (unescape_mode)
+	    citer->form = unescape(citer->form);
+
+	  if (normalize_mode) {
+	    if (relation_mode)
+	      citer->deprel = normalize(citer->deprel);
+	    else
+	      citer->cpostag = normalize(citer->cpostag);
 	  }
 	}
+      }
 
-	if (forest_mode) {
-	  transform.clear();
+      if (forest_mode) {
+	transform.clear();
 	  
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
-	    transform.sentence.push_back(citer->form);
+	conll_set_type::const_iterator citer_end = conll.end();
+	for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+	  transform.sentence.push_back(citer->form);
 	    
-	    if (relation_mode)
-	      transform.pos.push_back('[' + citer->deprel + ']');
-	    else
-	      transform.pos.push_back('[' + citer->cpostag + ']');
+	  if (relation_mode)
+	    transform.pos.push_back('[' + citer->deprel + ']');
+	  else
+	    transform.pos.push_back('[' + citer->cpostag + ']');
 	    
-	    if (projective_mode) {
-	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	      if (head == conll_type::size_type(-1))
-		throw std::runtime_error("invalid projective head");
+	  if (projective_mode) {
+	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	    if (head == conll_type::size_type(-1))
+	      throw std::runtime_error("invalid projective head");
 	      
-	      transform.dependency.push_back(head);
-	    } else
-	      transform.dependency.push_back(citer->head);
-	  }
+	    transform.dependency.push_back(head);
+	  } else
+	    transform.dependency.push_back(citer->head);
+	}
 	  
-	  transform();
+	transform();
 	  
-	  os << transform.hypergraph << '\n';
-	  if (flush_output)
-	    os << std::flush;
+	os << transform.hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	conll_set_type::const_iterator citer_end = conll.end();
+	for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	  os << citer->form << ' ';
+	os << "||| ";
+	  
+	if (relation_mode) {
+	  conll_set_type::const_iterator citer_end = conll.end();
+	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	    os << citer->deprel << ' ';
 	} else {
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << citer->form << ' ';
-	  os << "||| ";
-	  
-	  if (relation_mode) {
-	    conll_set_type::const_iterator citer_end = conll.end();
-	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	      os << citer->deprel << ' ';
-	  } else {
-	    conll_set_type::const_iterator citer_end = conll.end();
-	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	      os << citer->cpostag << ' ';
-	  }
-	  os << "|||";
-	  
-	  if (projective_mode) {
-	    conll_set_type::const_iterator citer_end = conll.end();
-	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
-	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	      if (head == conll_type::size_type(-1))
-		throw std::runtime_error("invalid projective head");
-	      
-	      os << ' ' << head;
-	    }
-	  } else {
-	    conll_set_type::const_iterator citer_end = conll.end();
-	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	      os << ' ' << citer->head;
-	  }
-	  os << '\n';
-	  if (flush_output)
-	    os << std::flush;
+	    os << citer->cpostag << ' ';
 	}
+	os << "|||";
+	  
+	if (projective_mode) {
+	  conll_set_type::const_iterator citer_end = conll.end();
+	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	    if (head == conll_type::size_type(-1))
+	      throw std::runtime_error("invalid projective head");
+	      
+	    os << ' ' << head;
+	  }
+	} else {
+	  conll_set_type::const_iterator citer_end = conll.end();
+	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	    os << ' ' << citer->head;
+	}
+	os << '\n';
+	if (flush_output)
+	  os << std::flush;
       }
     }
   }
@@ -887,7 +802,7 @@ struct Cabocha
   
   typedef std::vector<int, std::allocator<int> > offset_set_type;
 
-  void operator()(const path_set_type& files, const path_type& output)
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
   {
     namespace qi = boost::spirit::qi;
     namespace karma = boost::spirit::karma;
@@ -896,8 +811,11 @@ struct Cabocha
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
-
+    
+    utils::compress_istream is(file, 1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024);
+
+    MapFile mapper(map);
 
     node_set_type nodes;
     dependency_type   dependency;
@@ -909,121 +827,126 @@ struct Cabocha
 
     Transform transform(goal, head_mode);
     
-    path_set_type::const_iterator fiter_end = files.end();
-    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      
-      while (std::getline(is, line)) {
-	tokenizer_type tokenizer(line);
+    while (std::getline(is, line)) {
+      tokenizer_type tokenizer(line);
 	
-	tokens.clear();
-	tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
+      tokens.clear();
+      tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
 	
-	if (tokens.empty()) continue;
+      if (tokens.empty()) continue;
 	
-	if (tokens.size() == 1) {
-	  if (tokens.front() != "EOS")
-	    throw std::runtime_error("invalid cabocha F1 format: no EOS");
+      if (tokens.size() == 1) {
+	if (tokens.front() != "EOS")
+	  throw std::runtime_error("invalid cabocha F1 format: no EOS");
 	  
-	  // we will convert bunsetsu dependency into word-dependency...
-	  dependency.clear();
-	  offsets.clear();
-	  terminals.clear();
-	  
-	  node_set_type::const_iterator niter_end = nodes.end();
-	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	    const size_t head_pos = dependency.size() + niter->head;
+	// we will convert bunsetsu dependency into word-dependency...
+	dependency.clear();
+	offsets.clear();
+	terminals.clear();
+	
+	node_set_type::const_iterator niter_end = nodes.end();
+	for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	  const size_t head_pos = dependency.size() + niter->head;
 	    
-	    int pos = 0;
-	    terminal_set_type::const_iterator titer_end = niter->terminals.end();
-	    for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
-	      if (pos == niter->head) {
-		offsets.push_back(dependency.size());
-		dependency.push_back(-1);
-	      } else 
-		dependency.push_back(head_pos + 1);
-	    }
-	    
-	    terminals.insert(terminals.end(), niter->terminals.begin(), niter->terminals.end());
+	  int pos = 0;
+	  terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	  for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
+	    if (pos == niter->head) {
+	      offsets.push_back(dependency.size());
+	      dependency.push_back(-1);
+	    } else 
+	      dependency.push_back(head_pos + 1);
 	  }
+	    
+	  terminals.insert(terminals.end(), niter->terminals.begin(), niter->terminals.end());
+	}
+	
+	if (mapper) {
+	  const sentence_type& mapped = mapper();
 	  
-	  //
-	  // second iteration to perform bunsets-wise dependency, but shifted by the bunsets length
-	  //
-	  int index = 0;
-	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	    int pos = 0;
-	    terminal_set_type::const_iterator titer_end = niter->terminals.end();
-	    for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
-	      if (pos == niter->head) {
-		if (niter->pos < 0)
-		  dependency[index] = 0;
-		else
-		  dependency[index] = offsets[niter->pos] + 1;
-	      }
+	  if (terminals.size() != mapped.size())
+	    throw std::runtime_error("cabocha size and mapped size differ");
+	  
+	  for (size_t i = 0; i != mapped.size(); ++ i)
+	    terminals[i].first = mapped[i];
+	}
+	
+	//
+	// second iteration to perform bunsets-wise dependency, but shifted by the bunsets length
+	//
+	int index = 0;
+	for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	  int pos = 0;
+	  terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	  for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
+	    if (pos == niter->head) {
+	      if (niter->pos < 0)
+		dependency[index] = 0;
+	      else
+		dependency[index] = offsets[niter->pos] + 1;
+	    }
 	      
-	      ++ index;
-	    }
+	    ++ index;
 	  }
+	}
 	  
-	  if (forest_mode) {
-	    transform.clear();
+	if (forest_mode) {
+	  transform.clear();
 	    
-	    terminal_set_type::const_iterator titer_end = terminals.end();
-	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer) {
-	      transform.sentence.push_back(titer->first);
-	      transform.pos.push_back('[' + titer->second + ']');
-	    }
-	    
-	    transform.dependency.assign(dependency.begin(), dependency.end());
-	    
-	    transform();
-	    
-	    os << transform.hypergraph << '\n';
-	    if (flush_output)
-	      os << std::flush;
-	  } else {
-	    terminal_set_type::const_iterator titer_end = terminals.end();
-	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	      os << titer->first << ' ';
-	    os << "||| ";
-	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	      os << titer->second << ' ';
-	    os << "||| ";
-	    
-	    if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
-	      throw std::runtime_error("generation failed");
-	    
-	    if (flush_output)
-	      os << std::flush;
+	  terminal_set_type::const_iterator titer_end = terminals.end();
+	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer) {
+	    transform.sentence.push_back(titer->first);
+	    transform.pos.push_back('[' + titer->second + ']');
 	  }
+	    
+	  transform.dependency.assign(dependency.begin(), dependency.end());
+	    
+	  transform();
+	    
+	  os << transform.hypergraph << '\n';
+	  if (flush_output)
+	    os << std::flush;
+	} else {
+	  terminal_set_type::const_iterator titer_end = terminals.end();
+	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	    os << titer->first << ' ';
+	  os << "||| ";
+	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	    os << titer->second << ' ';
+	  os << "||| ";
+	    
+	  if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
+	    throw std::runtime_error("generation failed");
+	    
+	  if (flush_output)
+	    os << std::flush;
+	}
 	  
-	} else if (tokens.size() == 5) {
-	  if (tokens.front() != "*")
-	    throw std::runtime_error("invalid cabocha F1 format: no star");
+      } else if (tokens.size() == 5) {
+	if (tokens.front() != "*")
+	  throw std::runtime_error("invalid cabocha F1 format: no star");
 	  
-	  const int index = utils::lexical_cast<int>(tokens[1]);
-	  if (index != static_cast<int>(nodes.size()))
-	    throw std::runtime_error("invalid cabocha F1 format: node size do not match");
+	const int index = utils::lexical_cast<int>(tokens[1]);
+	if (index != static_cast<int>(nodes.size()))
+	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
 	  
-	  nodes.push_back(node_type(atoi(tokens[2].c_str()), atoi(tokens[3].c_str())));
-	} else if (tokens.size() == 3) {
-	  boost::tokenizer<boost::char_separator<char> > tokenizer(tokens[1], boost::char_separator<char>(","));
-	  tokens_type poss(tokenizer.begin(), tokenizer.end());
+	nodes.push_back(node_type(atoi(tokens[2].c_str()), atoi(tokens[3].c_str())));
+      } else if (tokens.size() == 3) {
+	boost::tokenizer<boost::char_separator<char> > tokenizer(tokens[1], boost::char_separator<char>(","));
+	tokens_type poss(tokenizer.begin(), tokenizer.end());
 	  
-	  if (poss.size() < 2) {
-	    poss.resize(2);
-	    poss[0] = "UNK";
-	    poss[1] = "*";
-	  }
+	if (poss.size() < 2) {
+	  poss.resize(2);
+	  poss[0] = "UNK";
+	  poss[1] = "*";
+	}
 	  
-	  if (poss[1] == "*")
-	    nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0]));
-	  else
-	    nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0] + '-' + poss[1]));
-	} else
-	  throw std::runtime_error("invalid cabocha F1 format: # of columns do not match");
-      }
+	if (poss[1] == "*")
+	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0]));
+	else
+	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0] + '-' + poss[1]));
+      } else
+	throw std::runtime_error("invalid cabocha F1 format: # of columns do not match");
     }
   }
 };
@@ -1093,7 +1016,7 @@ struct KHayashi
     boost::spirit::qi::rule<Iterator, khayashi_type(), blank_type> khayashi;
   };
   
-  void operator()(const path_set_type& files, const path_type& output)
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
   {
     typedef boost::spirit::istream_iterator iiter_type;
     
@@ -1105,63 +1028,71 @@ struct KHayashi
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
 
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
+    
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
+    MapFile mapper(map);
+
     khayashi_parser<iiter_type> parser;
     khayashi_type khayashi;
 
     Transform transform(goal, head_mode);
     
-    path_set_type::const_iterator fiter_end = files.end();
-    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
+    while (iter != iter_end) {
+      khayashi.clear();
+	
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, khayashi))
+	throw std::runtime_error("parsing failed");
       
-      iiter_type iter(is);
-      iiter_type iter_end;
-
-      while (iter != iter_end) {
-	khayashi.clear();
+      if (mapper) {
+	const sentence_type& mapped = mapper();
 	
-	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, khayashi))
-	  throw std::runtime_error("parsing failed");
+	if (mapped.size() != khayashi.words.size())
+	  throw std::runtime_error("khayashi size and mapped size differ");
 	
-	if (! khayashi.verify())
-	  throw std::runtime_error("invalid khayashi format");
-
-	if (unescape_mode)
-	  unescape(khayashi.words.begin(), khayashi.words.end());
+	khayashi.words.assign(mapped.begin(), mapped.end());
+      }
 	
-	if (normalize_mode)
-	  normalize(khayashi.poss.begin(), khayashi.poss.end());
+      if (! khayashi.verify())
+	throw std::runtime_error("invalid khayashi format");
+      
+      if (unescape_mode)
+	unescape(khayashi.words.begin(), khayashi.words.end());
+	
+      if (normalize_mode)
+	normalize(khayashi.poss.begin(), khayashi.poss.end());
 
-	if (forest_mode) {
-	  transform.clear();
-	  transform.sentence.assign(khayashi.words.begin(), khayashi.words.end());
+      if (forest_mode) {
+	transform.clear();
+	transform.sentence.assign(khayashi.words.begin(), khayashi.words.end());
 	  
-	  khayashi_type::label_set_type::const_iterator liter_end = khayashi.poss.end();
-	  for (khayashi_type::label_set_type::const_iterator liter = khayashi.poss.begin(); liter != liter_end; ++ liter)
-	    transform.pos.push_back('[' + *liter + ']');	    
+	khayashi_type::label_set_type::const_iterator liter_end = khayashi.poss.end();
+	for (khayashi_type::label_set_type::const_iterator liter = khayashi.poss.begin(); liter != liter_end; ++ liter)
+	  transform.pos.push_back('[' + *liter + ']');	    
 	  
-	  transform.dependency.assign(khayashi.positions.begin(), khayashi.positions.end());
+	transform.dependency.assign(khayashi.positions.begin(), khayashi.positions.end());
 	  
-	  transform();
+	transform();
 	  
-	  os << transform.hypergraph << '\n';
-	  if (flush_output)
-	    os << std::flush;
-	} else {
-	  if (! karma::generate(oiter, (-(standard::string % ' ')
-					<< " ||| " << -(standard::string % ' ')
-					<< " ||| " << -(karma::int_ % ' ')
-					<< '\n'),
-				khayashi.words, khayashi.poss, khayashi.positions))
-	    throw std::runtime_error("generation failed");
+	os << transform.hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	if (! karma::generate(oiter, (-(standard::string % ' ')
+				      << " ||| " << -(standard::string % ' ')
+				      << " ||| " << -(karma::int_ % ' ')
+				      << '\n'),
+			      khayashi.words, khayashi.poss, khayashi.positions))
+	  throw std::runtime_error("generation failed");
 	  
-	  if (flush_output)
-	    os << std::flush;
-	}
+	if (flush_output)
+	  os << std::flush;
       }
     }
   }
@@ -1311,7 +1242,7 @@ struct KHayashiForest
     }
   };
 
-  void operator()(const path_set_type& files, const path_type& output)
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
   {
     typedef boost::spirit::istream_iterator iiter_type;
     
@@ -1341,8 +1272,16 @@ struct KHayashiForest
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
 
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
+    
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
+
+    MapFile mapper(map);
     
     khayashi_parser<iiter_type> parser;
     khayashi_forest_type khayashi;
@@ -1353,160 +1292,160 @@ struct KHayashiForest
     label_set_type   labels;
     goal_id_set_type goals;
 
-    path_set_type::const_iterator fiter_end = files.end();
-    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
-      utils::compress_istream is(*fiter, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
+    while (iter != iter_end) {
+      khayashi.clear();
+      hypergraph.clear();
+	
+      if (! qi::parse(iter, iter_end, parser, khayashi))
+	throw std::runtime_error("parsing failed");
       
-      iiter_type iter(is);
-      iiter_type iter_end;
+      if (mapper) {
+	const MapFile::sentence_type& mapped = mapper();
+	
+	if (mapped.size() != khayashi.words.size())
+	  throw std::runtime_error("khayashi size and mapped size differ");
+	
+	khayashi.words.assign(mapped.begin(), mapped.end());
+      }
 
-      while (iter != iter_end) {
-	khayashi.clear();
-	hypergraph.clear();
+      if (! khayashi.verify())
+	throw std::runtime_error("invalid khayashi forest format");
 	
-	if (! qi::parse(iter, iter_end, parser, khayashi))
-	  throw std::runtime_error("parsing failed");
-
-	if (! khayashi.verify())
-	  throw std::runtime_error("invalid khayashi forest format");
+      if (unescape_mode)
+	unescape(khayashi.words.begin(), khayashi.words.end());
 	
-	if (unescape_mode)
-	  unescape(khayashi.words.begin(), khayashi.words.end());
+      if (normalize_mode)
+	normalize(khayashi.poss.begin(), khayashi.poss.end());
 	
-	if (normalize_mode)
-	  normalize(khayashi.poss.begin(), khayashi.poss.end());
-	
-	if (khayashi.nodes.empty()) {
-	  os << hypergraph << '\n';
-	  if (flush_output)
-	    os << std::flush;
-	} else {
-	  nodes.clear();
-	  nodes.resize(khayashi.nodes.size() + 1, std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
+      if (khayashi.nodes.empty()) {
+	os << hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	nodes.clear();
+	nodes.resize(khayashi.nodes.size() + 1, std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
 	  
-	  terminals.clear();
-	  terminals.resize(khayashi.words.size(), std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
+	terminals.clear();
+	terminals.resize(khayashi.words.size(), std::make_pair(hypergraph_type::invalid, hypergraph_type::invalid));
 	  
-	  labels.clear();
-	  goals.clear();
+	labels.clear();
+	goals.clear();
 	  
-	  rule_type::symbol_set_type rhs(2);
-	  hypergraph_type::edge_type::node_set_type tails(2);
+	rule_type::symbol_set_type rhs(2);
+	hypergraph_type::edge_type::node_set_type tails(2);
 	  
-	  khayashi_forest_type::node_set_type::const_iterator niter_end = khayashi.nodes.end();
-	  for (khayashi_forest_type::node_set_type::const_iterator niter = khayashi.nodes.begin(); niter != niter_end; ++ niter) {
-	    const khayashi_forest_type::node_type& node = *niter;
+	khayashi_forest_type::node_set_type::const_iterator niter_end = khayashi.nodes.end();
+	for (khayashi_forest_type::node_set_type::const_iterator niter = khayashi.nodes.begin(); niter != niter_end; ++ niter) {
+	  const khayashi_forest_type::node_type& node = *niter;
 	    
-	    if (node.is_terminal()) {
-	      // we will remove terminal sharing code, since we need to differentiate head and dependent...??
+	  if (node.is_terminal()) {
+	    // we will remove terminal sharing code, since we need to differentiate head and dependent...??
 	      
-	      if (terminals[node.parent].first == hypergraph_type::invalid) {
-		const hypergraph_type::id_type head_id = hypergraph.add_node().id;
-		const hypergraph_type::id_type node_id = hypergraph.add_node().id;
+	    if (terminals[node.parent].first == hypergraph_type::invalid) {
+	      const hypergraph_type::id_type head_id = hypergraph.add_node().id;
+	      const hypergraph_type::id_type node_id = hypergraph.add_node().id;
 		
-		terminals[node.parent].first  = head_id;
-		terminals[node.parent].second = node_id;
+	      terminals[node.parent].first  = head_id;
+	      terminals[node.parent].second = node_id;
 		
-		if (head_id >= labels.size())
-		  labels.resize(head_id + 1);		
-		if (node_id >= labels.size())
-		  labels.resize(node_id + 1);
-		
-		labels[head_id] = '[' + khayashi.poss[node.parent] + "*]";
-		labels[node_id] = '[' + khayashi.poss[node.parent] + ']';
-		
-		hypergraph_type::edge_type& edge = hypergraph.add_edge();
-		
-		edge.rule = rule_type::create(rule_type(labels[head_id], rule_type::symbol_set_type(1, khayashi.words[node.parent])));
-		
-		hypergraph.connect_edge(edge.id, head_id);
-		
-		hypergraph_type::edge_type& edge2 = hypergraph.add_edge(&head_id, (&head_id) + 1);
-		
-		edge2.rule = rule_type::create(rule_type(labels[node_id], rule_type::symbol_set_type(1, labels[head_id])));
-		
-		hypergraph.connect_edge(edge2.id, node_id);
-	      }
-	      
-	      nodes[node.id] = terminals[node.parent];
-	    } else {
-	      const hypergraph_type::id_type node_id   = hypergraph.add_node().id;
-	      const hypergraph_type::id_type binary_id = hypergraph.add_node().id;
-	      
-	      nodes[node.id].first = node_id;
-	      nodes[node.id].second = binary_id;
-	      
+	      if (head_id >= labels.size())
+		labels.resize(head_id + 1);		
 	      if (node_id >= labels.size())
 		labels.resize(node_id + 1);
-	      if (binary_id >= labels.size())
-		labels.resize(binary_id + 1);
+		
+	      labels[head_id] = '[' + khayashi.poss[node.parent] + "*]";
+	      labels[node_id] = '[' + khayashi.poss[node.parent] + ']';
+		
+	      hypergraph_type::edge_type& edge = hypergraph.add_edge();
+		
+	      edge.rule = rule_type::create(rule_type(labels[head_id], rule_type::symbol_set_type(1, khayashi.words[node.parent])));
+		
+	      hypergraph.connect_edge(edge.id, head_id);
+		
+	      hypergraph_type::edge_type& edge2 = hypergraph.add_edge(&head_id, (&head_id) + 1);
+		
+	      edge2.rule = rule_type::create(rule_type(labels[node_id], rule_type::symbol_set_type(1, labels[head_id])));
+		
+	      hypergraph.connect_edge(edge2.id, node_id);
+	    }
 	      
-	      labels[node_id]   = '[' + khayashi.poss[node.parent] + ']';
-	      labels[binary_id] = '[' + khayashi.poss[node.parent] + "^]";
-
-	      if (node.first == 0 && node.last == static_cast<int>(khayashi.words.size()))
-		goals.push_back(node_id);
+	    nodes[node.id] = terminals[node.parent];
+	  } else {
+	    const hypergraph_type::id_type node_id   = hypergraph.add_node().id;
+	    const hypergraph_type::id_type binary_id = hypergraph.add_node().id;
 	      
-	      khayashi_forest_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	      for (khayashi_forest_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-		const khayashi_forest_type::node_type& node1 = khayashi.nodes[eiter->node1 - 1];
-		const khayashi_forest_type::node_type& node2 = khayashi.nodes[eiter->node2 - 1];
+	    nodes[node.id].first = node_id;
+	    nodes[node.id].second = binary_id;
+	      
+	    if (node_id >= labels.size())
+	      labels.resize(node_id + 1);
+	    if (binary_id >= labels.size())
+	      labels.resize(binary_id + 1);
+	      
+	    labels[node_id]   = '[' + khayashi.poss[node.parent] + ']';
+	    labels[binary_id] = '[' + khayashi.poss[node.parent] + "^]";
 
-		if (node1.is_terminal())
-		  tails[0] = utils::bithack::branch(node.parent == node1.parent, nodes[node1.id].first, nodes[node1.id].second);
-		else
-		  tails[0] = utils::bithack::branch(node.parent != node1.parent, nodes[node1.id].first, nodes[node1.id].second);
-		
-		if (node2.is_terminal())
-		  tails[1] = utils::bithack::branch(node.parent == node2.parent, nodes[node2.id].first, nodes[node2.id].second);
-		else
-		  tails[1] = utils::bithack::branch(node.parent != node2.parent, nodes[node2.id].first, nodes[node2.id].second);
-		
-		rhs[0] = labels[tails[0]];
-		rhs[1] = labels[tails[1]];
-		
-		hypergraph_type::edge_type& edge1 = hypergraph.add_edge(tails.begin(), tails.end());
-		hypergraph_type::edge_type& edge2 = hypergraph.add_edge(tails.begin(), tails.end());
-		
-		edge1.rule = rule_type::create(rule_type(labels[node_id], rhs));
-		edge2.rule = rule_type::create(rule_type(labels[binary_id], rhs));
-		
-		edge1.features[feature] = eiter->score;
-		edge2.features[feature] = eiter->score;
+	    if (node.first == 0 && node.last == static_cast<int>(khayashi.words.size()))
+	      goals.push_back(node_id);
+	      
+	    khayashi_forest_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	    for (khayashi_forest_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const khayashi_forest_type::node_type& node1 = khayashi.nodes[eiter->node1 - 1];
+	      const khayashi_forest_type::node_type& node2 = khayashi.nodes[eiter->node2 - 1];
 
-		hypergraph.connect_edge(edge1.id, node_id);
-		hypergraph.connect_edge(edge2.id, binary_id);
-	      }
+	      if (node1.is_terminal())
+		tails[0] = utils::bithack::branch(node.parent == node1.parent, nodes[node1.id].first, nodes[node1.id].second);
+	      else
+		tails[0] = utils::bithack::branch(node.parent != node1.parent, nodes[node1.id].first, nodes[node1.id].second);
+		
+	      if (node2.is_terminal())
+		tails[1] = utils::bithack::branch(node.parent == node2.parent, nodes[node2.id].first, nodes[node2.id].second);
+	      else
+		tails[1] = utils::bithack::branch(node.parent != node2.parent, nodes[node2.id].first, nodes[node2.id].second);
+		
+	      rhs[0] = labels[tails[0]];
+	      rhs[1] = labels[tails[1]];
+		
+	      hypergraph_type::edge_type& edge1 = hypergraph.add_edge(tails.begin(), tails.end());
+	      hypergraph_type::edge_type& edge2 = hypergraph.add_edge(tails.begin(), tails.end());
+		
+	      edge1.rule = rule_type::create(rule_type(labels[node_id], rhs));
+	      edge2.rule = rule_type::create(rule_type(labels[binary_id], rhs));
+		
+	      edge1.features[feature] = eiter->score;
+	      edge2.features[feature] = eiter->score;
+
+	      hypergraph.connect_edge(edge1.id, node_id);
+	      hypergraph.connect_edge(edge2.id, binary_id);
 	    }
 	  }
-	  
-	  if (! goals.empty()) {
-	    hypergraph.goal = hypergraph.add_node().id;
-
-	    goal_id_set_type::const_iterator giter_end = goals.end();
-	    for (goal_id_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
-	      const hypergraph_type::id_type tail = *giter;
-	      
-	      hypergraph_type::edge_type& edge = hypergraph.add_edge(&tail, (&tail) + 1);
-	      
-	      edge.rule = rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, labels[tail])));
-	      
-	      hypergraph.connect_edge(edge.id, hypergraph.goal);
-	    }
-	    
-	    cicada::topologically_sort(hypergraph);
-	    
-	    if (head_mode)
-	      cicada::debinarize(hypergraph);
-	    else
-	      cicada::remove_non_terminal(hypergraph, remove_nodes());
-	  }
-	  
-	  os << hypergraph << '\n';
-	  if (flush_output)
-	    os << std::flush;
 	}
+	  
+	if (! goals.empty()) {
+	  hypergraph.goal = hypergraph.add_node().id;
+
+	  goal_id_set_type::const_iterator giter_end = goals.end();
+	  for (goal_id_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
+	    const hypergraph_type::id_type tail = *giter;
+	      
+	    hypergraph_type::edge_type& edge = hypergraph.add_edge(&tail, (&tail) + 1);
+	      
+	    edge.rule = rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, labels[tail])));
+	      
+	    hypergraph.connect_edge(edge.id, hypergraph.goal);
+	  }
+	    
+	  cicada::topologically_sort(hypergraph);
+	    
+	  if (head_mode)
+	    cicada::debinarize(hypergraph);
+	  else
+	    cicada::remove_non_terminal(hypergraph, remove_nodes());
+	}
+	  
+	os << hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
       }
     }
   }
@@ -1518,24 +1457,13 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",      po::value<path_set_type>(&input_files)->multitoken(),           "input file(s)")
+    ("input",      po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",     po::value<path_type>(&output_file)->default_value(output_file), "output file")
+    ("map",        po::value<path_type>(&map_file),                                "map file")
     
-    ("source",     po::value<path_set_type>(&source_files)->multitoken(),     "source file(s)")
-    ("target",     po::value<path_set_type>(&target_files)->multitoken(),     "target file(s)")
-    ("alignment",  po::value<path_set_type>(&alignment_files)->multitoken(),  "alignment file(s)")
-    ("dependency", po::value<path_set_type>(&dependency_files)->multitoken(), "dependency file(s)")
-    
-    ("list",            po::value<path_type>(&list_file),            "list file")
-    ("list-source",     po::value<path_type>(&list_source_file),     "source list file")
-    ("list-target",     po::value<path_type>(&list_target_file),     "target list file")
-    ("list-alignment",  po::value<path_type>(&list_alignment_file),  "alignment list file")
-    ("list-dependency", po::value<path_type>(&list_dependency_file), "dependency list file")
-
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
-    ("bilingual",       po::bool_switch(&bilingual_mode),       "project source dependency into target dependency")
     ("mst",             po::bool_switch(&mst_mode),             "tranform MST dependency")
     ("conll",           po::bool_switch(&conll_mode),           "tranform CoNLL dependency")
     ("cabocha",         po::bool_switch(&cabocha_mode),         "tranform Cabocha dependency")
