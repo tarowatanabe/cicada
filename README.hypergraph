@@ -61,28 +61,24 @@ The tool (will) supports projection of source-side dependency into target-side v
 
 cicada_filter_dependency [options]
 options:
-  --input arg               input file(s)
+  --input arg (="-")        input file
   --output arg (="-")       output file
-  --source arg              source file(s)
-  --target arg              target file(s)
-  --alignment arg           alignment file(s)
-  --dependency arg          dependency file(s)
-  --list arg                list file
-  --list-source arg         source list file
-  --list-target arg         target list file
-  --list-alignment arg      alignment list file
-  --list-dependency arg     dependency list file
+  --map arg                 map file
   --goal arg (=[s])         goal symbol
   --non-terminal arg (=[x]) non-terminal symbol
-  --bilingual               project source dependency into target dependency
   --mst                     tranform MST dependency
   --conll                   tranform CoNLL dependency
   --cabocha                 tranform Cabocha dependency
+  --khayashi                tranform KHayashi dependency
+  --khayashi-forest         tranform KHayashi Forest dependency
   --projective              project into projective dependency
   --relation                assing relation to POS
+  --unescape                unescape terminal symbols, such as -LRB-, \* etc.
+  --normalize               normalize category, such as [,] [.] etc.
   --forest                  output as a forest
   --head                    output hypergraph with explicit head
   --help                    help message
+
 
 You can merge multiple hypergraphs in one by:
 cicada_unite_forest

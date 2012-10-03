@@ -49,8 +49,10 @@ opt_parser = OptionParser(
                 help="host list file to run job. Identical to --hostfile for mpirun", metavar="FILE"),
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
-    make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+    make_option("--pbs-name", default="cicada-sh", action="store", type="string",
+                help="PBS process name (up to 15 characters!) (default: cicada-sh)", metavar="NAME"),
+    make_option("--pbs-queue", default="mt48", action="store", type="string",
+                help="PBS queue for launching processes (default: mt48)", metavar="NAME"),
     make_option("--pbs-after", default="", action="store", type="string",
                 help="PBS for launching processes after this process id", metavar="ID"),
     make_option("--pbs-before", default="", action="store", type="string",
@@ -325,6 +327,7 @@ if __name__ == '__main__':
                 pbs.run(command=line,
                         threads=options.threads,
                         memory=options.max_malloc,
+                        name=options.pbs_name,
                         after=options.pbs_after,
                         before=options.pbs_before)
     elif options.mpi:
