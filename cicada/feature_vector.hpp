@@ -15,7 +15,6 @@
 
 #include <cicada/feature.hpp>
 
-//#include <utils/dense_hash_map.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/hashmurmur.hpp>
 
@@ -43,9 +42,26 @@ namespace cicada
     typedef std::pair<const feature_type, data_type> value_type;
     
   private:
+    struct empty_key
+    {
+      const feature_type& operator()() const
+      {
+	static feature_type __feature(feature_type::id_type(-1));
+	return __feature;
+      }
+    };
+
+    struct deleted_key
+    {
+      const feature_type& operator()() const
+      {
+	static feature_type __feature(feature_type::id_type(-2));
+	return __feature;
+      }
+    };
+
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
-    //typedef typename utils::dense_hash_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type>::type vector_type;
-    typedef typename utils::compact_map<key_type, data_type, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type> vector_type;
+    typedef typename utils::compact_map<key_type, data_type, empty_key, deleted_key, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type> vector_type;
     
     typedef FeatureVector<Tp, Alloc> self_type;
     
@@ -61,15 +77,15 @@ namespace cicada
     typedef typename vector_type::pointer         pointer;
     
   public:
-    FeatureVector(size_type hint=8) : __vector(hint) { initialize(__vector); rehash(hint); }
+    FeatureVector(size_type hint=8) : __vector(hint) { rehash(hint); }
     FeatureVector(const FeatureVector<Tp,Alloc>& x) : __vector(x.__vector) {}
     template <typename T, typename A>
-    FeatureVector(const FeatureVector<T,A>& x) : __vector(x.size()) { initialize(__vector);  assign(x); }
+    FeatureVector(const FeatureVector<T,A>& x) : __vector(x.size()) { assign(x); }
     template <typename Iterator>
-    FeatureVector(Iterator first, Iterator last) : __vector() { initialize(__vector); assign(first, last); }
-    FeatureVector(const FeatureVectorCompact& x) : __vector() { initialize(__vector); assign(x); }
+    FeatureVector(Iterator first, Iterator last) : __vector() { assign(first, last); }
+    FeatureVector(const FeatureVectorCompact& x) : __vector() { assign(x); }
     template <typename T, typename A>
-    FeatureVector(const FeatureVectorLinear<T,A>& x): __vector(x.size()) { initialize(__vector); assign(x); } 
+    FeatureVector(const FeatureVectorLinear<T,A>& x): __vector(x.size()) { assign(x); } 
     
     FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
     {
@@ -154,7 +170,6 @@ namespace cicada
 	clear();
       else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
@@ -177,7 +192,6 @@ namespace cicada
 	clear();
       else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect(vector_new, __vector, x.begin(), x.end());
@@ -195,7 +209,6 @@ namespace cicada
 	operator=(x);
       else if (! x.empty()) {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect_absmax(vector_new, __vector, x.begin(), x.end());
@@ -215,7 +228,6 @@ namespace cicada
 	operator=(x);
       else if (! x.empty()) {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect_absmax(vector_new, __vector, x.begin(), x.end());
@@ -236,7 +248,6 @@ namespace cicada
 	clear();
       else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect_absmin(vector_new, __vector, x.begin(), x.end());
@@ -259,7 +270,6 @@ namespace cicada
 	clear();
       else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	intersect_absmin(vector_new, __vector, x.begin(), x.end());
@@ -615,7 +625,6 @@ namespace cicada
 	return *this;
       } else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	multiply_equal(vector_new, __vector, x.begin(), x.end());
@@ -636,7 +645,6 @@ namespace cicada
 	return *this;
       } else {
 	vector_type vector_new;
-	initialize(vector_new);
 	vector_new.rehash(utils::bithack::max(__vector.size(), x.size()));
 	
 	multiply_equal(vector_new, __vector, x.begin(), x.end());
@@ -733,13 +741,6 @@ namespace cicada
       }
     }
 
-  private:
-    void initialize(vector_type& x)
-    {
-      x.set_empty_key(feature_type(feature_type::id_type(-1)));
-      x.set_deleted_key(feature_type(feature_type::id_type(-2)));
-    }
-    
   public:
     vector_type __vector;
   };
@@ -995,7 +996,6 @@ namespace cicada
       clear();
     else {
       vector_type vector_new;
-      initialize(vector_new);
       vector_new.rehash(__vector.size());
       
       intersect(vector_new, __vector, x.begin(), x.end());
@@ -1014,7 +1014,6 @@ namespace cicada
       operator=(x);
     else if (! x.empty()) {
       vector_type vector_new;
-      initialize(vector_new);
       vector_new.rehash(__vector.size());
       
       intersect_absmax(vector_new, __vector, x.begin(), x.end());
@@ -1036,7 +1035,6 @@ namespace cicada
       clear();
     else {
       vector_type vector_new;
-      initialize(vector_new);
       vector_new.rehash(__vector.size());
       
       intersect_absmin(vector_new, __vector, x.begin(), x.end());
@@ -1083,7 +1081,6 @@ namespace cicada
       return *this;
     } else {
       vector_type vector_new;
-      initialize(vector_new);
       vector_new.rehash(__vector.size());
       
       multiply_equal(vector_new, __vector, x.begin(), x.end());

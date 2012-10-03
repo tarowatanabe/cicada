@@ -20,7 +20,8 @@
 
 namespace utils
 {
-  template <typename Key, typename Value, typename ExtractKey, typename Hash, typename Pred, typename Alloc>
+  template <typename Key, typename Value, typename Empty, typename Deleted,
+	    typename ExtractKey, typename Hash, typename Pred, typename Alloc>
   class compact_hashtable;
   
   // bucket impelemntation
@@ -92,7 +93,7 @@ namespace utils
       std::swap(__last,  x.__last);
     }
     
-    const allocator_type& allocator() const { return static_cast<allocator_type&>(*this); }
+    const allocator_type& allocator() const { return static_cast<const allocator_type&>(*this); }
     allocator_type& allocator() { return static_cast<allocator_type&>(*this); }
 
     template <typename Integer>
@@ -160,7 +161,7 @@ namespace utils
   template <typename Table, typename Iterator, typename Reference, typename Tp>
   struct __compact_hashtable_iterator
   {
-    template <typename K, typename V, typename E,typename H,typename P, typename A>
+    template <typename K, typename V, typename _E, typename _D, typename E,typename H,typename P, typename A>
     friend class compact_hashtable;
 
     template <typename T, typename I, typename R, typename V>
@@ -253,8 +254,11 @@ namespace utils
     return x.pos != y.pos;
   }
   
-  template <typename Key, typename Value, typename ExtractKey, typename Hash, typename Pred, typename Alloc>
-  class compact_hashtable : public ExtractKey,
+  template <typename Key, typename Value, typename Empty, typename Deleted,
+	    typename ExtractKey, typename Hash, typename Pred, typename Alloc>
+  class compact_hashtable : public Empty,
+			    public Deleted,
+			    public ExtractKey,
                             public Hash,
                             public Pred
   {
@@ -273,7 +277,7 @@ namespace utils
     typedef ptrdiff_t  difference_type;
     
   private:
-    typedef compact_hashtable<Key, Value, ExtractKey, Hash, Pred, Alloc> self_type;
+    typedef compact_hashtable<Key, Value, Empty, Deleted, ExtractKey, Hash, Pred, Alloc> self_type;
     typedef __compact_hashtable_bucket<Value, Alloc> bucket_type;
 
   public:
@@ -295,14 +299,10 @@ namespace utils
   public:
     compact_hashtable(size_type hint=0)
       : __bucket(),
-	__value_empty(),
-	__value_deleted(),
 	__size_element(0),
 	__size_deleted(0) {  }
     compact_hashtable(const compact_hashtable& x)
       : __bucket(),
-	__value_empty(x.__value_empty),
-	__value_deleted(x.__value_deleted),
 	__size_element(0),
 	__size_deleted(0) 
     {
@@ -319,48 +319,37 @@ namespace utils
     void assign(const compact_hashtable& x)
     {
       if (this == &x) return;
-      
-      __bucket.assign(x.__bucket);
-      
-      copy_value(__value_empty, x.__value_empty);
-      copy_value(__value_deleted, x.__value_deleted);
-      __size_element = x.__size_element;
-      __size_deleted = x.__size_deleted;
 
+      static_cast<Empty&>(*this) = static_cast<const Empty&>(x);
+      static_cast<Deleted&>(*this) = static_cast<const Deleted&>(x);
       extract_key() = x.extract_key();
       hash() = x.hash();
       pred() = x.pred();
+      
+      __bucket.assign(x.__bucket);
+      
+      __size_element = x.__size_element;
+      __size_deleted = x.__size_deleted;
     }
 
     void swap(compact_hashtable& x)
     {
-      __bucket.swap(x.__bucket);
-      
-      // very strange swapping
-      {
-	const value_type tmptmp(x.__value_empty);
-	copy_value(x.__value_empty, __value_empty);
-	copy_value(__value_empty, tmptmp);
-      }
-      
-      {
-	const value_type tmptmp(x.__value_deleted);
-	copy_value(x.__value_deleted, __value_deleted);
-	copy_value(__value_deleted, tmptmp);
-      }
-      
-      std::swap(__size_element, x.__size_element);
-      std::swap(__size_deleted, x.__size_deleted);
-      
+      std::swap(static_cast<Empty&>(*this), static_cast<Empty&>(x));
+      std::swap(static_cast<Deleted&>(*this), static_cast<Deleted&>(x));
       std::swap(extract_key(), x.extract_key());
       std::swap(hash(), x.hash());
       std::swap(pred(), x.pred());
+      
+      __bucket.swap(x.__bucket);
+      
+      std::swap(__size_element, x.__size_element);
+      std::swap(__size_deleted, x.__size_deleted);
     }
     
     void clear()
     {
       utils::destroy_range(__bucket.begin(), __bucket.end());
-      std::uninitialized_fill(__bucket.begin(), __bucket.end(), __value_empty);
+      std::uninitialized_fill(__bucket.begin(), __bucket.end(), Empty::operator()());
       
       __size_element = 0;
       __size_deleted = 0;
@@ -417,7 +406,7 @@ namespace utils
       iterator iter = find(key);
       
       if (iter != end()) {
-	copy_value(*iter, __value_deleted);
+	copy_value(*iter, Deleted::operator()());
 	++ __size_deleted;
 	return 1;
       } else
@@ -430,22 +419,22 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(__value_empty)) && ! pred()(key, extract_key()(__value_deleted))) {
-	copy_value(*iter.pos, __value_deleted);
+      if (! pred()(key, extract_key()(Empty::operator()())) && ! pred()(key, extract_key()(Deleted::operator()()))) {
+	copy_value(*iter.pos, Deleted::operator()());
 	++ __size_deleted;
       }
     }
     
     void erase(iterator first, iterator last)
     {
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
       
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
 	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
-	  copy_value(*first.pos, __value_deleted);
+	  copy_value(*first.pos, Deleted::operator()());
 	  ++ __size_deleted;
 	}
       }
@@ -457,22 +446,22 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(__value_empty)) && ! pred()(key, extract_key()(__value_deleted))) {
-	copy_value(*iter.pos, __value_deleted);
+      if (! pred()(key, extract_key()(Empty::operator()())) && ! pred()(key, extract_key()(Deleted::operator()()))) {
+	copy_value(*iter.pos, Deleted::operator()());
 	++ __size_deleted;
       }
     }
     
     void erase(const_iterator first, const_iterator last)
     {
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
       
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
 	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
-	  copy_value(*first.pos, __value_deleted);
+	  copy_value(*first.pos, Deleted::operator()());
 	  ++ __size_deleted;
 	}
       }
@@ -503,7 +492,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return __bucket[pos.first];
       else {
-	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(__value_deleted)))
+	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(Deleted::operator()())))
 	  -- __size_deleted;
 	else
 	  ++ __size_element;
@@ -516,20 +505,20 @@ namespace utils
   private:
     bool is_deleted(const_iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
+      return pred()(extract_key()(*x.pos), extract_key()(Deleted::operator()()));
     }
     bool is_deleted(iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_deleted));
+      return pred()(extract_key()(*x.pos), extract_key()(Deleted::operator()()));
     }
       
     bool is_empty(const_iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
+      return pred()(extract_key()(*x.pos), extract_key()(Empty::operator()()));
     }
     bool is_empty(iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(__value_empty));
+      return pred()(extract_key()(*x.pos), extract_key()(Empty::operator()()));
     }
     
   private:
@@ -541,7 +530,7 @@ namespace utils
       
       if (capacity <= __bucket.size()) return false;
       
-      bucket_type bucket_new(capacity, __value_empty);
+      bucket_type bucket_new(capacity, Empty::operator()());
       __bucket.swap(bucket_new);
 
       __size_element = 0;
@@ -557,8 +546,8 @@ namespace utils
 
     std::pair<size_type, size_type> find_linear(const key_type& key) const
     {
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
 
       size_type pos_insert = size_type(-1);
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
@@ -582,8 +571,8 @@ namespace utils
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
       size_type pos_insert = size_type(-1);
       
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
       
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
@@ -624,8 +613,8 @@ namespace utils
 
       if (bucket.empty()) return;
 
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
 
       typename bucket_type::iterator iter = __bucket.begin();
       
@@ -648,8 +637,8 @@ namespace utils
 
       if (bucket.empty()) return;
       
-      const key_type& key_empty   = extract_key()(__value_empty);
-      const key_type& key_deleted = extract_key()(__value_deleted);
+      const key_type& key_empty   = extract_key()(Empty::operator()());
+      const key_type& key_deleted = extract_key()(Deleted::operator()());
       
       typename bucket_type::const_iterator biter_end = bucket.end();
       for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
@@ -683,7 +672,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, false), false);
       else {
-	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(__value_deleted)))
+	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(Deleted::operator()())))
 	  -- __size_deleted;
 	else
 	  ++ __size_element;
@@ -712,16 +701,6 @@ namespace utils
     }
     
   public:
-    void set_empty_key(const value_type& x)
-    {
-      copy_value(__value_empty, x);
-    }
-    
-    void set_deleted_key(const value_type& x)
-    {
-      copy_value(__value_deleted, x);
-    }
-
     extract_key_type& extract_key() { return static_cast<extract_key_type&>(*this); }
     const extract_key_type& extract_key() const { return static_cast<const extract_key_type&>(*this); }
 
@@ -751,8 +730,6 @@ namespace utils
     
   private:
     bucket_type __bucket;
-    value_type  __value_empty;
-    value_type  __value_deleted;
     size_type   __size_element;
     size_type   __size_deleted;
   };
@@ -761,10 +738,10 @@ namespace utils
 
 namespace std
 {
-  template <typename K, typename V, typename E, typename H, typename P, typename A>
+  template <typename K, typename V, typename _E, typename _D, typename E, typename H, typename P, typename A>
   inline
-  void swap(utils::compact_hashtable<K,V,E,H,P,A>& x,
-	    utils::compact_hashtable<K,V,E,H,P,A>& y)
+  void swap(utils::compact_hashtable<K,V,_E,_D,E,H,P,A>& x,
+	    utils::compact_hashtable<K,V,_E,_D,E,H,P,A>& y)
   {
     x.swap(y);
   }

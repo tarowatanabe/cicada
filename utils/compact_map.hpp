@@ -14,6 +14,8 @@ namespace utils
 {
   template <typename Key,
 	    typename Data,
+	    typename Empty,
+	    typename Deleted,
 	    typename Hash=boost::hash<Key>,
 	    typename Pred=std::equal_to<Key>,
 	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
@@ -25,12 +27,31 @@ namespace utils
     typedef std::pair<const key_type, mapped_type> value_type;
     
   private:
+    struct value_empty : public Empty
+    {
+      const value_type& operator()() const
+      {
+	static value_type __value(Empty::operator()(), mapped_type());
+	return __value;
+      }
+    };
+    
+    struct value_deleted : public Deleted
+    {
+      const value_type& operator()() const
+      {
+	static value_type __value(Deleted::operator()(), mapped_type());
+	return __value;
+      }
+    };
+    
     struct extract_key
     {
       const Key& operator()(const value_type& x) const { return x.first; }
       const Key& operator()(value_type& x) const { return x.first; }
     };
-    typedef compact_hashtable<key_type, value_type, extract_key, Hash, Pred, Alloc> impl_type;
+    
+    typedef compact_hashtable<key_type, value_type, value_empty, value_deleted, extract_key, Hash, Pred, Alloc> impl_type;
 
   public:
     typedef typename impl_type::size_type  size_type;
@@ -92,10 +113,6 @@ namespace utils
 
     void erase(iterator first, iterator last) { impl.erase(first, last); }
     void erase(const_iterator first, const_iterator last) { impl.erase(first, last); }
-
-    void set_empty_key(const key_type& key) { impl.set_empty_key(std::make_pair(key, mapped_type())); }
-    void set_deleted_key(const key_type& key) { impl.set_deleted_key(std::make_pair(key, mapped_type())); }
-    
   private:
     impl_type impl;
   };
@@ -104,10 +121,10 @@ namespace utils
 
 namespace std
 {
-  template <typename Key, typename Data, typename Hash, typename Pred, typename Alloc>
+  template <typename Key, typename Data, typename Empty, typename Deleted, typename Hash, typename Pred, typename Alloc>
   inline
-  void swap(utils::compact_map<Key,Data, Hash,Pred,Alloc>& x,
-	    utils::compact_map<Key,Data, Hash,Pred,Alloc>& y)
+  void swap(utils::compact_map<Key,Data,Empty,Deleted,Hash,Pred,Alloc>& x,
+	    utils::compact_map<Key,Data,Empty,Deleted,Hash,Pred,Alloc>& y)
   {
     x.swap(y);
   }

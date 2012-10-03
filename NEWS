@@ -3,6 +3,8 @@ Bugfix: kbest-based (mert) learner/oracle computer core dump!
 	The reason is the incorrect hash value computation for compact-feature-vector.
 INCOMPATIBLE: The feature-vector is re-implemented by a privately implemented compact-hashtable.
 	      Thus, the element is not "sorted" but randomly inserted in the vector.
+	      The compact-hashtable is inspired by the dense-hash-map, but differ in that empty/deleted items are
+	      specified by "template."
 INCOMPATIBLE: phrase extraction now explicitly enumerate all the corners for lexical reordering computation
 INCOMPATIBLE: lexical weights are now computed by cicada_filter_extract_{phrase,scfg,ghkm}, not during extraction
 	      for flexible feature function computation. Thus, cicada-extract.py simply extract rules with counts,

@@ -13,6 +13,8 @@
 namespace utils
 {
   template <typename Tp,
+	    typename Empty,
+	    typename Deleted,
 	    typename Hash=boost::hash<Tp>,
 	    typename Pred=std::equal_to<Tp>,
 	    typename Alloc=std::allocator<Tp > >
@@ -28,7 +30,7 @@ namespace utils
       Tp& operator()(Tp& x) const { return x; }
     };
 
-    typedef compact_hashtable<Tp, Tp, extract_key, Hash, Pred, Alloc> impl_type;
+    typedef compact_hashtable<Tp, Tp, Empty, Deleted, extract_key, Hash, Pred, Alloc> impl_type;
 
   public:
     typedef typename impl_type::size_type  size_type;
@@ -78,9 +80,6 @@ namespace utils
     void erase(iterator first, iterator last) { impl.erase(first, last); }
     void erase(const_iterator first, const_iterator last) { impl.erase(first, last); }
 
-    void set_empty_key(const value_type& key) { impl.set_empty_key(key); }
-    void set_deleted_key(const value_type& key) { impl.set_deleted_key(key); }
-    
   private:
     impl_type impl;
   };
@@ -89,10 +88,10 @@ namespace utils
 
 namespace std
 {
-  template <typename Tp, typename Hash, typename Pred, typename Alloc>
+  template <typename Tp, typename Empty, typename Deleted, typename Hash, typename Pred, typename Alloc>
   inline
-  void swap(utils::compact_set<Tp, Hash,Pred,Alloc>& x,
-	    utils::compact_set<Tp, Hash,Pred,Alloc>& y)
+  void swap(utils::compact_set<Tp,Empty,Deleted,Hash,Pred,Alloc>& x,
+	    utils::compact_set<Tp,Empty,Deleted,Hash,Pred,Alloc>& y)
   {
     x.swap(y);
   }

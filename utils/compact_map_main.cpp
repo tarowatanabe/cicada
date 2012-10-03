@@ -4,18 +4,37 @@
 
 #include <utils/compact_map.hpp>
 
+struct empty_key
+{
+  const std::string& operator()() const
+  {
+    static std::string __key("");
+    
+    return __key;
+  }
+};
+
+struct deleted_key
+{
+  const std::string& operator()() const
+  {
+    static std::string __key("This is not allowed!");
+    
+    return __key;
+  }
+};
+
+
+
 int main(int argc, char** argv)
 {
   typedef std::map<std::string, int>          map_map_type;
-  typedef utils::compact_map<std::string, int> vec_map_type;
+  typedef utils::compact_map<std::string, int, empty_key, deleted_key> vec_map_type;
 
   std::cerr << "size: " << sizeof(vec_map_type) << std::endl;
 
   map_map_type map_map;
   vec_map_type vec_map;
-
-  vec_map.set_empty_key("");
-  vec_map.set_deleted_key("This is not allowed!");
 
   size_t prev_size = 0;
   size_t prev_bucket = 0;
