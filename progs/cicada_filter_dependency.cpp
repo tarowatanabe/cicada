@@ -1044,6 +1044,7 @@ struct KHayashi
 
     Transform transform(goal, head_mode);
     
+    size_t num = 0;
     while (iter != iter_end) {
       khayashi.clear();
 	
@@ -1054,7 +1055,7 @@ struct KHayashi
 	const sentence_type& mapped = mapper();
 	
 	if (mapped.size() != khayashi.words.size())
-	  throw std::runtime_error("khayashi size and mapped size differ");
+	  throw std::runtime_error("khayashi size and mapped size differ: " + utils::lexical_cast<std::string>(num));
 	
 	khayashi.words.assign(mapped.begin(), mapped.end());
       }
@@ -1094,6 +1095,8 @@ struct KHayashi
 	if (flush_output)
 	  os << std::flush;
       }
+
+      ++ num;
     }
   }
 };
