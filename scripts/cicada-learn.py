@@ -360,7 +360,6 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 def learn_algorithms(command):
-    
     pattern = re.compile(r"\s+--learn-(\S+)\s*")
 
     algs = []

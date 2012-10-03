@@ -12,6 +12,7 @@ import os, os.path
 import string
 import re
 import subprocess
+import cStringIO
 
 from optparse import OptionParser, make_option
 
@@ -50,6 +51,10 @@ opt_parser = OptionParser(
                 metavar="SIZE", help="cube size for oracle computation (default: 400)"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
+    make_option("--learn", default="xbleu", action="store", type="string",
+                metavar="LEARN", help="learning algorithms from [lbfgs, svm, linear, sgd, pegasos, mira, cw, arow, nherd, cp, mcp, xbleu] (default: xbleu)"),
+    make_option("--learn-options", default="", action="store", type="string",
+                metavar="OPTION", help="additional learning options"),
         
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -346,6 +351,17 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 
+def learn_algorithms(command):
+    pattern = re.compile(r"\s+--learn-(\S+)\s*")
+
+    algs = []
+    
+    for line in cStringIO.StringIO(subprocess.check_output([command, "--help"])):
+        result = pattern.search(line)
+        if result:
+            algs.append(result.group(1))
+    return algs
+
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
     
@@ -391,6 +407,19 @@ if __name__ == '__main__':
     ### QSUB
     qsub = QSub(mpi=mpi, pbs=pbs)
 
+    learn_forest     = learn_algorithms(cicada.cicada_learn)
+    learn_forest_mpi = learn_algorithms(cicada.cicada_learn_mpi)
+    
+    if options.learn not in learn_forest or options.learn not in learn_forest_mpi:
+        raise ValueError, "%s is not supported by forest learner" %(options.learn)
+    
+    if not mpi and options.learn not in learn_forest:
+        raise ValueError, "%s is not supported by non-mpi-forest learner" %(options.learn)
+    
+    learn_mpi = None
+    if mpi and options.learn in learn_forest_mpi:
+        learn_mpi = 1
+    
     ## generated files
     config  = os.path.join(options.root_dir, options.prefix + '.config')
     forest  = os.path.join(options.root_dir, options.prefix + '.forest')
@@ -473,13 +502,18 @@ if __name__ == '__main__':
     
     ### step 3:
     print "learn %s @ %s" %(weights, time.ctime())
+    
+    learn_algorithm = Option('--learn-' + options.learn)
 
-    if mpi:
+    if learn_mpi and mpi:
         qsub.mpirun(Program(cicada.cicada_learn_mpi,
                             Option('--input', Quoted(forest)),
                             Option('--oracle', Quoted(oracle)),
                             Option('--output', Quoted(weights)),
-                            Option('--learn-lbfgs'),
+                            Option('--refset', options.refset),
+                            Option('--scorer', options.scorer),
+                            learn_algorithm,
+                            options.learn_options,
                             Option('--C', options.C),
                             Option(regularizer),
                             Option('--debug', 2),),
@@ -492,7 +526,10 @@ if __name__ == '__main__':
                          Option('--input', forest),
                          Option('--oracle', oracle),
                          Option('--output', weights),
-                         Option('--learn-lbfgs'),
+                         Option('--refset', options.refset),
+                         Option('--scorer', options.scorer),
+                         learn_algorithm,
+                         options.learn_options,
                          Option('--C', options.C),
                          Option(regularizer),
                          Option('--threads', options.threads),
