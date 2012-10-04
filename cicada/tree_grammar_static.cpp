@@ -707,7 +707,7 @@ namespace cicada
 
 	bit_vector_type bits;
 	
-	bits.set(score_db.size() - 1, false);
+	bits.set(score_db[feature].size() - 1, false);
 	
 	if (counts.size() == 1) // we have a single value only!
 	  score_db[feature].maps[0] = counts.begin()->first;
@@ -764,7 +764,7 @@ namespace cicada
 	
 	bit_vector_type bits;
 	
-	bits.set(attr_db.size() - 1, false);
+	bits.set(attr_db[attr].size() - 1, false);
 	
 	if (counts.size() == 1) // we have a single value only!
 	  attr_db[attr].maps[0] = counts.begin()->first;
@@ -2014,7 +2014,7 @@ namespace cicada
     }
     
     // perform binarization, if possible!
-    //binarize();
+    binarize();
   }
   
 
