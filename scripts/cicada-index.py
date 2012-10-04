@@ -592,7 +592,7 @@ class Index(UserString.UserString):
         command += " --input %s" %(input_path)
         command += " --output \"%s\"" %(output)
 
-        UserString.UserString.__init__(self, command)
+        UserString.UserString.__init__(self, '('+command+')')
         
 class Score:
     def __init__(self, input="", output="", name=""):
