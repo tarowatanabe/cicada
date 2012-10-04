@@ -26,16 +26,8 @@ void prepare_directory(const boost::filesystem::path& path)
   }
   
   boost::filesystem::directory_iterator iter_end;
-  for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter) {
-    const boost::filesystem::path subdir = *iter;
-    
-    utils::filesystem::remove_all(subdir);
-    
-    while (boost::filesystem::exists(subdir)) {
-      ::sync();
-      boost::thread::yield();
-    }
-  }
+  for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter)
+    utils::filesystem::remove_all(*iter);
 }
 
 #endif
