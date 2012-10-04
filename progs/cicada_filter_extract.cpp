@@ -98,20 +98,27 @@ int main(int argc, char** argv)
       
       if (phrase_pair.source != source_prev) {
 	if (! heap.empty()) {
-	  heap_type::iterator iter_begin = heap.begin();
-	  heap_type::iterator iter       = heap.end();
-	  
-	  for (int k = 0; k != nbest && iter_begin != iter; ++ k, -- iter) {
-	    os << iter_begin->line << '\n';
-	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
-	  }
-	  
-	  if (iter != iter_begin && iter != heap.end()) {
-	    const double threshold = iter->score;
+	  if (static_cast<int>(heap.size()) <= nbest) {
+	    heap_type::iterator iter_end = heap.end();
+	    for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
+	      os << iter->line << '\n';
+	  } else {
+	    heap_type::iterator iter_begin = heap.begin();
+	    heap_type::iterator iter_kbest = heap.end() - nbest;
+	    heap_type::iterator iter       = heap.end();
 	    
-	    for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	    for (/**/; iter_kbest != iter; -- iter) {
 	      os << iter_begin->line << '\n';
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	    }
+	    
+	    if (iter != iter_begin) {
+	      const double threshold = iter->score;
+	      
+	      for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+		os << iter_begin->line << '\n';
+		std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	      }
 	    }
 	  }
 	}
@@ -127,20 +134,27 @@ int main(int argc, char** argv)
     }
     
     if (! heap.empty()) {
-      heap_type::iterator iter_begin = heap.begin();
-      heap_type::iterator iter       = heap.end();
-      
-      for (int k = 0; k != nbest && iter_begin != iter; ++ k, -- iter) {
-	os << iter_begin->line << '\n';
-	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
-      }
-      
-      if (iter != iter_begin && iter != heap.end()) {
-	const double threshold = iter->score;
-	
-	for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+      if (static_cast<int>(heap.size()) <= nbest) {
+	heap_type::iterator iter_end = heap.end();
+	for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
+	  os << iter->line << '\n';
+      } else {
+	heap_type::iterator iter_begin = heap.begin();
+	heap_type::iterator iter_kbest = heap.end() - nbest;
+	heap_type::iterator iter       = heap.end();
+	    
+	for (/**/; iter_kbest != iter; -- iter) {
 	  os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	}
+	    
+	if (iter != iter_begin) {
+	  const double threshold = iter->score;
+	      
+	  for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	    os << iter_begin->line << '\n';
+	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	  }
 	}
       }
     }
