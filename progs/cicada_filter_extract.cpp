@@ -112,13 +112,11 @@ int main(int argc, char** argv)
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	    
-	    if (iter != iter_begin) {
-	      const double threshold = iter->score;
-	      
-	      for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-		os << iter_begin->line << '\n';
-		std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
-	      }
+	    const double threshold = iter->score;
+	    
+	    for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	      os << iter_begin->line << '\n';
+	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	  }
 	}
@@ -147,14 +145,12 @@ int main(int argc, char** argv)
 	  os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
-	    
-	if (iter != iter_begin) {
-	  const double threshold = iter->score;
-	      
-	  for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-	    os << iter_begin->line << '\n';
-	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
-	  }
+	
+	const double threshold = iter->score;
+	
+	for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	  os << iter_begin->line << '\n';
+	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
       }
     }
