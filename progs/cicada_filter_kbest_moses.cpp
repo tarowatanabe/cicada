@@ -30,6 +30,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/thread.hpp>
 
 #include "utils/filesystem.hpp"
 #include "utils/program_options.hpp"
@@ -116,10 +117,23 @@ int main(int argc, char** argv)
 	
 	boost::filesystem::create_directories(output_file);
 	
+	while (! boost::filesystem::exists(output_file)) {
+	  ::sync();
+	  boost::thread::yield();
+	}
+	
 	if (! keep_mode) {
 	  boost::filesystem::directory_iterator iter_end;
-	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	    utils::filesystem::remove_all(*iter);
+	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter) {
+	    const boost::filesystem::path subdir = *iter;
+	    
+	    utils::filesystem::remove_all(subdir);
+	    
+	    while (boost::filesystem::exists(subdir)) {
+	      ::sync();
+	      boost::thread::yield();
+	    }
+	  }
 	}
       }
       

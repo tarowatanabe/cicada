@@ -48,6 +48,8 @@
 #include "utils/unordered_set.hpp"
 #include "utils/lexical_cast.hpp"
 
+#include "cicada_output_impl.hpp"
+
 typedef boost::filesystem::path path_type;
 
 typedef size_t size_type;
@@ -192,23 +194,6 @@ struct Task
     }
   }
 };
-
-inline
-void prepare_directory(const boost::filesystem::path& path)
-{
-  if (! boost::filesystem::exists(path))
-    boost::filesystem::create_directories(path);
-  else if (! boost::filesystem::is_directory(path)) {
-    utils::filesystem::remove_all(path);
-    boost::filesystem::create_directories(path);
-  }
-  
-  boost::filesystem::directory_iterator iter_end;
-  for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter)
-    utils::filesystem::remove_all(*iter);  
-  
-  ::sync();
-}
 
 
 path_type input_file = "-";

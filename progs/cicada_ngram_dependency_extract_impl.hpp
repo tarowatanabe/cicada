@@ -25,6 +25,8 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
 
+#include "cicada_output_impl.hpp"
+
 //
 // input format:
 // sentence1 ||| dependency1
@@ -443,16 +445,7 @@ struct DependencyCounts
   static
   void preprocess(const path_type& path)
   {
-    if (! boost::filesystem::exists(path))
-      boost::filesystem::create_directories(path);
-    else if (! boost::filesystem::is_directory(path)) {
-      utils::filesystem::remove_all(path);
-      boost::filesystem::create_directories(path);
-    }
-  
-    boost::filesystem::directory_iterator iter_end;
-    for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter)
-      utils::filesystem::remove_all(*iter);  
+    prepare_directory(path);
     
     boost::filesystem::create_directory(path / "unigram");
     boost::filesystem::create_directory(path / "root");
