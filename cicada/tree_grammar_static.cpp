@@ -2014,7 +2014,7 @@ namespace cicada
     }
     
     // perform binarization, if possible!
-    binarize();
+    //binarize();
   }
   
 
