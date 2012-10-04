@@ -718,10 +718,10 @@ namespace cicada
 	
 	bits.write(path);
 	
-	::sync();
-	
-	while (! score_set_type::binarized_set_type::exists(path))
+	while (! score_set_type::binarized_set_type::exists(path)) {
+	  ::sync();
 	  boost::thread::yield();
+	}
 	
 	utils::tempfile::permission(path);
 	
@@ -773,10 +773,10 @@ namespace cicada
 	
 	bits.write(path);
 	
-	::sync();
-	
-	while (! score_set_type::binarized_set_type::exists(path))
+	while (! score_set_type::binarized_set_type::exists(path)) {
+	  ::sync();
 	  boost::thread::yield();
+	}
 	
 	utils::tempfile::permission(path);
 	
@@ -830,10 +830,11 @@ namespace cicada
 	  score_db[feature].maps[i] = codebook[i];
 	
 	os.reset();
-	::sync();
 	
-	while (! score_set_type::quantized_set_type::exists(path))
+	while (! score_set_type::quantized_set_type::exists(path)) {
+	  ::sync();
 	  boost::thread::yield();
+	}
 
 	utils::tempfile::permission(path);
 	
@@ -872,11 +873,11 @@ namespace cicada
 	  attr_db[attr].maps[i] = codebook[i];
 	
 	os.reset();
-	::sync();
 	
-	while (! score_set_type::quantized_set_type::exists(path))
+	while (! score_set_type::quantized_set_type::exists(path)) {
+	  ::sync();
 	  boost::thread::yield();
-	
+	}
 	utils::tempfile::permission(path);
 	
 	attr_db[attr].quantized.open(path);
@@ -1532,16 +1533,22 @@ namespace cicada
     
     rule_db.close();
     
-    ::sync();
-
-    while (! rule_db_type::exists(path_source))
+    while (! rule_db_type::exists(path_source)) {
+      ::sync();
       boost::thread::yield();
-    while (! rule_db_type::exists(path_target))
+    }
+    while (! rule_db_type::exists(path_target)) {
+      ::sync();
       boost::thread::yield();
-    while (! edge_db_type::exists(path_edge))
+    }
+    while (! edge_db_type::exists(path_edge)) {
+      ::sync();
       boost::thread::yield();
-    while (! rule_pair_db_type::exists(path_rule))
+    }
+    while (! rule_pair_db_type::exists(path_rule)) {
+      ::sync();
       boost::thread::yield();
+    }
     
     source_db.open(path_source);
     target_db.open(path_target);
@@ -1550,9 +1557,10 @@ namespace cicada
     
     // vocabulary...
     word_type::write(path_vocab);
-    ::sync();
-    while (! vocab_type::exists(path_vocab))
+    while (! vocab_type::exists(path_vocab)) {
+      ::sync();
       boost::thread::yield();
+    }
     
     vocab.open(path_vocab);
     
@@ -1823,16 +1831,22 @@ namespace cicada
     
     rule_db.close();
     
-    ::sync();
-    
-    while (! rule_db_type::exists(path_source))
+    while (! rule_db_type::exists(path_source)) {
+      ::sync();
       boost::thread::yield();
-    while (! rule_db_type::exists(path_target))
+    }
+    while (! rule_db_type::exists(path_target)) {
+      ::sync();
       boost::thread::yield();
-    while (! edge_db_type::exists(path_edge))
+    }
+    while (! edge_db_type::exists(path_edge)) {
+      ::sync();
       boost::thread::yield();
-    while (! rule_pair_db_type::exists(path_rule))
+    }
+    while (! rule_pair_db_type::exists(path_rule)) {
+      ::sync();
       boost::thread::yield();
+    }
     
     source_db.open(path_source);
     target_db.open(path_target);
@@ -1841,9 +1855,10 @@ namespace cicada
     
     // vocabulary...
     word_type::write(path_vocab);
-    ::sync();
-    while (! vocab_type::exists(path_vocab))
+    while (! vocab_type::exists(path_vocab)) {
+      ::sync();
       boost::thread::yield();
+    }
     
     vocab.open(path_vocab);
 
@@ -1860,10 +1875,11 @@ namespace cicada
      
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
-      ::sync();
       
-      while (! score_set_type::score_set_type::exists(score_streams[feature].path))
+      while (! score_set_type::score_set_type::exists(score_streams[feature].path)) {
+	::sync();
 	boost::thread::yield();
+      }
       
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
@@ -1892,10 +1908,11 @@ namespace cicada
      
     for (int attribute = 0; attribute < attribute_size; ++ attribute) {
       attr_streams[attribute].ostream->reset();
-      ::sync();
       
-      while (! score_set_type::score_set_type::exists(attr_streams[attribute].path))
+      while (! score_set_type::score_set_type::exists(attr_streams[attribute].path)) {
+	::sync();
 	boost::thread::yield();
+      }
       
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
