@@ -124,8 +124,16 @@ int main(int argc, char** argv)
 	
 	if (! keep_mode) {
 	  boost::filesystem::directory_iterator iter_end;
-	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-	    utils::filesystem::remove_all(*iter);
+	  for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter) {
+	    const boost::filesystem::path subdir = *iter;
+	    
+	    utils::filesystem::remove_all(subdir);
+	    
+	    while (boost::filesystem::exists(subdir)) {
+	      ::sync();
+	      boost::thread::yield();
+	    }
+	  }
 	}
       }
       
