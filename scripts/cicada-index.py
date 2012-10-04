@@ -586,7 +586,7 @@ class Index(UserString.UserString):
         
         # add debug flag
         input_path += sep
-        esp = ','
+        sep = ','
         input_path +='debug=1'
 
         command += " --input %s" %(input_path)
