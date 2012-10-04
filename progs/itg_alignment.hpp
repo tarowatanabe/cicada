@@ -21,7 +21,7 @@ namespace detail
 #if 1
   struct ITGAlignment
   {
-    static const double threshold = 1e-2;
+    static const double threshold = 1e-3;
     
     typedef cicada::SpanVector       span_set_type;
     typedef span_set_type::span_type span_type;
