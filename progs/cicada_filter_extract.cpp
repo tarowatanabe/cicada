@@ -30,6 +30,9 @@ struct score_phrase_pair_type
   score_phrase_pair_type(const double& __score, const std::string& __line)
     : score(__score), line(__line) {}
 
+  score_phrase_pair_type(const double& __score)
+    : score(__score), line() {}
+
   friend
   bool operator<(const score_phrase_pair_type& x, const score_phrase_pair_type& y)
   {
@@ -117,7 +120,9 @@ int main(int argc, char** argv)
 	source_prev = phrase_pair.source;
       }
       
-      heap.push_back(score_phrase_pair_type(phrase_pair.counts.front(), line));
+      // push-heap and swap line
+      heap.push_back(score_phrase_pair_type(phrase_pair.counts.front()));
+      heap.back().line.swap(line);
       std::push_heap(heap.begin(), heap.end(), std::less<score_phrase_pair_type>());
     }
     
