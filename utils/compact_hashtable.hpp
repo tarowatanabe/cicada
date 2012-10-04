@@ -427,13 +427,11 @@ namespace utils
     
     void erase(iterator first, iterator last)
     {
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-      
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
+	if (! pred()(key, extract_key()(Empty::operator()()))
+	    && ! pred()(key, extract_key()(Deleted::operator()()))) {
 	  copy_value(*first.pos, Deleted::operator()());
 	  ++ __size_deleted;
 	}
@@ -454,13 +452,11 @@ namespace utils
     
     void erase(const_iterator first, const_iterator last)
     {
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-      
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, key_empty) && ! pred()(key, key_deleted)) {
+	if (! pred()(key, extract_key()(Empty::operator()()))
+	    && ! pred()(key, extract_key()(Deleted::operator()()))) {
 	  copy_value(*first.pos, Deleted::operator()());
 	  ++ __size_deleted;
 	}
@@ -546,16 +542,13 @@ namespace utils
 
     std::pair<size_type, size_type> find_linear(const key_type& key) const
     {
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-
       size_type pos_insert = size_type(-1);
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
-
-	if (pred()(key_buck, key_empty))
+	
+	if (pred()(key_buck, extract_key()(Empty::operator()())))
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
-	else if (pred()(key_buck, key_deleted))
+	else if (pred()(key_buck, extract_key()(Deleted::operator()())))
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -571,15 +564,12 @@ namespace utils
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
       size_type pos_insert = size_type(-1);
       
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-      
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, key_empty)) // no searching further
+	if (pred()(key_buck, extract_key()(Empty::operator()()))) // no searching further
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
-	else if (pred()(key_buck, key_deleted)) // searching...
+	else if (pred()(key_buck, extract_key()(Deleted::operator()()))) // searching...
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -613,16 +603,14 @@ namespace utils
 
       if (bucket.empty()) return;
 
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-
       typename bucket_type::iterator iter = __bucket.begin();
       
       typename bucket_type::const_iterator biter_end = bucket.end();
       for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
-	if (pred()(key, key_empty) || pred()(key, key_deleted)) continue;
+	if (pred()(key, extract_key()(Empty::operator()()))
+	    || pred()(key, extract_key()(Deleted::operator()()))) continue;
 	
 	copy_value(*iter, *biter);
 	++ iter;
@@ -637,14 +625,12 @@ namespace utils
 
       if (bucket.empty()) return;
       
-      const key_type& key_empty   = extract_key()(Empty::operator()());
-      const key_type& key_deleted = extract_key()(Deleted::operator()());
-      
       typename bucket_type::const_iterator biter_end = bucket.end();
       for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
-	if (pred()(key, key_empty) || pred()(key, key_deleted)) continue;
+	if (pred()(key, extract_key()(Empty::operator()()))
+	    || pred()(key, extract_key()(Deleted::operator()()))) continue;
 	
 	size_type num_probes = 0;
 	size_type pos_buck = hash()(key) & (__bucket.size() - 1);
@@ -652,7 +638,7 @@ namespace utils
 	for (;;) {
 	  const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	  
-	  if (pred()(key_buck, key_empty)) break;
+	  if (pred()(key_buck, extract_key()(Empty::operator()()))) break;
 	  
 	  ++ num_probes;
 	  pos_buck = (pos_buck + num_probes) & (__bucket.size() - 1);
