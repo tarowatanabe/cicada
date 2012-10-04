@@ -806,32 +806,54 @@ struct Unaligned
   typedef ExtractAlignment::alignment_set_type alignment_set_type;
   
   typedef std::vector<int, std::allocator<int> > align_set_type;
-
-  std::pair<size_type, size_type> operator()(const sentence_type& source,
-					     const sentence_type& target,
-					     const alignment_set_type& alignments) const
+  
+  struct scores_type
   {
-    size_type unaligned_source = size_type(-1);
-    size_type unaligned_target = size_type(-1);
+    size_type aligned_source;
+    size_type aligned_target;
+    size_type unaligned_source;
+    size_type unaligned_target;
+    
+    scores_type() : aligned_source(0), aligned_target(0), unaligned_source(0), unaligned_target(0) {}
+    scores_type(const size_type& __aligned_source,
+		const size_type& __aligned_target,
+		const size_type& __unaligned_source,
+		const size_type& __unaligned_target)
+      : aligned_source(__aligned_source),
+        aligned_target(__aligned_target),
+        unaligned_source(__unaligned_source),
+        unaligned_target(__unaligned_target) {}
+  };
+  
+  scores_type operator()(const sentence_type& source,
+			 const sentence_type& target,
+			 const alignment_set_type& alignments) const
+  {
+    scores_type scores(0, 0, size_type(-1), size_type(-1));
     
     alignment_set_type::const_iterator aiter_end = alignments.end();
     for (alignment_set_type::const_iterator aiter = alignments.begin(); aiter != aiter_end; ++ aiter) {
-      const std::pair<size_type, size_type> result = operator()(source, target, *aiter);
+      const scores_type result = operator()(source, target, *aiter);
       
-      unaligned_source = utils::bithack::min(unaligned_source, result.first);
-      unaligned_target = utils::bithack::min(unaligned_target, result.second);
+      scores.aligned_source = utils::bithack::max(scores.aligned_source, result.aligned_source);
+      scores.aligned_target = utils::bithack::max(scores.aligned_target, result.aligned_target);
+      
+      scores.unaligned_source = utils::bithack::min(scores.unaligned_source, result.unaligned_source);
+      scores.unaligned_target = utils::bithack::min(scores.unaligned_target, result.unaligned_target);
     }
     
-    return std::make_pair(utils::bithack::branch(unaligned_source == size_type(-1), size_type(0), unaligned_source),
-			  utils::bithack::branch(unaligned_target == size_type(-1), size_type(0), unaligned_target));
+    return scores_type(scores.aligned_source,
+		       scores.aligned_target,
+		       utils::bithack::branch(scores.unaligned_source == size_type(-1), size_type(0), scores.unaligned_source),
+		       utils::bithack::branch(scores.unaligned_target == size_type(-1), size_type(0), scores.unaligned_target));
   }
   
   align_set_type aligns_source_impl;
   align_set_type aligns_target_impl;
   
-  std::pair<size_type, size_type> operator()(const sentence_type& source,
-					     const sentence_type& target,
-					     const alignment_type& alignment) const
+  scores_type operator()(const sentence_type& source,
+			 const sentence_type& target,
+			 const alignment_type& alignment) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
@@ -860,18 +882,27 @@ struct Unaligned
       ++ aligns_target[aiter->target];
     }
     
+    size_type terminals_source = 0;
+    size_type terminals_target = 0;
     size_type unaligned_source = 0;
     size_type unaligned_target = 0;
     
     for (size_t src = 0; src != source_size; ++ src) 
-      if (source[src].is_terminal())
+      if (source[src].is_terminal()) {
 	unaligned_source += (aligns_source[src] == 0);
+	++ terminals_source;
+      }
     
     for (size_t trg = 0; trg != target_size; ++ trg) 
-      if (target[trg].is_terminal())
+      if (target[trg].is_terminal()) {
 	unaligned_target += (aligns_target[trg] == 0);
+	++ terminals_target;
+      }
     
-    return std::make_pair(unaligned_source, unaligned_target);
+    return scores_type(terminals_source - unaligned_source, 
+		       terminals_target - unaligned_target, 
+		       unaligned_source,
+		       unaligned_target);
   }
   
 };
