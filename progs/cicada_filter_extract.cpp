@@ -10,7 +10,7 @@
 #include <utility>
 #include <cfloat>
 #include <cmath>
-#include <map>
+#include <queue>
 
 #include <boost/program_options.hpp>
 
@@ -21,8 +21,44 @@
 typedef boost::filesystem::path path_type;
 
 typedef PhrasePair phrase_pair_type;
-typedef std::multimap<double, std::string, std::greater<double>,
-		      std::allocator<std::pair<const double, std::string> > > phrase_pair_set_type;
+
+struct score_phrase_pair_type
+{
+  double score;
+  std::string line;
+
+  score_phrase_pair_type(const double& __score, const std::string& __line)
+    : score(__score), line(__line) {}
+
+  friend
+  bool operator<(const score_phrase_pair_type& x, const score_phrase_pair_type& y)
+  {
+    return x.score < y.score;
+  }
+  
+  friend
+  bool operator>(const score_phrase_pair_type& x, const score_phrase_pair_type& y)
+  {
+    return x.score > y.score;
+  }
+  
+  void swap(score_phrase_pair_type& x)
+  {
+    std::swap(score, x.score);
+    line.swap(x.line);
+  }
+};
+
+namespace std
+{
+  inline
+  void swap(score_phrase_pair_type& x, score_phrase_pair_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+typedef std::vector<score_phrase_pair_type, std::allocator<score_phrase_pair_type> > heap_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -47,7 +83,8 @@ int main(int argc, char** argv)
     
     std::string          source_prev;
     phrase_pair_type     phrase_pair;
-    phrase_pair_set_type phrase_pairs;
+    
+    heap_type heap;
     
     PhrasePairParser    parser;
     std::string line;
@@ -57,43 +94,49 @@ int main(int argc, char** argv)
       if (phrase_pair.counts.empty()) continue;
       
       if (phrase_pair.source != source_prev) {
-	if (! phrase_pairs.empty()) {
-	  phrase_pair_set_type::const_iterator iter = phrase_pairs.begin();
-	  phrase_pair_set_type::const_iterator iter_end = phrase_pairs.end();
-	  phrase_pair_set_type::const_iterator iter_prev = iter_end;
-	  for (int k = 0; k < nbest && iter != iter_end; ++ k, ++ iter) {
-	    os << iter->second << '\n';
-	    iter_prev = iter;
+	if (! heap.empty()) {
+	  heap_type::iterator iter_begin = heap.begin();
+	  heap_type::iterator iter       = heap.end();
+	  
+	  for (int k = 0; k != nbest && iter_begin != iter; ++ k, -- iter) {
+	    os << iter_begin->line << '\n';
+	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	  }
 	  
-	  if (iter != iter_end && iter_prev != iter_end) {
-	    iter_end = phrase_pairs.upper_bound(iter_prev->first);
-	    for (/**/; iter != iter_end; ++ iter)
-	      os << iter->second << '\n';
+	  if (iter != iter_begin && iter != heap.end()) {
+	    const double threshold = iter->score;
+	    
+	    for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	      os << iter_begin->line << '\n';
+	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	    }
 	  }
 	}
-	phrase_pairs.clear();
+	
+	heap.clear();
 	source_prev = phrase_pair.source;
       }
       
-      const double& count = phrase_pair.counts.front();
-      if (static_cast<int>(phrase_pairs.size()) < nbest || count >= (-- phrase_pairs.end())->first)
-	phrase_pairs.insert(std::make_pair(count, line));
+      heap.push_back(score_phrase_pair_type(phrase_pair.counts.front(), line));
+      std::push_heap(heap.begin(), heap.end(), std::less<score_phrase_pair_type>());
     }
     
-    if (! phrase_pairs.empty()) {
-      phrase_pair_set_type::const_iterator iter = phrase_pairs.begin();
-      phrase_pair_set_type::const_iterator iter_end = phrase_pairs.end();
-      phrase_pair_set_type::const_iterator iter_prev = iter_end;
-      for (int k = 0; k < nbest && iter != iter_end; ++ k, ++ iter) {
-	os << iter->second << '\n';
-	iter_prev = iter;
+    if (! heap.empty()) {
+      heap_type::iterator iter_begin = heap.begin();
+      heap_type::iterator iter       = heap.end();
+      
+      for (int k = 0; k != nbest && iter_begin != iter; ++ k, -- iter) {
+	os << iter_begin->line << '\n';
+	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
       }
       
-      if (iter != iter_end && iter_prev != iter_end) {
-	iter_end = phrase_pairs.upper_bound(iter_prev->first);
-	for (/**/; iter != iter_end; ++ iter)
-	  os << iter->second << '\n';
+      if (iter != iter_begin && iter != heap.end()) {
+	const double threshold = iter->score;
+	
+	for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	  os << iter_begin->line << '\n';
+	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	}
       }
     }
   }
