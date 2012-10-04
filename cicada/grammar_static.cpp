@@ -34,6 +34,7 @@
 #include "utils/json_string_parser.hpp"
 #include "utils/dense_hash_map.hpp"
 #include "utils/succinct_vector.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -284,7 +285,8 @@ namespace cicada
   public:
     GrammarStaticImpl(const std::string& parameter)
       : max_span(15),
-	caching(false)
+	caching(false),
+	debug(0)
     {
       cache_node.set_empty_key(word_node_type());
       read(parameter);
@@ -304,7 +306,8 @@ namespace cicada
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
 	max_span(x.max_span),
-	caching(x.caching)
+	caching(x.caching),
+	debug(x.debug)
     {
       cache_node.set_empty_key(word_node_type());
     }
@@ -327,6 +330,7 @@ namespace cicada
       attribute_names = x.attribute_names;
       max_span        = x.max_span;
       caching         = x.caching;
+      debug           = x.debug;
       
       return *this;
     }
@@ -620,6 +624,7 @@ namespace cicada
   public:
     int max_span;
     bool caching;
+    int debug;
   };
   
   void GrammarStaticImpl::ScoreSet::read(const path_type& path)
@@ -916,7 +921,11 @@ namespace cicada
     parameter_type::const_iterator kiter = param.find("key-value");
     if (kiter != param.end())
       key_value = utils::lexical_cast<bool>(kiter->second);
-
+    
+    parameter_type::const_iterator diter = param.find("debug");
+    if (diter != param.end())
+      debug = utils::lexical_cast<int>(diter->second);
+    
     if (boost::filesystem::is_directory(path))
       read_binary(parameter);
     else if (key_value)
@@ -1395,8 +1404,11 @@ namespace cicada
     GrammarParser::parser<std::string::const_iterator> rule_parser;
     
     size_type arity_source = 0;
+
+    utils::resource start;
     
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1410,6 +1422,13 @@ namespace cicada
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
+
       if (! result || iter != iter_end) {
 	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
 	continue;
@@ -1493,6 +1512,20 @@ namespace cicada
       
       // insert...
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size()); 
+    }
+    
+    utils::resource end;
+    
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+      
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << start.cpu_time() - end.cpu_time()
+		<< " user time: " << start.user_time() - end.user_time()
+		<< std::endl;
     }
     
     source_map->prune(static_cast<const hasher_type&>(*this));
@@ -1636,7 +1669,10 @@ namespace cicada
 
     size_type arity_source = 0;
 
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    utils::resource start;
+
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1649,6 +1685,13 @@ namespace cicada
       std::string::const_iterator iter = line.begin();
       
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
+
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
       
       if (! result || iter != iter_end) {
 	std::cerr << "invalid line: " << num_line << ": " << line << std::endl;
@@ -1781,9 +1824,23 @@ namespace cicada
 	   
       // encode source.. we will use index-stripped indexing!
       encode_index(source_prev.begin(), source_prev.end(), source_index);
-
+      
       // insert...
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
+    }
+    
+    utils::resource end;
+
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+      
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << start.cpu_time() - end.cpu_time()
+		<< " user time: " << start.user_time() - end.user_time()
+		<< std::endl;
     }
     
     source_map->prune(static_cast<const hasher_type&>(*this));

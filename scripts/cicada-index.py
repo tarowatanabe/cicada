@@ -583,6 +583,11 @@ class Index(UserString.UserString):
             input_path += sep
             sep = ','
             input_path += ','.join(attributes)
+        
+        # add debug flag
+        input_path += sep
+        esp = ','
+        input_path +='debug=1'
 
         command += " --input %s" %(input_path)
         command += " --output \"%s\"" %(output)

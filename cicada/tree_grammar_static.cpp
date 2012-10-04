@@ -37,7 +37,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/succinct_vector.hpp"
-
+#include "utils/resource.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
@@ -286,7 +286,7 @@ namespace cicada
     typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 4, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
     typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
 
-    TreeGrammarStaticImpl(const std::string& parameter) : cky(false) { read(parameter); }
+    TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
 	rule_db(x.rule_db),
@@ -302,7 +302,8 @@ namespace cicada
 	vocab(x.vocab),
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
-	cky(x.cky) {}
+	cky(x.cky),
+	debug(x.debug) {}
 
     TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
     {
@@ -323,6 +324,7 @@ namespace cicada
       feature_names = x.feature_names;
       attribute_names = x.attribute_names;
       cky = x.cky;
+      debug = x.debug;
       
       return *this;
     }
@@ -612,6 +614,8 @@ namespace cicada
     cache_rule_pair_map_type cache_rule;
     cache_rule_set_type      cache_source;
     cache_rule_set_type      cache_target;
+
+    int debug;
   };
 
 
@@ -909,6 +913,10 @@ namespace cicada
     parameter_type::const_iterator kiter = param.find("key-value");
     if (kiter != param.end())
       key_value = utils::lexical_cast<bool>(kiter->second);
+
+    parameter_type::const_iterator diter = param.find("debug");
+    if (diter != param.end())
+      debug = utils::lexical_cast<int>(diter->second);
     
     if (boost::filesystem::is_directory(path))
       read_binary(parameter);
@@ -1393,7 +1401,10 @@ namespace cicada
     TreeGrammarParser::parser<std::string::const_iterator> features_parser;
     TreeRuleCODEC codec;
     
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    utils::resource start;
+    
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
@@ -1406,6 +1417,13 @@ namespace cicada
       
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
+
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
       
       if ((! source.assign(iter, iter_end))
 	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
@@ -1486,7 +1504,21 @@ namespace cicada
 	  
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
-    
+
+    utils::resource end;
+
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << start.cpu_time() - end.cpu_time()
+		<< " user time: " << start.user_time() - end.user_time()
+		<< std::endl;
+    }
+   
     source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
     source_map.reset();
@@ -1682,8 +1714,11 @@ namespace cicada
 
     scores_parser %= "|||" >> +qi::float_;
     attrs_parser  %= -("|||" >> *qi::float_);
+
+    utils::resource start;
     
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();
@@ -1693,6 +1728,13 @@ namespace cicada
 
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
+      
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
       
       if ((! source.assign(iter, iter_end))
 	  || (! qi::phrase_parse(iter, iter_end, "|||", standard::space))
@@ -1808,6 +1850,20 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
 
+    utils::resource end;
+    
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+      
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << start.cpu_time() - end.cpu_time()
+		<< " user time: " << start.user_time() - end.user_time()
+		<< std::endl;
+    }
+    
     source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
     source_map.reset();
