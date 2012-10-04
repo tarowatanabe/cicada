@@ -57,6 +57,8 @@
 // the content is dumpped after close() "when modified" and/or when no prop.list exsists
 //
 
+#include <unistd.h>
+
 #include <iostream>
 #include <fstream>
 #include <map>
@@ -67,6 +69,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/thread.hpp>
 
 #include <utils/filesystem.hpp>
 #include <utils/space_separator.hpp>
@@ -174,6 +177,12 @@ namespace utils
       
       // create directory
       boost::filesystem::create_directories(repository_dir);
+
+      // wait!
+      while (! boost::filesystem::exists(repository_dir)) {
+	::sync();
+	boost::thread::yield();
+      }
       
       // remove all the files under the repository_dir
       boost::filesystem::directory_iterator iter_end;

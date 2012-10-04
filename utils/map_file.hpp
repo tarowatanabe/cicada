@@ -45,9 +45,9 @@ namespace utils
     
   public:
     __map_file_impl(const std::string& file, const flag_type flag=MAP_FILE_NONE)
-      : mmapped(), filesize(), filename() { open(file, flag); }
+      : mmapped(), filesize(), mappedsize(), filename() { open(file, flag); }
     __map_file_impl(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
-      : mmapped(), filesize(), filename() { open(file, flag); }
+      : mmapped(), filesize(), mappedsize(), filename() { open(file, flag); }
     ~__map_file_impl() { close(); }
     
   public:
@@ -82,8 +82,11 @@ namespace utils
   private:
     void open(const boost::filesystem::path& file, const flag_type flag=MAP_FILE_NONE)
     {
+      const off_type page_size = getpagesize();
+
       filename = file;
       filesize = static_cast<off_type>(boost::filesystem::file_size(file));
+      mappedsize = std::max((filesize + page_size - 1) / page_size, off_type(1)) * page_size;
       modifiable = (flag & MAP_FILE_WRITE);
       
       const bool writable = (flag & MAP_FILE_WRITE);
@@ -108,7 +111,7 @@ namespace utils
 #endif
       
       // First, try map_shared
-      byte_type* x = static_cast<byte_type*>(::mmap(0, filesize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
+      byte_type* x = static_cast<byte_type*>(::mmap(0, mappedsize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       
       // Second, try map_private
       if (! (x + 1)) {
@@ -117,7 +120,7 @@ namespace utils
 	if (flag & MAP_FILE_POPULATE)
 	  mmap_flag |= MAP_POPULATE;
 #endif
-	x = static_cast<byte_type*>(::mmap(0, filesize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
+	x = static_cast<byte_type*>(::mmap(0, mappedsize, writable ? PROT_WRITE : PROT_READ, mmap_flag, fd, 0));
       }
 	
       // no need to keep file-descriptor
@@ -132,11 +135,12 @@ namespace utils
 
     void close()
     {
-      if (mmapped && filesize > 0)
-	::munmap(mmapped, filesize);
+      if (mmapped && mappedsize)
+	::munmap(mmapped, mappedsize);
       
       mmapped = 0;
       filesize = 0;
+      mappedsize = 0;
       filename = std::string();
       
       modifiable = false;
@@ -146,6 +150,7 @@ namespace utils
     byte_type* mmapped;
     
     off_type filesize;
+    off_type mappedsize;
     
     boost::filesystem::path filename;
 

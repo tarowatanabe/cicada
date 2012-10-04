@@ -175,6 +175,14 @@ namespace cicada
 	data.write(rep.path("data"));
 	offset.write(rep.path("offset"));
       }
+
+      static
+      bool exists(const path_type& path)
+      {
+	return (utils::repository::exists(path)
+		&& data_type::exists(path / "data")
+		&& offset_type::exists(path / "offset"));
+      }
       
     private:
       data_type   data;
@@ -1536,11 +1544,21 @@ namespace cicada
     vocab.open(path_vocab);
     
     if (has_features) {
+      while (! feature_data_type::exists(path_feature_data)) {
+	::sync();
+	boost::thread::yield();
+      }
+      
       feature_data.open(path_feature_data);
       feature_vocab.open(path_feature_vocab);
     }
     
     if (has_attributes) {
+      while (! attribute_data_type::exists(path_attribute_data)) {
+	::sync();
+	boost::thread::yield();
+      }
+      
       attribute_data.open(path_attribute_data);
       attribute_vocab.open(path_attribute_vocab);
     }

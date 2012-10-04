@@ -7,6 +7,7 @@
 #define __UTILS__VERTICAL_CODED_VECTOR__HPP__ 1
 
 #include <stdint.h>
+#include <unistd.h>
 
 #include <vector>
 #include <stdexcept>
@@ -341,9 +342,10 @@ namespace utils
       clear();
 
       repository_type rep(path, repository_type::read);
+
       compressed.open(rep.path("data"));
       off.open(rep.path("offsets"));
-      
+
       repository_type::const_iterator titer = rep.find("type");
       if (titer == rep.end())
 	throw std::runtime_error("no type...");
@@ -352,7 +354,7 @@ namespace utils
       
       const size_type cache_size = std::max(size_type(utils::bithack::next_largest_power2(size() >> 7)),
 					    size_type(1024 * 32));
-      
+
       __cache.reserve(cache_size);
       __cache.resize(cache_size, cache_type());
       
@@ -371,6 +373,12 @@ namespace utils
       // create directory
       if (! boost::filesystem::exists(file))
 	boost::filesystem::create_directories(file);
+
+      // wait!
+      while (! boost::filesystem::exists(file)) {
+	::sync();
+	boost::thread::yield();
+      }
       
       // remove all the files...
       boost::filesystem::directory_iterator iter_end;
@@ -600,7 +608,7 @@ namespace utils
       
       stream_integral_size << sizeof(value_type);
       stream_size << size();
-      stream_coded_size << off.size() - 1;
+      stream_coded_size << (off.size() ? off.size() - 1 : size_type(0));
       
       rep["size"] = stream_size.str();
       rep["integral-size"] = stream_integral_size.str();

@@ -8,6 +8,7 @@
 
 // byte packed vector with random access support
 
+#include <unistd.h>
 
 #include <iostream>
 #include <sstream>
@@ -16,6 +17,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/thread.hpp>
 
 #include <utils/succinct_vector.hpp>
 #include <utils/map_file.hpp>
@@ -481,6 +483,12 @@ namespace utils
       // create directory
       if (! boost::filesystem::exists(file))
 	boost::filesystem::create_directories(file);
+
+      // wait!
+      while (! boost::filesystem::exists(file)) {
+	::sync();
+	boost::thread::yield();
+      }
       
       // remove all the files...
       boost::filesystem::directory_iterator iter_end;

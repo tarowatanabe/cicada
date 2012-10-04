@@ -70,11 +70,11 @@ int main(int argc, char** argv)
     {
       utils::vertical_coded_vector<int> coded_empty;
       coded_empty.write("tmptmptmp.vc");
+      
       utils::vertical_coded_vector_mapped<int> __coded_mapped("tmptmptmp.vc");
     }
     
     utils::vertical_coded_vector<int> coded;
-    
     
     boost::iostreams::filtering_ostream os;
     os.push(utils::vertical_coded_sink<int>("tmptmptmp.vc.iostream"));

@@ -7,6 +7,7 @@
 #define __UTILS__SUCCINCT_VECTOR__HPP__ 1
 
 #include <stdint.h>
+#include <unistd.h>
 
 #include <sstream>
 #include <iostream>
@@ -532,6 +533,12 @@ namespace utils
       // create directory
       if (! boost::filesystem::exists(file))
 	boost::filesystem::create_directories(file);
+
+      // wait!
+      while (! boost::filesystem::exists(file)) {
+	::sync();
+	boost::thread::yield();
+      }
       
       // remove all the files...
       boost::filesystem::directory_iterator iter_end;
