@@ -707,6 +707,9 @@ namespace cicada
 	
 	// we perform binarization!
 
+	if (debug)
+	  std::cerr << "binarize feature: " << feature << std::endl;
+
 	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.binary.XXXXXX");
 	utils::tempfile::insert(path);
 
@@ -761,7 +764,9 @@ namespace cicada
 	if (counts.size() > 2 || counts.empty()) continue;
 	
 	// we perform binarization!
-
+	if (debug)
+	  std::cerr << "binarize attribute: " << attr << std::endl;
+	
 	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.attr.binary.XXXXXX");
 	utils::tempfile::insert(path);
 	
@@ -821,6 +826,9 @@ namespace cicada
     
     for (size_t feature = 0; feature < score_db.size(); ++ feature)
       if (score_db[feature].score.is_open()) {
+
+	if (debug)
+	  std::cerr << "quantize feature: " << feature << std::endl;
 	
 	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.quantized.XXXXXX");
 	utils::tempfile::insert(path);
@@ -864,6 +872,9 @@ namespace cicada
 
     for (size_t attr = 0; attr < attr_db.size(); ++ attr)
       if (attr_db[attr].score.is_open()) {
+
+	if (debug)
+	  std::cerr << "quantize attribute: " << attr << std::endl;
 	
 	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.attr.quantized.XXXXXX");
 	utils::tempfile::insert(path);
