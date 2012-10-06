@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     if (mpi_rank == 0) 
       prepare_directory(output_file);
 
-    static const size_t queue_size = 32;
+    static const size_t queue_size = 16;
     
     queue_type queue(queue_size);
     task_type task(queue, output_file, max_nodes, max_height, max_compose, max_scope,
