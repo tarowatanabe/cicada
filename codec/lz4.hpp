@@ -1,14 +1,13 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __CODEC__LZ4_HPP__
 #define __CODEC__LZ4_HPP__ 1
 
-//
-// we will use the chunk size of 8MB
-//
-
-#include <memory>
 #include <cstddef>
+#include <memory>
 
 #include <boost/iostreams/filter/symmetric.hpp>
 
@@ -16,18 +15,19 @@ namespace codec
 {
   namespace detail
   {
-    struct lz4
+    struct lz4_param
     {
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
       typedef char byte_type;
-      
+      typedef char char_type;
+
       static const size_type chunk_size;
       static const size_type bound_size;
     };
   };
 
-  struct lz4_compressor_impl : detail::lz4
+  struct lz4_compressor_impl : detail::lz4_param
   {
     //
     // we will initialize buffer, but do not allow copy/assign
@@ -63,7 +63,7 @@ namespace codec
     size_type  pos_compressed;
   };
   
-  struct lz4_decompressor_impl : detail::lz4
+  struct lz4_decompressor_impl : detail::lz4_param
   {
     lz4_decompressor_impl();
     lz4_decompressor_impl(const lz4_decompressor_impl&);
@@ -108,10 +108,15 @@ namespace codec
   public:
     typedef typename base_type::char_type char_type;
     typedef typename base_type::category  category;
+
+  public:
+    basic_lz4_compressor(int buffer_size = boost::iostreams::default_device_buffer_size)
+      : base_type(buffer_size) {}
   };
   
   template<typename Alloc = std::allocator<char> >
   struct basic_lz4_decompressor
+    : boost::iostreams::symmetric_filter<lz4_decompressor_impl, Alloc>
   {
   private:
     typedef lz4_decompressor_impl                                impl_type;
@@ -120,8 +125,15 @@ namespace codec
   public:
     typedef typename base_type::char_type char_type;
     typedef typename base_type::category  category;
+
+  public:
+    basic_lz4_decompressor(int buffer_size = boost::iostreams::default_device_buffer_size)
+      : base_type(buffer_size) {}
   };
   
+
+  typedef basic_lz4_compressor<>   lz4_compressor;
+  typedef basic_lz4_decompressor<> lz4_decompressor;
 };
 
 #endif

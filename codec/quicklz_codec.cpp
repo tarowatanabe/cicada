@@ -1,7 +1,10 @@
-#include "quicklz.hpp"
-#include "quicklz.h"
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
-#include "codec_impl.hpp"
+#include "codec/quicklz.hpp"
+#include "codec/quicklz.h"
+#include "codec/codec_impl.hpp"
 
 #include "utils/bithack.hpp"
 
@@ -9,10 +12,20 @@ namespace codec
 {
   namespace detail
   {
-    const quicklz::size_type quicklz::chunk_size = 8 * 1024 * 1024;
-    const quicklz::size_type quicklz::bound_size = QUICKLZ_compressBound(8 * 1024 * 1024) + 4;
+    struct quicklz_param_impl : qlz_state_compress,
+				qlz_state_decompress
+    {
+      quicklz_param_impl() {}
+    };
+    
+    quicklz_param::quicklz_param() : pimpl(new quicklz_param_impl()) {}
+    quicklz_param::quicklz_param(const quicklz_param&x) : pimpl(new quicklz_param_impl()) {}
+    quicklz_param::~quicklz_param() { delete pimpl; }
+    
+    const quicklz_param::size_type quicklz_param::chunk_size = 8 * 1024 * 1024;
+    const quicklz_param::size_type quicklz_param::bound_size = chunk_size + 400 + 4;
   };
-
+  
   quicklz_compressor_impl::quicklz_compressor_impl()
     : buffer(new byte_type[chunk_size]),
       pos(0),
@@ -46,10 +59,11 @@ namespace codec
       
     // perform compression, if all the compressed buffer is dumped, pos == chunk or flush
     if (pos_compressed == size_compressed && (pos == chunk_size || (pos && flush))) {
-      size_compressed = QUICKLZ_compress(buffer, buffer_compressed + 4, pos);
+      size_compressed = qlz_compress(buffer, buffer_compressed + 4, pos, pimpl);
       
       impl::write_size(size_compressed, buffer_compressed);
       
+      size_compressed += 4;
       pos_compressed = 0;
       pos = 0;
     }
@@ -104,14 +118,14 @@ namespace codec
       src_begin += src_copied;
       pos_compressed += src_copied;
     }
-    
+
     // assig size-compressed if possible
-    if (! size_compressed && pos_compressed >= 4)
+    if ((! size_compressed) && pos_compressed >= 4)
       size_compressed = impl::read_size(buffer_compressed);
-    
+
     // perform actual uncompression...
     if (pos == size && size_compressed && pos_compressed >= size_compressed + 4) {
-      size = QUICKLZ_uncompress_unknownOutputSize(buffer_compressed + 4, buffer, size_compressed, chunk_size);
+      size = qlz_decompress(buffer_compressed + 4, buffer, pimpl);
       pos = 0;
       
       // copy with potential overlap...
@@ -120,12 +134,12 @@ namespace codec
       size_compressed = 0;
       
       // assig size-compressed if possible
-      if (! size_compressed && pos_compressed >= 4)
+      if ((! size_compressed) && pos_compressed >= 4)
 	size_compressed = impl::read_size(buffer_compressed);
     }
     
     // dump into dest
-    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size);
+    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size - pos);
     
     if (dest_copied) {
       std::copy(buffer + pos, buffer + pos + dest_copied, dest_begin);

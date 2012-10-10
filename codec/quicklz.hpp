@@ -1,14 +1,13 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __CODEC__QUICKLZ_HPP__
 #define __CODEC__QUICKLZ_HPP__ 1
 
-//
-// we will use the chunk size of 8MB
-//
-
-#include <memory>
 #include <cstddef>
+#include <memory>
 
 #include <boost/iostreams/filter/symmetric.hpp>
 
@@ -16,18 +15,28 @@ namespace codec
 {
   namespace detail
   {
-    struct quicklz
+    struct quicklz_param_impl;
+
+    struct quicklz_param
     {
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
       typedef char byte_type;
+      typedef char char_type;
       
       static const size_type chunk_size;
       static const size_type bound_size;
+      
+      quicklz_param();
+      quicklz_param(const quicklz_param&x);
+      ~quicklz_param();
+      quicklz_param& operator=(const quicklz_param&) { return *this; }
+      
+      quicklz_param_impl* pimpl;
     };
   };
 
-  struct quicklz_compressor_impl : detail::quicklz
+  struct quicklz_compressor_impl : detail::quicklz_param
   {
     //
     // we will initialize buffer, but do not allow copy/assign
@@ -63,7 +72,7 @@ namespace codec
     size_type  pos_compressed;
   };
   
-  struct quicklz_decompressor_impl : detail::quicklz
+  struct quicklz_decompressor_impl : detail::quicklz_param
   {
     quicklz_decompressor_impl();
     quicklz_decompressor_impl(const quicklz_decompressor_impl&);
@@ -108,10 +117,15 @@ namespace codec
   public:
     typedef typename base_type::char_type char_type;
     typedef typename base_type::category  category;
+
+  public:
+    basic_quicklz_compressor(int buffer_size = boost::iostreams::default_device_buffer_size)
+      : base_type(buffer_size) {}
   };
   
   template<typename Alloc = std::allocator<char> >
   struct basic_quicklz_decompressor
+    : boost::iostreams::symmetric_filter<quicklz_decompressor_impl, Alloc>
   {
   private:
     typedef quicklz_decompressor_impl                            impl_type;
@@ -120,8 +134,15 @@ namespace codec
   public:
     typedef typename base_type::char_type char_type;
     typedef typename base_type::category  category;
+
+  public:
+    basic_quicklz_decompressor(int buffer_size = boost::iostreams::default_device_buffer_size)
+      : base_type(buffer_size) {}
   };
   
+
+  typedef basic_quicklz_compressor<>   quicklz_compressor;
+  typedef basic_quicklz_decompressor<> quicklz_decompressor;
 };
 
 #endif

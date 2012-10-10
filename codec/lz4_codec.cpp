@@ -1,7 +1,10 @@
-#include "lz4.hpp"
-#include "lz4.h"
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
-#include "codec_impl.hpp"
+#include "codec/lz4.hpp"
+#include "codec/lz4.h"
+#include "codec/codec_impl.hpp"
 
 #include "utils/bithack.hpp"
 
@@ -9,8 +12,8 @@ namespace codec
 {
   namespace detail
   {
-    const lz4::size_type lz4::chunk_size = 8 * 1024 * 1024;
-    const lz4::size_type lz4::bound_size = LZ4_compressBound(8 * 1024 * 1024) + 4;
+    const lz4_param::size_type lz4_param::chunk_size = 8 * 1024 * 1024;
+    const lz4_param::size_type lz4_param::bound_size = LZ4_compressBound(8 * 1024 * 1024) + 4;
   };
 
   lz4_compressor_impl::lz4_compressor_impl()
@@ -50,6 +53,7 @@ namespace codec
       
       impl::write_size(size_compressed, buffer_compressed);
       
+      size_compressed += 4;
       pos_compressed = 0;
       pos = 0;
     }
@@ -104,11 +108,11 @@ namespace codec
       src_begin += src_copied;
       pos_compressed += src_copied;
     }
-    
+
     // assig size-compressed if possible
-    if (! size_compressed && pos_compressed >= 4)
+    if ((! size_compressed) && pos_compressed >= 4)
       size_compressed = impl::read_size(buffer_compressed);
-    
+
     // perform actual uncompression...
     if (pos == size && size_compressed && pos_compressed >= size_compressed + 4) {
       size = LZ4_uncompress_unknownOutputSize(buffer_compressed + 4, buffer, size_compressed, chunk_size);
@@ -120,12 +124,12 @@ namespace codec
       size_compressed = 0;
       
       // assig size-compressed if possible
-      if (! size_compressed && pos_compressed >= 4)
+      if ((! size_compressed) && pos_compressed >= 4)
 	size_compressed = impl::read_size(buffer_compressed);
     }
     
     // dump into dest
-    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size);
+    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size - pos);
     
     if (dest_copied) {
       std::copy(buffer + pos, buffer + pos + dest_copied, dest_begin);

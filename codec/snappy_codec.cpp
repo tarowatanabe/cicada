@@ -1,7 +1,11 @@
-#include "snappy.hpp"
-#include "snappy.h"
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
-#include "codec_impl.hpp"
+#include <snappy.h>
+
+#include "codec/snappy.hpp"
+#include "codec/codec_impl.hpp"
 
 #include "utils/bithack.hpp"
 
@@ -9,8 +13,8 @@ namespace codec
 {
   namespace detail
   {
-    const snappy::size_type snappy::chunk_size = 8 * 1024 * 1024;
-    const snappy::size_type snappy::bound_size = SNAPPY_compressBound(8 * 1024 * 1024) + 4;
+    const snappy_param::size_type snappy_param::chunk_size = 8 * 1024 * 1024;
+    const snappy_param::size_type snappy_param::bound_size = snappy::MaxCompressedLength(chunk_size);
   };
 
   snappy_compressor_impl::snappy_compressor_impl()
@@ -30,10 +34,10 @@ namespace codec
   { }
   
   bool snappy_compressor_impl::filter(const char*& src_begin,
-				   const char* src_end,
-				   char*& dest_begin,
-				   char* dest_end,
-				   bool flush)
+				      const char* src_end,
+				      char*& dest_begin,
+				      char* dest_end,
+				      bool flush)
   {
     const size_type src_copied = utils::bithack::min(size_type(src_end - src_begin), chunk_size - pos);
       
@@ -46,10 +50,12 @@ namespace codec
       
     // perform compression, if all the compressed buffer is dumped, pos == chunk or flush
     if (pos_compressed == size_compressed && (pos == chunk_size || (pos && flush))) {
-      size_compressed = SNAPPY_compress(buffer, buffer_compressed + 4, pos);
+      size_compressed = 0;
+      snappy::RawCompress(buffer, pos, buffer_compressed + 4, &size_compressed);
       
       impl::write_size(size_compressed, buffer_compressed);
       
+      size_compressed += 4;
       pos_compressed = 0;
       pos = 0;
     }
@@ -86,10 +92,10 @@ namespace codec
   { }
   
   bool snappy_decompressor_impl::filter(const char*& src_begin,
-				     const char* src_end,
-				     char*& dest_begin,
-				     char* dest_end,
-				     bool flush)
+					const char* src_end,
+					char*& dest_begin,
+					char* dest_end,
+					bool flush)
   {
     // copy into buffer as much as possible
     
@@ -104,14 +110,15 @@ namespace codec
       src_begin += src_copied;
       pos_compressed += src_copied;
     }
-    
+
     // assig size-compressed if possible
-    if (! size_compressed && pos_compressed >= 4)
+    if ((! size_compressed) && pos_compressed >= 4)
       size_compressed = impl::read_size(buffer_compressed);
-    
+
     // perform actual uncompression...
     if (pos == size && size_compressed && pos_compressed >= size_compressed + 4) {
-      size = SNAPPY_uncompress_unknownOutputSize(buffer_compressed + 4, buffer, size_compressed, chunk_size);
+      snappy::RawUncompress(buffer_compressed + 4, size_compressed, buffer);
+      snappy::GetUncompressedLength(buffer_compressed + 4, size_compressed, &size);
       pos = 0;
       
       // copy with potential overlap...
@@ -120,12 +127,12 @@ namespace codec
       size_compressed = 0;
       
       // assig size-compressed if possible
-      if (! size_compressed && pos_compressed >= 4)
+      if ((! size_compressed) && pos_compressed >= 4)
 	size_compressed = impl::read_size(buffer_compressed);
     }
     
     // dump into dest
-    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size);
+    const size_type dest_copied = utils::bithack::min(size_type(dest_end - dest_begin), size - pos);
     
     if (dest_copied) {
       std::copy(buffer + pos, buffer + pos + dest_copied, dest_begin);

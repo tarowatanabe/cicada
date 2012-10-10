@@ -139,6 +139,7 @@ else
 fi
 AC_SUBST(SNAPPY_CPPFLAGS)
 AC_SUBST(SNAPPY_LDFLAGS)
+AM_CONDITIONAL([WITH_SNAPPY], [test "x$ac_have_libsnappy" = "xyes" -a "x$ac_cv_header_snappy_h" = "xyes"])
 
 AC_ARG_WITH(jemalloc,
 	[AC_HELP_STRING([--with-jemalloc=DIR], [jemalloc in DIR])],
