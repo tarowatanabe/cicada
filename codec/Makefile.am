@@ -20,7 +20,8 @@ libcodec_la_LIBADD = \
 
 libcodecincludedir = $(pkgincludedir)/codec
 libcodecinclude_HEADERS = \
-lz4.hpp
+lz4.hpp \
+quicklz.hpp
 
 noinst_HEADERS = \
 codec_impl.hpp \
