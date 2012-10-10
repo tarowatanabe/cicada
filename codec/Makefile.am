@@ -22,11 +22,6 @@ libcodecincludedir = $(pkgincludedir)/codec
 libcodecinclude_HEADERS = \
 lz4.hpp
 
-if WITH_SNAPPY
-libcodec_la_SOURCES += snappy_codec.cpp
-libcodecinclude_HEADERS += snappy.hpp
-endif WITH_SNAPPY
-
 noinst_HEADERS = \
 codec_impl.hpp \
 fastlz.h \
@@ -38,9 +33,21 @@ noinst_PROGRAMS = \
 lz4_compress_main \
 lz4_decompress_main \
 quicklz_compress_main \
-quicklz_decompress_main \
+quicklz_decompress_main
+
+if WITH_SNAPPY
+
+libcodec_la_SOURCES += \
+snappy_codec.cpp
+
+libcodecinclude_HEADERS += \
+snappy.hpp
+
+noinst_PROGRAMS += \
 snappy_compress_main \
 snappy_decompress_main
+
+endif WITH_SNAPPY
 
 lz4_compress_main_SOURCES = lz4_compress_main.cpp
 lz4_compress_main_LDADD = $(LIBCODEC)
