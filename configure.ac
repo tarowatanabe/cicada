@@ -523,6 +523,7 @@ AC_CHECK_FUNCS([dup2 gethostname getpagesize gettimeofday memset munmap pow sele
 
 AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
+		 codec/Makefile
 		 libstemmer_c/Makefile
 		 liblinear/Makefile
 		 liblbfgs/Makefile
