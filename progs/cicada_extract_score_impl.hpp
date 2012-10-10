@@ -67,6 +67,7 @@
 #include <utils/double_base64_generator.hpp>
 #include <utils/dense_hash_map.hpp>
 #include <utils/map_file_allocator.hpp>
+#include <utils/group_aligned_code.hpp>
 
 class RootCount
 {
