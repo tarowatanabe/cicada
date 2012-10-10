@@ -1748,15 +1748,114 @@ struct PhrasePairTargetMapper
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
 
+#if 1
   struct PhraseSet
   {
     typedef uint32_t length_type;
     typedef char     char_type;
 
-    //typedef utils::map_file_allocator<char_type, std::allocator<char_type>, 4ull * 1024 * 1024 * 1024>  char_alloc_type;
-    typedef std::allocator<char_type> char_alloc_type;
+    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
+    typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
     
-    typedef std::vector<char_type, char_alloc_type > buffer_type;
+    struct const_iterator
+    {
+      const_iterator() {}
+      const_iterator(typename buffer_type::const_iterator  __biter,
+		     typename buffer_type::const_iterator  __biter_end,
+		     typename lengths_type::const_iterator __liter,
+		     typename lengths_type::const_iterator __liter_end)
+	: biter(__biter), biter_end(__biter_end),
+	  liter(__liter), liter_end(__liter_end)
+      {
+	operator++();
+      }
+
+      const std::string& operator*() const
+      {
+	return curr;
+      }
+      
+      const_iterator& operator++()
+      {
+	if (biter == biter_end || liter == liter_end) {
+	  curr.clear();
+	  return *this;
+	}
+
+	// replace!
+	curr.replace(curr.begin() + *liter, curr.end(), biter, biter + *(liter + 1));
+	biter += *(liter + 1);
+	liter += 2;
+	
+	return *this;
+      }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr == y.curr;
+      }
+      
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr != y.curr;
+      }
+      
+      typename buffer_type::const_iterator  biter;
+      typename buffer_type::const_iterator  biter_end;
+      typename lengths_type::const_iterator liter;
+      typename lengths_type::const_iterator liter_end;
+      
+      std::string curr;
+    };
+    
+    void clear()
+    {
+      buffer.clear();
+      lengths.clear();
+      last.clear();
+    }
+    
+    bool empty() const { return lengths.empty(); }
+    size_t size() const { return lengths.size() >> 1; }
+
+    void swap(PhraseSet& x)
+    {
+      buffer.swap(x.buffer);
+      lengths.swap(x.lengths);
+      last.swap(x.last);
+    }
+    
+    void push_back(const std::string& x)
+    {
+      size_type pos = 0;
+      const size_type pos_last = utils::bithack::min(last.size(), x.size());
+      for (/**/; pos != pos_last && x[pos] == last[pos]; ++ pos) {}
+      
+      buffer.insert(buffer.end(), x.begin() + pos, x.end());
+      lengths.push_back(pos);
+      lengths.push_back(x.size() - pos);
+      last = x;
+    }
+
+    const_iterator begin() const { return const_iterator(buffer.begin(), buffer.end(),
+							 lengths.begin(), lengths.end()); }
+    const_iterator end() const { return const_iterator(); }
+    
+    buffer_type  buffer;
+    lengths_type lengths;
+    std::string  last;
+  };
+#endif
+  
+#if 0
+  struct PhraseSet
+  {
+    typedef uint32_t length_type;
+    typedef char     char_type;
+
+    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
     typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
     
     struct const_iterator
@@ -1820,6 +1919,7 @@ struct PhrasePairTargetMapper
     buffer_type  buffer;
     lengths_type lengths;
   };
+#endif
 
   typedef PhraseSet phrase_set_type;
 
@@ -1947,7 +2047,7 @@ struct PhrasePairTargetMapper
 	  
 	  typename phrase_set_type::const_iterator piter_end = phrases.end();
 	  for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	    const std::string phrase = *piter;
+	    const std::string& phrase = *piter;
 	    
 	    const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
 	    
@@ -1962,6 +2062,7 @@ struct PhrasePairTargetMapper
 	  
 	  if (malloc_full) {
 	    phrase_set_type(phrases).swap(phrases);
+	    //phrases.shrink();
 	    
 	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  }
@@ -2011,7 +2112,7 @@ struct PhrasePairTargetMapper
       
       typename phrase_set_type::const_iterator piter_end = phrases.end();
       for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
-	const std::string phrase = *piter;
+	const std::string& phrase = *piter;
 	
 	const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
 	
@@ -2020,6 +2121,7 @@ struct PhrasePairTargetMapper
       
       phrases.clear();
       phrase_set_type(phrases).swap(phrases);
+      //phrases.shrink();
     }
     
     //

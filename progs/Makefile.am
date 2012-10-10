@@ -11,6 +11,7 @@ boost_LDADD = \
 
 LIBCICADA = $(top_builddir)/cicada/libcicada.la
 LIBUTILS  = $(top_builddir)/utils/libutils.la
+LIBCODEC  = $(top_builddir)/codec/libcodec.la
 LIBLINEAR = $(top_builddir)/liblinear/liblinear.la
 LIBLBFGS  = $(top_builddir)/liblbfgs/liblbfgs.la
 
