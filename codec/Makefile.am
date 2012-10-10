@@ -35,18 +35,14 @@ lz4_decompress_main \
 quicklz_compress_main \
 quicklz_decompress_main
 
-if WITH_SNAPPY
-
-libcodec_la_SOURCES += \
-snappy_codec.cpp
-
-libcodecinclude_HEADERS += \
-snappy.hpp
-
-noinst_PROGRAMS += \
+SNAPPY_MAIN = \
 snappy_compress_main \
 snappy_decompress_main
 
+if WITH_SNAPPY
+libcodec_la_SOURCES += snappy_codec.cpp
+libcodecinclude_HEADERS += snappy.hpp
+noinst_PROGRAMS += $(SNAPPY_MAIN)
 endif WITH_SNAPPY
 
 lz4_compress_main_SOURCES = lz4_compress_main.cpp
@@ -72,6 +68,9 @@ noinst_DATA = .gitignore
 .gitignore: Makefile.am
 	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SNAPPY_MAIN); do \
 	  echo $$bin >> .gitignore; \
 	done; \
 	for bin in $(SCRIPTS); do \

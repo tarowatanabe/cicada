@@ -34,3 +34,5 @@ quicklz_compress_main
 quicklz_decompress_main
 snappy_compress_main
 snappy_decompress_main
+snappy_compress_main
+snappy_decompress_main
