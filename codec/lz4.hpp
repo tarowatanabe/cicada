@@ -130,7 +130,6 @@ namespace codec
     basic_lz4_decompressor(int buffer_size = boost::iostreams::default_device_buffer_size)
       : base_type(buffer_size) {}
   };
-  
 
   typedef basic_lz4_compressor<>   lz4_compressor;
   typedef basic_lz4_decompressor<> lz4_decompressor;

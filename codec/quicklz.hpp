@@ -139,7 +139,6 @@ namespace codec
     basic_quicklz_decompressor(int buffer_size = boost::iostreams::default_device_buffer_size)
       : base_type(buffer_size) {}
   };
-  
 
   typedef basic_quicklz_compressor<>   quicklz_compressor;
   typedef basic_quicklz_decompressor<> quicklz_decompressor;

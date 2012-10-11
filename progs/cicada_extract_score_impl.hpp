@@ -1749,7 +1749,6 @@ struct PhrasePairTargetMapper
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
 
-#if 1
   struct PhraseSet
   {
     typedef uint32_t length_type;
@@ -1848,80 +1847,7 @@ struct PhrasePairTargetMapper
     lengths_type lengths;
     std::string  last;
   };
-#endif
   
-#if 0
-  struct PhraseSet
-  {
-    typedef uint32_t length_type;
-    typedef char     char_type;
-
-    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
-    typedef std::vector<length_type, std::allocator<length_type> > lengths_type;
-    
-    struct const_iterator
-    {
-      const_iterator(typename buffer_type::const_iterator  __biter,
-		     typename lengths_type::const_iterator __liter)
-	: biter(__biter), liter(__liter) {}
-
-      std::string operator*() const
-      {
-	return std::string(biter, biter + *liter);
-      }
-      
-      const_iterator& operator++()
-      {
-	biter += *liter;
-	++ liter;
-	return *this;
-      }
-      
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.biter == y.biter && x.liter == y.liter;
-      }
-      
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.biter != y.biter || x.liter != y.liter;
-      }
-      
-      typename buffer_type::const_iterator  biter;
-      typename lengths_type::const_iterator liter;
-    };
-    
-    void clear()
-    {
-      buffer.clear();
-      lengths.clear();
-    }
-    
-    bool empty() const { return lengths.empty(); }
-    size_t size() const { return lengths.size(); }
-
-    void swap(PhraseSet& x)
-    {
-      buffer.swap(x.buffer);
-      lengths.swap(x.lengths);
-    }
-    
-    void push_back(const std::string& x)
-    {
-      buffer.insert(buffer.end(), x.begin(), x.end());
-      lengths.push_back(x.size());
-    }
-
-    const_iterator begin() const { return const_iterator(buffer.begin(), lengths.begin()); }
-    const_iterator end() const { return const_iterator(buffer.end(), lengths.end()); }
-    
-    buffer_type  buffer;
-    lengths_type lengths;
-  };
-#endif
-
   typedef PhraseSet phrase_set_type;
 
   typedef PhrasePairSimpleParser    simple_parser_type;
@@ -2063,7 +1989,6 @@ struct PhrasePairTargetMapper
 	  
 	  if (malloc_full) {
 	    phrase_set_type(phrases).swap(phrases);
-	    //phrases.shrink();
 	    
 	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  }
@@ -2122,7 +2047,6 @@ struct PhrasePairTargetMapper
       
       phrases.clear();
       phrase_set_type(phrases).swap(phrases);
-      //phrases.shrink();
     }
     
     //

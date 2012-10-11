@@ -130,7 +130,6 @@ namespace codec
     basic_snappy_decompressor(int buffer_size = boost::iostreams::default_device_buffer_size)
       : base_type(buffer_size) {}
   };
-  
 
   typedef basic_snappy_compressor<>   snappy_compressor;
   typedef basic_snappy_decompressor<> snappy_decompressor;
