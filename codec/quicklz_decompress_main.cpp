@@ -6,13 +6,13 @@
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 
-#include "codec/lz4.hpp"
+#include "codec/quicklz.hpp"
 
 int main(int argc, char** argv)
 {
   boost::iostreams::filtering_ostream os;
   
-  os.push(codec::lz4_decompressor());
+  os.push(codec::quicklz_decompressor());
   os.push(boost::iostreams::file_descriptor_sink(::dup(STDOUT_FILENO), boost::iostreams::close_handle));
   
   char buffer[4096];

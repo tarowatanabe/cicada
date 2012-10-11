@@ -16,6 +16,7 @@ New: bash-based learning scripts are re-implemented by equivalent, better python
      Check cicada-{learn,mert}{,-moses}.py, not *.sh equivalents.
 New: added cutoff threshold for ghkm/tree extraction to prune out rare elementary trees in advance.
 New: added remove-head for removing nodes with '*' as non-temrinal, and re-implemented debinarize which shares the same code
+New: added codecs which implements various filters for use with boost.iostreams
 Deprecated: bash based scripts
 Deprecated: dependency structure filters: cicada_filter_{conll,mst,cabocha} and are merged into cicada_filter_dependency
 Removed terminal-binarization and re-wrote as dependency-binarization

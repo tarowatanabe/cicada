@@ -28,6 +28,8 @@ libtool
 
 
 
+fastlz_compress_main
+fastlz_decompress_main
 lz4_compress_main
 lz4_decompress_main
 quicklz_compress_main

@@ -6,6 +6,7 @@ lib_LTLIBRARIES = libcodec.la
 
 libcodec_la_SOURCES = \
 fastlz.c \
+fastlz_codec.cpp \
 lz4.c \
 lz4hc.c \
 lz4_codec.cpp \
@@ -20,6 +21,7 @@ libcodec_la_LIBADD = \
 
 libcodecincludedir = $(pkgincludedir)/codec
 libcodecinclude_HEADERS = \
+fastlz.hpp \
 lz4.hpp \
 quicklz.hpp
 
@@ -31,6 +33,8 @@ lz4hc.h \
 quicklz.h
 
 noinst_PROGRAMS = \
+fastlz_compress_main \
+fastlz_decompress_main \
 lz4_compress_main \
 lz4_decompress_main \
 quicklz_compress_main \
@@ -45,6 +49,12 @@ libcodec_la_SOURCES += snappy_codec.cpp
 libcodecinclude_HEADERS += snappy.hpp
 noinst_PROGRAMS += $(SNAPPY_MAIN)
 endif WITH_SNAPPY
+
+fastlz_compress_main_SOURCES = fastlz_compress_main.cpp
+fastlz_compress_main_LDADD = $(LIBCODEC)
+
+fastlz_decompress_main_SOURCES = fastlz_decompress_main.cpp
+fastlz_decompress_main_LDADD = $(LIBCODEC)
 
 lz4_compress_main_SOURCES = lz4_compress_main.cpp
 lz4_compress_main_LDADD = $(LIBCODEC)
