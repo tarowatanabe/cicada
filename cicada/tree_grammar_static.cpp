@@ -1525,8 +1525,8 @@ namespace cicada
       std::cerr << "# of rules: " << num_line << std::endl;
       
       std::cerr << "indexing:"
-		<< " cpu time: " << start.cpu_time() - end.cpu_time()
-		<< " user time: " << start.user_time() - end.user_time()
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
 		<< std::endl;
     }
    
@@ -1870,8 +1870,8 @@ namespace cicada
       std::cerr << "# of rules: " << num_line << std::endl;
       
       std::cerr << "indexing:"
-		<< " cpu time: " << start.cpu_time() - end.cpu_time()
-		<< " user time: " << start.user_time() - end.user_time()
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
 		<< std::endl;
     }
     
