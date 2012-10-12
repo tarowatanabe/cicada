@@ -442,8 +442,8 @@ namespace cicada
 	      else
 		++ unary_loop;
 	      
-	      // 4 iterations
-	      if (unary_loop == 4) break;
+	      // 2 iterations
+	      if (unary_loop == 2) break;
 	    }
 	  }
 	  
