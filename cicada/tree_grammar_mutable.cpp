@@ -29,6 +29,7 @@
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/json_string_parser.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -86,10 +87,10 @@ namespace cicada
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
     
     TreeGrammarMutableImpl(const std::string& parameter)
-      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false) { read(parameter); }
+      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false), debug(0) { read(parameter); }
 
     TreeGrammarMutableImpl()
-      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false) {  }
+      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false), debug(0) {  }
     
     edge_id_type edge(const symbol_type* first, const symbol_type* last) const
     {
@@ -118,6 +119,7 @@ namespace cicada
     attribute_name_set_type attribute_names_default;
 
     bool cky;
+    int debug;
   };
   
   //
@@ -188,6 +190,11 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
+      if (utils::ipiece(piter->first) == "debug") {
+	debug = utils::lexical_cast<int>(piter->second);
+	continue;
+      }
+
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
@@ -254,8 +261,11 @@ namespace cicada
     scores_attrs_parsed_type scores_attrs;
     feature_set_type         features;
     attribute_set_type       attributes;
+
+    utils::resource start;
     
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();
@@ -266,6 +276,13 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
 
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
+      
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
@@ -325,6 +342,20 @@ namespace cicada
       }
       
       insert(rule_pair_type(rule_type::create(rule_type(source)), rule_type::create(rule_type(target)), features, attributes));
+    }
+
+    utils::resource end;
+
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
     }
   }
   

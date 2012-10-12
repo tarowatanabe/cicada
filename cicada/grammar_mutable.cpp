@@ -33,6 +33,7 @@
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
+#include "utils/resource.hpp"
 
 namespace std
 {
@@ -72,7 +73,7 @@ namespace cicada
     typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
 
-    GrammarMutableImpl(const int __max_span=0) : trie(symbol_type()), max_span(__max_span) {}
+    GrammarMutableImpl(const int __max_span=0) : trie(symbol_type()), max_span(__max_span), debug(0) {}
     
     void read(const std::string& parameter);
     
@@ -111,6 +112,7 @@ namespace cicada
     attribute_name_set_type attribute_names_default;
 
     int max_span;
+    int debug;
   };
   
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
@@ -297,6 +299,11 @@ namespace cicada
 	continue;
       }
 
+      if (utils::ipiece(piter->first) == "debug") {
+	debug = utils::lexical_cast<int>(piter->second);
+	continue;
+      }
+
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
@@ -336,7 +343,10 @@ namespace cicada
     
     sequence_type source_index;
 
-    for (size_t num_line = 0; std::getline(is, line); ++ num_line) {
+    utils::resource start;
+    
+    size_t num_line = 0;
+    for (/**/; std::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       boost::fusion::get<0>(rule_parsed).clear();
@@ -348,6 +358,13 @@ namespace cicada
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator iter_end = line.end();
       
+      if (debug) {
+	if ((num_line + 1) % 100000 == 0)
+	  std::cerr << '.';
+	if ((num_line + 1) % 10000000 == 0)
+	  std::cerr << std::endl;
+      } 
+
       const bool result = qi::phrase_parse(iter, iter_end, grammar_mutable_impl::instance(), standard::space, rule_parsed);
       
       if (! result || iter != iter_end)
@@ -418,6 +435,20 @@ namespace cicada
 	  ++ attribute;
 	} else
 	  rules.back().attributes[aiter->first] = aiter->second;
+    }
+    
+    utils::resource end;
+    
+    if (debug) {
+      if (num_line % 10000000 != 0)
+	std::cerr << std::endl;
+
+      std::cerr << "# of rules: " << num_line << std::endl;
+      
+      std::cerr << "indexing:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
     }
   }
   
