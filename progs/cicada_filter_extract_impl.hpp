@@ -523,9 +523,10 @@ struct LexiconModel
   };
 
   typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
+  typedef std::vector<double, std::allocator<double> > max_set_type;
 
-  LexiconModel() : smooth(1e-7), tables() {}
-  LexiconModel(const path_type& path) : smooth(), tables() { open(path); }
+  LexiconModel() : smooth(1e-7), tables(), maximum() {}
+  LexiconModel(const path_type& path) : smooth(), tables(), maximum() { open(path); }
 
   void open(const path_type& path)
   {
@@ -542,7 +543,8 @@ struct LexiconModel
 
     smooth = std::numeric_limits<double>::infinity();
     tables.clear();
-
+    maximum.clear();
+    
     utils::compress_istream is(path, 1024 * 1024);
     std::string line;
     parsed_type parsed;
@@ -550,34 +552,48 @@ struct LexiconModel
     while (std::getline(is, line)) {
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end = line.end();
-
+      
       boost::fusion::get<0>(parsed).clear();
       boost::fusion::get<1>(parsed).clear();
 
       const bool result = qi::phrase_parse(iter, end, lexicon, standard::space, parsed);
       if (! result || iter != end) continue;
-
-
-      tables[word_type(boost::fusion::get<1>(parsed)).id()].table[boost::fusion::get<0>(parsed)] = boost::fusion::get<2>(parsed);
-
+      
+      const word_type source(boost::fusion::get<1>(parsed));
+      const word_type target(boost::fusion::get<0>(parsed));
+      
+      tables[source.id()].table[target] = boost::fusion::get<2>(parsed);
+      
+      if (target.id() >= maximum.size())
+	maximum.resize(target.id() + 1, 0.0);
+      
+      maximum[target.id()] = std::max(maximum[target.id()], boost::fusion::get<2>(parsed));
+      
       smooth = std::min(smooth, boost::fusion::get<2>(parsed));
     }
 
+    max_set_type(maximum).swap(maximum);
   }
 
   double operator()(const word_type& source, const word_type& target) const
   {
     if (tables.exists(source.id())) {
       const table_type& table = tables[source.id()];
-
+      
       table_type::__table_type::const_iterator iter = table.table.find(target);
       return (iter != table.table.end() ? iter->second : smooth);
     } else 
       return smooth;
   }
+  
+  double operator()(const word_type& word) const
+  {
+    return (word.id() < maximum.size() ?  std::max(smooth, maximum[word.id()]) : smooth);
+  }
 
   double smooth;
   table_set_type tables;
+  max_set_type   maximum;
 };
 
 struct Lexicon
@@ -760,8 +776,8 @@ struct Lexicon
   
   std::pair<double, double> insertion_deletion(const sentence_type& source,
 					       const sentence_type& target,
-					       const double threshold_insertion=0.01,
-					       const double threshold_deletion=0.01) const
+					       const double threshold_insertion=0.1,
+					       const double threshold_deletion=0.1) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
@@ -776,7 +792,7 @@ struct Lexicon
 	  if (source[src].is_terminal())
 	    score = std::max(score, lexicon_source_target(source[src], target[trg]));
 	
-	score_source_target -= (score < threshold_insertion);
+	score_source_target -= (score < lexicon_source_target(target[trg]) * threshold_insertion);
       }
     
     double score_target_source = 0.0;
@@ -789,7 +805,7 @@ struct Lexicon
 	  if (target[trg].is_terminal())
 	    score = std::max(score, lexicon_target_source(target[trg], source[src]));
 	
-	score_target_source -= (score < threshold_deletion);
+	score_target_source -= (score < lexicon_target_source(source[src]) * threshold_deletion);
       }
     
     return std::make_pair(score_source_target, score_target_source);

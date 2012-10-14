@@ -69,8 +69,8 @@ opt_parser = OptionParser(
     make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
     
-    make_option("--threshold-insertion", default=0.01, action="store", type="float", help="threshold for insertion (default: 0.01)"),
-    make_option("--threshold-deletion",  default=0.01, action="store", type="float", help="threshold for deletion (default: 0.01)"),
+    make_option("--threshold-insertion", default=0.1, action="store", type="float", help="threshold for insertion (default: 0.1)"),
+    make_option("--threshold-deletion",  default=0.1, action="store", type="float", help="threshold for deletion (default: 0.1)"),
     
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),
@@ -465,8 +465,8 @@ class Lexicon:
                  model1=None,
                  noisy_or=None,
                  insertion_deletion=None,
-                 threshold_insertion=0.01,
-                 threshold_deletion=0.01):
+                 threshold_insertion=0.1,
+                 threshold_deletion=0.1):
         self.lexicon_source_target = compressed_file(lexicon_source_target)
         self.lexicon_target_source = compressed_file(lexicon_target_source)
         

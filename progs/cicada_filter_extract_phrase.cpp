@@ -57,8 +57,8 @@ bool feature_model1_mode = false;
 bool feature_noisy_or_mode = false;
 bool feature_insertion_deletion_mode = false;
 
-double threshold_insertion = 0.01;
-double threshold_deletion = 0.01;
+double threshold_insertion = 0.1;
+double threshold_deletion = 0.1;
 
 int buffer_size = 1024 * 1024;
 int debug = 0;
