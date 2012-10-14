@@ -33,6 +33,12 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
     make_option("--lexical-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
+    make_option("--counts-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="grammar counts directory (default: ${model_dir})"),
+    make_option("--score-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="grammar score directory (default: ${model_dir})"),
+    make_option("--index-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="grammar index directory (default: ${model_dir})"),
 
     make_option("--lexicon-source-target", default="", action="store", type="string",
                 metavar="LEXICON", help="lexicon for P(target | source) (default: ${lexical_dir}/lex.f2n)"),
@@ -366,7 +372,13 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 class IndexPhrase:
-    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
+    def __init__(self,
+                 cicada=None,
+                 counts_dir="",
+                 score_dir="",
+                 index_dir="",
+                 cky=None,
+                 reordering=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
@@ -378,49 +390,67 @@ class IndexPhrase:
         self.grammar = "grammar"
         self.name = "phrase"
         
-        self.counts = os.path.join(model_dir, "phrase-counts")
-        self.scores = os.path.join(model_dir, "phrase-score")
-        self.index  = os.path.join(model_dir, "phrase-index")
-        self.base   = model_dir
+        self.counts = os.path.join(counts_dir, "phrase-counts")
+        self.scores = os.path.join(score_dir, "phrase-score")
+        self.index  = os.path.join(index_dir, "phrase-index")
+        self.base   = index_dir
         
 class IndexSCFG:
-    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
+    def __init__(self,
+                 cicada=None,
+                 counts_dir="",
+                 score_dir="",
+                 index_dir="",
+                 cky=None,
+                 reordering=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
         self.cky = None
         self.grammar = "grammar"
         self.name = "scfg"
 
-        self.counts = os.path.join(model_dir, "scfg-counts")
-        self.scores = os.path.join(model_dir, "scfg-score")
-        self.index  = os.path.join(model_dir, "scfg-index")
-        self.base   = model_dir
+        self.counts = os.path.join(counts_dir, "scfg-counts")
+        self.scores = os.path.join(score_dir, "scfg-score")
+        self.index  = os.path.join(index_dir, "scfg-index")
+        self.base   = index_dir
 
 class IndexGHKM:
-    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
+    def __init__(self,
+                 cicada=None,
+                 counts_dir="",
+                 score_dir="",
+                 index_dir="",
+                 cky=None, 
+                 reordering=None):
         self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"
         self.name = "ghkm"
 
-        self.counts = os.path.join(model_dir, "ghkm-counts")
-        self.scores = os.path.join(model_dir, "ghkm-score")
-        self.index  = os.path.join(model_dir, "ghkm-index")
-        self.base   = model_dir
+        self.counts = os.path.join(counts_dir, "ghkm-counts")
+        self.scores = os.path.join(score_dir, "ghkm-score")
+        self.index  = os.path.join(index_dir, "ghkm-index")
+        self.base   = index_dir
 
 class IndexTree:
-    def __init__(self, cicada=None, model_dir="", cky=None, reordering=None):
+    def __init__(self,
+                 cicada=None,
+                 counts_dir="",
+                 score_dir="",
+                 index_dir="",
+                 cky=None,
+                 reordering=None):
         self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"
         self.name = "tree"
 
-        self.counts = os.path.join(model_dir, "tree-counts")
-        self.scores = os.path.join(model_dir, "tree-score")
-        self.index  = os.path.join(model_dir, "tree-index")
-        self.base   = model_dir
+        self.counts = os.path.join(counts_dir, "tree-counts")
+        self.scores = os.path.join(score_dir, "tree-score")
+        self.index  = os.path.join(index_dir, "tree-index")
+        self.base   = index_dir
 
 ## additional features...
 class Features:
@@ -524,7 +554,7 @@ class Index(UserString.UserString):
             raise ValueError, "no root source? %s" %(root_source)
         if not root_target:
             raise ValueError, "no root target? %s" %(root_target)
-        
+                
         self.name    = "index-" + indexer.name
         self.logfile = os.path.join(indexer.base, "index-" + indexer.name + "." + name + ".log")
         
@@ -664,6 +694,15 @@ if __name__ == '__main__':
         options.model_dir = os.path.join(options.root_dir, "model")
     if not options.lexical_dir:
         options.lexical_dir = options.model_dir
+    if not options.counts_dir:
+        options.counts_dir = options.model_dir
+    if not options.score_dir:
+        options.score_dir = options.model_dir
+    if not options.index_dir:
+        options.index_dir = options.model_dir
+    if not os.path.exists(options.index_dir):
+        os.makedirs(options.index_dir)
+
     if not options.lexicon_source_target:
         options.lexicon_source_target = os.path.join(options.lexical_dir, "lex.f2n")
     if not options.lexicon_target_source:
@@ -673,13 +712,33 @@ if __name__ == '__main__':
 
     indexer = None
     if options.phrase:
-        indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+        indexer = IndexPhrase(cicada,
+                              counts_dir=options.counts_dir,
+                              score_dir=options.score_dir,
+                              index_dir=options.index_dir,
+                              cky=options.cky,
+                              reordering=options.reordering)
     elif options.scfg:
-        indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+        indexer = IndexSCFG(cicada,
+                            counts_dir=options.counts_dir,
+                            score_dir=options.score_dir,
+                            index_dir=options.index_dir,
+                            cky=options.cky,
+                            reordering=options.reordering)
     elif options.ghkm:
-        indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+        indexer = IndexGHKM(cicada,
+                            counts_dir=options.counts_dir,
+                            score_dir=options.score_dir,
+                            index_dir=options.index_dir,
+                            cky=options.cky,
+                            reordering=options.reordering)
     elif options.tree:
-        indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky, reordering=options.reordering)
+        indexer = IndexTree(cicada,
+                            counts_dir=options.counts_dir,
+                            score_dir=options.score_dir,
+                            index_dir=options.index_dir,
+                            cky=options.cky,
+                            reordering=options.reordering)
     else:
         raise ValueError, "no indexer?"
 
