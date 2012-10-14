@@ -31,6 +31,7 @@ Alignment can be carried out by:
      In order to support word alignment training, we can learn Model1/HMM lexicon model
      by symmetized learning [22] or posterior constrained learning [23] with smoothing
      via variational Bayes.
+     Also, lexicon model can be discriminatively trained [28]
 
 Dependency parsing can be carried out by:
    - A lattice is dependency parsed by compose-dependency-{arc-standard, arc-eager, hybrid, degree2}, generating derivation hypergraph
