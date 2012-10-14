@@ -52,6 +52,7 @@ namespace cicada
       smooth = boost::lexical_cast<weight_type>(siter->second);
     } else {
       bool feature_mode = false;
+      
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "feature")
 	  feature_mode = utils::lexical_cast<bool>(piter->second);
@@ -94,7 +95,7 @@ namespace cicada
 	
 	lexicon_parsed_type lexicon_parsed;
 	code_set_type codes;
-
+	
 	smooth = std::numeric_limits<weight_type>::infinity();
 	
 	while (iter != iter_end) {
@@ -117,8 +118,11 @@ namespace cicada
 	  
 	  smooth = std::min(smooth, weight);
 	}
-
+	
+	// maximum...?
+	
       } else {
+	typedef std::vector<weight_type, std::allocator<weight_type> > maximum_set_type;
 	typedef boost::fusion::tuple<std::string, std::string, weight_type > lexicon_parsed_type;
 	typedef boost::spirit::istream_iterator iterator_type;
 	
@@ -130,7 +134,7 @@ namespace cicada
 	
 	word   %= qi::lexeme[+(standard::char_ - standard::space)];
 	parser %= word >> word >> qi::float_ >> (qi::eol | qi::eoi); // weight type!
-  
+	
 	utils::compress_istream is(path, 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	
@@ -141,6 +145,8 @@ namespace cicada
 	
 	word_id_type codes[2];
 	smooth = std::numeric_limits<weight_type>::infinity();
+
+	maximum_set_type maximum;
 	
 	while (iter != iter_end) {
 	  boost::fusion::get<0>(lexicon_parsed).clear();
@@ -154,11 +160,21 @@ namespace cicada
 	  codes[1] = word_type(boost::fusion::get<0>(lexicon_parsed)).id(); // target
 	  
 	  lexicon.insert(codes, 2, boost::fusion::get<2>(lexicon_parsed));
-
+	  
+	  if (codes[1] >= maximum.size())
+	    maximum.resize(codes[1] + 1, 0.0);
+	  
+	  maximum[codes[1]] = std::max(maximum[codes[1]], boost::fusion::get<2>(lexicon_parsed));
+	  
 	  smooth = std::min(smooth, boost::fusion::get<2>(lexicon_parsed));
 	}
+	
+	// store maximum...
+	for (word_id_type id = 0; id != maximum.size(); ++ id)
+	  if (maximum[id] > 0.0)
+	    lexicon.insert(&id, 1, maximum[id]);
       }
-
+      
       if (smooth == std::numeric_limits<weight_type>::infinity())
 	smooth = 1e-40;
       

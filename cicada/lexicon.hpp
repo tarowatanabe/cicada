@@ -87,6 +87,12 @@ namespace cicada
     }
     
   public:
+    weight_type operator()(const word_type& word) const
+    {
+      const node_type node = traverse(0, word);
+      
+      return (lexicon.is_valid(node) && lexicon.exists(node) ? lexicon[node] : smooth);
+    }
     
     weight_type operator()(const word_type& prev, const word_type& word) const
     {
