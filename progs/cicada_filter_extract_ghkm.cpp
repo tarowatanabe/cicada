@@ -53,8 +53,8 @@ bool feature_model1_mode = false;
 bool feature_noisy_or_mode = false;
 bool feature_insertion_deletion_mode = false;
 
-double threshold_insertion = 0.1;
-double threshold_deletion = 0.1;
+double threshold_insertion = 0.5;
+double threshold_deletion = 0.5;
 
 double dirichlet_prior = 0.1;
 

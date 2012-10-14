@@ -69,8 +69,8 @@ opt_parser = OptionParser(
     make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
     
-    make_option("--threshold-insertion", default=0.1, action="store", type="float", help="threshold for insertion (default: 0.1)"),
-    make_option("--threshold-deletion",  default=0.1, action="store", type="float", help="threshold for deletion (default: 0.1)"),
+    make_option("--threshold-insertion", default=0.5, action="store", type="float", help="threshold for insertion (default: 0.5)"),
+    make_option("--threshold-deletion",  default=0.5, action="store", type="float", help="threshold for deletion (default: 0.5)"),
     
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),

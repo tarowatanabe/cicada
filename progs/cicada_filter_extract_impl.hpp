@@ -776,8 +776,8 @@ struct Lexicon
   
   std::pair<double, double> insertion_deletion(const sentence_type& source,
 					       const sentence_type& target,
-					       const double threshold_insertion=0.1,
-					       const double threshold_deletion=0.1) const
+					       const double threshold_insertion=0.5,
+					       const double threshold_deletion=0.5) const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
