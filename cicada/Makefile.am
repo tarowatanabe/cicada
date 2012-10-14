@@ -133,6 +133,7 @@ feature/depeval.hpp \
 feature/distortion.hpp \
 feature/feature_builder.hpp \
 feature/global_lexicon.hpp \
+feature/insertion.hpp \
 feature/lexicalized_reordering.hpp \
 feature/lexicon.hpp \
 feature/neighbours.hpp \
@@ -163,6 +164,7 @@ feature/distortion.cpp \
 feature/dependency.cpp \
 feature/depeval.cpp \
 feature/global_lexicon.cpp \
+feature/insertion.cpp \
 feature/lexicalized_reordering.cpp \
 feature/lexicon.cpp \
 feature/neighbours.cpp \

@@ -17,6 +17,7 @@
 #include "feature/depeval.hpp"
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
+#include "feature/insertion.hpp"
 #include "feature/lexicalized_reordering.hpp"
 #include "feature/lexicon.hpp"
 #include "feature/neighbours.hpp"
@@ -87,6 +88,13 @@ depeval: dependency evaluation feature\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
+insertion: insertion feature\n\
+\tfile=lexicon model file\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tunique-source=[true|source] unique source labels\n\
+\tname=feature-name (default: insertion)\n\
+\tthreshold=threshold (default: 0.5)\n\
 lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
@@ -244,6 +252,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Depeval(parameter));
     else if (param_name == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
+    else if (param_name == "insertion")
+      return feature_function_ptr_type(new feature::Insertion(parameter));
     else if (param_name == "lexicalized-reordering"
 	     || param_name == "lexicalized-reorder"
 	     || param_name == "lexical-reordering"

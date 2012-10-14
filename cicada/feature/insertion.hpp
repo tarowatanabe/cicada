@@ -1,10 +1,10 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__FEATURE__LEXICON__HPP__
-#define __CICADA__FEATURE__LEXICON__HPP__ 1
+#ifndef __CICADA__FEATURE__INSERTION__HPP__
+#define __CICADA__FEATURE__INSERTION__HPP__ 1
 
 #include <string>
 
@@ -14,9 +14,9 @@ namespace cicada
 {
   namespace feature
   {
-    class LexiconImpl;
+    class InsertionImpl;
     
-    class Lexicon : public FeatureFunction
+    class Insertion : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -25,19 +25,28 @@ namespace cicada
       typedef cicada::Symbol symbol_type;
       typedef cicada::Vocab  vocab_type;
       
+      
     private:
       typedef FeatureFunction base_type;
-      typedef LexiconImpl       impl_type;
+      typedef InsertionImpl       impl_type;
       
     public:
-      Lexicon(const std::string& parameter);
-      Lexicon(const Lexicon&);
-      ~Lexicon();
+      // parameter = key:[key=value (delimited by ',')]*
       
-      Lexicon& operator=(const Lexicon&);
+      // ngram parameter = ngram:file=file-name,name=feature-name,order=5
+      // "ngram" is the key for this ngram-feature
+      // file: file name
+      // name: name of this feature function. default to ngram
+      // order: ngram's order
+      
+      Insertion(const std::string& parameter);
+      Insertion(const Insertion&);
+      ~Insertion();
+      
+      Insertion& operator=(const Insertion&);
 
     private:
-      Lexicon() {}
+      Insertion() {}
       
     public:
       virtual void apply(state_ptr_type& state,
@@ -74,7 +83,7 @@ namespace cicada
 			  const sentence_set_type& targets,
 			  const ngram_count_set_type& ngram_counts);
       
-      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Lexicon(*this)); }
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Insertion(*this)); }
       
     private:
       

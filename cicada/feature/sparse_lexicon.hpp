@@ -88,7 +88,6 @@ namespace cicada
     private:
       
       impl_type* pimpl;
-      impl_type* pimpl_coarse;
     };
   };
 };

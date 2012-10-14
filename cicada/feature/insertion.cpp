@@ -1,11 +1,11 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/filesystem.hpp>
 
-#include "lexicon.hpp"
+#include "insertion.hpp"
 
 #include "cicada/parameter.hpp"
 #include "cicada/lexicon.hpp"
@@ -19,7 +19,7 @@ namespace cicada
 {
   namespace feature
   {
-    class LexiconImpl
+    class InsertionImpl
     {
     public:
       typedef size_t    size_type;
@@ -52,25 +52,16 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
-      struct score_set_type
-      {
-	double model1;
-	double viterbi;
-	double noisy_or;
-	
-	score_set_type() 
-	  : model1(- std::numeric_limits<double>::infinity()),
-	    viterbi(- std::numeric_limits<double>::infinity()),
-	    noisy_or(- std::numeric_limits<double>::infinity()) {}
-      };
-      typedef std::vector<score_set_type, std::allocator<score_set_type> > cache_set_type;
+      
+      
+      typedef std::vector<bool, std::allocator<bool> > cache_set_type;
       
       typedef cicada::Lexicon lexicon_type;
       
-      LexiconImpl()
-	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_viterbi(), feature_noisy_or()
+      InsertionImpl()
+	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false)
       { uniques.set_empty_key(word_type());  }
-
+      
       struct skipper_epsilon
       {
 	bool operator()(const symbol_type& word) const
@@ -87,78 +78,49 @@ namespace cicada
 	}
       };
       
-      void lexicon_score(const edge_type& edge,
+      double lexicon_score(const edge_type& edge,
 			 feature_set_type& features)
       {
-	if (skip_sgml_tag)
-	  lexicon_score(edge, features, skipper_sgml());
-	else
-	  lexicon_score(edge, features, skipper_epsilon());
+	return (skip_sgml_tag
+		? lexicon_score(edge, features, skipper_sgml())
+		: lexicon_score(edge, features, skipper_epsilon()));
       }
       
-      
       template <typename Skipper>
-      void lexicon_score(const edge_type& edge,
-			 feature_set_type& features,
-			 Skipper skipper)
+      double lexicon_score(const edge_type& edge,
+			   feature_set_type& features,
+			   Skipper skipper)
       {
 	const phrase_type& phrase = edge.rule->rhs;
-	const double inf = std::numeric_limits<double>::infinity();
-
-	double score_model1 = 0.0;
-	double score_viterbi = 0.0;
-	double score_noisy_or = 0.0;
+	
+	double score = 0.0;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
 	    const symbol_type& target = *piter;
-
-	    if (target.id() >= caches.size())
-	      caches.resize(target.id() + 1);
 	    
-	    if (caches[target.id()].model1 == - inf) {
-	      //
-	      // 1.0 - exp(score) == - expm1(score)
-	      //
-	      
-	      double score_model1   = lexicon->operator()(vocab_type::EPSILON, target);
-	      double score_viterbi  = score_model1;
-	      double score_noisy_or = 0.0;
+	    const size_type check = target.id() << 1;
+	    const size_type pos   = (target.id() << 1) + 1;
+
+	    if (pos >= caches.size())
+	      caches.resize(pos + 1, false);
+
+	    if (! caches[check]) {
+	      double score = 0.0;
 	      
 	      sentence_type::const_iterator siter_end = words.end();
-	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter) {
-		const double score = lexicon->operator()(*siter, target);
-		
-		score_model1   += score;
-		score_viterbi   = std::max(score_viterbi, score);
-		score_noisy_or += utils::mathop::log(1.0 - score);
-	      }
+	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
+		score = std::max(score, double(lexicon->operator()(*siter, target)));
 	      
-	      caches[target.id()].model1   = utils::mathop::log(score_model1);
-	      caches[target.id()].viterbi  = utils::mathop::log(score_viterbi);
-	      caches[target.id()].noisy_or = utils::mathop::log(- boost::math::expm1(score_noisy_or));
+	      caches[check] = true;
+	      caches[pos] = (score < threshold * lexicon->operator()(target)); // this target is inserted!
 	    }
 	    
-	    score_model1   += caches[target.id()].model1;
-	    score_viterbi  += caches[target.id()].viterbi;
-	    score_noisy_or += caches[target.id()].noisy_or;
+	    score -= caches[pos];
 	  }
 	
-	if (score_model1 != 0.0)
-	  features[feature_model1] = score_model1;
-	else
-	  features.erase(feature_model1);
-
-	if (score_viterbi != 0.0)
-	  features[feature_viterbi] = score_viterbi;
-	else
-	  features.erase(feature_viterbi);
-	
-	if (score_noisy_or != 0.0)
-	  features[feature_noisy_or] = score_noisy_or;
-	else
-	  features.erase(feature_noisy_or);
+	return score;
       }
 
       void assign(const lattice_type& lattice)
@@ -215,13 +177,10 @@ namespace cicada
       
       bool skip_sgml_tag;
       bool unique_source;
-      
-      feature_type feature_model1;
-      feature_type feature_viterbi;
-      feature_type feature_noisy_or;
+      double threshold;
     };
     
-    Lexicon::Lexicon(const std::string& parameter)
+    Insertion::Insertion(const std::string& parameter)
       : pimpl(0)
     {
       typedef cicada::Parameter parameter_type;
@@ -229,14 +188,15 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (utils::ipiece(param.name()) != "lexicon")
-	throw std::runtime_error("this is not a lexicon feature: " + parameter);
+      if (utils::ipiece(param.name()) != "insertion")
+	throw std::runtime_error("this is not a insertion feature: " + parameter);
 
       std::string path;
       
       bool populate = false;
       bool skip_sgml_tag = false;
       bool unique_source = false;
+      double threshold = 0.5;
       
       std::string name;
       
@@ -249,41 +209,41 @@ namespace cicada
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique-source")
 	  unique_source = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "threshold")
+	  threshold = utils::lexical_cast<double>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
-	  std::cerr << "WARNING: unsupported parameter for lexicon: " << piter->first << "=" << piter->second << std::endl;
+	  std::cerr << "WARNING: unsupported parameter for insertion: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (path.empty())
-	throw std::runtime_error("no lexicon file? " + path);
+	throw std::runtime_error("no insertion file? " + path);
       
-      std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      std::auto_ptr<impl_type> impl(new impl_type());
       
-      lexicon_impl->skip_sgml_tag = skip_sgml_tag;
-      lexicon_impl->unique_source = unique_source;
-      lexicon_impl->feature_model1   = (name.empty() ? std::string("lexicon") : name) + ":model1";
-      lexicon_impl->feature_viterbi  = (name.empty() ? std::string("lexicon") : name) + ":viterbi";
-      lexicon_impl->feature_noisy_or = (name.empty() ? std::string("lexicon") : name) + ":noisy-or";
+      impl->skip_sgml_tag = skip_sgml_tag;
+      impl->unique_source = unique_source;
+      impl->threshold = threshold;
       
       // open!
-      lexicon_impl->lexicon = &cicada::Lexicon::create(path);
-
-      if (! lexicon_impl->lexicon)
-	throw std::runtime_error("no lexicon");
-
+      impl->lexicon = &cicada::Lexicon::create(path);
+      
+      if (! impl->lexicon)
+	throw std::runtime_error("no Insertion");
+      
       if (populate)
-	lexicon_impl->lexicon->populate();
+	impl->lexicon->populate();
       
       base_type::__state_size = 0;
-      base_type::__feature_name = (name.empty() ? std::string("lexicon") : name);
+      base_type::__feature_name = (name.empty() ? std::string("insertion") : name);
       
-      pimpl = lexicon_impl.release();
+      pimpl = impl.release();
     }
     
-    Lexicon::~Lexicon() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Insertion::~Insertion() { std::auto_ptr<impl_type> tmp(pimpl); }
     
-    Lexicon::Lexicon(const Lexicon& x)
+    Insertion::Insertion(const Insertion& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
     {
@@ -292,7 +252,7 @@ namespace cicada
 	pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
     }
 
-    Lexicon& Lexicon::operator=(const Lexicon& x)
+    Insertion& Insertion::operator=(const Insertion& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
@@ -304,55 +264,60 @@ namespace cicada
       return *this;
     }
     
-    void Lexicon::apply(state_ptr_type& state,
-			const state_ptr_set_type& states,
-			const edge_type& edge,
-			feature_set_type& features,
-			const bool final) const
+    void Insertion::apply(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  const bool final) const
     {
-      pimpl->lexicon_score(edge, features);
+      const double value = pimpl->lexicon_score(edge, features);
+      
+      if (value != 0.0)
+	features[base_type::__feature_name] = value;
+      else
+	features.erase(base_type::__feature_name);
     }
 
-    void Lexicon::apply_coarse(state_ptr_type& state,
-			       const state_ptr_set_type& states,
-			       const edge_type& edge,
-			       feature_set_type& features,
-			       const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-    
-    void Lexicon::apply_predict(state_ptr_type& state,
-				const state_ptr_set_type& states,
-				const edge_type& edge,
-				feature_set_type& features,
-				const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-
-    
-    void Lexicon::apply_scan(state_ptr_type& state,
-			     const state_ptr_set_type& states,
-			     const edge_type& edge,
-			     const int dot,
-			     feature_set_type& features,
-			     const bool final) const
-    {}
-    
-    void Lexicon::apply_complete(state_ptr_type& state,
+    void Insertion::apply_coarse(state_ptr_type& state,
 				 const state_ptr_set_type& states,
 				 const edge_type& edge,
 				 feature_set_type& features,
 				 const bool final) const
+    {
+      apply(state, states, edge, features, final);
+    }
+    
+    void Insertion::apply_predict(state_ptr_type& state,
+				  const state_ptr_set_type& states,
+				  const edge_type& edge,
+				  feature_set_type& features,
+				  const bool final) const
+    {
+      apply(state, states, edge, features, final);
+    }
+
+    
+    void Insertion::apply_scan(state_ptr_type& state,
+			       const state_ptr_set_type& states,
+			       const edge_type& edge,
+			       const int dot,
+			       feature_set_type& features,
+			       const bool final) const
     {}
     
-    void Lexicon::assign(const size_type& id,
-			 const hypergraph_type& hypergraph,
-			 const lattice_type& lattice,
-			 const span_set_type& spans,
-			 const sentence_set_type& targets,
-			 const ngram_count_set_type& ngram_counts)
+    void Insertion::apply_complete(state_ptr_type& state,
+				   const state_ptr_set_type& states,
+				   const edge_type& edge,
+				   feature_set_type& features,
+				   const bool final) const
+    {}
+    
+    void Insertion::assign(const size_type& id,
+			   const hypergraph_type& hypergraph,
+			   const lattice_type& lattice,
+			   const span_set_type& spans,
+			   const sentence_set_type& targets,
+			   const ngram_count_set_type& ngram_counts)
     {
       //
       // how do we assign lexion feature from hypergraph...???
