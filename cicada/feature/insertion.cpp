@@ -2,7 +2,6 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include <boost/math/special_functions/expm1.hpp>
 #include <boost/filesystem.hpp>
 
 #include "insertion.hpp"
@@ -117,7 +116,7 @@ namespace cicada
 	      caches[pos] = (score < threshold * lexicon->operator()(target)); // this target is inserted!
 	    }
 	    
-	    score -= caches[pos];
+	    score -= double(caches[pos]);
 	  }
 	
 	return score;
