@@ -15,6 +15,7 @@
 #include "utils/dense_hash_set.hpp"
 #include "utils/bit_vector.hpp"
 #include "utils/memory.hpp"
+#include "utils/indexed_set.hpp"
 
 namespace cicada
 {
@@ -49,6 +50,9 @@ namespace cicada
       typedef feature_function_type::rule_type rule_type;
       
       typedef utils::bit_vector<1024> coverage_type;
+      typedef utils::indexed_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
+				 std::allocator<coverage_type> > coverage_set_type;
+      typedef coverage_set_type::index_type index_type;
       
       typedef rule_type::symbol_set_type phrase_type;
 
@@ -96,13 +100,11 @@ namespace cicada
 			   const edge_type& edge,
 			   Skipper skipper)
       {
-	utils::construct_object(reinterpret_cast<coverage_type*>(state), coverage_init);
-	
-	coverage_type& coverage = *reinterpret_cast<coverage_type*>(state);
+	coverage_type coverage(coverage_init);
 	
 	difference_type deleted = 0;
 	for (size_type i = 0; i != states.size(); ++ i) {
-	  const coverage_type& antecedent = *reinterpret_cast<const coverage_type*>(states[i]);
+	  const coverage_type& antecedent = coverages[*reinterpret_cast<const index_type*>(states[i])];
 	  
 	  deleted -= antecedent.count();
 	  coverage &= antecedent;
@@ -128,8 +130,15 @@ namespace cicada
 	    coverage &= citer->second;
 	  }
 	
+	// updated deleted
 	deleted += coverage.count();
 	
+	// assign state
+	coverage_set_type::iterator citer = coverages.insert(coverage).first;
+	
+	*reinterpret_cast<index_type*>(state) = citer - coverages.begin();
+	
+	// return score
 	return - deleted;
       }
 
@@ -182,14 +191,16 @@ namespace cicada
 	words.clear();
 	caches.clear();
 	coverage_init.clear();
+	coverages.clear();
       }
       
       lexicon_type* lexicon;
       
-      word_set_type  uniques;
-      sentence_type  words;
-      cache_set_type caches;
-      coverage_type  coverage_init;
+      word_set_type     uniques;
+      sentence_type     words;
+      cache_set_type    caches;
+      coverage_type     coverage_init;
+      coverage_set_type coverages;
       
       bool skip_sgml_tag;
       bool unique_source;
@@ -251,7 +262,7 @@ namespace cicada
       if (populate)
 	impl->lexicon->populate();
       
-      base_type::__state_size = sizeof(impl_type::coverage_type);
+      base_type::__state_size = sizeof(impl_type::index_type);
       base_type::__feature_name = (name.empty() ? std::string("deletion") : name);
       
       pimpl = impl.release();
