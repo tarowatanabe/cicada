@@ -4,7 +4,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include "insertion.hpp"
+#include "deletion.hpp"
 
 #include "cicada/parameter.hpp"
 #include "cicada/lexicon.hpp"
@@ -13,12 +13,14 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/mathop.hpp"
 #include "utils/dense_hash_set.hpp"
+#include "utils/bit_vector.hpp"
+#include "utils/memory.hpp"
 
 namespace cicada
 {
   namespace feature
   {
-    class InsertionImpl
+    class DeletionImpl
     {
     public:
       typedef size_t    size_type;
@@ -46,19 +48,21 @@ namespace cicada
       typedef feature_function_type::edge_type edge_type;
       typedef feature_function_type::rule_type rule_type;
       
-      typedef rule_type::symbol_set_type phrase_type;
+      typedef utils::bit_vector<1024> coverage_type;
       
+      typedef rule_type::symbol_set_type phrase_type;
+
       typedef symbol_type word_type;
       
       typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
       
-      
-      typedef std::vector<bool, std::allocator<bool> > cache_set_type;
+      typedef utils::unordered_map<word_type, coverage_type, boost::hash<word_type>, std::equal_to<word_type>,
+				   std::allocator<std::pair<const word_type, coverage_type> > >::type cache_set_type;
       
       typedef cicada::Lexicon lexicon_type;
       
-      InsertionImpl()
-	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false)
+      DeletionImpl()
+	: lexicon(0), uniques(), words(), skip_sgml_tag(false), unique_source(false)
       { uniques.set_empty_key(word_type());  }
       
       struct skipper_epsilon
@@ -77,47 +81,56 @@ namespace cicada
 	}
       };
       
-      double lexicon_score(const edge_type& edge)
+      double lexicon_score(state_ptr_type& state,
+			   const state_ptr_set_type& states,
+			   const edge_type& edge)
       {
 	return (skip_sgml_tag
-		? lexicon_score(edge, skipper_sgml())
-		: lexicon_score(edge, skipper_epsilon()));
+		? lexicon_score(state, states, edge, skipper_sgml())
+		: lexicon_score(state, states, edge, skipper_epsilon()));
       }
       
       template <typename Skipper>
-      double lexicon_score(const edge_type& edge,
+      double lexicon_score(state_ptr_type& state,
+			   const state_ptr_set_type& states,
+			   const edge_type& edge,
 			   Skipper skipper)
       {
-	const phrase_type& phrase = edge.rule->rhs;
+	utils::construct_object(reinterpret_cast<coverage_type*>(state), coverage_init);
 	
-	double score = 0.0;
+	coverage_type& coverage = *reinterpret_cast<coverage_type*>(state);
+	
+	difference_type deleted = 0;
+	for (size_type i = 0; i != states.size(); ++ i) {
+	  const coverage_type& antecedent = *reinterpret_cast<const coverage_type*>(states[i]);
+	  
+	  deleted -= antecedent.count();
+	  coverage &= antecedent;
+	}
+	
+	const phrase_type& phrase = edge.rule->rhs;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
 	    const symbol_type& target = *piter;
 	    
-	    const size_type check = size_type(target.id()) << 1;
-	    const size_type pos   = (size_type(target.id()) << 1) + 1;
-
-	    if (pos >= caches.size())
-	      caches.resize(pos + 1, false);
-
-	    if (! caches[check]) {
-	      double score = 0.0;
+	    cache_set_type::iterator citer = caches.find(target);
+	    if (citer == caches.end()) {
+	      citer = caches.insert(std::make_pair(target, coverage_type())).first;
 	      
+	      size_type i = 0;
 	      sentence_type::const_iterator siter_end = words.end();
-	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score = std::max(score, double(lexicon->operator()(*siter, target)));
-	      
-	      caches[check] = true;
-	      caches[pos] = (score < threshold * lexicon->operator()(target)); // this target is inserted!
+	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter, ++ i)
+		citer->second.set(i, lexicon->operator()(target, *siter) < threshold * lexicon->operator()(*siter));
 	    }
 	    
-	    score -= double(caches[pos]);
+	    coverage &= citer->second;
 	  }
 	
-	return score;
+	deleted += coverage.count();
+	
+	return - deleted;
       }
 
       void assign(const lattice_type& lattice)
@@ -157,6 +170,10 @@ namespace cicada
 	}
 	
 	std::sort(words.begin(), words.end());
+	
+	// set-up covearge-init
+	for (size_type i = 0; i != words.size(); ++ i)
+	  coverage_init.set(i, true);
       }
       
       void clear()
@@ -164,6 +181,7 @@ namespace cicada
 	uniques.clear();
 	words.clear();
 	caches.clear();
+	coverage_init.clear();
       }
       
       lexicon_type* lexicon;
@@ -171,13 +189,14 @@ namespace cicada
       word_set_type  uniques;
       sentence_type  words;
       cache_set_type caches;
+      coverage_type  coverage_init;
       
       bool skip_sgml_tag;
       bool unique_source;
       double threshold;
     };
     
-    Insertion::Insertion(const std::string& parameter)
+    Deletion::Deletion(const std::string& parameter)
       : pimpl(0)
     {
       typedef cicada::Parameter parameter_type;
@@ -185,8 +204,8 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (utils::ipiece(param.name()) != "insertion")
-	throw std::runtime_error("this is not a insertion feature: " + parameter);
+      if (utils::ipiece(param.name()) != "deletion")
+	throw std::runtime_error("this is not a deletion feature: " + parameter);
 
       std::string path;
       
@@ -211,11 +230,11 @@ namespace cicada
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
-	  std::cerr << "WARNING: unsupported parameter for insertion: " << piter->first << "=" << piter->second << std::endl;
+	  std::cerr << "WARNING: unsupported parameter for deletion: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (path.empty())
-	throw std::runtime_error("no insertion file? " + path);
+	throw std::runtime_error("no deletion file? " + path);
       
       std::auto_ptr<impl_type> impl(new impl_type());
       
@@ -227,20 +246,20 @@ namespace cicada
       impl->lexicon = &cicada::Lexicon::create(path);
       
       if (! impl->lexicon)
-	throw std::runtime_error("no Insertion");
+	throw std::runtime_error("no Deletion");
       
       if (populate)
 	impl->lexicon->populate();
       
-      base_type::__state_size = 0;
-      base_type::__feature_name = (name.empty() ? std::string("insertion") : name);
+      base_type::__state_size = sizeof(impl_type::coverage_type);
+      base_type::__feature_name = (name.empty() ? std::string("deletion") : name);
       
       pimpl = impl.release();
     }
     
-    Insertion::~Insertion() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Deletion::~Deletion() { std::auto_ptr<impl_type> tmp(pimpl); }
     
-    Insertion::Insertion(const Insertion& x)
+    Deletion::Deletion(const Deletion& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
     {
@@ -249,7 +268,7 @@ namespace cicada
 	pimpl->lexicon = &cicada::Lexicon::create(x.pimpl->lexicon->path().string());
     }
 
-    Insertion& Insertion::operator=(const Insertion& x)
+    Deletion& Deletion::operator=(const Deletion& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
@@ -261,13 +280,13 @@ namespace cicada
       return *this;
     }
     
-    void Insertion::apply(state_ptr_type& state,
-			  const state_ptr_set_type& states,
-			  const edge_type& edge,
-			  feature_set_type& features,
-			  const bool final) const
+    void Deletion::apply(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 const bool final) const
     {
-      const double value = pimpl->lexicon_score(edge);
+      const double value = pimpl->lexicon_score(state, states, edge);
       
       if (value != 0.0)
 	features[base_type::__feature_name] = value;
@@ -275,7 +294,16 @@ namespace cicada
 	features.erase(base_type::__feature_name);
     }
 
-    void Insertion::apply_coarse(state_ptr_type& state,
+    void Deletion::apply_coarse(state_ptr_type& state,
+				const state_ptr_set_type& states,
+				const edge_type& edge,
+				feature_set_type& features,
+				const bool final) const
+    {
+      apply(state, states, edge, features, final);
+    }
+    
+    void Deletion::apply_predict(state_ptr_type& state,
 				 const state_ptr_set_type& states,
 				 const edge_type& edge,
 				 feature_set_type& features,
@@ -283,38 +311,29 @@ namespace cicada
     {
       apply(state, states, edge, features, final);
     }
+
     
-    void Insertion::apply_predict(state_ptr_type& state,
+    void Deletion::apply_scan(state_ptr_type& state,
+			      const state_ptr_set_type& states,
+			      const edge_type& edge,
+			      const int dot,
+			      feature_set_type& features,
+			      const bool final) const
+    {}
+    
+    void Deletion::apply_complete(state_ptr_type& state,
 				  const state_ptr_set_type& states,
 				  const edge_type& edge,
 				  feature_set_type& features,
 				  const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-
-    
-    void Insertion::apply_scan(state_ptr_type& state,
-			       const state_ptr_set_type& states,
-			       const edge_type& edge,
-			       const int dot,
-			       feature_set_type& features,
-			       const bool final) const
     {}
     
-    void Insertion::apply_complete(state_ptr_type& state,
-				   const state_ptr_set_type& states,
-				   const edge_type& edge,
-				   feature_set_type& features,
-				   const bool final) const
-    {}
-    
-    void Insertion::assign(const size_type& id,
-			   const hypergraph_type& hypergraph,
-			   const lattice_type& lattice,
-			   const span_set_type& spans,
-			   const sentence_set_type& targets,
-			   const ngram_count_set_type& ngram_counts)
+    void Deletion::assign(const size_type& id,
+			  const hypergraph_type& hypergraph,
+			  const lattice_type& lattice,
+			  const span_set_type& spans,
+			  const sentence_set_type& targets,
+			  const ngram_count_set_type& ngram_counts)
     {
       //
       // how do we assign lexion feature from hypergraph...???

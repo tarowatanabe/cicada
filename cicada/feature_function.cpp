@@ -15,6 +15,7 @@
 #include "feature/bleu_multi.hpp"
 #include "feature/dependency.hpp"
 #include "feature/depeval.hpp"
+#include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/insertion.hpp"
@@ -85,6 +86,13 @@ dependency: dependency feature\n\
 depeval: dependency evaluation feature\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
+deletion: deletion feature\n\
+\tfile=lexicon model file\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tunique-source=[true|source] unique source labels\n\
+\tname=feature-name (default: insertion)\n\
+\tthreshold=threshold (default: 0.5)\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
@@ -246,6 +254,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::BleuMulti(parameter));
     else if (param_name == "distortion")
       return feature_function_ptr_type(new feature::Distortion(parameter));
+    else if (param_name == "deletion")
+      return feature_function_ptr_type(new feature::Deletion(parameter));
     else if (param_name == "dependency")
       return feature_function_ptr_type(new feature::Dependency(parameter));
     else if (param_name == "depeval")

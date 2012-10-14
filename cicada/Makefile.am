@@ -130,6 +130,7 @@ feature/bleu_linear.hpp \
 feature/bleu_multi.hpp \
 feature/dependency.hpp \
 feature/depeval.hpp \
+feature/deletion.hpp \
 feature/distortion.hpp \
 feature/feature_builder.hpp \
 feature/global_lexicon.hpp \
@@ -163,6 +164,7 @@ feature/bleu_multi.cpp \
 feature/distortion.cpp \
 feature/dependency.cpp \
 feature/depeval.cpp \
+feature/deletion.cpp \
 feature/global_lexicon.cpp \
 feature/insertion.cpp \
 feature/lexicalized_reordering.cpp \
