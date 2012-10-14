@@ -81,18 +81,18 @@ bleu-multi: multiple BLEU\n\
 \ttokenizer=[tokenizer spec]\n\
 \tname=feature-name (default: bleu-multi:integer)\n\
 \tsize=# of BLEU features\n\
-dependency: dependency feature\n\
-\torder=[order] (default: 2)\n\
-depeval: dependency evaluation feature\n\
-\tskip-sgml-tag=[true|false] skip sgml tags\n\
-\ttokenizer=[tokenizer spec]\n\
 deletion: deletion feature\n\
 \tfile=lexicon model file\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tunique-source=[true|source] unique source labels\n\
-\tname=feature-name (default: insertion)\n\
+\tname=feature-name (default: deletion)\n\
 \tthreshold=threshold (default: 0.5)\n\
+dependency: dependency feature\n\
+\torder=[order] (default: 2)\n\
+depeval: dependency evaluation feature\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\ttokenizer=[tokenizer spec]\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
