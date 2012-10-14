@@ -90,14 +90,14 @@ namespace cicada
       {
 	const phrase_type& phrase = edge.rule->rhs;
 	
-	double score = 0.0;
+	difference_type inserted = 0;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
 	    const symbol_type& target = *piter;
 	    
-	    const size_type check = size_type(target.id()) << 1;
+	    const size_type check = (size_type(target.id()) << 1) + 0;
 	    const size_type pos   = (size_type(target.id()) << 1) + 1;
 
 	    if (pos >= caches.size())
@@ -114,10 +114,10 @@ namespace cicada
 	      caches[pos] = (score < threshold * lexicon->operator()(target)); // this target is inserted!
 	    }
 	    
-	    score -= double(caches[pos]);
+	    inserted += caches[pos];
 	  }
 	
-	return score;
+	return - inserted;
       }
 
       void assign(const lattice_type& lattice)
