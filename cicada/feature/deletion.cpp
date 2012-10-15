@@ -319,10 +319,7 @@ namespace cicada
 				 const edge_type& edge,
 				 feature_set_type& features,
 				 const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-
+    {}
     
     void Deletion::apply_scan(state_ptr_type& state,
 			      const state_ptr_set_type& states,
@@ -337,7 +334,9 @@ namespace cicada
 				  const edge_type& edge,
 				  feature_set_type& features,
 				  const bool final) const
-    {}
+    {
+      apply(state, states, edge, features, final);
+    }
     
     void Deletion::assign(const size_type& id,
 			  const hypergraph_type& hypergraph,
