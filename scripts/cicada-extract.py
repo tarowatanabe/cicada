@@ -32,7 +32,11 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
     make_option("--lexical-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir})"),
-    
+    make_option("--counts-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="grammar counts directory (default: ${model_dir})"),
+    make_option("--score-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="grammar score directory (default: ${model_dir})"),
+
     ### source/target flags
     make_option("--f", default="", action="store", type="string",
                 metavar="FILE-OR-SUFFIX", help="source (or 'French')  language file or suffix"),
@@ -561,13 +565,13 @@ class Extract:
 class ExtractPhrase(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
+                 counts_dir="",
                  max_length=7, max_fertility=4,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+        Extract.__init__(self, max_malloc, threads, mpi, pbs, counts_dir)
         
-        self.counts = os.path.join(model_dir, "phrase-counts")
+        self.counts = os.path.join(counts_dir, "phrase-counts")
 
         self.data.append(corpus.source)
         self.data.append(corpus.target)
@@ -604,7 +608,7 @@ class ExtractPhrase(Extract):
 class ExtractSCFG(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
+                 counts_dir="",
                  max_length=7, max_fertility=4,
                  max_span_source=15, max_span_target=20,
                  min_hole_source=1, min_hole_target=1,
@@ -612,9 +616,9 @@ class ExtractSCFG(Extract):
                  exhaustive=None, constrained=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+        Extract.__init__(self, max_malloc, threads, mpi, pbs, counts_dir)
         
-        self.counts = os.path.join(model_dir, "scfg-counts")
+        self.counts = os.path.join(counts_dir, "scfg-counts")
         
         self.data.append(corpus.source)
         self.data.append(corpus.target)
@@ -670,7 +674,7 @@ class ExtractSCFG(Extract):
 class ExtractGHKM(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
+                 counts_dir="",
                  non_terminal="", max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
                  cutoff=1e-7,
                  collapse_source=None,
@@ -680,9 +684,9 @@ class ExtractGHKM(Extract):
                  project=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+        Extract.__init__(self, max_malloc, threads, mpi, pbs, counts_dir)
         
-        self.counts = os.path.join(model_dir, "ghkm-counts")
+        self.counts = os.path.join(counts_dir, "ghkm-counts")
 
         if os.path.exists(corpus.source_forest) and os.path.exists(corpus.target_forest):
             raise ValueError, "both source and target forest.. we can extract string-to-tree or tree-to-string"
@@ -763,7 +767,7 @@ class ExtractGHKM(Extract):
 class ExtractTree(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
+                 counts_dir="",
                  max_sentence_length=0, max_nodes=15, max_height=4, max_compose=0, max_scope=0,
                  cutoff=1e-7,
                  collapse_source=None,
@@ -772,9 +776,9 @@ class ExtractTree(Extract):
                  constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+        Extract.__init__(self, max_malloc, threads, mpi, pbs, counts_dir)
         
-        self.counts = os.path.join(model_dir, "tree-counts")
+        self.counts = os.path.join(counts_dir, "tree-counts")
 
         self.data.append(corpus.source_forest)
         self.data.append(corpus.target_forest)
@@ -824,31 +828,32 @@ class ExtractTree(Extract):
 class ExtractScore(Extract):
     
     def __init__(self, cicada=None,
-                 model_dir="",
+                 counts_dir="",
+                 score_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+        Extract.__init__(self, max_malloc, threads, mpi, pbs, score_dir)
         
         option = ""
         if phrase:
-            self.counts = os.path.join(model_dir, "phrase-counts")
-            self.scores = os.path.join(model_dir, "phrase-score")
+            self.counts = os.path.join(counts_dir, "phrase-counts")
+            self.scores = os.path.join(score_dir,  "phrase-score")
             self.logfile = "extract-score.phrase.log"
             option = " --score-phrase"
         elif scfg:
-            self.counts = os.path.join(model_dir, "scfg-counts")
-            self.scores = os.path.join(model_dir, "scfg-score")
+            self.counts = os.path.join(counts_dir, "scfg-counts")
+            self.scores = os.path.join(score_dir,  "scfg-score")
             self.logfile = "extract-score.scfg.log"
             option = " --score-scfg"
         elif ghkm:
-            self.counts = os.path.join(model_dir, "ghkm-counts")
-            self.scores = os.path.join(model_dir, "ghkm-score")
+            self.counts = os.path.join(counts_dir, "ghkm-counts")
+            self.scores = os.path.join(score_dir,  "ghkm-score")
             self.logfile = "extract-score.ghkm.log"
             option = " --score-ghkm"
         elif tree:
-            self.counts = os.path.join(model_dir, "tree-counts")
-            self.scores = os.path.join(model_dir, "tree-score")
+            self.counts = os.path.join(counts_dir, "tree-counts")
+            self.scores = os.path.join(score_dir,  "tree-score")
             self.logfile = "extract-score.tree.log"
             option = " --score-ghkm"
         else:
@@ -897,6 +902,10 @@ if __name__ == '__main__':
         options.lexical_dir = options.model_dir
     if not options.alignment_dir:
         options.alignment_dir = options.model_dir
+    if not options.counts_dir:
+        options.counts_dir = options.model_dir
+    if not options.score_dir:
+        options.score_dir = options.model_dir
 
     cicada = CICADA(options.cicada_dir)
 
@@ -942,14 +951,14 @@ if __name__ == '__main__':
         extract = None
         if options.phrase:
             extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
-                                    model_dir=options.model_dir,
+                                    counts_dir=options.counts_dir,
                                     max_length=options.max_length,
                                     max_fertility=options.max_fertility,
                                     max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                                     debug=options.debug)
         elif options.scfg:
             extract = ExtractSCFG(cicada=cicada, corpus=corpus, alignment=alignment,
-                                  model_dir=options.model_dir,
+                                  counts_dir=options.counts_dir,
                                   max_length=options.max_length,
                                   max_fertility=options.max_fertility,
                                   max_span_source=options.max_span_source,
@@ -964,7 +973,7 @@ if __name__ == '__main__':
                                   debug=options.debug)
         elif options.ghkm:
             extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
-                                  model_dir=options.model_dir,
+                                  counts_dir=options.counts_dir,
                                   non_terminal=options.non_terminal,
                                   max_sentence_length=options.max_sentence_length,
                                   max_nodes=options.max_nodes,
@@ -981,7 +990,7 @@ if __name__ == '__main__':
                                   debug=options.debug)
         elif options.tree:
             extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
-                                  model_dir=options.model_dir,
+                                  counts_dir=options.counts_dir,
                                   max_sentence_length=options.max_sentence_length,
                                   max_nodes=options.max_nodes,
                                   max_height=options.max_height,
@@ -1003,7 +1012,8 @@ if __name__ == '__main__':
 
     if options.first_step <= 6 and options.last_step >= 6:
         score = ExtractScore(cicada=cicada,
-                             model_dir=options.model_dir,
+                             counts_dir=options.counts_dir,
+                             score_dir=options.score_dir,
                              phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                              debug=options.debug)
