@@ -18,7 +18,8 @@
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-path_set_type files;
+path_set_type input_files;
+path_type     output_file = "-";
 
 void options(int argc, char** argv);
 
@@ -30,19 +31,20 @@ int main(int argc, char** argv)
 
     options(argc, argv);
 
-    if (files.empty())
-      files.push_back("-");
+    if (input_files.empty())
+      input_files.push_back("-");
     
-    istream_set_type istreams(files.size());
+    istream_set_type istreams(input_files.size());
 
-    for (size_t i = 0; i != files.size(); ++ i) {
-      if (files[i] != "-" && ! boost::filesystem::exists(files[i]))
-	throw std::runtime_error("no file? " + files[i].string());
+    for (size_t i = 0; i != input_files.size(); ++ i) {
+      if (input_files[i] != "-" && ! boost::filesystem::exists(input_files[i]))
+	throw std::runtime_error("no file? " + input_files[i].string());
       
-      istreams[i] = new utils::compress_istream(files[i], 1024 * 1024);
+      istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
     }
-    
-    std::ostream_iterator<char> oiter(std::cout);
+
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    std::ostream_iterator<char> oiter(os);
     
     line_set_type lines(istreams.size());
     for (;;) {
@@ -86,17 +88,15 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
+    ("input",  po::value<path_set_type>(&input_files)->multitoken(), "input file(s)")
+    ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("help", "help message");
   
-  po::options_description hidden;
-  hidden.add_options()
-    ("file", po::value<path_set_type>(&files), "files");
-  
   po::options_description cmdline_options;
-  cmdline_options.add(desc).add(hidden);
+  cmdline_options.add(desc);
   
   po::positional_options_description pos;
-  pos.add("file", -1); // all the files
+  pos.add("input", -1); // all the files
   
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(pos).run(), vm);
