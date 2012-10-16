@@ -68,20 +68,20 @@ class Grammar(UserList.UserList):
         path_files = os.path.join(grammar_dir, 'files');
         
         if not os.path.exists(path_files):
-            raise ValueError, "no path to files: %s" %(path_files)
-        
-        self.grammar_dir = grammar_dir
-        
-        for line in open(path_files):
+            if not os.path.exists(grammar_dir):
+                raise ValueError, "no path to grammar: %s" %(grammar_dir)
             
-            name = line.strip()
-            if not name: continue
+            self.append("grammar = " + grammar_dir + ":max-span=%d" %(max_span))
+        else:
+            for line in open(path_files):
+                name = line.strip()
+                if not name: continue
+                
+                path = os.path.join(grammar_dir, name)
+                if not os.path.exists(path):
+                    raise ValueError, "no path to grammar: %s" %(path)
             
-            path = os.path.join(grammar_dir, name)
-            if not os.path.exists(path):
-                raise ValueError, "no path to scores: %s" %(path)
-            
-            self.append("grammar = " + path + ":max-span=%d" %(max_span))
+                self.append("grammar = " + path + ":max-span=%d" %(max_span))
 
 class TreeGrammar(UserList.UserList):
     
@@ -92,20 +92,20 @@ class TreeGrammar(UserList.UserList):
         path_files = os.path.join(grammar_dir, 'files');
         
         if not os.path.exists(path_files):
-            raise ValueError, "no path to files: %s" %(path_files)
-        
-        self.grammar_dir = grammar_dir
-        
-        for line in open(path_files):
+            if not os.path.exists(grammar_dir):
+                raise ValueError, "no path to grammar: %s" %(grammar_dir)
             
-            name = line.strip()
-            if not name: continue
+            self.append("tree-grammar = " + grammar_dir)
+        else:
+            for line in open(path_files):
+                name = line.strip()
+                if not name: continue
             
-            path = os.path.join(grammar_dir, name)
-            if not os.path.exists(path):
-                raise ValueError, "no path to scores: %s" %(path)
-            
-            self.append("tree-grammar = " + path)
+                path = os.path.join(grammar_dir, name)
+                if not os.path.exists(path):
+                    raise ValueError, "no path to grammar: %s" %(path)
+                
+                self.append("tree-grammar = " + path)
 
 def non_terminal(x, index=0):
     if not x:
