@@ -18,17 +18,18 @@ libcicada-stemmer.la
 
 libcicadaincludedir= $(pkgincludedir)/cicada
 
-semiringdir  = $(pkgincludedir)/cicada/semiring
 evaldir      = $(pkgincludedir)/cicada/eval
+featuredir   = $(pkgincludedir)/cicada/feature
 formatdir    = $(pkgincludedir)/cicada/format
 headdir      = $(pkgincludedir)/cicada/head
+matcherdir   = $(pkgincludedir)/cicada/matcher
+msgpackdir   = $(pkgincludedir)/cicada/msgpack
+operationdir = $(pkgincludedir)/cicada/operation
 optimizedir  = $(pkgincludedir)/cicada/optimize
-featuredir   = $(pkgincludedir)/cicada/feature
+semiringdir  = $(pkgincludedir)/cicada/semiring
 signaturedir = $(pkgincludedir)/cicada/signature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
-operationdir = $(pkgincludedir)/cicada/operation
 tokenizerdir = $(pkgincludedir)/cicada/tokenizer
-matcherdir   = $(pkgincludedir)/cicada/matcher
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -252,6 +253,24 @@ matcher/wordnet.cpp
 
 libcicada_matcher_la_CPPFLAGS = $(AM_CPPFLAGS)
 libcicada_matcher_la_LIBADD = $(top_builddir)/wn/libwn.la
+
+dist_msgpack_HEADERS = \
+msgpack/alignment.hpp \
+msgpack/attribute.hpp \
+msgpack/attribute_vector.hpp \
+msgpack/dependency.hpp \
+msgpack/feature.hpp \
+msgpack/feature_vector.hpp \
+msgpack/hypergrpah.hpp \
+msgpack/lattice.hpp \
+msgpack/rule.hpp \
+msgpack/sentence.hpp \
+msgpack/sentence_vector.hpp \
+msgpack/span_vector.hpp \
+msgpack/symbol.hpp \
+msgpack/symbol_vector.hpp \
+msgpack/tree_rule.hpp \
+msgpack/weight_vector.hpp
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
