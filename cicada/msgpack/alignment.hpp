@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_ALIGNMENT__HPP__
 #define __CICADA__MSGPACK_ALIGNMENT__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/alignment.hpp>
 
 #include <msgpack/object.hpp>
@@ -108,4 +112,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

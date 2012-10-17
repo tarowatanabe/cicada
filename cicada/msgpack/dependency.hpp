@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_DEPENDENCY__HPP__
 #define __CICADA__MSGPACK_DEPENDENCY__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/dependency.hpp>
 
 #include <msgpack/object.hpp>
@@ -69,4 +73,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

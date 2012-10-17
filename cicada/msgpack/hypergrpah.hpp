@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_HYPERGRAPH__HPP__
 #define __CICADA__MSGPACK_HYPERGRAPH__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/hypergraph.hpp>
 
 #include <cicada/msgpack/rule.hpp>
@@ -219,4 +223,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

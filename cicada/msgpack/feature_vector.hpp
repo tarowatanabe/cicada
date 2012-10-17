@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_FEATURE_VECTOR__HPP__
 #define __CICADA__MSGPACK_FEATURE_VECTOR__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/feature_vector.hpp>
 
 #include <cicada/msgpack/feature.hpp>
@@ -79,4 +83,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

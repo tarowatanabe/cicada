@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_SPAN_VECTOR__HPP__
 #define __CICADA__MSGPACK_SPAN_VECTOR__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/span_vector.hpp>
 
 #include <cicada/msgpack/symbol.hpp>
@@ -112,4 +116,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

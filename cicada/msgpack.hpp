@@ -6,21 +6,25 @@
 #ifndef __CICADA__MSGPACK__HPP__
 #define __CICADA__MSGPACK__HPP__ 1
 
-#include <msgpack/alignment.hpp>
-#include <msgpack/attribute.hpp>
-#include <msgpack/attribute_vector.hpp>
-#include <msgpack/dependency.hpp>
-#include <msgpack/feature.hpp>
-#include <msgpack/feature_vector.hpp>
-#include <msgpack/hypergrpah.hpp>
-#include <msgpack/lattice.hpp>
-#include <msgpack/rule.hpp>
-#include <msgpack/sentence.hpp>
-#include <msgpack/sentence_vector.hpp>
-#include <msgpack/span_vector.hpp>
-#include <msgpack/symbol.hpp>
-#include <msgpack/symbol_vector.hpp>
-#include <msgpack/tree_rule.hpp>
-#include <msgpack/weight_vector.hpp>
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+#include <cicada/msgpack/alignment.hpp>
+#include <cicada/msgpack/attribute.hpp>
+#include <cicada/msgpack/attribute_vector.hpp>
+#include <cicada/msgpack/dependency.hpp>
+#include <cicada/msgpack/feature.hpp>
+#include <cicada/msgpack/feature_vector.hpp>
+#include <cicada/msgpack/hypergrpah.hpp>
+#include <cicada/msgpack/lattice.hpp>
+#include <cicada/msgpack/rule.hpp>
+#include <cicada/msgpack/sentence.hpp>
+#include <cicada/msgpack/sentence_vector.hpp>
+#include <cicada/msgpack/span_vector.hpp>
+#include <cicada/msgpack/symbol.hpp>
+#include <cicada/msgpack/symbol_vector.hpp>
+#include <cicada/msgpack/tree_rule.hpp>
+#include <cicada/msgpack/weight_vector.hpp>
+#endif
 
 #endif

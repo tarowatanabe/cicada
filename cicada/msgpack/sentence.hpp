@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_SENTENCE__HPP__
 #define __CICADA__MSGPACK_SENTENCE__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <cicada/sentence.hpp>
 
 #include <cicada/msgpack/symbol.hpp>
@@ -70,4 +74,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif

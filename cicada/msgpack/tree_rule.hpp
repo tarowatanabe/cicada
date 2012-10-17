@@ -6,6 +6,10 @@
 #ifndef __CICADA__MSGPACK_TREE_RULE__HPP__
 #define __CICADA__MSGPACK_TREE_RULE__HPP__ 1
 
+#include <utils/config.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
+
 #include <vector>
 
 #include <cicada/tree_rule.hpp>
@@ -128,4 +132,5 @@ namespace cicada
   };
 };
 
+#endif
 #endif
