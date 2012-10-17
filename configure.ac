@@ -94,7 +94,6 @@ else
     AC_DEFINE([HAVE_GOOGLE_SPARSEHASH], 1, [Define to 1 if you have (old) sparsehash.])
   fi
 fi
-
 CXXFLAGS="$save_CXXFLAGS"
 
 AC_ARG_WITH(snappy,
@@ -140,6 +139,51 @@ fi
 AC_SUBST(SNAPPY_CPPFLAGS)
 AC_SUBST(SNAPPY_LDFLAGS)
 AM_CONDITIONAL([WITH_SNAPPY], [test "x$ac_have_libsnappy" = "xyes" -a "x$ac_cv_header_snappy_h" = "xyes"])
+
+AC_ARG_WITH(msgpack,
+        [AC_HELP_STRING([--with-msgpack=DIR], [msgpack in DIR])],
+        [msgpack_dir="${withval}"], [msgpack_dir=''])
+AC_ARG_ENABLE(msgpack,
+        [AC_HELP_STRING([--enable-msgpack], [enable msgpack])],
+        [ac_enable_msgpack=yes], [ac_enable_msgpack=no])
+
+if test "x$msgpack_dir" != "x"; then
+  MSGPACK_CPPFLAGS="-I${msgpack_dir}/include"
+  MSGPACK_LDFLAGS="-L${msgpack_dir}/lib -lmsgpack"
+else
+  MSGPACK_CPPFLAGS=""
+  MSGPACK_LDFLAGS="-lmsgpack"
+fi
+
+if test "x$ac_enable_msgpack" = "xyes"; then
+   AC_MSG_CHECKING(for msgpack)
+   
+   save_CXXFLAGS="$CXXFLAGS"
+   save_LDFLAGS="$LDFLAGS"
+   CXXFLAGS="$CXXFLAGS $MSGPACK_CPPFLAGS"
+   LDFLAGS="$LDFLAGS $MSGPACK_LDFLAGS"
+
+   AC_TRY_LINK([], [], [ac_have_libmsgpack=yes], [ac_have_libmsgpack=no])
+   AC_MSG_RESULT($ac_have_libmsgpack)
+   AC_CHECK_HEADERS([msgpack.hpp])
+
+   if test "x$ac_have_libmsgpack" = "xno" -o "x$ac_cv_header_msgpack_hpp" = "xno"; then
+     MSGPACK_CPPFLAGS=""
+     MSGPACK_LDFLAGS=""
+   else
+     AC_DEFINE(HAVE_MSGPACK, 1, [Define if you have msgpack])
+   fi
+
+  CXXFLAGS="$save_CXXFLAGS"
+  LDFLAGS="$save_LDFLAGS"
+else
+  MSGPACK_CPPFLAGS=""
+  MSGPACK_LDFLAGS=""
+fi
+AC_SUBST(MSGPACK_CPPFLAGS)
+AC_SUBST(MSGPACK_LDFLAGS)
+AM_CONDITIONAL([WITH_MSGPACK], [test "x$ac_have_libmsgpack" = "xyes" -a "x$ac_cv_header_msgpack_hpp" = "xyes"])
+
 
 AC_ARG_WITH(jemalloc,
 	[AC_HELP_STRING([--with-jemalloc=DIR], [jemalloc in DIR])],

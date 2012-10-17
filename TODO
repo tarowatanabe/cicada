@@ -168,3 +168,5 @@ the difference of the # of lines read and the actual read from stdin!
 cicada_filter_kbest to support {file,directory}-to-{file,directory}
 
 add error checking for codecs
+
+msgpack for succinct storage
