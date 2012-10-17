@@ -161,8 +161,8 @@ namespace cicada
 	  
 	  lexicon.insert(codes, 2, boost::fusion::get<2>(lexicon_parsed));
 	  
-	  if (codes[1] >= maximum.size())
-	    maximum.resize(codes[1] + 1, 0.0);
+	  if (codes[0] >= maximum.size())
+	    maximum.resize(codes[0] + 1, 0.0);
 	  
 	  maximum[codes[0]] = std::max(maximum[codes[0]], boost::fusion::get<2>(lexicon_parsed));
 	  
