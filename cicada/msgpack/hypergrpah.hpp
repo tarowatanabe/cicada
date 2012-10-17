@@ -20,6 +20,58 @@ namespace cicada
 {
   namespace msgpack
   {
+    namespace detail
+    {
+      template <typename Storage>
+      inline
+      void decode_array(::msgpack::object& o, Storage& storage)
+      {
+	if (o.type != ::msgpack::type::ARRAY)
+	  throw ::msgpack::type_error();
+	
+	storage.resize(o.via.array.size);
+	
+	if (o.via.array.size) {
+	  ::msgpack::object* p = o.via.array.ptr;
+	  ::msgpack::object* const pend = o.via.array.ptr + o.via.array.size;
+	  
+	  for (typename Storage::iterator it = storage.begin(); p != pend; ++ p, ++ it)
+	    p->convert(&(*it));
+	}
+      }
+
+      template <typename Stream, typename Iterator>
+      inline
+      void encode_array(::msgpack::packer<Stream>& o, Iterator first, Iterator last)
+      {
+	o.pack_array(std::distance(first, last));
+	for (/**/; first != last; ++ first)
+	  o.pack(*first);
+      }
+      
+      template <typename Iterator>
+      inline
+      void encode_array(::msgpack::objec& t, ::msgpack::object::with_zone& o, Iterator first, Iterator last)
+      {
+	const size_t size = std::distance(first, last);
+	
+	t.type = ::msgpack::type::ARRAY;
+	if (! size) {
+	  t.via.array.ptr = NULL;
+	  t.via.array.size = 0;
+	} else {
+	  ::msgpack::object* p = (::msgpack::object*) o.zone->malloc(sizeof(::msgpack::object) * size);
+	  ::msgpack::object* const pend = p + size;
+	  
+	  t.via.array.ptr  = p;
+	  t.via.array.size = size;
+	  
+	  for (/**/; p != pend; ++ p, ++ first)
+	    *p = ::msgpack::object(*first, o.zone);
+	}
+      }
+    };
+
     inline
     cicada::HyperGraph::node_type& operator>>(::msgpack::object o, cicada::HyperGraph::node_type& v)
     {
@@ -66,6 +118,21 @@ namespace cicada
       if (o.via.array.size != 6)
 	throw ::msgpack::type_error();
       
+      // head
+      o.via.array.ptr[0].convert(&v.head);
+      // tails
+      detai::decode_array(o.via.array.ptr[1], v.tails);
+      
+      // features/attributes
+      o.via.array.ptr[2].convert(&v.features);
+      o.via.array.ptr[3].convert(&v.attributes);
+      
+      // rule/id
+      cicada::Rule rule;
+      o.via.array.ptr[4].convert(&rule);
+      o.via.array.ptr[5].convert(&v.id);
+      
+      v.rule = cicada::Rule::crate(rule);
       
       return v;
     }
@@ -75,7 +142,15 @@ namespace cicada
     ::msgpack::packer<Stream>& operator<<(::msgpack::packer<Stream>& o, const cicada::HyperGraph::edge_type& v)
     {
       o.pack_array(6);
+      o.pack(v.head);
       
+      // tails...
+      detail::encode_array(o, v.tails.begin(), v.tails.end());
+      
+      o.pack(v.features);
+      o.pack(v.attributes);
+      o.pack(*v.rule);
+      o.pack(v.id)
       return o;
     }
     
@@ -89,7 +164,14 @@ namespace cicada
       o.via.array.ptr = p;
       o.via.array.size = 6;
       
+      p[0] = ::msgpack::object(v.head,       o.zone);
       
+      detail::encode_array(p[1], o, v.tails.begin(), v.tails.end());
+      
+      p[2] = ::msgpack::object(v.features,   o.zone);
+      p[3] = ::msgpack::object(v.attributes, o.zone);
+      p[4] = ::msgpack::object(*v.rule,      o.zone);
+      p[5] = ::msgpack::object(v.id,         o.zone);
     }
     
     inline
@@ -100,6 +182,10 @@ namespace cicada
       if (o.via.array.size != 3)
 	throw ::msgpack::type_error();
       
+      detai::decode_array(o.via.array.ptr[0], v.nodes);
+      detai::decode_array(o.via.array.ptr[1], v.edges);
+      o.via.array.ptr[2].convert(&v.goal);
+      
       return v;
     }
     
@@ -109,8 +195,9 @@ namespace cicada
     {
       o.pack_array(3);
       
-      
-      
+      detail::encode_array(o, v.nodes.begin(), v.nodes.end());
+      detail::encode_array(o, v.edges.begin(), v.edges.end());
+      o.pack(v.goal);
       
       return o;
     }
@@ -125,7 +212,9 @@ namespace cicada
       o.via.array.ptr = p;
       o.via.array.size = 3;
       
-      
+      detail::encode_array(p[0], o, v.nodes.begin(), v.nodes.end());
+      detail::encode_array(p[1], o, v.edges.begin(), v.edges.end());
+      p[2] = ::msgpack::object(v.goal,   o.zone);
     }
   };
 };
