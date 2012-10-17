@@ -21,16 +21,16 @@ namespace cicada
   namespace msgpack
   {
     inline
-    cicada::Sentence& operator>>(::msgpack::object o, cicada::Sentence& v)
+    cicada::Sentence& operator>>(msgpack::object o, cicada::Sentence& v)
     {
-      if (o.type != ::msgpack::type::ARRAY)
-	throw ::msgpack::type_error();
+      if (o.type != msgpack::type::ARRAY)
+	throw msgpack::type_error();
       
       v.resize(o.via.array.size);
       
       if (o.via.array.size) {
-	::msgpack::object* p = o.via.array.ptr;
-	::msgpack::object* const pend = o.via.array.ptr + o.via.array.size;
+	msgpack::object* p = o.via.array.ptr;
+	msgpack::object* const pend = o.via.array.ptr + o.via.array.size;
 	
 	for (cicada::Sentence::iterator it = v.begin(); p != pend; ++ p, ++ it)
 	  p->convert(&(*it));
@@ -41,7 +41,7 @@ namespace cicada
     
     template <typename Stream>
     inline
-    ::msgpack::packer<Stream>& operator<<(::msgpack::packer<Stream>& o, const cicada::Sentence& v)
+    msgpack::packer<Stream>& operator<<(msgpack::packer<Stream>& o, const cicada::Sentence& v)
     {
       o.pack_array(v.size());
       
@@ -53,22 +53,22 @@ namespace cicada
     }
     
     inline
-    void operator<<(::msgpack::object::with_zone& o, const cicada::Sentence& v)
+    void operator<<(msgpack::object::with_zone& o, const cicada::Sentence& v)
     {
-      o.type = ::msgpack::type::ARRAY;
+      o.type = msgpack::type::ARRAY;
       
       if (v.empty()) {
 	o.via.array.ptr = NULL;
 	o.via.array.size = 0;
       } else {
-	::msgpack::object* p = (::msgpack::object*) o.zone->malloc(sizeof(::msgpack::object) * v.size());
-	::msgpack::object* const pend = p + v.size();
+	msgpack::object* p = (msgpack::object*) o.zone->malloc(sizeof(msgpack::object) * v.size());
+	msgpack::object* const pend = p + v.size();
 	
 	o.via.array.ptr = p;
 	o.via.array.size = v.size();
 	
 	for (cicada::Sentence::const_iterator it(v.begin()); p != pend; ++ p, ++ it)
-	  *p = ::msgpack::object(*it, o.zone);
+	  *p = msgpack::object(*it, o.zone);
       }
     }
   };

@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I.. $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(SPARSEHASH_CPPFLAGS)
+AM_CPPFLAGS = -I.. $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(SPARSEHASH_CPPFLAGS) $(MSGPACK_CPPFLAGS)
 
 LIBUTILS=$(top_builddir)/utils/libutils.la
 
@@ -408,7 +408,6 @@ lattice.hpp \
 lexicon.hpp \
 matcher.hpp \
 model.hpp \
-msgpack.hpp \
 ngram.hpp \
 ngram_cache.hpp \
 ngram_index.hpp \
@@ -670,7 +669,7 @@ stemmer_main_SOURCES = stemmer_main.cpp
 stemmer_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
-symbol_main_LDADD = libcicada.la
+symbol_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 symbol_vector_main_SOURCES = symbol_vector_main.cpp
 symbol_vector_main_LDADD = libcicada.la
