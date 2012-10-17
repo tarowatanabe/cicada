@@ -55,6 +55,11 @@ namespace cicada
       __impl.clear();
     }
 
+    void resize(size_type x)
+    {
+      __impl.resize(x);
+    }
+
     void assign(const SymbolVector& x)
     {
       __impl = x.__impl;

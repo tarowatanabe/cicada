@@ -8,12 +8,11 @@
 
 #include <utils/config.hpp>
 
-#ifdef HAVE_MSGPACK_HPP
-
 #include <cicada/lattice.hpp>
-
 #include <cicada/msgpack/symbol.hpp>
 #include <cicada/msgpack/feature_vector.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 #include <msgpack/type/int.hpp>
@@ -21,17 +20,17 @@
 namespace msgpack
 {
   inline
-  cicada::Lattice& operator>>(msgpack::object o, cicada::Lattice::arc_type& v)
+  cicada::Lattice::arc_type& operator>>(msgpack::object o, cicada::Lattice::arc_type& v)
   {
     if (o.type != msgpack::type::ARRAY)
       throw msgpack::type_error();
     if (o.via.array.size != 3)
       throw msgpack::type_error();
       
-    o.via.array.ptr[0].convert(&v.feature);
+    o.via.array.ptr[0].convert(&v.features);
     o.via.array.ptr[1].convert(&v.label);
     o.via.array.ptr[2].convert(&v.distance);
-      
+    
     return v;
   }
 
@@ -62,7 +61,7 @@ namespace msgpack
   }
 
   inline
-  cicada::Lattice& operator>>(msgpack::object o, cicada::Lattice::arc_set_type& v)
+  cicada::Lattice::arc_set_type& operator>>(msgpack::object o, cicada::Lattice::arc_set_type& v)
   {
     if (o.type != msgpack::type::ARRAY)
       throw msgpack::type_error();
@@ -73,7 +72,7 @@ namespace msgpack
       msgpack::object* p = o.via.array.ptr;
       msgpack::object* const pend = o.via.array.ptr + o.via.array.size;
 	
-      for (cicada::Lattice::iterator it = v.begin(); p != pend; ++ p, ++ it)
+      for (cicada::Lattice::arc_set_type::iterator it = v.begin(); p != pend; ++ p, ++ it)
 	p->convert(&(*it));
     }
       
@@ -108,7 +107,7 @@ namespace msgpack
       o.via.array.ptr = p;
       o.via.array.size = v.size();
 	
-      for (cicada::Lattice::const_iterator it(v.begin()); p != pend; ++ p, ++ it)
+      for (cicada::Lattice::arc_set_type::const_iterator it(v.begin()); p != pend; ++ p, ++ it)
 	*p = msgpack::object(*it, o.zone);
     }
   }

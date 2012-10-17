@@ -6,15 +6,14 @@
 #ifndef __CICADA__MSGPACK_TREE_RULE__HPP__
 #define __CICADA__MSGPACK_TREE_RULE__HPP__ 1
 
-#include <utils/config.hpp>
-
-#ifdef HAVE_MSGPACK_HPP
-
 #include <vector>
 
-#include <cicada/tree_rule.hpp>
+#include <utils/config.hpp>
 
+#include <cicada/tree_rule.hpp>
 #include <cicada/msgpack/symbol.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 #include <msgpack/type/int.hpp>
@@ -37,7 +36,7 @@ namespace msgpack
     typedef msgpack::object* object_ptr_type;
       
     inline
-    void decode(const cicada::TreeRule& rule, object_ptr_type& p)
+    void decode(cicada::TreeRule& rule, object_ptr_type& p)
     {
       uint32_t size = 0;
 	
@@ -45,7 +44,7 @@ namespace msgpack
       ++ p;
       p->convert(&size);
       ++ p;
-	
+      
       rule.antecedents.resize(size);
 	
       for (size_t i = 0; i != rule.antecedents.size(); ++ i)

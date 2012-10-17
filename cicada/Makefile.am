@@ -261,7 +261,7 @@ msgpack/attribute_vector.hpp \
 msgpack/dependency.hpp \
 msgpack/feature.hpp \
 msgpack/feature_vector.hpp \
-msgpack/hypergrpah.hpp \
+msgpack/hypergraph.hpp \
 msgpack/lattice.hpp \
 msgpack/rule.hpp \
 msgpack/sentence.hpp \
@@ -602,10 +602,10 @@ noinst_DATA = .gitignore
 	done
 
 alignment_main_SOURCES = alignment_main.cpp
-alignment_main_LDADD = libcicada.la
+alignment_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 attribute_vector_main_SOURCES = attribute_vector_main.cpp
-attribute_vector_main_LDADD = libcicada.la
+attribute_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 cluster_main_SOURCES = cluster_main.cpp
 cluster_main_LDADD = libcicada.la
@@ -630,10 +630,10 @@ grammar_unknown_main_SOURCES = grammar_unknown_main.cpp
 grammar_unknown_main_LDADD = libcicada.la
 
 hypergraph_main_SOURCES = hypergraph_main.cpp
-hypergraph_main_LDADD = libcicada.la
+hypergraph_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 lattice_main_SOURCES = lattice_main.cpp
-lattice_main_LDADD = libcicada.la
+lattice_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 lexicon_main_SOURCES = lexicon_main.cpp
 lexicon_main_LDADD = libcicada.la
@@ -651,19 +651,19 @@ parameter_main_SOURCES = parameter_main.cpp
 parameter_main_LDADD = libcicada.la
 
 rule_main_SOURCES = rule_main.cpp
-rule_main_LDADD = libcicada.la
+rule_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 sentence_main_SOURCES = sentence_main.cpp
-sentence_main_LDADD = libcicada.la
+sentence_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 sentence_vector_main_SOURCES = sentence_vector_main.cpp
-sentence_vector_main_LDADD = libcicada.la
+sentence_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 signature_main_SOURCES = signature_main.cpp
 signature_main_LDADD = libcicada.la
 
 span_vector_main_SOURCES = span_vector_main.cpp
-span_vector_main_LDADD = libcicada.la
+span_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 stemmer_main_SOURCES = stemmer_main.cpp
 stemmer_main_LDADD = libcicada.la
@@ -672,7 +672,7 @@ symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 symbol_vector_main_SOURCES = symbol_vector_main.cpp
-symbol_vector_main_LDADD = libcicada.la
+symbol_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 tokenizer_main_SOURCES = tokenizer_main.cpp
 tokenizer_main_LDADD = libcicada.la
@@ -687,4 +687,4 @@ tree_grammar_static_main_SOURCES = tree_grammar_static_main.cpp
 tree_grammar_static_main_LDADD = libcicada.la
 
 tree_rule_main_SOURCES = tree_rule_main.cpp
-tree_rule_main_LDADD = libcicada.la
+tree_rule_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)

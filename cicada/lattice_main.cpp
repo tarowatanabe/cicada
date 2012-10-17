@@ -1,11 +1,16 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
 
 #include "lattice.hpp"
 #include "remove_epsilon.hpp"
+
+#ifdef HAVE_MSGPACK_HPP
+#include <msgpack.hpp>
+#include <cicada/msgpack/lattice.hpp>
+#endif
 
 int main(int argc, char** argv)
 {

@@ -8,11 +8,10 @@
 
 #include <utils/config.hpp>
 
-#ifdef HAVE_MSGPACK_HPP
-
 #include <cicada/sentence_vector.hpp>
-
 #include <cicada/msgpack/sentence.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 

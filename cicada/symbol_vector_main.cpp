@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -8,6 +12,11 @@
 
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+
+#ifdef HAVE_MSGPACK_HPP
+#include <msgpack.hpp>
+#include <cicada/msgpack/symbol_vector.hpp>
+#endif
 
 typedef cicada::Symbol symbol_type;
 typedef cicada::SymbolVector symbol_set_type;

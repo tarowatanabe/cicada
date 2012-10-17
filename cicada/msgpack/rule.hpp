@@ -8,12 +8,11 @@
 
 #include <utils/config.hpp>
 
-#ifdef HAVE_MSGPACK_HPP
-
 #include <cicada/rule.hpp>
-
 #include <cicada/msgpack/symbol.hpp>
 #include <cicada/msgpack/symbol_vector.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 

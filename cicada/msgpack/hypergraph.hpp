@@ -8,13 +8,13 @@
 
 #include <utils/config.hpp>
 
-#ifdef HAVE_MSGPACK_HPP
-
 #include <cicada/hypergraph.hpp>
 
 #include <cicada/msgpack/rule.hpp>
 #include <cicada/msgpack/feature_vector.hpp>
 #include <cicada/msgpack/attribute_vector.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 #include <msgpack/type/int.hpp>
@@ -53,7 +53,7 @@ namespace msgpack
       
     template <typename Iterator>
     inline
-    void encode_array(msgpack::objec& t, msgpack::object::with_zone& o, Iterator first, Iterator last)
+    void encode_array(msgpack::object& t, msgpack::object::with_zone& o, Iterator first, Iterator last)
     {
       const size_t size = std::distance(first, last);
 	
@@ -82,7 +82,7 @@ namespace msgpack
     if (o.via.array.size != 2)
       throw msgpack::type_error();
     
-    detai::decode_array(o.via.array.ptr[0], v.edges);
+    detail::decode_array(o.via.array.ptr[0], v.edges);
     o.via.array.ptr[1].convert(&v.id);
       
     return v;
@@ -123,7 +123,7 @@ namespace msgpack
     // head
     o.via.array.ptr[0].convert(&v.head);
     // tails
-    detai::decode_array(o.via.array.ptr[1], v.tails);
+    detail::decode_array(o.via.array.ptr[1], v.tails);
       
     // features/attributes
     o.via.array.ptr[2].convert(&v.features);
@@ -134,7 +134,7 @@ namespace msgpack
     o.via.array.ptr[4].convert(&rule);
     o.via.array.ptr[5].convert(&v.id);
       
-    v.rule = cicada::Rule::crate(rule);
+    v.rule = cicada::Rule::create(rule);
       
     return v;
   }
@@ -152,8 +152,8 @@ namespace msgpack
     o.pack(v.features);
     o.pack(v.attributes);
     o.pack(*v.rule);
-    o.pack(v.id)
-      return o;
+    o.pack(v.id);
+    return o;
   }
     
   inline
@@ -184,8 +184,8 @@ namespace msgpack
     if (o.via.array.size != 3)
       throw msgpack::type_error();
       
-    detai::decode_array(o.via.array.ptr[0], v.nodes);
-    detai::decode_array(o.via.array.ptr[1], v.edges);
+    detail::decode_array(o.via.array.ptr[0], v.nodes);
+    detail::decode_array(o.via.array.ptr[1], v.edges);
     o.via.array.ptr[2].convert(&v.goal);
       
     return v;

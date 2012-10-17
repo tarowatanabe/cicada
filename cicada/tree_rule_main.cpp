@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iterator>
@@ -7,6 +7,11 @@
 
 #include "tree_rule.hpp"
 #include "tree_rule_compact.hpp"
+
+#ifdef HAVE_MSGPACK_HPP
+#include <msgpack.hpp>
+#include <cicada/msgpack/tree_rule.hpp>
+#endif
 
 typedef cicada::TreeRule rule_type;
 

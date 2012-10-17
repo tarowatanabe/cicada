@@ -8,11 +8,10 @@
 
 #include <utils/config.hpp>
 
-#ifdef HAVE_MSGPACK_HPP
-
 #include <cicada/attribute_vector.hpp>
-
 #include <cicada/msgpack/attribute.hpp>
+
+#ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
 #include <msgpack/type/string.hpp>
@@ -42,29 +41,35 @@ namespace msgpack
   };
 
   inline
-  cicada::AttributeVector& operator>>(msgpack::object o, cicada::AttributeVector::data_type& v)
+  cicada::AttributeVector::data_type& operator>>(msgpack::object o, cicada::AttributeVector::data_type& v)
   {
     switch (o.type) {
     case msgpack::type::POSITIVE_INTEGER:
     case msgpack::type::NEGATIVE_INTEGER:
-      cicada::AttributeVector::int_type vi;
-      o >> vi;
-      v = vi;
+      {
+	cicada::AttributeVector::int_type vi;
+	o >> vi;
+	v = vi;
+      }
       break;
     case msgpack::type::DOUBLE:
-      cicada::AttributeVector::float_type vf;
-      o >> vf;
-      v = vf;
+      {
+	cicada::AttributeVector::float_type vf;
+	o >> vf;
+	v = vf;
+      }
       break;
     case msgpack::type::RAW:
-      cicada::AttributeVector::string_type vs;
-      o >> vs;
-      v = vs;
+      {
+	cicada::AttributeVector::string_type vs;
+	o >> vs;
+	v = vs;
+      }
       break;
     default:
       throw msgpack::type_error();
     }
-      
+    
     return v;
   }
     
@@ -99,7 +104,6 @@ namespace msgpack
     msgpack::object_kv* const pend(o.via.map.ptr + o.via.map.size);
       
     v.clear();
-    v.rehash(o.via.map.size);
       
     cicada::Attribute attribute;
     for (/**/; p != pend; ++ p) {

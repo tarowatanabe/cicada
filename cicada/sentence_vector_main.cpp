@@ -1,8 +1,14 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "sentence_vector.hpp"
+
+
+#ifdef HAVE_MSGPACK_HPP
+#include <msgpack.hpp>
+#include <cicada/msgpack/sentence_vector.hpp>
+#endif
 
 int main(int argc, char** argv)
 {

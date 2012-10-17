@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <time.h>
@@ -15,6 +15,11 @@
 
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+
+#ifdef HAVE_MSGPACK_HPP
+#include <msgpack.hpp>
+#include <cicada/msgpack/feature_vector.hpp>
+#endif
 
 typedef cicada::FeatureVector<double> feature_set_type;
 typedef cicada::FeatureVectorLinear<double> feature_linear_type;
