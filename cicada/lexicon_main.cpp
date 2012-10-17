@@ -16,10 +16,17 @@ int main(int argc, char** argv)
   
   cicada::Sentence sentence;
   while (std::cin >> sentence)
-    if (! sentence.empty())
-      std::cerr << "value: " << lexicon(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl
-		<< "max: " << lexicon(sentence.back()) << std::endl
-		<< "exists: " << lexicon.exists(sentence.begin(), sentence.end() - 1) << std::endl
-		<< "exists2: " << lexicon.exists(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl;
+    if (! sentence.empty()) {
+
+      if (sentence.size() < 2)
+	std::cerr << "value: " << lexicon(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl
+		  << "exists: " << lexicon.exists(sentence.begin(), sentence.end() - 1) << std::endl
+		  << "exists2: " << lexicon.exists(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl;
+      else
+	std::cerr << "value: " << lexicon(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl
+		  << "max: " << lexicon(*(sentence.end() - 2)) << std::endl
+		  << "exists: " << lexicon.exists(sentence.begin(), sentence.end() - 1) << std::endl
+		  << "exists2: " << lexicon.exists(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl;
+    }
   
 }
