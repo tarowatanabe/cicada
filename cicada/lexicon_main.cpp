@@ -18,6 +18,7 @@ int main(int argc, char** argv)
   while (std::cin >> sentence)
     if (! sentence.empty())
       std::cerr << "value: " << lexicon(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl
+		<< "max: " << lexicon(sentence.back()) << std::endl
 		<< "exists: " << lexicon.exists(sentence.begin(), sentence.end() - 1) << std::endl
 		<< "exists2: " << lexicon.exists(sentence.begin(), sentence.end() - 1, sentence.back()) << std::endl;
   

@@ -104,14 +104,13 @@ namespace cicada
 	      caches.resize(pos + 1, false);
 
 	    if (! caches[check]) {
-	      double score = 0.0;
-	      
+	      bool inserted = true;
 	      sentence_type::const_iterator siter_end = words.end();
 	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter)
-		score = std::max(score, double(lexicon->operator()(*siter, target)));
+		inserted &= lexicon->operator()(*siter, target) < threshold * lexicon->operator()(*siter);
 	      
 	      caches[check] = true;
-	      caches[pos] = (score < threshold * lexicon->operator()(target)); // this target is inserted!
+	      caches[pos] = inserted;
 	    }
 	    
 	    inserted += caches[pos];

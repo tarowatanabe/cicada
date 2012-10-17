@@ -164,7 +164,7 @@ namespace cicada
 	  if (codes[1] >= maximum.size())
 	    maximum.resize(codes[1] + 1, 0.0);
 	  
-	  maximum[codes[1]] = std::max(maximum[codes[1]], boost::fusion::get<2>(lexicon_parsed));
+	  maximum[codes[0]] = std::max(maximum[codes[0]], boost::fusion::get<2>(lexicon_parsed));
 	  
 	  smooth = std::min(smooth, boost::fusion::get<2>(lexicon_parsed));
 	}

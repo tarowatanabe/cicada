@@ -564,10 +564,10 @@ struct LexiconModel
       
       tables[source.id()].table[target] = boost::fusion::get<2>(parsed);
       
-      if (target.id() >= maximum.size())
-	maximum.resize(target.id() + 1, 0.0);
+      if (source.id() >= maximum.size())
+	maximum.resize(source.id() + 1, 0.0);
       
-      maximum[target.id()] = std::max(maximum[target.id()], boost::fusion::get<2>(parsed));
+      maximum[source.id()] = std::max(maximum[source.id()], boost::fusion::get<2>(parsed));
       
       smooth = std::min(smooth, boost::fusion::get<2>(parsed));
     }
@@ -598,6 +598,9 @@ struct LexiconModel
 
 struct Lexicon
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   typedef cicada::Sentence  sentence_type;
   
   typedef ExtractAlignment::alignment_type     alignment_type;
@@ -782,30 +785,29 @@ struct Lexicon
     const size_t source_size = source.size();
     const size_t target_size = target.size();
     
-    double score_source_target = 0.0;
+    difference_type score_source_target = 0;
     
     for (size_t trg = 0; trg != target_size; ++ trg)
       if (target[trg].is_terminal()) {
-	
-	double score = 0.0;
+	bool inserted = true;
 	for (size_t src = 0; src != source_size; ++ src)
 	  if (source[src].is_terminal())
-	    score = std::max(score, lexicon_source_target(source[src], target[trg]));
+	    inserted &= (lexicon_source_target(source[src], target[trg]) < lexicon_source_target(source[src]) * threshold_insertion);
 	
-	score_source_target -= (score < lexicon_source_target(target[trg]) * threshold_insertion);
+	score_source_target -= inserted;
       }
     
-    double score_target_source = 0.0;
+    difference_type score_target_source = 0;
     
     for (size_t src = 0; src != source_size; ++ src)
       if (source[src].is_terminal()) {
 	
-	double score = 0.0;
+	bool deleted = true;
 	for (size_t trg = 0; trg != target_size; ++ trg)
 	  if (target[trg].is_terminal())
-	    score = std::max(score, lexicon_target_source(target[trg], source[src]));
+	    deleted &= (lexicon_target_source(target[trg], source[src])	< lexicon_target_source(target[trg]) * threshold_deletion);
 	
-	score_target_source -= (score < lexicon_target_source(source[src]) * threshold_deletion);
+	score_target_source -= deleted;
       }
     
     return std::make_pair(score_source_target, score_target_source);

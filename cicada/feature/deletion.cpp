@@ -124,7 +124,7 @@ namespace cicada
 	      size_type i = 0;
 	      sentence_type::const_iterator siter_end = words.end();
 	      for (sentence_type::const_iterator siter = words.begin(); siter != siter_end; ++ siter, ++ i)
-		citer->second.set(i, lexicon->operator()(target, *siter) < threshold * lexicon->operator()(*siter));
+		citer->second.set(i, lexicon->operator()(target, *siter) < threshold * lexicon->operator()(target));
 	    }
 	    
 	    coverage &= citer->second;
