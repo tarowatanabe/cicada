@@ -408,6 +408,7 @@ lattice.hpp \
 lexicon.hpp \
 matcher.hpp \
 model.hpp \
+msgpack.hpp \
 ngram.hpp \
 ngram_cache.hpp \
 ngram_index.hpp \
