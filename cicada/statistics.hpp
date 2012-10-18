@@ -32,7 +32,7 @@ namespace cicada
     
     struct Stat
     {
-      count_type  count;
+      count_type count;
       
       count_type node;
       count_type edge;

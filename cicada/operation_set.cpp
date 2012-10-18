@@ -306,7 +306,7 @@ viterbi: compute viterbi tree\n\
     if (input_sentence)
       input_lattice = true;
     
-    data.id = size_t(-1);
+    data.id = id_type(-1);
     output_data.use_buffer = false;
     
     bool output_initial = true;
@@ -456,7 +456,7 @@ viterbi: compute viterbi tree\n\
     data.statistics.clear();
     
     if (input_id) {
-      qi::uint_parser<size_t> id_parser;
+      qi::uint_parser<operation_type::id_type> id_parser;
       
       if (! qi::phrase_parse(iter, end, id_parser >> "|||", standard::space, data.id))
 	throw std::runtime_error("invalid id-prefixed format: " + line);

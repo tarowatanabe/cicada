@@ -263,10 +263,13 @@ msgpack/feature.hpp \
 msgpack/feature_vector.hpp \
 msgpack/hypergraph.hpp \
 msgpack/lattice.hpp \
+msgpack/ngram_count_set.hpp \
+msgpack/operation.hpp \
 msgpack/rule.hpp \
 msgpack/sentence.hpp \
 msgpack/sentence_vector.hpp \
 msgpack/span_vector.hpp \
+msgpack/statistics.hpp \
 msgpack/symbol.hpp \
 msgpack/symbol_vector.hpp \
 msgpack/tree_rule.hpp \

@@ -6,6 +6,8 @@
 #ifndef __CICADA__OPERATION__HPP__
 #define __CICADA__OPERATION__HPP__ 1
 
+#include <cstddef>
+
 #include <iostream>
 #include <string>
 
@@ -36,6 +38,8 @@ namespace cicada
   {
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
+    
+    typedef uint64_t id_type;
     
     typedef cicada::WeightVector<double>   weight_set_type;
     
@@ -79,7 +83,7 @@ namespace cicada
     
     struct Data
     {
-      size_type id;
+      id_type id;
       
       hypergraph_type      hypergraph;
       lattice_type         lattice;
