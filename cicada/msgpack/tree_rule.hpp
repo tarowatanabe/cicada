@@ -91,7 +91,7 @@ namespace msgpack
       o.pack(sizes[i]);
     }
       
-    return 0;
+    return o;
   }
     
   inline

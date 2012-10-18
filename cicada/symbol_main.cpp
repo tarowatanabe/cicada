@@ -15,10 +15,9 @@
 
 #include "symbol.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/symbol.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 void process(const cicada::Symbol& x, int index)
 {
@@ -37,52 +36,8 @@ void process(const cicada::Symbol& x, int index)
 	    << "coarse? " << x.coarse() << std::endl
 	    << "pos " << x.pos() << std::endl
 	    << "terminal " << x.terminal() << std::endl;
-  
-#ifdef HAVE_MSGPACK
-  {
-    // packing...
-    msgpack::sbuffer sbuf;
-    msgpack::pack(sbuf, x);
-    
-    // deserialize it.
-    msgpack::unpacked msg;
-    msgpack::unpack(&msg, sbuf.data(), sbuf.size());
-    
-    // get an object...
-    cicada::Symbol back;
-    msg.get().convert(&back);
-    
-    if (back != x)
-      std::cerr << "different symbol?" << std::endl;
-  }
-  
-  {
-    // streaming...
-     msgpack::sbuffer buffer;
- 
-     msgpack::packer<msgpack::sbuffer> pk(&buffer);
-     pk.pack(x);
-     
-     // deserializes these objects using msgpack::unpacker.
-     msgpack::unpacker pac;
-     
-     // feeds the buffer.
-     pac.reserve_buffer(buffer.size());
-     memcpy(pac.buffer(), buffer.data(), buffer.size());
-     pac.buffer_consumed(buffer.size());
-     
-     // now starts streaming deserialization.
-     cicada::Symbol back;
-     msgpack::unpacked result;
-     while(pac.next(&result)) {
-       result.get().convert(&back);
 
-       if (back != x)
-	 std::cerr << "different symbol?" << std::endl;
-     }
-  }
-  
-#endif
+  msgpack_test(x);
 }
 
 int main(int argc, char** argv)

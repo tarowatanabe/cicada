@@ -4,6 +4,9 @@ LIBUTILS=$(top_builddir)/utils/libutils.la
 
 lib_LTLIBRARIES = libcicada.la
 
+noinst_HEADERS =\
+msgpack_main_impl.hpp
+
 noinst_LTLIBRARIES = \
 libcicada-feature.la \
 libcicada-matcher.la \

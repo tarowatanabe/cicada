@@ -8,10 +8,9 @@
 #include "tree_rule.hpp"
 #include "tree_rule_compact.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/tree_rule.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 typedef cicada::TreeRule rule_type;
 
@@ -72,6 +71,8 @@ void process(const utils::piece& rule_str)
 
   std::cout << "internal size: " << rule.size_internal() << std::endl;
   std::cout << "frontier size: " << rule.size_frontier() << std::endl;
+
+  msgpack_test(rule);
 }
 
 int main(int argc, char** argv)
