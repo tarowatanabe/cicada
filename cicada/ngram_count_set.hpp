@@ -44,6 +44,8 @@ public:
     size_type size() const { return ngrams.size(); }
     bool empty() const { return ngrams.empty(); }
 
+    void swap(NGramCountSet& x) { ngrams.swap(x.ngrams); }
+    
     count_type sum_unigram() const
     {
       count_type sum = 0.0;
@@ -65,11 +67,41 @@ public:
 
     const_iterator end() const { return ngrams.end(); }
     iterator end() { return ngrams.end(); }
+
+  public:    
+    friend
+    bool operator==(const NGramCountSet& x, const NGramCountSet& y)
+    {
+      if (x.size() != y.size()) return false;
+      
+      NGramCountSet::const_iterator iter_end = y.end();
+      for (NGramCountSet::const_iterator iter = y.begin(); iter != iter_end; ++ iter) {
+	NGramCountSet::const_iterator fiter = x.ngrams.find(iter->first);
+	
+	if (fiter == x.end() || *fiter != *iter)
+	  return false;
+      }
+      return true;
+    }
     
+    friend
+    bool operator!=(const NGramCountSet& x, const NGramCountSet& y)
+    {
+      return !(x == y);
+    }
 private:
   ngram_set_type ngrams;
   };
   
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::NGramCountSet& x, cicada::NGramCountSet& y)
+  {
+    x.swap(y);
+  }
 };
 
 #endif
