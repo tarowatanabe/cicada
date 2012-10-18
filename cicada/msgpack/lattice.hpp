@@ -85,8 +85,8 @@ namespace msgpack
   {
     o.pack_array(v.size());
       
-    cicada::Lattice::const_iterator it_end = v.end();
-    for (cicada::Lattice::const_iterator it(v.begin()); it != it_end; ++ it) 
+    cicada::Lattice::arc_set_type::const_iterator it_end = v.end();
+    for (cicada::Lattice::arc_set_type::const_iterator it(v.begin()); it != it_end; ++ it) 
       o.pack(*it);
       
     return o;
