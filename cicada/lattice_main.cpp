@@ -7,10 +7,9 @@
 #include "lattice.hpp"
 #include "remove_epsilon.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/lattice.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
@@ -22,6 +21,8 @@ int main(int argc, char** argv)
 
   std::cout << lattice << std::endl;
 
+  msgpack_test(lattice);
+
   lattice_type input;
   lattice_type removed;
   while (std::cin >> input) {
@@ -31,6 +32,8 @@ int main(int argc, char** argv)
 	      << std::endl;
     
     std::cout << input << std::endl;
+
+    msgpack_test(lattice);
     
     cicada::remove_epsilon(input, removed);
 
@@ -40,5 +43,7 @@ int main(int argc, char** argv)
 	      << std::endl;
     
     std::cout << removed << std::endl;
+
+    msgpack_test(removed);
   }
 }

@@ -6,10 +6,9 @@
 
 #include "alignment.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/alignment.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
@@ -19,6 +18,8 @@ int main(int argc, char** argv)
   for (alignment_type::const_iterator iter = alignment.begin(); iter != alignment.end(); ++ iter)
     std::cout << "align: " << *iter << std::endl;
   std::cout << alignment << std::endl;
+
+  msgpack_test(alignment);
 
   alignment_type::point_type point("500-40");
   std::cout << "point: " << point << std::endl;

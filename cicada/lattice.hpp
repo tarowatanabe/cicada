@@ -167,13 +167,39 @@ namespace cicada
     std::ostream& operator<<(std::ostream& os, const Lattice& x);
     friend
     std::istream& operator>>(std::istream& is, Lattice& x);
+
+    friend
+    bool operator==(const Lattice::arc_type& x, const Lattice::arc_type& y);
+    friend
+    bool operator!=(const Lattice::arc_type& x, const Lattice::arc_type& y);
         
+    friend
+    bool operator==(const Lattice& x, const Lattice& y);
+    friend
+    bool operator!=(const Lattice& x, const Lattice& y);
+
   private:
     lattice_type  lattice;
     distance_type dist_short;
     distance_type dist_long;
     size_type     num_edge;
   };
+
+  inline
+  bool operator==(const Lattice::arc_type& x, const Lattice::arc_type& y)
+  {
+    return x.label == y.label && x.distance == y.distance && x.features == y.features;
+  }
+  inline
+  bool operator!=(const Lattice::arc_type& x, const Lattice::arc_type& y)
+  {
+    return !(x == y);
+  }
+
+  inline
+  bool operator==(const Lattice& x, const Lattice& y) { return x.lattice == y.lattice; }
+  inline
+  bool operator!=(const Lattice& x, const Lattice& y) { return x.lattice != y.lattice; }
   
 };
 

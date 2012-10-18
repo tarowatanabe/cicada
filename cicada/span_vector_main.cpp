@@ -6,10 +6,9 @@
 
 #include "span_vector.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/span_vector.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
@@ -22,5 +21,7 @@ int main(int argc, char** argv)
     
     for (size_t i = 0; i != input.size(); ++ i)
       std::cout << "span: " << input[i] << std::endl;
+
+    msgpack_test(input);
   }
 }
