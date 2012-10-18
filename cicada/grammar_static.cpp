@@ -35,6 +35,7 @@
 #include "utils/dense_hash_map.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/resource.hpp"
+#include "utils/unordered_map.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -814,12 +815,18 @@ namespace cicada
   {
     typedef score_type base_type;
 
-    typedef std::map<base_type, size_type, std::less<base_type>, std::allocator<std::pair<const base_type, size_type> > > counts_type;
-    typedef std::map<base_type, quantized_type, std::less<base_type>, std::allocator<std::pair<const base_type, quantized_type> > > codemap_type;
+    typedef utils::unordered_map<base_type, size_type, boost::hash<base_type>, std::equal_to<base_type>,
+				 std::allocator<std::pair<const base_type, size_type> > >::type hashed_type;
+
+    typedef std::map<base_type, size_type, std::less<base_type>,
+		     std::allocator<std::pair<const base_type, size_type> > > counts_type;
+    typedef utils::unordered_map<base_type, quantized_type, boost::hash<base_type>, std::equal_to<base_type>,
+				 std::allocator<std::pair<const base_type, quantized_type> > >::type codemap_type;
     typedef boost::array<base_type, 256> codebook_type;
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     
+    hashed_type      hashed;
     counts_type      counts;
     codebook_type    codebook;
     codemap_type     codemap;
@@ -836,13 +843,17 @@ namespace cicada
 	boost::iostreams::filtering_ostream os;
 	os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
 	
+	hashed.clear();
 	counts.clear();
 	codemap.clear();
 	std::fill(codebook.begin(), codebook.end(), 0.0);
 	
 	score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
 	for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter)
-	  ++ counts[*liter];
+	  ++ hashed[*liter];
+	
+	counts.insert(hashed.begin(), hashed.end());
+	hashed.clear();
 	
 	Quantizer::quantize(counts, codebook, codemap);
 	
@@ -882,13 +893,17 @@ namespace cicada
 	boost::iostreams::filtering_ostream os;
 	os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
 	
+	hashed.clear();
 	counts.clear();
 	codemap.clear();
 	std::fill(codebook.begin(), codebook.end(), 0.0);
 	
 	score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
 	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter)
-	  ++ counts[*liter];
+	  ++ hashed[*liter];
+	
+	counts.insert(hashed.begin(), hashed.end());
+	hashed.clear();
 	
 	Quantizer::quantize(counts, codebook, codemap);
 	
