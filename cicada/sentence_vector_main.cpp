@@ -5,10 +5,9 @@
 #include "sentence_vector.hpp"
 
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/sentence_vector.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
@@ -22,6 +21,8 @@ int main(int argc, char** argv)
     std::cout << "sentence: " <<  *siter << ':' << '\n';
   std::cout << "END" << '\n';
   std::cout << "sentences: " << sentences << ':' << std::endl;
+
+  msgpack_test(sentences);
 }
 
 

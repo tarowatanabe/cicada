@@ -90,9 +90,36 @@ namespace cicada
     friend
     std::istream& operator>>(std::istream& is, SentenceVector& x);
     
+    friend
+    bool operator==(const SentenceVector& x, const SentenceVector& y);
+    friend
+    bool operator!=(const SentenceVector& x, const SentenceVector& y);
+    friend
+    bool operator<(const SentenceVector& x, const SentenceVector& y);
+    friend
+    bool operator>(const SentenceVector& x, const SentenceVector& y);
+    friend
+    bool operator<=(const SentenceVector& x, const SentenceVector& y);
+    friend
+    bool operator>=(const SentenceVector& x, const SentenceVector& y);
+
   private:
     sent_set_type __sents;
   };
+
+  inline
+  bool operator==(const SentenceVector& x, const SentenceVector& y) { return x.__sents == y.__sents; }
+  inline
+  bool operator!=(const SentenceVector& x, const SentenceVector& y) { return x.__sents != y.__sents; }
+  inline
+  bool operator<(const SentenceVector& x, const SentenceVector& y) { return x.__sents < y.__sents; }
+  inline
+  bool operator>(const SentenceVector& x, const SentenceVector& y) { return x.__sents > y.__sents; }
+  inline
+  bool operator<=(const SentenceVector& x, const SentenceVector& y) { return x.__sents <= y.__sents; }
+  inline
+  bool operator>=(const SentenceVector& x, const SentenceVector& y) { return x.__sents >= y.__sents; }
+
 };
 
 namespace std
