@@ -64,7 +64,6 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 namespace cicada
 {
-
   typedef utils::array_power2<TreeRule::rule_ptr_type, 1024, std::allocator<TreeRule::rule_ptr_type> > cache_type;
   
 #ifdef HAVE_TLS

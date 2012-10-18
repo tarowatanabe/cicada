@@ -284,8 +284,8 @@ namespace cicada
       cache_rule_type() : rule(), pos(size_type(-1)) {}
     };
     
-    typedef utils::array_power2<cache_rule_pair_set_type, 1024, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
-    typedef utils::array_power2<cache_rule_type,          1024, std::allocator<cache_rule_type> >          cache_rule_set_type;
+    typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 2, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
+    typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
 
     TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
