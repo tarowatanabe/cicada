@@ -306,7 +306,7 @@ viterbi: compute viterbi tree\n\
     if (input_sentence)
       input_lattice = true;
     
-    data.id = id_type(-1);
+    data.id = operation_type::id_type(-1);
     output_data.use_buffer = false;
     
     bool output_initial = true;
