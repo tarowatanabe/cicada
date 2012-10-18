@@ -615,7 +615,7 @@ eval_main_LDADD = libcicada.la
 
 feature_vector_main_SOURCES = feature_vector_main.cpp symbol.cpp vocab.cpp feature.cpp
 feature_vector_main_CPPFLAGS = $(AM_CPPFLAGS)
-feature_vector_main_LDADD = $(LIBUTILS)
+feature_vector_main_LDADD = $(LIBUTILS) $(MSGPACK_LDFLAGS)
 
 format_main_SOURCES = format_main.cpp
 format_main_LDADD = libcicada.la

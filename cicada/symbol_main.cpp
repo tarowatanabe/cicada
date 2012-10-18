@@ -82,8 +82,6 @@ void process(const cicada::Symbol& x, int index)
      }
   }
   
-  
-  
 #endif
 }
 

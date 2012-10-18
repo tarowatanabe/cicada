@@ -87,6 +87,53 @@ void check_compact(const feature_set_type& features)
 
   if (decoded != features)
     std::cerr << "differ?" << std::endl;
+
+#ifdef HAVE_MSGPACK
+  {
+    // packing...
+    msgpack::sbuffer sbuf;
+    msgpack::pack(sbuf, features);
+    
+    // deserialize it.
+    msgpack::unpacked msg;
+    msgpack::unpack(&msg, sbuf.data(), sbuf.size());
+    
+    // get an object...
+    feature_set_type back;
+    msg.get().convert(&back);
+    
+    if (back != features)
+      std::cerr << "different features?" << std::endl;
+  }
+  
+  
+  {
+    // streaming...
+     msgpack::sbuffer buffer;
+ 
+     msgpack::packer<msgpack::sbuffer> pk(&buffer);
+     pk.pack(features);
+     
+     // deserializes these objects using msgpack::unpacker.
+     msgpack::unpacker pac;
+     
+     // feeds the buffer.
+     pac.reserve_buffer(buffer.size());
+     memcpy(pac.buffer(), buffer.data(), buffer.size());
+     pac.buffer_consumed(buffer.size());
+     
+     // now starts streaming deserialization.
+     feature_set_type back;
+     msgpack::unpacked result;
+     while(pac.next(&result)) {
+       result.get().convert(&back);
+
+       if (back != features)
+	 std::cerr << "different features?" << std::endl;
+     }
+  }
+
+#endif
 }
 
 int main(int argc, char** argv)
