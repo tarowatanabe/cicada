@@ -446,14 +446,7 @@ viterbi: compute viterbi tree\n\
     std::string::const_iterator iter = line.begin();
     std::string::const_iterator end = line.end();
     
-    data.hypergraph.clear();
-    data.lattice.clear();
-    data.spans.clear();
-    data.alignment.clear();
-    data.dependency.clear();
-    data.targets.clear();
-    data.ngram_counts.clear();
-    data.statistics.clear();
+    data.clear();
     
     if (input_id) {
       qi::uint_parser<operation_type::id_type> id_parser;

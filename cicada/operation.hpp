@@ -93,6 +93,18 @@ namespace cicada
       sentence_set_type    targets;
       ngram_count_set_type ngram_counts;
       statistics_type      statistics;
+
+      void clear()
+      {
+	hypergraph.clear();
+	lattice.clear();
+	spans.clear();
+	alignment.clear();
+	dependency.clear();
+	targets.clear();
+	ngram_counts.clear();
+	statistics.clear();
+      }
     };
 
     struct OutputData

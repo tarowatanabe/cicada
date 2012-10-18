@@ -520,6 +520,7 @@ struct TaskStdout
     }
     
     operations.clear();
+    const_cast<operation_set_type::data_type&>(operations.get_data()).clear();
     
     queue_os.push(std::string());
   }
@@ -798,6 +799,7 @@ struct Task
     }
     
     operations.clear();
+    const_cast<operation_set_type::data_type&>(operations.get_data()).clear();
   }
   
   queue_type&   queue;
