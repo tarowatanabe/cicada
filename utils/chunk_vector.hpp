@@ -838,6 +838,50 @@ namespace utils
       }
     }
   };
+  
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator==(const chunk_vector<Tp, Size, Alloc>& x,
+		  const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin());
+  }
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator!=(const chunk_vector<Tp, Size, Alloc>& x,
+		  const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return !(x == y);
+  }
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator<(const chunk_vector<Tp, Size, Alloc>& x,
+		 const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
+  }
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator>(const chunk_vector<Tp, Size, Alloc>& x,
+		 const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return y < x;
+  }
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator<=(const chunk_vector<Tp, Size, Alloc>& x,
+		  const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return ! (y < x);
+  }
+  template <typename Tp, size_t Size, typename Alloc>
+  inline
+  bool operator>=(const chunk_vector<Tp, Size, Alloc>& x,
+		  const chunk_vector<Tp, Size, Alloc>& y)
+  {
+    return ! (x < y);
+  }
+
 };
 
 namespace std

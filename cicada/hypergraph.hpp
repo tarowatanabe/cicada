@@ -177,6 +177,21 @@ namespace cicada
     std::ostream& operator<<(std::ostream& os, const HyperGraph& x);
     friend
     std::istream& operator>>(std::istream& is, HyperGraph& x);
+
+    friend
+    bool operator==(const HyperGraph::node_type& x, const HyperGraph::node_type& y);
+    friend
+    bool operator!=(const HyperGraph::node_type& x, const HyperGraph::node_type& y);
+
+    friend
+    bool operator==(const HyperGraph::edge_type& x, const HyperGraph::edge_type& y);
+    friend
+    bool operator!=(const HyperGraph::edge_type& x, const HyperGraph::edge_type& y);
+        
+    friend
+    bool operator==(const HyperGraph& x, const HyperGraph& y);
+    friend
+    bool operator!=(const HyperGraph& x, const HyperGraph& y);
     
   public:
     node_set_type nodes;
@@ -185,6 +200,43 @@ namespace cicada
     id_type goal;
   };
   
+  inline
+  bool operator==(const HyperGraph::node_type& x, const HyperGraph::node_type& y)
+  {
+    return x.id == y.id && x.edges == y.edges;
+  }
+  inline
+  bool operator!=(const HyperGraph::node_type& x, const HyperGraph::node_type& y)
+  {
+    return !(x == y);
+  }
+
+  inline
+  bool operator==(const HyperGraph::edge_type& x, const HyperGraph::edge_type& y)
+  {
+    return (x.id == y.id
+	    && x.head == y.head && x.tails == y.tails
+	    && x.features == y.features && x.attributes == y.attributes
+	    && ((x.rule == y.rule) || (x.rule && y.rule && *x.rule == *y.rule)));
+  }
+  
+  inline
+  bool operator!=(const HyperGraph::edge_type& x, const HyperGraph::edge_type& y)
+  {
+    return !(x == y);
+  }
+
+  inline
+  bool operator==(const HyperGraph& x, const HyperGraph& y)
+  {
+    return x.nodes == y.nodes && x.edges == y.edges && x.goal == y.goal;
+  }
+  inline
+  bool operator!=(const HyperGraph& x, const HyperGraph& y)
+  {
+    return !(x == y);
+  }
+
 };
 
 namespace std
