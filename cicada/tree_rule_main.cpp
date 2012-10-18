@@ -54,6 +54,13 @@ void compact(const rule_type& rule)
 void process(const utils::piece& rule_str)
 {
   const rule_type rule(rule_str);
+
+  std::cerr << "trivial assign: " << boost::has_trivial_assign<rule_type>::value << std::endl
+	    << "trivial construct: " << boost::has_trivial_constructor<rule_type>::value << std::endl
+	    << "trivial copy: " << boost::has_trivial_copy<rule_type>::value << std::endl
+	    << "trivial copy-construct: " << boost::has_trivial_copy_constructor<rule_type>::value << std::endl
+	    << "trivial default-construct: " << boost::has_trivial_default_constructor<rule_type>::value << std::endl
+	    << "trivial destructor: " << boost::has_trivial_destructor<rule_type>::value << std::endl;
   
   std::cout << "string: " << rule_str << std::endl;
   std::cout << "tree rule: " << rule << std::endl;
