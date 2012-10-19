@@ -14,7 +14,7 @@ namespace codec
   namespace detail
   {
     const snappy_param::size_type snappy_param::chunk_size = 8 * 1024 * 1024;
-    const snappy_param::size_type snappy_param::bound_size = snappy::MaxCompressedLength(chunk_size);
+    const snappy_param::size_type snappy_param::bound_size = snappy::MaxCompressedLength(chunk_size) + 4;
   };
 
   snappy_compressor_impl::snappy_compressor_impl()
