@@ -155,12 +155,12 @@ namespace utils
   public:
     void assign(const bit_vector& x)
     {
-      std::copy((const size_type*) x.begin(), (const size_type*) x.end(), (size_type*) begin());
+      std::copy((const block_type*) x.begin(), (const block_type*) x.end(), (block_type*) begin());
     }
     
     void clear() 
     {
-      std::fill((size_type*) begin(), (size_type*) end(), size_type(0));
+      std::fill((block_type*) begin(), (block_type*) end(), block_type(0));
     }
 
   public:
@@ -219,19 +219,19 @@ namespace utils
   public:
     bit_vector& operator|=(const bit_vector& x)
     {
-      __assign_operator_aux((const size_type*) x.begin(), (const size_type*) x.end(), (size_type*) begin(), __or_op<size_type>());
+      __assign_operator_aux((const block_type*) x.begin(), (const block_type*) x.end(), (block_type*) begin(), __or_op<block_type>());
       return *this;
     }
     
     bit_vector& operator&=(const bit_vector& x)
     {
-      __assign_operator_aux((const size_type*) x.begin(), (const size_type*) x.end(), (size_type*) begin(), __and_op<size_type>());
+      __assign_operator_aux((const block_type*) x.begin(), (const block_type*) x.end(), (block_type*) begin(), __and_op<block_type>());
       return *this;
     }
     
     bit_vector& operator^=(const bit_vector& x)
     {
-      __assign_operator_aux((const size_type*) x.begin(), (const size_type*) x.end(), (size_type*) begin(), __xor_op<size_type>());
+      __assign_operator_aux((const block_type*) x.begin(), (const block_type*) x.end(), (block_type*) begin(), __xor_op<block_type>());
       
       return *this;
     }
@@ -240,8 +240,8 @@ namespace utils
     size_type count() const
     {
       size_type sum = 0;
-      const size_type* biter_end = (const size_type*) end();
-      for (const size_type* biter = (const size_type*) begin(); biter != biter_end; ++ biter)
+      const block_type* biter_end = (const block_type*) end();
+      for (const block_type* biter = (const block_type*) begin(); biter != biter_end; ++ biter)
 	sum += utils::bithack::bit_count(*biter);
       return sum;
     }
