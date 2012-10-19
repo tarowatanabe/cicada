@@ -593,7 +593,7 @@ namespace utils
       
       return utils::bithack::branch(size_power2 <= __cache_linear,
 				    utils::bithack::max(size_power2, __cache_minimum),
-				    capacity_power2(n + (n >> 2) + (n >> 3)));
+				    capacity_power2(n + (n >> 2)));
     }
     
     void initialize_linear(const bucket_type& bucket)
