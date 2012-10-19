@@ -6,19 +6,20 @@
 
 #include "rule.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/rule.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
   typedef cicada::Rule rule_type;
-  
-
+ 
   std::cout << "rule: " << rule_type("good boy") << std::endl;
-  
+  msgpack_test(rule_type("good boy"));
+
   std::cout << "rule: " << rule_type("[s] ||| good boy") << std::endl;
+  msgpack_test(rule_type("[s] ||| good boy"));
   
   std::cout << "rule: " << rule_type("[s] ||| good boy [x,1]") << std::endl;
+  msgpack_test(rule_type("[s] ||| good boy [x,1]"));
 }

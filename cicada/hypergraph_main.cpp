@@ -6,10 +6,9 @@
 
 #include "hypergraph.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/hypergraph.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 int main(int argc, char** argv)
 {
@@ -17,4 +16,6 @@ int main(int argc, char** argv)
   
   std::cin >> graph;
   std::cout << graph << std::endl;
+
+  msgpack_test(graph);
 }

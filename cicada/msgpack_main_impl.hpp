@@ -5,6 +5,8 @@
 #ifndef __MSGPACK_MAIN_IMPL__HPP__
 #define __MSGPACK_MAIN_IMPL__HPP__ 
 
+#include <iostream>
+
 #include "utils/config.hpp"
 
 #ifdef HAVE_MSGPACK_HPP
@@ -20,6 +22,8 @@ void msgpack_test(const Obj& obj)
     // packing...
     msgpack::sbuffer sbuf;
     msgpack::pack(sbuf, obj);
+
+    std::cerr << "packed size: " << sbuf.size() << std::endl;
     
     // deserialize it.
     msgpack::unpacked msg;
@@ -39,6 +43,8 @@ void msgpack_test(const Obj& obj)
  
      msgpack::packer<msgpack::sbuffer> pk(&buffer);
      pk.pack(obj);
+
+     std::cerr << "streamed packed size: " << buffer.size() << std::endl;
      
      // deserializes these objects using msgpack::unpacker.
      msgpack::unpacker pac;
