@@ -166,8 +166,12 @@ namespace cicada
 	//std::cerr << "edge: " << edge.id << std::endl;
 	
 	edge.tails = hypergraph_type::edge_type::node_set_type(boost::fusion::get<0>(edge_parsed).begin(), boost::fusion::get<0>(edge_parsed).end());
+	
+	edge.features.rehash(boost::fusion::get<1>(edge_parsed).size());
 	edge.features.insert(boost::fusion::get<1>(edge_parsed).begin(), boost::fusion::get<1>(edge_parsed).end());
+	
 	edge.attributes.insert(boost::fusion::get<2>(edge_parsed).begin(), boost::fusion::get<2>(edge_parsed).end());
+	
 	edge.rule = rules[boost::fusion::get<3>(edge_parsed)];
 	
 	graph.connect_edge(edge.id, graph.nodes.back().id);
