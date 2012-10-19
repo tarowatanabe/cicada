@@ -134,9 +134,11 @@ namespace cicada
 	deleted += coverage.count();
 	
 	// assign state
-	coverage_set_type::iterator citer = coverages.insert(coverage).first;
-	
-	*reinterpret_cast<index_type*>(state) = citer - coverages.begin();
+	{
+	  coverage_set_type::iterator citer = coverages.insert(coverage).first;
+	  
+	  *reinterpret_cast<index_type*>(state) = citer - coverages.begin();
+	}
 	
 	// return score
 	return - deleted;

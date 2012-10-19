@@ -15,6 +15,7 @@ int main(int argc, char** argv)
   
   for (int sample = 0; sample < 8; ++ sample) {
     utils::bit_vector<1024> bvec;
+    utils::bit_vector<1024> bvec2;
     std::vector<char> stdvec(1024);
     
     for (int i = 0; i < 512; ++ i) {
@@ -22,6 +23,11 @@ int main(int argc, char** argv)
       bvec.set(pos); 
       stdvec[pos] = true;
     }
+    
+    bvec2 &= bvec;
+    
+    if (bvec2 != utils::bit_vector<1024>())
+      std::cout << "DIFFERENT" << std::endl;
     
     size_t rank1 = 0;
     size_t rank0 = 0;
