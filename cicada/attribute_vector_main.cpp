@@ -10,10 +10,9 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/attribute_vector.hpp>
-#endif
+
+#include "msgpack_main_impl.hpp"
 
 typedef cicada::AttributeVector attribute_set_type;
 
@@ -85,6 +84,9 @@ int main(int argc, char** argv)
   attr1["bad"] = 4.5;
   std::cout << "attr1: " << attr1 << std::endl;
 
+  check_codec(attr1);
+  msgpack_test(attr1);
+
   attribute_set_type attributes;
   
   for (int iter = 0; iter != 32; ++ iter) {
@@ -94,6 +96,7 @@ int main(int argc, char** argv)
     }
 
     check_codec(attributes);
+    msgpack_test(attributes);
 
     for (int i = 0; i != 16; ++ i) {
       std::string attr = "int:" + utils::lexical_cast<std::string>(random());
@@ -101,6 +104,7 @@ int main(int argc, char** argv)
     }
 
     check_codec(attributes);
+    msgpack_test(attributes);
     
     for (int i = 0; i != 16; ++ i) {
       std::string attr = "string:" + utils::lexical_cast<std::string>(random());
@@ -111,5 +115,6 @@ int main(int argc, char** argv)
     }
 
     check_codec(attributes);
+    msgpack_test(attributes);
   }
 }

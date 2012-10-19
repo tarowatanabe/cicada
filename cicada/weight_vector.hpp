@@ -24,6 +24,8 @@ namespace cicada
   template <typename Tp, typename Alloc >
   class FeatureVector;
 
+  class FeatureVectorCompact;
+
   template <typename Tp, typename Alloc >
   class FeatureVectorLinear;
 
@@ -251,6 +253,9 @@ namespace cicada
       return *this;
     }
 
+    self_type& operator+=(const FeatureVectorCompact& x);
+    self_type& operator-=(const FeatureVectorCompact& x);
+
   public:
     //comparison...
     friend
@@ -352,6 +357,36 @@ namespace std
 };
 
 #include <cicada/feature_vector.hpp>
+#include <cicada/feature_vector_compact.hpp>
 #include <cicada/feature_vector_linear.hpp>
+
+namespace cicada
+{
+  template <typename T, typename A>
+  inline
+  WeightVector<T,A>& WeightVector<T,A>::operator+=(const FeatureVectorCompact& x)
+  {
+    typedef typename FeatureVectorCompact::const_iterator iter_type;
+    
+    iter_type iter_end = x.end();
+    for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+      operator[](iter->first) += iter->second;
+    
+    return *this;
+  }
+
+  template <typename T, typename A>
+  inline
+  WeightVector<T,A>& WeightVector<T,A>::operator-=(const FeatureVectorCompact& x)
+  {
+    typedef typename FeatureVectorCompact::const_iterator iter_type;
+    
+    iter_type iter_end = x.end();
+    for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+      operator[](iter->first) -= iter->second;
+    
+    return *this;    
+  }
+};
 
 #endif

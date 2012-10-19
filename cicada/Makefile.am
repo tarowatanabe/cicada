@@ -264,6 +264,7 @@ msgpack/attribute_vector.hpp \
 msgpack/dependency.hpp \
 msgpack/feature.hpp \
 msgpack/feature_vector.hpp \
+msgpack/feature_vector_linear.hpp \
 msgpack/hypergraph.hpp \
 msgpack/lattice.hpp \
 msgpack/ngram_count_set.hpp \

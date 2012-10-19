@@ -14,6 +14,7 @@
 #ifdef HAVE_MSGPACK_HPP
 
 #include <msgpack/object.hpp>
+#include <msgpack/type/int.hpp>
 #include <msgpack/type/float.hpp>
 
 namespace msgpack

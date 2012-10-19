@@ -16,10 +16,8 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 
-#ifdef HAVE_MSGPACK_HPP
-#include <msgpack.hpp>
 #include <cicada/msgpack/feature_vector.hpp>
-#endif
+#include "msgpack_main_impl.hpp"
 
 typedef cicada::FeatureVector<double> feature_set_type;
 typedef cicada::FeatureVectorLinear<double> feature_linear_type;
@@ -88,52 +86,7 @@ void check_compact(const feature_set_type& features)
   if (decoded != features)
     std::cerr << "differ?" << std::endl;
 
-#ifdef HAVE_MSGPACK
-  {
-    // packing...
-    msgpack::sbuffer sbuf;
-    msgpack::pack(sbuf, features);
-    
-    // deserialize it.
-    msgpack::unpacked msg;
-    msgpack::unpack(&msg, sbuf.data(), sbuf.size());
-    
-    // get an object...
-    feature_set_type back;
-    msg.get().convert(&back);
-    
-    if (back != features)
-      std::cerr << "different features?" << std::endl;
-  }
-  
-  
-  {
-    // streaming...
-     msgpack::sbuffer buffer;
- 
-     msgpack::packer<msgpack::sbuffer> pk(&buffer);
-     pk.pack(features);
-     
-     // deserializes these objects using msgpack::unpacker.
-     msgpack::unpacker pac;
-     
-     // feeds the buffer.
-     pac.reserve_buffer(buffer.size());
-     memcpy(pac.buffer(), buffer.data(), buffer.size());
-     pac.buffer_consumed(buffer.size());
-     
-     // now starts streaming deserialization.
-     feature_set_type back;
-     msgpack::unpacked result;
-     while(pac.next(&result)) {
-       result.get().convert(&back);
-
-       if (back != features)
-	 std::cerr << "different features?" << std::endl;
-     }
-  }
-
-#endif
+  msgpack_test(features);
 }
 
 int main(int argc, char** argv)
