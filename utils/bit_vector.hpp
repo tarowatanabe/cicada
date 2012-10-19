@@ -196,7 +196,7 @@ namespace utils
     {
       Tp operator()(const Tp& x, const Tp& y) const
       {
-	return x | y;
+	return x & y;
       }
     };
     
