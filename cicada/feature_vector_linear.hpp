@@ -217,7 +217,236 @@ namespace cicada
       return *this;
     }
     
+    template <typename T, typename A>
+    self_type& operator+=(const FeatureVector<T,A>& x)
+    {
+      if (x.empty())
+	return *this;
+      else if (empty()) {
+	assign(x);
+	return *this;
+      } else {
+	plus_equal(__map, x.begin(), x.end());
+	return *this;
+      }
+    }
+
+    template <typename T, typename A>
+    self_type& operator-=(const FeatureVector<T,A>& x)
+    {
+      minus_equal(__map, x.begin(), x.end());
+      return *this;
+    }
+
+
+    template <typename T, typename A>
+    self_type& operator*=(const FeatureVector<T,A>& x)
+    {
+      if (empty() || x.empty()) {
+	clear();
+	return *this;
+      } else {
+	map_type map_new;
+	multiply_equal(map_new, __map, x.begin(), x.end());
+	__map.swap(map_new);
+	return *this;
+      }
+    }
+
+
+    template <typename T, typename A>
+    self_type& operator+=(const FeatureVectorLinear<T,A>& x)
+    {
+      if (x.empty())
+	return *this;
+      else if (empty()) {
+	assign(x);
+	return *this;
+      } else {
+	plus_equal_ordered(__map, x.begin(), x.end());
+	return *this;
+      }
+    }
+    
+    template <typename T, typename A>
+    self_type& operator-=(const FeatureVectorLinear<T,A>& x)
+    {
+      minus_equal_ordered(__map, x.begin(), x.end());
+      return *this;
+    }
+    
+    template <typename T, typename A>
+    self_type& operator*=(const FeatureVectorLinear<T,A>& x)
+    {
+      if (empty() || x.empty()) {
+	clear();
+	return *this;
+      } else {
+	map_type map_new;
+	multiply_equal_ordered(map_new, __map.begin(), __map.end(), x.begin(), x.end());
+	__map.swap(map_new);
+	return *this;
+      }
+    }
+    self_type& operator+=(const FeatureVectorCompact& x);
+    self_type& operator-=(const FeatureVectorCompact& x);
+    self_type& operator*=(const FeatureVectorCompact& x);
+
+  private:
+    template <typename Container, typename Iterator>
+    static inline
+    void plus_equal(Container& container, Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	std::pair<typename Container::iterator, bool> result = container.insert(*first);
+	
+	if (! result.second) {
+	  result.first->second += first->second;
+	  
+	  if (result.first->second == Tp())
+	    container.erase(result.first);
+	}
+      }
+    }
+
+    template <typename Container, typename Iterator>
+    static inline
+    void plus_equal_ordered(Container& container, Iterator first, Iterator last)
+    {
+      typename Container::iterator hint = container.begin();
+
+      for (/**/; first != last && hint != container.end(); ++ first) {
+	std::pair<typename Container::iterator, bool> result = container.insert(*first);
+	
+	hint = result.first;
+        ++ hint;
+	
+	if (! result.second) {
+	  result.first->second += first->second;
+	  
+	  if (result.first->second == Tp())
+	    container.erase(result.first);
+	}
+      }
+      
+      if (first != last)
+	container.insert(first, last);
+    }
+    
+    template <typename Container, typename Iterator>
+    static inline
+    void minus_equal(Container& container, Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	std::pair<typename Container::iterator, bool> result = container.insert(std::make_pair(first->first, -Tp(first->second)));
+	
+	if (! result.second) {
+	  result.first->second -= first->second;
+	  
+	  if (result.first->second == Tp())
+	    container.erase(result.first);
+	}
+      }
+    }
+
+    template <typename Container, typename Iterator>
+    static inline
+    void minus_equal_ordered(Container& container, Iterator first, Iterator last)
+    {
+      typename Container::iterator hint = container.begin();
+
+      for (/**/; first != last && hint != container.end(); ++ first) {
+	std::pair<typename Container::iterator, bool> result = container.insert(std::make_pair(first->first, -Tp(first->second)));
+	
+	hint = result.first;
+        ++ hint;
+	
+	if (! result.second) {
+	  result.first->second -= first->second;
+	  
+	  if (result.first->second == Tp())
+	    container.erase(result.first);
+	}
+      }
+      
+      for (/**/; first != last; ++ first)
+        container.insert(container.end(), std::make_pair(first->first, -Tp(first->second)));
+    }
+    
+    template <typename Container, typename Original, typename Iterator>
+    static inline
+    void multiply_equal(Container& container, const Original& orig, Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) {
+	typename Original::const_iterator iter = orig.find(first->first);
+	
+	if (iter == orig.end()) continue;
+	
+	const Tp value(iter->second * first->second);
+	
+	if (value != Tp())
+	  container.insert(std::make_pair(first->first, value));
+      }
+    }
+
+    template <typename Container, typename Iterator1, typename Iterator2>
+    static inline
+    void multiply_equal_ordered(Container& container,
+				Iterator1 first1, Iterator1 last1,
+				Iterator2 first2, Iterator2 last2)
+    {
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first)
+	  ++ first1;
+	else if (first2->first < first1->first)
+	  ++ first2;
+	else {
+	  const Tp value = first1->second * first2->second;
+	  
+	  if (value != Tp())
+	    container.insert(container.end(), std::make_pair(first1->first, value));
+	  
+	  ++ first1;
+	  ++ first2;
+	}
+      }
+    }
+    
+    
   public:
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator+(const FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y);
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator-(const FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y);
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y);
+
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator+(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator-(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
+    template <typename T1, typename A1, typename T2, typename A2>
+    friend
+    FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y);
+    
+    template <typename T1, typename A1>
+    friend
+    FeatureVectorLinear<T1,A1> operator+(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y);
+    
+    template <typename T1, typename A1>
+    friend
+    FeatureVectorLinear<T1,A1> operator-(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y);
+    
+    template <typename T1, typename A1>
+    friend
+    FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y);
+
+
     friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
     friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }
     friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }
@@ -228,6 +457,7 @@ namespace cicada
   private:
     map_type __map;
   };
+  
 
   template <typename T1, typename A1, typename T2>
   inline
@@ -287,6 +517,72 @@ namespace cicada
     return features;
   }
 
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator+(FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new += y;
+    return x_new;
+  }
+  
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator-(FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new -= y;
+    return x_new;    
+  }
+  
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator*(FeatureVectorLinear<T1,A1>& x, const FeatureVector<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new *= y;
+    return x_new;
+  }
+
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator+(FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new += y;
+    return x_new;
+  }
+  
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator-(FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new -= y;
+    return x_new;    
+  }
+  
+  template <typename T1, typename A1, typename T2, typename A2>
+  inline
+  FeatureVectorLinear<T1,A1> operator*(FeatureVectorLinear<T1,A1>& x, const FeatureVectorLinear<T2,A2>& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new;
+    self_type::multiply_equal_ordered(x_new.__map, x.begin(), x.end(), y.begin(), y.end());
+    return x_new;
+  }
+
 };
 
 namespace std
@@ -312,6 +608,78 @@ namespace cicada
     __map.clear();
     __map.insert(x.begin(), x.end());
   }
+
+  template <typename T, typename A>
+  inline
+  FeatureVectorLinear<T,A>& FeatureVectorLinear<T,A>::operator+=(const FeatureVectorCompact& x)
+  {
+    if (x.empty())
+      return *this;
+    else if (empty()) {
+      assign(x);
+      return *this;
+    } else {
+      plus_equal_ordered(__map, x.begin(), x.end());
+      return *this;
+    }
+  }
+
+  template <typename T, typename A>
+  inline
+  FeatureVectorLinear<T,A>& FeatureVectorLinear<T,A>::operator-=(const FeatureVectorCompact& x)
+  {
+    minus_equal_ordered(__map, x.begin(), x.end());
+    return *this;
+  }
+  
+  template <typename T, typename A>
+  inline
+  FeatureVectorLinear<T,A>& FeatureVectorLinear<T,A>::operator*=(const FeatureVectorCompact& x)
+  {
+    if (empty() || x.empty()) {
+      clear();
+      return *this;
+    } else {
+      map_type map_new;
+      multiply_equal_ordered(map_new, __map.begin(), __map.end(), x.begin(), x.end());
+      __map.swap(map_new);
+      return *this;
+    } 
+  }
+  
+  template <typename T1, typename A1>
+  inline
+  FeatureVectorLinear<T1,A1> operator+(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new += y;
+    return x_new;
+  }
+  
+  template <typename T1, typename A1>
+  inline
+  FeatureVectorLinear<T1,A1> operator-(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new(x);
+    x_new -= y;
+    return x_new;
+  }
+
+  template <typename T1, typename A1>
+  inline
+  FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y)
+  {
+    typedef FeatureVectorLinear<T1,A1> self_type;
+    
+    self_type x_new;
+    self_type::multiply_equal_ordered(x_new.__map, x.begin(), x.end(), y.begin(), y.end());
+    return x_new;
+  }
+
 };
 
 #endif
