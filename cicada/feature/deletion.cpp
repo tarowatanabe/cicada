@@ -192,8 +192,8 @@ namespace cicada
 	uniques.clear();
 	words.clear();
 	caches.clear();
-	coverage_init.clear();
 	coverages.clear();
+	coverage_init.clear();
       }
       
       lexicon_type* lexicon;
