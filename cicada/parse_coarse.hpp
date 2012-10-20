@@ -962,7 +962,7 @@ namespace cicada
       //ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, ordered, true);
       cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, ordered, true);
       
-      double factor = 1.0;
+      std::vector<double, std::allocator<double> > factors(thresholds.size(), 1.0);
       
       for (;;) {
 	scores = scores_init;
@@ -970,7 +970,8 @@ namespace cicada
 	bool succeed = true;
 	
 	// corse-to-fine 
-	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
+	size_t level = 1;
+	for (/**/; level != grammars.size() - 1; ++ level) {
 	  if (! parsers[level])
 	    parsers[level].reset(new ParseCKY(goal, grammars[level], function, yield_source, treebank, pos_mode, ordered));
 
@@ -979,50 +980,38 @@ namespace cicada
 	  scores_prev.swap(scores);
 	  
 	  if (level == 1)
-	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
+	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev,
+											    thresholds[level - 1] * factors[level - 1],
+											    CoarseSimple()));
 	  else
-	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
-	  
-	  if (! succeed) {
-	    // anyway, try relaxed thershold
-	    if (level == 1)
-	      succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor * 0.1, CoarseSimple()));
-	    else
-	      succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor * 0.1, CoarseSymbol(level - 2)));
-	  }
+	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev,
+											    thresholds[level - 1] * factors[level - 1],
+											    CoarseSymbol(level - 2)));
 	  
 	  if (! succeed) break;
 	}
 	
 	if (! succeed) {
-	  factor *= 0.1;
+	  // multiply factors up-until the corresponding levels
+	  for (size_t i = 0; i != level; ++ i)
+	    factors[i] *= 0.1;
 	  continue;
 	}
 	
 	// we will fallback to simple tag!
 	if (grammars.size() == 2)
 	  composer(lattice, graph, PruneCoarse<CoarseSimple>(scores,
-							     thresholds.back() * factor,
+							     thresholds.back() * factors.back(),
 							     CoarseSimple()));
 	else
 	  composer(lattice, graph, PruneCoarse<CoarseSymbol>(scores,
-							     thresholds.back() * factor,
+							     thresholds.back() * factors.back(),
 							     CoarseSymbol(grammars.size() - 2)));
 	if (graph.is_valid()) break;
 	
-	// second trial...
-	if (grammars.size() == 2)
-	  composer(lattice, graph, PruneCoarse<CoarseSimple>(scores,
-							     thresholds.back() * factor * 0.1,
-							     CoarseSimple()));
-	else
-	  composer(lattice, graph, PruneCoarse<CoarseSymbol>(scores,
-							     thresholds.back() * factor * 0.1,
-							     CoarseSymbol(grammars.size() - 2)));
-	
-	if (graph.is_valid()) break;
-
-	factor *= 0.1;
+	// multiply all the factors
+	for (size_t i = 0; i != factors.size(); ++ i)
+	  factors[i] *= 0.1;
       }
     }
     
