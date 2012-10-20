@@ -503,6 +503,7 @@ struct TaskStdout
   {
     std::string line;
     while (1) {
+      line.clear();
       queue_is.pop_swap(line);
       if (line.empty()) break;
       
@@ -550,6 +551,7 @@ struct ReduceStdout
     utils::compress_ostream os(path, 1024 * 1024);
     
     for (;;) {
+      buffer.clear();
       queue.pop_swap(buffer);
       
       if (buffer.empty()) break;
@@ -743,6 +745,7 @@ void cicada_stdout(operation_set_type& operations)
       }
       
       if (! terminated) {
+	line.clear();
 	if (os && os->test() && queue_os.pop_swap(line, true)) {
 	  if (line.empty())
 	    terminated = true;
@@ -784,6 +787,7 @@ struct Task
     std::string line;
     
     while (1) {
+      line.clear();
       queue.pop_swap(line);
       if (line.empty()) break;
 

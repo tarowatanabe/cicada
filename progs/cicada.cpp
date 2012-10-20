@@ -229,6 +229,7 @@ struct TaskFile
     
     std::string line;
     while (1) {
+      line.clear();
       queue_is.pop_swap(line);
       if (line.empty()) break;
       
@@ -278,6 +279,7 @@ struct ReduceFile
     utils::compress_ostream os(path, 1024 * 1024);
     
     for (;;) {
+      buffer.clear();
       queue.pop_swap(buffer);
       
       if (buffer.empty()) break;
@@ -373,6 +375,7 @@ struct TaskDirectory
     std::string line;
     
     while (1) {
+      line.clear();
       queue.pop_swap(line);
       if (line.empty()) break;
 
