@@ -466,7 +466,7 @@ struct MapStdout
 	queue.push(std::make_pair(path_input.string(), false));
       }
     } else {
-      size_t id = 0;
+      operation_set_type::operation_type::id_type id = 0;
       utils::compress_istream is(path, 1024 * 1024);
       
       std::string line;
@@ -539,7 +539,7 @@ struct ReduceStdout
   
   void operator()()
   {
-    typedef size_t id_type;
+    typedef operation_set_type::operation_type::id_type id_type;
     typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
     
     buffer_map_type maps;
@@ -863,7 +863,7 @@ void cicada_process(operation_set_type& operations)
     } else {
       utils::compress_istream is(input_file, 1024 * 1024);
       
-      size_t id = 0;
+      operation_set_type::operation_type::id_type id = 0;
       std::string line;
       
       int non_found_iter = 0;
