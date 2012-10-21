@@ -50,6 +50,8 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include "cicada/traits.hpp"
+
 namespace cicada
 {
   struct TreeGrammarMutableImpl : public utils::hashmurmur<uint64_t>
@@ -74,25 +76,8 @@ namespace cicada
     typedef TreeTransducer::feature_set_type   feature_set_type;
     typedef TreeTransducer::attribute_set_type attribute_set_type;
     
-    struct empty_edge_key
-    {
-      const symbol_type& operator()() const
-      {
-	static symbol_type __symbol(symbol_type::id_type(-1));
-	return __symbol;
-      }
-    };
-
-    struct deleted_edge_key
-    {
-      const symbol_type& operator()() const
-      {
-	static symbol_type __symbol(symbol_type::id_type(-2));
-	return __symbol;
-      }
-    };
-
-    typedef utils::trie_set_compact<symbol_type, empty_edge_key, deleted_edge_key, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+    typedef utils::trie_set_compact<symbol_type, utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				    boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				    std::allocator<symbol_type > > edge_trie_type;
     typedef edge_trie_type::id_type edge_id_type;
     
@@ -112,7 +97,9 @@ namespace cicada
       }
     };
     
-    typedef utils::trie_compact<edge_id_type, rule_pair_set_type, empty_key, deleted_key, boost::hash<edge_id_type>, std::equal_to<edge_id_type>,
+    typedef utils::trie_compact<edge_id_type, rule_pair_set_type,
+				empty_key, deleted_key,
+				boost::hash<edge_id_type>, std::equal_to<edge_id_type>,
 				std::allocator<std::pair<const edge_id_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
     

@@ -478,6 +478,7 @@ treebank.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 symbol_vector_compact.hpp \
+traits.hpp \
 transducer.hpp \
 tree_grammar.hpp \
 tree_grammar_mutable.hpp \
