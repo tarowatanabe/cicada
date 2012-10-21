@@ -12,8 +12,8 @@
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/signature.hpp>
 
-#include <utils/dense_hash_map.hpp>
-#include <utils/trie_dense.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/trie_compact.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -29,18 +29,43 @@ namespace cicada
     typedef feature_set_type::feature_type feature_type;
 
   private:
-    typedef utils::trie_dense<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			      std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
-    class unigram_set_type : public utils::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >::type
+    struct empty_key
     {
-    public:
-      typedef utils::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >::type base_type;
-      
-      unigram_set_type() : base_type() { base_type::set_empty_key(0); }
+      const symbol_type& operator()() const
+      {
+	static symbol_type __symbol(symbol_type::id_type(-1));
+	return __symbol;
+      }
     };
+
+    struct deleted_key
+    {
+      const symbol_type& operator()() const
+      {
+	static symbol_type __symbol(symbol_type::id_type(-2));
+	return __symbol;
+      }
+    };
+
+    struct empty_unigram
+    {
+      uchar_type operator()() const { return 0; }
+    };
+
+    struct deleted_unigram
+    {
+      uchar_type operator()() const { return 1; }
+    };
+
+    typedef utils::trie_compact<symbol_type, double, empty_key, deleted_key, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
+        
+    typedef utils::compact_map<uchar_type, double, empty_unigram, deleted_unigram, utils::hashmurmur<size_t>, std::equal_to<uchar_type>,
+			       std::allocator<std::pair<const uchar_type, double> > > unigram_set_type;
+
     
-    typedef utils::trie_dense<symbol_type, unigram_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			      std::allocator<std::pair<const symbol_type, unigram_set_type> > > ngram_set_type;
+    typedef utils::trie_compact<symbol_type, unigram_set_type, empty_key, deleted_key, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, unigram_set_type> > > ngram_set_type;
     
     
   public:
@@ -48,8 +73,8 @@ namespace cicada
 		   const std::string& __parameter)
       : base_type(1),
 	signature(&signature_type::create(__signature)),
-	backoff(symbol_type()),
-	ngram(symbol_type()),
+	backoff(),
+	ngram(),
 	unigram(),
 	logprob_unk(0),
 	feature_character()
@@ -62,8 +87,8 @@ namespace cicada
 		   const std::string& __character)
       : base_type(1),
 	signature(&signature_type::create(__signature)),
-	backoff(symbol_type()),
-	ngram(symbol_type()),
+	backoff(),
+	ngram(),
 	unigram(),
 	logprob_unk(0),
 	feature_character("rule-character")

@@ -98,22 +98,19 @@ namespace cicada
     
     struct empty_key
     {
-      const edge_id_type& operator()() const
+      edge_id_type operator()() const
       {
-	static edge_id_type __symbol(edge_id_type(-1));
-	return __symbol;
+	return edge_id_type(-1);
       }
     };
 
     struct deleted_key
     {
-      const edge_id_type& operator()() const
+      edge_id_type operator()() const
       {
-	static edge_id_type __symbol(edge_id_type(-2));
-	return __symbol;
+	return edge_id_type(-2);
       }
     };
-    
     
     typedef utils::trie_compact<edge_id_type, rule_pair_set_type, empty_key, deleted_key, boost::hash<edge_id_type>, std::equal_to<edge_id_type>,
 				std::allocator<std::pair<const edge_id_type, rule_pair_set_type> > > trie_type;
