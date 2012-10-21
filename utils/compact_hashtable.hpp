@@ -292,9 +292,9 @@ namespace utils
   private:
     static const size_type __cache_bytes = 128;
     static const size_type __cache_size = __cache_bytes / sizeof(value_type);
-    static const size_type __cache_size_power2 = (utils::bithack::static_next_largest_power2<__cache_size>::result >> 1);
+    static const size_type __cache_size_power2 = (utils::bithack::static_next_largest_power2<__cache_size>::result >> 2);
     static const size_type __cache_minimum = (__cache_size_power2 == 0 ? size_type(1) : __cache_size_power2);
-    static const size_type __cache_linear = (__cache_minimum << 1);
+    static const size_type __cache_linear = (__cache_minimum << 2);
     
   public:
     compact_hashtable(size_type hint=0)
