@@ -355,7 +355,7 @@ namespace cicada
 	// closure_map.clear();
 	// unaries.clear();
 	// unaries_computed.clear();
-
+	
 	symbol_map_type(symbol_map).swap(symbol_map);
 	closure_map_type(closure_map).swap(closure_map);
 	

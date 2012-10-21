@@ -106,11 +106,9 @@ namespace utils
 
     void swap(__indexed_hashtable_bin& x)
     {
-      using namespace std;
-      
-      swap(base, x.base);
-      swap(last, x.last);
-      swap(allocator(), x.allocator());
+      std::swap(base, x.base);
+      std::swap(last, x.last);
+      std::swap(allocator(), x.allocator());
     }
     
   private:
