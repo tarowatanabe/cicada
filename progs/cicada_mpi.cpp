@@ -550,6 +550,10 @@ struct ReduceStdout
     
     utils::compress_ostream os(path, 1024 * 1024);
     
+    const bool flush_output = (path == "-"
+			       || (boost::filesystem::exists(path)
+				   && ! boost::filesystem::is_regular_file(path)));
+    
     for (;;) {
       buffer.clear();
       queue.pop_swap(buffer);
@@ -581,7 +585,7 @@ struct ReduceStdout
 	maps.erase(iter ++);
       }
       
-      if (dump)
+      if (dump && flush_output)
 	os << std::flush;
     }
     
@@ -597,7 +601,8 @@ struct ReduceStdout
 	maps.erase(iter ++);
       }
     
-    os << std::flush;
+    if (flush_output)
+      os << std::flush;
     
     if (! maps.empty())
       throw std::runtime_error("id mismatch! expecting: " + utils::lexical_cast<std::string>(id)
