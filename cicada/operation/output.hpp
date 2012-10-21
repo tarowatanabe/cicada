@@ -31,7 +31,6 @@ namespace cicada
   
       path_type file;
       path_type directory;
-      bool flush;
   
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
