@@ -29,7 +29,7 @@
 #include <utils/unordered_map.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -72,14 +72,11 @@ namespace cicada
     typedef std::vector<grammar_type, std::allocator<grammar_type> > grammar_set_type;
     typedef std::vector<double, std::allocator<double> > threshold_set_type;
 
-    class LabelScoreSet : public utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
-    {
-    public:
-      typedef typename utils::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type label_score_set_type;
-      
-      LabelScoreSet() : label_score_set_type() { label_score_set_type::set_empty_key(symbol_type()); }
-    };
-    typedef LabelScoreSet label_score_set_type;
+    typedef utils::compact_map<symbol_type, score_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>
+			       std::allocator<std::pair<const symbol_type, score_type> > > label_score_set_type;
+
     typedef utils::chart<label_score_set_type, std::allocator<label_score_set_type > > label_score_chart_type;
 
     struct CoarseSymbol

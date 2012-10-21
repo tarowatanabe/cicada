@@ -30,7 +30,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -93,8 +93,6 @@ namespace cicada
 	attr_span_last("span-last")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
-      
-      node_map.set_empty_key(symbol_level_type());
     }
     
     typedef utils::mulvector2<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_map_type;
@@ -179,6 +177,17 @@ namespace cicada
 					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
     
     typedef std::pair<symbol_type, int> symbol_level_type;
+
+    
+    struct symbol_level_unassigned
+    {
+      symbol_level_type operator()() const { return symbol_level_type(symbol_type(0, -1)); }
+    };
+    
+    struct symbol_level_deleted
+    {
+      symbol_level_type operator()() const { return symbol_level_type(symbol_type(0, -2)); }
+    };
     
     struct symbol_level_hash : public utils::hashmurmur<size_t>
     {
@@ -190,11 +199,15 @@ namespace cicada
       }
     };
     
-    typedef typename utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
+    typedef typename utils::compact_map<symbol_level_type, hypergraph_type::id_type,
+					symbol_level_unassigned, symbol_level_deleted,
+					symbol_level_hash, std::equal_to<symbol_level_type>,
+					std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
     
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
 
-    typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+    typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type,
+					  utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 					  std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > >::type unary_rule_map_type;
     
     typedef utils::small_vector<int, std::allocator<int> > index_set_type;
