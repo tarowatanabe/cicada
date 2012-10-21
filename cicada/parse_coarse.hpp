@@ -74,7 +74,7 @@ namespace cicada
 
     typedef utils::compact_map<symbol_type, score_type,
 			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
-			       boost::hash<symbol_type>, std::equal_to<symbol_type>
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, score_type> > > label_score_set_type;
 
     typedef utils::chart<label_score_set_type, std::allocator<label_score_set_type > > label_score_chart_type;
