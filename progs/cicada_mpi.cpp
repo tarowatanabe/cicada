@@ -548,12 +548,12 @@ struct ReduceStdout
     
     id_type     id = 0;
     
-    utils::compress_ostream os(path, 1024 * 1024);
-    
     const bool flush_output = (path == "-"
 			       || (boost::filesystem::exists(path)
 				   && ! boost::filesystem::is_regular_file(path)));
-    
+
+    utils::compress_ostream os(path, 1024 * 1024);
+        
     for (;;) {
       buffer.clear();
       queue.pop_swap(buffer);
