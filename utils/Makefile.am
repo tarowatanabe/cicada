@@ -133,6 +133,7 @@ symbol_sequence.hpp \
 symbol_tree.hpp \
 tempfile.hpp \
 thread_specific_ptr.hpp \
+traits.hpp \
 trie.hpp \
 trie_compact.hpp \
 trie_dense.hpp \

@@ -50,8 +50,6 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
-#include "cicada/compact_func.hpp"
-
 namespace cicada
 {
   struct TreeGrammarMutableImpl : public utils::hashmurmur<uint64_t>

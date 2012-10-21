@@ -17,6 +17,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/memory.hpp>
+#include <utils/compact_func.hpp>
 
 namespace utils
 {

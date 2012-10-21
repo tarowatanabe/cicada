@@ -366,7 +366,6 @@ binarize_left.hpp \
 binarize_right.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
-compact_func.hpp \
 compose.hpp \
 compose_alignment.hpp \
 compose_cky.hpp \

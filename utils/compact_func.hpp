@@ -6,18 +6,20 @@
 #ifndef __UTILS__COMPACT_FUNC__HPP__
 #define __UTILS__COMPACT_FUNC__HPP__
 
+#include <utils/traits.hpp>
+
 namespace utils
 {
   template <typename Tp>
   struct unassigned
   {
-    Tp operator()() { return Tp(); }
+    Tp operator()() const { return utils::traits<Tp>::unassigned(); }
   };
   
   template <typename Tp>
   struct deleted
   {
-    Tp operator()() { return Tp(); }
+    Tp operator()() const { return utils::traits<Tp>::deleted(); }
   };
   
 };

@@ -20,6 +20,7 @@
 #include <utils/rwticket.hpp>
 #include <utils/piece.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/traits.hpp>
 
 namespace cicada
 {
@@ -247,6 +248,19 @@ namespace std
   {
     x.swap(y);
   }
+};
+
+namespace utils
+{
+  template <>
+  struct traits<cicada::Feature>
+  {
+    typedef cicada::Feature     value_type;
+    typedef value_type::id_type id_type;
+    
+    static inline value_type unassigned() { return value_type(id_type(-1)); }
+    static inline value_type deleted() { return value_type(id_type(-2)); }
+  };
 };
 
 #endif

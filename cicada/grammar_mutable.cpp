@@ -35,8 +35,6 @@
 #include "utils/json_string_parser.hpp"
 #include "utils/resource.hpp"
 
-#include "cicada/compact_func.hpp"
-
 namespace std
 {
   std::ostream& operator<<(std::ostream& os, const std::pair<std::string, double>& x)
