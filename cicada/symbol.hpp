@@ -274,7 +274,6 @@ namespace cicada
   {
     return x.__id >= y.__id;
   }
-
 };
 
 namespace std

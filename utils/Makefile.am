@@ -50,6 +50,7 @@ c_string_generator.hpp \
 c_string_parser.hpp \
 chart.hpp \
 chunk_vector.hpp \
+compact_func.hpp \
 compact_hashtable.hpp \
 compact_map.hpp \
 compact_set.hpp \
