@@ -181,12 +181,12 @@ namespace cicada
     
     struct symbol_level_unassigned
     {
-      symbol_level_type operator()() const { return symbol_level_type(symbol_type(0, -1)); }
+      symbol_level_type operator()() const { return symbol_level_type(symbol_type(), -1); }
     };
     
     struct symbol_level_deleted
     {
-      symbol_level_type operator()() const { return symbol_level_type(symbol_type(0, -2)); }
+      symbol_level_type operator()() const { return symbol_level_type(symbol_type(), -2); }
     };
     
     struct symbol_level_hash : public utils::hashmurmur<size_t>
