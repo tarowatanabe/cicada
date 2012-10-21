@@ -250,5 +250,14 @@ namespace cicada
     rule_pair_set_type::const_iterator riter_end = rules_new.end();
     for (rule_pair_set_type::const_iterator riter = rules_new.begin(); riter != riter_end; ++ riter)
       base_type::insert(*riter);
+
+    
+    {
+      const id_type node = base_type::next(base_type::root(), word);
+      
+      base_type::rule_pair_set_type& cands = const_cast<rule_pair_set_type&>(base_type::rules(node));
+      
+      base_type::rule_pair_set_type(cands).swap(cands);
+    }
   }
 };
