@@ -366,6 +366,7 @@ binarize_left.hpp \
 binarize_right.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
+compact_func.hpp \
 compose.hpp \
 compose_alignment.hpp \
 compose_cky.hpp \
@@ -478,7 +479,6 @@ treebank.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 symbol_vector_compact.hpp \
-traits.hpp \
 transducer.hpp \
 tree_grammar.hpp \
 tree_grammar_mutable.hpp \
