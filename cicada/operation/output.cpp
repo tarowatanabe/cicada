@@ -210,7 +210,7 @@ namespace cicada
 
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
       : base_type("output"),
-	output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
+	output_data(__output_data), file(), directory(), flush(false), weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
 	kbest_size(0), kbest_unique(false),
 	insertion_prefix(),
 	yield_string(false),
@@ -322,6 +322,10 @@ namespace cicada
       
       if (int(lattice_mode) + forest_mode == 0)
 	forest_mode = true;
+      
+      if (! file.empty())
+	flush = (file == "-"
+		 || (boost::filesystem::exists(file) && ! boost::filesystem::is_regular_file(file)));
     }
 
     void Output::assign(const weight_set_type& __weights)
@@ -337,7 +341,7 @@ namespace cicada
       if (output_data.os) {
 	if (! directory.empty())
 	  output_data.os.reset();
-	else
+	else if (flush)
 	  *output_data.os << std::flush;
       }
     }
