@@ -11,8 +11,8 @@
 #include "parameter.hpp"
 #include "quantizer.hpp"
 
-#include "utils/compact_trie_dense.hpp"
-#include "utils/compact_trie_dense_set.hpp"
+#include "utils/trie_dense.hpp"
+#include "utils/trie_set_dense.hpp"
 #include "utils/compress_stream.hpp"
 
 #include "utils/bithack.hpp"
@@ -73,12 +73,12 @@ namespace cicada
     typedef TreeTransducer::feature_set_type   feature_set_type;
     typedef TreeTransducer::attribute_set_type attribute_set_type;
     
-    typedef utils::compact_trie_dense_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-					  std::allocator<symbol_type > > edge_trie_type;
+    typedef utils::trie_set_dense<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<symbol_type > > edge_trie_type;
     typedef edge_trie_type::id_type edge_id_type;
     
-    typedef utils::compact_trie_dense<edge_id_type, rule_pair_set_type, boost::hash<edge_id_type>, std::equal_to<edge_id_type>,
-				      std::allocator<std::pair<const edge_id_type, rule_pair_set_type> > > trie_type;
+    typedef utils::trie_dense<edge_id_type, rule_pair_set_type, boost::hash<edge_id_type>, std::equal_to<edge_id_type>,
+			      std::allocator<std::pair<const edge_id_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
     
     typedef boost::filesystem::path path_type;

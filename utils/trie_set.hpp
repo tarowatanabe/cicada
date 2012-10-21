@@ -1,10 +1,10 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__COMPACT_TRIE__HPP__
-#define __UTILS__COMPACT_TRIE__HPP__ 1
+#ifndef __UTILS__TRIE_SET__HPP__
+#define __UTILS__TRIE_SET__HPP__ 1
 
 #include <utils/chunk_vector.hpp>
 #include <utils/unordered_map.hpp>
@@ -13,7 +13,7 @@
 
 namespace utils
 {
-  struct __compact_trie_base
+  struct __trie_set_base
   {
     typedef uint32_t                   id_type;
     
@@ -24,17 +24,14 @@ namespace utils
   };
 
   template <typename Key,
-	    typename Data,
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
-	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
-  class compact_trie : public __compact_trie_base
+	    typename Alloc=std::allocator<Key> >
+  class trie_set : public __trie_set_base
   {
   public:
     typedef Key                        key_type;
-    typedef Data                       data_type;
-    typedef Data                       mapped_type;
-    typedef std::pair<const Key, Data> value_type;
+    typedef Key                        value_type;
     
     typedef Hash                       hash_type;
     typedef Equal                      equal_type;
@@ -45,14 +42,13 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-    typedef typename utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
+    typedef utils::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
     
     struct Node
     {
       id_map_type __map;
-      mapped_type __data;
       
-      Node() : __map(), __data() { }
+      Node() : __map() { }
     };
     typedef Node node_type;
     
@@ -64,7 +60,7 @@ namespace utils
     typedef typename id_map_type::const_iterator       iterator;
     
   public:
-    compact_trie() { clear(); }
+    trie_set() {}
     
   public:
     const_iterator begin() const { return __root.begin(); }
@@ -73,9 +69,6 @@ namespace utils
     const_iterator begin(id_type __id) const { return (__id == npos() ? __root.begin() : __nodes[__id].__map.begin()); }
     const_iterator end(id_type __id) const { return (__id == npos() ? __root.end() : __nodes[__id].__map.end()); }
     
-    inline const mapped_type& operator[](id_type __id) const { return __nodes[__id].__data; }
-    inline       mapped_type& operator[](id_type __id)       { return __nodes[__id].__data; }
-    
     void clear() { __root.clear(); __nodes.clear(); }
 
     size_type size() const { return __nodes.size(); }
@@ -83,15 +76,12 @@ namespace utils
     bool empty() const { return __nodes.empty(); }
     bool empty(id_type __id) const
     {
-      if (__id == npos())
-	return __root.empty();
-      else
-	return __nodes[__id].__map.empty();
+      return (__id == npos() ? __root.empty() : __nodes[__id].__map.empty());
     }
     
     bool is_root(id_type __id) const { return __id == npos(); }
-    
-    void swap(compact_trie& x)
+
+    void swap(trie_set& x)
     {
       __root.swap(x.__root);
       __nodes.swap(x.__nodes);
@@ -210,10 +200,10 @@ namespace utils
 
 namespace std
 {
-  template <typename Key, typename Data, typename Hash, typename Equal, typename Alloc>
+  template <typename Key, typename Hash, typename Equal, typename Alloc>
   inline
-  void swap(utils::compact_trie<Key,Data,Hash,Equal,Alloc>& x,
-	    utils::compact_trie<Key,Data,Hash,Equal,Alloc>& y)
+  void swap(utils::trie_set<Key,Hash,Equal,Alloc>& x,
+	    utils::trie_set<Key,Hash,Equal,Alloc>& y)
   {
     x.swap(y);
   }

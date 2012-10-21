@@ -3,8 +3,8 @@
 //  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__COMPACT_TRIE_DENSE_SET__HPP__
-#define __UTILS__COMPACT_TRIE_DENSE_SET__HPP__ 1
+#ifndef __UTILS__TRIE_SET_DENSE__HPP__
+#define __UTILS__TRIE_SET_DENSE__HPP__ 1
 
 #include <utils/dense_hash_map.hpp>
 #include <utils/chunk_vector.hpp>
@@ -13,7 +13,7 @@
 
 namespace utils
 {
-  struct __compact_trie_dense_set_base
+  struct __trie_set_dense_base
   {
     typedef uint32_t                   id_type;
     
@@ -27,7 +27,7 @@ namespace utils
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
 	    typename Alloc=std::allocator<Key > >
-  class compact_trie_dense_set : public __compact_trie_dense_set_base
+  class trie_set_dense : public __trie_set_dense_base
   {
   public:
     typedef Key                        key_type;
@@ -60,10 +60,10 @@ namespace utils
     typedef typename id_map_type::const_iterator       iterator;
     
   public:
-    compact_trie_dense_set(const key_type& __empty) { __root.set_empty_key(__empty); }
+    trie_set_dense(const key_type& __empty) { __root.set_empty_key(__empty); }
 
   private:
-    compact_trie_dense_set() {}
+    trie_set_dense() {}
     
   public:
     const_iterator begin() const { return __root.begin(); }
@@ -86,7 +86,7 @@ namespace utils
     
     bool is_root(id_type __id) const { return __id == npos(); }
 
-    void swap(compact_trie_dense_set& x)
+    void swap(trie_set_dense& x)
     {
       __root.swap(x.__root);
       __nodes.swap(x.__nodes);
@@ -207,8 +207,8 @@ namespace std
 {
   template <typename Key, typename Hash, typename Equal, typename Alloc>
   inline
-  void swap(utils::compact_trie_dense_set<Key,Hash,Equal,Alloc>& x,
-	    utils::compact_trie_dense_set<Key,Hash,Equal,Alloc>& y)
+  void swap(utils::trie_set_dense<Key,Hash,Equal,Alloc>& x,
+	    utils::trie_set_dense<Key,Hash,Equal,Alloc>& y)
   {
     x.swap(y);
   }

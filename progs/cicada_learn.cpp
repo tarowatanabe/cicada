@@ -27,7 +27,6 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/mathop.hpp"
-#include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_trie.hpp"
 
 #include <boost/program_options.hpp>

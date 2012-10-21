@@ -18,7 +18,6 @@
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/indexed_trie.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>

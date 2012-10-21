@@ -42,7 +42,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"

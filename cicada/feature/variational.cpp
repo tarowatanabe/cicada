@@ -10,7 +10,7 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
 
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 
@@ -36,8 +36,8 @@ namespace cicada
       
       typedef double logprob_type;
       
-      typedef utils::compact_trie_dense<symbol_type, logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-					std::allocator<std::pair<const symbol_type, logprob_type> > > ngram_set_type;
+      typedef utils::trie_dense<symbol_type, logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, logprob_type> > > ngram_set_type;
 
       typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
 

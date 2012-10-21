@@ -31,7 +31,7 @@
 #include <cicada/sentence.hpp>
 #include <cicada/dependency.hpp>
 
-#include <utils/compact_trie.hpp>
+#include <utils/trie_dense.hpp>
 #include <utils/dense_hash_map.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
@@ -110,8 +110,8 @@ struct DependencyModel
       node_type() : counts(), parent(id_type(-1)) {}
     };
     
-    typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-				      std::allocator<std::pair<const word_type, node_type> > > count_trie_type;
+    typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<std::pair<const word_type, node_type> > > count_trie_type;
 
 
 

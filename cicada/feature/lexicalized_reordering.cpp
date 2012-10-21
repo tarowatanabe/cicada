@@ -9,7 +9,6 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/piece.hpp"

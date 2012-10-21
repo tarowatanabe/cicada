@@ -13,7 +13,7 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
@@ -54,8 +54,8 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      typedef utils::compact_trie_dense<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-					std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
+      typedef utils::trie_dense<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
       
       typedef tree_map_type::id_type id_type;
 

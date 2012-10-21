@@ -53,10 +53,6 @@ chunk_vector.hpp \
 compact_hashtable.hpp \
 compact_map.hpp \
 compact_set.hpp \
-compact_trie.hpp \
-compact_trie_dense.hpp \
-compact_trie_set.hpp \
-compact_trie_dense_set.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \
@@ -136,6 +132,12 @@ symbol_sequence.hpp \
 symbol_tree.hpp \
 tempfile.hpp \
 thread_specific_ptr.hpp \
+trie.hpp \
+trie_compact.hpp \
+trie_dense.hpp \
+trie_set.hpp \
+trie_set_compact.hpp \
+trie_set_dense.hpp \
 json_string_generator.hpp \
 json_string_parser.hpp \
 unique_set.hpp \

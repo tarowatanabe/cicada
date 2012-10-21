@@ -13,7 +13,7 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 
@@ -62,8 +62,8 @@ namespace cicada
 	node_pair_type() : nodes() {}
       };
       
-      typedef utils::compact_trie_dense<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-					std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
+      typedef utils::trie_dense<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 
       typedef tree_map_type::id_type id_type;
 

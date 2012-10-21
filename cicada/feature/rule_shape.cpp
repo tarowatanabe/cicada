@@ -10,7 +10,7 @@
 
 #include "cicada/parameter.hpp"
 
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
@@ -44,8 +44,8 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
       
-      typedef utils::compact_trie_dense<int, std::string, utils::hashmurmur<size_t>, std::equal_to<int>,
-					std::allocator<std::pair<const int, std::string> > > trie_type;
+      typedef utils::trie_dense<int, std::string, utils::hashmurmur<size_t>, std::equal_to<int>,
+				std::allocator<std::pair<const int, std::string> > > trie_type;
       
       typedef std::vector<feature_type, std::allocator<feature_type> > cache_unigram_type;
       typedef std::vector<bool, std::allocator<bool> > checked_unigram_type;

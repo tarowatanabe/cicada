@@ -13,7 +13,7 @@
 #include <cicada/signature.hpp>
 
 #include <utils/dense_hash_map.hpp>
-#include <utils/compact_trie_dense.hpp>
+#include <utils/trie_dense.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -29,8 +29,8 @@ namespace cicada
     typedef feature_set_type::feature_type feature_type;
 
   private:
-    typedef utils::compact_trie_dense<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				      std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
+    typedef utils::trie_dense<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			      std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
     class unigram_set_type : public utils::dense_hash_map<uchar_type, double, utils::hashmurmur<size_t>, std::equal_to<uchar_type> >::type
     {
     public:
@@ -39,8 +39,8 @@ namespace cicada
       unigram_set_type() : base_type() { base_type::set_empty_key(0); }
     };
     
-    typedef utils::compact_trie_dense<symbol_type, unigram_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				      std::allocator<std::pair<const symbol_type, unigram_set_type> > > ngram_set_type;
+    typedef utils::trie_dense<symbol_type, unigram_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			      std::allocator<std::pair<const symbol_type, unigram_set_type> > > ngram_set_type;
     
     
   public:

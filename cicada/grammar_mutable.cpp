@@ -11,7 +11,8 @@
 #include "parameter.hpp"
 #include "attribute_vector.hpp"
 
-#include "utils/compact_trie_dense.hpp"
+//#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 
@@ -65,15 +66,39 @@ namespace cicada
     typedef Transducer::rule_ptr_type      rule_ptr_type;
     typedef Transducer::rule_pair_type     rule_pair_type;
     typedef Transducer::rule_pair_set_type rule_pair_set_type;
+
+    struct empty_key
+    {
+      const symbol_type& operator()() const
+      {
+	static symbol_type __symbol(symbol_type::id_type(-1));
+	return __symbol;
+      }
+    };
+
+    struct deleted_key
+    {
+      const symbol_type& operator()() const
+      {
+	static symbol_type __symbol(symbol_type::id_type(-2));
+	return __symbol;
+      }
+    };
     
-    typedef utils::compact_trie_dense<symbol_type, rule_pair_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				      std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
+    typedef utils::trie_compact<symbol_type, rule_pair_set_type, empty_key, deleted_key, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
+#if 0
+    typedef utils::trie_dense<symbol_type, rule_pair_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			      std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
+    typedef trie_type::id_type id_type;
+#endif
 
     typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
 
-    GrammarMutableImpl(const int __max_span=0) : trie(symbol_type()), max_span(__max_span), debug(0) {}
+    //GrammarMutableImpl(const int __max_span=0) : trie(symbol_type()), max_span(__max_span), debug(0) {}
+    GrammarMutableImpl(const int __max_span=0) : trie(), max_span(__max_span), debug(0) {}
     
     void read(const std::string& parameter);
     

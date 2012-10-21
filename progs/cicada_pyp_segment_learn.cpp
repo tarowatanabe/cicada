@@ -48,7 +48,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/dense_hash_set.hpp"
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -106,8 +106,8 @@ struct PYPWord
   };
   typedef Node node_type;
   
-  typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
@@ -691,8 +691,8 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
   

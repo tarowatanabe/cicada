@@ -1,19 +1,19 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__COMPACT_TRIE_DENSE__HPP__
-#define __UTILS__COMPACT_TRIE_DENSE__HPP__ 1
+#ifndef __UTILS__TRIE_COMPACT__HPP__
+#define __UTILS__TRIE_COMPACT__HPP__ 1
 
-#include <utils/dense_hash_map.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/compact_map.hpp>
 
 #include <boost/functional/hash.hpp>
 
 namespace utils
 {
-  struct __compact_trie_dense_base
+  struct __trie_compact_base
   {
     typedef uint32_t                   id_type;
     
@@ -25,16 +25,21 @@ namespace utils
 
   template <typename Key,
 	    typename Data,
+	    typename Empty,
+	    typename Deleted,
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
 	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
-  class compact_trie_dense : public __compact_trie_dense_base
+  class trie_compact : public __trie_compact_base
   {
   public:
     typedef Key                        key_type;
     typedef Data                       data_type;
     typedef Data                       mapped_type;
     typedef std::pair<const Key, Data> value_type;
+
+    typedef Empty                      empty_type;
+    typedef Deleted                    deleted_type;
     
     typedef Hash                       hash_type;
     typedef Equal                      equal_type;
@@ -45,14 +50,14 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-    typedef typename utils::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type>::type id_map_type;
+    typedef typename utils::compact_map<key_type, id_type, empty_type, deleted_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
     
     struct Node
     {
       id_map_type __map;
       mapped_type __data;
       
-      Node(const key_type& __empty) : __map(), __data() { __map.set_empty_key(__empty); }
+      Node() : __map(), __data() { }
     };
     typedef Node node_type;
     
@@ -64,10 +69,7 @@ namespace utils
     typedef typename id_map_type::const_iterator       iterator;
     
   public:
-    compact_trie_dense(const key_type& __empty) { __root.set_empty_key(__empty); }
-
-  private:
-    compact_trie_dense() {}
+    trie_compact() { }
     
   public:
     const_iterator begin() const { return __root.begin(); }
@@ -80,7 +82,7 @@ namespace utils
     inline       mapped_type& operator[](id_type __id)       { return __nodes[__id].__data; }
     
     void clear() { __root.clear(); __nodes.clear(); }
-    
+
     size_type size() const { return __nodes.size(); }
     
     bool empty() const { return __nodes.empty(); }
@@ -93,15 +95,15 @@ namespace utils
     }
     
     bool is_root(id_type __id) const { return __id == npos(); }
-
-    void swap(compact_trie_dense& x)
+    
+    void swap(trie_compact& x)
     {
       __root.swap(x.__root);
       __nodes.swap(x.__nodes);
     }
     
     id_type root() const { return npos(); }
-
+    
     id_type find(id_type __id, const key_type& key) const
     {
       return __find_key(__id, key);
@@ -189,7 +191,7 @@ namespace utils
       else {
 	const id_type __id_new = __nodes.size();
 	
-	__nodes.push_back(node_type(__root.empty_key()));
+	__nodes.push_back(node_type());
 	mapping.insert(std::make_pair(key, __id_new));
 	
 	return __id_new;
@@ -213,10 +215,10 @@ namespace utils
 
 namespace std
 {
-  template <typename Key, typename Data, typename Hash, typename Equal, typename Alloc>
+  template <typename Key, typename Data, typename Empty, typename Deleted, typename Hash, typename Equal, typename Alloc>
   inline
-  void swap(utils::compact_trie_dense<Key,Data,Hash,Equal,Alloc>& x,
-	    utils::compact_trie_dense<Key,Data,Hash,Equal,Alloc>& y)
+  void swap(utils::trie_compact<Key,Data,Empty,Deleted,Hash,Equal,Alloc>& x,
+	    utils::trie_compact<Key,Data,Empty,Deleted,Hash,Equal,Alloc>& y)
   {
     x.swap(y);
   }

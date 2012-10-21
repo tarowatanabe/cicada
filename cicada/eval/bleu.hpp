@@ -17,7 +17,7 @@
 #include <cicada/eval/score.hpp>
 #include <cicada/symbol_vector.hpp>
 
-#include <utils/compact_trie_dense.hpp>
+#include <utils/trie_dense.hpp>
 #include <utils/simple_vector.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>
@@ -166,7 +166,7 @@ namespace cicada
       typedef double count_type;
       
       typedef std::allocator<std::pair<const word_type, count_type> > ngram_allocator_type;
-      typedef utils::compact_trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef utils::trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
       
       typedef std::vector<int, std::allocator<int> > size_set_type;
 

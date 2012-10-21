@@ -60,7 +60,7 @@
 #include "utils/restaurant_vector.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/compact_trie_dense.hpp"
+#include "utils/trie_dense.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -109,8 +109,8 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
   typedef std::vector<node_type*, std::allocator<node_type*> > node_ptr_set_type;
   typedef std::vector<node_ptr_set_type, std::allocator<node_ptr_set_type> > node_ptr_map_type;
@@ -688,8 +688,8 @@ struct PYPMixture
   
   typedef Node node_type;
   
-  typedef utils::compact_trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-				    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
   typedef std::vector<node_type*, std::allocator<node_type*> > node_ptr_set_type;
   typedef std::vector<node_ptr_set_type, std::allocator<node_ptr_set_type> > node_ptr_map_type;
