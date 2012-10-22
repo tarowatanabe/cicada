@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <memory>
 
-#include <utils/static_allocator.hpp>
 #include <utils/atomicop.hpp>
 #include <utils/memory.hpp>
 
