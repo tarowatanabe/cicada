@@ -18,8 +18,8 @@ namespace utils
 
   public:
     chunk_vector() : base_type() {}
-    chunk_vector(size_t x) : base_type(x) {}
-    chunk_vector(size_t x, const _Tp& val) : base_type(x, val) {}
+    chunk_vector(typename base_type::size_type x) : base_type(x) {}
+    chunk_vector(typename base_type::size_type x, const _Tp& val) : base_type(x, val) {}
     template <typename Iterator>
     chunk_vector(Iterator first, Iterator last) : base_type(first, last) {}
   };
