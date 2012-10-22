@@ -11,7 +11,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/tree_grammar_mutable.hpp>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 
 namespace cicada
 {
@@ -40,7 +40,7 @@ namespace cicada
       }
     };
 
-    typedef utils::dense_hash_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal, std::allocator<graph_rule_ptr_type> >::type graph_rule_ptr_set_type;
+    typedef utils::unordered_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal, std::allocator<graph_rule_ptr_type> >::type graph_rule_ptr_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
   public:
@@ -48,7 +48,6 @@ namespace cicada
     TreeGrammarFallback(const symbol_type& __non_terminal)
       : non_terminal(__non_terminal)
     {
-      rules.set_empty_key(graph_rule_ptr_type());
       features["tree-insertion-penalty"] = -1.0;
       attributes["insertion"] = attribute_set_type::int_type(1);
     }
@@ -56,7 +55,6 @@ namespace cicada
     TreeGrammarFallback()
       : non_terminal()
     {
-      rules.set_empty_key(graph_rule_ptr_type());
       features["tree-insertion-penalty"] = -1.0;
       attributes["insertion"] = attribute_set_type::int_type(1);
     }

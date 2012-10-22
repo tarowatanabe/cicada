@@ -24,9 +24,6 @@ namespace cicada
       : excludes(), size(0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
-
-      excludes.set_empty_key(symbol_type());
-      deterministics.set_empty_key(symbol_type());
     
       param_type param(parameter);
       if (utils::ipiece(param.name()) != "permute")

@@ -22,13 +22,24 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
   namespace operation
   {
-    
+    template <typename Tp>
+    struct unassigned_id
+    {
+      Tp operator()() const { return Tp(-1); }
+    };
+
+    template <typename Tp>
+    struct deleted_id
+    {
+      Tp operator()() const { return Tp(-2); }
+    };
+
     template <typename Hypergraph, typename Function, typename Filter>
     inline
     void kbest_derivations(std::ostream& os,
@@ -68,8 +79,11 @@ namespace cicada
       typedef typename hypergraph_type::id_type id_type;
 
       typedef typename Function::value_type weight_type;
-
-      typedef typename utils::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type node_map_type;
+      
+      typedef utils::compact_map<id_type, id_type,
+				 unassigned_id<id_type>, deleted_id<id_type>,
+				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
 
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
       
@@ -79,8 +93,6 @@ namespace cicada
       head_set_type   heads;
       hypergraph_type graph_kbest;
       
-      node_maps.set_empty_key(id_type(-1));
-
       edge_set_type tails;
   
       for (int k = 0; k < kbest_size; ++ k) {

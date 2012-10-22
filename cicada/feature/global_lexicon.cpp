@@ -7,7 +7,7 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/piece.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 
 namespace cicada
 {
@@ -42,15 +42,16 @@ namespace cicada
       
       typedef symbol_type word_type;
       
-      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+      typedef utils::compact_set<word_type,
+				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 boost::hash<word_type>, std::equal_to<word_type>,
+				 std::allocator<word_type> > word_set_type;
       
       typedef std::vector<double, std::allocator<double> > cache_set_type;
       
       GlobalLexiconImpl(const path_type& __path)
 	: lexicon(__path)
-      {
-	words.set_empty_key(symbol_type());
-      }
+      { }
       
       double global_lexicon_score(const edge_type& edge)
       {

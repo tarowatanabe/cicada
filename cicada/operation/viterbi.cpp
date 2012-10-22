@@ -15,7 +15,7 @@
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -68,12 +68,27 @@ namespace cicada
       
       name = std::string("viterbi");
     }
-    
+
+    template <typename Tp>
+    struct unassigned_id
+    {
+      Tp operator()() const { return Tp(-1); }
+    };
+
+    template <typename Tp>
+    struct deleted_id
+    {
+      Tp operator()() const { return Tp(-2); }
+    };
+
     void Viterbi::operator()(data_type& data) const
     {
       typedef hypergraph_type::id_type id_type;
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
-      typedef utils::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type node_map_type;
+      typedef utils::compact_map<id_type, id_type,
+				 unassigned_id<id_type>, deleted_id<id_type>,
+				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
       typedef cicada::operation::edge_traversal::edge_set_type edge_set_type;
 
       if (! data.hypergraph.is_valid()) return;
@@ -117,7 +132,6 @@ namespace cicada
       head_set_type heads;
       edge_set_type tails;
       node_map_type node_maps;
-      node_maps.set_empty_key(id_type(-1));
 
       heads.reserve(edges.size());
 

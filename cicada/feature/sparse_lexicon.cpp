@@ -19,7 +19,7 @@
 #include "utils/alloc_vector.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/small_vector.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 
 namespace cicada
 {
@@ -67,10 +67,35 @@ namespace cicada
       typedef symbol_type word_type;
       typedef std::pair<word_type, word_type> word_pair_type;
       
-      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_unique_type;
+      typedef utils::compact_set<word_type,
+				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 boost::hash<word_type>, std::equal_to<word_type>,
+				 std::allocator<word_type> > word_unique_type;
       
       typedef std::vector<word_pair_type, std::allocator<word_pair_type> > word_pair_set_type;
-      typedef utils::dense_hash_set<word_pair_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> >::type word_pair_unique_type;
+      
+      struct unassigned_key : utils::unassigned<word_type>
+      {
+	word_pair_type operator()() const 
+	{
+	  return word_pair_type(utils::unassigned<word_type>::operator()(),
+				utils::unassigned<word_type>::operator()());
+	}
+      };
+
+      struct deleted_key : utils::deleted<word_type>
+      {
+	word_pair_type operator()() const 
+	{
+	  return word_pair_type(utils::deleted<word_type>::operator()(),
+				utils::deleted<word_type>::operator()());
+	}
+      };
+      
+      typedef utils::compact_set<word_pair_type,
+				 unassigned_key, deleted_key,
+				 utils::hashmurmur<size_t>, std::equal_to<word_pair_type>,
+				 std::allocator<word_pair_type> > word_pair_unique_type;
 
       typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
       typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
@@ -101,11 +126,7 @@ namespace cicada
 	  prefix_mode(false),
 	  suffix_mode(false),
 	  fertility_mode(false)
-      {
-	uniques.set_empty_key(word_type()); 
-	uniques_prefix.set_empty_key(word_pair_type()); 
-        uniques_suffix.set_empty_key(word_pair_type()); 
-      }
+      { }
 
       struct skipper_epsilon
       {

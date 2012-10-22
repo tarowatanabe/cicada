@@ -10,7 +10,7 @@
 
 #include <cicada/operation.hpp>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -19,7 +19,10 @@ namespace cicada
 
     class Permute : public Operation
     {
-      typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> >::type exclude_set_type;
+      typedef utils::compact_set<symbol_type,
+				 utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				 std::allocator<symbol_type> > exclude_set_type;
       typedef exclude_set_type deterministic_set_type;
 
       struct Filter

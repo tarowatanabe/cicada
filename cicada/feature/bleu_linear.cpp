@@ -11,7 +11,7 @@
 
 #include "utils/space_separator.hpp"
 #include "utils/hashmurmur.hpp"
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
@@ -92,7 +92,10 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef std::allocator<std::pair<const word_type, count_type> >  ngram_allocator_type;
-      typedef utils::trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef utils::trie_compact<word_type, count_type,
+				  utils::unassigned<word_type>, utils::deleted<word_type>,
+				  boost::hash<word_type>, std::equal_to<word_type>,
+				  ngram_allocator_type> ngram_set_type;
       
       struct Node
       {
@@ -116,7 +119,7 @@ namespace cicada
 		     const double __ratio,
 		     const tokenizer_type* __tokenizer,
 		     const bool __skip_sgml_tag)
-	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
+	: ngrams(), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
 	  tokenizer(__tokenizer),
 	  skip_sgml_tag(__skip_sgml_tag)
       {

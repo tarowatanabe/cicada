@@ -15,8 +15,6 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 
-#include <utils/dense_hash_set.hpp>
-
 namespace cicada
 {
   class GrammarChinese : public GrammarChinese

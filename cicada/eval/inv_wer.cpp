@@ -16,7 +16,6 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/bichart.hpp"
 #include "utils/chart.hpp"
-#include "utils/dense_hash_set.hpp"
 
 namespace cicada
 {

@@ -13,7 +13,7 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 
@@ -62,15 +62,17 @@ namespace cicada
 	node_pair_type() : nodes() {}
       };
       
-      typedef utils::trie_dense<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
+      typedef utils::trie_compact<symbol_type, node_pair_type,
+				  utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				  boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 
       typedef tree_map_type::id_type id_type;
 
       typedef FeatureBuilder feature_builder_type;
 
       NGramTreeImpl()
-	: tree_map(symbol_type()),
+	: tree_map(),
 	  sentence(0),
 	  forced_feature(false),
 	  alignment_mode(false),

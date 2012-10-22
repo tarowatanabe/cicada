@@ -21,8 +21,8 @@
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/indexed_set.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -61,11 +61,6 @@ namespace cicada
 	attr_span_last("span-last")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
-      
-      node_map.set_empty_key(symbol_level_type());
-      closure.set_empty_key(symbol_type());
-      closure_head.set_empty_key(symbol_type());
-      closure_tail.set_empty_key(symbol_type());
     }
     
     struct Active
@@ -119,10 +114,36 @@ namespace cicada
       }
     };
 
-    typedef utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
+    struct symbol_level_unassigned : utils::unassigned<symbol_type>
+    {
+      symbol_level_type operator()() const
+      {
+	return symbol_level_type(utils::unassigned<symbol_type>::operator()(), -1);
+      }
+    };
+
+    struct symbol_level_deleted : utils::deleted<symbol_type>
+    {
+      symbol_level_type operator()() const
+      {
+	return symbol_level_type(utils::deleted<symbol_type>::operator()(), -1);
+      }
+    };
+
+    typedef utils::compact_map<symbol_level_type, hypergraph_type::id_type,
+			       symbol_level_unassigned, symbol_level_deleted,
+			       symbol_level_hash, std::equal_to<symbol_level_type>,
+			       std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
     
-    typedef utils::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type closure_level_type;
-    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type closure_type;
+    
+    typedef utils::compact_map<symbol_type, int,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, int> > > closure_level_type;
+    typedef utils::compact_set<symbol_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<symbol_type> > closure_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     

@@ -10,7 +10,7 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
 
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 
@@ -36,8 +36,10 @@ namespace cicada
       
       typedef double logprob_type;
       
-      typedef utils::trie_dense<symbol_type, logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, logprob_type> > > ngram_set_type;
+      typedef utils::trie_compact<symbol_type, logprob_type,
+				  utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				  boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, logprob_type> > > ngram_set_type;
 
       typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
 
@@ -59,7 +61,7 @@ namespace cicada
       
     public:
       VariationalImpl(const int __order)
-	: ngrams(symbol_type()), order(__order), no_bos_eos(false)
+	: ngrams(), order(__order), no_bos_eos(false)
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)

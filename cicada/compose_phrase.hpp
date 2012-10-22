@@ -22,7 +22,7 @@
 #include <utils/bit_vector.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/unordered_map.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -113,8 +113,27 @@ namespace cicada
 	return x.node == y.node && x.id == y.id && x.first == y.first && x.last == y.last;
       }
     };
+
+    struct span_node_unassigned
+    {
+      span_node_type operator()() const
+      {
+	return span_node_type(-1, -1, -1, -1);
+      }
+    };
+  
+    struct span_node_deleted
+    {
+      span_node_type operator()() const
+      {
+	return span_node_type(-2, -2, -2, -2);
+      }
+    };
     
-    typedef utils::dense_hash_map<span_node_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<span_node_type> >::type span_node_map_type;
+    typedef utils::compact_map<span_node_type, hypergraph_type::id_type,
+			       span_node_unassigned, span_node_deleted,
+			       utils::hashmurmur<size_t>, std::equal_to<span_node_type>,
+			       std::allocator<std::pair<const span_node_type, hypergraph_type::id_type> > > span_node_map_type;
 
     typedef std::vector<int, std::allocator<int> > node_set_type;
 
@@ -136,8 +155,6 @@ namespace cicada
       
       rule_x1_x2 = rule_type::create(rule_type(non_terminal.non_terminal(), sequence.begin(), sequence.end()));
       rule_x1    = rule_type::create(rule_type(non_terminal.non_terminal(), sequence.begin(), sequence.begin() + 1));
-      
-      span_nodes.set_empty_key(span_node_type());
     }
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)

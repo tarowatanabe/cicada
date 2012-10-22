@@ -20,7 +20,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/bithack.hpp>
 #include <utils/chart.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -63,8 +63,6 @@ namespace cicada
 	attr_dependency_head("dependency-head"),
 	attr_dependency_dependent("dependency-dependent")
     {
-      node_map.set_empty_key(id_type(-1));
-      
       rule_reduce1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X)));
       rule_reduce2 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(2, vocab_type::X)));
     }
@@ -84,8 +82,21 @@ namespace cicada
     typedef Item item_type;
     typedef utils::chunk_vector<item_type, 4096 / sizeof(item_type), std::allocator<item_type> > item_set_type;
     typedef utils::chart<item_set_type, std::allocator<item_set_type> >  active_chart_type;
+
+    struct unassigned_key
+    {
+      id_type operator()() const { return id_type(-1); }
+    };
+
+    struct deleted_key
+    {
+      id_type operator()() const { return id_type(-2); }
+    };
     
-    typedef utils::dense_hash_map<id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type node_map_type;
+    typedef utils::compact_map<id_type, hypergraph_type::id_type,
+			       unassigned_key, deleted_key, 
+			       utils::hashmurmur<size_t>, std::equal_to<id_type>,
+			       std::allocator<std::pair<const id_type, hypergraph_type::id_type> > > node_map_type;
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)

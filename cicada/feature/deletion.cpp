@@ -12,7 +12,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/mathop.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/bit_vector.hpp"
 #include "utils/memory.hpp"
 #include "utils/indexed_set.hpp"
@@ -58,7 +58,10 @@ namespace cicada
 
       typedef symbol_type word_type;
       
-      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+      typedef utils::compact_set<word_type,
+				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 boost::hash<word_type>, std::equal_to<word_type>,
+				 std::allocator<word_type> > word_set_type;
       
       typedef utils::unordered_map<word_type, coverage_type, boost::hash<word_type>, std::equal_to<word_type>,
 				   std::allocator<std::pair<const word_type, coverage_type> > >::type cache_set_type;
@@ -67,7 +70,7 @@ namespace cicada
       
       DeletionImpl()
 	: lexicon(0), uniques(), words(), skip_sgml_tag(false), unique_source(false)
-      { uniques.set_empty_key(word_type());  }
+      {  }
       
       struct skipper_epsilon
       {

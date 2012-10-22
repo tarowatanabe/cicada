@@ -33,7 +33,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -103,9 +103,6 @@ namespace cicada
 	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
-      
-      label_map.set_empty_key(internal_label_type(-1, -1, symbol_type()));
-      terminal_map.set_empty_key(terminal_label_type(-1, -1, symbol_type()));
     }
     
     struct ActiveTree
@@ -326,25 +323,31 @@ namespace cicada
       }
     };
     
-    class NodeMap : public utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type
+    struct symbol_level_unassigned : utils::unassigned<symbol_type>
     {
-    public:
-      typedef typename utils::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >::type node_map_type;
-      
-    public:
-      NodeMap() : node_map_type() { node_map_type::set_empty_key(symbol_level_type(symbol_type(), -1)); }
+      symbol_level_type operator()() const
+      {
+	return symbol_level_type(utils::unassigned<symbol_type>::operator()(), -1);
+      }
     };
-    typedef NodeMap node_map_type;
 
-    class NodeSet : public utils::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
+    struct symbol_level_deleted : utils::deleted<symbol_type>
     {
-    public:
-      typedef typename utils::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type node_set_type;
-      
-    public:
-      NodeSet() : node_set_type() { node_set_type::set_empty_key(symbol_type()); }
+      symbol_level_type operator()() const
+      {
+	return symbol_level_type(utils::deleted<symbol_type>::operator()(), -1);
+      }
     };
-    typedef NodeSet node_set_type;
+    
+    typedef utils::compact_map<symbol_level_type, hypergraph_type::id_type,
+			       symbol_level_unassigned, symbol_level_deleted,
+			       symbol_level_hash, std::equal_to<symbol_level_type>,
+			       std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
+    
+    typedef utils::compact_map<symbol_type, hypergraph_type::id_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
     
     typedef utils::chunk_vector<node_set_type, 4096 / sizeof(node_set_type), std::allocator<node_set_type> > node_graph_type;
     
@@ -374,8 +377,28 @@ namespace cicada
     typedef boost::fusion::tuple<typename internal_tail_set_type::index_type, typename internal_symbol_set_type::index_type, symbol_type> internal_label_type;
     typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
-    typedef typename utils::dense_hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type> >::type internal_label_map_type;
-    typedef typename utils::dense_hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type> >::type terminal_label_map_type;
+    
+    template <typename Tp>
+    struct unassigned_key : public utils::unassigned<symbol_type>
+    {
+      Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
+    };
+
+    template <typename Tp>
+    struct deleted_key : public utils::deleted<symbol_type>
+    {
+      Tp operator()() const { return Tp(-1, -1, utils::deleted<symbol_type>::operator()()); }
+    };
+
+    
+    typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
+			       unassigned_key<internal_label_type>,  deleted_key<internal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
+			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+    typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
+			       unassigned_key<terminal_label_type>,  deleted_key<terminal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
+			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
     struct less_non_terminal
     {

@@ -3,7 +3,7 @@
 //
 
 #include "utils/hashmurmur.hpp"
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
@@ -51,7 +51,10 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef std::allocator<std::pair<const word_type, expected_type> >  ngram_allocator_type;
-      typedef utils::trie_dense<word_type, expected_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef utils::trie_compact<word_type, expected_type,
+				  utils::unassigned<word_type>, utils::deleted<word_type>,
+				  boost::hash<word_type>, std::equal_to<word_type>,
+				  ngram_allocator_type> ngram_set_type;
       
       struct Node
       {
@@ -81,7 +84,7 @@ namespace cicada
 
     public:
       BleuExpectedImpl(const int __order)
-	: ngrams(word_type()), nodes(), unigram(0),
+	: ngrams(), nodes(), unigram(0),
 	  order(__order) {}
 
       double bleu_score(state_ptr_type& state,

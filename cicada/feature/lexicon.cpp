@@ -13,7 +13,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/mathop.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 
 namespace cicada
 {
@@ -51,7 +51,10 @@ namespace cicada
       
       typedef symbol_type word_type;
       
-      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+      typedef utils::compact_set<word_type,
+				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 boost::hash<word_type>, std::equal_to<word_type>,
+				 std::allocator<word_type> > word_set_type;
       struct score_set_type
       {
 	double model1;
@@ -69,7 +72,7 @@ namespace cicada
       
       LexiconImpl()
 	: lexicon(0), uniques(), words(), caches(), skip_sgml_tag(false), unique_source(false), feature_model1(), feature_viterbi(), feature_noisy_or()
-      { uniques.set_empty_key(word_type());  }
+      {  }
 
       struct skipper_epsilon
       {

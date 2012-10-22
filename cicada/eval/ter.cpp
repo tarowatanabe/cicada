@@ -13,7 +13,7 @@
 
 #include <boost/functional/hash.hpp>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 #include <utils/vector2.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/bithack.hpp>
@@ -142,7 +142,10 @@ namespace cicada
 
       typedef cicada::Matcher matcher_type;
       
-      typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+      typedef utils::compact_set<word_type,
+				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 boost::hash<word_type>, std::equal_to<word_type>,
+				 std::allocator<word_type> > word_set_type;
 
       struct Score
       {
@@ -284,7 +287,6 @@ namespace cicada
 	ngram_index.clear();
 	
 	word_set_type words_intersect;
-	words_intersect.set_empty_key(word_type());
 	words_intersect.insert(hyp.begin(), hyp.end());
 
 	word_set_type::const_iterator iiter_end = words_intersect.end();

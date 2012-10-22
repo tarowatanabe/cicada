@@ -10,11 +10,11 @@
 
 #include "cicada/parameter.hpp"
 
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
-#include "utils/dense_hash_map.hpp"
+#include "utils/compact_map.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -44,26 +44,37 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
       
-      typedef utils::trie_dense<int, std::string, utils::hashmurmur<size_t>, std::equal_to<int>,
-				std::allocator<std::pair<const int, std::string> > > trie_type;
+      template <typename Tp>
+      struct unassigned_key
+      {
+	Tp operator()() const { return Tp(-1); }
+      };
+      
+      template <typename Tp>
+      struct deleted_key
+      {
+	Tp operator()() const { return Tp(-2); }
+      };
+      
+      typedef utils::trie_compact<int, std::string,
+				  unassigned_key<int>, deleted_key<int>,
+				  utils::hashmurmur<size_t>, std::equal_to<int>,
+				  std::allocator<std::pair<const int, std::string> > > trie_type;
       
       typedef std::vector<feature_type, std::allocator<feature_type> > cache_unigram_type;
       typedef std::vector<bool, std::allocator<bool> > checked_unigram_type;
       
       typedef trie_type::id_type id_type;
       
-      class node_map_type : public utils::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type
-      {
-      public:
-	typedef utils::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >::type map_type;
-	
-	node_map_type() : map_type() { map_type::set_empty_key(id_type(-1)); }
-      };
+      typedef utils::compact_map<id_type, feature_type,
+				 unassigned_key<id_type>, deleted_key<id_type>,
+				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 std::allocator<std::pair<const id_type, feature_type> > > node_map_type;
       typedef std::deque<node_map_type, std::allocator<node_map_type> > cache_bigram_type;
 
       typedef FeatureBuilder feature_builder_type;
     
-      RuleShapeImpl() : trie(-1), forced_feature(false) {}
+      RuleShapeImpl() : trie(), forced_feature(false) {}
     
       void rule_shape_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
