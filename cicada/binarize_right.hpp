@@ -10,7 +10,7 @@
 
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -38,13 +38,35 @@ namespace cicada
 			       std::allocator<symbol_set_type> > symbol_map_type;
     
     typedef boost::fusion::tuple<tail_map_type::index_type, symbol_map_type::index_type, symbol_type> internal_type;
-    typedef utils::dense_hash_map<internal_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_type> >::type node_map_type;
+
+    struct unassigned_key
+    {
+      const internal_type& operator()() const
+      {
+	utils::unassigned<symbol_type> __unassigned;
+	static internal_type __internal(-1, -1, __unassigned());
+	return __internal;
+      }
+    };
+    
+    struct deleted_key
+    {
+      const internal_type& operator()() const
+      {
+	utils::deleted<symbol_type> __deleted;
+	static internal_type __internal(-1, -1, __deleted());
+	return __internal;
+      }
+    };
+    
+    typedef utils::compact_map<internal_type, hypergraph_type::id_type,
+			       unassigned_key, deleted_key,
+			       utils::hashmurmur<size_t>, std::equal_to<internal_type>,
+			       std::allocator<std::pair<const internal_type, hypergraph_type::id_type> > > node_map_type;
 
     BinarizeRight(const int __order=-1)
       : node_map(), order(__order)
-    {
-      node_map.set_empty_key(internal_type(-1, -1, symbol_type()));
-    }
+    { }
 
     template <typename Iterator>
     symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)

@@ -32,7 +32,7 @@
 #include "utils/bithack.hpp"
 #include "utils/byte_aligned_code.hpp"
 #include "utils/json_string_parser.hpp"
-#include "utils/dense_hash_map.hpp"
+#include "utils/compact_map.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
@@ -281,7 +281,28 @@ namespace cicada
 
     typedef std::pair<word_type, size_type> word_node_type;
 
-    typedef utils::dense_hash_map<word_node_type, size_type, utils::hashmurmur<size_t>, std::equal_to<word_node_type>, std::allocator<word_node_type> >::type cache_node_type;
+    struct unassigned_cache
+    {
+      word_node_type operator()() const
+      {
+	utils::unassigned<word_type> __unassigned;
+	return word_node_type(__unassigned(), size_type(-1));
+      }
+    };
+
+    struct deleted_cache
+    {
+      word_node_type operator()() const
+      {
+	utils::deleted<word_type> __deleted;
+	return word_node_type(__deleted(), size_type(-1));
+      }
+    };
+
+    typedef utils::compact_map<word_node_type, size_type,
+			       unassigned_cache, deleted_cache,
+			       utils::hashmurmur<size_t>, std::equal_to<word_node_type>,
+			       std::allocator<std::pair<const word_node_type, size_type> > > cache_node_type;
 
   public:
     GrammarStaticImpl(const std::string& parameter)
@@ -289,7 +310,6 @@ namespace cicada
 	caching(false),
 	debug(0)
     {
-      cache_node.set_empty_key(word_node_type());
       read(parameter);
     }
 
@@ -309,9 +329,7 @@ namespace cicada
 	max_span(x.max_span),
 	caching(x.caching),
 	debug(x.debug)
-    {
-      cache_node.set_empty_key(word_node_type());
-    }
+    { }
 
     GrammarStaticImpl& operator=(const GrammarStaticImpl& x)
     {

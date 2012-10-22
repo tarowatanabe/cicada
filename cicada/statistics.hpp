@@ -15,7 +15,7 @@
 
 #include <boost/functional/hash/hash.hpp>
 
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -111,7 +111,10 @@ namespace cicada
     typedef Stat statistic_type;
     
   private:
-    typedef utils::dense_hash_map<attribute_type, stat_type, boost::hash<attribute_type>, std::equal_to<attribute_type> >::type stat_set_type;
+    typedef utils::compact_map<attribute_type, stat_type,
+			       utils::unassigned<attribute_type>, utils::deleted<attribute_type>,
+			       boost::hash<attribute_type>, std::equal_to<attribute_type>,
+			       std::allocator<std::pair<const attribute_type, stat_type> > > stat_set_type;
     
   public:
     typedef stat_set_type::value_type     value_type;
@@ -120,7 +123,7 @@ namespace cicada
     typedef stat_set_type::iterator       iterator;
     
   public:
-    Statistics() : stats() { stats.set_empty_key(attribute_type(attribute_type::id_type(-1))); }
+    Statistics() : stats() {  }
     
     inline const_iterator begin() const { return stats.begin(); }
     inline       iterator begin()       { return stats.begin(); }

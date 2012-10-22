@@ -15,7 +15,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -27,10 +27,12 @@ namespace cicada
     GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, Iterator first, Iterator last, const bool __straight, const bool __inverted)
       : straight(__straight), inverted(__inverted)
     {
-      typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type non_terminal_set_type;
+      typedef utils::compact_set<symbol_type,
+				 utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				 std::allocator<symbol_type> > non_terminal_set_type;
       
       non_terminal_set_type non_terminals;
-      non_terminals.set_empty_key(symbol_type());
       non_terminals.insert(first, last);
       if (! non_terminal.empty())
 	non_terminals.insert(non_terminal);
@@ -109,7 +111,6 @@ namespace cicada
     GrammarPair(const symbol_type& __non_terminal)
       : GrammarMutable(1), non_terminal(__non_terminal)
     {
-      symbols.set_empty_key(symbol_pair_type());
       attributes["pair"] = attribute_set_type::int_type(1);
     }
     
@@ -117,7 +118,31 @@ namespace cicada
 
   private:
     typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
-    typedef utils::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> >::type symbol_pair_set_type;
+    
+    struct unassigned_key
+    {
+      const symbol_pair_type& operator()() const
+      {
+	utils::unassigned<symbol_type> __unassigned;
+	static symbol_pair_type __pair(__unassigned(), __unassigned());
+	return __pair;
+      }
+    };
+
+    struct deleted_key
+    {
+      const symbol_pair_type& operator()() const
+      {
+	utils::deleted<symbol_type> __deleted;
+	static symbol_pair_type __pair(__deleted(), __deleted());
+	return __pair;
+      }
+    };
+    
+    typedef utils::compact_set<symbol_pair_type,
+			       unassigned_key, deleted_key,
+			       boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type>,
+			       std::allocator<symbol_pair_type> > symbol_pair_set_type;
     
   public:
     void assign(const hypergraph_type& source, const lattice_type& target)
@@ -209,7 +234,6 @@ namespace cicada
   public:
     GrammarPOS() : GrammarMutable(1) 
     {
-      symbols.set_empty_key(symbol_type());
       features["pos-penalty"] = - 1.0;
       attributes["pos"] = attribute_set_type::int_type(1);
     }
@@ -217,7 +241,10 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarPOS(*this)); }
 
   private:
-    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
+    typedef utils::compact_set<symbol_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<symbol_type> > symbol_set_type;
 
   public:
     void assign(const lattice_type& lattice)
@@ -257,7 +284,6 @@ namespace cicada
     GrammarInsertion(const symbol_type& __non_terminal)
       : GrammarMutable(1), non_terminal(__non_terminal)
     {
-      symbols.set_empty_key(symbol_type());
       features["insertion-penalty"] = - 1.0;
       attributes["insertion"] = attribute_set_type::int_type(1);
     }
@@ -265,7 +291,10 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarInsertion(*this)); }
 
   private:
-    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
+    typedef utils::compact_set<symbol_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<symbol_type> > symbol_set_type;
     
   public:
     void assign(const hypergraph_type& graph)
@@ -323,7 +352,6 @@ namespace cicada
 	non_terminal(__non_terminal),
 	rule_epsilon(rule_type::create(rule_type(__non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))))
     {
-      symbols.set_empty_key(symbol_type());
       features["deletion-penalty"] = - 1.0;
       attributes["deletion"] = attribute_set_type::int_type(1);
     }
@@ -331,7 +359,10 @@ namespace cicada
     transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarDeletion(*this)); }
 
   private:
-    typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type symbol_set_type;
+    typedef utils::compact_set<symbol_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<symbol_type> > symbol_set_type;
     
   public:
     void assign(const hypergraph_type& graph)

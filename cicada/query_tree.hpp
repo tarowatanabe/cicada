@@ -25,8 +25,6 @@
 #include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
 
 #include <boost/fusion/tuple.hpp>
 

@@ -11,7 +11,7 @@
 #include <cicada/hypergraph.hpp>
 
 #include <utils/hashmurmur.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -66,10 +66,23 @@ namespace cicada
       }
     };
     
+    struct unassigned_key
+    {
+      id_type operator()() const { return id_type(-1); }
+    };
+
+    struct deleted_key
+    {
+      id_type operator()() const { return id_type(-2); }
+    };
+
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool validate=true)
     {
-      typedef utils::dense_hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> >::type id_set_type;
+      typedef utils::compact_set<id_type,
+				 unassigned_key, deleted_key,
+				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 std::allocator<id_type> > id_set_type;
       
       sorted.clear();
       
@@ -77,7 +90,6 @@ namespace cicada
 	return;
 
       id_set_type edges_cycle;
-      edges_cycle.set_empty_key(id_type(-1));
 
       reloc_set_type reloc_node(x.nodes.size(), -1);
       reloc_set_type reloc_edge(x.edges.size(), -1);
@@ -197,7 +209,6 @@ namespace cicada
 	  reloc_map_node[reloc_node[i]] = i;
 
       id_set_type nodes_empty;
-      nodes_empty.set_empty_key(id_type(-1));
       
       for (size_t i = 0; i != reloc_map_node.size(); ++ i) {
 	const node_type& node_old = x.nodes[reloc_map_node[i]];
