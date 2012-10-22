@@ -43,7 +43,7 @@ namespace utils
     
   private:
     
-    //typedef typename _Alloc::template rebind<value_type>::other value_alloc_type;
+    typedef typename _Alloc::template rebind<value_type>::other value_alloc_type;
     typedef std::list<value_type, value_alloc_type > list_type;
     
   public:
