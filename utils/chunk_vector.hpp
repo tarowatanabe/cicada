@@ -6,6 +6,19 @@
 #ifndef __UTILS__CHUNK_VECTOR__HPP__
 #define __UTILS__CHUNK_VECTOR__HPP__ 1
 
+#include <deque>
+
+namespace utils
+{
+
+  template <typename _Tp, size_t _ChunkSize=128, typename _Alloc=std::allocator<_Tp> >
+  class chunk_vector : public std::deque<_Tp, _Alloc>
+  {
+  public:
+    
+  };
+};
+#if 0
 //
 // chunk vector inspired by std::deque
 //
@@ -897,5 +910,6 @@ namespace std
   }
   
 };
+#endif
 
 #endif
