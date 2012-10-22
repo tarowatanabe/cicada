@@ -21,7 +21,7 @@
 #include <boost/filesystem.hpp>
 
 #include <utils/trie.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
 
@@ -79,8 +79,10 @@ struct DependencyCounts
   typedef boost::filesystem::path                                     path_type;
   typedef std::vector<path_type, std::allocator<path_type> >          path_set_type;
 
-  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>,
-				std::allocator<std::pair<const word_type, count_type> > >::type root_count_set_type;
+  typedef utils::compact_map<word_type, count_type,
+			     utlils::unassigned<word_type>, std::deleted<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<std::pair<const word_type, count_type> > > root_count_set_type;
   
   typedef utils::trie<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>,
 		      std::allocator<std::pair<const word_type, count_type> > > trie_count_set_type;

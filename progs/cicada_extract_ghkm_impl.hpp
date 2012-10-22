@@ -47,8 +47,8 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/vector_set.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 struct Bitext
 {
@@ -1301,12 +1301,28 @@ struct ExtractGHKM
     derivations_new.clear();
   }
   
+  struct unassigned_range
+  {
+    range_type operator()() const { return range_type(0, 0); }
+  };
+
+  struct deleted_range
+  {
+    range_type operator()() const { return range_type(-1, -1); }
+  };
+
   void construct_derivations(const hypergraph_type& graph,
 			     const sentence_type& sentence)
   {
     typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
-    typedef utils::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_node_map_type;
-    typedef utils::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_set_type;
+    typedef utils::compact_map<range_type, id_type,
+			       unassigned_range, deleted_range,
+			       utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       std::allocator<std::pair<const range_type, id_type> > > range_node_map_type;
+    typedef utils::compact_set<range_type,
+			       unassigned_range, deleted_range,
+			       utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       std::allocator<range_type> > range_set_type;
 
     // construc derivations wrt non-aligned words...
 
@@ -1314,7 +1330,6 @@ struct ExtractGHKM
 
     queue_type queue;
     range_node_map_type buf;
-    buf.set_empty_key(range_type(0, 0));
     
     for (size_t id = 0; id != graph.nodes.size(); ++ id) 
       if (admissibles[id]) {
@@ -1379,7 +1394,6 @@ struct ExtractGHKM
 	}
 
 	range_set_type ranges;
-	ranges.set_empty_key(range_type(0, 0));
 
 	while (! queue.empty()) {
 	  // stack operation...

@@ -298,8 +298,12 @@ namespace utils
     static const size_type __cache_linear = (__cache_minimum << 2);
     
   public:
-    compact_hashtable(size_type hint=0)
-      : __bucket(),
+    compact_hashtable(size_type hint=0,
+		      const Hash& __hash = Hash(),
+		      const Pred& __pred = Pred())
+      : Hash(__hash),
+	Pred(__pred),
+	__bucket(),
 	__size_element(0),
 	__size_deleted(0) {  }
     compact_hashtable(const compact_hashtable& x)

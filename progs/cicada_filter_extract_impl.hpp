@@ -22,7 +22,7 @@
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/mathop.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -513,15 +513,11 @@ struct LexiconModel
 
   typedef boost::filesystem::path path_type;
 
-  struct table_type
-  {
-    typedef utils::dense_hash_map<word_type, double, boost::hash<word_type> , std::equal_to<word_type> >::type __table_type;
-
-    table_type() : table() { table.set_empty_key(word_type()); }
-
-    __table_type table;
-  };
-
+  typedef utils::compact_map<word_type, double,
+			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     boost::hash<word_type> , std::equal_to<word_type>,
+			     std::allocator<std::pair<const word_type, double> > > table_type;
+  
   typedef utils::alloc_vector<table_type, std::allocator<table_type> > table_set_type;
   typedef std::vector<double, std::allocator<double> > max_set_type;
 
@@ -562,7 +558,7 @@ struct LexiconModel
       const word_type source(boost::fusion::get<1>(parsed));
       const word_type target(boost::fusion::get<0>(parsed));
       
-      tables[source.id()].table[target] = boost::fusion::get<2>(parsed);
+      tables[source.id()][target] = boost::fusion::get<2>(parsed);
       
       if (source.id() >= maximum.size())
 	maximum.resize(source.id() + 1, 0.0);
@@ -580,8 +576,8 @@ struct LexiconModel
     if (tables.exists(source.id())) {
       const table_type& table = tables[source.id()];
       
-      table_type::__table_type::const_iterator iter = table.table.find(target);
-      return (iter != table.table.end() ? iter->second : smooth);
+      table_type::const_iterator iter = table.find(target);
+      return (iter != table.end() ? iter->second : smooth);
     } else 
       return smooth;
   }

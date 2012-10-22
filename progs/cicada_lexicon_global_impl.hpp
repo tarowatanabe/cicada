@@ -18,8 +18,8 @@
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
 #include <utils/random_seed.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 #include "cicada/symbol.hpp"
 #include "cicada/vocab.hpp"
@@ -71,7 +71,10 @@ void read_bitexts(const path_type& path_source,
 		  word_set_type& vocab,
 		  const int kbest)
 {
-  typedef utils::dense_hash_map<word_type, size_t, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_set_type;
+  typedef utils::compact_map<word_type, size_t,
+			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<std::pair<const word_type, size_t> > > word_count_set_type;
   typedef std::vector<std::pair<word_type, size_t>, std::allocator<std::pair<word_type, size_t> > > word_count_sorted_type;
   
   typedef std::set<word_type, std::less<word_type>, std::allocator<word_type> > word_sorted_set_type;
@@ -81,8 +84,6 @@ void read_bitexts(const path_type& path_source,
   word_count_set_type  counts;
   word_sorted_set_type uniques_source;
 
-  counts.set_empty_key(word_type());
-  
   utils::compress_istream is_src(path_source, 1024 * 1024);
   utils::compress_istream is_trg(path_target, 1024 * 1024);
   
@@ -299,10 +300,12 @@ struct Optimizer
     : bitexts(__bitexts.size()),
       word(__word)
   {
-    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type  word_set_type;
+    typedef utils::compact_set<word_type,
+			       utils::unassigned<word_type>, utils::deleted<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<word_type> >  word_set_type;
     
     word_set_type cooc;
-    cooc.set_empty_key(word_type());
     
     bitext_set_type::const_iterator biter_end = __bitexts.end();
     for (bitext_set_type::const_iterator biter = __bitexts.begin(); biter != biter_end; ++ biter)

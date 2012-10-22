@@ -54,7 +54,8 @@ namespace utils
     typedef compact_hashtable<key_type, value_type, value_empty, value_deleted, extract_key, Hash, Pred, Alloc> impl_type;
 
   public:
-    typedef typename impl_type::size_type  size_type;
+    typedef typename impl_type::size_type       size_type;
+    typedef typename impl_type::difference_type difference_type;
     
     typedef typename impl_type::iterator       iterator;
     typedef typename impl_type::const_iterator const_iterator;
@@ -63,8 +64,10 @@ namespace utils
     typedef typename impl_type::const_reference const_reference;
 
   public:
-    compact_map(const size_type __size=8, const Hash& __hash=Hash(), const Pred& __equal=Pred())
-      : impl(__size) {}
+    compact_map(const size_type __size=8,
+		const Hash& __hash=Hash(),
+		const Pred& __pred=Pred())
+      : impl(__size, __hash, __pred) {}
 
   public:
     void assign(const compact_map& x) { impl.assign(x.impl); }

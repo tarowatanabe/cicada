@@ -44,8 +44,8 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 struct Bitext
 {
@@ -858,6 +858,16 @@ struct ExtractTree
       derivations_new.clear();
     }
     
+    struct unassigned_range
+    {
+      range_type operator()() const { return range_type(0, 0); }
+    };
+    
+    struct deleted_range
+    {
+      range_type operator()() const { return range_type(-1, -1); }
+    };
+    
     void construct_derivations(const hypergraph_type& graph,
 			       const DerivationGraph& counterpart,
 			       const int max_nodes,
@@ -866,8 +876,15 @@ struct ExtractTree
 			       const bool constrained)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
-      typedef utils::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_node_map_type;
-      typedef utils::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> >::type range_set_type;
+      typedef utils::compact_map<range_type, id_type,
+				 unassigned_range, deleted_range,
+				 utils::hashmurmur<size_t>, std::equal_to<range_type>,
+				 std::allocator<std::pair<const range_type, id_type> > > range_node_map_type;
+      typedef utils::compact_set<range_type,
+				 unassigned_range, deleted_range,
+				 utils::hashmurmur<size_t>, std::equal_to<range_type>,
+				 std::allocator<range_type> > range_set_type;
+    
       typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
       node_map_type node_map(graph.nodes.size());
@@ -902,7 +919,6 @@ struct ExtractTree
 	  const bool is_goal(id == graph.goal);
 	
 	  range_node_map_type buf;
-	  buf.set_empty_key(range_type(0, 0));
 	
 	  queue_type queue;
 
@@ -978,7 +994,6 @@ struct ExtractTree
 	      node_set_type tails_next(tails.size());
 
 	      range_set_type ranges;
-	      ranges.set_empty_key(range_type(0, 0));
 	    
 	      for (;;) {
 		bool is_valid = true;
