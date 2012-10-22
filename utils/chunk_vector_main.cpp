@@ -20,6 +20,7 @@ struct worker_str
     vec_chunk_type vec_chunk;
     vec_type vec;
 
+    const int margin = random() & (1024 - 1);
     
     std::cout << "string..." << std::endl;
     
@@ -27,7 +28,7 @@ struct worker_str
 
       
     char buffer[1024];
-    for (int i = 0; i < 1024 + 100; ++ i) {
+    for (int i = 0; i < 1024 + margin; ++ i) {
       sprintf(buffer, "%06d", i);
       vec.push_back(buffer);
       vec_chunk.push_back(buffer);
@@ -35,7 +36,7 @@ struct worker_str
     
     std::cerr << "size:" << vec.size() << " " << vec_chunk.size() << std::endl;
     
-    for (int i = 0; i < 1024 + 100; ++ i) {
+    for (int i = 0; i < 1024 + margin; ++ i) {
       if (vec[i] != vec_chunk[i])
 	std::cerr << "DIFFER!" << std::endl;
       if (*(vec.begin() + i) != *(vec_chunk.begin() + i))
@@ -47,7 +48,7 @@ struct worker_str
     
     std::cerr << "size:" << vec.size() << " " << vec_chunk.size() << std::endl;
 
-    for (int i = 0; i < 1024 + 100; ++ i) {
+    for (int i = 0; i < 1024 + margin; ++ i) {
       sprintf(buffer, "%06d", i);
       vec.push_back(buffer);
       vec_chunk.push_back(buffer);
@@ -55,7 +56,7 @@ struct worker_str
     
     std::cerr << "size:" << vec.size() << " " << vec_chunk.size() << std::endl;
     
-    for (int i = 0; i < 1024 + 100; ++ i) {
+    for (int i = 0; i < 1024 + margin; ++ i) {
       if (vec[i] != vec_chunk[i])
 	std::cerr << "DIFFER!" << std::endl;
       if (*(vec.begin() + i) != *(vec_chunk.begin() + i))
@@ -90,10 +91,10 @@ struct worker_str
     std::cerr << "size:" << vec.size() << " " << vec_chunk.size() << std::endl;
     
     
-    vec_chunk.resize(1024 * 4 + 100);
-    vec.resize(1024 * 4 + 100);
+    vec_chunk.resize(1024 * 4 + margin);
+    vec.resize(1024 * 4 + margin);
     
-    for (int i = 0; i < 1024 * 4 + 100; ++ i) {
+    for (int i = 0; i < 1024 * 4 + margin; ++ i) {
       sprintf(buffer, "%06d", i);
       vec[i] = buffer;
       vec_chunk[i] = buffer;
@@ -101,7 +102,7 @@ struct worker_str
     
     std::cerr << "size:" << vec.size() << " " << vec_chunk.size() << std::endl;
     
-    for (int i = 0; i < 1024 * 4 + 100; ++ i) {
+    for (int i = 0; i < 1024 * 4 + margin; ++ i) {
       if (vec[i] != vec_chunk[i])
 	std::cerr << "DIFFER!" << std::endl;
       if (*(vec.begin() + i) != *(vec_chunk.begin() + i))
