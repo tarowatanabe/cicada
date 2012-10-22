@@ -43,8 +43,8 @@ namespace utils
     
   private:
     
-    typedef typename _Alloc::template rebind<value_type>::other value_alloc_type;
-    typedef std::list<value_type, utils::static_allocator<value_type, 1, value_alloc_type> > list_type;
+    //typedef typename _Alloc::template rebind<value_type>::other value_alloc_type;
+    typedef std::list<value_type, value_alloc_type > list_type;
     
   public:
     typedef typename list_type::iterator iterator;
