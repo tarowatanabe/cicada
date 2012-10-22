@@ -14,8 +14,14 @@ namespace utils
   template <typename _Tp, size_t _ChunkSize=128, typename _Alloc=std::allocator<_Tp> >
   class chunk_vector : public std::deque<_Tp, _Alloc>
   {
+    typedef std::deque<_Tp, _Alloc> base_type;
+
   public:
-    
+    chunk_vector() : base_type() {}
+    chunk_vector(size_t x) : base_type(x) {}
+    chunk_vector(size_t x, const _Tp& val) : base_type(x, val) {}
+    template <typename Iterator>
+    chunk_vector(Iterator first, Iterator last) : base_type(first, last) {}
   };
 };
 #if 0
