@@ -25,7 +25,7 @@
 #include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -128,9 +128,26 @@ namespace cicada
 
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
     typedef boost::fusion::tuple<int, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
+    
+    template <typename Tp>
+    struct unassigned_key
+    {
+      Tp operator()() const { return Tp(-1, -1, symbol_type::id_type(-1)); }
+    };
+    template <typename Tp>
+    struct deleted_key
+    {
+      Tp operator()() const { return Tp(-1, -1, symbol_type::id_type(-2)); }
+    };
 
-    typedef utils::dense_hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type> >::type internal_label_map_type;
-    typedef utils::dense_hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type> >::type terminal_label_map_type;
+    typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
+			       unassigned_key<internal_label_type>, deleted_key<internal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
+			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+    typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
+			       unassigned_key<terminal_label_type>, deleted_key<terminal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
+			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
     struct State
     {
@@ -152,36 +169,11 @@ namespace cicada
     typedef State state_type;
 
     typedef std::deque<state_type, std::allocator<state_type> > queue_type;
-
-    struct NodeMap
-    {
-      typedef utils::dense_hash_map<symbol_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_type> >::type node_map_type;
-
-      typedef node_map_type::value_type value_type;
-      
-      typedef node_map_type::iterator       iterator;
-      typedef node_map_type::const_iterator const_iterator;
-
-      NodeMap() : node_map() { node_map.set_empty_key(symbol_type()); }
-
-      size_t size() const { return node_map.size(); }
-      bool empty() const { return node_map.empty(); }
-      
-      std::pair<iterator, bool> insert(const value_type& x) { return node_map.insert(x); }
-      
-      const_iterator find(const symbol_type& x) const { return node_map.find(x); }
-      iterator find(const symbol_type& x) { return node_map.find(x); }
-      
-      const_iterator begin() const { return node_map.begin(); }
-      iterator begin() { return node_map.begin(); }
-
-      const_iterator end() const { return node_map.end(); }
-      iterator end() { return node_map.end(); }
-
-      node_map_type node_map;
-    };
-
-    typedef NodeMap node_map_type;
+    
+    typedef utils::compact_map<symbol_type, hypergraph_type::id_type,
+			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
     ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
@@ -195,9 +187,6 @@ namespace cicada
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
 					      rule_type::symbol_set_type(1, goal.non_terminal())));
-      
-      label_map.set_empty_key(internal_label_type(-1, -1, symbol_type()));
-      terminal_map.set_empty_key(terminal_label_type(-1, -1, symbol_type()));
     }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)

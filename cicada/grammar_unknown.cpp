@@ -1,6 +1,11 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
 
 #include <string>
 #include <vector>
@@ -25,8 +30,6 @@
 
 namespace cicada
 {
-  
-
   template <typename Iterator>
   inline
   uint32_t parse_utf8(Iterator first, Iterator last)
@@ -93,6 +96,9 @@ namespace cicada
     ngram.clear();
     unigram.clear();
     logprob_unk = 0.0;
+
+    if (file.empty() || (file != "-" && ! boost::filesystem::exists(file)))
+      throw std::runtime_error("no character file?");
     
     utils::compress_istream is(file, 1024 * 1024);
     std::string line;
@@ -139,12 +145,16 @@ namespace cicada
 
   void GrammarUnknown::insert(const symbol_type& word)
   {
-    id_type node = base_type::next(base_type::root(), word);
-    if (node != base_type::root()) return;
+    GrammarMutable* oov = dynamic_cast<GrammarMutable*>(&(*__grammar_oov));
+    
+    if (! oov)
+      throw std::runtime_error("no oov grammar?");
+    
+    if (oov->next(oov->root(), word) != oov->root()) return;
     
     // word is oov
     symbol_type sig = signature->operator()(word);
-    node = base_type::next(base_type::root(), sig);
+    id_type node = base_type::next(base_type::root(), sig);
     if (node == base_type::root()) {
       sig =  signature_type::FALLBACK;
       node = base_type::next(base_type::root(), sig);
@@ -249,15 +259,6 @@ namespace cicada
     
     rule_pair_set_type::const_iterator riter_end = rules_new.end();
     for (rule_pair_set_type::const_iterator riter = rules_new.begin(); riter != riter_end; ++ riter)
-      base_type::insert(*riter);
-
-    
-    {
-      const id_type node = base_type::next(base_type::root(), word);
-      
-      base_type::rule_pair_set_type& cands = const_cast<rule_pair_set_type&>(base_type::rules(node));
-      
-      base_type::rule_pair_set_type(cands).swap(cands);
-    }
+      oov->insert(*riter);
   }
 };

@@ -563,7 +563,7 @@ namespace cicada
 			     const std::string& __goal,
 			     const int __debug)
       : base_type("parse-coarse"),
-	grammars(), thresholds(), grammar(__grammar),
+	grammars(), thresholds(), grammar(__grammar), 
 	goal(__goal),
 	weights(0),
 	weights_assigned(0),
@@ -657,29 +657,42 @@ namespace cicada
       
       // assign unknown/pos grammar from the fine-grammar
       if (grammars.back().size() >= 2) {
-	grammar_type::transducer_ptr_type unknown;
-	grammar_type::transducer_ptr_type pos;
+        grammar_type::transducer_ptr_type unknown;
+        grammar_type::transducer_ptr_type pos;
 	
-	grammar_type::iterator giter_end = grammars.back().end();
-	for (grammar_type::iterator giter = grammars.back().begin(); giter != giter_end; ++ giter) {
-	  if (dynamic_cast<GrammarUnknown*>(&(*(*giter))))
-	    unknown = *giter;
-	  else if (dynamic_cast<GrammarPOS*>(&(*(*giter))))
-	    pos = *giter;
-	}
+        grammar_type::iterator giter_end = grammars.back().end();
+        for (grammar_type::iterator giter = grammars.back().begin(); giter != giter_end; ++ giter) {
+          if (dynamic_cast<GrammarUnknown*>(&(*(*giter))))
+            unknown = *giter;
+          else if (dynamic_cast<GrammarPOS*>(&(*(*giter))))
+            pos = *giter;
+        }
+        
+        if (unknown) {
+          grammar_set_type::iterator giter_end = grammars.end() - 1;
+          for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
+            if (! has_grammar<GrammarUnknown>(giter->begin(), giter->end()))
+              giter->push_back(unknown);
+        }
+        
+        if (pos) {
+          grammar_set_type::iterator giter_end = grammars.end() - 1;
+          for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
+            if (! has_grammar<GrammarPOS>(giter->begin(), giter->end()))
+              giter->push_back(pos);
+        }
+      }
+
+      /// assign OOV grammar from GrammarUnknown!
+      grammar_set_type::iterator giter_end = grammars.end();
+      for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter) {
 	
-	if (unknown) {
-	  grammar_set_type::iterator giter_end = grammars.end() - 1;
-	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
-	    if (! has_grammar<GrammarUnknown>(giter->begin(), giter->end()))
-	      giter->push_back(unknown);
-	}
-	
-	if (pos) {
-	  grammar_set_type::iterator giter_end = grammars.end() - 1;
-	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
-	    if (! has_grammar<GrammarPOS>(giter->begin(), giter->end()))
-	      giter->push_back(pos);
+	grammar_type::const_iterator uiter_end = giter->end();
+	for (grammar_type::const_iterator uiter = giter->begin(); uiter != uiter_end; ++ uiter) {
+	  if (dynamic_cast<GrammarUnknown*>(&(*(*uiter)))) {
+	    giter->push_back(dynamic_cast<GrammarUnknown*>(&(*(*uiter)))->grammar_oov());
+	    break;
+	  }
 	}
       }
     }

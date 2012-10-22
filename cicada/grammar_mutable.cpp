@@ -461,6 +461,11 @@ namespace cicada
   {
     pimpl->clear();
   }
+  
+  GrammarMutable::size_type GrammarMutable::size() const
+  {
+    return pimpl->trie.size();
+  }
 
   void GrammarMutable::insert(const std::string& pattern)
   {

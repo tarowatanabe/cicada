@@ -66,6 +66,7 @@ namespace cicada
     // mutable grammar specific members...
     void read(const std::string& parameter);
     void clear();
+    size_type size() const;
     
     void insert(const std::string& pattern);
     void insert(const rule_pair_type& rule_pair);
