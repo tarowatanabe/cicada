@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iterator>
@@ -16,6 +16,7 @@
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/array_power2.hpp>
 
 #include "symbol.hpp"
 
@@ -31,18 +32,27 @@ namespace cicada
     typedef Symbol::mutex_type mutex_type;
     
     typedef utils::indexed_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
+
+    struct id_pair_type
+    {
+      id_type first;
+      id_type second;
+      
+      id_pair_type() : first(id_type(-1)), second(id_type(-1)) {}
+      id_pair_type(const id_type& __first, const id_type& __second) : first(__first), second(__second) {}
+    };
     
     typedef std::vector<int, std::allocator<int> >   index_map_type;
     typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_id_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_symbol_map_type;
-    typedef std::vector<id_type, std::allocator<id_type> > pos_symbol_map_type;
-    typedef std::vector<id_type, std::allocator<id_type> > terminal_symbol_map_type;
+    typedef utils::array_power2<id_pair_type, 1024 * 8, std::allocator<id_pair_type> > pos_symbol_map_type;
+    typedef utils::array_power2<id_pair_type, 1024 * 8, std::allocator<id_pair_type> > terminal_symbol_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > coarse_symbol_map_type;
     
     typedef utils::simple_vector<id_type, std::allocator<id_type> > id_set_type;
     typedef std::vector<id_set_type, std::allocator<id_set_type> >  coarser_symbol_map_type;
-    
+
     symbol_map_type              symbol_maps;
     index_map_type               index_maps;
     non_terminal_map_type        non_terminal_maps;
@@ -80,6 +90,7 @@ namespace cicada
 #else
       if (! impl.get())
 	impl.reset(new SymbolImpl());
+      
       return *impl;
 #endif
     }
@@ -315,17 +326,10 @@ namespace cicada
     if (! is_terminal()) return Symbol();
     
     SymbolImpl::pos_symbol_map_type& maps = symbol_impl::instance().pos_symbol_maps;
+
+    SymbolImpl::id_pair_type& pair = maps[__id & (maps.size() - 1)];
     
-    if (__id >= maps.size()) {
-      const size_type size = __id + 1;
-      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
-						      size,
-						      size_type(utils::bithack::next_largest_power2(size)));
-      maps.reserve(power2);
-      maps.resize(power2, id_type(-1));
-    }
-    
-    if (maps[__id] == id_type(-1)) {
+    if (pair.first != __id) {
       namespace xpressive = boost::xpressive;
       
       typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
@@ -335,11 +339,12 @@ namespace cicada
       
       pmatch what;
       if (xpressive::regex_match(utils::piece(symbol()), what, re))
-	maps[__id] = Symbol(what[1]).id();
+	pair.second = Symbol(what[1]).id();
       else
-	maps[__id] = Symbol().id();
+	pair.second = Symbol().id();
+      pair.first = __id;
     }
-    return maps[__id];
+    return pair.second;
   }
   
   Symbol Symbol::terminal() const
@@ -347,17 +352,10 @@ namespace cicada
     if (! is_terminal()) return *this;
     
     SymbolImpl::terminal_symbol_map_type& maps = symbol_impl::instance().terminal_symbol_maps;
-    
-    if (__id >= maps.size()) {
-      const size_type size = __id + 1;
-      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
-						      size,
-						      size_type(utils::bithack::next_largest_power2(size)));
-      maps.reserve(power2);
-      maps.resize(power2, id_type(-1));
-    }
 
-    if (maps[__id] == id_type(-1)) {
+    SymbolImpl::id_pair_type& pair = maps[__id & (maps.size() - 1)];
+    
+    if (pair.first != __id) {
       namespace xpressive = boost::xpressive;
       
       typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
@@ -367,11 +365,13 @@ namespace cicada
       
       pmatch what;
       if (xpressive::regex_match(utils::piece(symbol()), what, re))
-	maps[__id] = Symbol(what[1]).id();
+	pair.second = Symbol(what[1]).id();
       else
-	maps[__id] = __id;
+	pair.second = __id;
+      
+      pair.first = __id;
     }
-    return maps[__id];
+    return pair.second;
   }
 
   bool Symbol::binarized() const
