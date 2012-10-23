@@ -388,7 +388,7 @@ namespace utils
       // not found...
       
       // perform resizing if we store many nodes
-      if (nodes.size() > bins.size())
+      if (nodes.size() > bins.size() + (bins.size() >> 3))
 	resize(bins.size() << 1);
       
       // insert at new bins position...
