@@ -78,7 +78,7 @@ namespace cicada
 	const size_type size = __id + 1;
 	const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
 							size,
-							utils::bithack::next_largest_power2(size));
+							size_type(utils::bithack::next_largest_power2(size)));
 	maps.reserve(power2);
 	maps.resize(power2, 0);
       }
