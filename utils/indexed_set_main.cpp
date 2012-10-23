@@ -114,7 +114,7 @@ int main (int argc, char** argv)
       for (int i = 0; i < 1024 * 8; ++ i) {
 	
 	std::ostringstream stream;
-	stream << (random() % 1024 * 2);
+	stream << (random() & (1024 * 16 - 1));
 	const std::string value = stream.str();
 	
 	if (set.find(value) == set.end()) {
@@ -141,6 +141,71 @@ int main (int argc, char** argv)
       set_inverse.clear();
     
       std::cerr << "clear size: indexed: " << indexed_set.size() << " map: " << set.size() << std::endl;
+    }
+  }
+
+  // random set...
+  {
+    typedef utils::indexed_set<std::string> indexed_set_type;
+    typedef std::set<std::string> set_type;
+
+    indexed_set_type indexed;
+    set_type set;
+    
+    for (int k = 0; k < 4; ++ k) {
+      
+      // we will randomly generate...
+      for (int i = 0; i < 1024 * 8; ++ i) {
+	std::ostringstream stream;
+	stream << (random() & (1024 * 16 - 1));
+	const std::string value = stream.str();
+
+	set.insert(value);
+	indexed.insert(value);
+      }
+
+      if (set.size() != indexed.size())
+	std::cerr << "size differ?" << std::endl;
+      
+      {
+	set_type::const_iterator siter_end = set.end();
+	for (set_type::const_iterator siter = set.begin(); siter != siter_end; ++ siter) {
+	  if (indexed.find(*siter) == indexed.end())
+	    std::cerr << "not inserted in the indexed set?";
+	}
+      }
+      
+      {
+	indexed_set_type::const_iterator siter_end = indexed.end();
+	for (indexed_set_type::const_iterator siter = indexed.begin(); siter != siter_end; ++ siter) {
+	  if (set.find(*siter) == set.end())
+	    std::cerr << "not inserted in the set?";
+	}
+      }
+      
+      indexed.clear();
+      set_type::const_iterator siter_end = set.end();
+      for (set_type::const_iterator siter = set.begin(); siter != siter_end; ++ siter)
+	indexed.insert(*siter);
+      
+      if (set.size() != indexed.size())
+	std::cerr << "size differ?" << std::endl;
+      
+      {
+	set_type::const_iterator siter_end = set.end();
+	for (set_type::const_iterator siter = set.begin(); siter != siter_end; ++ siter) {
+	  if (indexed.find(*siter) == indexed.end())
+	    std::cerr << "not inserted in the indexed set?";
+	}
+      }
+      
+      {
+	indexed_set_type::const_iterator siter_end = indexed.end();
+	for (indexed_set_type::const_iterator siter = indexed.begin(); siter != siter_end; ++ siter) {
+	  if (set.find(*siter) == set.end())
+	    std::cerr << "not inserted in the set?";
+	}
+      }
     }
     
   }
