@@ -81,12 +81,10 @@ namespace cicada
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_set_type& __cache = const_cast<symbol_set_type&>(cache);
+      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
+      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
       
-      if (word.id() >= __cache.size())
-	__cache.resize(word.id() + 1, vocab_type::EMPTY);
-      
-      if (__cache[word.id()] == vocab_type::EMPTY) {
+      if (pair.first != word) {
 	typedef ChineseImpl impl_type;
 
 	impl_type& impl = *static_cast<impl_type*>(pimpl);
@@ -94,7 +92,7 @@ namespace cicada
 	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
 	std::string signature = "<UNK";
-
+	
 	if (impl.date_match(uword))
 	  signature += "-DATE";
 	else if (impl.number_match(uword)) {
@@ -112,10 +110,11 @@ namespace cicada
 	
 	signature += '>';
 	
-	__cache[word.id()] = signature;
+	pair.first  = word;
+	pair.second = signature;
       }
       
-      return __cache[word.id()];
+      return pair.second;
     }
       
   };
