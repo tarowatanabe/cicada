@@ -23,6 +23,7 @@
 #include <utils/piece.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/traits.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -80,9 +81,14 @@ namespace cicada
       symbol_map_type& maps = __symbol_maps();
       
       if (__id >= maps.size()) {
-	maps.reserve(allocated());
-	maps.resize(__id + 1, 0);
+	const size_type size = __id + 1;
+	const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+							size,
+							utils::bithack::next_largest_power2(size));
+	maps.reserve(power2);
+	maps.resize(power2, 0);
       }
+      
       if (! maps[__id]) {
 	ticket_type::scoped_reader_lock lock(__mutex);
 	

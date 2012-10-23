@@ -184,8 +184,12 @@ namespace cicada
     SymbolImpl::non_terminal_id_map_type& maps = symbol_impl::instance().non_terminal_id_maps;
 
     if (__id >= maps.size()) {
-      maps.reserve(allocated());
-      maps.resize(__id + 1, id_type(-1));
+      const size_type size = __id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      utils::bithack::next_largest_power2(size));
+      maps.reserve(power2);
+      maps.resize(power2, id_type(-1));
     }
     
     if (maps[__id] == id_type(-1)) {
@@ -301,8 +305,12 @@ namespace cicada
     SymbolImpl::pos_symbol_map_type& maps = symbol_impl::instance().pos_symbol_maps;
     
     if (__id >= maps.size()) {
-      maps.reserve(allocated());
-      maps.resize(__id + 1, id_type(-1));
+      const size_type size = __id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      utils::bithack::next_largest_power2(size));
+      maps.reserve(power2);
+      maps.resize(power2, id_type(-1));
     }
     
     if (maps[__id] == id_type(-1)) {
@@ -329,8 +337,12 @@ namespace cicada
     SymbolImpl::terminal_symbol_map_type& maps = symbol_impl::instance().terminal_symbol_maps;
     
     if (__id >= maps.size()) {
-      maps.reserve(allocated());
-      maps.resize(__id + 1, id_type(-1));
+      const size_type size = __id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      utils::bithack::next_largest_power2(size));
+      maps.reserve(power2);
+      maps.resize(power2, id_type(-1));
     }
 
     if (maps[__id] == id_type(-1)) {
