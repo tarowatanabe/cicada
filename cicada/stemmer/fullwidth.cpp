@@ -44,13 +44,10 @@ namespace cicada
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_set_type& __cache = const_cast<symbol_set_type&>(cache);
-      
-      if (word.id() >= __cache.size())
-	__cache.resize(word.id() + 1, vocab_type::EMPTY);
+      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
+      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
     
-      if (__cache[word.id()] == vocab_type::EMPTY) {
-	
+      if (pair.first != word) {
 	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
 	static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
@@ -58,10 +55,11 @@ namespace cicada
 	std::string word_fullwidth;
 	uword.toUTF8String(word_fullwidth);
 	
-	__cache[word.id()] = word_fullwidth;
+	pair.first = word;
+	pair.second = word_fullwidth;
       }
     
-      return __cache[word.id()];
+      return pair.second;
     }
 
   };
