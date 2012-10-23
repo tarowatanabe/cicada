@@ -485,7 +485,7 @@ namespace cicada
   {
     pimpl->read(parameter);
   }
-  GrammarMutable::~GrammarMutable() { std::auto_ptr<impl_type>(tmp); }
+  GrammarMutable::~GrammarMutable() { std::auto_ptr<impl_type> tmp(pimpl); }
   
   GrammarMutable::GrammarMutable(const GrammarMutable& x)
     : pimpl(new impl_type(*x.pimpl)) {}
