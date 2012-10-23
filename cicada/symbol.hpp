@@ -79,8 +79,10 @@ namespace cicada
     {
       symbol_map_type& maps = __symbol_maps();
       
-      if (__id >= maps.size())
+      if (__id >= maps.size()) {
+	maps.reserve(allocated());
 	maps.resize(__id + 1, 0);
+      }
       if (! maps[__id]) {
 	ticket_type::scoped_reader_lock lock(__mutex);
 	

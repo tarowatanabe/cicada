@@ -183,8 +183,10 @@ namespace cicada
     
     SymbolImpl::non_terminal_id_map_type& maps = symbol_impl::instance().non_terminal_id_maps;
 
-    if (__id >= maps.size())
+    if (__id >= maps.size()) {
+      maps.reserve(allocated());
       maps.resize(__id + 1, id_type(-1));
+    }
     
     if (maps[__id] == id_type(-1)) {
       mutex_type::scoped_lock lock(__non_terminal_mutex);
@@ -298,8 +300,10 @@ namespace cicada
     
     SymbolImpl::pos_symbol_map_type& maps = symbol_impl::instance().pos_symbol_maps;
     
-    if (__id >= maps.size())
+    if (__id >= maps.size()) {
+      maps.reserve(allocated());
       maps.resize(__id + 1, id_type(-1));
+    }
     
     if (maps[__id] == id_type(-1)) {
       namespace xpressive = boost::xpressive;
@@ -324,8 +328,10 @@ namespace cicada
     
     SymbolImpl::terminal_symbol_map_type& maps = symbol_impl::instance().terminal_symbol_maps;
     
-    if (__id >= maps.size())
+    if (__id >= maps.size()) {
+      maps.reserve(allocated());
       maps.resize(__id + 1, id_type(-1));
+    }
 
     if (maps[__id] == id_type(-1)) {
       namespace xpressive = boost::xpressive;
