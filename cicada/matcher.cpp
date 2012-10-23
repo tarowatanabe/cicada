@@ -48,7 +48,7 @@ wordnet: matching by wordnet synsets\n\
 
 #ifdef HAVE_TLS
   static __thread matcher_map_type* __matchers_tls = 0;
-  static boost::thread_specific_ptr<matcher_map_type> __matchers;
+  static utils::thread_specific_ptr<matcher_map_type> __matchers;
 #else
   static utils::thread_specific_ptr<matcher_map_type> __matchers;
 #endif

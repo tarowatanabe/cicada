@@ -32,7 +32,7 @@ namespace cicada
 
 #ifdef HAVE_TLS
     static __thread weight_map_type* __weights_tls = 0;
-    static boost::thread_specific_ptr<weight_map_type> __weights;
+    static utils::thread_specific_ptr<weight_map_type> __weights;
 #else
     static utils::thread_specific_ptr<weight_map_type> __weights;
 #endif

@@ -60,15 +60,15 @@ namespace cicada
   static __thread SymbolImpl::coarse_symbol_map_type*       coarse_symbol_maps_tls = 0;
   static __thread SymbolImpl::coarser_symbol_map_type*      coarser_symbol_maps_tls = 0;
 
-  static boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
-  static boost::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
-  static boost::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
-  static boost::thread_specific_ptr<SymbolImpl::non_terminal_id_map_type>     non_terminal_id_maps;
-  static boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
-  static boost::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
-  static boost::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
-  static boost::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
-  static boost::thread_specific_ptr<SymbolImpl::coarser_symbol_map_type>      coarser_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
+  static utils::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
+  static utils::thread_specific_ptr<SymbolImpl::non_terminal_id_map_type>     non_terminal_id_maps;
+  static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::coarser_symbol_map_type>      coarser_symbol_maps;
 #else
   static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;

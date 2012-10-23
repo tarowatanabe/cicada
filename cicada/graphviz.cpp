@@ -174,11 +174,11 @@ namespace cicada
     static __thread grammar_feature_type*   __grammar_feature_tls = 0;
     static __thread grammar_attribute_type* __grammar_attribute_tls = 0;
     
-    static boost::thread_specific_ptr<grammar_label_type >     __grammar_label;
-    static boost::thread_specific_ptr<grammar_rule_type >      __grammar_rule;
-    static boost::thread_specific_ptr<grammar_tail_type >      __grammar_tail;
-    static boost::thread_specific_ptr<grammar_feature_type >   __grammar_feature;
-    static boost::thread_specific_ptr<grammar_attribute_type > __grammar_attribute;
+    static utils::thread_specific_ptr<grammar_label_type >     __grammar_label;
+    static utils::thread_specific_ptr<grammar_rule_type >      __grammar_rule;
+    static utils::thread_specific_ptr<grammar_tail_type >      __grammar_tail;
+    static utils::thread_specific_ptr<grammar_feature_type >   __grammar_feature;
+    static utils::thread_specific_ptr<grammar_attribute_type > __grammar_attribute;
 #else
     static utils::thread_specific_ptr<grammar_label_type >     __grammar_label;
     static utils::thread_specific_ptr<grammar_rule_type >      __grammar_rule;

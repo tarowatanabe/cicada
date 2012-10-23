@@ -46,7 +46,7 @@ chinese: Chinese signature\n\
 
 #ifdef HAVE_TLS
   static __thread signature_map_type* __signatures_tls = 0;
-  static boost::thread_specific_ptr<signature_map_type> __signatures;
+  static utils::thread_specific_ptr<signature_map_type> __signatures;
 #else
   static utils::thread_specific_ptr<signature_map_type> __signatures;
 #endif

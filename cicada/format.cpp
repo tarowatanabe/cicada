@@ -57,7 +57,7 @@ number: number format\n\
   
 #ifdef HAVE_TLS
   static __thread format_map_type* __formats_tls = 0;
-  static boost::thread_specific_ptr<format_map_type> __formats;
+  static utils::thread_specific_ptr<format_map_type> __formats;
 #else
   static utils::thread_specific_ptr<format_map_type> __formats;
 #endif

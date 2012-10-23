@@ -256,7 +256,7 @@ namespace cicada
     
 #ifdef HAVE_TLS
     static __thread scores_parser_type* __scores_parser_tls = 0;
-    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    static utils::thread_specific_ptr<scores_parser_type > __scores_parser;
     
     if (! __scores_parser_tls) {
       __scores_parser.reset(new scores_parser_type());
@@ -386,7 +386,7 @@ namespace cicada
     
 #ifdef HAVE_TLS
     static __thread scores_parser_type* __scores_parser_tls = 0;
-    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    static utils::thread_specific_ptr<scores_parser_type > __scores_parser;
     
     if (! __scores_parser_tls) {
       __scores_parser.reset(new scores_parser_type());

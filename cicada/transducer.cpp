@@ -89,7 +89,7 @@ format: ICU's number/date format rules\n\
   
 #ifdef HAVE_TLS
   static __thread transducer_map_type* __transducers_tls = 0;
-  static boost::thread_specific_ptr<transducer_map_type> __transducers;
+  static utils::thread_specific_ptr<transducer_map_type> __transducers;
 #else
   static utils::thread_specific_ptr<transducer_map_type> __transducers;
 #endif

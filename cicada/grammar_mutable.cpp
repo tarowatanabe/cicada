@@ -173,7 +173,7 @@ namespace cicada
     
 #ifdef HAVE_TLS
     static __thread rule_parser_type* __rule_parser_tls = 0;
-    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
+    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
 #else
     static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
 #endif

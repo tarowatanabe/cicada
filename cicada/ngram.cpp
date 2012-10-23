@@ -126,7 +126,7 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread ngram_map_type* __ngrams_tls = 0;
-  static boost::thread_specific_ptr<ngram_map_type> __ngrams;
+  static utils::thread_specific_ptr<ngram_map_type> __ngrams;
 #else
   static utils::thread_specific_ptr<ngram_map_type> __ngrams;
 #endif

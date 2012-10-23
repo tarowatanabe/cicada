@@ -232,7 +232,7 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread lexicon_map_type* __lexicons_tls = 0;
-  static boost::thread_specific_ptr<lexicon_map_type> __lexicons;
+  static utils::thread_specific_ptr<lexicon_map_type> __lexicons;
 #else
   static utils::thread_specific_ptr<lexicon_map_type> __lexicons;
 #endif

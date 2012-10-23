@@ -63,7 +63,7 @@ tokenize: use the chain of tokenization\n\
 
 #ifdef HAVE_TLS
   static __thread tokenizer_map_type* __tokenizers_tls = 0;
-  static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
+  static utils::thread_specific_ptr<tokenizer_map_type> __tokenizers;
 #else
   static utils::thread_specific_ptr<tokenizer_map_type> __tokenizers;
 #endif

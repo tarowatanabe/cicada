@@ -146,7 +146,7 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread cluster_map_type* __clusters_tls = 0;
-  static boost::thread_specific_ptr<cluster_map_type> __clusters;
+  static utils::thread_specific_ptr<cluster_map_type> __clusters;
 #else
   static utils::thread_specific_ptr<cluster_map_type> __clusters;
 #endif

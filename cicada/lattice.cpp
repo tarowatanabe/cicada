@@ -150,7 +150,7 @@ namespace cicada
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
@@ -262,7 +262,7 @@ namespace cicada
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif

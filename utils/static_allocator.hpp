@@ -95,7 +95,7 @@ namespace utils
       // differentiate here for __thread keyword... is this correct?
 #ifdef HAVE_TLS
       static __thread pool_type* local_pool = 0;
-      static boost::thread_specific_ptr<pool_type> local_pool_tss;
+      static utils::thread_specific_ptr<pool_type> local_pool_tss;
       
       if (local_pool == 0) {
 	local_pool_tss.reset(new pool_type());

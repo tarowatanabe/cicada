@@ -66,7 +66,7 @@ fallback: fallback source-to-target transfer rule\n\
   
 #ifdef HAVE_TLS
   static __thread tree_transducer_map_type* __tree_transducers_tls = 0;
-  static boost::thread_specific_ptr<tree_transducer_map_type> __tree_transducers;
+  static utils::thread_specific_ptr<tree_transducer_map_type> __tree_transducers;
 #else
   static utils::thread_specific_ptr<tree_transducer_map_type> __tree_transducers;
 #endif
