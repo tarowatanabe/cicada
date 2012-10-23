@@ -529,20 +529,22 @@ namespace utils
 
       const size_type capacity = capacity_bucket(minimum_size);
       
-      if (capacity <= __bucket.size()) return false;
-      
-      bucket_type bucket_new(capacity, Empty::operator()());
-      __bucket.swap(bucket_new);
-
-      __size_element = 0;
-      __size_deleted = 0;
-      
-      if (capacity <= __cache_linear)
-	initialize_linear(bucket_new);
-      else
-	initialize_bucket(bucket_new);
-      
-      return true;
+      // new capacity is larger than current or capaciy is far-smaller than current
+      if (capacity > __bucket.size() || capacity < (__bucket.size() >> 4)) {
+	bucket_type bucket_new(capacity, Empty::operator()());
+	__bucket.swap(bucket_new);
+	
+	__size_element = 0;
+	__size_deleted = 0;
+	
+	if (capacity <= __cache_linear)
+	  initialize_linear(bucket_new);
+	else
+	  initialize_bucket(bucket_new);
+	
+	return true;
+      } else
+	return false;
     }
 
     std::pair<size_type, size_type> find_linear(const key_type& key) const
