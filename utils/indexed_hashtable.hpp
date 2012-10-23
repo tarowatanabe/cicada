@@ -389,7 +389,7 @@ namespace utils
       
       // perform resizing if we store many nodes
       if (nodes.size() > bins.size())
-	resize(2 * bins.size());
+	resize(bins.size() << 1);
       
       // insert at new bins position...
       const index_type pos = key & (bins.size() - 1);
