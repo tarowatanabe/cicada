@@ -39,67 +39,57 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > pos_symbol_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > terminal_symbol_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > coarse_symbol_map_type;
-
+    
     typedef utils::simple_vector<id_type, std::allocator<id_type> > id_set_type;
     typedef std::vector<id_set_type, std::allocator<id_set_type> >  coarser_symbol_map_type;
+    
+    symbol_map_type              symbol_maps;
+    index_map_type               index_maps;
+    non_terminal_map_type        non_terminal_maps;
+    non_terminal_id_map_type     non_terminal_id_maps;
+    non_terminal_symbol_map_type non_terminal_symbol_maps;
+    pos_symbol_map_type          pos_symbol_maps;
+    terminal_symbol_map_type     terminal_symbol_maps;
+    coarse_symbol_map_type       coarse_symbol_maps;
+    coarser_symbol_map_type      coarser_symbol_maps;
   };
   
   Symbol::ticket_type    Symbol::__mutex;
 
   static SymbolImpl::mutex_type            __non_terminal_mutex;
   static SymbolImpl::non_terminal_set_type __non_terminal_map;
-  
-#ifdef HAVE_TLS
-  static __thread SymbolImpl::symbol_map_type*              symbol_maps_tls = 0;
-  static __thread SymbolImpl::index_map_type*               index_maps_tls = 0;
-  static __thread SymbolImpl::non_terminal_map_type*        non_terminal_maps_tls = 0;
-  static __thread SymbolImpl::non_terminal_id_map_type*     non_terminal_id_maps_tls = 0;
-  static __thread SymbolImpl::non_terminal_symbol_map_type* non_terminal_symbol_maps_tls = 0;
-  static __thread SymbolImpl::pos_symbol_map_type*          pos_symbol_maps_tls = 0;
-  static __thread SymbolImpl::terminal_symbol_map_type*     terminal_symbol_maps_tls = 0;
-  static __thread SymbolImpl::coarse_symbol_map_type*       coarse_symbol_maps_tls = 0;
-  static __thread SymbolImpl::coarser_symbol_map_type*      coarser_symbol_maps_tls = 0;
 
-  static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_id_map_type>     non_terminal_id_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::coarser_symbol_map_type>      coarser_symbol_maps;
+  namespace symbol_impl
+  {
+#ifdef HAVE_TLS
+    static __thread SymbolImpl*                   impl_tls = 0;
+    static utils::thread_specific_ptr<SymbolImpl> impl;
 #else
-  static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_id_map_type>     non_terminal_id_maps;
-  static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
-  static utils::thread_specific_ptr<SymbolImpl::coarser_symbol_map_type>      coarser_symbol_maps;
+    static utils::thread_specific_ptr<SymbolImpl> impl;
 #endif
+    
+    static SymbolImpl& instance()
+    {
+#ifdef HAVE_TLS
+      if (! impl_tls) {
+	impl.reset(new SymbolImpl());
+	impl_tls = impl.get();
+      }
+      
+      return *impl_tls;
+#else
+      if (! impl.get())
+	impl.reset(new SymbolImpl());
+      return *impl;
+#endif
+    }
+  };
+
 
 
   Symbol::symbol_map_type& Symbol::__symbol_maps()
   {
-#ifdef HAVE_TLS
-    if (! symbol_maps_tls) {
-      symbol_maps.reset(new symbol_map_type());
-      symbol_maps->reserve(allocated());
-      symbol_maps_tls = symbol_maps.get();
-    }
-    
-    return *symbol_maps_tls;
-#else
-    if (! symbol_maps.get()) {
-      symbol_maps.reset(new symbol_map_type());
-      symbol_maps->reserve(allocated());
-    }
-    
-    return *symbol_maps;
-#endif
+    return symbol_impl::instance().symbol_maps;
   }
 
   Symbol::piece_type Symbol::sgml_tag() const
@@ -163,19 +153,7 @@ namespace cicada
 
   bool Symbol::is_non_terminal() const
   {
-#ifdef HAVE_TLS
-    if (! non_terminal_maps_tls) {
-      non_terminal_maps.reset(new SymbolImpl::non_terminal_map_type());
-      non_terminal_maps_tls = non_terminal_maps.get();
-    }
-    
-    SymbolImpl::non_terminal_map_type& maps =  *non_terminal_maps_tls;
-#else
-    if (! non_terminal_maps.get())
-      non_terminal_maps.reset(new SymbolImpl::non_terminal_map_type());
-    
-    SymbolImpl::non_terminal_map_type& maps =  *non_terminal_maps;
-#endif
+    SymbolImpl::non_terminal_map_type& maps =  symbol_impl::instance().non_terminal_maps;
     
     const size_type scan_pos = (__id << 1);
     const size_type flag_pos = (__id << 1) + 1;
@@ -203,19 +181,7 @@ namespace cicada
   {
     if (! is_non_terminal()) return id_type(-1);
     
-#ifdef HAVE_TLS
-    if (! non_terminal_id_maps_tls) {
-      non_terminal_id_maps.reset(new SymbolImpl::non_terminal_id_map_type());
-      non_terminal_id_maps_tls = non_terminal_id_maps.get();
-    }
-    
-    SymbolImpl::non_terminal_id_map_type& maps = *non_terminal_id_maps_tls;
-#else
-    if (! non_terminal_id_maps.get())
-      non_terminal_id_maps.reset(new SymbolImpl::non_terminal_id_map_type());
-    
-    SymbolImpl::non_terminal_id_map_type& maps = *non_terminal_id_maps;
-#endif
+    SymbolImpl::non_terminal_id_map_type& maps = symbol_impl::instance().non_terminal_id_maps;
 
     if (__id >= maps.size())
       maps.resize(__id + 1, id_type(-1));
@@ -247,19 +213,7 @@ namespace cicada
     if (! is_non_terminal())
       return 0;
     
-#ifdef HAVE_TLS
-    if (! index_maps_tls) {
-      index_maps.reset(new SymbolImpl::index_map_type());
-      index_maps_tls = index_maps.get();
-    }
-    
-    SymbolImpl::index_map_type& maps = *index_maps_tls;
-#else
-    if (! index_maps.get())
-      index_maps.reset(new SymbolImpl::index_map_type());
-    
-    SymbolImpl::index_map_type& maps = *index_maps;
-#endif
+    SymbolImpl::index_map_type& maps = symbol_impl::instance().index_maps;
 
     const id_type __non_terminal_id = non_terminal_id();
     
@@ -307,20 +261,8 @@ namespace cicada
   {
     if (! is_non_terminal())
       return *this;
-
-#ifdef HAVE_TLS
-    if (! non_terminal_symbol_maps_tls) {
-      non_terminal_symbol_maps.reset(new SymbolImpl::non_terminal_symbol_map_type());
-      non_terminal_symbol_maps_tls = non_terminal_symbol_maps.get();
-    }
     
-    SymbolImpl::non_terminal_symbol_map_type& maps = *non_terminal_symbol_maps_tls;
-#else
-    if (! non_terminal_symbol_maps.get())
-      non_terminal_symbol_maps.reset(new SymbolImpl::non_terminal_symbol_map_type());
-    
-    SymbolImpl::non_terminal_symbol_map_type& maps = *non_terminal_symbol_maps;
-#endif
+    SymbolImpl::non_terminal_symbol_map_type& maps = symbol_impl::instance().non_terminal_symbol_maps;
 
     const id_type __non_terminal_id = non_terminal_id();
     
@@ -354,19 +296,7 @@ namespace cicada
   {
     if (! is_terminal()) return Symbol();
     
-#ifdef HAVE_TLS
-    if (! pos_symbol_maps_tls) {
-      pos_symbol_maps.reset(new SymbolImpl::pos_symbol_map_type());
-      pos_symbol_maps_tls = pos_symbol_maps.get();
-    }
-    
-    SymbolImpl::pos_symbol_map_type& maps = *pos_symbol_maps_tls;
-#else
-    if (! pos_symbol_maps.get())
-      pos_symbol_maps.reset(new SymbolImpl::pos_symbol_map_type());
-    
-    SymbolImpl::pos_symbol_map_type& maps = *pos_symbol_maps;
-#endif
+    SymbolImpl::pos_symbol_map_type& maps = symbol_impl::instance().pos_symbol_maps;
     
     if (__id >= maps.size())
       maps.resize(__id + 1, id_type(-1));
@@ -392,19 +322,7 @@ namespace cicada
   {
     if (! is_terminal()) return *this;
     
-#ifdef HAVE_TLS
-    if (! terminal_symbol_maps_tls) {
-      terminal_symbol_maps.reset(new SymbolImpl::terminal_symbol_map_type());
-      terminal_symbol_maps_tls = terminal_symbol_maps.get();
-    }
-    
-    SymbolImpl::terminal_symbol_map_type& maps = *terminal_symbol_maps_tls;
-#else
-    if (! terminal_symbol_maps.get())
-      terminal_symbol_maps.reset(new SymbolImpl::terminal_symbol_map_type());
-    
-    SymbolImpl::terminal_symbol_map_type& maps = *terminal_symbol_maps;
-#endif
+    SymbolImpl::terminal_symbol_map_type& maps = symbol_impl::instance().terminal_symbol_maps;
     
     if (__id >= maps.size())
       maps.resize(__id + 1, id_type(-1));
@@ -479,19 +397,7 @@ namespace cicada
     // even coarser!
     if (pos < 0) return coarse();
     
-#ifdef HAVE_TLS
-    if (! coarser_symbol_maps_tls) {
-      coarser_symbol_maps.reset(new SymbolImpl::coarser_symbol_map_type());
-      coarser_symbol_maps_tls = coarser_symbol_maps.get();
-    }
-    
-    SymbolImpl::coarser_symbol_map_type& maps = *coarser_symbol_maps_tls;
-#else
-    if (! coarser_symbol_maps.get())
-      coarser_symbol_maps.reset(new SymbolImpl::coarser_symbol_map_type());
-    
-    SymbolImpl::coarser_symbol_map_type& maps = *coarser_symbol_maps;
-#endif
+    SymbolImpl::coarser_symbol_map_type& maps = symbol_impl::instance().coarser_symbol_maps;
 
     const id_type __non_terminal_id = non_terminal_id();
 
@@ -536,19 +442,7 @@ namespace cicada
   {
     if (! is_non_terminal()) return *this;
     
-#ifdef HAVE_TLS
-    if (! coarse_symbol_maps_tls) {
-      coarse_symbol_maps.reset(new SymbolImpl::coarse_symbol_map_type());
-      coarse_symbol_maps_tls = coarse_symbol_maps.get();
-    }
-    
-    SymbolImpl::coarse_symbol_map_type& maps = *coarse_symbol_maps_tls;
-#else
-    if (! coarse_symbol_maps.get())
-      coarse_symbol_maps.reset(new SymbolImpl::coarse_symbol_map_type());
-    
-    SymbolImpl::coarse_symbol_map_type& maps = *coarse_symbol_maps;
-#endif
+    SymbolImpl::coarse_symbol_map_type& maps = symbol_impl::instance().coarse_symbol_maps;
 
     const id_type __non_terminal_id = non_terminal_id();
     

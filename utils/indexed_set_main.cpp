@@ -111,7 +111,7 @@ int main (int argc, char** argv)
     for (int k = 0; k < 4; ++ k) {
       
       // we will randomly generate...
-      for (int i = 0; i < 1024 * 4; ++ i) {
+      for (int i = 0; i < 1024 * 8; ++ i) {
 	
 	std::ostringstream stream;
 	stream << (random() % 1024 * 2);
