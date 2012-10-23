@@ -114,7 +114,7 @@ namespace cicada
       if (! oov)
 	throw std::runtime_error("no oov grammar?");
 
-      if (oov->size() > 1024 * 64)
+      if (oov->size() > 1024 * 4)
 	oov->clear();
 
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
@@ -137,8 +137,8 @@ namespace cicada
       if (! oov)
 	throw std::runtime_error("no oov grammar?");
       
-      if (oov->size() > 1024 * 64)
-	oov->clear();      
+      if (oov->size() > 1024 * 4)
+	oov->clear();
 
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
