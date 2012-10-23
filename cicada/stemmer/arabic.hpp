@@ -6,9 +6,9 @@
 #ifndef __CICADA__STEMMER_ARABIC__HPP__
 #define __CICADA__STEMMER_ARABIC__HPP__ 1
 
-#include <vector>
-
 #include <cicada/stemmer.hpp>
+
+#include <utils/array_power2.hpp>
 
 namespace cicada
 {
@@ -19,7 +19,8 @@ namespace cicada
     class Arabic : public Stemmer
     {
     private:
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+      typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
+      typedef utils::array_power2<symbol_pair_type, 1024 * 8, std::allocator<symbol_pair_type> > symbol_pair_set_type;
       typedef ArabicImpl impl_type;
       
     public:
@@ -31,7 +32,7 @@ namespace cicada
       
     private:
       impl_type* pimpl;
-      symbol_set_type cache;
+      symbol_pair_set_type cache;
     };
   };
 };

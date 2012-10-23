@@ -22,18 +22,17 @@ namespace cicada
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
     
-      symbol_set_type& __cache = const_cast<symbol_set_type&>(cache);
+      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
+      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
     
-      if (word.id() >= __cache.size())
-	__cache.resize(word.id() + 1, vocab_type::EMPTY);
-    
-      if (__cache[word.id()] == vocab_type::EMPTY) {
-      
+      if (pair.first != word) {
+	pair.first = word;
+
 	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
       
 	if (u_getIntPropertyValue(uword.char32At(0), UCHAR_NUMERIC_TYPE) == U_NT_NONE
 	    && u_getIntPropertyValue(uword.char32At(uword.length() - 1), UCHAR_NUMERIC_TYPE) == U_NT_NONE)
-	  __cache[word.id()] = word;
+	  pair.second = word;
 	else {
 	  bool found = false;
 	  icu::UnicodeString uword_digits("<digit-");
@@ -60,13 +59,13 @@ namespace cicada
 	    std::string word_digits;
 	    uword_digits.toUTF8String(word_digits);
 	  
-	    __cache[word.id()] = word_digits;
+	    pair.second = word_digits;
 	  } else
-	    __cache[word.id()] = word;
+	    pair.second = word;
 	}
       }
     
-      return __cache[word.id()];
+      return pair.second;
     }
 
   };

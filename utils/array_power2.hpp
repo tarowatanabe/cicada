@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__ARRAY_POWER2__HPP__
@@ -52,6 +52,11 @@ namespace utils
     {
       if (m_base)
 	static_cast<_Alloc&>(*this).deallocate(m_base, Size);
+    }
+
+    void swap(__array_power2_base& x)
+    {
+      std::swap(m_base, x.m_base);
     }
   };
   
@@ -121,7 +126,7 @@ namespace utils
     
     void swap(self_type& x)
     {
-      std::swap_ranges(begin(), end(), x.begin());
+      base.swap(x.base);
     }
 
   private:

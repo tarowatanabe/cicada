@@ -18,7 +18,7 @@ namespace cicada
     {
     private:
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
-      typedef utils::array_power2<symbol_pair_type, 1024 * 16, std::allocator<symbol_pair_type> > symbol_pair_set_type;
+      typedef utils::array_power2<symbol_pair_type, 1024 * 8, std::allocator<symbol_pair_type> > symbol_pair_set_type;
       
     public:
       English();

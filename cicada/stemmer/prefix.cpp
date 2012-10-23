@@ -20,32 +20,32 @@ namespace cicada
       // SGML-like symbols are not prefixed
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
-
-      symbol_set_type& __cache = const_cast<symbol_set_type&>(cache);
-    
-      if (word.id() >= __cache.size())
-	__cache.resize(word.id() + 1, vocab_type::EMPTY);
-
-      if (__cache[word.id()] == vocab_type::EMPTY) {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-    
-	const size_t index = uword.moveIndex32(0, static_cast<int>(size));
       
+      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
+      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
+      
+      if (pair.first != word) {
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	
+	const size_t index = uword.moveIndex32(0, static_cast<int>(size));
+	
 	icu::UnicodeString uword_prefix;
 	uword.extractBetween(0, index, uword_prefix);
-      
+	
 	if (uword_prefix.length() < uword.length()) {
 	  uword_prefix.append('+');
-	
+	  
 	  std::string word_prefix;
 	  uword_prefix.toUTF8String(word_prefix);
-	
-	  __cache[word.id()] = word_prefix;
+	  
+	  pair.second = word_prefix;
 	} else
-	  __cache[word.id()] = word;
+	  pair.second = word;
+	
+	pair.first = word;
       }
-    
-      return __cache[word.id()];
+      
+      return pair.second;
     }
 
   };
