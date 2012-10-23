@@ -223,8 +223,14 @@ namespace cicada
 
     const id_type __non_terminal_id = non_terminal_id();
     
-    if (__non_terminal_id >= maps.size())
-      maps.resize(__non_terminal_id + 1, -1);
+    if (__non_terminal_id >= maps.size()) {
+      const size_type size = __non_terminal_id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      size_type(utils::bithack::next_largest_power2(size)));
+      maps.reserve(power2);
+      maps.resize(power2, -1);
+    }
 
     if (maps[__non_terminal_id] < 0) {
       namespace qi = boost::spirit::qi;
@@ -272,8 +278,14 @@ namespace cicada
 
     const id_type __non_terminal_id = non_terminal_id();
     
-    if (__non_terminal_id >= maps.size())
-      maps.resize(__non_terminal_id + 1, id_type(-1));
+    if (__non_terminal_id >= maps.size()) {
+      const size_type size = __non_terminal_id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      size_type(utils::bithack::next_largest_power2(size)));
+      maps.reserve(power2);
+      maps.resize(power2, id_type(-1));
+    }
       
     if (maps[__non_terminal_id] == id_type(-1)) {
       namespace qi = boost::spirit::qi;
@@ -419,8 +431,14 @@ namespace cicada
 
     const id_type __non_terminal_id = non_terminal_id();
 
-    if (__non_terminal_id >= maps.size())
-      maps.resize(__non_terminal_id + 1);
+    if (__non_terminal_id >= maps.size()) {
+      const size_type size = __non_terminal_id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      size_type(utils::bithack::next_largest_power2(size)));
+      maps.reserve(power2);
+      maps.resize(power2);
+    }
 
     if (pos >= static_cast<int>(maps[__non_terminal_id].size()))
       maps[__non_terminal_id].resize(pos + 1, id_type(-1));
@@ -464,8 +482,14 @@ namespace cicada
 
     const id_type __non_terminal_id = non_terminal_id();
     
-    if (__non_terminal_id >= maps.size())
-      maps.resize(__non_terminal_id + 1, id_type(-1));
+    if (__non_terminal_id >= maps.size()) {
+      const size_type size = __non_terminal_id + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      size_type(utils::bithack::next_largest_power2(size)));
+      maps.reserve(power2);
+      maps.resize(power2, id_type(-1));
+    }
     
     if (maps[__non_terminal_id] == id_type(-1)) {
       namespace xpressive = boost::xpressive;
