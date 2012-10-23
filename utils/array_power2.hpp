@@ -27,6 +27,7 @@ namespace utils
   {
     typedef _Tp        value_type;
     typedef size_t     size_type;
+    typedef ptrdiff_t  difference_type;
     typedef _Tp*       pointer;
     
     typedef _Tp*       iterator;
@@ -72,8 +73,9 @@ namespace utils
     typedef __array_power2_base<_Tp, static_size, _Alloc> base_type;
     
   public:
-    typedef typename base_type::value_type    value_type;
-    typedef typename base_type::size_type     size_type;
+    typedef typename base_type::value_type      value_type;
+    typedef typename base_type::size_type       size_type;
+    typedef typename base_type::difference_type difference_type;
 
     typedef typename base_type::iterator               iterator;
     typedef typename base_type::const_iterator         const_iterator;
