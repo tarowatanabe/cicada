@@ -11,6 +11,7 @@
 namespace utils
 {
 
+#if 0
   template <typename _Tp, size_t _ChunkSize=128, typename _Alloc=std::allocator<_Tp> >
   class chunk_vector : public std::deque<_Tp, _Alloc>
   {
@@ -24,7 +25,7 @@ namespace utils
     chunk_vector(Iterator first, Iterator last) : base_type(first, last) {}
   };
 };
-#if 0
+#endif
 //
 // chunk vector inspired by std::deque
 //
@@ -916,6 +917,5 @@ namespace std
   }
   
 };
-#endif
 
 #endif
