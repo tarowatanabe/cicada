@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__SIGNATURE__HPP__
@@ -8,11 +8,13 @@
 
 #include <string>
 #include <algorithm>
+#include <utility>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
 #include <utils/piece.hpp>
+#include <utils/array_power2.hpp>
 
 namespace cicada
 {
@@ -28,6 +30,10 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 
+  private:
+    typedef std::pair<symbol_type, symbol_type> cache_type;
+    typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+    
   public:
     static const symbol_type FALLBACK;
     
@@ -41,15 +47,34 @@ namespace cicada
     Signature(const Signature& x) {}
     
   public:
-    static Signature&    create(const utils::piece& parameter);
+    static Signature&  create(const utils::piece& parameter);
     static const char* lists();
     
   public:
-    symbol_type operator()(const symbol_type& x) const { return operator[](x); }
-    virtual symbol_type operator[](const symbol_type& x) const = 0;
+    virtual std::string operator()(const utils::piece& word) const = 0;
+    
+    std::string operator()(const std::string& word) const
+    {
+      return operator()(utils::piece(word));
+    }
+    
+    symbol_type operator()(const symbol_type& word) const
+    {
+      cache_set_type& __caches = const_cast<cache_set_type&>(caches);
+      cache_type& cache = __caches[word.id() & (__caches.size() - 1)];
+      
+      if (cache.first != word) {
+	cache.first = word;
+	cache.second = operator()(static_cast<const utils::piece&>(word));
+      }
+      
+      return cache.second;
+    }
+    
     const std::string& algorithm() const { return __algorithm; }
 
   private:
+    cache_set_type caches;
     std::string __algorithm;
   };
 };

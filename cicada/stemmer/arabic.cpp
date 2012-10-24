@@ -1,6 +1,6 @@
 // -*- encoding: utf-8 -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer/arabic.hpp"
@@ -183,9 +183,9 @@ namespace cicada
 	  remove_diacritics_kashida("(ً|ٌ|ٍ|َ|ُ|ِ|ّ|ْ|ـ)", "") {}
       
       
-      std::string operator()(const std::string& word)
+      std::string operator()(const utils::piece& word)
       {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(word);
+	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(icu::StringPiece(word.data(), word.size()));
 	
 	normalize_ya_alef_maqsoura(uword);
 	
@@ -214,9 +214,9 @@ namespace cicada
     Arabic::Arabic() : pimpl(new impl_type()) {}
     Arabic::~Arabic() { std::auto_ptr<impl_type>(pimpl); }
     
-    Stemmer::symbol_type Arabic::operator[](const symbol_type& word) const
+    std::string Arabic::operator()(const utils::piece& word) const
     {
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
+      if (word.empty()) return word;
       
       const size_type word_size = word.size();
       
@@ -224,15 +224,7 @@ namespace cicada
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
-      
-      if (pair.first != word) {
-	pair.first  = word;
-	pair.second = pimpl->operator()(word);
-      }
-      
-      return pair.second;
+      return pimpl->operator()(word);
     }
 
   };

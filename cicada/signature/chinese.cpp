@@ -1,6 +1,6 @@
 // -*- encoding: utf-8 -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "signature/chinese.hpp"
@@ -71,9 +71,9 @@ namespace cicada
     Chinese::Chinese() : pimpl(new ChineseImpl()) {}
     Chinese::~Chinese() { std::auto_ptr<ChineseImpl> tmp(static_cast<ChineseImpl*>(pimpl)); }
     
-    Signature::symbol_type Chinese::operator[](const symbol_type& word) const
+    std::string Chinese::operator()(const utils::piece& word) const
     {
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
+      if (word.empty()) return word;
       
       const size_type word_size = word.size();
       
@@ -81,40 +81,32 @@ namespace cicada
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
+      typedef ChineseImpl impl_type;
       
-      if (pair.first != word) {
-	typedef ChineseImpl impl_type;
-
-	impl_type& impl = *static_cast<impl_type*>(pimpl);
-	
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	
-	std::string signature = "<UNK";
-	
-	if (impl.date_match(uword))
-	  signature += "-DATE";
-	else if (impl.number_match(uword)) {
-	  signature += "-NUM";
-	  if (impl.ordinal_match(uword))
-	    signature += "-ORD";
-	}
-	
-	if (impl.proper_name_match(uword))
-	  signature += "-PROP";
-	if (impl.punct_match(uword))
-	  signature += "-PUNCT";
-	if (impl.latin_match(uword))
-	  signature += "-LAT";
-	
-	signature += '>';
-	
-	pair.first  = word;
-	pair.second = signature;
+      impl_type& impl = *static_cast<impl_type*>(pimpl);
+      
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(icu::StringPiece(word.data(), word.size()));
+      
+      std::string signature = "<UNK";
+      
+      if (impl.date_match(uword))
+	signature += "-DATE";
+      else if (impl.number_match(uword)) {
+	signature += "-NUM";
+	if (impl.ordinal_match(uword))
+	  signature += "-ORD";
       }
       
-      return pair.second;
+      if (impl.proper_name_match(uword))
+	signature += "-PROP";
+      if (impl.punct_match(uword))
+	signature += "-PUNCT";
+      if (impl.latin_match(uword))
+	signature += "-LAT";
+      
+      signature += '>';
+      
+      return signature;
     }
       
   };

@@ -12,6 +12,7 @@
 
 #include <boost/xpressive/xpressive.hpp>
 
+#include <utils/atomicop.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
@@ -32,24 +33,22 @@ namespace cicada
     typedef Symbol::mutex_type mutex_type;
     
     typedef utils::indexed_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
-
-    struct id_pair_type
-    {
-      id_type first;
-      id_type second;
-      
-      id_pair_type() : first(id_type(-1)), second(id_type(-1)) {}
-      id_pair_type(const id_type& __first, const id_type& __second) : first(__first), second(__second) {}
-    };
     
+    struct symbol_cache_type
+    {
+      typedef uint64_t value_type;
+      typedef utils::array_power2<value_type, 1024 * 8, std::allocator<value_type> > value_set_type;
+
+      symbol_cache_type() { std::fill(caches.begin(), caches.end(), value_type(-1)); }
+
+      value_set_type caches;
+    };
+
     typedef std::vector<int, std::allocator<int> >   index_map_type;
     typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_id_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_symbol_map_type;
-    typedef utils::array_power2<id_pair_type, 1024 * 8, std::allocator<id_pair_type> > pos_symbol_map_type;
-    typedef utils::array_power2<id_pair_type, 1024 * 8, std::allocator<id_pair_type> > terminal_symbol_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > coarse_symbol_map_type;
-    
     typedef utils::simple_vector<id_type, std::allocator<id_type> > id_set_type;
     typedef std::vector<id_set_type, std::allocator<id_set_type> >  coarser_symbol_map_type;
 
@@ -58,8 +57,6 @@ namespace cicada
     non_terminal_map_type        non_terminal_maps;
     non_terminal_id_map_type     non_terminal_id_maps;
     non_terminal_symbol_map_type non_terminal_symbol_maps;
-    pos_symbol_map_type          pos_symbol_maps;
-    terminal_symbol_map_type     terminal_symbol_maps;
     coarse_symbol_map_type       coarse_symbol_maps;
     coarser_symbol_map_type      coarser_symbol_maps;
   };
@@ -324,54 +321,73 @@ namespace cicada
   Symbol Symbol::pos() const
   {
     if (! is_terminal()) return Symbol();
-    
-    SymbolImpl::pos_symbol_map_type& maps = symbol_impl::instance().pos_symbol_maps;
 
-    SymbolImpl::id_pair_type& pair = maps[__id & (maps.size() - 1)];
+    static SymbolImpl::symbol_cache_type caches;
     
-    if (pair.first != __id) {
-      namespace xpressive = boost::xpressive;
-      
-      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
-      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
-      
-      static pregex re = (+(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s1= '[' >> -+(~(xpressive::set= ']')) >> ']');
-      
-      pmatch what;
-      if (xpressive::regex_match(utils::piece(symbol()), what, re))
-	pair.second = Symbol(what[1]).id();
-      else
-	pair.second = Symbol().id();
-      pair.first = __id;
-    }
-    return pair.second;
+    typedef SymbolImpl::symbol_cache_type::value_type cache_type;
+    
+    cache_type cache = utils::atomicop::fetch_and_add(caches.caches[__id & (caches.caches.size() - 1)],
+						      cache_type(0));
+    id_type word   = (cache >> 32) & 0xffffffff;
+    id_type mapped = (cache) & 0xffffffff;
+    
+    if (word == __id)
+      return mapped;
+    
+    namespace xpressive = boost::xpressive;
+    
+    typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+    typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+    
+    static pregex re = (+(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s1= '[' >> -+(~(xpressive::set= ']')) >> ']');
+    
+    pmatch what;
+    if (xpressive::regex_match(utils::piece(symbol()), what, re))
+      mapped = Symbol(what[1]).id();
+    else
+      mapped = Symbol().id();
+    
+    cache_type cache_new = (cache_type(__id) << 32 | (cache_type(mapped) & 0xffffffff));
+    
+    utils::atomicop::compare_and_swap(caches.caches[__id & (caches.caches.size() - 1)], cache, cache_new);
+    
+    return mapped;
   }
   
   Symbol Symbol::terminal() const
   {
     if (! is_terminal()) return *this;
     
-    SymbolImpl::terminal_symbol_map_type& maps = symbol_impl::instance().terminal_symbol_maps;
-
-    SymbolImpl::id_pair_type& pair = maps[__id & (maps.size() - 1)];
+    static SymbolImpl::symbol_cache_type caches;
     
-    if (pair.first != __id) {
-      namespace xpressive = boost::xpressive;
-      
-      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
-      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
-      
-      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> ('[' >> -+(~(xpressive::set= ']')) >> ']');
-      
-      pmatch what;
-      if (xpressive::regex_match(utils::piece(symbol()), what, re))
-	pair.second = Symbol(what[1]).id();
-      else
-	pair.second = __id;
-      
-      pair.first = __id;
-    }
-    return pair.second;
+    typedef SymbolImpl::symbol_cache_type::value_type cache_type;
+    
+    cache_type cache = utils::atomicop::fetch_and_add(caches.caches[__id & (caches.caches.size() - 1)],
+						      cache_type(0));
+    id_type word   = (cache >> 32) & 0xffffffff;
+    id_type mapped = (cache) & 0xffffffff;
+    
+    if (word == __id)
+      return mapped;
+    
+    namespace xpressive = boost::xpressive;
+    
+    typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+    typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+
+    static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> ('[' >> -+(~(xpressive::set= ']')) >> ']');
+    
+    pmatch what;
+    if (xpressive::regex_match(utils::piece(symbol()), what, re))
+      mapped = Symbol(what[1]).id();
+    else
+      mapped = __id;
+    
+    cache_type cache_new = (cache_type(__id) << 32 | (cache_type(mapped) & 0xffffffff));
+    
+    utils::atomicop::compare_and_swap(caches.caches[__id & (caches.caches.size() - 1)], cache, cache_new);
+    
+    return mapped;
   }
 
   bool Symbol::binarized() const
