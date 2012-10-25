@@ -106,7 +106,8 @@ struct PYPWord
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+  typedef utils::trie_dense<word_type, node_type,
+			    boost::hash<word_type>, std::equal_to<word_type>,
 			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   
@@ -691,7 +692,8 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
+  typedef utils::trie_dense<word_type, node_type,
+			    boost::hash<word_type>, std::equal_to<word_type>,
 			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   typedef std::vector<double, std::allocator<double> > parameter_set_type;

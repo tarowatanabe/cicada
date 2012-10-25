@@ -53,9 +53,7 @@
 #include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/trie_dense.hpp"
-#include "utils/dense_hash_map.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -99,8 +97,10 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_compact<word_type, node_type,
+			      utils::unassigned<word_type>, utils::deleted<word_type>,
+			      boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   typedef std::vector<node_type*, std::allocator<node_type*> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
@@ -110,7 +110,7 @@ struct PYPLM
 
   struct shard_type
   {
-    shard_type() : trie(word_type())  {}
+    shard_type() : trie()  {}
     
     template <typename Iterator>
     id_type insert(Iterator first, Iterator last)

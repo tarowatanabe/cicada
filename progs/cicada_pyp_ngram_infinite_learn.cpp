@@ -37,7 +37,7 @@
 #include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/trie_dense.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -83,8 +83,10 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type, boost::hash<word_type>, std::equal_to<word_type>,
-			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_compact<word_type, node_type,
+			      utils::unassigned<word_type>, utils::deleted<word_type>,
+			      boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
 
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
@@ -108,7 +110,7 @@ struct PYPLM
 	const double __order_alpha,
 	const double __order_beta,
 	const bool __infinite=false)
-    : trie(word_type()),
+    : trie(),
       nodes(order),
       parameters(order, parameter_type(__discount_alpha, __discount_beta, __strength_shape, __strength_rate)),
       p0(__p0),
