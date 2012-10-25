@@ -540,7 +540,7 @@ namespace utils
       const size_type capacity = capacity_bucket(minimum_size);
       
       // new capacity is larger than current
-      if (capacity > __bucket.size()) {
+      if (capacity > __bucket.size() || capacity < (__bucket.size() >> 3)) {
 	bucket_type bucket_new(capacity, Empty::operator()());
 	__bucket.swap(bucket_new);
 	
