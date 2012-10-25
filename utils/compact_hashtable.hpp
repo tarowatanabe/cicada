@@ -485,6 +485,9 @@ namespace utils
     value_type& insert_default(const key_type& x)
     {
       rehash(__size_element + 1);
+
+      if (__size_element == __bucket.size())
+	throw std::runtime_error("no room for insert_default?");
       
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(x)
@@ -655,6 +658,9 @@ namespace utils
     // insert when we already know that the storage is big enough
     std::pair<iterator, bool> insert_noresize(const value_type& x)
     {
+      if (__size_element == __bucket.size())
+	throw std::runtime_error("no room for insert_default?");
+      
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(extract_key()(x))
 						   : find_bucket(extract_key()(x)));
