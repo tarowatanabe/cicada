@@ -504,7 +504,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
 	  throw std::runtime_error("refset parsing failed");
       
       const int& id = id_sentence.first;
-      
+
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
       
