@@ -34,14 +34,15 @@ namespace utils
     typedef indexed_hashtable<key_type, value_type, extract_key, Hash, Equal, Alloc> impl_type;
 
   public:
-    typedef typename impl_type::size_type  size_type;
-    typedef typename impl_type::index_type index_type;
+    typedef typename impl_type::size_type       size_type;
+    typedef typename impl_type::difference_type difference_type;
+    typedef typename impl_type::index_type      index_type;
     
-    typedef typename impl_type::iterator       iterator;
-    typedef typename impl_type::const_iterator const_iterator;
-    
-    typedef mapped_type&      reference;
-    typedef const mapped_type& const_reference;
+    typedef typename impl_type::iterator        iterator;
+    typedef typename impl_type::const_iterator  const_iterator;
+    typedef typename impl_type::pointer         pointer;
+    typedef typename impl_type::reference       reference;
+    typedef typename impl_type::const_reference const_reference;
 
   public:
     indexed_map(const size_type __size=8, const Hash& __hash=Hash(), const Equal& __equal=Equal())

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer/lower.hpp"
@@ -31,35 +31,27 @@ namespace cicada
       std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
     }
     
-    Stemmer::symbol_type Lower::operator[](const symbol_type& word) const
+    std::string Lower::operator()(const utils::piece& word) const
     {
       if (! pimpl)
 	throw std::runtime_error("no lower caser?");
-
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
-    
+      
+      if (word.empty()) return word;
+      
       const size_type word_size = word.size();
     
       // SGML-like symbols are not lowered...
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
-    
-      if (pair.first != word) {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	
-	static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
-	
-	std::string word_lower;
-	uword.toUTF8String(word_lower);
-	
-	pair.first  = word;
-	pair.second = word_lower;
-      }
-    
-      return pair.second;
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(icu::StringPiece(word.data(), word.size()));
+      
+      static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
+      
+      std::string word_lower;
+      uword.toUTF8String(word_lower);
+      
+      return word_lower;
     }
 
   };

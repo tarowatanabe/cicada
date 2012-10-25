@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer/latin.hpp"
@@ -66,39 +66,30 @@ namespace cicada
     Latin::Latin() : pimpl(new impl_type()) {}
     Latin::~Latin() { std::auto_ptr<impl_type> tmp(pimpl); }
 
-    Stemmer::symbol_type Latin::operator[](const symbol_type& word) const
+    std::string Latin::operator()(const utils::piece& word) const
     {
       if (! pimpl)
 	throw std::runtime_error("no latin normalizer?");
-
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
+      
+      if (word.empty()) return word;
     
       const size_type word_size = word.size();
     
       // SGML-like symbols are not prefixed
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
-    
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
       
-      if (pair.first != word) {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	
-	pimpl->operator()(uword);
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(icu::StringPiece(word.data(), word.size()));
       
-	if (! uword.isEmpty()) {
-	  std::string word_latin;
-	  uword.toUTF8String(word_latin);
-	
-	  pair.second = word_latin;
-	} else
-	  pair.second = word;
-	
-	pair.first = word;
-      }
+      pimpl->operator()(uword);
       
-      return pair.second;
+      if (! uword.isEmpty()) {
+	std::string word_latin;
+	uword.toUTF8String(word_latin);
+	
+	return word_latin;
+      } else
+	return word;
     }
 
   };

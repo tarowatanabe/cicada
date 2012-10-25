@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "signature.hpp"
@@ -18,7 +18,7 @@ int main(int argc, char** argv)
   
   std::string word;
   while (std::cin >> word)
-    std::cout << "word: " << word << " signature: " << signature[word] << std::endl;
+    std::cout << "word: " << word << " signature: " << signature(word) << std::endl;
 
   
 }

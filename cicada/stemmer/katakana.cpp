@@ -66,39 +66,30 @@ namespace cicada
     Katakana::Katakana() : pimpl(new impl_type()) {}
     Katakana::~Katakana() { std::auto_ptr<impl_type> tmp(pimpl); }
 
-    Stemmer::symbol_type Katakana::operator[](const symbol_type& word) const
+    std::string Katakana::operator()(const utils::piece& word) const
     {
       if (! pimpl)
 	throw std::runtime_error("no katakana normalizer?");
 
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
+      if (word.empty()) return word;
     
       const size_type word_size = word.size();
     
       // SGML-like symbols are not prefixed
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
-    
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
       
-      if (pair.first != word) {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	
-	pimpl->operator()(uword);
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(icu::StringPiece(word.data(), word.size()));
       
-	if (! uword.isEmpty()) {
-	  std::string word_katakana;
-	  uword.toUTF8String(word_katakana);
+      pimpl->operator()(uword);
+      
+      if (! uword.isEmpty()) {
+	std::string word_katakana;
+	uword.toUTF8String(word_katakana);
 	
-	  pair.second = word_katakana;
-	} else
-	  pair.second = word;
-	
-	pair.first = word;
-      }
-    
-      return pair.second;
+	return word_katakana;
+      } else
+	return word;
     }
 
   };

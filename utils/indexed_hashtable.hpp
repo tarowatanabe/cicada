@@ -259,6 +259,7 @@ namespace utils
     typedef Alloc      allocator_type;
     
     typedef size_t     size_type;
+    typedef ptrdiff_t  difference_type;
     
   private:
     typedef __indexed_hashtable_bin<index_type,
@@ -271,6 +272,7 @@ namespace utils
   public:
     typedef       value_type& reference;
     typedef const value_type& const_reference;
+    typedef       value_type* pointer;
     
     struct const_iterator : public node_set_type::const_iterator
     {

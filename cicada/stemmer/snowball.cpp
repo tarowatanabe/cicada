@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <vector>
@@ -30,7 +30,7 @@ namespace cicada
       std::string operator()(const utils::piece& word) const
       {
 	if (! pimpl) return word;
-
+	
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	
 	buffer.clear();
@@ -55,25 +55,17 @@ namespace cicada
     
     Snowball::~Snowball() { std::auto_ptr<impl_type> tmp(pimpl); }
     
-    Stemmer::symbol_type Snowball::operator[](const symbol_type& word) const
+    std::string Snowball::operator()(const utils::piece& word) const
     {
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
-    
+      if (word.empty()) return word;
+      
       const size_type word_size = word.size();
     
       // SGML-like symbols are not stemmed...
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
-      
-      if (pair.first != word) {
-	pair.first  = word;
-	pair.second = pimpl->operator()(word);
-      }
-      
-      return pair.second;
+      return pimpl->operator()(word);
     }
 
   };

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -75,7 +75,7 @@ struct NormalizerLower
   template <typename Word>
   Word operator()(const Word& x) const
   {
-    return lower->operator[](x);
+    return lower->operator()(x);
   }
 };
 

@@ -31,35 +31,27 @@ namespace cicada
       std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
     }
     
-    Stemmer::symbol_type Traditional::operator[](const symbol_type& word) const
+    std::string Traditional::operator()(const utils::piece& word) const
     {
       if (! pimpl)
 	throw std::runtime_error("no traditional?");
-
-      if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
-    
+      
+      if (word.empty()) return word;
+      
       const size_type word_size = word.size();
-    
+      
       // SGML-like symbols are not traditionaled...
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
       
-      symbol_pair_set_type& __cache = const_cast<symbol_pair_set_type&>(cache);
-      symbol_pair_type& pair = __cache[word.id() & (__cache.size() - 1)];
+      icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
       
-      if (pair.first != word) {
-	icu::UnicodeString uword = icu::UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-	
-	static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
-	
-	std::string word_traditional;
-	uword.toUTF8String(word_traditional);
-	
-	pair.first  = word;
-	pair.second = word_traditional;
-      }
-    
-      return pair.second;
+      static_cast<icu::Transliterator*>(pimpl)->transliterate(uword);
+      
+      std::string word_traditional;
+      uword.toUTF8String(word_traditional);
+      
+      return word_traditional;
     }
 
   };
