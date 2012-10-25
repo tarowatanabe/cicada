@@ -529,8 +529,8 @@ namespace utils
 
       const size_type capacity = capacity_bucket(minimum_size);
       
-      // new capacity is larger than current or capaciy is far-smaller than current
-      if (capacity > __bucket.size() || capacity < (__bucket.size() >> 4)) {
+      // new capacity is larger than current
+      if (capacity > __bucket.size()) {
 	bucket_type bucket_new(capacity, Empty::operator()());
 	__bucket.swap(bucket_new);
 	
