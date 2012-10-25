@@ -196,7 +196,7 @@ namespace cicada
   inline
   size_t hash_value(Feature const& x)
   {
-    return utils::hashmurmur<size_t>()(x.__id);
+    return x.__id;
   }
   
   inline
