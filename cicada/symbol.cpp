@@ -166,8 +166,15 @@ namespace cicada
     const size_type scan_pos = (__id << 1);
     const size_type flag_pos = (__id << 1) + 1;
     
-    if (flag_pos >= maps.size())
-      maps.resize(flag_pos + 1, false);
+    if (flag_pos >= maps.size()) {
+      const size_type size = flag_pos + 1;
+      const size_type power2 = utils::bithack::branch(utils::bithack::is_power2(size),
+						      size,
+						      size_type(utils::bithack::next_largest_power2(size)));
+      
+      maps.reserve(power2);
+      maps.resize(power2, false);
+    }
     
     if (! maps[scan_pos]) {
       namespace qi = boost::spirit::qi;
