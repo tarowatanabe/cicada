@@ -14,6 +14,7 @@
 #include <cstring>
 
 #include <boost/type_traits.hpp>
+#include <boost/static_assert.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/memory.hpp>
@@ -280,7 +281,11 @@ namespace utils
   private:
     typedef compact_hashtable<Key, Value, Empty, Deleted, ExtractKey, Hash, Pred, Alloc> self_type;
     typedef __compact_hashtable_bucket<Value, Alloc> bucket_type;
-
+    
+  private:
+    typedef typename boost::is_same<Empty,Deleted> is_invalid_type;
+    BOOST_STATIC_ASSERT(! is_invalid_type::value);
+ 
   public:
     typedef typename bucket_type::reference       reference;
     typedef typename bucket_type::const_reference const_reference;
@@ -305,7 +310,9 @@ namespace utils
 	Pred(__pred),
 	__bucket(),
 	__size_element(0),
-	__size_deleted(0) {  }
+	__size_deleted(0)
+    { }
+
     compact_hashtable(const compact_hashtable& x)
       : __bucket(),
 	__size_element(0),
