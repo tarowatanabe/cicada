@@ -36,10 +36,10 @@ namespace utils
     typedef typename impl_type::size_type       size_type;
     typedef typename impl_type::difference_type difference_type;
     
-    typedef typename impl_type::const_iterator  iterator;
+    typedef typename impl_type::iterator        iterator;
     typedef typename impl_type::const_iterator  const_iterator;
     typedef typename impl_type::pointer         pointer;
-    typedef typename impl_type::const_reference reference;
+    typedef typename impl_type::reference       reference;
     typedef typename impl_type::const_reference const_reference;
     
   public:
