@@ -42,26 +42,12 @@ namespace cicada
     typedef std::pair<const feature_type, data_type> value_type;
     
   private:
-    struct empty_key
-    {
-      const feature_type& operator()() const
-      {
-	static feature_type __feature(feature_type::id_type(-1));
-	return __feature;
-      }
-    };
-
-    struct deleted_key
-    {
-      const feature_type& operator()() const
-      {
-	static feature_type __feature(feature_type::id_type(-2));
-	return __feature;
-      }
-    };
 
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
-    typedef typename utils::compact_map<key_type, data_type, empty_key, deleted_key, utils::hashmurmur<size_t>, std::equal_to<key_type>, alloc_type> vector_type;
+    typedef typename utils::compact_map<key_type, data_type,
+					utils::unassigned<key_type>, utils::deleted<key_type>,
+					utils::hashmurmur<size_t>, std::equal_to<key_type>,
+					alloc_type> vector_type;
     
     typedef FeatureVector<Tp, Alloc> self_type;
     
