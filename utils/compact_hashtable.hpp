@@ -283,8 +283,8 @@ namespace utils
     typedef __compact_hashtable_bucket<Value, Alloc> bucket_type;
     
   private:
-    typedef typename boost::is_same<Empty,Deleted> is_invalid_type;
-    BOOST_STATIC_ASSERT(! is_invalid_type::value);
+    typedef typename boost::is_same<Empty,Deleted> non_erase_type;
+    
  
   public:
     typedef typename bucket_type::reference       reference;
@@ -415,6 +415,8 @@ namespace utils
     
     size_type erase(const key_type& key)
     {
+      BOOST_STATIC_ASSERT(! non_erase_type::value);
+      
       iterator iter = find(key);
       
       if (iter != end()) {
@@ -427,6 +429,8 @@ namespace utils
     
     void erase(iterator iter)
     {
+      BOOST_STATIC_ASSERT(! non_erase_type::value);
+      
       if (iter == end()) return;
       
       const key_type& key = extract_key()(*iter.pos);
@@ -439,6 +443,8 @@ namespace utils
     
     void erase(iterator first, iterator last)
     {
+      BOOST_STATIC_ASSERT(! non_erase_type::value);
+      
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
@@ -452,6 +458,8 @@ namespace utils
 
     void erase(const_iterator iter)
     {
+      BOOST_STATIC_ASSERT(! non_erase_type::value);
+      
       if (iter == end()) return;
       
       const key_type& key = extract_key()(*iter.pos);
@@ -464,6 +472,8 @@ namespace utils
     
     void erase(const_iterator first, const_iterator last)
     {
+      BOOST_STATIC_ASSERT(! non_erase_type::value);
+      
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
@@ -491,10 +501,13 @@ namespace utils
     template <typename DefaultValue>
     value_type& insert_default(const key_type& x)
     {
+      return insert_default<DefaultValue>(x, typename non_erase_type::type());
+    }
+    
+    template <typename DefaultValue>
+    value_type& insert_default(const key_type& x, boost::false_type)
+    {
       rehash(__size_element + 1);
-
-      //if (__size_element == __bucket.size())
-      //  throw std::runtime_error("no room for insert_default?");
       
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(x)
@@ -512,6 +525,24 @@ namespace utils
 	return __bucket[pos.second];
       }
     }
+    
+    template <typename DefaultValue>
+    value_type& insert_default(const key_type& x, boost::true_type)
+    {
+      rehash(__size_element + 1);
+      
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
+						   ? find_linear(x)
+						   : find_bucket(x));
+      
+      if (pos.first != size_type(-1))
+	return __bucket[pos.first];
+      else {
+	copy_value(__bucket[pos.second], DefaultValue()(x));
+	return __bucket[pos.second];
+      }
+    }
+    
 
   private:
     bool is_deleted(const_iterator& x) const
@@ -559,6 +590,11 @@ namespace utils
 
     std::pair<size_type, size_type> find_linear(const key_type& key) const
     {
+      return find_linear(key, typename non_erase_type::type());
+    }
+
+    std::pair<size_type, size_type> find_linear(const key_type& key, boost::false_type) const
+    {
       size_type pos_insert = size_type(-1);
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
@@ -573,8 +609,28 @@ namespace utils
       
       return std::make_pair(size_type(-1), pos_insert);
     }
+
+    std::pair<size_type, size_type> find_linear(const key_type& key, boost::true_type) const
+    {
+      size_type pos_insert = size_type(-1);
+      for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
+	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
+	
+	if (pred()(key_buck, extract_key()(Empty::operator()())))
+	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
+	else if (pred()(key_buck, key))
+	  return std::make_pair(pos_buck, size_type(-1));
+      }
+      
+      return std::make_pair(size_type(-1), pos_insert);
+    }
     
     std::pair<size_type, size_type> find_bucket(const key_type& key) const
+    {
+      return find_bucket(key, typename non_erase_type::type());
+    }
+
+    std::pair<size_type, size_type> find_bucket(const key_type& key, boost::false_type) const
     {
       size_type num_probes = 0;
 
@@ -588,6 +644,33 @@ namespace utils
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
 	else if (pred()(key_buck, extract_key()(Deleted::operator()()))) // searching...
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
+	else if (pred()(key_buck, key))
+	  return std::make_pair(pos_buck, size_type(-1));
+
+	// linear probing...
+	//pos_buck = (pos_buck + 1) & (__bucket.size() - 1);
+	
+	// quadratic probing...
+        ++ num_probes;
+	pos_buck = (pos_buck + num_probes) & (__bucket.size() - 1);
+      }
+      
+      // we found no empty!
+      return std::make_pair(size_type(-1), pos_insert);
+    }
+
+    std::pair<size_type, size_type> find_bucket(const key_type& key, boost::true_type) const
+    {
+      size_type num_probes = 0;
+
+      size_type pos_buck = hash()(key) & (__bucket.size() - 1);
+      size_type pos_insert = size_type(-1);
+      
+      for (;;) {
+	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
+	
+	if (pred()(key_buck, extract_key()(Empty::operator()()))) // no searching further
+	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
 
@@ -675,13 +758,15 @@ namespace utils
 	++ __size_element;
       }
     }
-    
-    // insert when we already know that the storage is big enough
+
     std::pair<iterator, bool> insert_noresize(const value_type& x)
     {
-      // if (__size_element == __bucket.size())
-      //   throw std::runtime_error("no room for insert_noresize?");
-      
+      return insert_noresize(x, typename non_erase_type::type());
+    }
+    
+    // insert when we already know that the storage is big enough
+    std::pair<iterator, bool> insert_noresize(const value_type& x, boost::false_type)
+    {
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(extract_key()(x))
 						   : find_bucket(extract_key()(x)));
@@ -693,6 +778,20 @@ namespace utils
 	else
 	  ++ __size_element;
 	
+	copy_value(__bucket[pos.second], x);
+	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, false), true);
+      }
+    }
+
+    // insert when we already know that the storage is big enough
+    std::pair<iterator, bool> insert_noresize(const value_type& x, boost::true_type)
+    {
+      const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
+						   ? find_linear(extract_key()(x))
+						   : find_bucket(extract_key()(x)));
+      if (pos.first != size_type(-1))
+	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, false), false);
+      else {
 	copy_value(__bucket[pos.second], x);
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, false), true);
       }
