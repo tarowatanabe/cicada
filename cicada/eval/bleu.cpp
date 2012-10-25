@@ -141,36 +141,15 @@ namespace cicada
       sentence_type sentence;
       counts_type counts;
 
-      std::cerr << "input: " << __sentence << std::endl;
-	
       tokenize(__sentence, sentence);
 
-      std::cerr << "tokenized: " << sentence << std::endl;
-	
       sentence_type::const_iterator siter_end = sentence.end();
       for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
 	ngram_set_type::id_type id = ngrams.root();
-
-	std::cerr << "size: " << ngrams.size() << std::endl;
-	{
-	  size_t num = 0;
-	  ngram_set_type::const_iterator niter_end = ngrams.end();
-	  for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
-	    ++ num;
-
-	  std::cerr << "root size: " << num << std::endl;
-	}
-
-	std::cerr << "new pos: " << *siter << std::endl;
 	  
 	for (sentence_type::const_iterator iter = siter; iter != std::min(siter + order, siter_end); ++ iter) {
 	  id = ngrams.insert(id, *iter);
 	  ++ counts[id];
-	  
-	  std::cerr << "id: " << id << " word: " << *iter << " word-id: " << iter->id() << std::endl;
-	  std::cerr << "ngram: ";
-	  std::copy(siter, iter + 1, std::ostream_iterator<sentence_type::value_type>(std::cerr, " "));
-	  std::cerr << std::endl;
 	}
       }
 	
