@@ -22,7 +22,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/dense_hash_map.hpp"
+#include "utils/compact_map.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -43,7 +43,10 @@ struct ttable_type
 
   struct count_map_type
   {
-    typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type counts_type;
+    typedef utils::compact_map<word_type, count_type,
+			       utils::unassigned<word_type>, utils::deleted<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, count_type> > > counts_type;
 
     typedef counts_type::value_type      value_type;
     typedef counts_type::size_type       size_type;
@@ -58,7 +61,7 @@ struct ttable_type
     typedef counts_type::const_reference const_reference;
     typedef counts_type::reference       reference;
   
-    count_map_type() { counts.set_empty_key(word_type()); }
+    count_map_type() {  }
 
     inline const_iterator begin() const { return counts.begin(); }
     inline       iterator begin()       { return counts.begin(); }

@@ -566,8 +566,6 @@ namespace utils
     
     std::pair<size_type, size_type> find_bucket(const key_type& key) const
     {
-      size_type num_probes = 0;
-      
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
       size_type pos_insert = size_type(-1);
       
@@ -581,9 +579,8 @@ namespace utils
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
 	
-	// quadratic probing...
-	++ num_probes;
-	pos_buck = (pos_buck + num_probes) & (__bucket.size() - 1);
+	// linear probing
+	pos_buck = (pos_buck + 1) & (__bucket.size() - 1);
       }
     }
 
@@ -639,7 +636,6 @@ namespace utils
 	if (pred()(key, extract_key()(Empty::operator()()))
 	    || pred()(key, extract_key()(Deleted::operator()()))) continue;
 	
-	size_type num_probes = 0;
 	size_type pos_buck = hash()(key) & (__bucket.size() - 1);
 	
 	for (;;) {
@@ -647,8 +643,8 @@ namespace utils
 	  
 	  if (pred()(key_buck, extract_key()(Empty::operator()()))) break;
 	  
-	  ++ num_probes;
-	  pos_buck = (pos_buck + num_probes) & (__bucket.size() - 1);
+	  // linear probling
+	  pos_buck = (pos_buck + 1) & (__bucket.size() - 1);
 	}
 	
 	copy_value(__bucket[pos_buck], *biter);

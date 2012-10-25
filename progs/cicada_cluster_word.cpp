@@ -30,7 +30,7 @@
 #include <utils/mathop.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/random_seed.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -78,17 +78,16 @@ typedef std::vector<word_class_count_type, std::allocator<word_class_count_type 
 
 struct Cluster
 {
-  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_type;
+  typedef utils::compact_map<word_type, count_type,
+			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<std::pair<const word_type, count_type> > > word_count_type;
   
   word_count_type words;
   count_type count;
   count_type size;
   
-  Cluster() : words(), count(0), size(0)
-  {
-    words.set_empty_key(word_type());
-    words.set_deleted_key(word_type(word_type::id_type(-1)));
-  }
+  Cluster() : words(), count(0), size(0) {}
 
   void clear()
   {
@@ -580,12 +579,15 @@ void initial_cluster(const word_class_count_set_type& words,
 
 struct WordCount
 {
-  typedef utils::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_count_type;
+  typedef utils::compact_map<word_type, count_type,
+			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<std::pair<const word_type, count_type> > > word_count_type;
   
   word_count_type words;
   count_type count;
   
-  WordCount() : words(), count(0) { words.set_empty_key(word_type()); }
+  WordCount() : words(), count(0) {  }
 };
 
 void read_bigram(const path_type& file,

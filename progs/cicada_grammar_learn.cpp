@@ -60,7 +60,8 @@
 #include <utils/packed_vector.hpp>
 #include <utils/random_seed.hpp>
 #include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef hypergraph_type::rule_type     rule_type;
@@ -192,12 +193,18 @@ public:
 };
 typedef NGramCounts ngram_count_set_type;
 
-class WordCounts : public utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
+class WordCounts : public utils::compact_map<symbol_type, weight_type,
+					     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+					     boost::hash<symbol_type>, std::equal_to<symbol_type>,
+					     std::allocator<std::pair<const symbol_type, weight_type> > >
 {
 public:
-  typedef utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type count_set_type;
-
-  WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
+  typedef utils::compact_map<symbol_type, weight_type,
+			     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			     boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<std::pair<const symbol_type, weight_type> > > count_set_type;
+  
+  WordCounts() : count_set_type() { }
 
   WordCounts& operator+=(const WordCounts& x)
   {
@@ -1210,7 +1217,10 @@ void grammar_merge(treebank_set_type& treebanks,
 		   Generator& generator,
 		   Maximizer maximizer)
 {
-  typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type merged_set_type;
+  typedef utils::compact_set<symbol_type,
+			     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			     boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			     std::allocator<symbol_type> > merged_set_type;
   typedef word_count_set_type scale_set_type;
   typedef word_count_set_type loss_set_type;
 
@@ -1298,7 +1308,6 @@ void grammar_merge(treebank_set_type& treebanks,
   const weight_type threshold = sorted[sorted_size]->second;
   
   merged_set_type merged;
-  merged.set_empty_key(symbol_type());
   
   if (debug >= 2)
     std::cerr << "threshold: " << threshold << std::endl;

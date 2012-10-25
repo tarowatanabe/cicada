@@ -19,14 +19,15 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/unordered_set.hpp>
 
 typedef boost::filesystem::path path_type;
 
 typedef RootCount  root_count_type;
 typedef PhrasePair phrase_pair_type;
 
-typedef utils::dense_hash_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type> >::type root_count_set_type;
+typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
+			     std::allocator<root_count_type> >::type root_count_set_type;
 
 typedef LexiconModel lexicon_model_type;
 
@@ -101,9 +102,6 @@ int main(int argc, char** argv)
     root_count_set_type root_joint;
     root_count_set_type root_source;
     root_count_set_type root_target;
-    root_joint.set_empty_key(root_count_type());
-    root_source.set_empty_key(root_count_type());
-    root_target.set_empty_key(root_count_type());
     
     lexicon_model_type lexicon_source_target;
     lexicon_model_type lexicon_target_source;

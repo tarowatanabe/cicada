@@ -38,7 +38,8 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 typedef boost::filesystem::path path_type;
 
@@ -92,26 +93,17 @@ public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
 };
 
-class Lexicon : public utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
-{
-public:
-  typedef utils::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type lexicon_type;
-
-  Lexicon() : lexicon_type() { lexicon_type::set_empty_key(symbol_type()); }
-};
-
-class ExpectedCounts : public utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type
-{
-public:
-  typedef utils::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type expected_counts_type;
-  
-  ExpectedCounts() : expected_counts_type() { expected_counts_type::set_empty_key(symbol_type()); }
-};
-
-
 typedef Grammar grammar_type;
-typedef Lexicon lexicon_type;
-typedef ExpectedCounts expected_counts_type;
+
+typedef utils::compact_set<symbol_type,
+			   utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			   boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			   std::allocator<symbol_type> > lexicon_type;
+
+typedef utils::compact_map<symbol_type, weight_type,
+			   utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			   boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			   std::allocator<std::pair<const symbol_type, weight_type> > > expected_counts_type;
 
 typedef utils::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			     std::allocator<std::pair<const symbol_type, grammar_type> > >::type count_set_type;

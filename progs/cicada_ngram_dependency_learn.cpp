@@ -32,7 +32,7 @@
 #include <cicada/dependency.hpp>
 
 #include <utils/trie_compact.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/spinlock.hpp>
@@ -99,8 +99,10 @@ struct DependencyModel
       parameter_type() : count(0), types(0), logrpob(0), backoff(0) {}
     };
 
-    typedef utils::dense_hash_map<word_type, parameter_type, boost::hash<word_type>, std::equal_to<word_type>,
-				  std::allocator<std::pair<word_type, parameter_type> > > count_set_type;
+    typedef utils::compact_map<word_type, parameter_type,
+			       utils::unassigned<word_type>, utils::deleted<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, parameter_type> > > count_set_type;
 
     struct node_type
     {

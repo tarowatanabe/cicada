@@ -20,7 +20,7 @@
 #include "utils/program_options.hpp"
 #include "utils/resource.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -242,7 +242,10 @@ struct TranslationErrorRate : public TER, public M
 			       std::allocator<std::pair<const word_type, index_set_type> > >::type arc_unique_set_type;
   typedef std::vector<arc_unique_set_type, std::allocator<arc_unique_set_type> > lattice_unique_type;
 
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >::type word_set_type;  
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;  
 
 
   typedef MinimumEditDistance<M> med_type;
@@ -638,7 +641,6 @@ struct TranslationErrorRate : public TER, public M
     typedef std::vector<int, std::allocator<int> > precedent_set_type;
     
     word_set_type words_intersect;
-    words_intersect.set_empty_key(word_type());
     for (sentence_type::const_iterator hiter = hyp.begin(); hiter != hyp.end(); ++ hiter)
       words_intersect.insert(M::operator()(*hiter));
     
