@@ -572,7 +572,7 @@ namespace utils
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
       size_type pos_insert = size_type(-1);
       
-      for (;;) {
+      for (size_type i = 0; i != __bucket.size(); ++ i) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
 	if (pred()(key_buck, extract_key()(Empty::operator()()))) // no searching further
@@ -585,6 +585,9 @@ namespace utils
 	// linear probing
 	pos_buck = (pos_buck + 1) & (__bucket.size() - 1);
       }
+      
+      // we found no empty!
+      return std::make_pair(size_type(-1), pos_insert);
     }
 
     static inline
@@ -659,7 +662,7 @@ namespace utils
     std::pair<iterator, bool> insert_noresize(const value_type& x)
     {
       if (__size_element == __bucket.size())
-	throw std::runtime_error("no room for insert_default?");
+	throw std::runtime_error("no room for insert_noresize?");
       
       const std::pair<size_type, size_type> pos = (__bucket.size() <= __cache_linear
 						   ? find_linear(extract_key()(x))
