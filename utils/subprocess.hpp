@@ -164,9 +164,7 @@ namespace utils
 	int status = 0;
 	int ret = 0;
 	do {
-	  // here, we wait all the pid-group
-	  //ret = ::waitpid(- __pid, &status, 0);
-	  ret = ::waitpid(- 1, &status, 0);
+	  ret = ::waitpid(__pid, &status, 0);
 	} while ((ret == -1 && errno == EINTR) || (ret != -1 && !WIFEXITED(status)));
 	
 	__pid = -1;
