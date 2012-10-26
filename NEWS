@@ -24,6 +24,7 @@ Deprecated: dependency structure filters: cicada_filter_{conll,mst,cabocha} and 
 Removed terminal-binarization and re-wrote as dependency-binarization
 Better parallelization by cicada{,_mpi} with more balanced input/output
 Better memory allocation: use of power2 heuristics
+Completely removed dependence on sparsehashmap/densehashmap!
 
 2012-9-6
 New: added feature selection by simple kbest merging (for cicada_learn_online_{kbest,}_mpi)
