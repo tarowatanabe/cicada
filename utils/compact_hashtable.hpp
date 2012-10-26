@@ -435,7 +435,7 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(unassigned()())) && ! pred()(key, extract_key()(deleted()()))) {
+      if (! is_empty(key)) {
 	copy_value(*iter.pos, deleted()());
 	++ __size_deleted;
       }
@@ -448,8 +448,7 @@ namespace utils
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, extract_key()(unassigned()()))
-	    && ! pred()(key, extract_key()(deleted()()))) {
+	if (! is_empty(key)) {
 	  copy_value(*first.pos, deleted()());
 	  ++ __size_deleted;
 	}
@@ -464,7 +463,7 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(unassigned()())) && ! pred()(key, extract_key()(deleted()()))) {
+      if (! is_empty(key)) {
 	copy_value(*iter.pos, deleted()());
 	++ __size_deleted;
       }
@@ -477,8 +476,7 @@ namespace utils
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, extract_key()(unassigned()()))
-	    && ! pred()(key, extract_key()(deleted()()))) {
+	if (! is_empty(key)) {
 	  copy_value(*first.pos, deleted()());
 	  ++ __size_deleted;
 	}
@@ -633,17 +631,16 @@ namespace utils
 
     std::pair<size_type, size_type> find_linear(const key_type& key, boost::true_type) const
     {
-      size_type pos_insert = size_type(-1);
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
 	if (pred()(key_buck, extract_key()(unassigned()())))
-	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
+	  return std::make_pair(size_type(-1), pos_buck);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
       }
       
-      return std::make_pair(size_type(-1), pos_insert);
+      return std::make_pair(size_type(-1), size_type(-1));
     }
     
     std::pair<size_type, size_type> find_bucket(const key_type& key) const
@@ -654,7 +651,6 @@ namespace utils
     std::pair<size_type, size_type> find_bucket(const key_type& key, boost::false_type) const
     {
       size_type num_probes = 0;
-
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
       size_type pos_insert = size_type(-1);
       
@@ -679,19 +675,17 @@ namespace utils
       // we found no empty!
       return std::make_pair(size_type(-1), pos_insert);
     }
-
+    
     std::pair<size_type, size_type> find_bucket(const key_type& key, boost::true_type) const
     {
       size_type num_probes = 0;
-
       size_type pos_buck = hash()(key) & (__bucket.size() - 1);
-      size_type pos_insert = size_type(-1);
       
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
 	if (pred()(key_buck, extract_key()(unassigned()()))) // no searching further
-	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
+	  return std::make_pair(size_type(-1), pos_buck);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
 
@@ -704,7 +698,7 @@ namespace utils
       }
       
       // we found no empty!
-      return std::make_pair(size_type(-1), pos_insert);
+      return std::make_pair(size_type(-1), size_type(-1));
     }
 
     static inline
