@@ -538,6 +538,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return __bucket[pos.first];
       else {
+	++ __size_element;
 	copy_value(__bucket[pos.second], DefaultValue()(x));
 	return __bucket[pos.second];
       }
@@ -810,6 +811,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, false), false);
       else {
+	++ __size_element;
 	copy_value(__bucket[pos.second], x);
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.second, false), true);
       }
