@@ -12,8 +12,8 @@
 
 #include <cicada/semiring/traits.hpp>
 
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -120,20 +120,27 @@ namespace cicada
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
-    
-    typedef typename utils::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal >::type state_node_map_type;
-    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type >::type candidate_set_unique_type;
 
+    struct candidate_unassigned
+    {
+      const candidate_type* operator()() const { return 0; }
+    };
+    
+    typedef utils::compact_map<state_type, id_type,
+			       model_type::state_unassigned, model_type::state_unassigned,
+			       model_type::state_hash, model_type::state_equal,
+			       std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
+    typedef utils::compact_set<const candidate_type*,
+			       candidate_unassigned, candidate_unassigned,
+			       candidate_hash_type, candidate_equal_type,
+			       std::allocator<const candidate_type*> > candidate_set_unique_type;
+    
     struct State
     {
       State(const size_type& hint, const size_type& state_size)
 	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
-      {
-	nodes.set_empty_key(state_type());
-	
-	uniques.set_empty_key(0);
-      }
+      { }
       
       candidate_heap_type cand;
       candidate_heap_type buf;
@@ -185,8 +192,6 @@ namespace cicada
 	states.clear();
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
-
-	
 	
 	for (size_t j = 0; j != cube_size_max; ++ j) {
 	  const size_type edge_size_prev = graph_out.edges.size();

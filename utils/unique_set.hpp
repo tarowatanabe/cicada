@@ -2,6 +2,7 @@
 //
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+// this is not debugged...
 
 #ifndef __UTILS__UNIQUE_SET__HPP__
 #define __UTILS__UNIQUE_SET__HPP__ 1
@@ -12,7 +13,7 @@
 #include <iterator>
 #include <algorithm>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/functional/hash/hash.hpp>
@@ -54,8 +55,18 @@ namespace utils
     };
     
     typedef typename Alloc::template rebind<inserted_type>::other inserted_alloc;
+
+    struct inserted_unassigned
+    {
+      inserted_type operator()() const
+      {
+	return inserted_type(value_ptr_type(), 0);
+      }
+    };
     
-    typedef typename utils::dense_hash_set<inserted_type, inserted_hash, inserted_pred, inserted_alloc>::type inserted_value_set_type;
+    typedef utils::compact_set<inserted_type,
+			       inserted_unassigned, inserted_unassigned, 
+			       inserted_hash, inserted_pred, inserted_alloc> inserted_value_set_type;
 
   public:
     class const_iterator : public inserted_value_set_type::const_iterator
@@ -69,7 +80,7 @@ namespace utils
       typedef typename inserted_value_set_type::size_type size_type;
 
     private:
-      typedef typename inserted_value_set_type::iterator iterator_type;
+      typedef typename inserted_value_set_type::const_iterator iterator_type;
       
     public:
       const_iterator(const iterator_type& x)  : iterator_type(x) {}
@@ -81,7 +92,7 @@ namespace utils
     typedef const_iterator iterator;
 
   public:
-    unique_set() : values_() { values_.set_empty_key(inserted_type()); }
+    unique_set() : values_() {  }
     
   public:
     const value_ptr_type operator[](const value_type& x)
@@ -99,6 +110,7 @@ namespace utils
       return values_.insert(inserted_type(x, 0)).first->first;
     }
     
+#if 0
     void erase(const value_type& x)
     {
       values_.erase(inserted_type(value_ptr_type(), &x));
@@ -108,6 +120,7 @@ namespace utils
     {
       values_.erase(inserted_type(x, 0));
     }
+#endif
 
     void clear() { values_.clear(); }
 

@@ -81,8 +81,8 @@
 #include "utils/restaurant_vector.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/dense_hash_map.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_map.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -90,7 +90,6 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/symbol_set.hpp"
-#include "utils/unique_set.hpp"
 #include "utils/rwticket.hpp"
 #include "utils/spinlock.hpp"
 
@@ -348,6 +347,12 @@ struct PYP
     id_set_type child_;
     id_set_type last_;
   };
+
+  template <typename Tp>
+  struct unassigned_key
+  {
+    Tp operator()() const { return Tp(); }
+  };
 };
 
 struct UnigramModel
@@ -524,29 +529,42 @@ struct LexiconModel
       return hasher_type()(x.source.id(), x.target.id());
     }
   };
+
+  struct word_pair_unassigned : public utils::unassigned<word_type>
+  {
+    typedef utils::unassigned<word_type> unassigned_type;
+    
+    word_pair_type operator()() const
+    {
+      return word_pair_type(unassigned_type::operator()(),
+			    unassigned_type::operator()());
+    }
+  };
   
-  typedef utils::dense_hash_map<word_pair_type, double, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-				std::allocator<std::pair<const word_pair_type, double> > >::type table_type;
+  typedef utils::compact_map<word_pair_type, double,
+			     word_pair_unassigned, word_pair_unassigned,
+			     boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+			     std::allocator<std::pair<const word_pair_type, double> > > table_type;
   
   typedef boost::filesystem::path path_type;
   
   LexiconModel(const double __smooth=1e-7)
     : table(), smooth(__smooth)
   {
-    table.set_empty_key(word_pair_type());
   }
   
   LexiconModel(const path_type& path)
     : table(), smooth()
   {
-    table.set_empty_key(word_pair_type());
-    
     open(path);
   }
   
   void open(const path_type& path)
   {
-    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+    typedef utils::compact_set<word_type,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<word_type> > word_set_type;
         
     typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
     typedef boost::spirit::istream_iterator iterator_type;
@@ -561,7 +579,6 @@ struct LexiconModel
     parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
     
     word_set_type words;
-    words.set_empty_key(word_type());
     table.clear();
     
     utils::compress_istream is(path, 1024 * 1024);
@@ -1475,8 +1492,20 @@ struct PYPGraph
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
 
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
-  typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
-				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+  
+  struct span_pairs_unassigned
+  {
+    span_pairs_type operator()() const
+    {
+      return span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
+			     span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)));
+    }
+  };
+  
+  typedef utils::compact_set<span_pairs_type,
+			     span_pairs_unassigned, span_pairs_unassigned,
+			     utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+			     std::allocator<span_pairs_type> > span_pairs_unique_type;
 
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > unigram_type;
   
@@ -1869,8 +1898,6 @@ struct PYPGraph
     //std::cerr << "forward" << std::endl;
 
     span_pairs_unique_type spans_unique;
-    spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
-					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
     
     // traverse agenda, smallest first...
     const size_type length_max = source.size() + target.size();
@@ -2857,21 +2884,27 @@ int main(int argc, char ** argv)
 	
 	typedef PYP::phrase_type      phrase_type;
 	typedef PYP::phrase_pair_type phrase_pair_type;
-	typedef utils::dense_hash_map<phrase_pair_type, double, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-				      std::allocator<std::pair<const phrase_pair_type, double> > >::type phrase_pair_set_type;
+		
+	typedef utils::compact_map<phrase_pair_type, double,
+				   PYP::unassigned_key<phrase_pair_type>, PYP::unassigned_key<phrase_pair_type>,
+				   boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+				   std::allocator<std::pair<const phrase_pair_type, double> > > phrase_pair_set_type;
 	
-	typedef utils::dense_hash_map<phrase_type, double, boost::hash<phrase_type>, std::equal_to<phrase_type>,
-				      std::allocator<std::pair<const phrase_type, double> > >::type phrase_set_type;
+	typedef utils::compact_map<phrase_type, double,
+				   PYP::unassigned_key<phrase_type>, PYP::unassigned_key<phrase_type>,
+				   boost::hash<phrase_type>, std::equal_to<phrase_type>,
+				   std::allocator<std::pair<const phrase_type, double> > > phrase_set_type;
 	
 	typedef boost::array<size_type, 5> reordering_type;
-	typedef utils::dense_hash_map<phrase_pair_type, reordering_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-				      std::allocator<std::pair<const phrase_pair_type, reordering_type> > >::type reordering_pair_set_type;
+	typedef utils::compact_map<phrase_pair_type, reordering_type,
+				   PYP::unassigned_key<phrase_pair_type>, PYP::unassigned_key<phrase_pair_type>,
+				   boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+				   std::allocator<std::pair<const phrase_pair_type, reordering_type> > > reordering_pair_set_type;
 	
 	typedef utils::vector2<bool, std::allocator<bool> > matrix_type;
 	
 	matrix_type matrix;
 	reordering_pair_set_type reorderings;
-	reorderings.set_empty_key(phrase_pair_type());
 	
 	for (size_type pos = 0; pos != derivations.size(); ++ pos)
 	  if (! derivations[pos].empty()) {
@@ -2918,10 +2951,6 @@ int main(int argc, char ** argv)
 	phrase_pair_set_type phrases;
 	phrase_set_type      phrases_source;
 	phrase_set_type      phrases_target;
-
-	phrases.set_empty_key(phrase_pair_type());
-	phrases_source.set_empty_key(phrase_type());
-	phrases_target.set_empty_key(phrase_type());
 
 	for (PYPPhrase::id_type id = 0; id != model.phrase.table.size(); ++ id)
 	  if (! model.phrase.table[id].empty()) {
@@ -3002,10 +3031,12 @@ int main(int argc, char ** argv)
 
 size_t read_data(const path_type& path, sentence_set_type& sentences)
 {
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
 
   word_set_type words;
-  words.set_empty_key(word_type());
 
   sentences.clear();
   

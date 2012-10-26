@@ -57,7 +57,7 @@
 #include "utils/packed_vector.hpp"
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/lockfree_list_queue.hpp"
 
 #include <boost/program_options.hpp>
@@ -603,7 +603,9 @@ typedef std::vector<cutoff_type, std::allocator<cutoff_type> > cutoff_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > position_set_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<size_type, std::allocator<size_type> > mapping_type;
-typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+typedef utils::compact_set<word_type,
+			   utils::unassigned<word_type>, utils::unassigned<word_type>,
+			   boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > word_set_type;
 
 struct TaskBeam
 {
@@ -868,7 +870,6 @@ int main(int argc, char ** argv)
     
     sentence_set_type training;
     word_set_type     words;
-    words.set_empty_key(word_type());
     
     read_data(train_files, training, words);
 

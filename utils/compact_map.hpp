@@ -27,20 +27,12 @@ namespace utils
     typedef std::pair<const key_type, mapped_type> value_type;
     
   private:
-    struct value_empty : public Empty
+    template <typename __Key>
+    struct value_static : public __Key
     {
       const value_type& operator()() const
       {
-	static value_type __value(Empty::operator()(), mapped_type());
-	return __value;
-      }
-    };
-    
-    struct value_deleted : public Deleted
-    {
-      const value_type& operator()() const
-      {
-	static value_type __value(Deleted::operator()(), mapped_type());
+	static value_type __value(__Key::operator()(), mapped_type());
 	return __value;
       }
     };
@@ -51,7 +43,9 @@ namespace utils
       const Key& operator()(value_type& x) const { return x.first; }
     };
     
-    typedef compact_hashtable<key_type, value_type, value_empty, value_deleted, extract_key, Hash, Pred, Alloc> impl_type;
+    typedef compact_hashtable<key_type, value_type,
+			      value_static<Empty>, value_static<Deleted>,
+			      extract_key, Hash, Pred, Alloc> impl_type;
 
   public:
     typedef typename impl_type::size_type       size_type;

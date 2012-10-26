@@ -47,8 +47,9 @@
 #include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/dense_hash_set.hpp"
-#include "utils/trie_dense.hpp"
+#include "utils/compact_map.hpp"
+#include "utils/compact_set.hpp"
+#include "utils/trie_compact.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -79,6 +80,11 @@ struct PYP
   typedef utils::piece piece_type;
   typedef utils::piece segment_type;
   typedef utils::piece word_type;
+
+  struct word_unassigned
+  {
+    word_type operator()() const { return word_type(); }
+  };
 };
 
 struct PYPWord
@@ -106,9 +112,10 @@ struct PYPWord
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type,
-			    boost::hash<word_type>, std::equal_to<word_type>,
-			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_compact<word_type, node_type,
+			      PYP::word_unassigned,
+			      boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
@@ -261,7 +268,7 @@ struct PYPWord
 	  const double __lambda,
 	  const double __lambda_strength,
 	  const double __lambda_rate)
-    : trie(word_type()),
+    : trie(),
       nodes(order),
       discount(order, __discount),
       strength(order, __strength),
@@ -692,9 +699,10 @@ struct PYPLM
   };
   typedef Node node_type;
   
-  typedef utils::trie_dense<word_type, node_type,
-			    boost::hash<word_type>, std::equal_to<word_type>,
-			    std::allocator<std::pair<const word_type, node_type> > > trie_type;
+  typedef utils::trie_compact<word_type, node_type,
+			      PYP::word_unassigned,
+			      boost::hash<word_type>, std::equal_to<word_type>,
+			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
   
@@ -712,7 +720,7 @@ struct PYPLM
 	const double __strength_shape,
 	const double __strength_rate)
     : base(__base),
-      trie(word_type()),
+      trie(),
       nodes(order),
       discount(order, __discount),
       strength(order, __strength),
@@ -1039,11 +1047,12 @@ struct PYPLM
   void sample_length(Sampler& sampler)
   {
     typedef size_type count_type;
-    typedef utils::dense_hash_map<segment_type, count_type, boost::hash<segment_type>, std::equal_to<segment_type>,
-				  std::allocator<std::pair<const segment_type, count_type> > >::type count_set_type;
+    typedef utils::compact_map<segment_type, count_type,
+			       PYP::word_unassigned, PYP::word_unassigned,
+			       boost::hash<segment_type>, std::equal_to<segment_type>,
+			       std::allocator<std::pair<const segment_type, count_type> > > count_set_type;
 
     count_set_type counts;
-    counts.set_empty_key(segment_type());
     
     typename node_type::table_type::const_iterator titer_end = root.table.end();
     for (typename node_type::table_type::const_iterator titer = root.table.begin(); titer != titer_end; ++ titer)
@@ -1767,11 +1776,13 @@ void read_data(const path_set_type& paths, data_set_type& data)
 void vocabulary(const data_set_type& data, vocabulary_type& vocab)
 {
   typedef utils::piece piece_type;
-  typedef utils::dense_hash_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> >::type vocab_type;
+  typedef utils::compact_set<piece_type, 
+			     PYP::word_unassigned, PYP::word_unassigned,
+			     boost::hash<piece_type>, std::equal_to<piece_type>,
+			     std::allocator<piece_type> > vocab_type;
   
   vocab_type voc;
-  voc.set_empty_key(piece_type());
-  
+   
   data_set_type::const_iterator diter_end = data.end();
   for (data_set_type::const_iterator diter = data.begin(); diter != diter_end; ++ diter) {
     const sentence_type& sentence = *diter;

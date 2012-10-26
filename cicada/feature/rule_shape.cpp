@@ -50,14 +50,8 @@ namespace cicada
 	Tp operator()() const { return Tp(-1); }
       };
       
-      template <typename Tp>
-      struct deleted_key
-      {
-	Tp operator()() const { return Tp(-2); }
-      };
-      
       typedef utils::trie_compact<int, std::string,
-				  unassigned_key<int>, deleted_key<int>,
+				  unassigned_key<int>, 
 				  utils::hashmurmur<size_t>, std::equal_to<int>,
 				  std::allocator<std::pair<const int, std::string> > > trie_type;
       
@@ -67,7 +61,7 @@ namespace cicada
       typedef trie_type::id_type id_type;
       
       typedef utils::compact_map<id_type, feature_type,
-				 unassigned_key<id_type>, deleted_key<id_type>,
+				 unassigned_key<id_type>, unassigned_key<id_type>,
 				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, feature_type> > > node_map_type;
       typedef std::deque<node_map_type, std::allocator<node_map_type> > cache_bigram_type;

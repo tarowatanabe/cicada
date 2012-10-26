@@ -24,7 +24,7 @@
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
-#include "utils/dense_hash_map.hpp"
+#include "utils/compact_map.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
@@ -436,6 +436,12 @@ namespace cicada
     }
   };
   
+  template <typename Tp>
+  struct null_const_ptr
+  {
+    const Tp* operator()() const { return 0; }
+  };
+  
   std::ostream& operator<<(std::ostream& os, const HyperGraph& graph)
   {
     namespace karma = boost::spirit::karma;
@@ -444,13 +450,13 @@ namespace cicada
     typedef HyperGraph hypergraph_type;
     typedef hypergraph_type::rule_type rule_type;
 
-    typedef utils::dense_hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
-				  std::allocator<std::pair<const rule_type*, int> > >::type rule_unique_map_type;
+    typedef utils::compact_map<const rule_type*, int,
+			       null_const_ptr<rule_type>, null_const_ptr<rule_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
     os << '{';
     
     rule_unique_map_type rules_unique;
-    rules_unique.set_empty_key(0);
     
     {
       os << "\"rules\"" << ": " << '[';

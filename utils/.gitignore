@@ -42,7 +42,6 @@ chart_main
 chunk_vector_main
 compact_map_main
 compress_stream_main
-dense_map_main
 double_base64_main
 filesystem_main
 group_aligned_code_main
@@ -66,7 +65,6 @@ rwspinlock_main
 rwticket_main
 simple_vector_main
 small_vector_main
-sparse_map_main
 spinlock_main
 static_allocator_main
 stick_break_main

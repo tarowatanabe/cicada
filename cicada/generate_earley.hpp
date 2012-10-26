@@ -24,8 +24,8 @@
 #include <cicada/inside_outside.hpp>
 #include <cicada/semiring.hpp>
 
-#include <utils/dense_hash_set.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_set.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
@@ -56,11 +56,6 @@ namespace cicada
     GenerateEarley(const int __depth, const int __width)
       : depth(__depth), width(__width)
     {
-      edges_unique.set_empty_key(0);
-
-      traversals.set_empty_key(traversal_type());
-
-      non_terminal_nodes.set_empty_key(0);
     }
     
     //
@@ -68,15 +63,18 @@ namespace cicada
     //
     
     typedef uint32_t id_type;
-    typedef utils::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type id_map_type;
+    typedef utils::compact_map<symbol_type, id_type,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, id_type> > > id_map_type;
     
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
     {
       grammar_node_type(const bool __is_root)
-	: edge(hypergraph_type::invalid), is_root(__is_root) { initialize(); }
+	: edge(hypergraph_type::invalid), is_root(__is_root) {  }
       grammar_node_type()
-	: edge(hypergraph_type::invalid), is_root(false) { initialize(); }
+	: edge(hypergraph_type::invalid), is_root(false) { }
       
       id_map_type terminals;
       id_map_type non_terminals;
@@ -85,12 +83,6 @@ namespace cicada
       feature_set_type features;
       bool is_root;
 
-    private:
-      void initialize()
-      {
-	terminals.set_empty_key(symbol_type());
-	non_terminals.set_empty_key(symbol_type());
-      }
     };
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
@@ -206,8 +198,16 @@ namespace cicada
 	return x.passive == y.passive && x.active == y.active && x.is_active == y.is_active;
       }
     };
+
+    struct traversal_unassigned
+    {
+      traversal_type operator()() const { return traversal_type(); }
+    };
     
-    typedef utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
+    typedef utils::compact_set<traversal_type,
+			       traversal_unassigned, traversal_unassigned,
+			       traversal_hash_type, traversal_equal_type,
+			       std::allocator<traversal_type> > traversal_set_type;
     
     // edge hash/comparison
     struct edge_unique_hash_type : public utils::hashmurmur<size_t>
@@ -259,16 +259,25 @@ namespace cicada
 			     && x->depth == y->depth));
       }
     };
+
+    struct edge_unassigned
+    {
+      const edge_type* operator()() const { return 0; }
+    };
     
-    typedef utils::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type >::type edge_set_unique_type;
+    typedef utils::compact_set<const edge_type*,
+			       edge_unassigned, edge_unassigned,
+			       edge_unique_hash_type, edge_unique_equal_type,
+			       std::allocator<const edge_type*> > edge_set_unique_type;
     
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_ptr_set_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
     
     // edge to traversal graph mappings...
-    typedef utils::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type >::type non_terminal_node_set_type;
-    
+    typedef utils::compact_map<const edge_type*, hypergraph_type::id_type,
+			       edge_unassigned, edge_unassigned,
+			       edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {

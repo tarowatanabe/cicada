@@ -60,8 +60,8 @@
 #include "utils/restaurant_vector.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/dense_hash_map.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_map.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -143,43 +143,53 @@ struct LexiconModel
       return hasher_type()(x.source.id(), x.target.id());
     }
   };
+
+  struct word_pair_unassigned : public utils::unassigned<word_type>
+  {
+    typedef utils::unassigned<word_type> unassigned_type;
+    
+    word_pair_type operator()() const
+    {
+      return word_pair_type(unassigned_type::operator()(),
+			    unassigned_type::operator()());
+    }
+  };
   
-  typedef utils::dense_hash_map<word_pair_type, double, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-				std::allocator<std::pair<const word_pair_type, double> > >::type table_type;
+  typedef utils::compact_map<word_pair_type, double,
+			     word_pair_unassigned, word_pair_unassigned,
+			     boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+			     std::allocator<std::pair<const word_pair_type, double> > > table_type;
   
   typedef boost::filesystem::path path_type;
   
   LexiconModel(const double __smooth=1e-7)
     : table(), smooth(__smooth)
-  {
-    table.set_empty_key(word_pair_type());
-  }
+  { }
+
   
   LexiconModel(const path_type& path_source_target,
 	       const path_type& path_target_source)
     : table(), smooth()
   {
-    table.set_empty_key(word_pair_type());
     open(path_source_target, path_target_source);
   }
   
   void open(const path_type& path_source_target,
 	    const path_type& path_target_source)
   {
-    typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+    typedef utils::compact_set<word_type,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<word_type> > word_set_type;
         
     table_type table_source_target;
     table_type table_target_source;
-    table_source_target.set_empty_key(word_pair_type());
-    table_target_source.set_empty_key(word_pair_type());
     
     open(path_source_target, table_source_target);
     open(path_target_source, table_target_source);
     
     word_set_type sources;
     word_set_type targets;
-    sources.set_empty_key(word_type());
-    targets.set_empty_key(word_type());
     
     table.clear();
     
@@ -1884,10 +1894,12 @@ int main(int argc, char ** argv)
 
 size_t read_data(const path_type& path, hypergraph_set_type& graphs)
 {
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
   
   word_set_type words;
-  words.set_empty_key(word_type());
   
   graphs.clear();
   
@@ -1913,10 +1925,12 @@ size_t read_data(const path_type& path, hypergraph_set_type& graphs)
 
 size_t read_data(const path_type& path, sentence_set_type& sentences)
 {
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
-
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
+  
   word_set_type words;
-  words.set_empty_key(word_type());
 
   sentences.clear();
   

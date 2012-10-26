@@ -58,44 +58,6 @@ fi
 AC_SUBST(BLAS_LDFLAGS)
 AM_CONDITIONAL([HAVE_BLAS], [test x$ac_have_blas = xyes])
 
-AC_ARG_WITH(sparsehash,
-	[AC_HELP_STRING([--with-sparsehash=DIR], [sparsehash in DIR])],
-	[sparsehash_dir="${withval}"], [sparsehash_dir=''])
-
-if test "x$sparsehash_dir" != "x"; then
-  SPARSEHASH_CPPFLAGS="-I${sparsehash_dir}/include"
-else
-  SPARSEHASH_CPPFLAGS=""
-fi
-AC_SUBST(SPARSEHASH_CPPFLAGS)
-
-save_CXXFLAGS="$CXXFLAGS"
-CXXFLAGS="$CXXFLAGS $SPARSEHASH_CPPFLAGS"
-AC_MSG_CHECKING(for sparsehash)
-AC_TRY_COMPILE([#include <string>
-	        #include <sparsehash/sparse_hash_map>],
-  	        [], [ac_have_sparsehash=yes], [ac_have_sparsehash=no])
-
-AC_MSG_RESULT($ac_have_sparsehash)
-
-if test "x$ac_have_sparsehash" = "xyes"; then
-  AC_DEFINE([HAVE_SPARSEHASH], 1, [Define to 1 if you have sparsehash.])
-else
-  AC_MSG_CHECKING(for (old) sparsehash)
-  AC_TRY_COMPILE([#include <string>
-  	          #include <google/sparse_hash_map>],
-  	          [], [ac_have_google_sparsehash=yes], [ac_have_google_sparsehash=no])
-   
-  AC_MSG_RESULT($ac_have_google_sparsehash)
-
-  if test "x$ac_have_google_sparsehash" = "xno"; then
-    AS_ERROR("no sparsehash")
-  else
-    AC_DEFINE([HAVE_GOOGLE_SPARSEHASH], 1, [Define to 1 if you have (old) sparsehash.])
-  fi
-fi
-CXXFLAGS="$save_CXXFLAGS"
-
 AC_ARG_WITH(snappy,
         [AC_HELP_STRING([--with-snappy=DIR], [snappy in DIR])],
         [snappy_dir="${withval}"], [snappy_dir=''])

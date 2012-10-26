@@ -35,28 +35,24 @@ namespace cicada
 
   private:
 
-    struct empty_unigram
+    struct unassigned_unigram
     {
       uchar_type operator()() const { return 0; }
     };
 
-    struct deleted_unigram
-    {
-      uchar_type operator()() const { return 1; }
-    };
 
     typedef utils::trie_compact<symbol_type, double,
-				utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				utils::unassigned<symbol_type>, 
 				boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
     
     typedef utils::compact_map<uchar_type, double,
-			       empty_unigram, deleted_unigram,
+			       unassigned_unigram, unassigned_unigram,
 			       utils::hashmurmur<size_t>, std::equal_to<uchar_type>,
 			       std::allocator<std::pair<const uchar_type, double> > > unigram_set_type;
     
     typedef utils::trie_compact<symbol_type, unigram_set_type,
-				utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				utils::unassigned<symbol_type>, 
 				boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				std::allocator<std::pair<const symbol_type, unigram_set_type> > > ngram_set_type;
     

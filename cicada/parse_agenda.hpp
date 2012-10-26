@@ -26,8 +26,8 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -293,8 +293,16 @@ namespace cicada
 	return x.passive == y.passive && x.active == y.active && x.is_active == y.is_active;
       }
     };
+
+    struct traversal_unassigned
+    {
+      traversal_type operator()() const { return traversal_type(); }
+    };
     
-    typedef typename utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
+    typedef utils::compact_set<traversal_type,
+			       traversal_unassigned, traversal_unassigned,
+			       traversal_hash_type, traversal_equal_type,
+			       std::allocator<traversal_type>  > traversal_set_type;
     
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> >   edge_ptr_set_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
@@ -343,9 +351,19 @@ namespace cicada
       
       head_edge_set_type() : score(), head(hypergraph_type::invalid), edges() {}
     };
+
+    struct edge_unassigned
+    {
+      const edge_type* operator()() const { return 0; }
+    };
+
     
-    typedef typename utils::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type >::type discovered_active_type;
-    typedef typename utils::dense_hash_map<const edge_type*, head_edge_set_type, edge_passive_hash_type, edge_passive_equal_type >::type discovered_passive_type;
+    typedef utils::compact_set<const edge_type*,
+			       edge_unassigned,	edge_unassigned, 
+			       edge_active_hash_type, edge_active_equal_type > discovered_active_type;
+    typedef utils::compact_map<const edge_type*, head_edge_set_type,
+			       edge_unassigned,	edge_unassigned, 
+			       edge_passive_hash_type, edge_passive_equal_type > discovered_passive_type;
     
     ParseAgenda(const symbol_type& __goal,
 		const grammar_type& __grammar,
@@ -365,11 +383,7 @@ namespace cicada
 	ordered(__ordered),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
-    {
-      traversals.set_empty_key(traversal_type());
-      discovered_active.set_empty_key(0);
-      discovered_passive.set_empty_key(0);
-    }
+    { }
 
     struct __extract
     {

@@ -77,8 +77,8 @@
 #include "utils/restaurant_sync.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/dense_hash_map.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_map.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -87,7 +87,6 @@
 #include "utils/simple_vector.hpp"
 #include "utils/symbol_set.hpp"
 #include "utils/indexed_set.hpp"
-#include "utils/unique_set.hpp"
 #include "utils/rwticket.hpp"
 #include "utils/atomicop.hpp"
 
@@ -141,6 +140,17 @@ struct PYP
       typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.source.id(), x.target.id());
+    }
+  };
+
+  struct word_pair_unassigned : public utils::unassigned<word_type>
+  {
+    typedef utils::unassigned<word_type> unassigned_type;
+
+    word_pair_type operator()() const
+    {
+      return word_pair_type(unassigned_type::operator()(),
+			    unassigned_type::operator()());
     }
   };
 
@@ -664,8 +674,20 @@ struct PYPGraph
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
 
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
-  typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
-				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
+  
+  struct span_pairs_unassigned
+  {
+    span_pairs_type operator()() const
+    {
+      return span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
+			     span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)));
+    }
+  };
+  
+  typedef utils::compact_set<span_pairs_type,
+			     span_pairs_unassigned, span_pairs_unassigned,
+			     utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+			     std::allocator<span_pairs_type> > span_pairs_unique_type;
 
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > chart_mono_type;
   typedef std::vector<logprob_type, std::allocator<logprob_type> > alpha_type;
@@ -834,9 +856,7 @@ struct PYPGraph
     // start parsing...
     
     span_pairs_unique_type spans_unique;
-    spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
-					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
-    
+     
     // traverse agenda, smallest first...
     const size_type length_max = source.size() + target.size();
 
@@ -1132,9 +1152,21 @@ struct PYPViterbi
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
 
   typedef std::pair<span_pair_type, span_pair_type> span_pairs_type;
-  typedef utils::dense_hash_set<span_pairs_type, utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
-				std::allocator<span_pairs_type> >::type span_pairs_unique_type;
-
+  
+  struct span_pairs_unassigned
+  {
+    span_pairs_type operator()() const
+    {
+      return span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
+			     span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)));
+    }
+  };
+  
+  typedef utils::compact_set<span_pairs_type,
+			     span_pairs_unassigned, span_pairs_unassigned,
+			     utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+			     std::allocator<span_pairs_type> > span_pairs_unique_type;
+  
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > chart_mono_type;
   typedef std::vector<logprob_type, std::allocator<logprob_type> > alpha_type;
   typedef std::vector<logprob_type, std::allocator<logprob_type> > beta_type;
@@ -1303,8 +1335,6 @@ struct PYPViterbi
     // start parsing...
     
     span_pairs_unique_type spans_unique;
-    spans_unique.set_empty_key(span_pairs_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
-					       span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1))));
     
     // traverse agenda, smallest first...
     const size_type length_max = source.size() + target.size();
@@ -2377,13 +2407,15 @@ struct PrepareMapper
   typedef PYP::difference_type difference_type;
   
   typedef PYP::word_pair_type word_pair_type;
-  
-  typedef utils::dense_hash_map<word_pair_type, size_t, boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
-				std::allocator<std::pair<const word_pair_type, size_t> >  >::type count_set_type;
+
+  typedef utils::compact_map<word_pair_type, size_t,
+			     PYP::word_pair_unassigned, PYP::word_pair_unassigned,
+			     boost::hash<word_pair_type>, std::equal_to<word_pair_type>,
+			     std::allocator<std::pair<const word_pair_type, size_t> >  > count_set_type;
   
   PrepareMapper(const sentence_set_type& __sources,
 		const sentence_set_type& __targets)
-    : sources(__sources), targets(__targets) { counts.set_empty_key(word_pair_type()); }
+    : sources(__sources), targets(__targets) {  }
   
   void operator()()
   {
@@ -2431,7 +2463,6 @@ void prepare(const sentence_set_type& sources,
   workers.join_all();
 
   count_set_type counts;
-  counts.set_empty_key(word_pair_type());
   
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
@@ -2718,10 +2749,12 @@ void viterbi(const path_type& output_file,
 
 size_t read_data(const path_type& path, sentence_set_type& sentences)
 {
-  typedef utils::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
 
   word_set_type words;
-  words.set_empty_key(word_type());
 
   sentences.clear();
   

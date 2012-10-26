@@ -11,7 +11,6 @@ MPI (Open MPI)    (http://www.open-mpi.org/)
 	    For details, consult open-mpi documentation.
 
 ICU               (http://site.icu-project.org/)
-sparsehash        (http://code.google.com/p/sparsehash/)
 
 Optional:
 	msgpack: http://msgpack.org

@@ -20,8 +20,8 @@
 #include <cicada/sort_topologically.hpp>
 #include <cicada/remove_epsilon.hpp>
 
-#include <utils/dense_hash_set.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_set.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/unordered_set.hpp>
@@ -56,13 +56,6 @@ namespace cicada
       : grammar(__grammar), yield_source(__yield_source)
 
     {
-      traversals.set_empty_key(traversal_type());
-      
-      terminal_nodes.set_empty_key(transducer_id_type(-1, 0));
-      non_terminal_nodes.set_empty_key(0);
-      
-      goal_nodes.set_empty_key(hypergraph_type::invalid);
-      
       rule_epsilon = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       rule_goal    = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
       rule_x1      = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(1, vocab_type::X)));
@@ -74,7 +67,10 @@ namespace cicada
     //
 
     typedef uint32_t id_type;
-    typedef utils::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >::type id_map_type;
+    typedef utils::compact_map<symbol_type, id_type,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
+			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			       std::allocator<std::pair<const symbol_type, id_type> > > id_map_type;
 
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
@@ -82,9 +78,9 @@ namespace cicada
       typedef utils::small_vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
       
       grammar_node_type(const bool __is_root)
-	: edges(), is_root(__is_root) { initialize(); }
+	: edges(), is_root(__is_root) {  }
       grammar_node_type()
-	: edges(), is_root(false) { initialize(); }
+	: edges(), is_root(false) { }
       
       id_map_type terminals;
       id_map_type non_terminals;
@@ -92,12 +88,6 @@ namespace cicada
       edge_set_type edges;
       bool is_root;
       
-    private:
-      void initialize()
-      {
-	terminals.set_empty_key(symbol_type());
-	non_terminals.set_empty_key(symbol_type());
-      }
     };
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
@@ -221,7 +211,15 @@ namespace cicada
       }
     };
     
-    typedef utils::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type >::type traversal_set_type;
+    struct traversal_unassigned
+    {
+      traversal_type operator()() const { return traversal_type(); }
+    };
+    
+    typedef utils::compact_set<traversal_type,
+			       traversal_unassigned, traversal_unassigned,
+			       traversal_hash_type, traversal_equal_type,
+			       std::allocator<traversal_type> > traversal_set_type;
     
     // edge hash/comparison
    struct edge_unique_hash_type : public utils::hashmurmur<size_t>
@@ -292,10 +290,35 @@ namespace cicada
 				      std::allocator<const edge_type*> >::type edge_set_passive_type;
     
     // edge to traversal graph mappings...
+
+    struct transducer_id_unassigned
+    {
+      transducer_id_type operator()() const { return transducer_id_type(-1, 0); }
+    };
     
-    typedef utils::dense_hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type> >::type terminal_node_set_type;
-    typedef utils::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type >::type non_terminal_node_set_type;
-    typedef utils::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> >::type goal_node_set_type;
+    typedef utils::compact_map<transducer_id_type, hypergraph_type::id_type, 
+			       transducer_id_unassigned, transducer_id_unassigned,
+			       utils::hashmurmur<size_t>, std::equal_to<transducer_id_type>,
+			       std::allocator<std::pair<const transducer_id_type, hypergraph_type::id_type> > > terminal_node_set_type;
+    
+    struct edge_unassigned
+    {
+      const edge_type* operator()() const { return 0; }
+    };
+    
+    typedef utils::compact_map<const edge_type*, hypergraph_type::id_type, 
+			       edge_unassigned, edge_unassigned,
+			       edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
+
+    struct goal_unassigned
+    {
+      hypergraph_type::id_type operator()() const { return hypergraph_type::invalid; }
+    };
+
+    typedef utils::compact_set<hypergraph_type::id_type,
+			       goal_unassigned, goal_unassigned,
+			       utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
+			       std::allocator<hypergraph_type::id_type> > goal_node_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     

@@ -1,5 +1,5 @@
 
-AM_CPPFLAGS = -I$(top_builddir) $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(SPARSEHASH_CPPFLAGS) $(TCMALLOC_CPPFLAGS) $(JEMALLOC_CPPFLAGS) $(PTHREAD_FLAGS)
+AM_CPPFLAGS = -I$(top_builddir) $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(TCMALLOC_CPPFLAGS) $(JEMALLOC_CPPFLAGS) $(PTHREAD_FLAGS)
 
 perftools_LDADD = $(JEMALLOC_LDFLAGS) $(TCMALLOC_LDFLAGS) $(PROFILER_LDFLAGS)
 
@@ -57,11 +57,6 @@ compact_set.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \
-dense_hashtable.hpp \
-dense_hash_map.hpp \
-dense_hash_set.hpp \
-dense_map.hpp \
-dense_set.hpp \
 double_base64_generator.hpp \
 double_base64_parser.hpp \
 filesystem.hpp \
@@ -114,11 +109,6 @@ simple_vector.hpp \
 slice_sampler.hpp \
 small_vector.hpp \
 space_separator.hpp \
-sparse_hash_map.hpp \
-sparse_hash_set.hpp \
-sparse_hashtable.hpp \
-sparse_map.hpp \
-sparse_set.hpp \
 spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
@@ -136,10 +126,8 @@ thread_specific_ptr.hpp \
 traits.hpp \
 trie.hpp \
 trie_compact.hpp \
-trie_dense.hpp \
 trie_set.hpp \
 trie_set_compact.hpp \
-trie_set_dense.hpp \
 json_string_generator.hpp \
 json_string_parser.hpp \
 unique_set.hpp \
@@ -170,7 +158,6 @@ chart_main \
 chunk_vector_main \
 compact_map_main \
 compress_stream_main \
-dense_map_main \
 double_base64_main \
 filesystem_main \
 group_aligned_code_main \
@@ -194,7 +181,6 @@ rwspinlock_main \
 rwticket_main \
 simple_vector_main \
 small_vector_main \
-sparse_map_main \
 spinlock_main \
 static_allocator_main \
 stick_break_main \
@@ -323,9 +309,6 @@ chunk_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 compress_stream_main_SOURCES = compress_stream_main.cpp
 compress_stream_main_LDADD = $(LIBUTILS)
 
-dense_map_main_SOURCES = dense_map_main.cpp
-dense_map_main_LDADD = $(LIBUTILS)
-
 double_base64_main_SOURCES = double_base64_main.cpp
 double_base64_main_LDADD = $(LIBUTILS)
 
@@ -381,9 +364,6 @@ small_vector_main_LDADD = $(BOOST_THREAD_LIBS)
 static_allocator_main_SOURCES = static_allocator_main.cpp
 static_allocator_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 static_allocator_main_LDADD = $(BOOST_THREAD_LIBS)
-
-sparse_map_main_SOURCES = sparse_map_main.cpp
-sparse_map_main_LDADD = $(LIBUTILS)
 
 symbol_set_main_SOURCES = symbol_set_main.cpp
 symbol_set_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)

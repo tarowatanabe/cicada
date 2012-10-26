@@ -12,7 +12,8 @@
 
 #include <cicada/semiring/traits.hpp>
 
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -133,9 +134,21 @@ namespace cicada
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
-    typedef typename utils::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal >::type state_node_map_type;
-    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type >::type candidate_set_unique_type;
+    typedef utils::compact_map<state_type, id_type,
+			       model_type::state_unassigned, model_type::state_unassigned,
+			       model_type::state_hash, model_type::state_equal,
+			       std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
 
+    struct candidate_unassigned
+    {
+      const candidate_type* operator()() const { return 0; }
+    };
+
+    typedef utils::compact_set<const candidate_type*,
+			       candidate_unassigned, candidate_unassigned,
+			       candidate_hash_type, candidate_equal_type,
+			       std::allocator<const candidate_type*> > candidate_set_unique_type;
+    
     typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
 
     struct State
@@ -145,10 +158,6 @@ namespace cicada
 	  nodes_coarse(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
       {
-	nodes.set_empty_key(state_type());
-	nodes_coarse.set_empty_key(state_type());
-	
-	uniques.set_empty_key(0);
       }
       
       candidate_heap_type cand;

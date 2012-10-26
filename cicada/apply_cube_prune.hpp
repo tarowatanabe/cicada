@@ -12,8 +12,7 @@
 
 #include <cicada/semiring/traits.hpp>
 
-#include <utils/dense_hash_set.hpp>
-#include <utils/dense_hash_map.hpp>
+#include <utils/compact_map.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -147,8 +146,10 @@ namespace cicada
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
-    typedef typename utils::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal >::type state_node_map_type;
-    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type >::type candidate_set_unique_type;
+    typedef utils::compact_map<state_type, candidate_type*,
+			       model_type::state_unassigned, model_type::state_unassigned,
+			       model_type::state_hash, model_type::state_equal,
+			       std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
     
     ApplyCubePrune(const model_type& _model,
 		   const function_type& _function,
@@ -157,8 +158,6 @@ namespace cicada
 	function(_function),
 	cube_size_max(_cube_size_max)
     { 
-      // we don't need this for alg. 2
-      //cand_unique.set_empty_key(0);
     }
     
     void operator()(const hypergraph_type& graph_in,
@@ -228,7 +227,6 @@ namespace cicada
       //std::cerr << "perform cube-prune" << std::endl;
       
       state_node_map_type buf(cand.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
-      buf.set_empty_key(state_type());
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
@@ -519,7 +517,6 @@ namespace cicada
     state_set_type      node_states;
 
     candidate_heap_type       cand;
-    //candidate_set_unique_type cand_unique;
 
     const model_type& model;
     const function_type& function;

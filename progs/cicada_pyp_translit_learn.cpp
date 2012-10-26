@@ -44,7 +44,7 @@
 #include "utils/restaurant.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/dense_hash_set.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -621,13 +621,21 @@ void read_data(const path_type& path, data_set_type& data)
     data.push_back(line);
 }
 
+template <typename Tp>
+struct unassigned_key
+{
+  Tp operator()() const { return Tp(); }
+};
+
 size_t vocabulary_size(const data_set_type& data)
 {
   typedef utils::piece piece_type;
-  typedef utils::dense_hash_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> >::type vocab_type;
+  typedef utils::compact_set<piece_type,
+			     unassigned_key<piece_type>, unassigned_key<piece_type>,
+			     boost::hash<piece_type>, std::equal_to<piece_type>,
+			     std::allocator<piece_type> > vocab_type;
   
   vocab_type vocab;
-  vocab.set_empty_key(piece_type());
   
   data_set_type::const_iterator diter_end = data.end();
   for (data_set_type::const_iterator diter = data.begin(); diter != diter_end; ++ diter) {

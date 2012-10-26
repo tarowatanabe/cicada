@@ -63,7 +63,7 @@ namespace cicada
       };
       
       typedef utils::trie_compact<symbol_type, node_pair_type,
-				  utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				  utils::unassigned<symbol_type>, 
 				  boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				  std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 

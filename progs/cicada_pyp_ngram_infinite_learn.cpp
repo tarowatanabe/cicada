@@ -84,7 +84,7 @@ struct PYPLM
   typedef Node node_type;
   
   typedef utils::trie_compact<word_type, node_type,
-			      utils::unassigned<word_type>, utils::deleted<word_type>,
+			      utils::unassigned<word_type>, 
 			      boost::hash<word_type>, std::equal_to<word_type>,
 			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
 

@@ -25,8 +25,7 @@ namespace utils
 
   template <typename Key,
 	    typename Data,
-	    typename Empty,
-	    typename Deleted,
+	    typename Unassigned,
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
 	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
@@ -38,8 +37,7 @@ namespace utils
     typedef Data                       mapped_type;
     typedef std::pair<const Key, Data> value_type;
 
-    typedef Empty                      empty_type;
-    typedef Deleted                    deleted_type;
+    typedef Unassigned                 unassigned_type;
     
     typedef Hash                       hash_type;
     typedef Equal                      equal_type;
@@ -50,7 +48,7 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-    typedef typename utils::compact_map<key_type, id_type, empty_type, deleted_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
+    typedef typename utils::compact_map<key_type, id_type, unassigned_type, unassigned_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
     
     struct Node
     {
@@ -215,10 +213,10 @@ namespace utils
 
 namespace std
 {
-  template <typename Key, typename Data, typename Empty, typename Deleted, typename Hash, typename Equal, typename Alloc>
+  template <typename Key, typename Data, typename Unassigned, typename Hash, typename Equal, typename Alloc>
   inline
-  void swap(utils::trie_compact<Key,Data,Empty,Deleted,Hash,Equal,Alloc>& x,
-	    utils::trie_compact<Key,Data,Empty,Deleted,Hash,Equal,Alloc>& y)
+  void swap(utils::trie_compact<Key,Data,Unassigned,Hash,Equal,Alloc>& x,
+	    utils::trie_compact<Key,Data,Unassigned,Hash,Equal,Alloc>& y)
   {
     x.swap(y);
   }

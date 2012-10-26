@@ -18,7 +18,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_set.hpp>
 
 namespace cicada
 {
@@ -138,14 +138,21 @@ namespace cicada
 	return (x == y) || (x && y && x->edge == y->edge && x->j == y->j);
       }
     };
+
+    struct derivation_unassigned
+    {
+      const derivation_type* operator()() const { return 0; }
+    };
     
-    typedef typename utils::dense_hash_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
-					   std::allocator<const derivation_type*> >::type derivation_set_unique_type;
+    typedef utils::compact_set<const derivation_type*,
+			       derivation_unassigned, derivation_unassigned,
+			       derivation_hash_type, derivation_equal_type,
+			       std::allocator<const derivation_type*> > derivation_set_unique_type;
 
     
     struct State
     {
-      State() { uniques.set_empty_key(0); }
+      State() {  }
       
       derivation_heap_type cand;
       derivation_list_type D;

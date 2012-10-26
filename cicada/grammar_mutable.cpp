@@ -66,7 +66,7 @@ namespace cicada
     typedef Transducer::rule_pair_type     rule_pair_type;
     typedef Transducer::rule_pair_set_type rule_pair_set_type;
     
-    typedef utils::trie_compact<symbol_type, rule_pair_set_type, utils::unassigned<symbol_type>, utils::deleted<symbol_type>, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+    typedef utils::trie_compact<symbol_type, rule_pair_set_type, utils::unassigned<symbol_type>, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
     

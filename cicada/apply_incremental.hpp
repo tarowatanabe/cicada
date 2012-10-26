@@ -13,8 +13,8 @@
 
 #include <cicada/semiring.hpp>
 
-#include <utils/dense_hash_map.hpp>
-#include <utils/dense_hash_set.hpp>
+#include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -134,8 +134,16 @@ namespace cicada
 	return (x == y) || (x && y && operator()(*x, *y));
       }
     };
+
+    struct candidate_unassigned
+    {
+      const candidate_type* operator()() const { return 0; }
+    };
     
-    typedef typename utils::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type>::type candidate_unique_set_type;
+    typedef utils::compact_set<const candidate_type*,
+			       candidate_unassigned, candidate_unassigned,
+			       candidate_hash_type, candidate_equal_type,
+			       std::allocator<const candidate_type*> > candidate_unique_set_type;
     
     struct compare_heap_type
     {
@@ -179,15 +187,23 @@ namespace cicada
 	return x.first == y.first && model_type::state_equal::operator()(x.second, y.second);
       }
     };
+
+    struct stack_state_unassigned
+    {
+      stack_state_type operator()() const { return stack_state_type(0, state_type()); }
+    };
     
-    typedef typename utils::dense_hash_map<stack_state_type, id_type, stack_state_hash_type, stack_state_equal_type>::type state_node_map_type;
+    typedef utils::compact_map<stack_state_type, id_type,
+			       stack_state_unassigned, stack_state_unassigned,
+			       stack_state_hash_type, stack_state_equal_type,
+			       std::allocator<std::pair<const stack_state_type, id_type> > > state_node_map_type;
     
     struct State : public state_node_map_type
     {
       State(const size_type& hint, const size_type& state_size)
 	: state_node_map_type(hint >> 1, stack_state_hash_type(state_size), stack_state_equal_type(state_size))
       {
-	state_node_map_type::set_empty_key(stack_state_type(0, state_type()));
+
       }
     };
     
@@ -225,7 +241,6 @@ namespace cicada
 	//attr_complete("incremental-complete"),
 	//attr_predict("incremental-predict")
     { 
-      predictions.set_empty_key(0);
     }
     
     void operator()(const hypergraph_type& graph_in,

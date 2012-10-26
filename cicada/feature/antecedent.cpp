@@ -55,7 +55,7 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef utils::trie_compact<symbol_type, std::string,
-				  utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				  utils::unassigned<symbol_type>, 
 				  boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				  std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
       

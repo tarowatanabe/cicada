@@ -59,7 +59,6 @@
 #include <utils/vertical_coded_vector.hpp>
 #include <utils/packed_vector.hpp>
 #include <utils/random_seed.hpp>
-#include <utils/dense_hash_map.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 
@@ -117,8 +116,6 @@ typedef Treebank treebank_type;
 
 typedef std::deque<treebank_type, std::allocator<treebank_type> > treebank_set_type;
 
-// use of utils dense_map for holding const rule_type*, not rule_ptr_type!
-
 template <typename Tp>
 struct ptr_hash : public boost::hash<Tp>
 {
@@ -149,15 +146,27 @@ struct ptr_equal
   }
 };
 
+struct rule_ptr_unassigned
+{
+  rule_ptr_type operator()() const { return rule_ptr_type(); }
+};
+
+
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
+class Grammar : public utils::compact_map<rule_ptr_type, weight_type,
+					  rule_ptr_unassigned, rule_ptr_unassigned,
+					  ptr_hash<rule_type>, ptr_equal<rule_type>,
+					  std::allocator<std::pair<const rule_ptr_type, weight_type> > >
 {
 public:
-  typedef utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
+  typedef utils::compact_map<rule_ptr_type, weight_type,
+			     rule_ptr_unassigned, rule_ptr_unassigned,
+			     ptr_hash<rule_type>, ptr_equal<rule_type>,
+			     std::allocator<std::pair<const rule_ptr_type, weight_type> > > count_set_type;
   
 public:
-  Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
+  Grammar() : count_set_type() { }
 
   Grammar& operator+=(const Grammar& x)
   {
@@ -175,12 +184,24 @@ typedef utils::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>
 			     std::allocator<std::pair<const symbol_type, grammar_type> > >::type count_set_type;
 
 typedef symbol_set_type ngram_type;
-class NGramCounts : public utils::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type
+
+struct ngram_unassigned
+{
+  ngram_type operator()() const { return ngram_type(); }
+};
+
+class NGramCounts : public utils::compact_map<ngram_type, weight_type,
+					      ngram_unassigned, ngram_unassigned,
+					      boost::hash<ngram_type>, std::equal_to<ngram_type>,
+					      std::allocator<std::pair<const ngram_type, weight_type> > >
 {
 public:
-  typedef utils::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type count_set_type;
-
-  NGramCounts() : count_set_type() { count_set_type::set_empty_key(ngram_type()); }
+  typedef utils::compact_map<ngram_type, weight_type,
+			     ngram_unassigned, ngram_unassigned,
+			     boost::hash<ngram_type>, std::equal_to<ngram_type>,
+			     std::allocator<std::pair<const ngram_type, weight_type> > > count_set_type;
+  
+  NGramCounts() : count_set_type() {  }
 
   NGramCounts& operator+=(const NGramCounts& x)
   {
@@ -374,19 +395,14 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   typedef utils::hashmurmur<size_t> hasher_type;
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
-    
-  class RuleCounts : public utils::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
-  {
-  public:
-    typedef utils::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
-  
-  public:
-    RuleCounts() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
-  };
 
   typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
   typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_ptr_set_type;
-  typedef RuleCounts rule_count_set_type;
+
+  typedef utils::compact_map<rule_ptr_type, int,
+			     rule_ptr_unassigned, rule_ptr_unassigned,
+			     ptr_hash<rule_type>, ptr_equal<rule_type>,
+			     std::allocator<std::pair<const rule_ptr_type, int> > > rule_count_set_type;
   
   
   logprob_set_type  __logprobs;
@@ -1967,7 +1983,9 @@ struct LexiconEstimate
   typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
   
   typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > ngram_set_type;
-  typedef utils::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type ngram_count_map_type;
+  typedef utils::unordered_map<ngram_type, ngram_set_type,
+			       boost::hash<ngram_type>, std::equal_to<ngram_type>,
+			       std::allocator<std::pair<const ngram_type, ngram_set_type> > >::type ngram_count_map_type;
   
   LexiconEstimate(const double& __prior, const int __order) : prior(__prior), order(__order) {}
   
@@ -2038,7 +2056,6 @@ struct LexiconEstimate
     const weight_type logprob_unk(discount);
 
     ngram_count_map_type ngrams;
-    ngrams.set_empty_key(ngram_type());
     
     for (int n = 2; n <= order; ++ n) {
       ngrams.clear();
@@ -2526,13 +2543,13 @@ void write_characters(const path_type& file,
 		      const double cutoff)
 {
   typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > sorted_type;
-  typedef utils::dense_hash_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >::type sorted_map_type;
+  typedef utils::unordered_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
+			       std::allocator<std::pair<const ngram_type, sorted_type> > >::type sorted_map_type;
   
   utils::compress_ostream os(file, 1024 * 1024);
   os.precision(10);
   
   sorted_map_type sorted;
-  sorted.set_empty_key(ngram_type(1, symbol_type()));
   
   ngram_count_set_type::const_iterator biter_end = backoff.end();
   for (ngram_count_set_type::const_iterator biter = backoff.begin(); biter != biter_end; ++ biter)

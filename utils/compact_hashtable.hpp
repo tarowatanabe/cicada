@@ -22,7 +22,7 @@
 
 namespace utils
 {
-  template <typename Key, typename Value, typename Empty, typename Deleted,
+  template <typename Key, typename Value, typename Unassigned, typename Deleted,
 	    typename ExtractKey, typename Hash, typename Pred, typename Alloc>
   class compact_hashtable;
   
@@ -230,7 +230,7 @@ namespace utils
   private:
     void advance()
     {
-      for (/**/; pos != table->__bucket.end() && (table->is_deleted(*this) || table->is_empty(*this)); ++ pos);
+      for (/**/; pos != table->__bucket.end() && table->is_empty(*this); ++ pos);
     }
     
   private:
@@ -256,11 +256,9 @@ namespace utils
     return x.pos != y.pos;
   }
   
-  template <typename Key, typename Value, typename Empty, typename Deleted,
+  template <typename Key, typename Value, typename Unassigned, typename Deleted,
 	    typename ExtractKey, typename Hash, typename Pred, typename Alloc>
-  class compact_hashtable : public Empty,
-			    public Deleted,
-			    public ExtractKey,
+  class compact_hashtable : public ExtractKey,
                             public Hash,
                             public Pred
   {
@@ -279,13 +277,14 @@ namespace utils
     typedef ptrdiff_t  difference_type;
     
   private:
-    typedef compact_hashtable<Key, Value, Empty, Deleted, ExtractKey, Hash, Pred, Alloc> self_type;
+    typedef compact_hashtable<Key, Value, Unassigned, Deleted, ExtractKey, Hash, Pred, Alloc> self_type;
     typedef __compact_hashtable_bucket<Value, Alloc> bucket_type;
-    
+
   private:
-    typedef typename boost::is_same<Empty,Deleted> non_erase_type;
+    typedef Unassigned unassigned_type;
+    typedef Deleted    deleted_type;
+    typedef typename boost::is_same<Unassigned,Deleted> non_erase_type;
     
- 
   public:
     typedef typename bucket_type::reference       reference;
     typedef typename bucket_type::const_reference const_reference;
@@ -311,10 +310,15 @@ namespace utils
 	__bucket(),
 	__size_element(0),
 	__size_deleted(0)
-    { }
-
+    {
+      if (hint)
+	rehash(hint);
+    }
+    
     compact_hashtable(const compact_hashtable& x)
-      : __bucket(),
+      : Hash(x.hash()),
+	Pred(x.pred()),
+	__bucket(),
 	__size_element(0),
 	__size_deleted(0) 
     {
@@ -332,8 +336,6 @@ namespace utils
     {
       if (this == &x) return;
 
-      static_cast<Empty&>(*this) = static_cast<const Empty&>(x);
-      static_cast<Deleted&>(*this) = static_cast<const Deleted&>(x);
       extract_key() = x.extract_key();
       hash() = x.hash();
       pred() = x.pred();
@@ -346,8 +348,6 @@ namespace utils
 
     void swap(compact_hashtable& x)
     {
-      std::swap(static_cast<Empty&>(*this), static_cast<Empty&>(x));
-      std::swap(static_cast<Deleted&>(*this), static_cast<Deleted&>(x));
       std::swap(extract_key(), x.extract_key());
       std::swap(hash(), x.hash());
       std::swap(pred(), x.pred());
@@ -361,7 +361,7 @@ namespace utils
     void clear()
     {
       utils::destroy_range(__bucket.begin(), __bucket.end());
-      std::uninitialized_fill(__bucket.begin(), __bucket.end(), Empty::operator()());
+      std::uninitialized_fill(__bucket.begin(), __bucket.end(), unassigned()());
       
       __size_element = 0;
       __size_deleted = 0;
@@ -420,7 +420,7 @@ namespace utils
       iterator iter = find(key);
       
       if (iter != end()) {
-	copy_value(*iter, Deleted::operator()());
+	copy_value(*iter, deleted()());
 	++ __size_deleted;
 	return 1;
       } else
@@ -435,8 +435,8 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(Empty::operator()())) && ! pred()(key, extract_key()(Deleted::operator()()))) {
-	copy_value(*iter.pos, Deleted::operator()());
+      if (! pred()(key, extract_key()(unassigned()())) && ! pred()(key, extract_key()(deleted()()))) {
+	copy_value(*iter.pos, deleted()());
 	++ __size_deleted;
       }
     }
@@ -448,9 +448,9 @@ namespace utils
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, extract_key()(Empty::operator()()))
-	    && ! pred()(key, extract_key()(Deleted::operator()()))) {
-	  copy_value(*first.pos, Deleted::operator()());
+	if (! pred()(key, extract_key()(unassigned()()))
+	    && ! pred()(key, extract_key()(deleted()()))) {
+	  copy_value(*first.pos, deleted()());
 	  ++ __size_deleted;
 	}
       }
@@ -464,8 +464,8 @@ namespace utils
       
       const key_type& key = extract_key()(*iter.pos);
       
-      if (! pred()(key, extract_key()(Empty::operator()())) && ! pred()(key, extract_key()(Deleted::operator()()))) {
-	copy_value(*iter.pos, Deleted::operator()());
+      if (! pred()(key, extract_key()(unassigned()())) && ! pred()(key, extract_key()(deleted()()))) {
+	copy_value(*iter.pos, deleted()());
 	++ __size_deleted;
       }
     }
@@ -477,9 +477,9 @@ namespace utils
       for (/**/; first != last; ++ first) {
 	const key_type& key = extract_key()(*first.pos);
 	
-	if (! pred()(key, extract_key()(Empty::operator()()))
-	    && ! pred()(key, extract_key()(Deleted::operator()()))) {
-	  copy_value(*first.pos, Deleted::operator()());
+	if (! pred()(key, extract_key()(unassigned()()))
+	    && ! pred()(key, extract_key()(deleted()()))) {
+	  copy_value(*first.pos, deleted()());
 	  ++ __size_deleted;
 	}
       }
@@ -516,7 +516,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return __bucket[pos.first];
       else {
-	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(Deleted::operator()())))
+	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(deleted()())))
 	  -- __size_deleted;
 	else
 	  ++ __size_element;
@@ -545,22 +545,42 @@ namespace utils
     
 
   private:
-    bool is_deleted(const_iterator& x) const
+    bool is_empty(const key_type& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(Deleted::operator()()));
+      return is_empty(x, typename non_erase_type::type());
     }
-    bool is_deleted(iterator& x) const
-    {
-      return pred()(extract_key()(*x.pos), extract_key()(Deleted::operator()()));
-    }
-      
+    
     bool is_empty(const_iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(Empty::operator()()));
+      return is_empty(x, typename non_erase_type::type());
     }
     bool is_empty(iterator& x) const
     {
-      return pred()(extract_key()(*x.pos), extract_key()(Empty::operator()()));
+      return is_empty(x, typename non_erase_type::type());
+    }
+    
+    bool is_empty(const key_type& x, boost::false_type) const
+    {
+      return (pred()(x, extract_key()(unassigned()()))
+	      || pred()(x, extract_key()(deleted()())));
+    }
+    
+    bool is_empty(const key_type& x, boost::true_type) const
+    {
+      return pred()(x, extract_key()(unassigned()()));
+    }
+
+    template <typename Iterator>
+    bool is_empty(Iterator x, boost::false_type) const
+    {
+      return (pred()(extract_key()(*x.pos), extract_key()(unassigned()()))
+	      || pred()(extract_key()(*x.pos), extract_key()(deleted()())));
+    }
+    
+    template <typename Iterator>
+    bool is_empty(Iterator x, boost::true_type) const
+    {
+      return pred()(extract_key()(*x.pos), extract_key()(unassigned()()));
     }
     
   private:
@@ -572,7 +592,7 @@ namespace utils
       
       // new capacity is larger than current
       if (capacity > __bucket.size() || capacity < (__bucket.size() >> 4)) {
-	bucket_type bucket_new(capacity, Empty::operator()());
+	bucket_type bucket_new(capacity, unassigned()());
 	__bucket.swap(bucket_new);
 	
 	__size_element = 0;
@@ -599,9 +619,9 @@ namespace utils
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, extract_key()(Empty::operator()())))
+	if (pred()(key_buck, extract_key()(unassigned()())))
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
-	else if (pred()(key_buck, extract_key()(Deleted::operator()())))
+	else if (pred()(key_buck, extract_key()(deleted()())))
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -616,7 +636,7 @@ namespace utils
       for (size_type pos_buck = 0; pos_buck != __bucket.size(); ++ pos_buck) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, extract_key()(Empty::operator()())))
+	if (pred()(key_buck, extract_key()(unassigned()())))
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -640,9 +660,9 @@ namespace utils
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, extract_key()(Empty::operator()()))) // no searching further
+	if (pred()(key_buck, extract_key()(unassigned()()))) // no searching further
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
-	else if (pred()(key_buck, extract_key()(Deleted::operator()()))) // searching...
+	else if (pred()(key_buck, extract_key()(deleted()()))) // searching...
 	  pos_insert = utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert);
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -669,7 +689,7 @@ namespace utils
       for (;;) {
 	const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	
-	if (pred()(key_buck, extract_key()(Empty::operator()()))) // no searching further
+	if (pred()(key_buck, extract_key()(unassigned()()))) // no searching further
 	  return std::make_pair(size_type(-1), utils::bithack::branch(pos_insert == size_type(-1), pos_buck, pos_insert));
 	else if (pred()(key_buck, key))
 	  return std::make_pair(pos_buck, size_type(-1));
@@ -715,8 +735,7 @@ namespace utils
       for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
-	if (pred()(key, extract_key()(Empty::operator()()))
-	    || pred()(key, extract_key()(Deleted::operator()()))) continue;
+	if (is_empty(key)) continue;
 	
 	copy_value(*iter, *biter);
 	++ iter;
@@ -735,8 +754,7 @@ namespace utils
       for (typename bucket_type::const_iterator biter = bucket.begin(); biter != biter_end; ++ biter) {
 	const key_type& key = extract_key()(*biter);
 	
-	if (pred()(key, extract_key()(Empty::operator()()))
-	    || pred()(key, extract_key()(Deleted::operator()()))) continue;
+	if (is_empty(key)) continue;
 	
 	size_type num_probes = 0;
 	size_type pos_buck = hash()(key) & (__bucket.size() - 1);
@@ -744,7 +762,7 @@ namespace utils
 	for (;;) {
 	  const key_type& key_buck = extract_key()(__bucket[pos_buck]);
 	  
-	  if (pred()(key_buck, extract_key()(Empty::operator()()))) break;
+	  if (pred()(key_buck, extract_key()(unassigned()()))) break;
 	  
 	  // linear probing
 	  //pos_buck = (pos_buck + 1) & (__bucket.size() - 1);
@@ -773,7 +791,7 @@ namespace utils
       if (pos.first != size_type(-1))
 	return std::make_pair(iterator(*this, __bucket.begin() + pos.first, false), false);
       else {
-	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(Deleted::operator()())))
+	if (pred()(extract_key()(__bucket[pos.second]), extract_key()(deleted()())))
 	  -- __size_deleted;
 	else
 	  ++ __size_element;
@@ -835,13 +853,24 @@ namespace utils
     {
       std::memcpy(&dest, &x, sizeof(value_type));
     }
-
+    
     void copy_value(value_type& dest, const value_type& x, boost::false_type)
     {
       utils::destroy_object(&dest);
       utils::construct_object(&dest, x);
     }
-      
+    
+    const unassigned_type& unassigned() const
+    {
+      static unassigned_type __unassigned;
+      return __unassigned;
+    }
+
+    const deleted_type& deleted() const
+    {
+      static deleted_type __deleted;
+      return __deleted;
+    }
     
   private:
     bucket_type __bucket;
@@ -853,10 +882,10 @@ namespace utils
 
 namespace std
 {
-  template <typename K, typename V, typename _E, typename _D, typename E, typename H, typename P, typename A>
+  template <typename K, typename V, typename U, typename D, typename E, typename H, typename P, typename A>
   inline
-  void swap(utils::compact_hashtable<K,V,_E,_D,E,H,P,A>& x,
-	    utils::compact_hashtable<K,V,_E,_D,E,H,P,A>& y)
+  void swap(utils::compact_hashtable<K,V,U,D,E,H,P,A>& x,
+	    utils::compact_hashtable<K,V,U,D,E,H,P,A>& y)
   {
     x.swap(y);
   }

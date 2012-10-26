@@ -71,6 +71,11 @@ namespace cicada
     typedef boost::shared_ptr<feature_function_type> feature_function_ptr_type;
 
   public:
+    struct state_unassigned
+    {
+      state_type operator()() const { return state_type(); }
+    };
+
     struct state_hash : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;

@@ -37,7 +37,7 @@ namespace cicada
       typedef double logprob_type;
       
       typedef utils::trie_compact<symbol_type, logprob_type,
-				  utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				  utils::unassigned<symbol_type>, 
 				  boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				  std::allocator<std::pair<const symbol_type, logprob_type> > > ngram_set_type;
 

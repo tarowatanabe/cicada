@@ -37,7 +37,6 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
-#include <utils/dense_hash_map.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 
@@ -81,19 +80,18 @@ struct ptr_equal
   }
 };
 
+struct rule_ptr_unassigned
+{
+  rule_ptr_type operator()() const { return rule_ptr_type(); }
+};
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type
-{
-public:
-  typedef utils::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >::type count_set_type;
-  
-public:
-  Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
-};
 
-typedef Grammar grammar_type;
+typedef utils::compact_map<rule_ptr_type, weight_type,
+			   rule_ptr_unassigned, rule_ptr_unassigned,
+			   ptr_hash<rule_type>, ptr_equal<rule_type>,
+			   std::allocator<std::pair<const rule_ptr_type, weight_type> > > grammar_type;
 
 typedef utils::compact_set<symbol_type,
 			   utils::unassigned<symbol_type>, utils::deleted<symbol_type>,

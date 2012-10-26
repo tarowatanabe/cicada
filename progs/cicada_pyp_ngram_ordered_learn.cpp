@@ -56,7 +56,6 @@
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/trie_compact.hpp"
-#include "utils/dense_hash_set.hpp"
 #include "utils/sampler.hpp"
 #include "utils/repository.hpp"
 #include "utils/packed_device.hpp"
@@ -103,7 +102,7 @@ struct PYPLM
   typedef Node node_type;
   
   typedef utils::trie_compact<word_type, node_type,
-			      utils::unassigned<word_type>, utils::deleted<word_type>,
+			      utils::unassigned<word_type>, 
 			      boost::hash<word_type>, std::equal_to<word_type>,
 			      std::allocator<std::pair<const word_type, node_type> > > trie_type;
   
