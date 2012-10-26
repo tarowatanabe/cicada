@@ -161,14 +161,12 @@ namespace utils
       }
       
       if (__pid >= 0) {
-	for (;;) {
-	  int status = 0;
-	  const int result = ::waitpid(__pid, &status, 0);
-	  
-	  if (result == -1 && errno == EINTR) continue;
-	  
-	  break;
-	}
+	int status = 0;
+	int ret = 0;
+	do {
+	  ret = ::waitpid(__pid, &status, 0);
+	} while ((ret == -1 && errno == EINTR) || (ret != -1 && !WIFEXITED(status)));
+	
 	__pid = -1;
       }
     }
