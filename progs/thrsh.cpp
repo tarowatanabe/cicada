@@ -17,10 +17,13 @@
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
 
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
+#include <utils/subprocess.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type> path_set_type;
@@ -33,6 +36,24 @@ int getoptions(int argc, char** argv);
 
 void run_command(const std::string& command)
 {
+  utils::subprocess run(command);
+
+  ::close(run.desc_write());
+  run.desc_write() = -1;
+
+  boost::iostreams::filtering_istream is;
+  is.push(boost::iostreams::file_descriptor_source(run.desc_read(), boost::iostreams::close_handle));
+
+  const size_t buffer_size = 4096;
+  char buffer[buffer_size];
+  
+  do {
+    is.read(buffer, buffer_size);
+    if (is.gcount() > 0)
+      std::cout.write(buffer, is.gcount());
+  } while (is);
+  
+#if 0
   static const size_t buffer_size = 1024;
   
   char buffer[buffer_size];
@@ -50,6 +71,7 @@ void run_command(const std::string& command)
       std::cout.write(buffer, size);
   }
   ::pclose(fp);
+#endif
 }
 
 struct Task

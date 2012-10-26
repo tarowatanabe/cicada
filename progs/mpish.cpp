@@ -26,7 +26,6 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/rwticket.hpp>
 #include <utils/subprocess.hpp>
-#include <utils/async_device.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type> path_set_type;
@@ -40,7 +39,8 @@ void run_command(const std::string& command)
 {
   utils::subprocess run(command);
 
-  run.desc_write();
+  ::close(run.desc_write());
+  run.desc_write() = -1;
 
   boost::iostreams::filtering_istream is;
   is.push(boost::iostreams::file_descriptor_source(run.desc_read(), boost::iostreams::close_handle));
