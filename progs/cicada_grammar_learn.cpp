@@ -215,13 +215,13 @@ public:
 typedef NGramCounts ngram_count_set_type;
 
 class WordCounts : public utils::compact_map<symbol_type, weight_type,
-					     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+					     utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 					     boost::hash<symbol_type>, std::equal_to<symbol_type>,
 					     std::allocator<std::pair<const symbol_type, weight_type> > >
 {
 public:
   typedef utils::compact_map<symbol_type, weight_type,
-			     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			     utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			     boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			     std::allocator<std::pair<const symbol_type, weight_type> > > count_set_type;
   
@@ -1234,7 +1234,7 @@ void grammar_merge(treebank_set_type& treebanks,
 		   Maximizer maximizer)
 {
   typedef utils::compact_set<symbol_type,
-			     utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			     utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			     boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			     std::allocator<symbol_type> > merged_set_type;
   typedef word_count_set_type scale_set_type;

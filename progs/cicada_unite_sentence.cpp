@@ -243,7 +243,7 @@ struct TranslationErrorRate : public TER, public M
   typedef std::vector<arc_unique_set_type, std::allocator<arc_unique_set_type> > lattice_unique_type;
 
   typedef utils::compact_set<word_type,
-			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
 			     boost::hash<word_type>, std::equal_to<word_type>,
 			     std::allocator<word_type> > word_set_type;  
 

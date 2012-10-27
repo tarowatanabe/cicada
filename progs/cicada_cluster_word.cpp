@@ -580,7 +580,7 @@ void initial_cluster(const word_class_count_set_type& words,
 struct WordCount
 {
   typedef utils::compact_map<word_type, count_type,
-			     utils::unassigned<word_type>, utils::deleted<word_type>,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
 			     boost::hash<word_type>, std::equal_to<word_type>,
 			     std::allocator<std::pair<const word_type, count_type> > > word_count_type;
   

@@ -68,7 +68,7 @@ namespace cicada
       typedef std::pair<word_type, word_type> word_pair_type;
       
       typedef utils::compact_set<word_type,
-				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 utils::unassigned<word_type>, utils::unassigned<word_type>,
 				 boost::hash<word_type>, std::equal_to<word_type>,
 				 std::allocator<word_type> > word_unique_type;
       
@@ -83,17 +83,8 @@ namespace cicada
 	}
       };
 
-      struct deleted_key : utils::deleted<word_type>
-      {
-	word_pair_type operator()() const 
-	{
-	  return word_pair_type(utils::deleted<word_type>::operator()(),
-				utils::deleted<word_type>::operator()());
-	}
-      };
-      
       typedef utils::compact_set<word_pair_type,
-				 unassigned_key, deleted_key,
+				 unassigned_key, unassigned_key,
 				 utils::hashmurmur<size_t>, std::equal_to<word_pair_type>,
 				 std::allocator<word_pair_type> > word_pair_unique_type;
 

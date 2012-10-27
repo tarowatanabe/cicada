@@ -34,12 +34,6 @@ namespace cicada
       Tp operator()() const { return Tp(-1); }
     };
 
-    template <typename Tp>
-    struct deleted_id
-    {
-      Tp operator()() const { return Tp(-2); }
-    };
-
     template <typename Hypergraph, typename Function, typename Filter>
     inline
     void kbest_derivations(std::ostream& os,
@@ -81,7 +75,7 @@ namespace cicada
       typedef typename Function::value_type weight_type;
       
       typedef utils::compact_map<id_type, id_type,
-				 unassigned_id<id_type>, deleted_id<id_type>,
+				 unassigned_id<id_type>, unassigned_id<id_type>,
 				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
 

@@ -131,21 +131,13 @@ namespace cicada
       }
     };
 
-    struct symbol_level_deleted : utils::deleted<symbol_type>
-    {
-      symbol_level_type operator()() const
-      {
-	return symbol_level_type(utils::deleted<symbol_type>::operator()(), -1);
-      }
-    };
-
     typedef utils::compact_map<symbol_level_type, hypergraph_type::id_type,
-			       symbol_level_unassigned, symbol_level_deleted,
+			       symbol_level_unassigned, symbol_level_unassigned,
 			       symbol_level_hash, std::equal_to<symbol_level_type>,
 			       std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
     
     typedef utils::compact_map<symbol_type, hypergraph_type::id_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
     
@@ -153,11 +145,11 @@ namespace cicada
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     
     typedef utils::compact_map<symbol_type, int,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, int> > > closure_level_type;
     typedef utils::compact_set<symbol_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<symbol_type> > closure_type;
     
@@ -190,18 +182,12 @@ namespace cicada
       Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
     };
 
-    template <typename Tp>
-    struct deleted_key : public utils::deleted<symbol_type>
-    {
-      Tp operator()() const { return Tp(-1, -1, utils::deleted<symbol_type>::operator()()); }
-    };
-    
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
-			       unassigned_key<internal_label_type>,  deleted_key<internal_label_type>,
+			       unassigned_key<internal_label_type>,  unassigned_key<internal_label_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key<terminal_label_type>,  deleted_key<terminal_label_type>,
+			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     

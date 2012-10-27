@@ -44,7 +44,7 @@ struct ttable_type
   struct count_map_type
   {
     typedef utils::compact_map<word_type, count_type,
-			       utils::unassigned<word_type>, utils::deleted<word_type>,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, count_type> > > counts_type;
 

@@ -75,18 +75,12 @@ namespace cicada
       Tp operator()() const { return Tp(-1); }
     };
 
-    template <typename Tp>
-    struct deleted_id
-    {
-      Tp operator()() const { return Tp(-2); }
-    };
-
     void Viterbi::operator()(data_type& data) const
     {
       typedef hypergraph_type::id_type id_type;
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
       typedef utils::compact_map<id_type, id_type,
-				 unassigned_id<id_type>, deleted_id<id_type>,
+				 unassigned_id<id_type>, unassigned_id<id_type>,
 				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
       typedef cicada::operation::edge_traversal::edge_set_type edge_set_type;

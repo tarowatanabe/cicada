@@ -94,12 +94,12 @@ typedef utils::compact_map<rule_ptr_type, weight_type,
 			   std::allocator<std::pair<const rule_ptr_type, weight_type> > > grammar_type;
 
 typedef utils::compact_set<symbol_type,
-			   utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			   utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			   boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			   std::allocator<symbol_type> > lexicon_type;
 
 typedef utils::compact_map<symbol_type, weight_type,
-			   utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			   utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			   boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			   std::allocator<std::pair<const symbol_type, weight_type> > > expected_counts_type;
 

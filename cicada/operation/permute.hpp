@@ -20,7 +20,7 @@ namespace cicada
     class Permute : public Operation
     {
       typedef utils::compact_set<symbol_type,
-				 utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				 utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				 std::allocator<symbol_type> > exclude_set_type;
       typedef exclude_set_type deterministic_set_type;

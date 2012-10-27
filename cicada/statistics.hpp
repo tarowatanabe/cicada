@@ -112,7 +112,7 @@ namespace cicada
     
   private:
     typedef utils::compact_map<attribute_type, stat_type,
-			       utils::unassigned<attribute_type>, utils::deleted<attribute_type>,
+			       utils::unassigned<attribute_type>, utils::unassigned<attribute_type>,
 			       boost::hash<attribute_type>, std::equal_to<attribute_type>,
 			       std::allocator<std::pair<const attribute_type, stat_type> > > stat_set_type;
     

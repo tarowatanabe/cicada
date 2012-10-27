@@ -73,7 +73,7 @@ namespace cicada
     typedef std::vector<double, std::allocator<double> > threshold_set_type;
 
     typedef utils::compact_map<symbol_type, score_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, score_type> > > label_score_set_type;
 

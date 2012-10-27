@@ -28,7 +28,7 @@ namespace cicada
       : straight(__straight), inverted(__inverted)
     {
       typedef utils::compact_set<symbol_type,
-				 utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+				 utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				 std::allocator<symbol_type> > non_terminal_set_type;
       
@@ -129,18 +129,8 @@ namespace cicada
       }
     };
 
-    struct deleted_key
-    {
-      const symbol_pair_type& operator()() const
-      {
-	utils::deleted<symbol_type> __deleted;
-	static symbol_pair_type __pair(__deleted(), __deleted());
-	return __pair;
-      }
-    };
-    
     typedef utils::compact_set<symbol_pair_type,
-			       unassigned_key, deleted_key,
+			       unassigned_key, unassigned_key,
 			       boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type>,
 			       std::allocator<symbol_pair_type> > symbol_pair_set_type;
     
@@ -242,7 +232,7 @@ namespace cicada
 
   private:
     typedef utils::compact_set<symbol_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<symbol_type> > symbol_set_type;
 
@@ -292,7 +282,7 @@ namespace cicada
 
   private:
     typedef utils::compact_set<symbol_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<symbol_type> > symbol_set_type;
     
@@ -360,7 +350,7 @@ namespace cicada
 
   private:
     typedef utils::compact_set<symbol_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<symbol_type> > symbol_set_type;
     

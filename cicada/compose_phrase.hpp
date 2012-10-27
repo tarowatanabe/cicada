@@ -121,17 +121,9 @@ namespace cicada
 	return span_node_type(-1, -1, -1, -1);
       }
     };
-  
-    struct span_node_deleted
-    {
-      span_node_type operator()() const
-      {
-	return span_node_type(-2, -2, -2, -2);
-      }
-    };
     
     typedef utils::compact_map<span_node_type, hypergraph_type::id_type,
-			       span_node_unassigned, span_node_deleted,
+			       span_node_unassigned, span_node_unassigned,
 			       utils::hashmurmur<size_t>, std::equal_to<span_node_type>,
 			       std::allocator<std::pair<const span_node_type, hypergraph_type::id_type> > > span_node_map_type;
 

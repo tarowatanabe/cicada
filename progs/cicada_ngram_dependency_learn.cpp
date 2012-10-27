@@ -100,7 +100,7 @@ struct DependencyModel
     };
 
     typedef utils::compact_map<word_type, parameter_type,
-			       utils::unassigned<word_type>, utils::deleted<word_type>,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, parameter_type> > > count_set_type;
 
@@ -113,7 +113,7 @@ struct DependencyModel
     };
     
     typedef utils::trie_compact<word_type, node_type,
-				utils::unassigned<word_type>, utils::deleted<word_type>,
+				utils::unassigned<word_type>,
 				boost::hash<word_type>, std::equal_to<word_type>,
 				std::allocator<std::pair<const word_type, node_type> > > count_trie_type;
 

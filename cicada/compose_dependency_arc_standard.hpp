@@ -88,13 +88,8 @@ namespace cicada
       id_type operator()() const { return id_type(-1); }
     };
 
-    struct deleted_key
-    {
-      id_type operator()() const { return id_type(-2); }
-    };
-    
     typedef utils::compact_map<id_type, hypergraph_type::id_type,
-			       unassigned_key, deleted_key, 
+			       unassigned_key, unassigned_key, 
 			       utils::hashmurmur<size_t>, std::equal_to<id_type>,
 			       std::allocator<std::pair<const id_type, hypergraph_type::id_type> > > node_map_type;
     

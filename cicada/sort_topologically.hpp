@@ -71,16 +71,11 @@ namespace cicada
       id_type operator()() const { return id_type(-1); }
     };
 
-    struct deleted_key
-    {
-      id_type operator()() const { return id_type(-2); }
-    };
-
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool validate=true)
     {
       typedef utils::compact_set<id_type,
-				 unassigned_key, deleted_key,
+				 unassigned_key, unassigned_key,
 				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				 std::allocator<id_type> > id_set_type;
       

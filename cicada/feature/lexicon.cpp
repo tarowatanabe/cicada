@@ -52,7 +52,7 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef utils::compact_set<word_type,
-				 utils::unassigned<word_type>, utils::deleted<word_type>,
+				 utils::unassigned<word_type>, utils::unassigned<word_type>,
 				 boost::hash<word_type>, std::equal_to<word_type>,
 				 std::allocator<word_type> > word_set_type;
       struct score_set_type

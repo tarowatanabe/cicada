@@ -39,28 +39,18 @@ namespace cicada
     
     typedef boost::fusion::tuple<tail_map_type::index_type, symbol_map_type::index_type, symbol_type> internal_type;
 
-    struct unassigned_key
+    struct unassigned_key : public utils::unassigned<symbol_type>
     {
-      const internal_type& operator()() const
+      typedef utils::unassigned<symbol_type> unassigned_type;
+
+      internal_type operator()() const
       {
-	utils::unassigned<symbol_type> __unassigned;
-	static internal_type __internal(-1, -1, __unassigned());
-	return __internal;
-      }
-    };
-    
-    struct deleted_key
-    {
-      const internal_type& operator()() const
-      {
-	utils::deleted<symbol_type> __deleted;
-	static internal_type __internal(-1, -1, __deleted());
-	return __internal;
+	return internal_type(-1, -1, unassigned_type::operator()());
       }
     };
     
     typedef utils::compact_map<internal_type, hypergraph_type::id_type,
-			       unassigned_key, deleted_key,
+			       unassigned_key, unassigned_key,
 			       utils::hashmurmur<size_t>, std::equal_to<internal_type>,
 			       std::allocator<std::pair<const internal_type, hypergraph_type::id_type> > > node_map_type;
 
