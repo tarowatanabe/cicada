@@ -518,6 +518,8 @@ namespace cicada
 	    ++ pos_feature;
 	  }
 	}
+	
+	rule_pair_set_type(options).swap(options);
       }
       
       return result.first->second;

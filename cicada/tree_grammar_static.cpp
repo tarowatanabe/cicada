@@ -97,7 +97,6 @@ namespace cicada
     
     typedef std::allocator<std::pair<id_type, mapped_type> > rule_alloc_type;
     
-    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > symbol_db_type;
     typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > rule_db_type;
     
     typedef succinctdb::succinct_trie_db<word_type::id_type, id_type, std::allocator<std::pair<word_type::id_type, id_type> > > edge_db_type;
@@ -283,14 +282,13 @@ namespace cicada
       cache_rule_type() : rule(), pos(size_type(-1)) {}
     };
     
-    typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 2, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
-    typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
-
+    typedef utils::array_power2<cache_rule_pair_set_type, 1024, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
+    typedef utils::array_power2<cache_rule_type,          1024, std::allocator<cache_rule_type> >          cache_rule_set_type;
+    
     TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
 	rule_db(x.rule_db),
-	symbol_db(x.symbol_db),
 	source_db(x.source_db),
 	target_db(x.target_db),
 	score_db(x.score_db),
@@ -311,7 +309,6 @@ namespace cicada
       
       edge_db       = x.edge_db;
       rule_db       = x.rule_db;
-      symbol_db     = x.symbol_db;
       source_db     = x.source_db;
       target_db     = x.target_db;
       score_db      = x.score_db;
@@ -333,7 +330,6 @@ namespace cicada
     {
       edge_db.clear();
       rule_db.clear();
-      symbol_db.clear();
       source_db.clear();
       target_db.clear();
       score_db.clear();
@@ -481,10 +477,12 @@ namespace cicada
 								     ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
 								     : feature_set_type::mapped_type(score)));
 	    }
-	     
+	    
 	    ++ pos_feature;
 	  }
 	}
+	
+	rule_pair_set_type(options).swap(options);
       }
       
       return result.first->second;
@@ -506,42 +504,11 @@ namespace cicada
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
+	rule_type rule;
+	codec.decode(db[pos].begin(), vocab, rule);
 	
-	if (symbol_db.empty()) {
-	  rule_type rule;
-	  //tree_rule_decode(db[pos].begin(), db[pos].end(), vocab, rule);
-	  codec.decode(db[pos].begin(), vocab, rule);
-	  
-	  cache.pos = pos;
-	  cache.rule = rule_type::create(rule);
-	} else {
-	  typedef utils::piece code_set_type;
-	
-	  code_buffer_type& buffer = const_cast<code_buffer_type&>(buffer_impl);
-	  buffer.clear();
-	
-	  code_set_type codes(db[pos].begin(), db[pos].end());
-	
-	  code_set_type::const_iterator hiter = codes.begin();
-	  code_set_type::const_iterator citer = codes.begin();
-	  code_set_type::const_iterator citer_end = codes.end();
-
-	  size_type code_pos = 0;
-	
-	  while (citer != citer_end) {
-	    id_type pos;
-	    const size_type offset = utils::group_aligned_decode(pos, &(*hiter), code_pos);
-	    citer = hiter + offset;
-	    hiter += offset & (- size_type((code_pos & 0x03) == 0x03));
-	    ++ code_pos;
-	  
-	    buffer.insert(buffer.end(), symbol_db[pos].begin(), symbol_db[pos].end());
-	    buffer.push_back(' ');
-	  }
-	  
-	  cache.pos = pos;
-	  cache.rule = rule_type::create(rule_type(utils::piece(buffer.begin(), buffer.end())));
-	}
+	cache.pos = pos;
+	cache.rule = rule_type::create(rule);
       }
       
       return cache.rule;
@@ -562,7 +529,7 @@ namespace cicada
     {
       edge_db.populate();
       rule_db.populate();
-      symbol_db.populate();
+      
       source_db.populate();
       target_db.populate();
 
@@ -591,7 +558,6 @@ namespace cicada
   private:
     edge_db_type          edge_db;
     rule_pair_db_type     rule_db;
-    symbol_db_type        symbol_db;
     rule_db_type          source_db;
     rule_db_type          target_db;
     score_db_type         score_db;
@@ -966,8 +932,7 @@ namespace cicada
     
     edge_db.write(rep.path("edge"));
     rule_db.write(rep.path("rule"));
-    if (! symbol_db.empty())
-      symbol_db.write(rep.path("symbol"));
+    
     source_db.write(rep.path("source"));
     target_db.write(rep.path("target"));
     
@@ -1026,9 +991,6 @@ namespace cicada
     
     edge_db.open(rep.path("edge"));
     rule_db.open(rep.path("rule"));
-    
-    if (boost::filesystem::exists(rep.path("symbol")))
-      symbol_db.open(rep.path("symbol"));
     
     source_db.open(rep.path("source"));
     target_db.open(rep.path("target"));
