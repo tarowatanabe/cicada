@@ -445,8 +445,10 @@ namespace cicada
     template <typename T1, typename A1>
     friend
     FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y);
-
-
+    
+    friend
+    size_t hash_value(FeatureVectorLinear const& x) { return utils::hashmurmur<size_t>()(x.__map.begin(), x.__map.end(), 0); }
+    
     friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
     friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }
     friend bool operator<(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map < y.__map; }

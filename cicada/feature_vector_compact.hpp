@@ -418,6 +418,7 @@ namespace cicada
     
   public:
     friend size_t hash_value(FeatureVectorCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
+    
     friend bool operator==(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl == y.impl; }
     friend bool operator!=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl != y.impl; }
     friend bool operator<(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl < y.impl; }

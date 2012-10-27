@@ -71,6 +71,8 @@ void process(const utils::piece& rule_str)
 
   std::cout << "internal size: " << rule.size_internal() << std::endl;
   std::cout << "frontier size: " << rule.size_frontier() << std::endl;
+  
+  std::cout << "hash value: " << hash_value(rule) << std::endl;
 
   msgpack_test(rule);
 }
