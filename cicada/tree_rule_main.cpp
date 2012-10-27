@@ -75,6 +75,11 @@ void process(const utils::piece& rule_str)
   std::cout << "hash value: " << hash_value(rule) << std::endl;
 
   msgpack_test(rule);
+
+  rule_type::rule_ptr_type rule_ptr = rule_type::create(rule);
+
+  if (*rule_ptr != rule)
+    std::cerr << "different tree rule?" << std::endl;
 }
 
 int main(int argc, char** argv)
