@@ -183,12 +183,7 @@ namespace cicada
     {
       symbol_level_type operator()() const { return symbol_level_type(symbol_type(), -1); }
     };
-    
-    struct symbol_level_deleted
-    {
-      symbol_level_type operator()() const { return symbol_level_type(symbol_type(), -2); }
-    };
-    
+        
     struct symbol_level_hash : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
@@ -200,7 +195,7 @@ namespace cicada
     };
     
     typedef typename utils::compact_map<symbol_level_type, hypergraph_type::id_type,
-					symbol_level_unassigned, symbol_level_deleted,
+					symbol_level_unassigned, symbol_level_unassigned,
 					symbol_level_hash, std::equal_to<symbol_level_type>,
 					std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
     

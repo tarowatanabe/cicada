@@ -145,18 +145,13 @@ namespace cicada
     {
       Tp operator()() const { return Tp(-1, -1, symbol_type::id_type(-1)); }
     };
-    template <typename Tp>
-    struct deleted_key
-    {
-      Tp operator()() const { return Tp(-1, -1, symbol_type::id_type(-2)); }
-    };
 
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
-			       unassigned_key<internal_label_type>, deleted_key<internal_label_type>,
+			       unassigned_key<internal_label_type>, unassigned_key<internal_label_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key<terminal_label_type>, deleted_key<terminal_label_type>,
+			       unassigned_key<terminal_label_type>, unassigned_key<terminal_label_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
@@ -182,7 +177,7 @@ namespace cicada
     typedef std::deque<state_type, std::allocator<state_type> > queue_type;
     
     typedef utils::compact_map<symbol_type, hypergraph_type::id_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;

@@ -31,6 +31,10 @@ int main(int argc, char** argv)
   typedef std::map<std::string, int>          map_map_type;
   typedef utils::compact_map<std::string, int, empty_key, deleted_key> vec_map_type;
 
+  utils::compact_map<std::string, int, empty_key, empty_key> tmptmp;
+  // this will cause compile error!
+  //tmptmp.erase("tmptmp");
+
   std::cerr << "size: " << sizeof(vec_map_type) << std::endl;
 
   map_map_type map_map;

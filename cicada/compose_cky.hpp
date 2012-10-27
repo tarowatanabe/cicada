@@ -122,26 +122,18 @@ namespace cicada
       }
     };
 
-    struct symbol_level_deleted : utils::deleted<symbol_type>
-    {
-      symbol_level_type operator()() const
-      {
-	return symbol_level_type(utils::deleted<symbol_type>::operator()(), -1);
-      }
-    };
-
     typedef utils::compact_map<symbol_level_type, hypergraph_type::id_type,
-			       symbol_level_unassigned, symbol_level_deleted,
+			       symbol_level_unassigned, symbol_level_unassigned,
 			       symbol_level_hash, std::equal_to<symbol_level_type>,
 			       std::allocator<std::pair<const symbol_level_type, hypergraph_type::id_type> > > node_map_type;
     
     
     typedef utils::compact_map<symbol_type, int,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, int> > > closure_level_type;
     typedef utils::compact_set<symbol_type,
-			       utils::unassigned<symbol_type>, utils::deleted<symbol_type>,
+			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<symbol_type> > closure_type;
     
