@@ -80,6 +80,7 @@ opt_parser = OptionParser(
     
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),
+    make_option("--plain",    default=None, action="store_true", help="plain output, meaning no-binary indexing"),
     
     ## kbest options
     make_option("--kbest", default=0, action="store", type="float",
@@ -534,6 +535,7 @@ class Index(UserString.UserString):
                  feats=None,
                  input="",
                  output="",
+                 plain=None,
                  name="",
                  root_joint="",
                  root_source="",
@@ -561,8 +563,7 @@ class Index(UserString.UserString):
         command = ""
 
         if kbest > 0:
-            
-            self.threads = 3
+            self.threads = 2
 
             command = cicada.cicada_filter_extract
             command += " --nbest %d" %(kbest)
@@ -577,11 +578,9 @@ class Index(UserString.UserString):
                 command += feats.options
             if lexicon:
                 command += lexicon.options
-            command += " | "
-            command += indexer.indexer
         else:
             
-            self.threads = 2
+            self.threads = 1
 
             command = indexer.filter
             command += " --dirichlet-prior %g" %(prior)
@@ -593,11 +592,12 @@ class Index(UserString.UserString):
             if lexicon:
                 command += lexicon.options
             command += " --input \"%s\"" %(input)
-            command += " | "
-            command += indexer.indexer
             
+        ### actual indexer...
+        command_indexer = indexer.indexer
+        
         if quantize:
-            command += " --quantize"
+            command_indexer += " --quantize"
 
         input_path='-'
         sep = ':'
@@ -619,9 +619,15 @@ class Index(UserString.UserString):
         sep = ','
         input_path +='debug=1'
 
-        command += " --input %s" %(input_path)
-        command += " --output \"%s\"" %(output)
+        command_indexer += " --input %s" %(input_path)
+        command_indexer += " --output \"%s\"" %(output)
 
+        if plain:
+            command += " --output \"%s\"" %(output)
+        else:
+            self.threads += 1
+            command += " | " + command_indexer
+            
         UserString.UserString.__init__(self, '('+command+')')
         
 class Score:
@@ -632,7 +638,7 @@ class Score:
 
 
 class Scores(UserList.UserList):
-    def __init__(self, indexer=None):
+    def __init__(self, indexer=None, plain=None):
 
         UserList.UserList.__init__(self)
 
@@ -674,8 +680,11 @@ class Scores(UserList.UserList):
                 raise ValueError, "no path to scores: %s" %(path)
 
             root,stem = os.path.splitext(name)
-
-            self.append(Score(path, os.path.join(output, root + '.bin'), root))
+            
+            if plain:
+                self.append(Score(path, os.path.join(output, root + '.gz'), root))
+            else:
+                self.append(Score(path, os.path.join(output, root + '.bin'), root))
             
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -742,7 +751,7 @@ if __name__ == '__main__':
     else:
         raise ValueError, "no indexer?"
 
-    scores = Scores(indexer)
+    scores = Scores(indexer,plain=options.plain)
     features = Features(root=options.feature_root,
                         types=options.feature_type,
                         singleton=options.feature_singleton,
@@ -772,6 +781,7 @@ if __name__ == '__main__':
                           feats=features,
                           input=score.input,
                           output=score.output,
+                          plain=options.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
@@ -802,6 +812,7 @@ if __name__ == '__main__':
                           feats=features,
                           input=score.input,
                           output=score.output,
+                          plain=options.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
@@ -828,6 +839,7 @@ if __name__ == '__main__':
                           feats=features,
                           input=score.input,
                           output=score.output,
+                          plain=options.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
