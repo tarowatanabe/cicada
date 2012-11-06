@@ -101,6 +101,7 @@ bool learn_sgd    = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
+double temperature = 0.0;
 double eps = std::numeric_limits<double>::infinity();
 double scale = 1.0;
 double eta0 = 0.2;
@@ -1283,7 +1284,8 @@ void options(int argc, char** argv)
     ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C",             po::value<double>(&C)->default_value(C),      "regularization constant")
+    ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
+    ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("eps",           po::value<double>(&eps),                      "tolerance for liblinear")
     ("scale",         po::value<double>(&scale),                    "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")

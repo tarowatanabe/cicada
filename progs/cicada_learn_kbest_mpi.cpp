@@ -3637,7 +3637,7 @@ struct OptimizeXBLEU
 	  std::transform(matched.begin(), matched.end(), counts_matched.begin(), counts_matched.begin(), std::plus<weight_type>());
 	  
 	  reference += Z_reference;
-	  entropy += Z_entropy;
+	  entropy   += Z_entropy;
 	  
 	  expectation_type::const_iterator eiter_end = expectation.end();
 	  for (expectation_type::const_iterator eiter = expectation.begin(); eiter != eiter_end; ++ eiter) {
@@ -3651,7 +3651,8 @@ struct OptimizeXBLEU
 	    gradient_reference[eiter->first] -= eiter->second * Z_reference;
 	    
 	    // entropy gradient...
-	    gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+	    //gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+	    gradient_entropy[eiter->first] -= - dR * eiter->second;
 	  }
 	  
 	  // third pass, collect gradients...

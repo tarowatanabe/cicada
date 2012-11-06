@@ -167,7 +167,7 @@ struct LearnXBLEU : public LearnBase
   }
   
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-  typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
+  typedef std::vector<gradient_type, std::allocator<gradient_type> >       gradients_type;
 
   typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
@@ -199,13 +199,17 @@ struct LearnXBLEU : public LearnBase
     
     std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
     std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
+    
     counts_reference = weight_type();
+    counts_entropy   = weight_type();
     
     for (int n = 1; n <= order; ++ n) {
       gradients_matched[n].clear();
       gradients_hypo[n].clear();
     }
+    
     gradients_reference.clear();
+    gradients_entropy.clear();
   }
   
   template <typename Iterator>
@@ -239,11 +243,14 @@ struct LearnXBLEU : public LearnBase
     // we will collect gradients from kbests
     weight_type Z;
     weight_type Z_reference;
+    weight_type Z_entropy;
+    weight_type dR;
 
     margins.clear();
     hypo.clear();
     matched.clear();
-
+    expectation.clear();
+    
     hypo.resize(order + 1);
     matched.resize(order + 1);
     
@@ -274,12 +281,40 @@ struct LearnXBLEU : public LearnBase
       
       // collect reference length
       Z_reference += prob * bleu->length_reference;
+      
+      // collect entropy...
+      Z_entropy -= prob * cicada::semiring::log(prob);
+      
+      // collect expectation
+      sample_set_type::value_type::const_iterator fiter_end = features[k].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[k].begin(); fiter != fiter_end; ++ fiter)
+	expectation[fiter->first] += prob * weight_type(fiter->second * scale);
+      
+      dR += weight_type(1.0 + cicada::semiring::log(prob)) * prob;
     }
     
     // accumulate
     std::transform(hypo.begin(), hypo.end(), counts_hypo.begin(), counts_hypo.begin(), std::plus<weight_type>());
     std::transform(matched.begin(), matched.end(), counts_matched.begin(), counts_matched.begin(), std::plus<weight_type>());
+    
     counts_reference += Z_reference;
+    counts_entropy   += Z_entropy;
+    
+    gradient_type::const_iterator eiter_end = expectation.end();
+    for (gradient_type::const_iterator eiter = expectation.begin(); eiter != eiter_end; ++ eiter) {
+      // collect bleus...
+      for (int n = 1; n <= order; ++ n) {
+	gradients_hypo[n][eiter->first] -= eiter->second * hypo[n];
+	gradients_matched[n][eiter->first] -= eiter->second * matched[n];
+      }
+      
+      // reference lengths
+      gradients_reference[eiter->first] -= eiter->second * Z_reference;
+      
+      // entropy gradient...
+      //gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+      gradients_entropy[eiter->first] -= - dR * eiter->second;
+    }
     
     // third pass, collect gradients...
     for (size_type k = 0; k != features.size(); ++ k) {
@@ -302,12 +337,16 @@ struct LearnXBLEU : public LearnBase
 	  if (n - 1 < bleu->ngrams_hypothesis.size())
 	    grad_matched += value * prob * bleu->ngrams_hypothesis[n - 1];
 	  
-	  grad_hypo    -= value * prob * hypo[n];
-	  grad_matched -= value * prob * matched[n];
+	  //grad_hypo    -= value * prob * hypo[n];
+	  //grad_matched -= value * prob * matched[n];
 	}
 	
 	// reference lengths
-	gradients_reference[fiter->first] += value * prob * (bleu->length_reference - Z_reference);
+	//gradients_reference[fiter->first] += value * prob * (bleu->length_reference - Z_reference);
+	gradients_reference[fiter->first] += value * prob * bleu->length_reference;
+	
+	// entropy: we will collect minus values!
+	gradients_entropy[fiter->first] += - weight_type(1.0 + cicada::semiring::log(prob)) * prob * value;
       }
     }
   }
@@ -341,10 +380,16 @@ struct LearnXBLEU : public LearnBase
     const double C_dC  = C * derivative_brevity_penalty(1.0 - C);
     
     // xBLEU...
-    const double objective = exp_P * B;
+    const double objective_bleu = exp_P * B;
+    const double factor_instance = 1.0 / features.size();
+    const double entropy = counts_entropy * factor_instance;
+    
+    // entropy...
+    gradient_type::const_iterator eiter_end = gradients_entropy.end();
+    for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
+      g[eiter->first] = - temperature * factor_instance * eiter->second;
     
     // we will collect minus gradient for minimizing negative-xBLEU
-    
     for (int n = 1; n <= order; ++ n) 
       if (counts_hypo[n] > weight_type()) {
 	const double factor_matched = - (exp_P * B / order) / counts_matched[n];
@@ -372,7 +417,7 @@ struct LearnXBLEU : public LearnBase
 	g[hiter->first] += factor_hypo * hiter->second;
     }
     
-    return objective;
+    return - objective_bleu - temperature * entropy;
   }
   
   sample_map_type    features;
@@ -382,15 +427,18 @@ struct LearnXBLEU : public LearnBase
   weights_type counts_matched;
   weights_type counts_hypo;
   weight_type  counts_reference;
+  weight_type  counts_entropy;
   
   gradients_type gradients_matched;
   gradients_type gradients_hypo;
   gradient_type  gradients_reference;
+  gradient_type  gradients_entropy;
   
   // local variables
-  margins_type margins;
-  weights_type matched;
-  weights_type hypo;
+  margins_type  margins;
+  weights_type  matched;
+  weights_type  hypo;
+  gradient_type expectation;
 };
 
 struct LearnXBLEUL2 : public LearnXBLEU

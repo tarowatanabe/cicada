@@ -1912,9 +1912,10 @@ struct OptimizeXBLEU
 	  gradient_reference[eiter->first] -= eiter->second * Z_reference;
 	    
 	  // entropy gradient...
-	  gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+	  //gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
+	  gradient_entropy[eiter->first] -= - dR * eiter->second;
 	}
-	  
+	
 	// third pass, collect gradients...
 	for (size_type k = 0; k != kbests[id].size(); ++ k) {
 	  const hypothesis_type& kbest = kbests[id][k];

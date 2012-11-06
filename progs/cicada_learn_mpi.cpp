@@ -1215,15 +1215,13 @@ struct OptimizeXBLEU
 	
 	// here, we will implement forest xBLEU...
 	
-	
 	// first, collect expected ngrams
 	index.clear();
 	counts.clear();
 	ngrams.clear();
 	ids.clear();
-	
 	ids.resize(forest.edges.size());
-		
+	
 	cicada::expected_ngram(forest,
 			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
 			       CollectCounts(index, ngrams, counts, ids),
@@ -1257,8 +1255,6 @@ struct OptimizeXBLEU
 	  for (int n = 1; n <= order; ++ n)
 	    std::cerr << "order: " << n << " matched: " << matched[n] << " hypo: " << hypo[n] << std::endl;
 	
-	
-	
 	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
 	bleu_inside.clear();
 	bleu_inside.resize(forest.nodes.size(), bleu_weight_type());
@@ -1286,7 +1282,6 @@ struct OptimizeXBLEU
 	  for (bleu_gradient_type::accumulated_type::const_iterator hiter = dH[n].begin(); hiter != hiter_end; ++ hiter)
 	    gradients_hypo[n][hiter->first] += hiter->second / Z;
 	}
-
 	
 	// forth, compute entorpy...
 	entropy_inside.clear();
