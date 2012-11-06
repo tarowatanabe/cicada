@@ -28,9 +28,9 @@ namespace utils
     
   public:
     explicit subprocess(const std::string& sh_command)
-      : __pid(-1), __pread(-1), __pwrite(-1) { open(sh_command); }
+      : __pid(-1), __pgid(0), __pread(-1), __pwrite(-1) { open(sh_command); }
     explicit subprocess(const boost::filesystem::path& command)
-      : __pid(-1), __pread(-1), __pwrite(-1) { open(command); }
+      : __pid(-1), __pgid(0), __pread(-1), __pwrite(-1) { open(command); }
     ~subprocess() { close(); }
   private:
     subprocess(const subprocess& x) {}
@@ -83,6 +83,11 @@ namespace utils
 	::dup2(pout[1], STDOUT_FILENO);
 	::close(pout[1]);
 	
+	__pid = ::getpid();
+	if (__pgid == 0)
+	  __pgid = __pid;
+	::setpgid(__pid, __pgid);
+	
 	::execlp("sh", "sh", "-c", sh_command.c_str(), (char*) 0);
 	
 	::_exit(errno);  // not exit(errno)!
@@ -92,6 +97,9 @@ namespace utils
 	::close(pout[1]);
 	
 	__pid = pid;
+	if (__pgid == 0)
+	  __pgid = __pid;
+	::setpgid(__pid, __pgid);
 	__pread = pout[0];
 	__pwrite = pin[1];
       }
@@ -131,6 +139,11 @@ namespace utils
 	::dup2(pout[1], STDOUT_FILENO);
 	::close(pout[1]);
 	
+	__pid = ::getpid();
+	if (__pgid == 0)
+	  __pgid = __pid;
+	::setpgid(__pid, __pgid);
+
 #if BOOST_FILESYSTEM_VERSION == 2
 	::execlp(command.file_string().c_str(), command.file_string().c_str(), (char*) 0);
 #else
@@ -144,6 +157,9 @@ namespace utils
 	::close(pout[1]);
 	
 	__pid = pid;
+	if (__pgid == 0)
+	  __pgid = __pid;
+	::setpgid(__pid, __pgid);
 	__pread = pout[0];
 	__pwrite = pin[1];
       }
@@ -183,6 +199,7 @@ namespace utils
     
   public:
     pid_t __pid;
+    pid_t __pgid;
     int   __pread;
     int   __pwrite;
   };
