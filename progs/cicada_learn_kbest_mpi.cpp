@@ -3651,7 +3651,6 @@ struct OptimizeXBLEU
 	    gradient_reference[eiter->first] -= eiter->second * Z_reference;
 	    
 	    // entropy gradient...
-	    //gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
 	    gradient_entropy[eiter->first] -= - dR * eiter->second;
 	  }
 	  

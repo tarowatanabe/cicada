@@ -312,7 +312,6 @@ struct LearnXBLEU : public LearnBase
       gradients_reference[eiter->first] -= eiter->second * Z_reference;
       
       // entropy gradient...
-      //gradient_entropy[eiter->first] -= - dR * expectation[eiter->first];
       gradients_entropy[eiter->first] -= - dR * eiter->second;
     }
     
@@ -336,13 +335,9 @@ struct LearnXBLEU : public LearnBase
 	  
 	  if (n - 1 < bleu->ngrams_hypothesis.size())
 	    grad_matched += value * prob * bleu->ngrams_hypothesis[n - 1];
-	  
-	  //grad_hypo    -= value * prob * hypo[n];
-	  //grad_matched -= value * prob * matched[n];
 	}
 	
 	// reference lengths
-	//gradients_reference[fiter->first] += value * prob * (bleu->length_reference - Z_reference);
 	gradients_reference[fiter->first] += value * prob * bleu->length_reference;
 	
 	// entropy: we will collect minus values!
