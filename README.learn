@@ -16,7 +16,7 @@ LEARN_ONLINE: cicada_learn_online{,_mpi}
 
 We can easily tune weights by using tree scripts:
 
-cicada-maxent.sh
+cicada-maxent.py
    Learn parameters which is "local" to supplied grammar.
    We need to specify:
       development data
@@ -25,7 +25,7 @@ cicada-maxent.sh
       composition algorithm   (default to compose-cky)
       hyperparameter constant (default to 1e-3)
 
-cicada-mert.sh
+cicada-mert.py
    MERT script. We need to specify
       development data
       corresponding reference translations
@@ -34,7 +34,7 @@ cicada-mert.sh
    ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
    (kbest will be always zero, since we will run hypergraph-MERT)
 
-cicada-learn.sh
+cicada-learn.py
    Learning script. We need to specify
       development data
       corresponding reference translations
@@ -45,8 +45,8 @@ cicada-learn.sh
    When run in hypergraph-learning mode, kbest will be always set to zero.
    For learn-linear trainig we can run only in kbest mode, which will be set to 1000 by default.
 
-cicada-mert-moses.sh
+cicada-mert-moses.py
    MERT for moses!
 
-cicada-learn-moses.sh
+cicada-learn-moses.py
    Learning for moses!

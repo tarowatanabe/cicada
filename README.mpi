@@ -6,6 +6,16 @@ REMARK: it is recommended not to use memory managers in open-mpi, which may conf
 	can edit "openmpi-mca-params.conf" and add(or disable) mca by, "memory = ^ptmalloc2"
 	For details, consult open-mpi documentation.
 
+Wrapper scripts:
+
+cicada-sh.py:
+	Runs multiple command on multiple hosts, by one-line-per-one-command from stdin
+	We use mpish/thrsh (see below) and pbs
+
+cicada-pipe.py:
+	Runs a single command on multiple hosts, stdin is automatically distributed, and merged into stdout
+	We use mpipe/thrpe and pbs
+
 Some utilities:
 
 mpish [list of files or use stdin]
