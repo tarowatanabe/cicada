@@ -84,6 +84,7 @@ std::string non_terminal = "[x]";
 
 bool mst_mode = false;
 bool conll_mode = false;
+bool dep_pos_mode = false;
 bool cabocha_mode = false;
 bool khayashi_mode = false;
 bool khayashi_forest_mode = false;
@@ -177,6 +178,7 @@ void normalize(Iterator first, Iterator last)
 
 struct MST;
 struct CoNLL;
+struct DepPos;
 struct Cabocha;
 struct KHayashi;
 struct KHayashiForest;
@@ -186,16 +188,18 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
-    if (int(mst_mode) + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
+    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
       throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest mode");
 
-    if (int(mst_mode) + conll_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
-      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest mode");
+    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
+      throw std::runtime_error("one of mst/conll/dep-pos/khayashi/khayashi-forest mode");
     
     if (mst_mode)
       apply<MST>(input_file, map_file, output_file);
     else if (conll_mode)
       apply<CoNLL>(input_file, map_file, output_file);
+    else if (dep_pos_mode)
+      apply<DepPos>(input_file, map_file, output_file);    
     else if (cabocha_mode)
       apply<Cabocha>(input_file, map_file, output_file);
     else if (khayashi_mode)
@@ -773,6 +777,149 @@ struct CoNLL
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
 	    os << ' ' << citer->head;
 	}
+	os << '\n';
+	if (flush_output)
+	  os << std::flush;
+      }
+    }
+  }
+};
+
+struct dep_pos_type
+{
+  typedef int index_type;
+  
+  index_type   id;
+  std::string  word;
+  std::string  tag;
+  index_type   dep;
+
+  dep_pos_type() {}
+  dep_pos_type(const index_type& __id,
+	       const std::string& __word,
+	       const std::string& __tag,
+	       const index_type& __dep)
+    : id(__id), word(__word), tag(__tag), dep(__dep) {}
+};
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  dep_pos_type,
+			  (dep_pos_type::index_type, id)
+			  (std::string, word)
+			  (std::string, tag)
+			  (dep_pos_type::index_type, dep)
+			  )
+struct DepPos
+{
+  typedef std::vector<dep_pos_type, std::allocator<dep_pos_type> > dep_pos_set_type;
+
+  template <typename Iterator>
+  struct dep_pos_parser : boost::spirit::qi::grammar<Iterator, dep_pos_set_type(), boost::spirit::standard::blank_type>
+  {
+    dep_pos_parser() : dep_pos_parser::base_type(dep_poss)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      token %= qi::lexeme[+(standard::char_ - standard::space)];
+      
+      dep_pos  %= qi::int_ >> token >> token >> qi::int_ >> qi::eol;
+      dep_poss %= *dep_pos >> qi::eol;
+    }
+    
+    typedef boost::spirit::standard::blank_type blank_type;
+    
+    boost::spirit::qi::rule<Iterator, std::string(), blank_type>      token;
+    boost::spirit::qi::rule<Iterator, dep_pos_type(), blank_type>     dep_pos;
+    boost::spirit::qi::rule<Iterator, dep_pos_set_type(), blank_type> dep_poss;
+  };
+
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
+  {
+    typedef boost::spirit::istream_iterator iiter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+    
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
+    
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    std::ostream_iterator<char> oiter(os);
+    
+    MapFile mapper(map);
+
+    dep_pos_parser<iiter_type> parser;
+    dep_pos_set_type dep_pos;
+    
+    Transform transform(goal, head_mode);
+
+    while (iter != iter_end) {
+      dep_pos.clear();
+	
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, dep_pos))
+	throw std::runtime_error("parsing failed");
+      
+      if (mapper) {
+	const sentence_type& mapped = mapper();
+
+	if (mapped.size() != dep_pos.size())
+	  throw std::runtime_error("dep_pos size and mapped size differ");
+	
+	for (size_t i = 0; i != mapped.size(); ++ i)
+	  dep_pos[i].word = mapped[i];
+      }
+
+      if (normalize_mode || unescape_mode) {
+	dep_pos_set_type::iterator citer_end = dep_pos.end();
+	for (dep_pos_set_type::iterator citer = dep_pos.begin(); citer != citer_end; ++ citer) {
+
+	  if (unescape_mode)
+	    citer->word = unescape(citer->word);
+	  
+	  if (normalize_mode)
+	    citer->tag = normalize(citer->tag);
+	}
+      }
+      
+      if (forest_mode) {
+	transform.clear();
+	
+	dep_pos_set_type::const_iterator citer_end = dep_pos.end();
+	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer) {
+	  transform.sentence.push_back(citer->word);
+	  
+	  transform.pos.push_back('[' + citer->tag + ']');
+	  
+	  // +1....
+	  transform.dependency.push_back(citer->dep + 1);
+	}
+	
+	transform();
+	
+	os << transform.hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	dep_pos_set_type::const_iterator citer_end = dep_pos.end();
+	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  os << citer->word << ' ';
+	os << "||| ";
+	
+	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  os << citer->tag << ' ';
+	os << "|||";
+	
+	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  os << ' ' << (citer->dep + 1);
 	os << '\n';
 	if (flush_output)
 	  os << std::flush;
@@ -1469,6 +1616,7 @@ void options(int argc, char** argv)
     
     ("mst",             po::bool_switch(&mst_mode),             "tranform MST dependency")
     ("conll",           po::bool_switch(&conll_mode),           "tranform CoNLL dependency")
+    ("dep-pos",         po::bool_switch(&dep_pos_mode),         "tranform dep-pos dependency")
     ("cabocha",         po::bool_switch(&cabocha_mode),         "tranform Cabocha dependency")
     ("khayashi",        po::bool_switch(&khayashi_mode),        "tranform KHayashi dependency")
     ("khayashi-forest", po::bool_switch(&khayashi_forest_mode), "tranform KHayashi Forest dependency")
