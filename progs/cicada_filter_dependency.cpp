@@ -98,6 +98,7 @@ bool unescape_mode = false;
 bool normalize_mode = false;
 bool forest_mode = false;
 bool head_mode = false;
+bool leaf_mode = false;
 
 void options(int argc, char** argv);
 
@@ -192,8 +193,9 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
+    //default to cicada-native-mode
     if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode == 0)
-      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest/cicada mode");
+      cicada_mode = true;
 
     if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
       throw std::runtime_error("one of mst/conll/dep-pos/khayashi/khayashi-forest/cicada mode");
@@ -555,22 +557,25 @@ struct MST
 	if (flush_output)
 	  os << std::flush;
       } else {
-	if (relation_mode) {
+	if (leaf_mode) {
+	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), mst.words))
+	    throw std::runtime_error("generation failed");
+	} else if (relation_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
 					<< " ||| " << -(karma::int_ % ' ')
 					<< '\n'),
 				mst.words, mst.labels, mst.positions))
 	    throw std::runtime_error("generation failed");
-	  else
-	    if (! karma::generate(oiter, (-(standard::string % ' ')
-					  << " ||| " << -(standard::string % ' ')
-					  << " ||| " << -(karma::int_ % ' ')
-					  << '\n'),
-				  mst.words, mst.poss, mst.positions))
-	      throw std::runtime_error("generation failed");
+	} else {
+	  if (! karma::generate(oiter, (-(standard::string % ' ')
+					<< " ||| " << -(standard::string % ' ')
+					<< " ||| " << -(karma::int_ % ' ')
+					<< '\n'),
+				mst.words, mst.poss, mst.positions))
+	    throw std::runtime_error("generation failed");
 	}
-
+	
 	if (flush_output)
 	  os << std::flush;
       }
@@ -753,37 +758,47 @@ struct CoNLL
 	if (flush_output)
 	  os << std::flush;
       } else {
-	conll_set_type::const_iterator citer_end = conll.end();
-	for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	  os << citer->form << ' ';
-	os << "||| ";
-	  
-	if (relation_mode) {
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << citer->deprel << ' ';
-	} else {
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << citer->cpostag << ' ';
-	}
-	os << "|||";
-	  
-	if (projective_mode) {
-	  conll_set_type::const_iterator citer_end = conll.end();
-	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
-	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
-	    if (head == conll_type::size_type(-1))
-	      throw std::runtime_error("invalid projective head");
-	      
-	    os << ' ' << head;
+	if (leaf_mode) {
+	  if (! conll.empty()) {
+	    conll_set_type::const_iterator citer_end = conll.end() - 1;
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << citer->form << ' ';
+	    os << conll.back().form;
 	  }
+	  os << '\n';
 	} else {
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	    os << ' ' << citer->head;
+	    os << citer->form << ' ';
+	  os << "||| ";
+	  
+	  if (relation_mode) {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << citer->deprel << ' ';
+	  } else {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << citer->cpostag << ' ';
+	  }
+	  os << "|||";
+	  
+	  if (projective_mode) {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
+	      const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	      if (head == conll_type::size_type(-1))
+		throw std::runtime_error("invalid projective head");
+	      
+	      os << ' ' << head;
+	    }
+	  } else {
+	    conll_set_type::const_iterator citer_end = conll.end();
+	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
+	      os << ' ' << citer->head;
+	  }
+	  os << '\n';
 	}
-	os << '\n';
 	if (flush_output)
 	  os << std::flush;
       }
@@ -915,18 +930,28 @@ struct DepPos
 	if (flush_output)
 	  os << std::flush;
       } else {
-	dep_pos_set_type::const_iterator citer_end = dep_pos.end();
-	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
-	  os << citer->word << ' ';
-	os << "||| ";
-	
-	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
-	  os << citer->tag << ' ';
-	os << "|||";
-	
-	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
-	  os << ' ' << (citer->dep + 1);
-	os << '\n';
+	if (leaf_mode) {
+	  if (! dep_pos.empty()) {
+	    dep_pos_set_type::const_iterator citer_end = dep_pos.end() - 1;
+	    for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	      os << citer->word << ' ';
+	    os << dep_pos.back().word;
+	  }
+	  os << '\n';
+	} else {
+	  dep_pos_set_type::const_iterator citer_end = dep_pos.end();
+	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	    os << citer->word << ' ';
+	  os << "||| ";
+	  
+	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	    os << citer->tag << ' ';
+	  os << "|||";
+	  
+	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	    os << ' ' << (citer->dep + 1);
+	  os << '\n';
+	}
 	if (flush_output)
 	  os << std::flush;
       }
@@ -1060,17 +1085,27 @@ struct Cabocha
 	  if (flush_output)
 	    os << std::flush;
 	} else {
-	  terminal_set_type::const_iterator titer_end = terminals.end();
-	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	    os << titer->first << ' ';
-	  os << "||| ";
-	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
-	    os << titer->second << ' ';
-	  os << "||| ";
+	  if (leaf_mode) {
+	    if (! terminals.empty()) {
+	      terminal_set_type::const_iterator titer_end = terminals.end() - 1;
+	      for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+		os << titer->first << ' ';
+	      os << terminals.back().first;
+	    }
+	    os << '\n';
+	  } else {
+	    terminal_set_type::const_iterator titer_end = terminals.end();
+	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	      os << titer->first << ' ';
+	    os << "||| ";
+	    for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
+	      os << titer->second << ' ';
+	    os << "||| ";
 	    
-	  if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
-	    throw std::runtime_error("generation failed");
-	    
+	    if (! karma::generate(std::ostream_iterator<char>(os), -(karma::int_ % ' ') << '\n', dependency))
+	      throw std::runtime_error("generation failed");
+	  }
+	  
 	  if (flush_output)
 	    os << std::flush;
 	}
@@ -1241,12 +1276,18 @@ struct KHayashi
 	if (flush_output)
 	  os << std::flush;
       } else {
-	if (! karma::generate(oiter, (-(standard::string % ' ')
-				      << " ||| " << -(standard::string % ' ')
-				      << " ||| " << -(karma::int_ % ' ')
-				      << '\n'),
-			      khayashi.words, khayashi.poss, khayashi.positions))
-	  throw std::runtime_error("generation failed");
+	
+	if (leaf_mode) {
+	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), khayashi.words))
+	    throw std::runtime_error("generation failed");
+	} else {
+	  if (! karma::generate(oiter, (-(standard::string % ' ')
+					<< " ||| " << -(standard::string % ' ')
+					<< " ||| " << -(karma::int_ % ' ')
+					<< '\n'),
+				khayashi.words, khayashi.poss, khayashi.positions))
+	    throw std::runtime_error("generation failed");
+	}
 	  
 	if (flush_output)
 	  os << std::flush;
@@ -1744,12 +1785,18 @@ struct Cicada
 	if (flush_output)
 	  os << std::flush;
       } else {
-	if (! karma::generate(oiter, (-(standard::string % ' ')
-				      << " ||| " << -(standard::string % ' ')
-				      << " ||| " << -(karma::int_ % ' ')
-				      << '\n'),
-			      cicada.tok, cicada.pos, cicada.dep))
-	  throw std::runtime_error("generation failed");
+	
+	if (leaf_mode) {
+	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), cicada.tok))
+	    throw std::runtime_error("generation failed");
+	} else {
+	  if (! karma::generate(oiter, (-(standard::string % ' ')
+					<< " ||| " << -(standard::string % ' ')
+					<< " ||| " << -(karma::int_ % ' ')
+					<< '\n'),
+				cicada.tok, cicada.pos, cicada.dep))
+	    throw std::runtime_error("generation failed");
+	}
 	  
 	if (flush_output)
 	  os << std::flush;
@@ -1787,6 +1834,7 @@ void options(int argc, char** argv)
     ("normalize",  po::bool_switch(&normalize_mode),  "normalize category, such as [,] [.] etc.")
     ("forest",     po::bool_switch(&forest_mode),     "output as a forest")
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
+    ("leaf",       po::bool_switch(&leaf_mode),       "output leafs (temrinals)")
             
     ("help", "help message");
   
