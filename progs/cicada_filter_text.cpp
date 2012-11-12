@@ -174,7 +174,9 @@ int main(int argc, char** argv)
 	  sentence.clear();
 	  
 	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
-	    std::cerr << "sentence prev: " << sentence_prev << std::endl;
+	    std::cerr << "sentence prev: ";
+	    std::copy(sentence_prev.begin(), sentence_prev.end(), std::ostream_iterator<std::string>(std::cerr, " "));
+	    std::cerr << std::endl;
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	  }
 	  
