@@ -16,8 +16,12 @@ LIBLINEAR = $(top_builddir)/liblinear/liblinear.la
 LIBLBFGS  = $(top_builddir)/liblbfgs/liblbfgs.la
 
 noinst_PROGRAMS = \
+cicada_extract_score_main \
 cicada_kbest_main \
 cicada_text_main
+
+cicada_extract_score_main_SOURCES = cicada_extract_score_main.cpp cicada_extract_score_impl.hpp
+cicada_extract_score_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_kbest_main_SOURCES = cicada_kbest_main.cpp cicada_kbest_impl.hpp
 cicada_kbest_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
