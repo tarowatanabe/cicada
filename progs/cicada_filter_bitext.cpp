@@ -48,7 +48,7 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    word %= qi::lexeme[standard::string("|||") >> +(standard::char_ - standard::space)] | (qi::hold[+(standard::char_ - standard::space) - "|||")];
+    word %= qi::lexeme[qi::hold[standard::string("|||") >> +(standard::char_ - standard::space)] | (+(standard::char_ - standard::space) - "|||")];
     tokens  %= *word >> (qi::eoi | qi::eol);
   }
   
