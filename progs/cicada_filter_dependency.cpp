@@ -890,8 +890,12 @@ struct DepPos
     while (iter != iter_end) {
       dep_pos.clear();
 	
-      if (! qi::parse(iter, iter_end, parser, dep_pos))
-	throw std::runtime_error("parsing failed");
+      if (! qi::parse(iter, iter_end, parser, dep_pos)) {
+	std::string str;
+	for (size_t i = 0; i != dep_pos.size(); ++ i)
+	  str += ' ' + dep_pos[i].word;
+	throw std::runtime_error("parsing failed:" + str);
+      }
       
       if (mapper) {
 	const sentence_type& mapped = mapper();
