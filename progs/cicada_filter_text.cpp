@@ -15,7 +15,6 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
-
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
@@ -171,11 +170,19 @@ int main(int argc, char** argv)
 	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
 	  sentence.clear();
 	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
+	    std::string str;
+	    for (size_t i = 0; i != sentence.size(); ++ i)
+	      str += ' ' + sentence[i];
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  }
 	  
-	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
+	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser)) {
+	    std::string str;
+	    for (size_t i = 0; i != sentence.size(); ++ i)
+	      str += ' ' + sentence[i];
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  }
 
 	  ps >> permutation;
 	  if (! ps)
@@ -231,15 +238,23 @@ int main(int argc, char** argv)
 	iiter_type iter_end;
       
 	sentence_type sentence;
-      
+	
 	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
 	  sentence.clear();
 	
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
-	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
+	    std::string str;
+	    for (size_t i = 0; i != sentence.size(); ++ i)
+	      str += ' ' + sentence[i];
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no) + str);
+	  }
 	
-	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
-	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser)) {
+	    std::string str;
+	    for (size_t i = 0; i != sentence.size(); ++ i)
+	      str += ' ' + sentence[i];
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no) + str);
+	  }
 	
 	  if (sentence.size() == 0) continue;
 	  if (max_length > 0 && static_cast<int>(sentence.size()) > max_length) continue;
