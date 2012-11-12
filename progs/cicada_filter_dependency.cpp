@@ -886,7 +886,9 @@ struct DepPos
     dep_pos_set_type dep_pos;
     
     Transform transform(goal, head_mode);
-
+    
+    size_t sent_no = 0;
+    size_t line_no = 0;
     while (iter != iter_end) {
       dep_pos.clear();
 	
@@ -894,8 +896,12 @@ struct DepPos
 	std::string str;
 	for (size_t i = 0; i != dep_pos.size(); ++ i)
 	  str += ' ' + dep_pos[i].word;
-	throw std::runtime_error("parsing failed:" + str);
+	throw std::runtime_error("parsing failed at # sent: " + utils::lexical_cast<std::string>(sent_no)
+				 + " # line: " + utils::lexical_cast<std::string>(line_no) + str);
       }
+      
+      ++ sent_no;
+      line_no += dep_pos.size() + 1;
       
       if (mapper) {
 	const sentence_type& mapped = mapper();
