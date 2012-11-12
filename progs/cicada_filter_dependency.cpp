@@ -835,7 +835,7 @@ struct DepPos
   typedef std::vector<dep_pos_type, std::allocator<dep_pos_type> > dep_pos_set_type;
 
   template <typename Iterator>
-  struct dep_pos_parser : boost::spirit::qi::grammar<Iterator, dep_pos_set_type(), boost::spirit::standard::blank_type>
+  struct dep_pos_parser : boost::spirit::qi::grammar<Iterator, dep_pos_set_type()>
   {
     dep_pos_parser() : dep_pos_parser::base_type(dep_poss)
     {
@@ -844,15 +844,19 @@ struct DepPos
       
       token %= qi::lexeme[+(standard::char_ - standard::space)];
       
-      dep_pos  %= qi::int_ >> token >> token >> qi::int_ >> qi::eol;
-      dep_poss %= *dep_pos >> qi::eol;
+      dep_pos  %= (qi::omit[*standard::blank] >> qi::int_
+		   >> qi::omit[+standard::blank] >> token
+		   >> qi::omit[+standard::blank] >> token
+		   >> qi::omit[+standard::blank] >> qi::int_
+		   >> qi::omit[*standard::blank] >> qi::eol);
+      dep_poss %= *dep_pos >> qi::omit[*standard::blank] >> qi::eol;
     }
     
     typedef boost::spirit::standard::blank_type blank_type;
     
-    boost::spirit::qi::rule<Iterator, std::string(), blank_type>      token;
-    boost::spirit::qi::rule<Iterator, dep_pos_type(), blank_type>     dep_pos;
-    boost::spirit::qi::rule<Iterator, dep_pos_set_type(), blank_type> dep_poss;
+    boost::spirit::qi::rule<Iterator, std::string()>      token;
+    boost::spirit::qi::rule<Iterator, dep_pos_type()>     dep_pos;
+    boost::spirit::qi::rule<Iterator, dep_pos_set_type()> dep_poss;
   };
 
   void operator()(const path_type& file, const path_type& map, const path_type& output)
@@ -886,7 +890,7 @@ struct DepPos
     while (iter != iter_end) {
       dep_pos.clear();
 	
-      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, dep_pos))
+      if (! qi::parse(iter, iter_end, parser, dep_pos))
 	throw std::runtime_error("parsing failed");
       
       if (mapper) {
