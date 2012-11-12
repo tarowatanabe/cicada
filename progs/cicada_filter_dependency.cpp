@@ -95,6 +95,7 @@ bool cicada_mode = false;
 bool projective_mode = false;
 bool relation_mode = false;
 bool unescape_mode = false;
+bool escape_mode = false;
 bool normalize_mode = false;
 bool forest_mode = false;
 bool head_mode = false;
@@ -156,6 +157,23 @@ void unescape(Iterator first, Iterator last)
 {
   for (/**/; first != last; ++ first)
     *first = unescape(*first);
+}
+
+std::string escape(const std::string& word)
+{
+  if (word.empty()) return word;
+  
+  if (word[0] == '[' && word[word.size() - 1] == ']')
+    return "&#91" + word.substr(1, word.size() - 2) + "&#93;";
+  else
+    return word;
+}
+
+template <typename Iterator>
+void escape(Iterator first, Iterator last)
+{
+  for (/**/; first != last; ++ first)
+    *first = escape(*first);
 }
 
 std::string normalize(const std::string& pos)
@@ -525,6 +543,9 @@ struct MST
       
       if (unescape_mode)
 	unescape(mst.words.begin(), mst.words.end());
+
+      if (escape_mode)
+	escape(mst.words.begin(), mst.words.end());
       
       if (normalize_mode) {
 	if (relation_mode)
@@ -709,12 +730,15 @@ struct CoNLL
       }
 
 
-      if (normalize_mode || unescape_mode) {
+      if (normalize_mode || unescape_mode || escape_mode) {
 	conll_set_type::iterator citer_end = conll.end();
 	for (conll_set_type::iterator citer = conll.begin(); citer != citer_end; ++ citer) {
 
 	  if (unescape_mode)
 	    citer->form = unescape(citer->form);
+
+	  if (escape_mode)
+	    citer->form = escape(citer->form);
 
 	  if (normalize_mode) {
 	    if (relation_mode)
@@ -884,12 +908,15 @@ struct DepPos
 	  dep_pos[i].word = mapped[i];
       }
 
-      if (normalize_mode || unescape_mode) {
+      if (normalize_mode || unescape_mode || escape_mode) {
 	dep_pos_set_type::iterator citer_end = dep_pos.end();
 	for (dep_pos_set_type::iterator citer = dep_pos.begin(); citer != citer_end; ++ citer) {
 
 	  if (unescape_mode)
 	    citer->word = unescape(citer->word);
+
+	  if (escape_mode)
+	    citer->word = escape(citer->word);
 	  
 	  if (normalize_mode)
 	    citer->tag = normalize(citer->tag);
@@ -1221,6 +1248,9 @@ struct KHayashi
       
       if (unescape_mode)
 	unescape(khayashi.words.begin(), khayashi.words.end());
+
+      if (escape_mode)
+	escape(khayashi.words.begin(), khayashi.words.end());
 	
       if (normalize_mode)
 	normalize(khayashi.poss.begin(), khayashi.poss.end());
@@ -1472,6 +1502,9 @@ struct KHayashiForest
 	
       if (unescape_mode)
 	unescape(khayashi.words.begin(), khayashi.words.end());
+
+      if (escape_mode)
+	escape(khayashi.words.begin(), khayashi.words.end());
 	
       if (normalize_mode)
 	normalize(khayashi.poss.begin(), khayashi.poss.end());
@@ -1724,6 +1757,9 @@ struct Cicada
       
       if (unescape_mode)
 	unescape(cicada.tok.begin(), cicada.tok.end());
+
+      if (escape_mode)
+	escape(cicada.tok.begin(), cicada.tok.end());
       
       if (normalize_mode)
 	normalize(cicada.pos.begin(), cicada.pos.end());
@@ -1784,6 +1820,7 @@ void options(int argc, char** argv)
     ("projective", po::bool_switch(&projective_mode), "project into projective dependency")
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
     ("unescape",   po::bool_switch(&unescape_mode),   "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("escape",     po::bool_switch(&escape_mode),     "escape terminal symbols for cicada")
     ("normalize",  po::bool_switch(&normalize_mode),  "normalize category, such as [,] [.] etc.")
     ("forest",     po::bool_switch(&forest_mode),     "output as a forest")
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
