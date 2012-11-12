@@ -67,11 +67,13 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"] >> (qi::eoi | qi::eol);
+    word    %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+    tokens  %= *word >> (qi::eoi | qi::eol);
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
   
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type> word;
   boost::spirit::qi::rule<Iterator, sentence_type(), blank_type> tokens;
 };
 
@@ -1148,8 +1150,10 @@ struct KHayashi
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      words %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-      poss  %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+
+      words %= +word;
+      poss  %= +word;
       positions %= +qi::int_;
       
       khayashi %= (words >> "|||" >> poss >> qi::eol
@@ -1160,6 +1164,7 @@ struct KHayashi
     
     typedef boost::spirit::standard::blank_type blank_type;
     
+    boost::spirit::qi::rule<Iterator, std::string(), blank_type> word;
     boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> words;
     boost::spirit::qi::rule<Iterator, khayashi_type::label_set_type(), blank_type> poss;
     boost::spirit::qi::rule<Iterator, khayashi_type::position_set_type(), blank_type> positions;
@@ -1345,8 +1350,8 @@ struct KHayashiForest
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      words %= (+(standard::char_ - standard::space) - "|||") % (+standard::blank);
-      poss  %= (+(standard::char_ - standard::space) - "|||") % (+standard::blank);
+      words %= (qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))) % (+standard::blank);
+      poss  %= (qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))) % (+standard::blank);
       
       edge %= (qi::omit[+standard::blank] >> qi::int_
 	       >> qi::omit[+standard::blank] >> qi::int_
@@ -1649,9 +1654,11 @@ struct Cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
+
+      word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
       
-      tok %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-      pos %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      tok %= +word;
+      pos %= +word;
       dep %= +qi::int_;
       
       cicada %= tok >> "|||" >> pos >> "|||" >> dep >> (qi::eol || qi::eoi);
@@ -1659,6 +1666,7 @@ struct Cicada
     
     typedef boost::spirit::standard::blank_type blank_type;
     
+    boost::spirit::qi::rule<Iterator, std::string(), blank_type> word;
     boost::spirit::qi::rule<Iterator, cicada_type::label_set_type(), blank_type> tok;
     boost::spirit::qi::rule<Iterator, cicada_type::label_set_type(), blank_type> pos;
     boost::spirit::qi::rule<Iterator, cicada_type::index_set_type(), blank_type> dep;

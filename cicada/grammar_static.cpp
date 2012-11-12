@@ -1150,11 +1150,13 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       
       lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
-      phrase %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      word %= qi::lexeme[qi::hold[standard::string("|||") >> +(standard::char_ - standard::space)] | (+(standard::char_ - standard::space) - "|||")];
+      phrase %= *word;
       rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase >> "|||" >> phrase >> "|||" >> +qi::float_ >> -("|||" >> *qi::float_);
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
+    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> word;
     boost::spirit::qi::rule<Iterator, phrase_parsed_type(), boost::spirit::standard::space_type> phrase;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };
@@ -1182,7 +1184,7 @@ namespace cicada
 	namespace standard = boost::spirit::standard;
 	
 	lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
-	phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
+	phrase %= *(qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))]);
 	
 	score %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
 	scores %= -(score % (+standard::space));

@@ -105,7 +105,7 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    word    %= qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    word    %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
     feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))];
     
     tokens  %= *word;

@@ -21,5 +21,6 @@ int main(int argc, char** argv)
   msgpack_test(rule_type("[s] ||| good boy"));
   
   std::cout << "rule: " << rule_type("[s] ||| good boy [x,1]") << std::endl;
+  std::cout << "rhs: " << rule_type("[s] ||| good boy [x,1]").rhs.size() << std::endl;
   msgpack_test(rule_type("[s] ||| good boy [x,1]"));
 }

@@ -54,8 +54,10 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    tokens   %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-    features %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    token %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+    
+    tokens   %= *token;
+    features %= *token;
     remains  %= *qi::lexeme[+(standard::char_ - standard::space)];
     
     kbest %= size >> "|||" >> tokens >> -("|||" >> features) >> -("|||" >> remains) >> (qi::eol | qi::eoi);
@@ -64,6 +66,7 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   typedef boost::spirit::standard::blank_type blank_type;
   
   boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type> token;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> features;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
