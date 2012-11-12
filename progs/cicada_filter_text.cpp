@@ -174,14 +174,14 @@ int main(int argc, char** argv)
 	    std::string str;
 	    for (size_t i = 0; i != sentence.size(); ++ i)
 	      str += ' ' + sentence[i];
-	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no) + str);
 	  }
 	  
 	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser)) {
 	    std::string str;
 	    for (size_t i = 0; i != sentence.size(); ++ i)
 	      str += ' ' + sentence[i];
-	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no) + str);
 	  }
 
 	  ps >> permutation;
