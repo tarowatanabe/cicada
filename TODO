@@ -170,3 +170,6 @@ cicada_filter_kbest to support {file,directory}-to-{file,directory}
 add error checking for codecs
 
 msgpack for succinct storage
+
+Rearrange learning code by splitting L2 and/or L1 projection
+  Especially for online-learning, they can be set up as additional "unified" code

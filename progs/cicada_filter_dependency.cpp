@@ -88,6 +88,7 @@ bool dep_pos_mode = false;
 bool cabocha_mode = false;
 bool khayashi_mode = false;
 bool khayashi_forest_mode = false;
+bool cicada_mode = false;
 
 bool projective_mode = false;
 bool relation_mode = false;
@@ -182,17 +183,18 @@ struct DepPos;
 struct Cabocha;
 struct KHayashi;
 struct KHayashiForest;
+struct Cicada;
 
 int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
     
-    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode == 0)
-      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest mode");
+    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode == 0)
+      throw std::runtime_error("one of mst/conll/khayashi/khayashi-forest/cicada mode");
 
-    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode > 1)
-      throw std::runtime_error("one of mst/conll/dep-pos/khayashi/khayashi-forest mode");
+    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
+      throw std::runtime_error("one of mst/conll/dep-pos/khayashi/khayashi-forest/cicada mode");
     
     if (mst_mode)
       apply<MST>(input_file, map_file, output_file);
@@ -206,8 +208,10 @@ int main(int argc, char** argv)
       apply<KHayashi>(input_file, map_file, output_file);
     else if (khayashi_forest_mode)
       apply<KHayashiForest>(input_file, map_file, output_file);
+    else if (cicada_mode)
+      apply<Cicada>(input_file, map_file, output_file);
     else
-      throw std::runtime_error("one of mst|conll|cabocha|forest?");
+      throw std::runtime_error("one of mst|conll|cabocha|khayashi|khayashi-forest|cicada?");
   }
   catch(std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -1601,6 +1605,153 @@ struct KHayashiForest
   }
 };
 
+struct cicada_type
+{
+  typedef int index_type;
+  typedef std::string label_type;
+  
+  typedef std::vector<label_type, std::allocator<label_type> > label_set_type;
+  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
+  
+  label_set_type tok;
+  label_set_type pos;
+  index_set_type dep;
+  
+  cicada_type() : tok(), pos(), dep() {}
+
+  void clear()
+  {
+    tok.clear();
+    pos.clear();
+    dep.clear();
+  }
+
+  bool verify() const
+  {
+    return tok.size() == pos.size() && tok.size() == dep.size();
+  }
+};
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  cicada_type,
+			  (cicada_type::label_set_type, tok)
+			  (cicada_type::label_set_type, pos)
+			  (cicada_type::index_set_type, dep)
+			  )
+
+struct Cicada
+{
+  
+  template <typename Iterator>
+  struct cicada_parser : boost::spirit::qi::grammar<Iterator, cicada_type(), boost::spirit::standard::blank_type>
+  {
+    cicada_parser() : cicada_parser::base_type(cicada)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      tok %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      pos %= +qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+      dep %= +qi::int_;
+      
+      cicada %= tok >> "|||" >> pos >> "|||" >> dep >> (qi::eol || qi::eoi);
+    }
+    
+    typedef boost::spirit::standard::blank_type blank_type;
+    
+    boost::spirit::qi::rule<Iterator, cicada_type::label_set_type(), blank_type> tok;
+    boost::spirit::qi::rule<Iterator, cicada_type::label_set_type(), blank_type> pos;
+    boost::spirit::qi::rule<Iterator, cicada_type::index_set_type(), blank_type> dep;
+    
+    boost::spirit::qi::rule<Iterator, cicada_type(), blank_type> cicada;
+  };
+
+  
+  void operator()(const path_type& file, const path_type& map, const path_type& output)
+  {
+    typedef boost::spirit::istream_iterator iiter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
+
+    utils::compress_istream is(file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iiter_type iter(is);
+    iiter_type iter_end;
+    
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    std::ostream_iterator<char> oiter(os);
+    
+    MapFile mapper(map);
+
+    cicada_parser<iiter_type> parser;
+    cicada_type cicada;
+
+    Transform transform(goal, head_mode);
+    
+    size_t num = 0;
+    while (iter != iter_end) {
+      cicada.clear();
+      
+      if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, cicada))
+	throw std::runtime_error("parsing failed");
+      
+      if (mapper) {
+	const sentence_type& mapped = mapper();
+	
+	if (mapped.size() != cicada.tok.size())
+	  throw std::runtime_error("cicada size and mapped size differ: " + utils::lexical_cast<std::string>(num));
+	
+	cicada.tok.assign(mapped.begin(), mapped.end());
+      }
+	
+      if (! cicada.verify())
+	throw std::runtime_error("invalid cicada format");
+      
+      if (unescape_mode)
+	unescape(cicada.tok.begin(), cicada.tok.end());
+      
+      if (normalize_mode)
+	normalize(cicada.pos.begin(), cicada.pos.end());
+
+      if (forest_mode) {
+	transform.clear();
+	transform.sentence.assign(cicada.tok.begin(), cicada.tok.end());
+	  
+	cicada_type::label_set_type::const_iterator liter_end = cicada.pos.end();
+	for (cicada_type::label_set_type::const_iterator liter = cicada.pos.begin(); liter != liter_end; ++ liter)
+	  transform.pos.push_back('[' + *liter + ']');	    
+	
+	transform.dependency.assign(cicada.dep.begin(), cicada.dep.end());
+	  
+	transform();
+	  
+	os << transform.hypergraph << '\n';
+	if (flush_output)
+	  os << std::flush;
+      } else {
+	if (! karma::generate(oiter, (-(standard::string % ' ')
+				      << " ||| " << -(standard::string % ' ')
+				      << " ||| " << -(karma::int_ % ' ')
+				      << '\n'),
+			      cicada.tok, cicada.pos, cicada.dep))
+	  throw std::runtime_error("generation failed");
+	  
+	if (flush_output)
+	  os << std::flush;
+      }
+
+      ++ num;
+    }    
+  }
+};
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -1620,6 +1771,7 @@ void options(int argc, char** argv)
     ("cabocha",         po::bool_switch(&cabocha_mode),         "tranform Cabocha dependency")
     ("khayashi",        po::bool_switch(&khayashi_mode),        "tranform KHayashi dependency")
     ("khayashi-forest", po::bool_switch(&khayashi_forest_mode), "tranform KHayashi Forest dependency")
+    ("cicada",          po::bool_switch(&cicada_mode),          "tranform CICADA dependency")
     
     ("projective", po::bool_switch(&projective_mode), "project into projective dependency")
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
