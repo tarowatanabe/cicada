@@ -155,6 +155,7 @@ int main(int argc, char** argv)
     
     if (! permutation_files.empty()) {
       permutation_type permutation;
+      sentence_type   sentence_prev;
       sentence_type   sentence;
       sentence_type   sentence_permuted;
 
@@ -169,10 +170,13 @@ int main(int argc, char** argv)
 	iiter_type iter_end;
 	
 	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
+	  sentence_prev.swap(sentence);
 	  sentence.clear();
-	
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
+	    std::cerr << "sentence prev: " << sentence_prev << std::endl;
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  }
 	  
 	  if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
 	    throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
