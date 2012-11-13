@@ -834,11 +834,14 @@ struct LearnMapper : public Learner
 	  Learner::operator()(biter->source, biter->target, biter->alignment);
       }
 
-      if ((iter & iter_mask) == iter_mask)
+      if ((iter & iter_mask) == iter_mask) {
 	dump();
+	Learner::shrink();
+      }
     }
     
     dump();
+    Learner::shrink();
   }
 
   void dump()

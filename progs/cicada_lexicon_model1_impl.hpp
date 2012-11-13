@@ -201,6 +201,11 @@ struct LearnModel1 : public LearnBase
     learn(target, source, alignment, true,  ttable_target_source, ttable_counts_target_source, aligned_target_source, objective_target_source);
   }
 
+  void shrink()
+  {
+    
+  }
+  
   prob_set_type  probs;
   point_map_type points;
 };
@@ -485,6 +490,11 @@ struct LearnModel1Posterior : public LearnBase
   {
     learn(source, target, alignment, false, ttable_source_target, ttable_counts_source_target, aligned_source_target, objective_source_target);
     learn(target, source, alignment, true,  ttable_target_source, ttable_counts_target_source, aligned_target_source, objective_target_source);
+  }
+
+  void shrink()
+  {
+    
   }
 
   posterior_set_type posterior;
@@ -836,6 +846,11 @@ struct LearnModel1Symmetric : public LearnBase
     objective_target_source += logsum_target_source / source_size;
   }
 
+  void shrink()
+  {
+    
+  }
+
   prob_set_type      prob_source_target;
   prob_set_type      prob_target_source;
   posterior_set_type posterior_source_target;
@@ -843,7 +858,6 @@ struct LearnModel1Symmetric : public LearnBase
 
   point_map_type points_source_target;
   point_map_type points_target_source;
-  
 };
 
 struct LearnModel1SymmetricPosterior : public LearnBase
@@ -1277,6 +1291,12 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       }
   }
 
+  void shrink()
+  {
+    
+  
+  }
+  
   posterior_set_type prob_source_target;
   posterior_set_type prob_target_source;
   posterior_set_type posterior_source_target;

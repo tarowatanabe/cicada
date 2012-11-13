@@ -735,6 +735,11 @@ struct LearnHMM : public LearnBase
 	  objective_target_source);
   }
 
+  void shrink()
+  {
+    hmm.shrink();
+  }
+
   hmm_data_type hmm;
 };
 
@@ -941,6 +946,11 @@ struct LearnHMMPosterior : public LearnBase
 	  objective_target_source);
   }
 
+  void shrink()
+  {
+    hmm.shrink();
+  }
+  
   hmm_data_type hmm;
   
   phi_set_type phi;
@@ -1031,6 +1041,12 @@ struct LearnHMMSymmetric : public LearnBase
     
     hmm_source_target.accumulate(source, target, atable_counts_source_target);
     hmm_target_source.accumulate(target, source, atable_counts_target_source);
+  }
+
+  void shrink()
+  {
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
   }
   
   hmm_data_type hmm_source_target;
@@ -1192,6 +1208,12 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     
     hmm_source_target.accumulate(source, target, atable_counts_source_target);
     hmm_target_source.accumulate(target, source, atable_counts_target_source);
+  }
+
+  void shrink()
+  {
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
   }
 
   hmm_data_type hmm_source_target;
