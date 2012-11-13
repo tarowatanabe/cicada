@@ -348,11 +348,8 @@ struct LearnReducer : public Maximizer
     ttable_type  ttable_reduced;
     aligned_type aligned_reduced;
     
-    ttable_counts_type counts;
-    
     for (;;) {
-      counts.counts.clear();
-      counts.aligned.clear();
+      ttable_counts_type counts;
       
       queue.pop_swap(counts);
       
