@@ -848,11 +848,8 @@ struct LearnMapper : public Learner
     const word_type::id_type target_max = utils::bithack::max(Learner::ttable_counts_target_source.size(),
 							      Learner::aligned_target_source.size());
     
-    ttable_counts_type counts;
-    
     for (word_type::id_type source_id = 0; source_id != source_max; ++ source_id) {
-      counts.counts.clear();
-      counts.aligned.clear();
+      ttable_counts_type counts;
 	  
       if (Learner::ttable_counts_source_target.exists(source_id) && ! Learner::ttable_counts_source_target[source_id].empty())
 	counts.counts.swap(Learner::ttable_counts_source_target[source_id]);
@@ -868,8 +865,7 @@ struct LearnMapper : public Learner
     }
 	
     for (word_type::id_type target_id = 0; target_id != target_max; ++ target_id) {
-      counts.counts.clear();
-      counts.aligned.clear();
+      ttable_counts_type counts;
       
       if (Learner::ttable_counts_target_source.exists(target_id) && ! Learner::ttable_counts_target_source[target_id].empty())
 	counts.counts.swap(Learner::ttable_counts_target_source[target_id]);
