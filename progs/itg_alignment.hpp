@@ -519,6 +519,30 @@ namespace detail
 
     void shrink()
     {
+      heap.clear();
+      agenda.clear();
+      
+      heap_type(headp).swap(heap);
+      agenda_type(agenda).swap(agenda);
+      
+      chart_source.clear();
+      chart_target.clear();
+      
+      chart_mono_type(chart_source).swap(chart_source);
+      chart_mono_type(chart_target).swap(chart_target);
+
+      alpha_source.clear();
+      alpha_target.clear();
+      
+      beta_source.clear();
+      beta_target.clear();
+      
+      alpha_type(alpha_source).swap(alpha_source);
+      alpha_type(alpha_target).swap(alpha_target);
+
+      beta_type(beta_source).swap(beta_source);
+      beta_type(beta_target).swap(beta_target);
+
       chart.clear();
       backptr.clear();
       
