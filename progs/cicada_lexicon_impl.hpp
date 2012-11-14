@@ -73,7 +73,7 @@ struct classes_type
     
     return classes[word.id()];
   }
-
+  
   map_type classes;
   
   bool unknown;
@@ -119,7 +119,7 @@ struct atable_type
 	
 	return counts[0];
       } else {
-	if (pos >= counts.size())
+	if (pos >= static_cast<index_type>(counts.size()))
 	  counts.resize(pos + 1, 0.0);
 	
 	return counts[pos];
@@ -171,7 +171,7 @@ struct atable_type
 			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type count_dict_type;
   
   typedef difference_map_type mapped_type;
-  
+
   typedef std::pair<class_pair_type, range_type> class_range_type;
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
@@ -197,18 +197,15 @@ struct atable_type
     if (source == vocab_type::BOS) {
       // 0 <= i < source_size
       // which implies: 1 <= diff < source_size + 1
-      //
       
       return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev];
     } else if (target == vocab_type::EOS) {
       // which implies: 1 <= diff < source_size - i_prev + 1
-      // 
       
       return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev];
     } else {
       // 0 <= i < source_size
       // which implies: 0 - i_prev <= diff < source_size - i_prev
-      //
       
       return estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev];
     }
@@ -218,7 +215,6 @@ struct atable_type
   {
     difference_map_type& diffs = const_cast<cache_set_type&>(caches)[std::make_pair(classes, range)];
     if (diffs.empty()) {
-      //diffs.assign(range.first, range.second);
       diffs.reserve(range.first, range.second - 1);
       
       double sum = 0.0;
