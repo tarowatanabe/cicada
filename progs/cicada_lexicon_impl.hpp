@@ -94,6 +94,8 @@ struct atable_type
     typedef int       index_type;
     
     typedef utils::simple_vector<count_type, std::allocator<count_type> > difference_set_type;
+
+    difference_map_type() : counts(), offset(0) {}
     
     difference_map_type& operator+=(const difference_map_type& x)
     {
@@ -103,23 +105,32 @@ struct atable_type
 	operator[](i) += x[i];
       return *this;
     }
-
+    
     count_type& operator[](const index_type& diff)
     {
-      const size_type pos = utils::bithack::branch(diff >= 0, diff, - diff - 1);
-      difference_set_type& diffs = (diff >= 0 ? positives : negatives);
+      const index_type pos = diff + offset;
       
-      if (pos >= diffs.size())
-	diffs.resize(pos + 1, 0.0);
-      return diffs[pos];
+      if (pos < 0) {
+	difference_set_type counts_new(counts.size() - pos, 0.0);
+	std::copy(counts.begin(), counts.end(), counts_new.begin() - pos);
+	
+	counts.swap(counts_new);
+	offset -= pos;
+	
+	return counts[0];
+      } else {
+	if (pos >= counts.size())
+	  counts.resize(pos + 1, 0.0);
+	
+	return counts[pos];
+      }
     }
     
     count_type operator[](const index_type& diff) const
     {
-      const size_type pos = utils::bithack::branch(diff >= 0, diff, - diff - 1);
-      const difference_set_type& diffs = (diff >= 0 ? positives : negatives);
+      const index_type pos = diff + offset;
       
-      return (pos >= diffs.size() ? 0.0 : diffs[pos]);
+      return (pos < 0 || pos >= static_cast<int>(counts.size()) ? 0.0 : counts[pos]);
     }
     
     void reserve(const index_type& min, const index_type& max)
@@ -130,29 +141,27 @@ struct atable_type
     
     void initialize()
     {
-      std::fill(positives.begin(), positives.end(), 0.0);
-      std::fill(negatives.begin(), negatives.end(), 0.0);
+      std::fill(counts.begin(), counts.end(), 0.0);
     }
-
-    bool empty() const { return positives.empty() && negatives.empty(); }
     
-    index_type min() const { return - negatives.size(); }
-    index_type max() const { return positives.size() - 1; }
-
+    bool empty() const { return counts.empty(); }
+    
+    index_type min() const { return - offset; }
+    index_type max() const { return static_cast<index_type>(counts.size()) - 1 - offset; }
+    
     void shrink()
     {
-      //difference_set_type(positives).swap(positives);
-      //difference_set_type(negatives).swap(negatives);
-    }
-
-    void swap(difference_map_type& x)
-    {
-      positives.swap(x.positives);
-      negatives.swap(x.negatives);
+      
     }
     
-    difference_set_type positives;
-    difference_set_type negatives;
+    void swap(difference_map_type& x)
+    {
+      counts.swap(x.counts);
+      std::swap(offset, x.offset);
+    }
+    
+    difference_set_type counts;
+    index_type offset;
   };
 
   typedef std::pair<word_type, word_type> class_pair_type;
@@ -165,40 +174,6 @@ struct atable_type
 
   typedef std::pair<class_pair_type, range_type> class_range_type;
 
-  struct cache_type
-  {
-  public:
-    typedef size_t    size_type;
-    typedef ptrdiff_t difference_type;
-    typedef int       index_type;
-    
-    typedef utils::simple_vector<count_type, std::allocator<count_type> > prob_set_type;
-    
-    cache_type() : probs(), offset(0) {}
-    cache_type(const index_type& min, const index_type& max)
-      : probs(max - min), offset(-min) {}
-    
-    void assign(const index_type& min, const index_type& max)
-    {
-      probs.resize(max - min, 0.0);
-      offset = - min;
-    }
-    
-    const count_type& operator[](const index_type& diff) const
-    {
-      return probs[offset + diff];
-    }
-
-    count_type& operator[](const index_type& diff)
-    {
-      return probs[offset + diff];
-    }
-    
-    bool empty() const { return probs.empty(); }
-    
-    prob_set_type probs;
-    index_type    offset;
-  };
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
 			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
