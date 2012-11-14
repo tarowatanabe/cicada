@@ -612,8 +612,14 @@ struct LearnHMM : public LearnBase
 
       for (size_type trg = 1; trg < target_size + 2; ++ trg) {
 	
-	for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev)
+	for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev) {
 	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
+	  
+	  // next - prev
+	  // minimum of next: 1
+	  // maximum of next: source_size + 2 - 1
+	  mapped[prev]->reserve(1 - prev, source_size + 2 - prev - 1);
+	}
 	
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg)) + 1;
