@@ -171,9 +171,8 @@ struct atable_type
 			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type count_dict_type;
   
   typedef difference_map_type mapped_type;
-
+  
   typedef std::pair<class_pair_type, range_type> class_range_type;
-
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
 			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
@@ -298,14 +297,10 @@ struct atable_type
     
     atable[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = atable_source_target;
   }
-
+  
   void shrink()
   {
-#if 0
-    count_dict_type::iterator aiter_end = atable.end();
-    for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
-      aiter->second.shrink();
-#endif
+    caches.clear();
   }
   
   void initialize()
