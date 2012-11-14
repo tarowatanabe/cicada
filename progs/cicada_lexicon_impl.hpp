@@ -176,7 +176,7 @@ struct atable_type
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
 			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
-
+  
   atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
   prob_type operator()(const word_type& source,

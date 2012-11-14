@@ -1071,12 +1071,11 @@ void learn(const Maximizer& maximizer,
     atable_source_target.estimate_unk();
     atable_target_source.estimate_unk();
     
-    atable_source_target.shrink();
-    atable_target_source.shrink();
-    
     for (size_t i = 0; i != mappers.size(); ++ i) {
       mappers[i].atable_source_target = atable_source_target;
       mappers[i].atable_target_source = atable_target_source;
+      //mappers[i].atable_source_target.shrink();
+      //mappers[i].atable_target_source.shrink();
     }
     
     workers_reducer_source_target.join_all();
