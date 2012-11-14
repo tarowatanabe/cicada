@@ -160,13 +160,48 @@ struct atable_type
   
   typedef utils::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type count_dict_type;
-
+  
   typedef difference_map_type mapped_type;
 
   typedef std::pair<class_pair_type, range_type> class_range_type;
+
+  struct cache_type
+  {
+  public:
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    typedef int       index_type;
+    
+    typedef utils::simple_vector<count_type, std::allocator<count_type> > prob_set_type;
+    
+    cache_type() : probs(), offset(0) {}
+    cache_type(const index_type& min, const index_type& max)
+      : probs(max - min), offset(-min) {}
+    
+    void assign(const index_type& min, const index_type& max)
+    {
+      probs.resize(max - min, 0.0);
+      offset = - min;
+    }
+    
+    const count_type& operator[](const index_type& diff) const
+    {
+      return probs[offset + diff];
+    }
+
+    count_type& operator[](const index_type& diff)
+    {
+      return probs[offset + diff];
+    }
+    
+    bool empty() const { return probs.empty(); }
+    
+    prob_set_type probs;
+    index_type    offset;
+  };
   
-  typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
-			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_type;
+  typedef utils::unordered_map<class_range_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
+			       std::allocator<std::pair<const class_range_type, cache_type> > >::type cache_set_type;
 
   atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
@@ -205,12 +240,11 @@ struct atable_type
     }
   }
   
-  const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
+  const cache_type& estimate(const class_pair_type& classes, const range_type& range) const
   {
-    difference_map_type& diffs = const_cast<cache_type&>(caches)[std::make_pair(classes, range)];
+    cache_type& diffs = const_cast<cache_set_type&>(caches)[std::make_pair(classes, range)];
     if (diffs.empty()) {
-      // reserve first...
-      diffs.reserve(range.first, range.second - 1);
+      diffs.assign(range.first, range.second);
       
       double sum = 0.0;
       
@@ -226,8 +260,6 @@ struct atable_type
       const double sum_digamma = utils::mathop::digamma(sum);
       for (index_type i = range.first; i != range.second; ++ i)
 	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
-      
-      //diffs.shrink();
     }
     
     return diffs;
@@ -319,7 +351,7 @@ struct atable_type
   }
   
   count_dict_type atable;
-  cache_type      caches;
+  cache_set_type  caches;
   double prior;
   double smooth;
 };
