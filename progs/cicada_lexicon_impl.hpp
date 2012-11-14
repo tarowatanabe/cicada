@@ -350,8 +350,6 @@ struct ttable_type
 
     count_map_type& operator+=(const count_map_type& x)
     {
-      counts.rehash(counts.size() + x.counts.size());
-
       const_iterator citer_end = x.counts.end();
       for (const_iterator citer = x.counts.begin(); citer != citer_end; ++ citer)
 	counts[citer->first] += citer->second;
@@ -360,8 +358,6 @@ struct ttable_type
 
     count_map_type& operator|=(const count_map_type& x)
     {
-      counts.rehash(counts.size() + x.counts.size());
-      
       counts.insert(x.begin(), x.end());
       return *this;
     }
@@ -505,8 +501,6 @@ struct aligned_type
     
     aligned_map_type& operator+=(const aligned_map_type& x)
     {
-      aligned.rehash(aligned.size() + x.aligned.size());
-      
       const_iterator citer_end = x.aligned.end();
       for (const_iterator citer = x.aligned.begin(); citer != citer_end; ++ citer)
 	aligned.insert(*citer);
