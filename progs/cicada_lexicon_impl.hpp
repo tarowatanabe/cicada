@@ -130,6 +130,12 @@ struct atable_type
     index_type min() const { return - negatives.size(); }
     index_type max() const { return positives.size() - 1; }
 
+    void shrink()
+    {
+      difference_set_type(positives).swap(positives);
+      difference_set_type(negatives).swap(negatives);
+    }
+
     void swap(difference_map_type& x)
     {
       positives.swap(x.positives);
@@ -209,7 +215,7 @@ struct atable_type
       for (index_type i = range.first; i != range.second; ++ i)
 	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
       
-      difference_map_type(diffs).swap(diffs);
+      diffs.shrink();
     }
     
     return diffs;
@@ -271,6 +277,13 @@ struct atable_type
       atable[titer->first] = titer->second;
     
     atable[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = atable_source_target;
+  }
+
+  void shrink()
+  {
+    count_dict_type::iterator aiter_end = atable.end();
+    for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
+      aiter->second.shrink();
   }
   
   void initialize()
@@ -633,6 +646,12 @@ struct LearnBase
     objective_source_target = 0.0;
     objective_target_source = 0.0;
   }
+
+  void shrink()
+  {
+    atable_counts_source_target.shrink();
+    atable_counts_target_source.shrink();
+  };
   
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;

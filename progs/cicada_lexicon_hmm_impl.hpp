@@ -750,6 +750,8 @@ struct LearnHMM : public LearnBase
   void shrink()
   {
     hmm.shrink();
+
+    LearnBase::shrink();
   }
 
   hmm_data_type hmm;
@@ -969,6 +971,8 @@ struct LearnHMMPosterior : public LearnBase
     phi_set_type(exp_phi_old).swap(exp_phi_old);
     
     hmm.shrink();
+    
+    LearnBase::shrink();
   }
   
   hmm_data_type hmm;
@@ -1067,6 +1071,8 @@ struct LearnHMMSymmetric : public LearnBase
   {
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+
+    LearnBase::shrink();
   }
   
   hmm_data_type hmm_source_target;
@@ -1242,6 +1248,8 @@ struct LearnHMMSymmetricPosterior : public LearnBase
 
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+
+    LearnBase::shrink();
   }
 
   hmm_data_type hmm_source_target;
