@@ -666,8 +666,8 @@ struct LearnBase
 
   void shrink()
   {
-    atable_counts_source_target.shrink();
-    atable_counts_target_source.shrink();
+    atable_source_target.shrink();
+    atable_target_source.shrink();
   };
   
   const ttable_type& ttable_source_target;
@@ -723,6 +723,12 @@ struct ViterbiBase
       classes_target(__classes_target)
   {}
   
+  void shrink()
+  {
+    atable_source_target.shrink();
+    atable_target_source.shrink();
+  };
+
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;
   

@@ -1460,6 +1460,8 @@ struct ViterbiHMM : public ViterbiBase
     
     sentence_type(source_class).swap(source_class);
     sentence_type(target_class).swap(target_class);
+
+    ViterbiBase::shrink();
   }
 
   typedef utils::vector2_aligned<prob_type, std::allocator<prob_type> > forward_type;
@@ -1530,6 +1532,8 @@ struct PosteriorHMM : public ViterbiBase
   {
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+
+    ViterbiBase::shrink();
   }
 
   hmm_data_type hmm_source_target;
@@ -1645,6 +1649,8 @@ struct ITGHMM : public ViterbiBase
     hmm_target_source.shrink();
 
     aligner.shrink();
+
+    ViterbiBase::shrink();
   }
 
   matrix_type costs;
@@ -1766,6 +1772,8 @@ struct MaxMatchHMM : public ViterbiBase
 
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
+  
+  ViterbiBase::shrink();
 };
 
 struct DependencyHMM : public ViterbiBase
@@ -1899,6 +1907,8 @@ struct DependencyHMM : public ViterbiBase
 
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+    
+    ViterbiBase::shrink();
   }
   
   matrix_type scores_source;
@@ -2408,6 +2418,8 @@ struct PermutationHMM : public ViterbiBase
 
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+
+    ViterbiBase::shrink();
   }
   
   matrix_type scores_source;
