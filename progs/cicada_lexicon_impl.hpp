@@ -296,7 +296,12 @@ struct atable_type
   
   void shrink()
   {
-    caches.clear();
+    for (cache_set_type::iterator citer = caches.begin(); citer != caches.end(); /**/) {
+      if (citer->first.second.second - citer->first.second.first > 20)
+	caches.erase(citer ++);
+      else
+	++ citer;
+    }
   }
   
   void initialize()
@@ -316,6 +321,8 @@ struct atable_type
     
     return *this;
   }
+
+  bool empty() const { return atable.empty(); }
   
   count_dict_type atable;
   cache_set_type  caches;

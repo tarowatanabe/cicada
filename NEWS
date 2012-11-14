@@ -11,6 +11,7 @@ INCOMPATIBLE: lexical weights are now computed by cicada_filter_extract_{phrase,
 	      then, cicada-index.py to add additional features and to perform indexing.
 INCOMPATIBLE: Use bitvector for features which takes only binary or single values
 INCOMPATIBLE: revised signature/stemmer interface and caching
+New: reduced memory consumption for HMM aligner
 New: added more features:# of unaligned words, # of cross for terimnals, and generative probabilities
      (P(pair | root(pair)), P(source | root(source)), P(target | root(target)))
 New: bash-based learning scripts are re-implemented by equivalent, better python codes for better readability.

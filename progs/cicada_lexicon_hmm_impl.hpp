@@ -188,10 +188,11 @@ struct LearnHMM : public LearnBase
 	  std::fill(eiter_first, eiter_last, ttable(vocab_type::EPSILON, target[trg]));
 	}
       }
-      
+
       // compute transition table...
       // we start from 1, since there exists no previously aligned word before BOS...
       for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+	
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
 	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {
@@ -298,6 +299,7 @@ struct LearnHMM : public LearnBase
       // compute transition table...
       // we start from 1, since there exists no previously aligned word before BOS...
       for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+	
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
 	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {

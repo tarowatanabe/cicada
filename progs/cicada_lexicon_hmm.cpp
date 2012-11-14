@@ -1177,7 +1177,7 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
     alignment_type alignment_source_target;
     alignment_type alignment_target_source;
 
-    const int iter_mask = (1 << 12) - 1;
+    const int iter_mask = (1 << 8) - 1;
     
     for (int iter = 0;; ++ iter) {
       mapper.pop_swap(bitext);
@@ -1518,7 +1518,7 @@ struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
     projected_type projected_source;
     projected_type projected_target;
     
-    const int iter_mask = (1 << 12) - 1;
+    const int iter_mask = (1 << 8) - 1;
     
     for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
@@ -1813,7 +1813,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
     posterior_type posterior_target_source;
     posterior_type posterior_combined;
     
-    const int iter_mask = (1 << 12) - 1;
+    const int iter_mask = (1 << 8) - 1;
     
     for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
