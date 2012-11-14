@@ -30,6 +30,7 @@
 #include <utils/unordered_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
+#include <utils/simple_vector.hpp>
 
 typedef cicada::Symbol     word_type;
 typedef cicada::Sentence   sentence_type;
@@ -92,10 +93,12 @@ struct atable_type
     typedef ptrdiff_t difference_type;
     typedef int       index_type;
     
-    typedef std::vector<count_type, std::allocator<count_type> > difference_set_type;
+    typedef utils::simple_vector<count_type, std::allocator<count_type> > difference_set_type;
     
     difference_map_type& operator+=(const difference_map_type& x)
     {
+      reserve(x.min(), x.max());
+      
       for (index_type i = x.min(); i <= x.max(); ++ i)
 	operator[](i) += x[i];
       return *this;
@@ -118,7 +121,13 @@ struct atable_type
       
       return (pos >= diffs.size() ? 0.0 : diffs[pos]);
     }
-
+    
+    void reserve(const index_type& min, const index_type& max)
+    {
+      operator[](min);
+      operator[](max);
+    }
+    
     void initialize()
     {
       std::fill(positives.begin(), positives.end(), 0.0);
@@ -132,8 +141,8 @@ struct atable_type
 
     void shrink()
     {
-      difference_set_type(positives).swap(positives);
-      difference_set_type(negatives).swap(negatives);
+      //difference_set_type(positives).swap(positives);
+      //difference_set_type(negatives).swap(negatives);
     }
 
     void swap(difference_map_type& x)
@@ -200,6 +209,9 @@ struct atable_type
   {
     difference_map_type& diffs = const_cast<cache_type&>(caches)[std::make_pair(classes, range)];
     if (diffs.empty()) {
+      // reserve first...
+      diffs.reserve(range.first, range.second - 1);
+      
       double sum = 0.0;
       
       count_dict_type::const_iterator aiter = atable.find(classes);
@@ -215,7 +227,7 @@ struct atable_type
       for (index_type i = range.first; i != range.second; ++ i)
 	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
       
-      diffs.shrink();
+      //diffs.shrink();
     }
     
     return diffs;
@@ -281,9 +293,11 @@ struct atable_type
 
   void shrink()
   {
+#if 0
     count_dict_type::iterator aiter_end = atable.end();
     for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
       aiter->second.shrink();
+#endif
   }
   
   void initialize()
