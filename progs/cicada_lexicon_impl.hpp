@@ -130,6 +130,11 @@ struct atable_type
     index_type min() const { return - negatives.size(); }
     index_type max() const { return positives.size() - 1; }
 
+    void swap(difference_map_type& x)
+    {
+      positives.swap(x.positives);
+      negatives.swap(x.negatives);
+    }
     
     difference_set_type positives;
     difference_set_type negatives;
@@ -143,10 +148,10 @@ struct atable_type
 
   typedef difference_map_type mapped_type;
 
-  typedef utils::unordered_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
-			       std::allocator<std::pair<const range_type, difference_map_type> > >::type cache_type;
-  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-			       std::allocator<std::pair<const class_pair_type, cache_type> > >::type cache_set_type;
+  typedef std::pair<class_pair_type, range_type> class_range_type;
+  
+  typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
+			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_type;
 
   atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
@@ -187,7 +192,7 @@ struct atable_type
   
   const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
   {
-    difference_map_type& diffs = const_cast<cache_set_type&>(caches)[classes][range];
+    difference_map_type& diffs = const_cast<cache_type&>(caches)[std::make_pair(classes, range)];
     if (diffs.empty()) {
       double sum = 0.0;
       
@@ -203,6 +208,8 @@ struct atable_type
       const double sum_digamma = utils::mathop::digamma(sum);
       for (index_type i = range.first; i != range.second; ++ i)
 	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
+      
+      difference_map_type(diffs).swap(diffs);
     }
     
     return diffs;
@@ -271,10 +278,8 @@ struct atable_type
     count_dict_type::iterator aiter_end = atable.end();
     for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
       aiter->second.initialize();
-    
-    cache_set_type::iterator citer_end = caches.end();
-    for (cache_set_type::iterator citer = caches.begin(); citer != citer_end; ++ citer)
-      citer->second.clear();
+
+    caches.clear();
   }
 
   atable_type& operator+=(const atable_type& x)
@@ -287,7 +292,7 @@ struct atable_type
   }
   
   count_dict_type atable;
-  cache_set_type  caches;
+  cache_type      caches;
   double prior;
   double smooth;
 };
@@ -350,14 +355,18 @@ struct ttable_type
 
     count_map_type& operator+=(const count_map_type& x)
     {
+      counts.rehash(counts.size() + x.counts.size());
+
       const_iterator citer_end = x.counts.end();
       for (const_iterator citer = x.counts.begin(); citer != citer_end; ++ citer)
 	counts[citer->first] += citer->second;
       return *this;
     }
-
+    
     count_map_type& operator|=(const count_map_type& x)
     {
+      counts.rehash(counts.size() + x.counts.size());
+      
       counts.insert(x.begin(), x.end());
       return *this;
     }
@@ -501,6 +510,8 @@ struct aligned_type
     
     aligned_map_type& operator+=(const aligned_map_type& x)
     {
+      aligned.rehash(aligned.size() + x.aligned.size());
+      
       const_iterator citer_end = x.aligned.end();
       for (const_iterator citer = x.aligned.begin(); citer != citer_end; ++ citer)
 	aligned.insert(*citer);

@@ -541,9 +541,16 @@ struct LearnHMM : public LearnBase
       const int target_size = __target.size();
       
       const prob_type sum = forward(target_size + 2 - 1, source_size + 2 - 1);
-
-      for (int src = 1; src <= source_size; ++ src) {
-	ttable_type::count_map_type& mapped = counts[source[src]];
+      
+      {
+	// allocate enough buffer size...
+	
+	for (int src = 1; src <= source_size; ++ src) {
+	  ttable_type::count_map_type& mapped = counts[source[src]];
+	  mapped.rehash(mapped.size() + target_size);
+	}
+	
+	ttable_type::count_map_type& mapped = counts[vocab_type::EPSILON];
 	mapped.rehash(mapped.size() + target_size);
       }
       
@@ -953,6 +960,14 @@ struct LearnHMMPosterior : public LearnBase
 
   void shrink()
   {
+    phi.clear();
+    exp_phi.clear();
+    exp_phi_old.clear();
+    
+    phi_set_type(phi).swap(phi);
+    phi_set_type(exp_phi).swap(exp_phi);
+    phi_set_type(exp_phi_old).swap(exp_phi_old);
+    
     hmm.shrink();
   }
   
@@ -1217,6 +1232,14 @@ struct LearnHMMSymmetricPosterior : public LearnBase
 
   void shrink()
   {
+    phi.clear();
+    exp_phi.clear();
+    exp_phi_old.clear();
+    
+    phi_set_type(phi).swap(phi);
+    phi_set_type(exp_phi).swap(exp_phi);
+    phi_set_type(exp_phi_old).swap(exp_phi_old);
+
     hmm_source_target.shrink();
     hmm_target_source.shrink();
   }
