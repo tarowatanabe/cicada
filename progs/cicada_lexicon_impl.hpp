@@ -200,8 +200,8 @@ struct atable_type
     index_type    offset;
   };
   
-  typedef utils::unordered_map<class_range_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
-			       std::allocator<std::pair<const class_range_type, cache_type> > >::type cache_set_type;
+  typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
+			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
 
   atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
@@ -240,11 +240,12 @@ struct atable_type
     }
   }
   
-  const cache_type& estimate(const class_pair_type& classes, const range_type& range) const
+  const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
   {
-    cache_type& diffs = const_cast<cache_set_type&>(caches)[std::make_pair(classes, range)];
+    difference_map_type& diffs = const_cast<cache_set_type&>(caches)[std::make_pair(classes, range)];
     if (diffs.empty()) {
-      diffs.assign(range.first, range.second);
+      //diffs.assign(range.first, range.second);
+      diffs.reserve(range.first, range.second - 1);
       
       double sum = 0.0;
       
