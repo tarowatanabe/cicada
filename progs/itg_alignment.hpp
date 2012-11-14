@@ -522,7 +522,7 @@ namespace detail
       heap.clear();
       agenda.clear();
       
-      heap_type(headp).swap(heap);
+      heap_type(heap).swap(heap);
       agenda_type(agenda).swap(agenda);
       
       chart_source.clear();
