@@ -541,6 +541,11 @@ struct LearnHMM : public LearnBase
       const int target_size = __target.size();
       
       const prob_type sum = forward(target_size + 2 - 1, source_size + 2 - 1);
+
+      for (int src = 1; src <= source_size; ++ src) {
+	ttable_type::count_map_type& mapped = counts[source[src]];
+	mapped.rehash(mapped.size() + target_size);
+      }
       
       // accumulate lexcion
       for (int trg = 1; trg <= target_size; ++ trg) {
