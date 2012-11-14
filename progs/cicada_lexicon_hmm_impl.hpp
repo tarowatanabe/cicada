@@ -1766,14 +1766,14 @@ struct MaxMatchHMM : public ViterbiBase
     
     hmm_source_target.shrink();
     hmm_target_source.shrink();
+
+    ViterbiBase::shrink();
   }
   
   matrix_type costs;
 
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
-  
-  ViterbiBase::shrink();
 };
 
 struct DependencyHMM : public ViterbiBase
