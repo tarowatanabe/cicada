@@ -409,9 +409,6 @@ struct atable_type
       node.cache.resize(range.second - range.first + 2);
     }
 
-    if (range.second >= node.cache.size())
-      throw std::runtime_error("invalid access");
-    
     return node.cache[range.second];
   }
   
