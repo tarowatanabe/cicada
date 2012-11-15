@@ -31,6 +31,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/spinlock.hpp>
 
 typedef cicada::Symbol     word_type;
 typedef cicada::Sentence   sentence_type;
@@ -272,18 +273,47 @@ struct atable_type
   typedef std::pair<class_pair_type, range_type> class_range_type;
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
-			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
-
-  static atable_counts_type& __global_counts()
+			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_type;
+  
+  struct node_type
   {
-    static atable_counts_type __tmp;
-    return __tmp;
-  }
+    typedef utils::spinlock            spinlock_type;
+    typedef spinlock_type::scoped_lock lock_type;
+    
+    node_type() : cache() {}
+    node_type(const node_type& x) : cache(x.cache) {}
+    node_type& operator=(const node_type& x)
+    {
+      cache = x.cache;
+      return *this;
+    }
+    
+    void clear() { cache.clear(); }
+    void initialize() { clear(); }
+    void shrink() { clear(); }
+    
+    cache_type    cache;
+    spinlock_type mutex;
+  };
+  
+  typedef utils::array_power2<node_type, 32, std::allocator<node_type> > node_static_type;
+  typedef std::deque<node_type, std::allocator<node_type> > node_set_type;
   
   atable_type(const double __prior=0.1, const double __smooth=1e-20)
-    : atable(__global_counts()), prior(__prior), smooth(__smooth) {}
-  atable_type(atable_counts_type& __atable, const double __prior=0.1, const double __smooth=1e-20)
-    : atable(__atable), prior(__prior), smooth(__smooth) {}
+    : atable(), prior(__prior), smooth(__smooth), caches_static(), caches_mutable() {}
+  
+  atable_type(const atable_type& x)
+    : atable(x.atable), prior(x.prior), smooth(x.smooth), caches_static(), caches_mutable() {}
+  atable_type& operator=(const atable_type& x)
+  {
+    clear();
+    
+    atable = x.atable;
+    prior  = x.prior;
+    smooth = x.smooth;
+    
+    return *this;
+  }
   
   prob_type operator()(const word_type& source,
 		       const word_type& target,
@@ -319,7 +349,11 @@ struct atable_type
   
   const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
   {
-    difference_map_type& diffs = const_cast<cache_set_type&>(caches)[std::make_pair(classes, range)];
+    node_type& node = caches(range);
+    
+    node_type::lock_type lock(node.mutex);
+    
+    difference_map_type& diffs = node.cache[std::make_pair(classes, range)];
     if (diffs.empty()) {
       diffs.reserve(range.first, range.second - 1);
       
@@ -342,6 +376,24 @@ struct atable_type
     return diffs;
   }
   
+  node_type& caches(const range_type& range) const
+  {
+    const size_type length = range.second - range.first;
+
+    if (length >= caches_static.size()) {
+      const size_type pos = length - caches_static.size();
+      
+      node_type::lock_type lock(const_cast<node_type::spinlock_type&>(mutex));
+      
+      if (pos >= caches_mutable.size())
+	const_cast<node_set_type&>(caches_mutable).resize(pos + 1);
+      
+      return const_cast<node_type&>(caches_mutable[pos]);
+    } else
+      return const_cast<node_type&>(caches_static[length]);
+  }
+
+  
   difference_map_type& operator[](const class_pair_type& x)
   {
     return atable[x];
@@ -357,35 +409,34 @@ struct atable_type
     return atable[class_pair_type(source, target)][diff];
   }
   
-  void clear() { atable.clear(); caches.clear(); }
+  void clear()
+  {
+    atable.clear();
+
+    caches_static.clear();
+    caches_mutable.clear();
+  }
   void swap(atable_type& x)
   {
-    if (&atable != &x.atable)
-      atable.swap(x.atable);
-    caches.swap(x.caches);
+    atable.swap(x.atable);
+    caches_static.swap(x.caches_static);
+    caches_mutable.swap(x.caches_mutable);
     std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
   }
-
+  
   void estimate_unk()
   {
     atable.estimate_unk();
   }
   
-  void shrink()
-  {
-    for (cache_set_type::iterator citer = caches.begin(); citer != caches.end(); /**/) {
-      if (citer->first.second.second - citer->first.second.first > 20)
-	caches.erase(citer ++);
-      else
-	++ citer;
-    }
-  }
+  void shrink() {}
   
   void initialize()
   {
     atable.initialize();
-    caches.clear();
+    caches_static.clear();
+    caches_mutable.clear();
   }
   
   atable_type& operator+=(const atable_type& x)
@@ -402,10 +453,14 @@ struct atable_type
   
   bool empty() const { return atable.empty(); }
   
-  atable_counts_type& atable;
-  cache_set_type      caches;
+  atable_counts_type atable;
   double prior;
   double smooth;
+  
+  // caching....
+  node_static_type caches_static;
+  node_set_type    caches_mutable;
+  node_type::spinlock_type mutex;
 };
 
 struct ttable_type
@@ -689,6 +744,12 @@ struct LearnBase
     static classes_type __tmp;
     return __tmp;
   }
+
+  static const atable_type& __atable()
+  {
+    static atable_type __tmp;
+    return __tmp;
+  }
   
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source)
@@ -696,6 +757,8 @@ struct LearnBase
       ttable_target_source(__ttable_target_source),
       ttable_counts_source_target(__ttable_source_target.prior, __ttable_source_target.smooth),
       ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
+      atable_source_target(__atable()),
+      atable_target_source(__atable()),
       classes_source(__classes()),
       classes_target(__classes()),
       objective_source_target(0),
@@ -747,8 +810,8 @@ struct LearnBase
 
   void shrink()
   {
-    atable_source_target.shrink();
-    atable_target_source.shrink();
+    //atable_source_target.shrink();
+    //atable_target_source.shrink();
   };
   
   const ttable_type& ttable_source_target;
@@ -756,8 +819,8 @@ struct LearnBase
   ttable_type ttable_counts_source_target;
   ttable_type ttable_counts_target_source;
 
-  atable_type atable_source_target;
-  atable_type atable_target_source;
+  const atable_type& atable_source_target;
+  const atable_type& atable_target_source;
   atable_counts_type atable_counts_source_target;
   atable_counts_type atable_counts_target_source;
 
@@ -783,10 +846,18 @@ struct ViterbiBase
     return __tmp;
   }
   
+  static const atable_type& __atable()
+  {
+    static atable_type __tmp;
+    return __tmp;
+  }
+
   ViterbiBase(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
+      atable_source_target(__atable()),
+      atable_target_source(__atable()),
       classes_source(__classes()),
       classes_target(__classes())
   {}
@@ -806,15 +877,15 @@ struct ViterbiBase
   
   void shrink()
   {
-    atable_source_target.shrink();
-    atable_target_source.shrink();
+    //atable_source_target.shrink();
+    //atable_target_source.shrink();
   };
 
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;
   
-  atable_type atable_source_target;
-  atable_type atable_target_source;
+  const atable_type& atable_source_target;
+  const atable_type& atable_target_source;
   
   const classes_type& classes_source;
   const classes_type& classes_target;
