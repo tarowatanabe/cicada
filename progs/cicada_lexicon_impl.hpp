@@ -272,13 +272,31 @@ struct atable_type
   typedef std::pair<index_type, index_type> range_type;
   typedef std::pair<class_pair_type, range_type> class_range_type;
   
-  typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
-			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_type;
+  struct cache_type
+  {
+    typedef utils::spinlock            spinlock_type;
+    typedef spinlock_type::scoped_lock lock_type;
+    
+    cache_type() : counts() {}
+    cache_type(const cache_type& x): counts(x.counts) {}
+    cache_type& operator=(const cache_type& x)
+    {
+      counts = x.counts;
+      return *this;
+    }
+    
+    void clear() { counts.clear(); }
+    
+    atable_counts_type counts;
+    spinlock_type      mutex;
+  };
   
   struct node_type
   {
     typedef utils::spinlock            spinlock_type;
     typedef spinlock_type::scoped_lock lock_type;
+    
+    typedef std::vector<cache_type, std::allocator<cache_type> > cache_set_type;
     
     node_type() : cache() {}
     node_type(const node_type& x) : cache(x.cache) {}
@@ -292,8 +310,8 @@ struct atable_type
     void initialize() { clear(); }
     void shrink() { clear(); }
     
-    cache_type    cache;
-    spinlock_type mutex;
+    cache_set_type cache;
+    spinlock_type  mutex;
   };
   
   typedef utils::array_power2<node_type, 64, std::allocator<node_type> > node_static_type;
@@ -349,11 +367,15 @@ struct atable_type
   
   const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
   {
-    node_type& node = caches(range);
+    //
+    // range-second is always positive, the range-second can range from 0 to (range.second - range.first) + 2, including BOS/EOS
+    //
     
-    node_type::lock_type lock(node.mutex);
+    cache_type& cache = caches(range);
     
-    difference_map_type& diffs = node.cache[std::make_pair(classes, range)];
+    cache_type::lock_type lock(cache.mutex);
+    
+    difference_map_type& diffs = cache.counts[classes];
     if (diffs.empty()) {
       diffs.reserve(range.first, range.second - 1);
       
@@ -375,8 +397,25 @@ struct atable_type
     
     return diffs;
   }
+
+  cache_type& caches(const range_type& range) const
+  {
+    node_type& node = nodes(range);
+    
+    node_type::lock_type lock(node.mutex);
+    
+    if (node.cache.empty()) {
+      node.cache.reserve(range.second - range.first + 2);
+      node.cache.resize(range.second - range.first + 2);
+    }
+
+    if (range.second >= node.cache.size())
+      throw std::runtime_error("invalid access");
+    
+    return node.cache[range.second];
+  }
   
-  node_type& caches(const range_type& range) const
+  node_type& nodes(const range_type& range) const
   {
     const size_type length = range.second - range.first;
 
