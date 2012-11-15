@@ -540,7 +540,6 @@ struct atable_type
   typedef atable_counts_type::class_pair_type class_pair_type;
   
   typedef std::pair<index_type, index_type> range_type;
-  typedef std::pair<class_pair_type, range_type> class_range_type;
   
   struct cache_type
   {
