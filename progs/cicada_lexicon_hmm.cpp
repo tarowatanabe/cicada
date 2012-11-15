@@ -147,13 +147,6 @@ int main(int argc, char ** argv)
     ttable_type ttable_source_target(prior_lexicon, smooth_lexicon);
     ttable_type ttable_target_source(prior_lexicon, smooth_lexicon);
     
-    // this is a trick: we have only alignment model counts, not estiamted parameters which will be computed on the fly
-    //atable_counts_type atable_counts_source_target;
-    //atable_counts_type atable_counts_target_source;
-    
-    //atable_type atable_source_target(atable_counts_source_target, prior_alignment, smooth_alignment);
-    //atable_type atable_target_source(atable_counts_target_source, prior_alignment, smooth_alignment);
-
     atable_type atable_source_target(prior_alignment, smooth_alignment);
     atable_type atable_target_source(prior_alignment, smooth_alignment);
     
@@ -1072,11 +1065,6 @@ void learn(const Maximizer& maximizer,
     // we need to initialize cache-local atable, first, since we will clear all the entries again!
     atable_source_target.initialize();
     atable_target_source.initialize();
-    
-    //for (size_t i = 0; i != mappers.size(); ++ i) {
-    //  mappers[i].atable_source_target.initialize();
-    //  mappers[i].atable_target_source.initialize();
-    //}
     
     // second, merge counts
     for (size_t i = 0; i != mappers.size(); ++ i) {
