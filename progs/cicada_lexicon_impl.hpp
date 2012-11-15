@@ -80,7 +80,7 @@ struct classes_type
   bool surface;
 };
 
-struct atable_type
+struct atable_counts_type
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
@@ -163,21 +163,127 @@ struct atable_type
     difference_set_type counts;
     index_type offset;
   };
-
+  
   typedef std::pair<word_type, word_type> class_pair_type;
-  typedef std::pair<index_type, index_type> range_type;
   
   typedef utils::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
-			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type count_dict_type;
-  
-  typedef difference_map_type mapped_type;
+			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type counts_type;
 
+  typedef difference_map_type mapped_type;
+  
+  typedef counts_type::const_iterator const_iterator;
+  typedef counts_type::iterator       iterator;
+
+  inline const_iterator begin() const { return counts.begin(); }
+  inline       iterator begin()       { return counts.begin(); }
+
+  inline const_iterator end() const { return counts.end(); }
+  inline       iterator end()       { return counts.end(); }
+
+  inline const_iterator find(const class_pair_type& x) const { return counts.find(x); }
+  inline       iterator find(const class_pair_type& x)       { return counts.find(x); }
+  
+  difference_map_type& operator[](const class_pair_type& x)
+  {
+    return counts[x];
+  }
+  
+  difference_map_type& operator()(const word_type& source, const word_type& target)
+  {
+    return counts[class_pair_type(source, target)];
+  }
+  
+  count_type& operator()(const word_type& source, const word_type& target, const index_type& diff)
+  {
+    return counts[class_pair_type(source, target)][diff];
+  }
+
+  bool empty() const { return counts.empty(); }
+  
+  void clear() { counts.clear(); }
+  
+  void swap(atable_counts_type& x) { counts.swap(x.counts); }
+  
+  void estimate_unk()
+  {
+    if (counts.empty()) return;
+
+    difference_map_type counts_source_target;
+    counts_type counts_source;
+    counts_type counts_target;
+    
+    counts_type::const_iterator aiter_end = counts.end();
+    for (counts_type::const_iterator aiter = counts.begin(); aiter != aiter_end; ++ aiter) {
+      const class_pair_type& pair = aiter->first;
+
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS)
+	counts_source[class_pair_type(vocab_type::UNK, pair.second)] += aiter->second;
+      
+      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+	counts_target[class_pair_type(pair.first, vocab_type::UNK)] += aiter->second;
+      
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS
+	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+	counts_source_target += aiter->second;
+    }
+    
+    counts_type::const_iterator siter_end = counts_source.end();
+    for (counts_type::const_iterator siter = counts_source.begin(); siter != siter_end; ++ siter)
+      counts[siter->first] = siter->second;
+    
+    counts_type::const_iterator titer_end = counts_target.end();
+    for (counts_type::const_iterator titer = counts_target.begin(); titer != titer_end; ++ titer)
+      counts[titer->first] = titer->second;
+    
+    counts[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = counts_source_target;
+  }
+
+  void initialize()
+  {
+    counts_type::iterator aiter_end = counts.end();
+    for (counts_type::iterator aiter = counts.begin(); aiter != aiter_end; ++ aiter)
+      aiter->second.initialize();
+  }
+  
+  atable_counts_type& operator+=(const atable_counts_type& x)
+  {
+    counts_type::const_iterator aiter_end = x.counts.end();
+    for (counts_type::const_iterator aiter = x.counts.begin(); aiter != aiter_end; ++ aiter)
+      counts[aiter->first] += aiter->second;
+    
+    return *this;
+  }
+  
+private:
+  counts_type counts;
+};
+
+struct atable_type
+{
+  typedef atable_counts_type::size_type       size_type;
+  typedef atable_counts_type::difference_type difference_type;
+  typedef atable_counts_type::index_type      index_type;
+  
+  typedef atable_counts_type::difference_map_type difference_map_type;
+  
+  typedef atable_counts_type::class_pair_type class_pair_type;
+  
+  typedef std::pair<index_type, index_type> range_type;
   typedef std::pair<class_pair_type, range_type> class_range_type;
   
   typedef utils::unordered_map<class_range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_range_type>,
 			       std::allocator<std::pair<const class_range_type, difference_map_type> > >::type cache_set_type;
+
+  static atable_counts_type& __global_counts()
+  {
+    static atable_counts_type __tmp;
+    return __tmp;
+  }
   
-  atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
+  atable_type(const double __prior=0.1, const double __smooth=1e-20)
+    : atable(__global_counts()), prior(__prior), smooth(__smooth) {}
+  atable_type(atable_counts_type& __atable, const double __prior=0.1, const double __smooth=1e-20)
+    : atable(__atable), prior(__prior), smooth(__smooth) {}
   
   prob_type operator()(const word_type& source,
 		       const word_type& target,
@@ -219,7 +325,7 @@ struct atable_type
       
       double sum = 0.0;
       
-      count_dict_type::const_iterator aiter = atable.find(classes);
+      atable_counts_type::const_iterator aiter = atable.find(classes);
       
       for (index_type i = range.first; i != range.second; ++ i) {
 	const double count = (aiter != atable.end() ? aiter->second[i] + prior : prior);
@@ -235,12 +341,12 @@ struct atable_type
     
     return diffs;
   }
-
+  
   difference_map_type& operator[](const class_pair_type& x)
   {
     return atable[x];
   }
-
+  
   difference_map_type& operator()(const word_type& source, const word_type& target)
   {
     return atable[class_pair_type(source, target)];
@@ -254,7 +360,8 @@ struct atable_type
   void clear() { atable.clear(); caches.clear(); }
   void swap(atable_type& x)
   {
-    atable.swap(x.atable);
+    if (&atable != &x.atable)
+      atable.swap(x.atable);
     caches.swap(x.caches);
     std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
@@ -262,36 +369,7 @@ struct atable_type
 
   void estimate_unk()
   {
-    if (atable.empty()) return;
-
-    difference_map_type atable_source_target;
-    count_dict_type atable_source;
-    count_dict_type atable_target;
-    
-    count_dict_type::const_iterator aiter_end = atable.end();
-    for (count_dict_type::const_iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter) {
-      const class_pair_type& pair = aiter->first;
-
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS)
-	atable_source[class_pair_type(vocab_type::UNK, pair.second)] += aiter->second;
-      
-      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
-	atable_target[class_pair_type(pair.first, vocab_type::UNK)] += aiter->second;
-      
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS
-	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
-	atable_source_target += aiter->second;
-    }
-    
-    count_dict_type::const_iterator siter_end = atable_source.end();
-    for (count_dict_type::const_iterator siter = atable_source.begin(); siter != siter_end; ++ siter)
-      atable[siter->first] = siter->second;
-    
-    count_dict_type::const_iterator titer_end = atable_target.end();
-    for (count_dict_type::const_iterator titer = atable_target.begin(); titer != titer_end; ++ titer)
-      atable[titer->first] = titer->second;
-    
-    atable[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = atable_source_target;
+    atable.estimate_unk();
   }
   
   void shrink()
@@ -306,26 +384,26 @@ struct atable_type
   
   void initialize()
   {
-    count_dict_type::iterator aiter_end = atable.end();
-    for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
-      aiter->second.initialize();
-
+    atable.initialize();
     caches.clear();
   }
-
+  
   atable_type& operator+=(const atable_type& x)
   {
-    count_dict_type::const_iterator aiter_end = x.atable.end();
-    for (count_dict_type::const_iterator aiter = x.atable.begin(); aiter != aiter_end; ++ aiter)
-      atable[aiter->first] += aiter->second;
-    
+    atable += x.atable;
     return *this;
   }
 
+  atable_type& operator+=(const atable_counts_type& x)
+  {
+    atable += x;
+    return *this;
+  }
+  
   bool empty() const { return atable.empty(); }
   
-  count_dict_type atable;
-  cache_set_type  caches;
+  atable_counts_type& atable;
+  cache_set_type      caches;
   double prior;
   double smooth;
 };
@@ -636,8 +714,8 @@ struct LearnBase
       ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
       atable_source_target(__atable_source_target),
       atable_target_source(__atable_target_source),
-      atable_counts_source_target(__atable_source_target.prior, __atable_source_target.smooth),
-      atable_counts_target_source(__atable_target_source.prior, __atable_target_source.smooth),
+      atable_counts_source_target(),
+      atable_counts_target_source(),
       classes_source(__classes_source),
       classes_target(__classes_target),
       objective_source_target(0),
@@ -680,8 +758,8 @@ struct LearnBase
 
   atable_type atable_source_target;
   atable_type atable_target_source;
-  atable_type atable_counts_source_target;
-  atable_type atable_counts_target_source;
+  atable_counts_type atable_counts_source_target;
+  atable_counts_type atable_counts_target_source;
 
   const classes_type& classes_source;
   const classes_type& classes_target;
@@ -896,8 +974,8 @@ void write_alignment(const path_type& path, const atable_type& align)
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(20);
   
-  atable_type::count_dict_type::const_iterator citer_end = align.atable.end();
-  for (atable_type::count_dict_type::const_iterator citer = align.atable.begin(); citer != citer_end; ++ citer)
+  atable_counts_type::const_iterator citer_end = align.atable.end();
+  for (atable_counts_type::const_iterator citer = align.atable.begin(); citer != citer_end; ++ citer)
     for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
       os << citer->first.first << ' ' << citer->first.second << ' ' << diff << ' ' << citer->second[diff] << '\n';
 }

@@ -146,9 +146,13 @@ int main(int argc, char ** argv)
     
     ttable_type ttable_source_target(prior_lexicon, smooth_lexicon);
     ttable_type ttable_target_source(prior_lexicon, smooth_lexicon);
-
-    atable_type atable_source_target(prior_alignment, smooth_alignment);
-    atable_type atable_target_source(prior_alignment, smooth_alignment);
+    
+    // this is a trick: we have only alignment model counts, not estiamted parameters which will be computed on the fly
+    atable_counts_type atable_counts_source_target;
+    atable_counts_type atable_counts_target_source;
+    
+    atable_type atable_source_target(atable_counts_source_target, prior_alignment, smooth_alignment);
+    atable_type atable_target_source(atable_counts_target_source, prior_alignment, smooth_alignment);
 
     classes_type classes_source;
     classes_type classes_target;
@@ -1061,22 +1065,25 @@ void learn(const Maximizer& maximizer,
 		<< "log-likelihood for P(source | target): " << objective_target_source << '\n';
     
     // merge atable counts... (we will dynamically create probability table!)
+    // first, initialize all the threaded alignment
+    // we need to initialize cache-local atable, first, since we will clear all the entries again!
     atable_source_target.initialize();
     atable_target_source.initialize();
+    
+    for (size_t i = 0; i != mappers.size(); ++ i) {
+      mappers[i].atable_source_target.initialize();
+      mappers[i].atable_target_source.initialize();
+    }
+    
+    // second, merge counts
     for (size_t i = 0; i != mappers.size(); ++ i) {
       atable_source_target += mappers[i].atable_counts_source_target;
       atable_target_source += mappers[i].atable_counts_target_source;
     }
     
+    // third, estimate unk
     atable_source_target.estimate_unk();
     atable_target_source.estimate_unk();
-    
-    for (size_t i = 0; i != mappers.size(); ++ i) {
-      mappers[i].atable_source_target = atable_source_target;
-      mappers[i].atable_target_source = atable_target_source;
-      //mappers[i].atable_source_target.shrink();
-      //mappers[i].atable_target_source.shrink();
-    }
     
     workers_reducer_source_target.join_all();
     workers_reducer_target_source.join_all();

@@ -600,9 +600,9 @@ struct LearnHMM : public LearnBase
     
     void accumulate(const sentence_type& __source,
 		    const sentence_type& __target,
-		    atable_type& counts)
+		    atable_counts_type& counts)
     {
-      typedef std::vector<atable_type::mapped_type*, std::allocator<atable_type::mapped_type*> > mapped_type;
+      typedef std::vector<atable_counts_type::mapped_type*, std::allocator<atable_counts_type::mapped_type*> > mapped_type;
 
       const size_type source_size = __source.size();
       const size_type target_size = __target.size();
@@ -660,7 +660,7 @@ struct LearnHMM : public LearnBase
 	     const classes_type& classes_source,
 	     const classes_type& classes_target,
 	     ttable_type& counts_ttable,
-	     atable_type& counts_atable,
+	     atable_counts_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
@@ -685,7 +685,7 @@ struct LearnHMM : public LearnBase
 	     const classes_type& classes_source,
 	     const classes_type& classes_target,
 	     ttable_type& counts_ttable,
-	     atable_type& counts_atable,
+	     atable_counts_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
@@ -783,7 +783,7 @@ struct LearnHMMPosterior : public LearnBase
 	     const classes_type& classes_source,
 	     const classes_type& classes_target,
 	     ttable_type& counts_ttable,
-	     atable_type& counts_atable,
+	     atable_counts_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
@@ -853,7 +853,7 @@ struct LearnHMMPosterior : public LearnBase
 	     const classes_type& classes_source,
 	     const classes_type& classes_target,
 	     ttable_type& counts_ttable,
-	     atable_type& counts_atable,
+	     atable_counts_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
