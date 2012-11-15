@@ -296,7 +296,7 @@ struct atable_type
     spinlock_type mutex;
   };
   
-  typedef utils::array_power2<node_type, 32, std::allocator<node_type> > node_static_type;
+  typedef utils::array_power2<node_type, 64, std::allocator<node_type> > node_static_type;
   typedef std::deque<node_type, std::allocator<node_type> > node_set_type;
   
   atable_type(const double __prior=0.1, const double __smooth=1e-20)
