@@ -318,10 +318,10 @@ struct atable_type
   typedef std::deque<node_type, std::allocator<node_type> > node_set_type;
   
   atable_type(const double __prior=0.1, const double __smooth=1e-20)
-    : atable(), prior(__prior), smooth(__smooth), caches_static(), caches_mutable() {}
+    : atable(), prior(__prior), smooth(__smooth), caches_static(), caches_mutable() { initialize_cache(); }
   
   atable_type(const atable_type& x)
-    : atable(x.atable), prior(x.prior), smooth(x.smooth), caches_static(), caches_mutable() {}
+    : atable(x.atable), prior(x.prior), smooth(x.smooth), caches_static(), caches_mutable() { initialize_cache(); }
   atable_type& operator=(const atable_type& x)
   {
     clear();
@@ -329,6 +329,8 @@ struct atable_type
     atable = x.atable;
     prior  = x.prior;
     smooth = x.smooth;
+
+    initialize_cache();
     
     return *this;
   }
@@ -400,20 +402,6 @@ struct atable_type
 
   cache_type& caches(const range_type& range) const
   {
-    node_type& node = nodes(range);
-    
-    node_type::lock_type lock(node.mutex);
-    
-    if (node.cache.empty()) {
-      node.cache.reserve(range.second - range.first + 2);
-      node.cache.resize(range.second - range.first + 2);
-    }
-
-    return node.cache[range.second];
-  }
-  
-  node_type& nodes(const range_type& range) const
-  {
     const size_type length = range.second - range.first;
 
     if (length >= caches_static.size()) {
@@ -424,9 +412,14 @@ struct atable_type
       if (pos >= caches_mutable.size())
 	const_cast<node_set_type&>(caches_mutable).resize(pos + 1);
       
-      return const_cast<node_type&>(caches_mutable[pos]);
+      if (caches_mutable[pos].cache.empty()) {
+	const_cast<node_type&>(caches_mutable[pos]).cache.reserve(length + 2);
+	const_cast<node_type&>(caches_mutable[pos]).cache.resize(length + 2);
+      }
+      
+      return const_cast<node_type&>(caches_mutable[pos]).cache[range.second];
     } else
-      return const_cast<node_type&>(caches_static[length]);
+      return const_cast<node_type&>(caches_static[length]).cache[range.second];
   }
 
   
@@ -449,8 +442,7 @@ struct atable_type
   {
     atable.clear();
 
-    caches_static.clear();
-    caches_mutable.clear();
+    initialize_cache();
   }
   void swap(atable_type& x)
   {
@@ -471,9 +463,20 @@ struct atable_type
   void initialize()
   {
     atable.initialize();
-    caches_static.clear();
-    caches_mutable.clear();
+    
+    initialize_cache();
   }
+
+  void initialize_cache()
+  {
+    caches_mutable.clear();
+    caches_static.clear();
+    
+    for (size_type i = 0; i != caches_static.size(); ++ i) {
+      caches_static[i].cache.reserve(i + 2);
+      caches_static[i].cache.resize(i + 2);
+    }
+  };
   
   atable_type& operator+=(const atable_type& x)
   {
