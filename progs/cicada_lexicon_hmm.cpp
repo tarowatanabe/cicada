@@ -1075,6 +1075,10 @@ void learn(const Maximizer& maximizer,
     // third, estimate unk
     atable_source_target.estimate_unk();
     atable_target_source.estimate_unk();
+
+    // initialize cache
+    atable_source_target.initialize_cache();
+    atable_target_source.initialize_cache();
     
     workers_reducer_source_target.join_all();
     workers_reducer_target_source.join_all();

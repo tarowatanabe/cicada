@@ -259,7 +259,7 @@ private:
   counts_type counts;
 };
 
-#if 0
+#if 1
 struct atable_type
 {
   typedef atable_counts_type::size_type       size_type;
@@ -301,7 +301,7 @@ struct atable_type
 
     typedef counts_type value_type;
     
-    typedef utils::array_power2<counts_type, 32, std::allocator<counts_type> > counts_static_type;
+    typedef utils::array_power2<counts_type, 64, std::allocator<counts_type> > counts_static_type;
     typedef std::deque<counts_type, std::allocator<counts_type> > counts_mutable_type;
     
     cache_type() { clear(); }
@@ -408,7 +408,6 @@ struct atable_type
     //
     
     cache_type* cache = &const_cast<cache_type&>(cache_unk);
-    
     cache_set_type::const_iterator citer = caches.find(classes);
     if (citer != caches.end())
       cache = &const_cast<cache_type&>(citer->second);
@@ -475,8 +474,6 @@ struct atable_type
   void estimate_unk()
   {
     atable.estimate_unk();
-    
-    initialize_cache();
   }
   
   void shrink() {}
@@ -501,8 +498,6 @@ struct atable_type
   atable_type& operator+=(const atable_type& x)
   {
     atable += x.atable;
-    
-    initialize_cache();
 
     return *this;
   }
@@ -510,8 +505,6 @@ struct atable_type
   atable_type& operator+=(const atable_counts_type& x)
   {
     atable += x;
-    
-    initialize_cache();
     
     return *this;
   }
@@ -528,7 +521,7 @@ struct atable_type
 };
 #endif
 
-#if 1
+#if 0
 struct atable_type
 {
   typedef atable_counts_type::size_type       size_type;
