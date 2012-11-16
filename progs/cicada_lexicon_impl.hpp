@@ -316,7 +316,7 @@ struct atable_type
     void clear()
     {
       counts_static.clear();
-      counts_mutable.clear(); 
+      counts_mutable.clear();
       
       for (size_type i = 0; i != counts_static.size(); ++ i)
 	counts_static[i].resize(i + 2);
@@ -555,7 +555,7 @@ struct atable_type
   
   typedef utils::simple_vector<cache_type, std::allocator<cache_type> > cache_set_type;
   
-  typedef utils::array_power2<cache_set_type, 128, std::allocator<cache_set_type> > cache_static_type;
+  typedef utils::array_power2<cache_set_type, 64, std::allocator<cache_set_type> > cache_static_type;
   typedef std::deque<cache_set_type, std::allocator<cache_set_type> > cache_mutable_type;
   
   atable_type(const double __prior=0.1, const double __smooth=1e-20)
