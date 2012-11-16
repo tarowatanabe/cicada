@@ -75,6 +75,8 @@ namespace cicada
 
   private:
     cache_set_type caches;
+
+  protected:
     std::string __algorithm;
   };
 };
