@@ -86,7 +86,7 @@ std::string non_terminal = "[x]";
 
 bool mst_mode = false;
 bool conll_mode = false;
-bool dep_pos_mode = false;
+bool malt_mode = false;
 bool cabocha_mode = false;
 bool khayashi_mode = false;
 bool khayashi_forest_mode = false;
@@ -182,7 +182,7 @@ void normalize(Iterator first, Iterator last)
 
 struct MST;
 struct CoNLL;
-struct DepPos;
+struct Malt;
 struct Cabocha;
 struct KHayashi;
 struct KHayashiForest;
@@ -194,18 +194,18 @@ int main(int argc, char** argv)
     options(argc, argv);
     
     //default to cicada-native-mode
-    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode == 0)
+    if (int(mst_mode) + conll_mode + malt_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode == 0)
       cicada_mode = true;
 
-    if (int(mst_mode) + conll_mode + dep_pos_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
-      throw std::runtime_error("one of mst/conll/dep-pos/khayashi/khayashi-forest/cicada mode");
+    if (int(mst_mode) + conll_mode + malt_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
+      throw std::runtime_error("one of mst/conll/malt/khayashi/khayashi-forest/cicada mode");
     
     if (mst_mode)
       apply<MST>(input_file, map_file, output_file);
     else if (conll_mode)
       apply<CoNLL>(input_file, map_file, output_file);
-    else if (dep_pos_mode)
-      apply<DepPos>(input_file, map_file, output_file);    
+    else if (malt_mode)
+      apply<Malt>(input_file, map_file, output_file);    
     else if (cabocha_mode)
       apply<Cabocha>(input_file, map_file, output_file);
     else if (khayashi_mode)
@@ -806,7 +806,7 @@ struct CoNLL
   }
 };
 
-struct dep_pos_type
+struct malt_type
 {
   typedef int index_type;
   
@@ -815,48 +815,48 @@ struct dep_pos_type
   std::string  tag;
   index_type   dep;
 
-  dep_pos_type() {}
-  dep_pos_type(const index_type& __id,
-	       const std::string& __word,
-	       const std::string& __tag,
-	       const index_type& __dep)
+  malt_type() {}
+  malt_type(const index_type& __id,
+	    const std::string& __word,
+	    const std::string& __tag,
+	    const index_type& __dep)
     : id(__id), word(__word), tag(__tag), dep(__dep) {}
 };
 
 BOOST_FUSION_ADAPT_STRUCT(
-			  dep_pos_type,
-			  (dep_pos_type::index_type, id)
+			  malt_type,
+			  (malt_type::index_type, id)
 			  (std::string, word)
 			  (std::string, tag)
-			  (dep_pos_type::index_type, dep)
+			  (malt_type::index_type, dep)
 			  )
-struct DepPos
+struct Malt
 {
-  typedef std::vector<dep_pos_type, std::allocator<dep_pos_type> > dep_pos_set_type;
+  typedef std::vector<malt_type, std::allocator<malt_type> > malt_set_type;
 
   template <typename Iterator>
-  struct dep_pos_parser : boost::spirit::qi::grammar<Iterator, dep_pos_set_type()>
+  struct malt_parser : boost::spirit::qi::grammar<Iterator, malt_set_type()>
   {
-    dep_pos_parser() : dep_pos_parser::base_type(dep_poss)
+    malt_parser() : malt_parser::base_type(malts)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
       token %= qi::lexeme[+(standard::char_ - standard::space)];
       
-      dep_pos  %= (qi::omit[*standard::blank] >> qi::int_
-		   >> qi::omit[+standard::blank] >> token
-		   >> qi::omit[+standard::blank] >> token
-		   >> qi::omit[+standard::blank] >> qi::int_
-		   >> qi::omit[*standard::blank] >> qi::eol);
-      dep_poss %= *dep_pos >> qi::omit[*standard::blank] >> qi::eol;
+      malt  %= (qi::omit[*standard::blank] >> qi::int_
+		>> qi::omit[+standard::blank] >> token
+		>> qi::omit[+standard::blank] >> token
+		>> qi::omit[+standard::blank] >> qi::int_
+		>> qi::omit[*standard::blank] >> qi::eol);
+      malts %= *malt >> qi::omit[*standard::blank] >> qi::eol;
     }
     
     typedef boost::spirit::standard::blank_type blank_type;
     
     boost::spirit::qi::rule<Iterator, std::string()>      token;
-    boost::spirit::qi::rule<Iterator, dep_pos_type()>     dep_pos;
-    boost::spirit::qi::rule<Iterator, dep_pos_set_type()> dep_poss;
+    boost::spirit::qi::rule<Iterator, malt_type()>     malt;
+    boost::spirit::qi::rule<Iterator, malt_set_type()> malts;
   };
 
   void operator()(const path_type& file, const path_type& map, const path_type& output)
@@ -882,40 +882,40 @@ struct DepPos
     
     MapFile mapper(map);
 
-    dep_pos_parser<iiter_type> parser;
-    dep_pos_set_type dep_pos;
+    malt_parser<iiter_type> parser;
+    malt_set_type malt;
     
     Transform transform(goal, head_mode);
     
     size_t sent_no = 0;
     size_t line_no = 0;
     while (iter != iter_end) {
-      dep_pos.clear();
+      malt.clear();
 	
-      if (! qi::parse(iter, iter_end, parser, dep_pos)) {
+      if (! qi::parse(iter, iter_end, parser, malt)) {
 	std::string str;
-	for (size_t i = 0; i != dep_pos.size(); ++ i)
-	  str += ' ' + dep_pos[i].word;
+	for (size_t i = 0; i != malt.size(); ++ i)
+	  str += ' ' + malt[i].word;
 	throw std::runtime_error("parsing failed at # sent: " + utils::lexical_cast<std::string>(sent_no)
 				 + " # line: " + utils::lexical_cast<std::string>(line_no) + str);
       }
       
       ++ sent_no;
-      line_no += dep_pos.size() + 1;
+      line_no += malt.size() + 1;
       
       if (mapper) {
 	const sentence_type& mapped = mapper();
 
-	if (mapped.size() != dep_pos.size())
-	  throw std::runtime_error("dep_pos size and mapped size differ");
+	if (mapped.size() != malt.size())
+	  throw std::runtime_error("malt size and mapped size differ");
 	
 	for (size_t i = 0; i != mapped.size(); ++ i)
-	  dep_pos[i].word = mapped[i];
+	  malt[i].word = mapped[i];
       }
 
       if (normalize_mode || unescape_mode) {
-	dep_pos_set_type::iterator citer_end = dep_pos.end();
-	for (dep_pos_set_type::iterator citer = dep_pos.begin(); citer != citer_end; ++ citer) {
+	malt_set_type::iterator citer_end = malt.end();
+	for (malt_set_type::iterator citer = malt.begin(); citer != citer_end; ++ citer) {
 
 	  if (unescape_mode)
 	    citer->word = unescape(citer->word);
@@ -928,8 +928,8 @@ struct DepPos
       if (forest_mode) {
 	transform.clear();
 	
-	dep_pos_set_type::const_iterator citer_end = dep_pos.end();
-	for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer) {
+	malt_set_type::const_iterator citer_end = malt.end();
+	for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer) {
 	  transform.sentence.push_back(citer->word);
 	  
 	  transform.pos.push_back('[' + citer->tag + ']');
@@ -945,24 +945,24 @@ struct DepPos
 	  os << std::flush;
       } else {
 	if (leaf_mode) {
-	  if (! dep_pos.empty()) {
-	    dep_pos_set_type::const_iterator citer_end = dep_pos.end() - 1;
-	    for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  if (! malt.empty()) {
+	    malt_set_type::const_iterator citer_end = malt.end() - 1;
+	    for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer)
 	      os << citer->word << ' ';
-	    os << dep_pos.back().word;
+	    os << malt.back().word;
 	  }
 	  os << '\n';
 	} else {
-	  dep_pos_set_type::const_iterator citer_end = dep_pos.end();
-	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  malt_set_type::const_iterator citer_end = malt.end();
+	  for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer)
 	    os << citer->word << ' ';
 	  os << "||| ";
 	  
-	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer)
 	    os << citer->tag << ' ';
 	  os << "|||";
 	  
-	  for (dep_pos_set_type::const_iterator citer = dep_pos.begin(); citer != citer_end; ++ citer)
+	  for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer)
 	    os << ' ' << (citer->dep + 1);
 	  os << '\n';
 	}
@@ -1836,7 +1836,7 @@ void options(int argc, char** argv)
     
     ("mst",             po::bool_switch(&mst_mode),             "tranform MST dependency")
     ("conll",           po::bool_switch(&conll_mode),           "tranform CoNLL dependency")
-    ("dep-pos",         po::bool_switch(&dep_pos_mode),         "tranform dep-pos dependency")
+    ("malt",            po::bool_switch(&malt_mode),            "tranform Malt dependency")
     ("cabocha",         po::bool_switch(&cabocha_mode),         "tranform Cabocha dependency")
     ("khayashi",        po::bool_switch(&khayashi_mode),        "tranform KHayashi dependency")
     ("khayashi-forest", po::bool_switch(&khayashi_forest_mode), "tranform KHayashi Forest dependency")
