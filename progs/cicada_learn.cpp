@@ -1666,6 +1666,12 @@ double optimize_xbleu(const hypergraph_set_type& forests,
       objective = optimizer();
     }
   }
+
+  if (! scale_fixed && weights[feature_scale] < 0.0) {
+    // inverse weights...
+    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
+      weights[i] = - weights[i];
+  }
     
   return objective;
 }

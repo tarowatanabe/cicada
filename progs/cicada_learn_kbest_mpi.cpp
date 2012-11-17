@@ -4266,6 +4266,12 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
       }
     }
     
+    if (! scale_fixed && weights[feature_scale] < 0.0) {
+      // inverse weights...
+      for (feature_type::id_type i = 0; i != weights.size(); ++ i)
+	weights[i] = - weights[i];
+    }
+    
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);

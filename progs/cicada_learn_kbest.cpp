@@ -2522,17 +2522,23 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
     
   if (quenching_mode) {
     temperature = 0.0;
-      
+    
     for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
       if (debug >= 2)
 	std::cerr << "quench: " << quench << std::endl;
-	
+      
       weights[feature_scale] = quench;
-	
+      
       objective = optimizer();
     }
   }
-    
+  
+  if (! scale_fixed && weights[feature_scale] < 0.0) {
+    // inverse weights...
+    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
+      weights[i] = - weights[i];
+  }
+  
   return objective;
 }
 
