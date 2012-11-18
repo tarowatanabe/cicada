@@ -34,7 +34,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      word = qi::lexeme[qi::hold[standard::string("|||") >> +(standard::char_ - standard::space)] | (+(standard::char_ - standard::space) - "|||")];
+      word = qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
       sentence = *word;
       sentence_vector = -(sentence % "|||");
     }

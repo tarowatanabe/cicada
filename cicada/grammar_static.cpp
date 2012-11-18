@@ -1150,7 +1150,7 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       
       lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
-      word %= qi::lexeme[qi::hold[standard::string("|||") >> +(standard::char_ - standard::space)] | (+(standard::char_ - standard::space) - "|||")];
+      word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
       phrase %= *word;
       rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase >> "|||" >> phrase >> "|||" >> +qi::float_ >> -("|||" >> *qi::float_);
     }
