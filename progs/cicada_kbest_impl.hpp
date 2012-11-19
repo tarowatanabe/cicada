@@ -52,7 +52,7 @@ struct hypothesis_type
   
   typedef utils::simple_vector<word_type, std::allocator<word_type> >                   sentence_type;
   //typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
-  typedef cicada::FeatureVectorCompact feature_set_type;
+  typedef cicada::FeatureVectorLinear<double> feature_set_type;
   
   hypothesis_type() : sentence(), features(), score(), loss(0) {}
   hypothesis_type(const kbest_feature_type& x)
