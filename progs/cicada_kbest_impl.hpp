@@ -28,6 +28,7 @@
 #include "cicada/feature.hpp"
 #include "cicada/symbol.hpp"
 #include "cicada/feature_vector_compact.hpp"
+#include "cicada/feature_vector_linear.hpp"
 
 typedef cicada::Sentence sentence_type;
 
