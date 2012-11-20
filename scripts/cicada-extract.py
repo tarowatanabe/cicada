@@ -368,7 +368,7 @@ class QSub:
             print str(command)
 
         if self.pbs:
-            self.pbs.run(str(command), name=name, memory=memory, mpi=self.mpi, logfile=logfile)
+            self.pbs.run(str(command), name=name, memory=memory, mpi=self.mpi, threads=threads, logfile=logfile)
         else:
             self.mpi.run(str(command), logfile=logfile)
 
