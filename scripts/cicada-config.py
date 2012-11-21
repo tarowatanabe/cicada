@@ -45,7 +45,6 @@ opt_parser = OptionParser(
     make_option("--feature-ngram", default=[], action="append", type="string", help="ngram feature"),
     make_option("--feature-lexicon", default="", action="store", type="string", help="lexicon feature"),
     
-
     ## operations...
     
     # cicada composition
@@ -53,6 +52,8 @@ opt_parser = OptionParser(
     make_option("--scfg",     default=None, action="store_true", help="SCFG"),
     make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
+
+    make_option("--beam", default=200, action="store_true", help="beam size"),
     
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
@@ -66,7 +67,9 @@ def escape_path(path):
 
 class Grammar(UserList.UserList):
     
-    def __init__(self, grammar_dir=""):
+    def __init__(self, grammar_dir="", max_span=15):
+
+        self.max_span = max_span
         
         UserList.UserList.__init__(self)
         
@@ -85,11 +88,13 @@ class Grammar(UserList.UserList):
         if not os.path.exists(path):
             raise ValueError, "no path to grammar: %s" %(path)
         
-        UserList.UserList.append(self, "grammar = " + escape_path(path) + ":max-span=15")
+        UserList.UserList.append(self, "grammar = " + escape_path(path) + ":max-span=%s" %(self.max_span))
 
 class TreeGrammar(UserList.UserList):
     
     def __init__(self, grammar_dir="", max_span=15):
+
+        self.max_span = max_span
         
         UserList.UserList.__init__(self)
         
@@ -144,7 +149,7 @@ if __name__ == '__main__':
         print "# grammar. For details, see \"cicada --grammar-list\""
         print "#"
         for indexed in options.grammar:
-            grammar = Grammar(grammar_dir=indexed)
+            grammar = Grammar(grammar_dir=indexed, max_span=options.max_span)
             
             for transducer in grammar:
                 print transducer
@@ -182,7 +187,7 @@ if __name__ == '__main__':
         print "# tree-grammar. For details see \"cicada --tree-grammar-list\""
         print "#"
         for indexed in options.tree_grammar:
-            grammar = TreeGrammar(grammar_dir=indexed)
+            grammar = TreeGrammar(grammar_dir=indexed, max_span=options.max_span)
     
             for transducer in grammar:
                 print transducer
@@ -259,9 +264,9 @@ if __name__ == '__main__':
     print
 
     print "# cube-pruning"
-    print "operation = apply:prune=true,size=200,${weights}"
+    print "operation = apply:prune=true,size=%d,${weights}" %(options.beam)
     print
-
+    
     print "# remove <s> and </s>"
     print "operation = remove-bos-eos:forest=true"
     print
