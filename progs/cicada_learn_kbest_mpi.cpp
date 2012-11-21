@@ -210,6 +210,9 @@ int main(int argc, char ** argv)
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
+    if (scale <= 0.0)
+      throw std::runtime_error("scaling must be positive: " + utils::lexical_cast<std::string>(scale));
+
     if (line_search && (learn_lbfgs || learn_sgd))
       throw std::runtime_error("line-search is applicable only for non-maxent based loss");
     
@@ -4266,7 +4269,7 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
       }
     }
     
-    if (! scale_fixed && weights[feature_scale] < 0.0) {
+    if (weights[feature_scale] < 0.0) {
       // inverse weights...
       for (feature_type::id_type i = 0; i != weights.size(); ++ i)
 	weights[i] = - weights[i];

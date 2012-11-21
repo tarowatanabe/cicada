@@ -182,6 +182,9 @@ int main(int argc, char ** argv)
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     
+    if (scale <= 0.0)
+      throw std::runtime_error("scaling must be positive: " + utils::lexical_cast<std::string>(scale));
+
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
     if (! learn_xbleu && oracle_path.empty())
@@ -2533,7 +2536,7 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
     }
   }
   
-  if (! scale_fixed && weights[feature_scale] < 0.0) {
+  if (weights[feature_scale] < 0.0) {
     // inverse weights...
     for (feature_type::id_type i = 0; i != weights.size(); ++ i)
       weights[i] = - weights[i];
