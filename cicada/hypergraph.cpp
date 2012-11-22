@@ -446,21 +446,23 @@ namespace cicada
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
-      
+
+    typedef std::ostream_iterator<char> iterator_type;
+    
     typedef HyperGraph hypergraph_type;
     typedef hypergraph_type::rule_type rule_type;
-
+    
     typedef utils::compact_map<const rule_type*, int,
 			       null_const_ptr<rule_type>, null_const_ptr<rule_type>,
 			       utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
-    os << '{';
+    karma::generate(iterator_type(os), '{');
     
-    rule_unique_map_type rules_unique;
+    rule_unique_map_type rules_unique(graph.edges.size());
     
     {
-      os << "\"rules\"" << ": " << '[';
-
+      karma::generate(iterator_type(os), karma::lit("\"rules\": ["));
+      
       // dump rule part...
 
       hypergraph_rule_generator_impl::grammar_type& grammar = hypergraph_rule_generator_impl::instance();
@@ -488,27 +490,27 @@ namespace cicada
 	      rules_unique.insert(std::make_pair(&rule, rule_id));
 	      
 	      if (! initial_rule)
-		os << ", ";
-	      os << '\"';
-	      karma::generate(hypergraph_rule_generator_impl::iterator_type(os), grammar, rule);
-	      os << '\"';
-	      
+		karma::generate(iterator_type(os), karma::lit(", "));
 	      initial_rule = false;
+	      
+	      karma::generate(hypergraph_rule_generator_impl::iterator_type(os),
+			      '\"' << grammar << '\"',
+			      rule);
 	    }
 	  }
 	}
       }
       
-      os << ']';
+      karma::generate(iterator_type(os), ']');
     }
     
-    os << ", ";
+    karma::generate(iterator_type(os), karma::lit(", "));
     
     {
-      os << "\"nodes\"" << ": " << '[';
+      karma::generate(iterator_type(os), karma::lit("\"nodes\": ["));
       
       hypergraph_feature_generator_impl::grammar_type& grammar = hypergraph_feature_generator_impl::instance();
-
+      
       //feature_generated_type features;
       
       // dump nodes...
@@ -516,64 +518,51 @@ namespace cicada
       hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 	if (! initial_node)
-	  os << ", ";
+	  karma::generate(iterator_type(os), karma::lit(", "));
 	initial_node = false;
 	
-	os << '[';
+	karma::generate(iterator_type(os), '[');
 	
 	bool initial_edge = true;
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = niter->edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = niter->edges.begin(); eiter != eiter_end; ++ eiter) {
 	  if (! initial_edge)
-	    os << ", ";
+	    karma::generate(iterator_type(os), karma::lit(", "));
 	  initial_edge = false;
 	  
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 	  
+	  karma::generate(iterator_type(os), '{');
 	  
-	  os << '{';
-
-	  if (! edge.tails.empty()) {
-	    typedef std::ostream_iterator<char> iterator_type;
-	    
-	    os << "\"tail\":[";
-	    karma::generate(iterator_type(os), karma::uint_ % ',', edge.tails);
-	    os << "],";
-	  }
+	  if (! edge.tails.empty())
+	    karma::generate(iterator_type(os),
+			    "\"tail\":[" << (karma::uint_ % ',') << "],",
+			    edge.tails);
 	  
-#if 0
-	  features.clear();
-	  hypergraph_type::feature_set_type::const_iterator fiter_end = edge.features.end();
-	  for (hypergraph_type::feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
-	    if (fiter->second != 0.0 && ! fiter->first.empty())
-	      features.push_back(*fiter);
-#endif
-	  
-	  if (! edge.features.empty()) {
-	    os << "\"feature\":{";
-	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os), grammar, edge.features);
-	    os << "},";
-	  }
+	  if (! edge.features.empty())
+	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os),
+			    "\"feature\":{" << grammar << "},",
+			    edge.features);
 	  
 	  if (! edge.attributes.empty())
 	    os << "\"attribute\":" << edge.attributes << ',';
 	  
-	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  karma::generate(iterator_type(os), "\"rule\":" << karma::uint_, ! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  
-	  os << '}';
+	  karma::generate(iterator_type(os), '}');
 	}
 	
-	os << ']';
+	karma::generate(iterator_type(os), ']');
       }
       
-      os << ']';
+      karma::generate(iterator_type(os), ']');
     }
     
     // dump goal...
     if (graph.is_valid())
-      os << ", \"goal\":" << graph.goal;
+      karma::generate(iterator_type(os), karma::lit(", \"goal\": ") << karma::uint_generator<HyperGraph::id_type>(), graph.goal);
     
-    os << '}';
+    karma::generate(iterator_type(os), '}');
     
     return os;
   }
