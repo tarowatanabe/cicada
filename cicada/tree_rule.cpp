@@ -108,13 +108,14 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       
       label %= qi::lexeme[qi::hold[+('\\' >> standard::char_('\\')
-			       | '\\' >> standard::char_('(')
-			       | '\\' >> standard::char_(')')
-			       | (standard::char_ - standard::space - '(' - ')' - '\\')) - "|||"]
+				     | '\\' >> standard::char_('(')
+				     | '\\' >> standard::char_(')')
+				     | (standard::char_ - standard::space - '(' - ')' - '\\')) - "|||"]
 			  | (standard::string("|||") >> +('\\' >> standard::char_('\\')
 							  | '\\' >> standard::char_('(')
 							  | '\\' >> standard::char_(')')
 							  | (standard::char_ - standard::space - '(' - ')' - '\\')))];
+      
       tree_rule %= label >> (qi::hold['(' >> +tree_rule >> ')'] | qi::eps);
       root %= -tree_rule;
     }

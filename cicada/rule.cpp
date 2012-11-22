@@ -70,12 +70,14 @@ namespace cicada
       
       lhs  %= qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')];
       word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+      
       phrase %= *word;
       rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> word;
+    
     boost::spirit::qi::rule<Iterator, phrase_parsed_type(), boost::spirit::standard::space_type> phrase;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };

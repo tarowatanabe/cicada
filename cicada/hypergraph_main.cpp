@@ -12,10 +12,16 @@
 
 int main(int argc, char** argv)
 {
-  cicada::HyperGraph graph;
-  
-  std::cin >> graph;
-  std::cout << graph << std::endl;
-
-  msgpack_test(graph);
+  try {
+    cicada::HyperGraph graph;
+    
+    std::cin >> graph;
+    std::cout << graph << std::endl;
+    
+    msgpack_test(graph);
+  }
+  catch (std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    return -1;
+  }
 }
