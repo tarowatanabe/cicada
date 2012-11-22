@@ -25,7 +25,7 @@ struct cicada_sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    word        %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+    word        %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
     sentence    %= *word;
     id_sentence %= qi::int_ >> "|||" >> sentence >> -qi::omit["|||" >> *(standard::char_ - qi::eol)] >> (qi::eol | qi::eoi);
   };

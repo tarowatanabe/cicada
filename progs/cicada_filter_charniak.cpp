@@ -127,7 +127,7 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    cat %= qi::lexeme[qi::hold[+(standard::char_ - standard::space - '[') - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space - '['))];
+    cat %= qi::lexeme[+(standard::char_ - standard::space - '[') - ("|||" >> (standard::space | qi::eoi))];
     
     category %= qi::hold[cat >> '[' >> qi::int_ >> ',' >> qi::int_ >> ']'] | cat;
     

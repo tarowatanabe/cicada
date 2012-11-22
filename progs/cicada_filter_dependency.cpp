@@ -67,7 +67,7 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    word    %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+    word    %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
     tokens  %= *word >> (qi::eoi | qi::eol);
   }
   
@@ -1199,7 +1199,7 @@ struct KHayashi
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+      word %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
 
       words %= +word;
       poss  %= +word;
@@ -1405,8 +1405,10 @@ struct KHayashiForest
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      words %= (qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))) % (+standard::blank);
-      poss  %= (qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))) % (+standard::blank);
+      token %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
+      
+      words %= token % (+standard::blank);
+      poss  %= token % (+standard::blank);
       
       edge %= (qi::omit[+standard::blank] >> qi::int_
 	       >> qi::omit[+standard::blank] >> qi::int_
@@ -1432,6 +1434,8 @@ struct KHayashiForest
 		   >> *node
 		   >> qi::omit[qi::eol]);
     }
+    
+    boost::spirit::qi::rule<Iterator, std::string()> token;
     
     boost::spirit::qi::rule<Iterator, khayashi_forest_type::label_set_type()> words;
     boost::spirit::qi::rule<Iterator, khayashi_forest_type::label_set_type()> poss;
@@ -1710,7 +1714,7 @@ struct Cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-      word %= qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+      word %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
       
       tok %= +word;
       pos %= +word;

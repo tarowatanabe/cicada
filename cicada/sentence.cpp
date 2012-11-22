@@ -26,7 +26,8 @@ namespace cicada
     
     clear();
     
-    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[qi::hold[+(standard::char_ - standard::space) - "|||"] | (standard::string("|||") >> +(standard::char_ - standard::space))];
+    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
+    
     
     return qi::phrase_parse(iter, end, *(word), standard::space, __sent);
   }
