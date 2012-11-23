@@ -18,7 +18,7 @@ int main(int argc, char** argv)
   
   sentence_set_type::const_iterator siter_end = sentences.end();
   for (sentence_set_type::const_iterator siter = sentences.begin(); siter != siter_end; ++ siter)
-    std::cout << "sentence: " <<  *siter << ':' << '\n';
+    std::cout << "sentence: " <<  *siter << " length: " << siter->size() << '\n';
   std::cout << "END" << '\n';
   std::cout << "sentences: " << sentences << ':' << std::endl;
 
