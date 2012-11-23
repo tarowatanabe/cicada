@@ -141,9 +141,7 @@ namespace cicada
     std::string::const_iterator iter(x.begin());
     std::string::const_iterator end(x.end());
     
-    qi::rule<std::string::const_iterator, std::string()> label;
-    
-    label %= qi::lexeme[+(standard::char_ - standard::space)];
+    qi::rule<std::string::const_iterator, std::string()> label = qi::lexeme[+(standard::char_ - standard::space)];
     
     const bool result = qi::parse(iter, end,
 				  qi::omit[*standard::space] >> qi::int_ >> '-' >> qi::int_ >> -(':' >> label) >> qi::omit[*standard::space],

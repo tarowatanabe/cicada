@@ -259,7 +259,6 @@ private:
   counts_type counts;
 };
 
-#if 1
 struct atable_type
 {
   typedef atable_counts_type::size_type       size_type;
@@ -519,227 +518,6 @@ struct atable_type
   cache_set_type caches;
   cache_type     cache_unk;
 };
-#endif
-
-#if 0
-struct atable_type
-{
-  typedef atable_counts_type::size_type       size_type;
-  typedef atable_counts_type::difference_type difference_type;
-  typedef atable_counts_type::index_type      index_type;
-  
-  typedef atable_counts_type::difference_map_type difference_map_type;
-  
-  typedef atable_counts_type::class_pair_type class_pair_type;
-  
-  typedef std::pair<index_type, index_type> range_type;
-  
-  struct cache_type
-  {
-    typedef utils::spinlock            spinlock_type;
-    typedef spinlock_type::scoped_lock lock_type;
-    
-    cache_type() : counts() {}
-    cache_type(const cache_type& x): counts(x.counts) {}
-    cache_type& operator=(const cache_type& x)
-    {
-      counts = x.counts;
-      return *this;
-    }
-    
-    void clear() { counts.clear(); }
-    
-    atable_counts_type counts;
-    spinlock_type      mutex;
-  };
-  
-  typedef utils::simple_vector<cache_type, std::allocator<cache_type> > cache_set_type;
-  
-  typedef utils::array_power2<cache_set_type, 64, std::allocator<cache_set_type> > cache_static_type;
-  typedef std::deque<cache_set_type, std::allocator<cache_set_type> > cache_mutable_type;
-  
-  atable_type(const double __prior=0.1, const double __smooth=1e-20)
-    : atable(), prior(__prior), smooth(__smooth), caches_static(), caches_mutable() { initialize_cache(); }
-  
-  atable_type(const atable_type& x)
-    : atable(x.atable), prior(x.prior), smooth(x.smooth), caches_static(), caches_mutable() { initialize_cache(); }
-  atable_type& operator=(const atable_type& x)
-  {
-    clear();
-    
-    atable = x.atable;
-    prior  = x.prior;
-    smooth = x.smooth;
-
-    initialize_cache();
-    
-    return *this;
-  }
-  
-  prob_type operator()(const word_type& source,
-		       const word_type& target,
-		       const index_type& source_size,
-		       const index_type& target_size,
-		       const index_type& i_prev,
-		       const index_type& i) const
-  {
-    if (atable.empty()) return 1.0 / source_size;
-    
-    // i_prev < 0 implies BOS
-    // i >= souce_size implies EOS
-    //
-    // we will cache wrt class_pair_type and diff's range
-    //
-    
-    if (source == vocab_type::BOS) {
-      // 0 <= i < source_size
-      // which implies: 1 <= diff < source_size + 1
-      
-      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev];
-    } else if (target == vocab_type::EOS) {
-      // which implies: 1 <= diff < source_size - i_prev + 1
-      
-      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev];
-    } else {
-      // 0 <= i < source_size
-      // which implies: 0 - i_prev <= diff < source_size - i_prev
-      
-      return estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev];
-    }
-  }
-  
-  const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
-  {
-    //
-    // range-second is always positive, the range-second can range from 0 to (range.second - range.first) + 2, including BOS/EOS
-    //
-    
-    cache_type& cache = caches(range);
-    
-    cache_type::lock_type lock(cache.mutex);
-    
-    difference_map_type& diffs = cache.counts[classes];
-    if (diffs.empty()) {
-      diffs.reserve(range.first, range.second - 1);
-      
-      double sum = 0.0;
-      
-      atable_counts_type::const_iterator aiter = atable.find(classes);
-      
-      for (index_type i = range.first; i != range.second; ++ i) {
-	const double count = (aiter != atable.end() ? aiter->second[i] + prior : prior);
-	
-	diffs[i] = count;
-	sum += count;
-      }
-      
-      const double sum_digamma = utils::mathop::digamma(sum);
-      for (index_type i = range.first; i != range.second; ++ i)
-	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
-    }
-    
-    return diffs;
-  }
-
-  cache_type& caches(const range_type& range) const
-  {
-    const size_type length = range.second - range.first;
-
-    if (length >= caches_static.size()) {
-      const size_type pos = length - caches_static.size();
-      
-      cache_type::lock_type lock(const_cast<cache_type::spinlock_type&>(mutex));
-      
-      if (pos >= caches_mutable.size())
-	const_cast<cache_mutable_type&>(caches_mutable).resize(pos + 1);
-      
-      if (caches_mutable[pos].empty())
-	const_cast<cache_set_type&>(caches_mutable[pos]).resize(length + 2);
-      
-      return const_cast<cache_set_type&>(caches_mutable[pos])[range.second];
-    } else
-      return const_cast<cache_set_type&>(caches_static[length])[range.second];
-  }
-
-  
-  difference_map_type& operator[](const class_pair_type& x)
-  {
-    return atable[x];
-  }
-  
-  difference_map_type& operator()(const word_type& source, const word_type& target)
-  {
-    return atable[class_pair_type(source, target)];
-  }
-
-  count_type& operator()(const word_type& source, const word_type& target, const index_type& diff)
-  {
-    return atable[class_pair_type(source, target)][diff];
-  }
-  
-  void clear()
-  {
-    atable.clear();
-
-    initialize_cache();
-  }
-  
-  void swap(atable_type& x)
-  {
-    atable.swap(x.atable);
-    caches_static.swap(x.caches_static);
-    caches_mutable.swap(x.caches_mutable);
-    std::swap(prior,  x.prior);
-    std::swap(smooth, x.smooth);
-  }
-  
-  void estimate_unk()
-  {
-    atable.estimate_unk();
-  }
-  
-  void shrink() {}
-  
-  void initialize()
-  {
-    atable.initialize();
-    
-    initialize_cache();
-  }
-
-  void initialize_cache()
-  {
-    caches_mutable.clear();
-    caches_static.clear();
-    
-    for (size_type i = 0; i != caches_static.size(); ++ i)
-      caches_static[i].resize(i + 2);
-  };
-  
-  atable_type& operator+=(const atable_type& x)
-  {
-    atable += x.atable;
-    return *this;
-  }
-
-  atable_type& operator+=(const atable_counts_type& x)
-  {
-    atable += x;
-    return *this;
-  }
-  
-  bool empty() const { return atable.empty(); }
-  
-  atable_counts_type atable;
-  double prior;
-  double smooth;
-  
-  // caching....
-  cache_static_type  caches_static;
-  cache_mutable_type caches_mutable;
-  cache_type::spinlock_type mutex;
-};
-#endif
 
 struct ttable_type
 {
@@ -831,7 +609,6 @@ struct ttable_type
   {
     return ttable[word.id()];
   }
-
   
   double operator()(const word_type& source, const word_type& target) const
   {
@@ -1009,6 +786,138 @@ struct aligned_type
   }
   
   aligned_set_type aligned;
+};
+
+//
+// epsilon table...
+//
+struct etable_type
+{
+  
+  
+};
+
+struct ntable_type
+{
+  //
+  // do we use the atable-type caching to differentiate the source sentence length...?
+  //
+  
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct counts_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    
+    typedef utils::simple_vector<count_type, std::allocator<count_type> > table_type;
+
+    count_type& operator[](size_type pos)
+    {
+      if (pos >= table.size())
+	table.resize(pos + 1, count_type(0));
+      
+      return table[pos];
+    }
+
+    count_type operator[](size_type pos) const
+    {
+      return (pos >= table.size() ? count_type(0) : table[pos]);
+    }
+
+    counts_type& operator+=(const counts_type& x)
+    {
+      if (! x.empty()) {
+	table.resize(utils::bithack::max(table.size(), x.table.size()));
+	
+	std::transform(x.table.begin(), x.table.end(), table.begin(), table.begin(), std::plus<count_type>());
+      }
+      
+      return *this;
+    }
+    
+    void clear() { table.clear(); }
+    void initialize() { std::fill(table.begin(), table.end(), count_type(0)); }
+    bool empty() const { return table.empty(); }
+    size_type size() const { return table.size(); }
+    
+    table_type table;
+  };
+
+  typedef std::vector<counts_type, std::allocator<counts_type> > counts_map_type;
+  
+  ntable_type(const double __prior=0.1, const double __smooth=1e-20) : counts(), prior(__prior), smooth(__smooth) {}
+
+  count_type operator()(const word_type& word, size_type fertility) const
+  {
+    if (word.id() >= counts.size())
+      return smooth;
+    
+    const counts_type& probs = counts[word.id()];
+    
+    return (fertility >= probs.size() ? smooth : probs[fertility]);
+  }
+  
+  counts_type& operator[](const word_type& word)
+  {
+    if (word.id() >= counts.size())
+      counts.resize(word.id() + 1);
+    return counts[word.id()];
+  }
+
+  const counts_type& operator[](const word_type& word) const
+  {
+    if (word.id() >= counts.size())
+      const_cast<counts_map_type&>(counts).resize(word.id() + 1);
+    return counts[word.id()];
+  }
+  
+  void swap(ntable_type& x)
+  {
+    counts.swap(x.counts);
+    std::swap(prior,  x.prior);
+    std::swap(smooth, x.smooth);
+  }
+
+  size_type size() const { return counts.size(); }
+  bool empty() const { return counts.empty(); }
+
+  void resize(size_type __size) { counts.resize(__size); }
+  void reserve(size_type __size) { counts.reserve(__size); }
+  
+  
+  void initialize()
+  {
+    for (size_type i = 0; i != counts.size(); ++ i)
+      counts[i].initialize();
+  }
+
+  ntable_type& operator+=(const ntable_type& x)
+  {
+    counts.resize(utils::bithack::max(counts.size(), x.counts.size()));
+    
+    for (size_type i = 0; i != x.counts.size(); ++ i) 
+      counts[i] += x.counts[i];
+
+    return *this;
+  }
+  
+  counts_map_type counts;
+  double prior;
+  double smooth;
+};
+
+struct dtable_type
+{
+  //
+  // we need to split head and non-head, and use the cache structure in the atable_type
+  //
+  // P(delta | source, target)
+  // P(delta | source, NONE)
+  
+  double prior;
+  double smooth;  
 };
 
 struct LearnBase

@@ -132,6 +132,7 @@ bool grow_mode = false;
 bool final_mode = false;
 bool diag_mode = false;
 bool final_and_mode = false;
+bool closure_mode = false;
 bool invert_mode = false;
 bool moses_mode = false;
 
@@ -600,6 +601,84 @@ struct FinalAnd
   __Final final;
 };
 
+struct Closure
+{
+  typedef alignment_type::index_type index_type;
+  typedef std::set<index_type, std::less<index_type>, std::allocator<index_type> > aligns_type;
+  typedef std::vector<aligns_type, std::allocator<aligns_type> > aligns_map_type;
+
+  template <typename Alignment>
+  void operator()(const alignment_type& align, Alignment& closure)
+  {
+    alignment_type::const_iterator aiter_end = align.end();
+    for (alignment_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+      if (aiter->source >= source_map.size())
+	source_map.resize(aiter->source + 1);
+      if (aiter->target >= target_map.size())
+	target_map.resize(aiter->target + 1);
+      
+      source_map[aiter->source].insert(aiter->target);
+      target_map[aiter->target].insert(aiter->source);
+    }
+    
+    // compute closure...
+    for (;;) {
+      bool inserted = false;
+      
+      for (index_type src = 0; src != static_cast<index_type>(source_map.size()); ++ src) {
+	aligns_type aligned(source_map[src]);
+	
+	const size_t size_prev  = aligned.size();
+	
+	aligns_type::const_iterator titer_end = source_map[src].end();
+	for (aligns_type::const_iterator titer = source_map[src].begin(); titer != titer_end; ++ titer) {
+	  
+	  aligns_type::const_iterator siter_end = target_map[*titer].end();
+	  for (aligns_type::const_iterator siter = target_map[*titer].begin(); siter != siter_end; ++ siter)
+	    aligned.insert(source_map[*siter].begin(), source_map[*siter].end());
+	}
+	
+	const size_t size_next = aligned.size();
+	
+	source_map[src].swap(aligned);
+	
+	inserted |= (size_prev != size_next);
+      }
+      
+      for (index_type trg = 0; trg != static_cast<index_type>(target_map.size()); ++ trg) {
+	aligns_type aligned(target_map[trg]);
+	
+	const size_t size_prev  = aligned.size();
+	
+	aligns_type::const_iterator siter_end = target_map[trg].end();
+	for (aligns_type::const_iterator siter = target_map[trg].begin(); siter != siter_end; ++ siter) {
+	  aligns_type::const_iterator titer_end = source_map[*siter].end();
+	  for (aligns_type::const_iterator titer = source_map[*siter].begin(); titer != titer_end; ++ titer)
+	    aligned.insert(target_map[*titer].begin(), target_map[*titer].end());
+	}
+	
+	const size_t size_next = aligned.size();
+	
+	target_map[trg].swap(aligned);
+	
+	inserted |= (size_prev != size_next);
+      }
+      
+      if (! inserted) break;
+    }
+    
+    // assignment...
+    for (index_type src = 0; src != static_cast<index_type>(source_map.size()); ++ src) {
+      aligns_type::const_iterator aiter_end = source_map[src].end();
+      for (aligns_type::const_iterator aiter = source_map[src].begin(); aiter != aiter_end; ++ aiter)
+	closure.insert(std::make_pair(src, *aiter));
+    }
+  }
+  
+  aligns_map_type source_map;
+  aligns_map_type target_map;
+};
+
 struct ITG
 {
   typedef utils::vector2<double, std::allocator<double> > matrix_type;
@@ -795,15 +874,29 @@ void process_alignment(std::istream& is, std::ostream& os)
 {
   alignment_type align;
   alignment_type inverted;
-  AlignmentInserter inserter(inverted);
+  alignment_type closured;
+  AlignmentInserter invert_inserter(inverted);
+  AlignmentInserter closure_inserter(closured);
   Invert invert;
+  Closure closure;
   
-  if (invert_mode) {
+  if (invert_mode || closure_mode) {
     while (is >> align) {
-      inverted.clear();
-      invert(align, inserter);
-      std::sort(inverted.begin(), inverted.end());
-      os << inverted << '\n';
+      
+      if (closure_mode) {
+	closured.clear();
+	closure(align, closure_inserter);
+	align.swap(closured);
+      }
+      
+      if (invert_mode) {
+	inverted.clear();
+	invert(align, invert_inserter);
+	std::sort(inverted.begin(), inverted.end());
+	align.swap(inverted);
+      }
+      
+      os << align << '\n';
     }
   } else {
     while (is >> align) {
@@ -842,13 +935,16 @@ void process_giza(std::istream& is, std::ostream& os)
   
   alignment_type    alignment;
   alignment_type    inverted;
+  alignment_type    closured;
   
   AlignmentInserter inserter(alignment);
   AlignmentInserter inverted_inserter(inverted);
+  AlignmentInserter closured_inserter(closured);
   
   if (source_target_mode) {
     SourceTarget process;
     Invert       invert;
+    Closure      closure;
     
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -868,6 +964,12 @@ void process_giza(std::istream& is, std::ostream& os)
       }
       
       process(bitext_giza, inserter);
+
+      if (closure_mode) {
+	closured.clear();
+	closure(alignment, closured_inserter);
+	alignment.swap(closured);
+      }
 
       if (invert_mode) {
 	inverted.clear();
@@ -881,6 +983,7 @@ void process_giza(std::istream& is, std::ostream& os)
   } else {
     TargetSource process;
     Invert       invert;
+    Closure      closure;
   
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -900,6 +1003,12 @@ void process_giza(std::istream& is, std::ostream& os)
       }
 
       process(bitext_giza, inserter);
+
+      if (closure_mode) {
+	closured.clear();
+	closure(alignment, closured_inserter);
+	alignment.swap(closured);
+      }
 
       if (invert_mode) {
 	inverted.clear();
@@ -1063,8 +1172,10 @@ struct Mapper
     align_set_type aligns;
     alignment_type alignment;
     alignment_type inverted;
+    alignment_type closured;
     AlignmentInserter inserter(alignment);
     AlignmentInserter inverted_inserter(inverted);
+    AlignmentInserter closured_inserter(closured);
 
     ITG       __itg;
     MaxMatch  __max_match;
@@ -1076,6 +1187,7 @@ struct Mapper
     FinalAnd  __final_and;
     
     Invert    __invert;
+    Closure   __closure;
     
     while (1) {
       queue_bitext.pop_swap(bitext_pair);
@@ -1127,6 +1239,13 @@ struct Mapper
 	  __final_and(bitext_source_target, bitext_target_source, aligns);
       
 	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+      }
+      
+      // closure
+      if (closure_mode) {
+	closured.cldear();
+	__closure(alignment, closured_inserter);
+	alignment.swap(closured);
       }
     
       // invert this alignment...
@@ -1721,6 +1840,7 @@ void options(int argc, char** argv)
     ("diag",         po::bool_switch(&diag_mode),         "diag")
     ("final",        po::bool_switch(&final_mode),        "final")
     ("final-and",    po::bool_switch(&final_and_mode),    "final-and")
+    ("closure",      po::bool_switch(&closure_mode),      "closure")
     ("invert",       po::bool_switch(&invert_mode),       "invert alignment")
 
     ("moses", po::bool_switch(&moses_mode), "moses alignment (not GIZA++ alignment)")

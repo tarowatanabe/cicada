@@ -173,3 +173,6 @@ msgpack for succinct storage
 
 Rearrange learning code by splitting L2 and/or L1 projection
   Especially for online-learning, they can be set up as additional "unified" code
+
+Implement IBM Model 4....
+   Use of the fast hill-climbing trick
