@@ -610,6 +610,9 @@ struct Closure
   template <typename Alignment>
   void operator()(const alignment_type& align, Alignment& closure)
   {
+    source_map.clear();
+    target_map.clear();
+
     alignment_type::const_iterator aiter_end = align.end();
     for (alignment_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
       if (aiter->source >= source_map.size())
