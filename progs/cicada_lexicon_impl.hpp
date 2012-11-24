@@ -790,12 +790,31 @@ struct aligned_type
 };
 
 //
-// epsilon table...
+// p-table for NULL alignment
 //
-struct etable_type
+struct ptable_type
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef utils::vector2<double, std::allocator<double> > table_type;
+
+  static const size_type max_length = 64;
   
+  ptable_type(const double __p0) : p0(__p0) { initialize(); }
   
+  double operator()(const size_type m, const size_type phi0) const
+  {
+    return 0.0;
+  }
+
+  void initialize()
+  {
+    
+  }
+
+  table_type table;
+  double p0;
 };
 
 // n-model table...
