@@ -605,6 +605,8 @@ class AlignmentHeuristic:
             command += " --itg"
         if 'max-match' in alignment:
             command += " --max-match"
+        if 'closure' in alignment:
+            command += " --closure"
         
         command += " --threads %d" %(threads)
 
