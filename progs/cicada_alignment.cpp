@@ -1243,7 +1243,7 @@ struct Mapper
       
       // closure
       if (closure_mode) {
-	closured.cldear();
+	closured.clear();
 	__closure(alignment, closured_inserter);
 	alignment.swap(closured);
       }
