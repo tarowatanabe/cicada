@@ -39,6 +39,7 @@
 #include <cicada/alignment.hpp>
 #include <cicada/dependency.hpp>
 #include <cicada/sentence.hpp>
+#include <cicada/span_vector.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
 #include <cicada/debinarize.hpp>
@@ -49,6 +50,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/chart.hpp"
 
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency dependency_type;
@@ -267,8 +269,87 @@ struct MapFile
   iterator_type iter_end;
 };
 
+struct TransformSpan
+{
+  typedef size_t size_type;
+  
+  typedef cicada::Sentence   sentence_type;
+  typedef cicada::Dependency dependency_type;
+  typedef cicada::SpanVector span_set_type;
+  typedef cicada::Symbol     symbol_type;
+  
+  typedef span_set_type::span_type span_type;
 
-struct Transform
+  typedef std::vector<size_type, std::allocator<size_type> > index_set_type;
+  typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_map_type;
+  typedef span_set_type span_map_type;
+  
+  TransformSpan(const symbol_type& __goal)
+    : goal(__goal) {} 
+  
+  dependency_map_type dependency_map;
+  span_map_type       span_map;
+
+  const symbol_type goal;
+  
+  void operator()(const sentence_type& sentence,
+		  const sentence_type& postag,
+		  const dependency_type& dependency,
+		  span_set_type& spans,
+		  const bool binarize=false)
+  {
+    dependency_map.clear();
+    dependency_map.resize(dependency.size() + 1);
+    
+    span_map.clear();
+    span_map.resize(dependency.size() + 1, span_type(0, 0, goal));
+    
+    for (size_type i = 0; i != dependency.size(); ++ i)
+      dependency_map[dependency[i]].push_back(i + 1);
+    
+    // post order traversal of dependency-map to compute spans...
+    traverse(0, postag);
+    
+    if (! binarize) return;
+    
+  }
+  
+  void traverse(const size_type node, const sentence_type& postag)
+  {
+    span_map[node].label = (node == 0 ? goal : postag[node - 1]);
+    
+    int span_pos =  span_map[node].first;
+    
+    index_set_type::const_iterator iiter_begin = dependency_map[node].begin();
+    index_set_type::const_iterator iiter_end   = dependency_map[node].end();
+    index_set_type::const_iterator iiter_lex   = std::lower_bound(iiter_begin, iiter_end, node);
+    
+    for (index_set_type::const_iterator iiter = iiter_begin; iiter != iiter_lex; ++ iiter) {
+      span_map[*iiter].first = span_pos;
+      
+      traverse(*iiter, postag);
+      
+      span_pos = span_map[*iiter].last;
+    }
+    
+    // increment when non-root!
+    // TODO: we need to handle span for head, like head-mode in transform-forest
+    span_pos += (node != 0);
+    
+    for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
+      span_map[*iiter].first = span_pos;
+      
+      traverse(*iiter, postag);
+      
+      span_pos = span_map[*iiter].last;
+    }
+    
+    span_map[node].last = span_pos;
+  }
+};
+
+
+struct TransformForest
 {
   typedef size_t size_type;
 
@@ -298,8 +379,8 @@ struct Transform
   dependency_type dependency;
   hypergraph_type hypergraph;
 
-  Transform(const symbol_type& __goal,
-	    const bool __head_mode)
+  TransformForest(const symbol_type& __goal,
+		  const bool __head_mode)
     : goal(__goal),
       head_mode(__head_mode) {} 
 
@@ -505,7 +586,7 @@ struct MST
     mst_parser<iiter_type> parser;
     mst_type mst;
     
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
     
     while (iter != iter_end) {
       mst.clear();
@@ -695,7 +776,7 @@ struct CoNLL
     conll_parser<iiter_type> parser;
     conll_set_type conll;
     
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
 
     while (iter != iter_end) {
       conll.clear();
@@ -885,7 +966,7 @@ struct Malt
     malt_parser<iiter_type> parser;
     malt_set_type malt;
     
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
     
     size_t sent_no = 0;
     size_t line_no = 0;
@@ -1017,7 +1098,7 @@ struct Cabocha
     std::string line;
     tokens_type tokens;
 
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
     
     while (std::getline(is, line)) {
       tokenizer_type tokenizer(line);
@@ -1247,7 +1328,7 @@ struct KHayashi
     khayashi_parser<iiter_type> parser;
     khayashi_type khayashi;
 
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
     
     size_t num = 0;
     while (iter != iter_end) {
@@ -1760,7 +1841,7 @@ struct Cicada
     cicada_parser<iiter_type> parser;
     cicada_type cicada;
 
-    Transform transform(goal, head_mode);
+    TransformForest transform(goal, head_mode);
     
     size_t num = 0;
     while (iter != iter_end) {
