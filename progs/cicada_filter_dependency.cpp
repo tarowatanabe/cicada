@@ -102,6 +102,7 @@ bool forest_mode = false;
 bool head_mode = false;
 bool span_mode = false;
 bool binarize_mode = false;
+bool category_mode = false;
 bool leaf_mode = false;
 
 void options(int argc, char** argv);
@@ -204,7 +205,7 @@ int main(int argc, char** argv)
     if (int(mst_mode) + conll_mode + malt_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
       throw std::runtime_error("one of mst/conll/malt/khayashi/khayashi-forest/cicada mode");
 
-    if (int(forest_mode) + span_mode + leaf_mode)
+    if (int(forest_mode) + span_mode + leaf_mode > 1)
       throw std::runtime_error("one of forest/span/leaf");
     
     if (mst_mode)
@@ -323,8 +324,8 @@ struct TransformSpan
 
   typedef utils::chart<std::string, std::allocator<std::string> > chart_type;
   
-  TransformSpan(const symbol_type& __goal, const bool __binarize)
-    : goal(__goal), binarize(__binarize) {} 
+  TransformSpan(const symbol_type& __goal, const bool __binarize, const bool __category)
+    : goal(__goal), binarize(__binarize), category(__category) {} 
   
   dependency_map_type dependency_map;
   span_map_type       span_map;
@@ -332,6 +333,7 @@ struct TransformSpan
 
   const symbol_type goal;
   const bool binarize;
+  const bool category;
   
   void operator()(const sentence_type& sentence,
 		  const sentence_type& postag,
@@ -342,7 +344,10 @@ struct TransformSpan
     dependency_map.resize(dependency.size() + 1);
     
     span_map.clear();
-    span_map.resize(dependency.size() + 1, span_type(0, 0, goal));
+    if (category)
+      span_map.resize(dependency.size() + 1, span_type(0, 0, goal));
+    else
+      span_map.resize(dependency.size() + 1, span_type(0, 0));
     
     for (size_type i = 0; i != dependency.size(); ++ i)
       dependency_map[dependency[i]].push_back(i + 1);
@@ -356,7 +361,8 @@ struct TransformSpan
   {
     span_set_type antecedents;
     
-    span_map[node].label = (node == 0 ? goal : postag[node - 1]);
+    if (category)
+      span_map[node].label = (node == 0 ? goal : postag[node - 1]);
     
     int span_pos =  span_map[node].first;
     
@@ -384,7 +390,10 @@ struct TransformSpan
     const int head_last = span_pos;
     
     if (node != 0 && ! dependency_map[node].empty()) {
-      antecedents.push_back(span_type(head_first, head_last, postag[node - 1]));
+      if (category)
+	antecedents.push_back(span_type(head_first, head_last, postag[node - 1]));
+      else
+	antecedents.push_back(span_type(head_first, head_last));
       spans.push_back(antecedents.back());
     }
     
@@ -417,7 +426,10 @@ struct TransformSpan
 	
 	chart(first, last) = chart(first, last - 1) + '+' + chart(last - 1, last);
 	
-	spans.push_back(span_type(antecedents[first].first, antecedents[last - 1].last, '[' + chart(first, last) +']'));
+	if (category)
+	  spans.push_back(span_type(antecedents[first].first, antecedents[last - 1].last, '[' + chart(first, last) +']'));
+	else
+	  spans.push_back(span_type(antecedents[first].first, antecedents[last - 1].last));
       }
   }
 };
@@ -651,7 +663,7 @@ struct MST
     
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     while (iter != iter_end) {
       mst.clear();
@@ -851,7 +863,7 @@ struct CoNLL
     
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
 
     while (iter != iter_end) {
       conll.clear();
@@ -1050,7 +1062,7 @@ struct Malt
     
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     size_t sent_no = 0;
     size_t line_no = 0;
@@ -1191,7 +1203,7 @@ struct Cabocha
 
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     while (std::getline(is, line)) {
       tokenizer_type tokenizer(line);
@@ -1430,7 +1442,7 @@ struct KHayashi
 
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     size_t num = 0;
     while (iter != iter_end) {
@@ -1953,7 +1965,7 @@ struct Cicada
 
     Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
-    TransformSpan   transform_span(goal, binarize_mode);
+    TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     size_t num = 0;
     while (iter != iter_end) {
@@ -2054,6 +2066,7 @@ void options(int argc, char** argv)
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
     ("span",       po::bool_switch(&span_mode),       "output as a set of spans")
     ("binarize",   po::bool_switch(&binarize_mode),   "output binarized spans")
+    ("category",   po::bool_switch(&category_mode),   "output spans with category labels")
     ("leaf",       po::bool_switch(&leaf_mode),       "output leafs (temrinals)")
             
     ("help", "help message");
