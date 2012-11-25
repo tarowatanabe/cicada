@@ -235,6 +235,8 @@ struct Dependency
 {
   typedef cicada::Sentence   sentence_type;
   typedef cicada::Dependency dependency_type;
+  typedef cicada::SpanVector span_set_type;
+  typedef cicada::HyperGraph hypergraph_type;
 
   Dependency() {}
 
@@ -243,6 +245,9 @@ struct Dependency
     sentence.clear();
     postag.clear();
     dependency.clear();
+
+    hypergraph.clear();
+    spans.clear();
   }
 
   bool verify() const
@@ -253,6 +258,9 @@ struct Dependency
   sentence_type   sentence;
   sentence_type   postag;
   dependency_type dependency;
+
+  hypergraph_type hypergraph;
+  span_set_type   spans;
 };
 
 struct MapFile
@@ -317,8 +325,6 @@ struct TransformSpan
   
   TransformSpan(const symbol_type& __goal, const bool __binarize)
     : goal(__goal), binarize(__binarize) {} 
-
-  span_set_type spans;
   
   dependency_map_type dependency_map;
   span_map_type       span_map;
@@ -329,7 +335,8 @@ struct TransformSpan
   
   void operator()(const sentence_type& sentence,
 		  const sentence_type& postag,
-		  const dependency_type& dependency)
+		  const dependency_type& dependency,
+		  span_set_type& spans)
   {
     dependency_map.clear();
     dependency_map.resize(dependency.size() + 1);
@@ -342,10 +349,10 @@ struct TransformSpan
     
     // post order traversal of dependency-map to compute spans...
     spans.clear();
-    traverse(0, postag);
+    traverse(0, postag, spans);
   }
   
-  void traverse(const size_type node, const sentence_type& postag)
+  void traverse(const size_type node, const sentence_type& postag, span_set_type& spans)
   {
     span_set_type antecedents;
     
@@ -360,7 +367,7 @@ struct TransformSpan
     for (index_set_type::const_iterator iiter = iiter_begin; iiter != iiter_lex; ++ iiter) {
       span_map[*iiter].first = span_pos;
       
-      traverse(*iiter, postag);
+      traverse(*iiter, postag, spans);
       
       span_pos = span_map[*iiter].last;
 
@@ -384,7 +391,7 @@ struct TransformSpan
     for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
       span_map[*iiter].first = span_pos;
       
-      traverse(*iiter, postag);
+      traverse(*iiter, postag, spans);
       
       span_pos = span_map[*iiter].last;
       
@@ -439,29 +446,18 @@ struct TransformForest
   
   const symbol_type goal;
   const bool head_mode;
-
-  // assign here for faster memory access!
-  sentence_type   sentence;
-  sentence_type   pos;
-  dependency_type dependency;
-  hypergraph_type hypergraph;
-
+  
   TransformForest(const symbol_type& __goal,
 		  const bool __head_mode)
     : goal(__goal),
       head_mode(__head_mode) {} 
 
-  void clear()
+  void operator()(const sentence_type& sentence,
+		  const sentence_type& postag,
+		  const dependency_type& dependency,
+		  hypergraph_type& hypergraph)
   {
-    sentence.clear();
-    pos.clear();
-    dependency.clear();
-    hypergraph.clear();
-  }
-  
-  void operator()()
-  {
-    if (sentence.size() != pos.size() || sentence.size() != dependency.size())
+    if (sentence.size() != postag.size() || sentence.size() != dependency.size())
       throw std::runtime_error("invalid transformaiton");
     
     hypergraph.clear();
@@ -491,7 +487,7 @@ struct TransformForest
 	node_map[antecedent] = hypergraph.add_node().id;
       
       tails.push_back(node_map[antecedent]);
-      rhs.push_back(pos[antecedent - 1]);
+      rhs.push_back(postag[antecedent - 1]);
     }
     
     if (node_map[0] == hypergraph_type::invalid)
@@ -518,11 +514,11 @@ struct TransformForest
 	  node_map[antecedent] = hypergraph.add_node().id;
 	
 	tails.push_back(node_map[antecedent]);
-	rhs.push_back(pos[antecedent - 1]);
+	rhs.push_back(postag[antecedent - 1]);
       }
       
       if (head_mode) {
-	const symbol_type lhs = '[' + pos[id - 1].non_terminal_strip() + "*]";
+	const symbol_type lhs = '[' + postag[id - 1].non_terminal_strip() + "*]";
 	tails.push_back(hypergraph.add_node().id);
 	rhs.push_back(lhs);
 	
@@ -540,13 +536,13 @@ struct TransformForest
 	  node_map[antecedent] = hypergraph.add_node().id;
 	
 	tails.push_back(node_map[antecedent]);
-	rhs.push_back(pos[antecedent - 1]);
+	rhs.push_back(postag[antecedent - 1]);
       }
       
       if (node_map[id] == hypergraph_type::invalid)
 	node_map[id] = hypergraph.add_node().id;
       
-      const symbol_type& lhs = pos[id - 1];
+      const symbol_type& lhs = postag[id - 1];
 		
       hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
       edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, rhs.begin(), rhs.end()));
@@ -653,6 +649,7 @@ struct MST
     mst_parser<iiter_type> parser;
     mst_type mst;
     
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
     
@@ -684,25 +681,33 @@ struct MST
 	  normalize(mst.poss.begin(), mst.poss.end());
       }
 
-      if (forest_mode) {
-	transform_forest.clear();
-	transform_forest.sentence.assign(mst.words.begin(), mst.words.end());
+      if (forest_mode || span_mode) {
+	deps.clear();
+	
+	deps.sentence.assign(mst.words.begin(), mst.words.end());
 	
 	if (relation_mode) {
 	  mst_type::label_set_type::const_iterator liter_end = mst.labels.end();
 	  for (mst_type::label_set_type::const_iterator liter = mst.labels.begin(); liter != liter_end; ++ liter)
-	    transform_forest.pos.push_back('[' + *liter + ']');
+	    deps.postag.push_back('[' + *liter + ']');
 	} else {
 	  mst_type::label_set_type::const_iterator liter_end = mst.poss.end();
 	  for (mst_type::label_set_type::const_iterator liter = mst.poss.begin(); liter != liter_end; ++ liter)
-	    transform_forest.pos.push_back('[' + *liter + ']');	    
+	    deps.postag.push_back('[' + *liter + ']');	    
 	}
 	  
-	transform_forest.dependency.assign(mst.positions.begin(), mst.positions.end());
+	deps.dependency.assign(mst.positions.begin(), mst.positions.end());
 	
-	transform_forest();
+	if (forest_mode) {
+	  transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
 	  
-	os << transform_forest.hypergraph << '\n';
+	  os << deps.hypergraph << '\n';
+	} else if (span_mode) {
+	  transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
+	  
+	  os << deps.spans << '\n';
+	}
+	
 	if (flush_output)
 	  os << std::flush;
       } else {
@@ -844,6 +849,7 @@ struct CoNLL
     conll_parser<iiter_type> parser;
     conll_set_type conll;
     
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
 
@@ -880,31 +886,38 @@ struct CoNLL
 	}
       }
 
-      if (forest_mode) {
-	transform_forest.clear();
+      if (forest_mode || span_mode) {
+	deps.clear();
 	  
 	conll_set_type::const_iterator citer_end = conll.end();
 	for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer) {
-	  transform_forest.sentence.push_back(citer->form);
+	  deps.sentence.push_back(citer->form);
 	    
 	  if (relation_mode)
-	    transform_forest.pos.push_back('[' + citer->deprel + ']');
+	    deps.postag.push_back('[' + citer->deprel + ']');
 	  else
-	    transform_forest.pos.push_back('[' + citer->cpostag + ']');
+	    deps.postag.push_back('[' + citer->cpostag + ']');
 	    
 	  if (projective_mode) {
 	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
 	    if (head == conll_type::size_type(-1))
 	      throw std::runtime_error("invalid projective head");
 	      
-	    transform_forest.dependency.push_back(head);
+	    deps.dependency.push_back(head);
 	  } else
-	    transform_forest.dependency.push_back(citer->head);
+	    deps.dependency.push_back(citer->head);
 	}
+	
+	if (forest_mode) {
+	  transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
 	  
-	transform_forest();
+	  os << deps.hypergraph << '\n';
+	} else if (span_mode) {
+	  transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
 	  
-	os << transform_forest.hypergraph << '\n';
+	  os << deps.spans << '\n';
+	}
+	
 	if (flush_output)
 	  os << std::flush;
       } else {
@@ -1035,6 +1048,7 @@ struct Malt
     malt_parser<iiter_type> parser;
     malt_set_type malt;
     
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
     
@@ -1076,22 +1090,29 @@ struct Malt
 	}
       }
       
-      if (forest_mode) {
-	transform_forest.clear();
+      if (forest_mode || span_mode) {
+	deps.clear();
 	
 	malt_set_type::const_iterator citer_end = malt.end();
 	for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer) {
-	  transform_forest.sentence.push_back(citer->word);
+	  deps.sentence.push_back(citer->word);
 	  
-	  transform_forest.pos.push_back('[' + citer->tag + ']');
+	  deps.postag.push_back('[' + citer->tag + ']');
 	  
 	  // +1....
-	  transform_forest.dependency.push_back(citer->dep + 1);
+	  deps.dependency.push_back(citer->dep + 1);
 	}
 	
-	transform_forest();
+	if (forest_mode) {
+	  transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
+	  
+	  os << deps.hypergraph << '\n';
+	} else if (span_mode) {
+	  transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
+	  
+	  os << deps.spans << '\n';
+	}
 	
-	os << transform_forest.hypergraph << '\n';
 	if (flush_output)
 	  os << std::flush;
       } else {
@@ -1168,6 +1189,7 @@ struct Cabocha
     std::string line;
     tokens_type tokens;
 
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
     
@@ -1234,20 +1256,27 @@ struct Cabocha
 	  }
 	}
 	  
-	if (forest_mode) {
-	  transform_forest.clear();
+	if (forest_mode || span_mode) {
+	  deps.clear();
 	    
 	  terminal_set_type::const_iterator titer_end = terminals.end();
 	  for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer) {
-	    transform_forest.sentence.push_back(titer->first);
-	    transform_forest.pos.push_back('[' + titer->second + ']');
+	    deps.sentence.push_back(titer->first);
+	    deps.postag.push_back('[' + titer->second + ']');
 	  }
+	  
+	  deps.dependency.assign(dependency.begin(), dependency.end());
+	  
+	  if (forest_mode) {
+	    transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
 	    
-	  transform_forest.dependency.assign(dependency.begin(), dependency.end());
+	    os << deps.hypergraph << '\n';
+	  } else if (span_mode) {
+	    transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
 	    
-	  transform_forest();
-	    
-	  os << transform_forest.hypergraph << '\n';
+	    os << deps.spans << '\n';
+	  }
+	  
 	  if (flush_output)
 	    os << std::flush;
 	} else {
@@ -1399,6 +1428,7 @@ struct KHayashi
     khayashi_parser<iiter_type> parser;
     khayashi_type khayashi;
 
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
     
@@ -1427,19 +1457,27 @@ struct KHayashi
       if (normalize_mode)
 	normalize(khayashi.poss.begin(), khayashi.poss.end());
 
-      if (forest_mode) {
-	transform_forest.clear();
-	transform_forest.sentence.assign(khayashi.words.begin(), khayashi.words.end());
+      if (forest_mode || span_mode) {
+	deps.clear();
+	
+	deps.sentence.assign(khayashi.words.begin(), khayashi.words.end());
 	  
 	khayashi_type::label_set_type::const_iterator liter_end = khayashi.poss.end();
 	for (khayashi_type::label_set_type::const_iterator liter = khayashi.poss.begin(); liter != liter_end; ++ liter)
-	  transform_forest.pos.push_back('[' + *liter + ']');	    
+	  deps.postag.push_back('[' + *liter + ']');	    
 	  
-	transform_forest.dependency.assign(khayashi.positions.begin(), khayashi.positions.end());
+	deps.dependency.assign(khayashi.positions.begin(), khayashi.positions.end());
+	
+	if (forest_mode) {
+	  transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
 	  
-	transform_forest();
+	  os << deps.hypergraph << '\n';
+	} else if (span_mode) {
+	  transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
 	  
-	os << transform_forest.hypergraph << '\n';
+	  os << deps.spans << '\n';
+	}
+	
 	if (flush_output)
 	  os << std::flush;
       } else {
@@ -1913,6 +1951,7 @@ struct Cicada
     cicada_parser<iiter_type> parser;
     cicada_type cicada;
 
+    Dependency      deps;
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode);
     
@@ -1941,19 +1980,26 @@ struct Cicada
       if (normalize_mode)
 	normalize(cicada.pos.begin(), cicada.pos.end());
 
-      if (forest_mode) {
-	transform_forest.clear();
-	transform_forest.sentence.assign(cicada.tok.begin(), cicada.tok.end());
+      if (forest_mode || span_mode) {
+	deps.clear();
+	deps.sentence.assign(cicada.tok.begin(), cicada.tok.end());
 	  
 	cicada_type::label_set_type::const_iterator liter_end = cicada.pos.end();
 	for (cicada_type::label_set_type::const_iterator liter = cicada.pos.begin(); liter != liter_end; ++ liter)
-	  transform_forest.pos.push_back('[' + *liter + ']');	    
+	  deps.postag.push_back('[' + *liter + ']');	    
 	
-	transform_forest.dependency.assign(cicada.dep.begin(), cicada.dep.end());
+	deps.dependency.assign(cicada.dep.begin(), cicada.dep.end());
+	
+	if (forest_mode) {
+	  transform_forest(deps.sentence, deps.postag, deps.dependency, deps.hypergraph);
 	  
-	transform_forest();
+	  os << deps.hypergraph << '\n';
+	} else if (span_mode) {
+	  transform_span(deps.sentence, deps.postag, deps.dependency, deps.spans);
 	  
-	os << transform_forest.hypergraph << '\n';
+	  os << deps.spans << '\n';
+	}
+	
 	if (flush_output)
 	  os << std::flush;
       } else {
