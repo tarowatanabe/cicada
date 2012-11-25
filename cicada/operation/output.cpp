@@ -2,7 +2,14 @@
 //  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
 #include <iostream>
+#include <iterator>
 
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
@@ -33,11 +40,34 @@ namespace cicada
     {
       Tp operator()() const { return Tp(-1); }
     };
+    
+    template <typename Iterator>
+    struct feature_generator : boost::spirit::karma::grammar<Iterator, HyperGraph::feature_set_type()>
+    {
+      feature_generator() : feature_generator::base_type(features) 
+      {
+	namespace karma = boost::spirit::karma;
+	namespace standard = boost::spirit::standard;
+	
+	features %= (standard::string << '=' << double10) % ' ';
+      }
+      
+      struct real_precision : boost::spirit::karma::real_policies<double>
+      {
+	static unsigned int precision(double) 
+	{ 
+	  return 10;
+	}
+      };
+      
+      boost::spirit::karma::real_generator<double, real_precision> double10;
+      boost::spirit::karma::rule<Iterator, HyperGraph::feature_set_type()> features;
+    };
 
     template <typename Hypergraph, typename Function, typename Filter>
     inline
     void kbest_derivations(std::ostream& os,
-			   const size_t id,
+			   const Operation::id_type id,
 			   const Hypergraph& graph,
 			   const int kbest_size,
 			   const Function& function,
@@ -47,6 +77,9 @@ namespace cicada
 			   const bool treebank_mode,
 			   const bool debinarize)
     {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
       
@@ -80,6 +113,10 @@ namespace cicada
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
 
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
+
+      typedef std::ostream_iterator<char> iterator_type;
+
+      feature_generator<iterator_type> features;
       
       derivation_type derivation;
       weight_type     weight;
@@ -158,14 +195,10 @@ namespace cicada
 	    cicada::treebank(os, graph_kbest);
 	  else
 	    os << graph_kbest;
-	  os << " |||";
 	  
-	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	    os << ' ' << fiter->first << '=' << fiter->second;
-	  os << " ||| ";
-	  os << weight;
-	  os << '\n';
+	  karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
+	  
+	  os << weight << '\n';
 	}
       }
     }
@@ -174,7 +207,7 @@ namespace cicada
     template <typename Hypergraph, typename Traversal, typename Function, typename Filter>
     inline
     void kbest_derivations(std::ostream& os,
-			   const size_t id,
+			   const Operation::id_type id,
 			   const Hypergraph& graph,
 			   const int kbest_size,
 			   const Traversal& traversal, 
@@ -182,6 +215,9 @@ namespace cicada
 			   const Filter& filter,
 			   const bool no_id)
     {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
       typedef typename hypergraph_type::feature_set_type feature_set_type;
@@ -194,7 +230,11 @@ namespace cicada
       }
       
       cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
-  
+      
+      typedef std::ostream_iterator<char> iterator_type;
+      
+      feature_generator<iterator_type> features;
+      
       typename Traversal::value_type derivation;
       typename Function::value_type  weight;
   
@@ -204,13 +244,11 @@ namespace cicada
     
 	if (! no_id)
 	  os << id << " ||| ";
-	os << boost::get<0>(derivation) << " |||";
-	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	  os << ' ' << fiter->first << '=' << fiter->second;
-	os << " ||| ";
-	os << weight;
-	os << '\n';
+	os << boost::get<0>(derivation);
+	
+	karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
+	
+	os << weight << '\n';
       }
     }
 
@@ -352,7 +390,7 @@ namespace cicada
     {
       typedef cicada::semiring::Logprob<double> weight_type;
 
-      const size_type& id = data.id;
+      const id_type& id = data.id;
       const hypergraph_type& hypergraph = data.hypergraph;
     	
       boost::iostreams::filtering_ostream os_buffer;

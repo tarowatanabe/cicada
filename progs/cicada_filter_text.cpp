@@ -119,6 +119,9 @@ bool verify(Iterator first, Iterator last, const Grammar& grammar)
 
 int main(int argc, char** argv)
 {
+  namespace qi = boost::spirit::qi;
+  namespace karma = boost::spirit::karma;
+  
   try {
     options(argc, argv);
     
@@ -170,7 +173,7 @@ int main(int argc, char** argv)
 	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
 	  sentence.clear();
 	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
+	  if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
 	    std::string str;
 	    for (size_t i = 0; i != sentence.size(); ++ i)
 	      str += ' ' + sentence[i];
@@ -225,7 +228,7 @@ int main(int argc, char** argv)
 	    sentence.push_back(eos);
 	  }
 	  
-	  if (! boost::spirit::karma::generate(oiter_type(os), generator, sentence))
+	  if (! karma::generate(oiter_type(os), generator, sentence))
 	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	}
       }
@@ -242,7 +245,7 @@ int main(int argc, char** argv)
 	for (size_t line_no = 0; iter != iter_end; ++ line_no) {
 	  sentence.clear();
 	
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
+	  if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence)) {
 	    std::string str;
 	    for (size_t i = 0; i != sentence.size(); ++ i)
 	      str += ' ' + sentence[i];
@@ -270,7 +273,7 @@ int main(int argc, char** argv)
 	    sentence.push_back(eos);
 	  }
 	  
-	  if (! boost::spirit::karma::generate(oiter_type(os), generator, sentence))
+	  if (! karma::generate(oiter_type(os), generator, sentence))
 	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	}
       }
