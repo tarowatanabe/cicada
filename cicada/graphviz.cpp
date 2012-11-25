@@ -272,6 +272,9 @@ namespace cicada
   
   std::ostream& graphviz(std::ostream& os, const HyperGraph& hypergraph)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+      
     typedef HyperGraph hypergraph_type;
 
     typedef hypergraph_type::node_type node_type;
@@ -299,23 +302,17 @@ namespace cicada
 	if (edge.rule) {
 	  os << " edge_" << edge.id << " [label=\"{";
 	  
-	  boost::spirit::karma::generate(iterator_type(os), grammar_rule, *edge.rule);
-	  if (! edge.tails.empty()) {
-	    os << " | ";
-	    boost::spirit::karma::generate(iterator_type(os), grammar_tail, edge.tails);
-	  }
+	  karma::generate(iterator_type(os), grammar_rule, *edge.rule);
+	  if (! edge.tails.empty())
+	    karma::generate(iterator_type(os), " | " << grammar_tail, edge.tails);
 	  
 	  os << "}";
 	  
-	  if (! edge.features.empty()) {
-	    os << " | ";
-	    boost::spirit::karma::generate(iterator_type(os), grammar_feature, edge.features);
-	  }
+	  if (! edge.features.empty())
+	    karma::generate(iterator_type(os), " | " << grammar_feature, edge.features);
 
-	  if (! edge.attributes.empty()) {
-	    os << " | ";
-	    boost::spirit::karma::generate(iterator_type(os), grammar_attribute, edge.attributes);
-	  }
+	  if (! edge.attributes.empty())
+	    karma::generate(iterator_type(os), " | " << grammar_attribute, edge.attributes);
 	  
 	  os << "\", shape=record];";
 	} else
@@ -337,6 +334,9 @@ namespace cicada
 
   std::ostream& graphviz(std::ostream& os, const Lattice& lattice)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     typedef Lattice lattice_type;
     
     typedef graphviz_impl::iterator_type iterator_type;
@@ -356,11 +356,9 @@ namespace cicada
 	
 	os << " edge_" << id_edge << " [label=\"";
 	
-	boost::spirit::karma::generate(iterator_type(os), grammar_label, arc.label);
-	if (! arc.features.empty()) {
-	  os << " | ";
-	  boost::spirit::karma::generate(iterator_type(os), grammar_feature, arc.features);
-	}
+	karma::generate(iterator_type(os), grammar_label, arc.label);
+	if (! arc.features.empty())
+	  karma::generate(iterator_type(os), " | " << grammar_feature, arc.features);
 	
 	os << "\", shape=record];";
 	

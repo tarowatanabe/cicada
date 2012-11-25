@@ -14,6 +14,14 @@
 
 #include <msgpack/object.hpp>
 
+namespace cicada
+{
+  namespace eval
+  {
+    
+    
+  };
+};
 
 #endif
 #endif
