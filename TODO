@@ -176,3 +176,6 @@ Rearrange learning code by splitting L2 and/or L1 projection
 
 Implement IBM Model 4....
    Use of the fast hill-climbing trick
+   Use of Gibbs sampling style learning
+     Keep track of a sampled derivation, or the best derivation from previous itereations.
+     Initialize table by the Viterbi alignment before starting more complex model iterations.
