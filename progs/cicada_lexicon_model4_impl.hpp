@@ -42,18 +42,50 @@ struct LearnModel4Posterior : public LearnBase
 {
   LearnModel4Posterior(const LearnBase& __base)
     : LearnBase(__base) {}
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    
+  }
+  
+  void operator()(const sentence_type& source, const sentence_type& target)
+  {
+    
+  }
+
 };
 
 struct LearnModel4Symmetric : public LearnBase
 {
   LearnModel4Symmetric(const LearnBase& __base)
     : LearnBase(__base) {}
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    
+  }
+  
+  void operator()(const sentence_type& source, const sentence_type& target)
+  {
+    
+  }
+
 };
 
 struct LearnModel4SymmetricPosterior : public LearnBase
 {
   LearnModel4SymmetricPosterior(const LearnBase& __base)
     : LearnBase(__base) {}
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    
+  }
+  
+  void operator()(const sentence_type& source, const sentence_type& target)
+  {
+    
+  }
 
 };
 
@@ -69,33 +101,110 @@ struct ViterbiModel4 : public ViterbiBase
 		  __atable_source_target, __atable_target_source,
 		  __classes_source, __classes_target) {}
   
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
+
 };
 
 struct PosteriorModel4 : public ViterbiBase
 {
+  template <typename Matrix>
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  Matrix& posterior_source_target,
+		  Matrix& posterior_target_source)
+  {
+    
+  } 
   
 };
 
 struct ITGModel4 : public ViterbiBase
 {
 
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
+
 };
 
 struct MaxMatchModel4 : public ViterbiBase
 {
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    
+  }
   
 };
 
 struct DependencyModel4 : public ViterbiBase
 {
 
-  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target)
+  {
+    
+  }
 };
 
 template <typename Analyzer>
 struct __DependencyModel4Base : public DependencyModel4
 {
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
   
+  }
 };
 
 typedef __DependencyModel4Base<DependencyHybrid>            DependencyHybridModel4;
@@ -109,6 +218,15 @@ typedef __DependencyModel4Base<DependencyMSTSingleRoot>     DependencyMSTSingleR
 struct PermutationModel4 : public ViterbiBase
 {
   
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& permutation_source,
+		  const dependency_type& permutation_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    
+  }
 };
 
 #endif
