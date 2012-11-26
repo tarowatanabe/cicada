@@ -14,6 +14,9 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
+#include <boost/filesystem.hpp>
+#include <boost/range.hpp>
+
 #include <cicada/sentence.hpp>
 #include <cicada/alignment.hpp>
 #include <cicada/dependency.hpp>
@@ -21,8 +24,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
-#include <boost/filesystem.hpp>
-
+#include <utils/bithack.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 #include <utils/alloc_vector.hpp>
@@ -33,6 +35,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/vector2.hpp>
+#include <utils/chart.hpp>
 
 typedef cicada::Symbol     word_type;
 typedef cicada::Sentence   sentence_type;
@@ -87,6 +90,15 @@ struct atable_counts_type
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   typedef int       index_type;
+
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+
 
   class difference_map_type
   {
@@ -218,14 +230,16 @@ struct atable_counts_type
     for (counts_type::const_iterator aiter = counts.begin(); aiter != aiter_end; ++ aiter) {
       const class_pair_type& pair = aiter->first;
 
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS)
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS && pair.first != vocab_type::EPSILON)
 	counts_source[class_pair_type(vocab_type::UNK, pair.second)] += aiter->second;
       
-      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS
+	  && pair.second != vocab_type::EPSILON && pair.second != vocab_type::NONE)
 	counts_target[class_pair_type(pair.first, vocab_type::UNK)] += aiter->second;
       
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS
-	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS && pair.first != vocab_type::EPSILON
+	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS
+	  && pair.second != vocab_type::EPSILON && pair.second != vocab_type::NONE)
 	counts_source_target += aiter->second;
     }
     
@@ -352,15 +366,15 @@ struct atable_type
   
   
   atable_type(const double __prior=0.1, const double __smooth=1e-20)
-    : atable(), prior(__prior), smooth(__smooth) { initialize_cache(); }
+    : table(), prior(__prior), smooth(__smooth) { initialize_cache(); }
   
   atable_type(const atable_type& x)
-    : atable(x.atable), prior(x.prior), smooth(x.smooth) { initialize_cache(); }
+    : table(x.table), prior(x.prior), smooth(x.smooth) { initialize_cache(); }
   atable_type& operator=(const atable_type& x)
   {
     clear();
     
-    atable = x.atable;
+    table = x.table;
     prior  = x.prior;
     smooth = x.smooth;
 
@@ -376,7 +390,7 @@ struct atable_type
 		       const index_type& i_prev,
 		       const index_type& i) const
   {
-    if (atable.empty()) return 1.0 / source_size;
+    if (table.empty()) return 1.0 / source_size;
     
     // i_prev < 0 implies BOS
     // i >= souce_size implies EOS
@@ -422,10 +436,10 @@ struct atable_type
       
       double sum = 0.0;
       
-      atable_counts_type::const_iterator aiter = atable.find(classes);
+      atable_counts_type::const_iterator aiter = table.find(classes);
       
       for (index_type i = range.first; i != range.second; ++ i) {
-	const double count = (aiter != atable.end() ? aiter->second[i] + prior : prior);
+	const double count = (aiter != table.end() ? aiter->second[i] + prior : prior);
 	
 	diffs[i] = count;
 	sum += count;
@@ -442,28 +456,28 @@ struct atable_type
   
   difference_map_type& operator[](const class_pair_type& x)
   {
-    return atable[x];
+    return table[x];
   }
   
   difference_map_type& operator()(const word_type& source, const word_type& target)
   {
-    return atable[class_pair_type(source, target)];
+    return table[class_pair_type(source, target)];
   }
 
   count_type& operator()(const word_type& source, const word_type& target, const index_type& diff)
   {
-    return atable[class_pair_type(source, target)][diff];
+    return table[class_pair_type(source, target)][diff];
   }
   
   void clear()
   {
-    atable.clear();
+    table.clear();
 
     initialize_cache();
   }
   void swap(atable_type& x)
   {
-    atable.swap(x.atable);
+    table.swap(x.table);
     std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
     
@@ -473,14 +487,14 @@ struct atable_type
   
   void estimate_unk()
   {
-    atable.estimate_unk();
+    table.estimate_unk();
   }
   
   void shrink() {}
   
   void initialize()
   {
-    atable.initialize();
+    table.initialize();
     
     initialize_cache();
   }
@@ -488,8 +502,8 @@ struct atable_type
   void initialize_cache()
   {
     caches.clear();
-    atable_counts_type::const_iterator aiter_end = atable.end();
-    for (atable_counts_type::const_iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter) 
+    atable_counts_type::const_iterator aiter_end = table.end();
+    for (atable_counts_type::const_iterator aiter = table.begin(); aiter != aiter_end; ++ aiter) 
       caches[aiter->first].clear();
     
     cache_unk.clear();
@@ -497,21 +511,21 @@ struct atable_type
   
   atable_type& operator+=(const atable_type& x)
   {
-    atable += x.atable;
+    table += x.table;
 
     return *this;
   }
 
   atable_type& operator+=(const atable_counts_type& x)
   {
-    atable += x;
+    table += x;
     
     return *this;
   }
   
-  bool empty() const { return atable.empty(); }
+  bool empty() const { return table.empty(); }
   
-  atable_counts_type atable;
+  atable_counts_type table;
   double prior;
   double smooth;
   
@@ -797,22 +811,42 @@ struct ptable_type
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
-  typedef utils::vector2<double, std::allocator<double> > table_type;
+  typedef utils::chart<double, std::allocator<double> > table_type;
 
-  static const size_type max_length = 64;
+  static const int max_length = 128;
   
   ptable_type(const double __p0) : p0(__p0) { initialize(); }
   
-  double operator()(const size_type m, const size_type phi0) const
+  double operator()(const int m, const int phi0) const
   {
-    return 0.0;
+    if (m < max_length && phi0 < max_length)
+      return table(phi0, m);
+    else
+      return (std::pow(1.0 - p0, utils::bithack::max(m - phi0 * 2, 0))
+	      * std::pow(p0, phi0)
+	      * binomial(m - phi0, phi0));
   }
-
+  
   void initialize()
   {
+    table.clear();
+    table.resize(max_length, 0.0);
     
+    for (int m = 1; m != max_length; ++ m)
+      for (int phi0 = 0; phi0 <= m; ++ phi0)
+	table(phi0, m) = (std::pow(1.0 - p0, utils::bithack::max(m - phi0 * 2, 0))
+			  * std::pow(p0, phi0)
+			  * binomial(m - phi0, phi0));
   }
 
+  double binomial(const int n, const int k) const
+  {
+    double result = 1.0;
+    for (int i = 1; i <= k; ++ i)
+      result *= double(utils::bithack::max(n - i + 1, 1)) / double(i);
+    return result;
+  }
+  
   table_type table;
   double p0;
 };
@@ -826,6 +860,17 @@ struct ntable_type
   
   typedef utils::vector2<count_type, std::allocator<count_type> > table_type;
   typedef std::vector<index_type, std::allocator<index_type> > map_type;
+  
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+
+  typedef table_type::const_iterator const_iterator;
+  typedef table_type::iterator       iterator;
   
   static const size_type fertility_size = 16;
   
@@ -855,6 +900,23 @@ struct ntable_type
     
     return table(map[word.id()], utils::bithack::min(fertility, fertility_size - 1));
   }
+
+  void assign(const word_type& word)
+  {
+    if (word.id() >= map.size())
+      map.resize(word.id() + 1, index_type(-1));
+    
+    if (map[word.id()] == index_type(-1)) {
+      table.resize(table.size1() + 1, fertility_size, count_type(0));
+      map[word.id()] = table.size1() - 1;
+    }
+  }
+
+  inline const_iterator begin(const word_type& x) const { return table.begin(map[x.id()]); }
+  inline       iterator begin(const word_type& x)       { return table.begin(map[x.id()]); }
+
+  inline const_iterator end(const word_type& x) const { return table.end(map[x.id()]); }
+  inline       iterator end(const word_type& x)       { return table.end(map[x.id()]); }
   
   void swap(ntable_type& x)
   {
@@ -862,6 +924,12 @@ struct ntable_type
     table.swap(x.table);
     std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
+  }
+
+  void clear()
+  {
+    map.clear();
+    table.clear();
   }
   
   void initialize()
@@ -915,6 +983,7 @@ struct dtable_type
   typedef dtable_counts_type::class_pair_type class_pair_type;
   
   typedef std::pair<index_type, index_type> range_type;
+
   
   struct cache_type
   {
@@ -1021,9 +1090,13 @@ struct dtable_type
 		       const index_type& i_prev,
 		       const index_type& i) const
   {
+    if (table.empty()) return 1.0 / source_size;
     
+    // 1 <= i <= source_size
+    
+    return estimate(class_pair_type(source, target), range_type(1 - i_prev, source_size - i_prev + 1))[i - i_prev];
   }
-
+  
   
   // non-head...
   prob_type operator()(const word_type& source,
@@ -1032,7 +1105,11 @@ struct dtable_type
 		       const index_type& i_prev,
 		       const index_type& i) const
   {
+    if (table.empty()) return 1.0 / source_size;
     
+    // 1 <= i <= source_size
+    
+    return estimate(class_pair_type(source, vocab_type::NONE), range_type(1 - i_prev, source_size - i_prev + 1))[i - i_prev];
   }
   
   const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
@@ -1409,12 +1486,18 @@ void write_lexicon(const path_type& path, const ttable_type& lexicon, const alig
 	sorted_type::const_iterator iter_end = sorted.end();
 	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
 	  if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
-	    if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n', (*iter)->first, source, (*iter)->second))
+	    if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n',
+				  (*iter)->first,
+				  source,
+				  (*iter)->second))
 	      throw std::runtime_error("generation failed");
       } else {
 	sorted_type::const_iterator iter_end = sorted.end();
 	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	  if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n', (*iter)->first, source, (*iter)->second))
+	  if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n',
+				(*iter)->first,
+				source,
+				(*iter)->second))
 	    throw std::runtime_error("generation failed");
       }
     }
@@ -1463,15 +1546,167 @@ void read_alignment(const path_type& path, atable_type& align)
   align.initialize_cache();
 }
 
+
 void write_alignment(const path_type& path, const atable_type& align)
 {
+  namespace karma = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+
+  typedef std::ostream_iterator<char> iterator_type;
+
+  karma::real_generator<double, atable_counts_type::real_precision> real;
+
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(20);
+
+  iterator_type iter(os);
   
-  atable_counts_type::const_iterator citer_end = align.atable.end();
-  for (atable_counts_type::const_iterator citer = align.atable.begin(); citer != citer_end; ++ citer)
+  atable_counts_type::const_iterator citer_end = align.table.end();
+  for (atable_counts_type::const_iterator citer = align.table.begin(); citer != citer_end; ++ citer)
     for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
-      os << citer->first.first << ' ' << citer->first.second << ' ' << diff << ' ' << citer->second[diff] << '\n';
+      if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
+			    citer->first.first,
+			    citer->first.second,
+			    diff,
+			    citer->second[diff]))
+	throw std::runtime_error("generation failed");
+}
+
+void read_distortion(const path_type& path, dtable_type& distortion)
+{
+  typedef boost::fusion::tuple<std::string, std::string, int, double > distortion_parsed_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  qi::rule<iterator_type, std::string(), standard::blank_type>       word;
+  qi::rule<iterator_type, distortion_parsed_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> word >> qi::int_ >> qi::double_ >> (qi::eol | qi::eoi);
+  
+  distortion.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+  
+  distortion_parsed_type distortion_parsed;
+  
+  while (iter != iter_end) {
+    boost::fusion::get<0>(distortion_parsed).clear();
+    boost::fusion::get<1>(distortion_parsed).clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, distortion_parsed))
+      if (iter != iter_end)
+	throw std::runtime_error("global lexicon parsing failed");
+    
+    const word_type source(boost::fusion::get<0>(distortion_parsed));
+    const word_type target(boost::fusion::get<1>(distortion_parsed));
+    const int&      index(boost::fusion::get<2>(distortion_parsed));
+    const double&   prob(boost::fusion::get<3>(distortion_parsed));
+    
+    distortion[std::make_pair(source, target)][index] = prob;
+  }
+
+  distortion.initialize_cache();
+}
+
+void write_distortion(const path_type& path, const dtable_type& distortion)
+{
+  namespace karma = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+
+  typedef std::ostream_iterator<char> iterator_type;
+
+  karma::real_generator<double, dtable_counts_type::real_precision> real;
+
+  utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(20);
+
+  iterator_type iter(os);
+  
+  dtable_counts_type::const_iterator citer_end = distortion.table.end();
+  for (dtable_counts_type::const_iterator citer = distortion.table.begin(); citer != citer_end; ++ citer)
+    for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
+      if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
+			    citer->first.first,
+			    citer->first.second,
+			    diff,
+			    citer->second[diff]))
+	throw std::runtime_error("generation failed");
+}
+
+void read_fertility(const path_type& path, ntable_type& fertility)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  typedef boost::fusion::tuple<std::string, prob_set_type> fertility_parsed_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+    
+  qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+  qi::rule<iterator_type, fertility_parsed_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> (qi::double_ % ' ') >> (qi::eol | qi::eoi);
+  
+  fertility.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+
+  fertility_parsed_type fertility_parsed;
+  
+  while (iter != iter_end) {
+    boost::fusion::get<0>(fertility_parsed).clear();
+    boost::fusion::get<1>(fertility_parsed).clear();
+    
+    if (! qi::phrase_parse(iter, iter_end, parser, standard::blank, fertility_parsed))
+      if (iter != iter_end)
+	throw std::runtime_error("global lexicon parsing failed");
+
+    if (boost::fusion::get<1>(fertility_parsed).size() != ntable_type::fertility_size)
+      throw std::runtime_error("invalid fertility table");
+    
+    const word_type word(boost::fusion::get<0>(fertility_parsed));
+    
+    fertility.assign(word);
+    
+    std::copy(boost::fusion::get<1>(fertility_parsed).begin(),
+	      boost::fusion::get<1>(fertility_parsed).end(),
+	      fertility.begin(word));
+  }
+  
+}
+
+void write_fertility(const path_type& path, const ntable_type& fertility)
+{
+  namespace karma = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+
+  typedef std::ostream_iterator<char> iterator_type;
+  
+  karma::real_generator<double, ntable_type::real_precision> real;
+  
+  utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(20);
+
+  iterator_type iter(os);
+  
+  for (word_type::id_type id = 0; id != fertility.map.size(); ++ id)
+    if (fertility.map[id] != ntable_type::index_type(-1))
+      karma::generate(iter, standard::string << ' ' << (real % ' ') << '\n',
+		      word_type(id),
+		      boost::make_iterator_range(fertility.begin(word_type(id)),
+						 fertility.end(word_type(id))));
 }
 
 
