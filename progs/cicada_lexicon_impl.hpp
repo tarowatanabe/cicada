@@ -815,7 +815,7 @@ struct ptable_type
 
   static const int max_length = 128;
   
-  ptable_type(const double __p0) : p0(__p0) { initialize(); }
+  ptable_type(const double __p0=0.01) : p0(__p0) { initialize(); }
   
   double operator()(const int m, const int phi0) const
   {
@@ -1248,6 +1248,24 @@ struct LearnBase
     static atable_type __tmp;
     return __tmp;
   }
+
+  static const dtable_type& __dtable()
+  {
+    static dtable_type __tmp;
+    return __tmp;
+  }
+
+  static const ntable_type& __ntable()
+  {
+    static ntable_type __tmp;
+    return __tmp;
+  }
+
+  static const ptable_type& __ptable()
+  {
+    static ptable_type __tmp;
+    return __tmp;
+  }
   
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source)
@@ -1257,12 +1275,18 @@ struct LearnBase
       ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
       atable_source_target(__atable()),
       atable_target_source(__atable()),
+      dtable_source_target(__dtable()),
+      dtable_target_source(__dtable()),
+      ntable_source_target(__ntable()),
+      ntable_target_source(__ntable()),
+      ptable_source_target(__ptable()),
+      ptable_target_source(__ptable()),
       classes_source(__classes()),
       classes_target(__classes()),
       objective_source_target(0),
       objective_target_source(0)
   {}
-
+  
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source,
 	    const atable_type& __atable_source_target,
@@ -1275,8 +1299,42 @@ struct LearnBase
       ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
       atable_source_target(__atable_source_target),
       atable_target_source(__atable_target_source),
-      atable_counts_source_target(),
-      atable_counts_target_source(),
+      dtable_source_target(__dtable()),
+      dtable_target_source(__dtable()),
+      ntable_source_target(__ntable()),
+      ntable_target_source(__ntable()),
+      ptable_source_target(__ptable()),
+      ptable_target_source(__ptable()),
+      classes_source(__classes_source),
+      classes_target(__classes_target),
+      objective_source_target(0),
+      objective_target_source(0)
+  {}
+
+  LearnBase(const ttable_type& __ttable_source_target,
+	    const ttable_type& __ttable_target_source,
+	    const dtable_type& __dtable_source_target,
+	    const dtable_type& __dtable_target_source,
+	    const ntable_type& __ntable_source_target,
+	    const ntable_type& __ntable_target_source,
+	    const ptable_type& __ptable_source_target,
+	    const ptable_type& __ptable_target_source,
+	    const classes_type& __classes_source,
+	    const classes_type& __classes_target)
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
+      ttable_counts_source_target(__ttable_source_target.prior, __ttable_source_target.smooth),
+      ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
+      atable_source_target(__atable()),
+      atable_target_source(__atable()),
+      dtable_source_target(__dtable_source_target),
+      dtable_target_source(__dtable_target_source),
+      ntable_source_target(__ntable_source_target),
+      ntable_target_source(__ntable_target_source),
+      ntable_counts_source_target(__ntable_source_target.prior, __ntable_source_target.smooth),
+      ntable_counts_target_source(__ntable_target_source.prior, __ntable_target_source.smooth),
+      ptable_source_target(__ptable_source_target),
+      ptable_target_source(__ptable_target_source),
       classes_source(__classes_source),
       classes_target(__classes_target),
       objective_source_target(0),
@@ -1292,15 +1350,21 @@ struct LearnBase
     ttable_counts_source_target.resize(word_type::allocated());
     ttable_counts_target_source.resize(word_type::allocated());
     
-    atable_counts_source_target.initialize();
-    atable_counts_target_source.initialize();
-    
     aligned_source_target.clear();
     aligned_target_source.clear();
     aligned_source_target.reserve(word_type::allocated());
     aligned_target_source.reserve(word_type::allocated());
     aligned_source_target.resize(word_type::allocated());
     aligned_target_source.resize(word_type::allocated());
+    
+    atable_counts_source_target.initialize();
+    atable_counts_target_source.initialize();
+    
+    dtable_counts_source_target.initialize();
+    dtable_counts_target_source.initialize();
+    
+    ntable_counts_source_target.initialize();
+    ntable_counts_target_source.initialize();
     
     objective_source_target = 0.0;
     objective_target_source = 0.0;
@@ -1317,17 +1381,30 @@ struct LearnBase
   ttable_type ttable_counts_source_target;
   ttable_type ttable_counts_target_source;
 
+  aligned_type aligned_source_target;
+  aligned_type aligned_target_source;
+
   const atable_type& atable_source_target;
   const atable_type& atable_target_source;
   atable_counts_type atable_counts_source_target;
   atable_counts_type atable_counts_target_source;
 
+  const dtable_type& dtable_source_target;
+  const dtable_type& dtable_target_source;
+  dtable_counts_type dtable_counts_source_target;
+  dtable_counts_type dtable_counts_target_source;
+
+  const ntable_type& ntable_source_target;
+  const ntable_type& ntable_target_source;
+  ntable_type ntable_counts_source_target;
+  ntable_type ntable_counts_target_source;
+
+  const ptable_type& ptable_source_target;
+  const ptable_type& ptable_target_source;
+
   const classes_type& classes_source;
   const classes_type& classes_target;
-  
-  aligned_type aligned_source_target;
-  aligned_type aligned_target_source;
-  
+    
   double objective_source_target;
   double objective_target_source;
 };
@@ -1350,12 +1427,37 @@ struct ViterbiBase
     return __tmp;
   }
 
+  static const dtable_type& __dtable()
+  {
+    static dtable_type __tmp;
+    return __tmp;
+  }
+
+  static const ntable_type& __ntable()
+  {
+    static ntable_type __tmp;
+    return __tmp;
+  }
+
+  static const ptable_type& __ptable()
+  {
+    static ptable_type __tmp;
+    return __tmp;
+  }
+
+
   ViterbiBase(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
       atable_source_target(__atable()),
       atable_target_source(__atable()),
+      dtable_source_target(__dtable()),
+      dtable_target_source(__dtable()),
+      ntable_source_target(__ntable()),
+      ntable_target_source(__ntable()),
+      ptable_source_target(__ptable()),
+      ptable_target_source(__ptable()),
       classes_source(__classes()),
       classes_target(__classes())
   {}
@@ -1369,6 +1471,36 @@ struct ViterbiBase
       ttable_target_source(__ttable_target_source),
       atable_source_target(__atable_source_target),
       atable_target_source(__atable_target_source),
+      dtable_source_target(__dtable()),
+      dtable_target_source(__dtable()),
+      ntable_source_target(__ntable()),
+      ntable_target_source(__ntable()),
+      ptable_source_target(__ptable()),
+      ptable_target_source(__ptable()),
+      classes_source(__classes_source),
+      classes_target(__classes_target)
+  {}
+
+  ViterbiBase(const ttable_type& __ttable_source_target,
+	      const ttable_type& __ttable_target_source,
+	      const dtable_type& __dtable_source_target,
+	      const dtable_type& __dtable_target_source,
+	      const ntable_type& __ntable_source_target,
+	      const ntable_type& __ntable_target_source,
+	      const ptable_type& __ptable_source_target,
+	      const ptable_type& __ptable_target_source,
+	      const classes_type& __classes_source,
+	      const classes_type& __classes_target)
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
+      atable_source_target(__atable()),
+      atable_target_source(__atable()),
+      dtable_source_target(__dtable_source_target),
+      dtable_target_source(__dtable_target_source),
+      ntable_source_target(__ntable_source_target),
+      ntable_target_source(__ntable_target_source),
+      ptable_source_target(__ptable_source_target),
+      ptable_target_source(__ptable_target_source),
       classes_source(__classes_source),
       classes_target(__classes_target)
   {}
@@ -1384,6 +1516,15 @@ struct ViterbiBase
   
   const atable_type& atable_source_target;
   const atable_type& atable_target_source;
+
+  const dtable_type& dtable_source_target;
+  const dtable_type& dtable_target_source;
+
+  const ntable_type& ntable_source_target;
+  const ntable_type& ntable_target_source;
+
+  const ptable_type& ptable_source_target;
+  const ptable_type& ptable_target_source;
   
   const classes_type& classes_source;
   const classes_type& classes_target;
