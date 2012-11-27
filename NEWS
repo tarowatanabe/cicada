@@ -1,4 +1,4 @@
-2012-x-x
+2012-11-27
 Bugfix: kbest-based (mert) learner/oracle computer core dump!
 	The reason is the incorrect hash value computation for compact-feature-vector.
 INCOMPATIBLE: The feature-vector is re-implemented by a privately implemented compact-hashtable.
