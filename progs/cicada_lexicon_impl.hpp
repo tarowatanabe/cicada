@@ -1311,8 +1311,11 @@ struct LearnBase
       objective_target_source(0)
   {}
 
+
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source,
+	    const atable_type& __atable_source_target,
+	    const atable_type& __atable_target_source,
 	    const dtable_type& __dtable_source_target,
 	    const dtable_type& __dtable_target_source,
 	    const ntable_type& __ntable_source_target,
@@ -1325,8 +1328,8 @@ struct LearnBase
       ttable_target_source(__ttable_target_source),
       ttable_counts_source_target(__ttable_source_target.prior, __ttable_source_target.smooth),
       ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
-      atable_source_target(__atable()),
-      atable_target_source(__atable()),
+      atable_source_target(__atable_source_target),
+      atable_target_source(__atable_target_source),
       dtable_source_target(__dtable_source_target),
       dtable_target_source(__dtable_target_source),
       ntable_source_target(__ntable_source_target),
@@ -1483,6 +1486,8 @@ struct ViterbiBase
 
   ViterbiBase(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source,
+	      const atable_type& __atable_source_target,
+	      const atable_type& __atable_target_source,
 	      const dtable_type& __dtable_source_target,
 	      const dtable_type& __dtable_target_source,
 	      const ntable_type& __ntable_source_target,
@@ -1493,8 +1498,8 @@ struct ViterbiBase
 	      const classes_type& __classes_target)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
-      atable_source_target(__atable()),
-      atable_target_source(__atable()),
+      atable_source_target(__atable_source_target),
+      atable_target_source(__atable_target_source),
       dtable_source_target(__dtable_source_target),
       dtable_target_source(__dtable_target_source),
       ntable_source_target(__ntable_source_target),

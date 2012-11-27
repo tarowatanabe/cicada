@@ -28,10 +28,20 @@ path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
+path_type distortion_source_target_file;
+path_type distortion_target_source_file;
+path_type fertility_source_target_file;
+path_type fertility_target_source_file;
+double insertion_source_target = 0.01;
+double insertion_target_source = 0.01;
 path_type output_lexicon_source_target_file;
 path_type output_lexicon_target_source_file;
 path_type output_alignment_source_target_file;
 path_type output_alignment_target_source_file;
+path_type output_distortion_source_target_file;
+path_type output_distortion_target_source_file;
+path_type output_fertility_source_target_file;
+path_type output_fertility_target_source_file;
 path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
 path_type projected_source_file;
@@ -42,6 +52,7 @@ path_type posterior_combined_file;
 
 int iteration_model1 = 5;
 int iteration_hmm = 5;
+int iteration_model4 = 5;
 
 bool symmetric_mode = false;
 bool posterior_mode = false;
@@ -59,11 +70,15 @@ bool mst_mode = false;
 bool single_root_mode = false;
 
 // parameter...
-double p0    = 0.01;
+double p0 = 0.01;
 double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
 double prior_alignment = 0.01;
 double smooth_alignment = 1e-20;
+double prior_distortion = 0.01;
+double smooth_distortion = 1e-20;
+double prior_fertility = 0.01;
+double smooth_fertility = 1e-20;
 
 double l0_alpha = 100;
 double l0_beta = 0.01;
@@ -77,6 +92,7 @@ int debug = 0;
 #include "cicada_lexicon_maximize_impl.hpp"
 #include "cicada_lexicon_model1_impl.hpp"
 #include "cicada_lexicon_hmm_impl.hpp"
+#include "cicada_lexicon_model4_impl.hpp"
 
 template <typename Learner, typename Maximizer>
 void learn(const Maximizer& maximier,
@@ -84,17 +100,36 @@ void learn(const Maximizer& maximier,
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   atable_type& atable_source_target,
-	   atable_type& atalbe_target_source,
+	   atable_type& atable_target_source,
 	   const classes_type& classes_source,
 	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source);
 
+// sample-based learner...
+template <typename Learner, typename Maximizer>
+void sample(const Maximizer& maximier,
+	    const int iteration,
+	    ttable_type& ttable_source_target,
+	    ttable_type& ttable_target_source,
+	    atable_type& atable_source_target,
+	    atable_type& atable_target_source,
+	    dtable_type& dtable_source_target,
+	    dtable_type& dtable_target_source,
+	    ntable_type& ntable_source_target,
+	    ntable_type& ntable_target_source,
+	    const ptable_type& ptable_source_target,
+	    const ptable_type& ptable_target_source,
+	    const classes_type& classes_source,
+	    const classes_type& classes_target,
+	    aligned_type& aligned_source_target,
+	    aligned_type& aligned_target_source);
+
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
 	     const ttable_type& ttable_target_source,
 	     const atable_type& atable_source_target,
-	     const atable_type& atalbe_target_source,
+	     const atable_type& atable_target_source,
 	     const classes_type& classes_source,
 	     const classes_type& classes_target);
 
@@ -102,7 +137,7 @@ template <typename Analyzer>
 void project_dependency(const ttable_type& ttable_source_target,
 			const ttable_type& ttable_target_source,
 			const atable_type& atable_source_target,
-			const atable_type& atalbe_target_source,
+			const atable_type& atable_target_source,
 			const classes_type& classes_source,
 			const classes_type& classes_target);
 
@@ -110,7 +145,7 @@ template <typename Infer>
 void posterior(const ttable_type& ttable_source_target,
 	       const ttable_type& ttable_target_source,
 	       const atable_type& atable_source_target,
-	       const atable_type& atalbe_target_source,
+	       const atable_type& atable_target_source,
 	       const classes_type& classes_source,
 	       const classes_type& classes_target);
 
@@ -149,6 +184,15 @@ int main(int argc, char ** argv)
     
     atable_type atable_source_target(prior_alignment, smooth_alignment);
     atable_type atable_target_source(prior_alignment, smooth_alignment);
+
+    dtable_type dtable_source_target(prior_distortion, smooth_distortion);
+    dtable_type dtable_target_source(prior_distortion, smooth_distortion);
+
+    ntable_type ntable_source_target(prior_fertility, smooth_fertility);
+    ntable_type ntable_target_source(prior_fertility, smooth_fertility);
+
+    ptable_type ptable_source_target(insertion_source_target);
+    ptable_type ptable_target_source(insertion_target_source);
     
     classes_type classes_source;
     classes_type classes_target;
@@ -172,6 +216,22 @@ int main(int argc, char ** argv)
       if (alignment_target_source_file != "-" && ! boost::filesystem::exists(alignment_target_source_file))
 	throw std::runtime_error("no file: " + alignment_target_source_file.string());
 
+    if (! distortion_source_target_file.empty())
+      if (distortion_source_target_file != "-" && ! boost::filesystem::exists(distortion_source_target_file))
+	throw std::runtime_error("no file: " + distortion_source_target_file.string());
+
+    if (! distortion_target_source_file.empty())
+      if (distortion_target_source_file != "-" && ! boost::filesystem::exists(distortion_target_source_file))
+	throw std::runtime_error("no file: " + distortion_target_source_file.string());
+
+    if (! fertility_source_target_file.empty())
+      if (fertility_source_target_file != "-" && ! boost::filesystem::exists(fertility_source_target_file))
+	throw std::runtime_error("no file: " + fertility_source_target_file.string());
+
+    if (! fertility_target_source_file.empty())
+      if (fertility_target_source_file != "-" && ! boost::filesystem::exists(fertility_target_source_file))
+	throw std::runtime_error("no file: " + fertility_target_source_file.string());
+
     if (! classes_source_file.empty())
       if (classes_source_file != "-" && ! boost::filesystem::exists(classes_source_file))
 	throw std::runtime_error("no file: " + classes_source_file.string());
@@ -184,21 +244,54 @@ int main(int argc, char ** argv)
     
     // read lexicon
     if (! lexicon_source_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon,
+							    boost::cref(lexicon_source_target_file),
+							    boost::ref(ttable_source_target))));
     if (! lexicon_target_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon,
+							    boost::cref(lexicon_target_source_file),
+							    boost::ref(ttable_target_source))));
     
     // read alignment
     if (! alignment_source_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_source_target_file), boost::ref(atable_source_target))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_alignment,
+							    boost::cref(alignment_source_target_file),
+							    boost::ref(atable_source_target))));
     if (! alignment_target_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_target_source_file), boost::ref(atable_target_source))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_alignment,
+							    boost::cref(alignment_target_source_file),
+							    boost::ref(atable_target_source))));
+
+    // read distortion
+    if (! distortion_source_target_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_distortion,
+							    boost::cref(distortion_source_target_file),
+							    boost::ref(dtable_source_target))));
+    if (! distortion_target_source_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_distortion,
+							    boost::cref(distortion_target_source_file),
+							    boost::ref(dtable_target_source))));
+    
+    // read fertility
+    if (! fertility_source_target_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_fertility,
+							    boost::cref(fertility_source_target_file),
+							    boost::ref(ntable_source_target))));
+    if (! fertility_target_source_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_fertility,
+							    boost::cref(fertility_target_source_file),
+							    boost::ref(ntable_target_source))));
+
 
     // read classes
     if (! classes_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_source_file), boost::ref(classes_source))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_classes,
+							    boost::cref(classes_source_file),
+							    boost::ref(classes_source))));
     if (! classes_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_target_file), boost::ref(classes_target))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_classes,
+							    boost::cref(classes_target_file),
+							    boost::ref(classes_target))));
     
     workers_read.join_all();
     
@@ -303,7 +396,6 @@ int main(int argc, char ** argv)
 					   aligned_source_target,
 					   aligned_target_source);
 	}
-	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
@@ -508,11 +600,234 @@ int main(int argc, char ** argv)
       }
     }
     
+    if (iteration_model4 > 0) {
+      if (debug)
+	std::cerr << "start Model4 training" << std::endl;
+      
+      if (variational_bayes_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    sample<LearnModel4SymmetricPosterior, MaximizeBayes>(MaximizeBayes(),
+								 iteration_model4,
+								 ttable_source_target,
+								 ttable_target_source,
+								 atable_source_target,
+								 atable_target_source,
+								 dtable_source_target,
+								 dtable_target_source,
+								 ntable_source_target,
+								 ntable_target_source,
+								 ptable_source_target,
+								 ptable_target_source,
+								 classes_source,
+								 classes_target,
+								 aligned_source_target,
+								 aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, MaximizeBayes>(MaximizeBayes(),
+							iteration_model4,
+							ttable_source_target,
+							ttable_target_source,
+							atable_source_target,
+							atable_target_source,
+							dtable_source_target,
+							dtable_target_source,
+							ntable_source_target,
+							ntable_target_source,
+							ptable_source_target,
+							ptable_target_source,
+							classes_source,
+							classes_target,
+							aligned_source_target,
+							aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, MaximizeBayes>(MaximizeBayes(),
+							iteration_model4,
+							ttable_source_target,
+							ttable_target_source,
+							atable_source_target,
+							atable_target_source,
+							dtable_source_target,
+							dtable_target_source,
+							ntable_source_target,
+							ntable_target_source,
+							ptable_source_target,
+							ptable_target_source,
+							classes_source,
+							classes_target,
+							aligned_source_target,
+							aligned_target_source);
+	  else
+	    sample<LearnModel4, MaximizeBayes>(MaximizeBayes(),
+					       iteration_model4,
+					       ttable_source_target,
+					       ttable_target_source,
+					       atable_source_target,
+					       atable_target_source,
+					       dtable_source_target,
+					       dtable_target_source,
+					       ntable_source_target,
+					       ntable_target_source,
+					       ptable_source_target,
+					       ptable_target_source,
+					       classes_source,
+					       classes_target,
+					       aligned_source_target,
+					       aligned_target_source);
+	}
+      } else if (pgd_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    sample<LearnModel4SymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+							      iteration_model4,
+							      ttable_source_target,
+							      ttable_target_source,
+							      atable_source_target,
+							      atable_target_source,
+							      dtable_source_target,
+							      dtable_target_source,
+							      ntable_source_target,
+							      ntable_target_source,
+							      ptable_source_target,
+							      ptable_target_source,
+							      classes_source,
+							      classes_target,
+							      aligned_source_target,
+							      aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						     iteration_model4,
+						     ttable_source_target,
+						     ttable_target_source,
+						     atable_source_target,
+						     atable_target_source,
+						     dtable_source_target,
+						     dtable_target_source,
+						     ntable_source_target,
+						     ntable_target_source,
+						     ptable_source_target,
+						     ptable_target_source,
+						     classes_source,
+						     classes_target,
+						     aligned_source_target,
+						     aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+						     iteration_model4,
+						     ttable_source_target,
+						     ttable_target_source,
+						     atable_source_target,
+						     atable_target_source,
+						     dtable_source_target,
+						     dtable_target_source,
+						     ntable_source_target,
+						     ntable_target_source,
+						     ptable_source_target,
+						     ptable_target_source,
+						     classes_source,
+						     classes_target,
+						     aligned_source_target,
+						     aligned_target_source);
+	  else
+	    sample<LearnModel4, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+					    iteration_model4,
+					    ttable_source_target,
+					    ttable_target_source,
+					    atable_source_target,
+					    atable_target_source,
+					    dtable_source_target,
+					    dtable_target_source,
+					    ntable_source_target,
+					    ntable_target_source,
+					    ptable_source_target,
+					    ptable_target_source,
+					    classes_source,
+					    classes_target,
+					    aligned_source_target,
+					    aligned_target_source);
+	}
+      } else {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    sample<LearnModel4SymmetricPosterior, Maximize>(Maximize(),
+							    iteration_model4,
+							    ttable_source_target,
+							    ttable_target_source,
+							    atable_source_target,
+							    atable_target_source,
+							    dtable_source_target,
+							    dtable_target_source,
+							    ntable_source_target,
+							    ntable_target_source,
+							    ptable_source_target,
+							    ptable_target_source,
+							    classes_source,
+							    classes_target,
+							    aligned_source_target,
+							    aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, Maximize>(Maximize(),
+						   iteration_model4,
+						   ttable_source_target,
+						   ttable_target_source,
+						   atable_source_target,
+						   atable_target_source,
+						   dtable_source_target,
+						   dtable_target_source,
+						   ntable_source_target,
+						   ntable_target_source,
+						   ptable_source_target,
+						   ptable_target_source,
+						   classes_source,
+						   classes_target,
+						   aligned_source_target,
+						   aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, Maximize>(Maximize(),
+						   iteration_model4,
+						   ttable_source_target,
+						   ttable_target_source,
+						   atable_source_target,
+						   atable_target_source,
+						   dtable_source_target,
+						   dtable_target_source,
+						   ntable_source_target,
+						   ntable_target_source,
+						   ptable_source_target,
+						   ptable_target_source,
+						   classes_source,
+						   classes_target,
+						   aligned_source_target,
+						   aligned_target_source);
+	  else
+	    sample<LearnModel4, Maximize>(Maximize(),
+					  iteration_model4,
+					  ttable_source_target,
+					  ttable_target_source,
+					  atable_source_target,
+					  atable_target_source,
+					  dtable_source_target,
+					  dtable_target_source,
+					  ntable_source_target,
+					  ntable_target_source,
+					  ptable_source_target,
+					  ptable_target_source,
+					  classes_source,
+					  classes_target,
+					  aligned_source_target,
+					  aligned_target_source);
+	}
+      }
+    }
+    
     if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
       if (itg_mode) {
 	if (debug)
 	  std::cerr << "ITG alignment" << std::endl;
-
+	
 	viterbi<ITGHMM>(ttable_source_target,
 			ttable_target_source,
 			atable_source_target,
@@ -653,7 +968,29 @@ int main(int argc, char ** argv)
       workers_write.add_thread(new boost::thread(boost::bind(write_alignment,
 							     boost::cref(output_alignment_target_source_file),
 							     boost::cref(atable_target_source))));
+
+    // write distortion
+    if (! output_distortion_source_target_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_distortion,
+							     boost::cref(output_distortion_source_target_file),
+							     boost::cref(dtable_source_target))));
     
+    if (! output_distortion_target_source_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_distortion,
+							     boost::cref(output_distortion_target_source_file),
+							     boost::cref(dtable_target_source))));
+    
+    // write fertility
+    if (! output_fertility_source_target_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_fertility,
+							     boost::cref(output_fertility_source_target_file),
+							     boost::cref(ntable_source_target))));
+    
+    if (! output_fertility_target_source_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_fertility,
+							     boost::cref(output_fertility_target_source_file),
+							     boost::cref(ntable_target_source))));
+
     
     workers_write.join_all();
   }
@@ -1094,6 +1431,249 @@ void learn(const Maximizer& maximizer,
     if (debug)
       std::cerr << "cpu time:  " << accumulate_end.cpu_time() - accumulate_start.cpu_time() << std::endl
 		<< "user time: " << accumulate_end.user_time() - accumulate_start.user_time() << std::endl;
+  }
+}
+
+
+// sampling learner for Model3,4,5
+
+struct SampleMapReduce
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct bitext_type
+  {
+    sentence_type source;
+    sentence_type target;
+    alignment_type alignment_source_target;
+    alignment_type alignment_target_source;
+    
+    bitext_type() {}
+    bitext_type(const sentence_type& __source,
+		const sentence_type& __target)
+      : source(__source),
+	target(__target)
+    {}
+    bitext_type(const sentence_type& __source,
+		const sentence_type& __target,
+		const alignment_type& __alignment_source_target,
+		const alignment_type& __alignment_target_source)
+      : source(__source),
+	target(__target),
+	alignment_source_target(__alignment_source_target),
+	alignment_target_source(__alignment_target_source)
+    {}
+    
+    void clear()
+    {
+      source.clear();
+      target.clear();
+      alignment_source_target.clear();
+      alignment_target_source.clear();
+    }
+
+    void swap(bitext_type& x)
+    {
+      source.swap(x.source);
+      target.swap(x.target);
+      alignment_source_target.swap(x.alignment_source_target);
+      alignment_target_source.swap(x.alignment_target_source);
+    }
+  };
+  
+  
+  typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
+
+  struct ttable_counts_type
+  {
+    word_type                      word;
+    ttable_type::count_map_type    counts;
+    aligned_type::aligned_map_type aligned;
+    
+    ttable_counts_type() : word(), counts(), aligned() {}
+    
+    void swap(ttable_counts_type& x)
+    {
+      word.swap(x.word);
+      counts.swap(x.counts);
+      aligned.swap(x.aligned);
+    }
+  };
+
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_bitext_type;
+  
+  typedef utils::lockfree_list_queue<ttable_counts_type, std::allocator<ttable_counts_type> > queue_ttable_type;
+  typedef std::vector<queue_ttable_type, std::allocator<queue_ttable_type> >                  queue_ttable_set_type;
+
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_id_type;
+};
+
+namespace std
+{
+  inline
+  void swap(SampleMapReduce::bitext_type& x, SampleMapReduce::bitext_type& y)
+  {
+    x.swap(y);
+  }
+  
+  inline
+  void swap(SampleMapReduce::ttable_counts_type& x, SampleMapReduce::ttable_counts_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+
+template <typename Burner>
+struct SampleBurnMapper : public Burner
+{
+  typedef SampleMapReduce map_reduce_type;
+  
+  typedef map_reduce_type::size_type         size_type;
+  typedef map_reduce_type::difference_type   difference_type;
+  typedef map_reduce_type::bitext_type       bitext_type;
+  typedef map_reduce_type::queue_bitext_type queue_type;
+
+  SampleBurnMapper(queue_type& mapper,
+		   queue_type& reducer,
+		   const Burner& __base)
+    : Burner(__base),
+      mapper(__mapper)
+      reducer(__reducer) {}
+
+  void operator()()
+  {
+    bitext_type bitext;
+    
+    const int iter_mask = (1 << 8) - 1;
+    
+    for (int iter = 0;; ++ iter) {
+      mapper.pop_swap(bitext);
+      if (bitext.source.empty() && bitext.target.empty()) break;
+      
+      Burner::operator()(bitext.source,
+			 bitext.target,
+			 bitext.alignment_source_target,
+			 bitext.alignment_target_source);
+      
+      reducer.push_swap(bitext);
+      
+      if ((iter & iter_mask) == iter_mask)
+	Burner::shrink();
+    }
+  }
+  
+  queue_type& mapper;
+  queue_type& reducer;
+};
+
+struct SampleBurnReducer
+{
+  typedef SampleMapReduce map_reduce_type;
+  
+  typedef map_reduce_type::size_type         size_type;
+  typedef map_reduce_type::difference_type   difference_type;
+  typedef map_reduce_type::bitext_type       bitext_type;
+  typedef map_reduce_type::bitext_set_type   bitext_set_type;
+  typedef map_reduce_type::queue_bitext_type queue_type;
+  
+  SampleBurnReducer(queue_type& __queue,
+		    bitext_set_type& __bitexts)
+    : queue(__queue), bitexts(__bitexts) {}
+
+  void operator()()
+  {
+    bitext_type bitext;
+    
+    for (;;) {
+      queue.pop_swap(bitext);
+      if (bitext.source.empty() && bitext.target.empty()) break;
+      
+      bitexts.push_back(bitext);
+    }
+  }
+  
+  queue_type& queue;
+  bitext_set_type& bitexts;
+};
+
+
+
+template <typename Learner, typename Maximizer>
+void sample(const Maximizer& maximizer,
+	    const int iteration,
+	    ttable_type& ttable_source_target,
+	    ttable_type& ttable_target_source,
+	    atable_type& atable_source_target,
+	    atable_type& atable_target_source,
+	    dtable_type& dtable_source_target,
+	    dtable_type& dtable_target_source,
+	    ntable_type& ntable_source_target,
+	    ntable_type& ntable_target_source,
+	    const ptable_type& ptable_source_target,
+	    const ptable_type& ptable_target_source,
+	    const classes_type& classes_source,
+	    const classes_type& classes_target,
+	    aligned_type& aligned_source_target,
+	    aligned_type& aligned_target_source)
+{
+  
+  typedef SampleMapReduce::bitext_type bitext_type;
+  typedef SampleMapReduce::bitext_set_type bitext_set_type;
+
+  bitext_set_type bitexts;
+  
+  {
+    if (debug)
+      std::cerr << "Viterbi iteration" << std::endl;
+    
+    utils::compress_istream is_src(source_file, 1024 * 1024);
+    utils::compress_istream is_trg(target_file, 1024 * 1024);
+    
+    bitext_type bitext;
+    
+    for (;;) {
+      bitext.clear();
+      
+      is_src >> bitext.source;
+      is_trg >> bitext.target;
+      
+      if (! is_src || ! is_trg) break;
+      
+      queue_mapper.push_swap(bitext);
+    }
+    
+    if (is_src || is_trg)
+      throw std::runtime_error("# of samples do not match");
+    
+    // join mappers
+    for (int i = 0; i != threads; ++ i) {
+      bitext.clear();
+      queue_mapper.push_swap(bitext);
+    }
+    workers_mapper.join_all();
+    
+    // join reducers
+    bitext.clear();
+    queue_reducer.push_swap(bitext);
+    workers_reducer.join_all();
+  }
+  
+  {
+    // Viterbi learner...
+    
+    if (debug)
+      std::cerr << "iteration: 0" << std::endl;
+    
+    
+  }
+  
+  for (int iter = 0; iter < iteration; ++ iter) {
+    if (debug)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+    
+    
   }
 }
 
@@ -2068,15 +2648,26 @@ void options(int argc, char** argv)
     ("classes-source", po::value<path_type>(&classes_source_file), "source classes file")
     ("classes-target", po::value<path_type>(&classes_target_file), "target classes file")
     
-    ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
-    ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
-    ("alignment-source-target", po::value<path_type>(&alignment_source_target_file), "alignment model for P(target | source)")
-    ("alignment-target-source", po::value<path_type>(&alignment_target_source_file), "alignment model for P(source | target)")
+    ("lexicon-source-target",    po::value<path_type>(&lexicon_source_target_file),    "lexicon model for P(target | source)")
+    ("lexicon-target-source",    po::value<path_type>(&lexicon_target_source_file),    "lexicon model for P(source | target)")
+    ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "alignment model for P(target | source)")
+    ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "alignment model for P(source | target)")
+    ("distortion-source-target", po::value<path_type>(&distortion_source_target_file), "distortion model for P(target | source)")
+    ("distortion-target-source", po::value<path_type>(&distortion_target_source_file), "distortion model for P(source | target)")
+    ("fertility-source-target",  po::value<path_type>(&fertility_source_target_file),  "fertility model for P(target | source)")
+    ("fertility-target-source",  po::value<path_type>(&fertility_target_source_file),  "fertility model for P(source | target)")
+    ("insertion-source-target",  po::value<double>(&insertion_source_target)->default_value(insertion_source_target), "insertion model for P(target | source)")
+    ("insertion-target-source",  po::value<double>(&insertion_target_source)->default_value(insertion_target_source), "insertion model for P(source | target)")
+    
 
     ("output-lexicon-source-target", po::value<path_type>(&output_lexicon_source_target_file), "lexicon model output for P(target | source)")
     ("output-lexicon-target-source", po::value<path_type>(&output_lexicon_target_source_file), "lexicon model output for P(source | target)")
     ("output-alignment-source-target", po::value<path_type>(&output_alignment_source_target_file), "alignment model output for P(target | source)")
     ("output-alignment-target-source", po::value<path_type>(&output_alignment_target_source_file), "alignment model output for P(source | target)")
+    ("output-distrotion-source-target", po::value<path_type>(&output_distrotion_source_target_file), "distrotion model output for P(target | source)")
+    ("output-distrotion-target-source", po::value<path_type>(&output_distrotion_target_source_file), "distrotion model output for P(source | target)")
+    ("output-fertility-source-target", po::value<path_type>(&output_fertility_source_target_file), "fertility model output for P(target | source)")
+    ("output-fertility-target-source", po::value<path_type>(&output_fertility_target_source_file), "fertility model output for P(source | target)")
     
     ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
     ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
@@ -2089,7 +2680,8 @@ void options(int argc, char** argv)
     ("posterior-combined",      po::value<path_type>(&posterior_combined_file),      "posterior for P(source | target) P(target | source)")
 
     ("iteration-model1", po::value<int>(&iteration_model1)->default_value(iteration_model1), "max Model1 iteration")
-    ("iteration-hmm", po::value<int>(&iteration_hmm)->default_value(iteration_hmm), "max HMM iteration")
+    ("iteration-hmm",    po::value<int>(&iteration_hmm)->default_value(iteration_hmm),       "max HMM iteration")
+    ("iteration-model4", po::value<int>(&iteration_model4)->default_value(iteration_model4), "max Model4 iteration")
     
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric training")
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained training")
@@ -2105,12 +2697,16 @@ void options(int argc, char** argv)
     ("degree2",     po::bool_switch(&degree2_mode),     "degree2 non-projective dependency parsing")
     ("mst",         po::bool_switch(&mst_mode),         "MST non-projective dependency parsing")
     ("single-root", po::bool_switch(&single_root_mode), "single root dependency")
-
+    
     ("p0",             po::value<double>(&p0)->default_value(p0),                               "parameter for NULL alignment")
     ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),         "Dirichlet prior for variational Bayes")
     ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon),       "smoothing parameter for uniform distribution")
     ("prior-alignment",  po::value<double>(&prior_alignment)->default_value(prior_alignment),   "Dirichlet prior for variational Bayes")
     ("smooth-alignment", po::value<double>(&smooth_alignment)->default_value(smooth_alignment), "smoothing parameter for uniform distribution")
+    ("prior-distortion",  po::value<double>(&prior_distortion)->default_value(prior_distortion),   "Dirichlet prior for variational Bayes")
+    ("smooth-distortion", po::value<double>(&smooth_distortion)->default_value(smooth_distortion), "smoothing parameter for uniform distribution")
+    ("prior-fertility",  po::value<double>(&prior_fertility)->default_value(prior_fertility),   "Dirichlet prior for variational Bayes")
+    ("smooth-fertility", po::value<double>(&smooth_fertility)->default_value(smooth_fertility), "smoothing parameter for uniform distortion")
     
     ("l0-alpha", po::value<double>(&l0_alpha)->default_value(l0_alpha), "L0 regularization")
     ("l0-beta",  po::value<double>(&l0_beta)->default_value(l0_beta),   "L0 regularization")
