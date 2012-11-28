@@ -71,6 +71,7 @@ opt_parser = OptionParser(
     make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)"),
     make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)"),
     make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)"),
+    make_option("--iteration-model4",  default=0,  action="store", type="int", metavar='ITERATION', help="Model4 iteratins    (default: 0)"),
     
     ## # of clusters
     make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
@@ -83,10 +84,16 @@ opt_parser = OptionParser(
     
     ## options for lexicon model training
     make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 0.01)"),
+    make_option("--insertion-p0",    default=0.01, action="store", type="float", metavar='P0',    help="parameter for insertion (default: 0.01)"),
     make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.01)"),
     make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.01)"),
+    make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: 0.01)"),
+    make_option("--prior-fertility", default=0.01, action="store", type="float", metavar="PRIOR", help="fertility model prior (default: 0.01)"),
+    
     make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-20)"),
     make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
+    make_option("--smooth-distortion", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for distortion model (default: 1e-20)"),
+    make_option("--smooth-fertility", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for fertility model (default: 1e-20)"),
 
     make_option("--l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
     make_option("--l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
@@ -294,6 +301,7 @@ class CICADA:
 	
         for binprog in ('cicada_cluster_word',
                         ## step 1
+                        'cicada_lexicon_model4',
                         'cicada_lexicon_model1',
                         'cicada_lexicon_hmm',
                         'cicada_lexicon_dice',
@@ -438,11 +446,17 @@ class Giza:
                  prefix_target_source="",
                  iteration_model1=5,
                  iteration_hmm=5,
+                 iteration_model4=5,
                  prior_lexicon=0.1,
                  prior_alignment=0.1,
+                 prior_distortion=0.1,
+                 prior_fertility=0.1,
                  smooth_lexicon=1e-20,
                  smooth_alignment=1e-20,
+                 smooth_distortion=1e-20,
+                 smooth_fertility=1e-20,
                  p0=1e-4,
+                 insertion_p0=1e-4,
                  symmetric=None,
                  posterior=None,
                  variational=None,
@@ -464,8 +478,9 @@ class Giza:
             os.makedirs(dir_target_source)
         
         command = ""
-        
-        if iteration_hmm > 0:
+        if iteration_model4 > 0:
+            command = cicada.cicada_lexicon_model4
+        elif iteration_hmm > 0:
             command = cicada.cicada_lexicon_hmm
         elif iteration_model1 > 0:
             command = cicada.cicada_lexicon_model1
@@ -477,13 +492,26 @@ class Giza:
 
         if os.path.exists(corpus.alignment):
             command += " --alignment \"%s\"" %(corpus.alignment)
-            
 
-        if iteration_hmm > 0:
+        if iteration_hmm > 0 or iteration_model4 > 0:
             command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
             command += " --classes-target \"%s\"" %(compressed_file(cluster.target.cluster))
         
-        if iteration_hmm > 0:
+        if iteration_model4 > 0:
+            self.distortion_source_target = os.path.join(dir_source_target, prefix_source_target + '.distortion.final.gz')
+            self.distortion_target_source = os.path.join(dir_target_source, prefix_target_source + '.distortion.final.gz')
+
+            command += " --output-distortion-source-target \"%s\"" %(self.distortion_source_target)
+            command += " --output-distortion-target-source \"%s\"" %(self.distortion_target_source)            
+
+        if iteration_model4 > 0:
+            self.fertility_source_target = os.path.join(dir_source_target, prefix_source_target + '.fertility.final.gz')
+            self.fertility_target_source = os.path.join(dir_target_source, prefix_target_source + '.fertility.final.gz')
+
+            command += " --output-fertility-source-target \"%s\"" %(self.fertility_source_target)
+            command += " --output-fertility-target-source \"%s\"" %(self.fertility_target_source)
+        
+        if iteration_hmm > 0 or iteration_model4 > 0:
             self.alignment_source_target = os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz')
             self.alignment_target_source = os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz')
 
@@ -502,7 +530,11 @@ class Giza:
         command += " --viterbi-source-target \"%s\"" %(self.viterbi_source_target)
         command += " --viterbi-target-source \"%s\"" %(self.viterbi_target_source)
 
-        if iteration_hmm > 0:
+        if iteraiton_model4 > 0:
+            command += " --iteration-model4 %d" %(iteration_model4)
+            command += " --iteration-hmm %d" %(iteration_hmm)
+            command += " --iteration-model1 %d" %(iteration_model1)
+        elif iteration_hmm > 0:
             command += " --iteration-hmm %d" %(iteration_hmm)
             command += " --iteration-model1 %d" %(iteration_model1)
         else:
@@ -521,17 +553,32 @@ class Giza:
         command += " --l0-beta %g" %(l0_beta)
         
         self.p0 = p0
+        self.insertion_p0 = insertion_p0
         self.prior_lexicon    = prior_lexicon
         self.prior_alignment  = prior_alignment
+        self.prior_distortion  = prior_distortion
+        self.prior_fertility  = prior_fertility
         self.smooth_lexicon   = smooth_lexicon
         self.smooth_alignment = smooth_alignment
+        self.smooth_distortion = smooth_distortion
+        self.smooth_fertility = smooth_fertility
         
         command += " --p0 %.20g" %(p0)
         command += " --prior-lexicon %.20g"   %(prior_lexicon)
         command += " --smooth-lexicon %.20g"   %(smooth_lexicon)
-        if iteration_hmm > 0:
+        if iteration_hmm > 0 or iteration_model4 > 0:
             command += " --prior-alignment %.20g" %(prior_alignment)
             command += " --smooth-alignment %.20g" %(smooth_alignment)
+
+        if iteration_model4 > 0:
+            command += " --insertion-source-target %.20g" %(insertion_p0)
+            command += " --insertion-target-source %.20g" %(insertion_p0)
+
+            command += " --prior-distortion %.20g" %(prior_distortion)
+            command += " --smooth-distortion %.20g" %(smooth_distortion)
+            command += " --prior-fertility %.20g" %(prior_fertility)
+            command += " --smooth-fertility %.20g" %(smooth_fertility)
+            
                     
         command += " --threads %d" %(threads)
 
@@ -646,13 +693,18 @@ class AlignmentPosterior:
             os.makedirs(alignment_dir)
 
         learn_hmm = None
+        learn_model4 = None
         if hasattr(giza, 'alignment_source_target'):
             learn_hmm = 1
+        if hasattr(giza, 'distortion_source_target'):
+            learn_model4 = 1
             
         
         command = cicada.cicada_lexicon_model1
         if learn_hmm:
             command = cicada.cicada_lexicon_hmm
+        if learn_model4:
+            command = cicada.cicada_lexicon_model4
            
         command += " --source \"%s\"" %(corpus.source)
         command += " --target \"%s\"" %(corpus.target)
@@ -662,16 +714,24 @@ class AlignmentPosterior:
         if os.path.exists(corpus.target_span):
             command += " --span-target \"%s\"" %(corpus.target_span)
 
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
             command += " --classes-target \"%s\"" %(compressed_file(cluster.target.cluster))
 
         command += " --lexicon-source-target \"%s\"" %(compressed_file(giza.lexicon_source_target))
         command += " --lexicon-target-source \"%s\"" %(compressed_file(giza.lexicon_target_source))
 
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --alignment-source-target \"%s\"" %(compressed_file(giza.alignment_source_target))
             command += " --alignment-target-source \"%s\"" %(compressed_file(giza.alignment_target_source))
+
+        if learn_model4:
+            command += " --insertion-source-target %.20g" %(giza.insertion_p0)
+            command += " --insertion-target-source %.20g" %(giza.insertion_p0)
+            command += " --distortion-source-target \"%s\"" %(compressed_file(giza.distortion_source_target))
+            command += " --distortion-target-source \"%s\"" %(compressed_file(giza.distortion_target_source))
+            command += " --fertility-source-target \"%s\"" %(compressed_file(giza.fertility_source_target))
+            command += " --fertility-target-source \"%s\"" %(compressed_file(giza.fertility_target_source))
         
         self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
         
@@ -679,7 +739,11 @@ class AlignmentPosterior:
         # we do not specify an alternative alignment!
         # command += " --viterbi-target-source /dev/null"
 
-        if learn_hmm:
+        if learn_model4:
+            command += " --iteration-model4 0"
+            command += " --iteration-model1 0"
+            command += " --iteration-hmm 0"
+        elif learn_hmm:
             command += " --iteration-model1 0"
             command += " --iteration-hmm 0"
         else:
@@ -688,9 +752,15 @@ class AlignmentPosterior:
         command += " --p0 %.20g" %(giza.p0)
         command += " --prior-lexicon %.20g"  %(giza.prior_lexicon)
         command += " --smooth-lexicon %.20g" %(giza.smooth_lexicon)
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --prior-alignment %.20g"  %(giza.prior_alignment)
             command += " --smooth-alignment %.20g" %(giza.smooth_alignment)
+
+        if learn_model4:
+            command += " --prior-distortion %.20g"  %(giza.prior_distortion)
+            command += " --smooth-distortion %.20g" %(giza.smooth_distortion)
+            command += " --prior-fertility %.20g"  %(giza.prior_fertility)
+            command += " --smooth-fertility %.20g" %(giza.smooth_fertility)
 
         if 'itg' in alignment:
             command += " --itg"
@@ -729,15 +799,20 @@ class Aligner:
             os.makedirs(alignment_dir)
             
         learn_hmm = None
+        learn_model4 = None
         if hasattr(giza, 'alignment_source_target'):
             learn_hmm = 1
-            
+        if hasattr(giza, 'distortion_source_target'):
+            learn_model4 = 1
+
         command = cicada.cicada_lexicon_model1
         if learn_hmm:
             command = cicada.cicada_lexicon_hmm
+        if learn_model4:
+            command = cicada.cicada_lexicon_model4
         command += " \\\n"
 
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --classes-source \"%s\"" %(os.path.realpath(compressed_file(cluster.source.cluster)))
             command += " \\\n"
             command += " --classes-target \"%s\"" %(os.path.realpath(compressed_file(cluster.target.cluster)))
@@ -748,13 +823,34 @@ class Aligner:
         command += " --lexicon-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.lexicon_target_source)))
         command += " \\\n"
 
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --alignment-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.alignment_source_target)))
             command += " \\\n"
             command += " --alignment-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.alignment_target_source)))
             command += " \\\n"
 
-        if learn_hmm:
+        if learn_model4:
+            command += " --insertion-source-target %.20g" %(giza.insertion_p0)
+            command += " \\\n"
+            command += " --insertion-target-source %.20g" %(giza.insertion_p0)
+            command += " \\\n"
+            command += " --distortion-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.distortion_source_target)))
+            command += " \\\n"
+            command += " --distortion-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.distortion_target_source)))
+            command += " \\\n"
+            command += " --fertility-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.fertility_source_target)))
+            command += " \\\n"
+            command += " --fertility-target-source \"%s\"" %(os.path.realpath(compressed_file(giza.fertility_target_source)))
+            command += " \\\n"
+
+        if learn_model4:
+            command += " --iteration-model4 0"
+            command += " \\\n"
+            command += " --iteration-model1 0"
+            command += " \\\n"
+            command += " --iteration-hmm 0"
+            command += " \\\n"
+        elif learn_hmm:
             command += " --iteration-model1 0"
             command += " \\\n"
             command += " --iteration-hmm 0"
@@ -769,10 +865,20 @@ class Aligner:
         command += " \\\n"
         command += " --smooth-lexicon %.20g" %(giza.smooth_lexicon)
         command += " \\\n"
-        if learn_hmm:
+        if learn_hmm or learn_model4:
             command += " --prior-alignment %.20g"  %(giza.prior_alignment)
             command += " \\\n"
             command += " --smooth-alignment %.20g" %(giza.smooth_alignment)
+            command += " \\\n"
+
+        if learn_model4:
+            command += " --prior-distortion %.20g"  %(giza.prior_distortion)
+            command += " \\\n"
+            command += " --smooth-distortion %.20g" %(giza.smooth_distortion)
+            command += " \\\n"
+            command += " --prior-fertility %.20g"  %(giza.prior_fertility)
+            command += " \\\n"
+            command += " --smooth-fertility %.20g" %(giza.smooth_fertility)
             command += " \\\n"
         
         if debug:
@@ -852,11 +958,17 @@ if __name__ == '__main__':
                 prefix_target_source=corpus.source_tag+'-'+corpus.target_tag,
                 iteration_model1=options.iteration_model1,
                 iteration_hmm=options.iteration_hmm,
+                iteration_model4=optios.iteration_model4,
                 prior_lexicon=options.prior_lexicon,
                 prior_alignment=options.prior_alignment,
+                prior_distortion=options.prior_distortion,
+                prior_fertility=options.prior_fertility,
                 smooth_lexicon=options.smooth_lexicon,
                 smooth_alignment=options.smooth_alignment,
+                smooth_distortion=options.smooth_distortion,
+                smooth_fertility=options.smooth_fertility,
                 p0=options.p0,
+                insetion_p0=options.insertion_p0,
                 symmetric=options.symmetric,
                 posterior=options.posterior,
                 variational=options.variational,

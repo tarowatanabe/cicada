@@ -90,6 +90,7 @@ cicada_lexicon_global
 cicada_lexicon_global_mpi
 cicada_lexicon_hmm
 cicada_lexicon_model1
+cicada_lexicon_model4
 cicada_maxlike
 cicada_maxlike_mpi
 cicada_mert

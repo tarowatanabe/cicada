@@ -92,6 +92,7 @@ bin_PROGRAMS = \
 	cicada_lexicon_global_mpi \
 	cicada_lexicon_hmm \
 	cicada_lexicon_model1 \
+	cicada_lexicon_model4 \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
 	cicada_mert \
@@ -354,6 +355,18 @@ cicada_lexicon_model1_SOURCES = \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
 cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_model4_SOURCES = \
+	cicada_lexicon_model4.cpp \
+	cicada_lexicon_hmm_impl.hpp \
+	cicada_lexicon_model1_impl.hpp \
+	cicada_lexicon_model4_impl.hpp \
+	cicada_lexicon_maximize_impl.hpp \
+	dependency_hybrid.hpp \
+	dependency_degree2.hpp \
+	itg_alignment.hpp \
+	kuhn_munkres.hpp 
+cicada_lexicon_model4_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp cicada_text_impl.hpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

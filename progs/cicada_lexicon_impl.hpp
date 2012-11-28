@@ -8,6 +8,8 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
+#include <numeric>
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
@@ -64,7 +66,7 @@ struct classes_type
   word_type operator[](const word_type& word) const
   {
     if (unknown)
-      return (word == vocab_type::BOS || word == vocab_type::EOS ? word : vocab_type::UNK);
+      return (word == vocab_type::BOS || word == vocab_type::EOS || word == vocab_type::EPSILON ? word : vocab_type::UNK);
     else if (surface)
       return word;
     else
@@ -229,17 +231,27 @@ struct atable_counts_type
     counts_type::const_iterator aiter_end = counts.end();
     for (counts_type::const_iterator aiter = counts.begin(); aiter != aiter_end; ++ aiter) {
       const class_pair_type& pair = aiter->first;
-
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS && pair.first != vocab_type::EPSILON)
+      
+      if (pair.first != vocab_type::BOS
+	  && pair.first != vocab_type::EOS
+	  && pair.first != vocab_type::EPSILON
+	  && pair.first != vocab_type::NONE)
 	counts_source[class_pair_type(vocab_type::UNK, pair.second)] += aiter->second;
       
-      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS
-	  && pair.second != vocab_type::EPSILON && pair.second != vocab_type::NONE)
+      if (pair.second != vocab_type::BOS
+	  && pair.second != vocab_type::EOS
+	  && pair.second != vocab_type::EPSILON
+	  && pair.second != vocab_type::NONE)
 	counts_target[class_pair_type(pair.first, vocab_type::UNK)] += aiter->second;
       
-      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS && pair.first != vocab_type::EPSILON
-	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS
-	  && pair.second != vocab_type::EPSILON && pair.second != vocab_type::NONE)
+      if (pair.first != vocab_type::BOS
+	  && pair.first != vocab_type::EOS
+	  && pair.first != vocab_type::EPSILON
+	  && pair.first != vocab_type::NONE
+	  && pair.second != vocab_type::BOS
+	  && pair.second != vocab_type::EOS
+	  && pair.second != vocab_type::EPSILON
+	  && pair.second != vocab_type::NONE)
 	counts_source_target += aiter->second;
     }
     
@@ -842,8 +854,9 @@ struct ptable_type
   double binomial(const int n, const int k) const
   {
     double result = 1.0;
-    for (int i = 1; i <= k; ++ i)
-      result *= double(utils::bithack::max(n - i + 1, 1)) / double(i);
+    if (k < n)
+      for (int i = 1; i <= k; ++ i)
+	result *= double(n - i + 1) / double(i);
     return result;
   }
   
@@ -890,15 +903,20 @@ struct ntable_type
     return table(map[word.id()], utils::bithack::min(fertility, fertility_size - 1));
   }
   
-  count_type operator()(word_type word, const size_type fertility) const
+  count_type operator()(word_type word, const size_type length, const size_type fertility) const
   {
     if (word.id() >= map.size() || map[word.id()] == index_type(-1))
       word = vocab_type::UNK;
     
+    // uniform... 0 <= fertility <= length
     if (word.id() >= map.size() || map[word.id()] == index_type(-1))
-      return smooth;
+      return 1.0 / (length + 1);
     
-    return table(map[word.id()], utils::bithack::min(fertility, fertility_size - 1));
+    // the last value (15, or fertility_size - 1) is reserved for further smoothing...
+    if (fertility >= fertility_size - 1)
+      return table(map[word.id()], fertility_size - 1) / (length  + 1 - (fertility_size - 1));
+    else
+      return table(map[word.id()], fertility);
   }
 
   void assign(const word_type& word)
@@ -909,6 +927,28 @@ struct ntable_type
     if (map[word.id()] == index_type(-1)) {
       table.resize(table.size1() + 1, fertility_size, count_type(0));
       map[word.id()] = table.size1() - 1;
+    }
+  }
+
+  void estimate()
+  {
+    // first, estimate for UNK...
+    std::vector<count_type, std::allocator<count_type> > counts(fertility_size, 0.0);
+    
+    for (size_type i = 0; i != table.size1(); ++ i)
+      std::transform(table.begin(i), table.end(i), counts.begin(), counts.begin(), std::plus<count_type>());
+    
+    assign(vocab_type::UNK);
+    std::copy(counts.begin(), counts.end(), begin(vocab_type::UNK));
+    
+    // then, perform estimation...
+    for (size_type i = 0; i != table.size1(); ++ i) {
+      const double sum = std::accumulate(table.begin(i), table.end(i), prior * fertility_size);
+      const double sum_digamma = utils::mathop::digamma(sum);
+      
+      table_type::iterator iter_end = table.end(i);
+      for (table_type::iterator iter = table.begin(i); iter != iter_end; ++ iter)
+	*iter = std::max(utils::mathop::exp(utils::mathop::digamma(*iter + prior) - sum_digamma), smooth);
     }
   }
 
@@ -934,7 +974,7 @@ struct ntable_type
   
   void initialize()
   {
-    std::fill(table.begin(), table.end(), count_type(0));
+    std::fill(table.begin(), table.end(), 0.0);
   }
   
   ntable_type& operator+=(const ntable_type& x)
@@ -1087,29 +1127,29 @@ struct dtable_type
 		       const word_type& target,
 		       const index_type& source_size,
 		       const index_type& target_size,
-		       const index_type& i_prev,
-		       const index_type& i) const
+		       const index_type& j_prev,
+		       const index_type& j) const
   {
-    if (table.empty()) return 1.0 / source_size;
+    if (table.empty()) return 1.0 / target_size;
     
-    // 1 <= i <= source_size
+    // 1 <= j <= target_size
     
-    return estimate(class_pair_type(source, target), range_type(1 - i_prev, source_size - i_prev + 1))[i - i_prev];
+    return estimate(class_pair_type(source, target), range_type(1 - j_prev, target_size - j_prev + 1))[j - j_prev];
   }
   
   
   // non-head...
-  prob_type operator()(const word_type& source,
+  prob_type operator()(const word_type& target,
 		       const index_type& source_size,
 		       const index_type& target_size,
-		       const index_type& i_prev,
-		       const index_type& i) const
+		       const index_type& j_prev,
+		       const index_type& j) const
   {
-    if (table.empty()) return 1.0 / source_size;
+    if (table.empty()) return 1.0 / target_size;
     
-    // 1 <= i <= source_size
+    // j_prev < j <= target_size, thus, range starts from 1!
     
-    return estimate(class_pair_type(source, vocab_type::NONE), range_type(1 - i_prev, source_size - i_prev + 1))[i - i_prev];
+    return estimate(class_pair_type(vocab_type::NONE, target), range_type(1, target_size - j_prev + 1))[j - j_prev];
   }
   
   const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
@@ -1896,6 +1936,9 @@ void read_classes(const path_type& path, classes_type& classes)
   
   classes[vocab_type::BOS] = vocab_type::BOS;
   classes[vocab_type::EOS] = vocab_type::EOS;
+  classes[vocab_type::UNK] = vocab_type::UNK;
+  classes[vocab_type::EPSILON] = vocab_type::EPSILON;
+  classes[vocab_type::NONE] = vocab_type::NONE;
 
   classes.shrink();
 }
