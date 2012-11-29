@@ -1663,8 +1663,8 @@ struct PosteriorModel4 : public ViterbiBase
   template <typename Matrix>
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
-		  alignment_type& alignment_source_target,
-		  alignment_type& alignment_target_source,
+		  const alignment_type& alignment_source_target,
+		  const alignment_type& alignment_target_source,
 		  Matrix& posterior_source_target,
 		  Matrix& posterior_target_source)
   {
