@@ -92,19 +92,22 @@ struct LearnModel4 : public LearnBase
     {
       const index_type i_prev = aligns[j];
       
+      aligns[j] = i_next;
+      
       sums[i_prev] -= j;
       sums[i_next] += j;
       
       mapped[i_prev].erase(j);
       mapped[i_next].insert(j);
-      
-      aligns[j] = i_next;
     }
 
     void swap(const index_type j1, const index_type j2)
     {
       const index_type i1 = aligns[j1];
       const index_type i2 = aligns[j2];
+      
+      aligns[j1] = i2;
+      aligns[j2] = i1;
       
       sums[i1] += j2 - j1;
       sums[i2] += j1 - j2;
@@ -114,8 +117,6 @@ struct LearnModel4 : public LearnBase
       
       mapped[i2].erase(j2);
       mapped[i2].insert(j1);
-      
-      std::swap(aligns[j2], aligns[j1]);
     }
     
     size_type fertility(index_type x) const
@@ -998,11 +999,11 @@ struct LearnModel4 : public LearnBase
     // update alignment...
     model4.aligns.alignment(alignment);
     
-    // udpate objective
-    objective += model4.objective() / target.size();
-
     // compute posterior
     model4.estimate_posterior(source, target);
+    
+    // udpate objective
+    objective += model4.objective() / target.size();
     
     // accumulate...
     model4.accumulate(source, target, counts_ttable);
@@ -1115,9 +1116,12 @@ struct LearnModel4Posterior : public LearnBase
       if (! model4.climb())
 	break;
     
+    // compute posterior
+    model4.estimate_posterior(source, target);
+
     // udpate objective
     objective += model4.objective() / target.size();
-    
+      
     phi.clear();
     exp_phi_old.clear();
     
@@ -1126,11 +1130,8 @@ struct LearnModel4Posterior : public LearnBase
     
     phi.resize(source_size + 1, 0.0);
     exp_phi_old.resize(source_size + 1, 1.0);
-
-    for (int iter = 0; iter < 5; ++ iter) {
-      // compute posterior
-      model4.estimate_posterior(source, target);
-      
+    
+    for (int iter = 0; iter < 5; ++ iter) {      
       exp_phi.clear();
       exp_phi.reserve(source_size + 1);
       exp_phi.resize(source_size + 1, 1.0);
@@ -1158,17 +1159,20 @@ struct LearnModel4Posterior : public LearnBase
       
       // swap...
       exp_phi_old.swap(exp_phi);
-
+      
       model4.update();
       
       // maximum 30 iterations...
       for (int iter = 0; iter != 30; ++ iter)
 	if (! model4.climb())
 	  break;
+      
+      // compute posterior
+      model4.estimate_posterior(source, target);
     }
-
-    model4.aligns.alignment(alignment);
     
+    model4.aligns.alignment(alignment);
+        
     // accumulate...
     model4.accumulate(source, target, counts_ttable);
     model4.accumulate(source, target, counts_dtable);
@@ -1295,18 +1299,19 @@ struct LearnModel4Symmetric : public LearnBase
     for (int iter = 0; iter != 30; ++ iter)
       if (! model4_target_source.climb())
 	break;
-
+    
     // update alignment...
     model4_source_target.aligns.alignment(alignment_source_target);
     model4_target_source.aligns.alignment(alignment_target_source);
-
-    objective_source_target += model4_source_target.objective() / target.size();
-    objective_target_source += model4_target_source.objective() / source.size();
     
     // compute posterior
     model4_source_target.estimate_posterior(source, target);
     model4_target_source.estimate_posterior(target, source);
-
+    
+    // update objective
+    objective_source_target += model4_source_target.objective() / target.size();
+    objective_target_source += model4_target_source.objective() / source.size();
+    
     // ttable update...
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -1418,6 +1423,9 @@ struct LearnModel4SymmetricPosterior : public LearnBase
       if (! model4_target_source.climb())
 	break;
     
+    model4_source_target.estimate_posterior(source, target);
+    model4_target_source.estimate_posterior(target, source);
+
     objective_source_target += model4_source_target.objective() / target.size();
     objective_target_source += model4_target_source.objective() / source.size();
 
@@ -1433,10 +1441,7 @@ struct LearnModel4SymmetricPosterior : public LearnBase
     exp_phi.resize(target_size + 1, source_size + 1, 1.0);
     exp_phi_old.resize(target_size + 1, source_size + 1, 1.0);
     
-    for (int iter = 0; iter != 5; ++ iter) {
-      model4_source_target.estimate_posterior(source, target);
-      model4_target_source.estimate_posterior(target, source);
-      
+    for (int iter = 0; iter != 5; ++ iter) {      
       bool updated = false;
       
       // update phi...
@@ -1477,6 +1482,9 @@ struct LearnModel4SymmetricPosterior : public LearnBase
       for (int iter = 0; iter != 30; ++ iter)
 	if (! model4_target_source.climb())
 	  break;
+
+      model4_source_target.estimate_posterior(source, target);
+      model4_target_source.estimate_posterior(target, source);
     }
     
     // update alignment...
