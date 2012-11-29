@@ -61,9 +61,9 @@ bool single_root_mode = false;
 // parameter...
 double p0    = 0.01;
 double prior_lexicon = 0.01;
-double smooth_lexicon = 1e-20;
+double smooth_lexicon = 1e-100;
 double prior_alignment = 0.01;
-double smooth_alignment = 1e-20;
+double smooth_alignment = 1e-100;
 
 double l0_alpha = 100;
 double l0_beta = 0.01;

@@ -90,10 +90,10 @@ opt_parser = OptionParser(
     make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: 0.01)"),
     make_option("--prior-fertility", default=0.01, action="store", type="float", metavar="PRIOR", help="fertility model prior (default: 0.01)"),
     
-    make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-20)"),
-    make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
-    make_option("--smooth-distortion", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for distortion model (default: 1e-20)"),
-    make_option("--smooth-fertility", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for fertility model (default: 1e-20)"),
+    make_option("--smooth-lexicon",   default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-100)"),
+    make_option("--smooth-alignment", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-100)"),
+    make_option("--smooth-distortion", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for distortion model (default: 1e-100)"),
+    make_option("--smooth-fertility", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for fertility model (default: 1e-100)"),
 
     make_option("--l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
     make_option("--l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
@@ -530,7 +530,7 @@ class Giza:
         command += " --viterbi-source-target \"%s\"" %(self.viterbi_source_target)
         command += " --viterbi-target-source \"%s\"" %(self.viterbi_target_source)
 
-        if iteraiton_model4 > 0:
+        if iteration_model4 > 0:
             command += " --iteration-model4 %d" %(iteration_model4)
             command += " --iteration-hmm %d" %(iteration_hmm)
             command += " --iteration-model1 %d" %(iteration_model1)
@@ -958,7 +958,7 @@ if __name__ == '__main__':
                 prefix_target_source=corpus.source_tag+'-'+corpus.target_tag,
                 iteration_model1=options.iteration_model1,
                 iteration_hmm=options.iteration_hmm,
-                iteration_model4=optios.iteration_model4,
+                iteration_model4=options.iteration_model4,
                 prior_lexicon=options.prior_lexicon,
                 prior_alignment=options.prior_alignment,
                 prior_distortion=options.prior_distortion,
@@ -968,7 +968,7 @@ if __name__ == '__main__':
                 smooth_distortion=options.smooth_distortion,
                 smooth_fertility=options.smooth_fertility,
                 p0=options.p0,
-                insetion_p0=options.insertion_p0,
+                insertion_p0=options.insertion_p0,
                 symmetric=options.symmetric,
                 posterior=options.posterior,
                 variational=options.variational,

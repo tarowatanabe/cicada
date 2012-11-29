@@ -74,16 +74,14 @@ struct LearnModel4 : public LearnBase
       mapped.resize(source.size() + 1);
       sums.resize(source.size() + 1);
       
+      // first, compute one-to-many alignment...
       alignment_type::const_iterator aiter_end = alignment.end();
-      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
 	aligns[aiter->target + 1] = aiter->source + 1;
-	mapped[aiter->source + 1].insert(aiter->target + 1);
-      }
       
-      // NULL alignment
+      // then, compute inverse alignment...
       for (size_type trg = 1; trg != aligns.size(); ++ trg)
-	if (! aligns[trg])
-	  mapped.front().insert(trg);
+	mapped[aligns[trg]].insert(trg);
       
       // summation
       for (size_type src = 0; src != mapped.size(); ++ src)
@@ -127,7 +125,7 @@ struct LearnModel4 : public LearnBase
     
     size_type center(index_type x) const
     {
-      return utils::bithack::branch(sums[x], (sums[x] + mapped[x].size() - 1) / mapped[x].size(), size_type(0));
+      return (sums[x] ? (sums[x] + mapped[x].size() - 1) / mapped[x].size() : size_type(0));
     }
     
     index_type prev_cept(index_type x) const
@@ -222,6 +220,11 @@ struct LearnModel4 : public LearnBase
 		const alignment_type& alignment)
     {
       aligns.assign(source, target, alignment);
+#if 0
+      std::cerr << "align: ";
+      std::copy(aligns.aligns.begin(), aligns.aligns.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
       
       // classes...
       source_class.clear();
@@ -259,6 +262,8 @@ struct LearnModel4 : public LearnBase
       sentence_type::iterator ctiter = target_class.begin() + 1;
       for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
 	*ctiter = model4.classes_target[*titer];
+
+      //std::cerr << "ttable" << std::endl;
       
       // ttable..
       ttable.clear();
@@ -271,6 +276,8 @@ struct LearnModel4 : public LearnBase
 	  ttable(trg + 1, src + 1) = model4.ttable(source[src], target[trg]);
       }
       
+      //std::cerr << "dtable" << std::endl;
+	    
       // dtable...
       dtable_head.clear();
       dtable_head.reserve(source.size() + 1, target.size() + 1, target.size() + 1);
@@ -278,25 +285,43 @@ struct LearnModel4 : public LearnBase
       
       for (size_type src = 0; src <= source.size(); ++ src)
 	for (int prev = (src != 0); prev <= static_cast<int>(target.size()); ++ prev)
-	  for (int next = 1; next <= static_cast<int>(target.size()); ++ next)
+	  for (int next = 1; next <= static_cast<int>(target.size()); ++ next) {
 	    dtable_head(src, prev, next) = model4.dtable(source_class[src],
 							 target_class[next],
 							 source.size(),
 							 target.size(),
 							 prev,
 							 next);
+#if 0
+	    std::cerr << "head: " << (src ? source[src - 1] : vocab_type::EPSILON)
+		      << " prev: " << prev
+		      << " next: " << next
+		      << " " << dtable_head(src, prev, next)
+		      << std::endl;
+#endif
+	  }
       
       dtable_others.clear();
       dtable_others.reserve(target.size() + 1, target.size() + 1);
       dtable_others.resize(target.size() + 1, target.size() + 1);
       
       for (int prev = 1; prev < static_cast<int>(target.size()); ++ prev)
-	for (int next = prev + 1; next <= static_cast<int>(target.size()); ++ next)
+	for (int next = prev + 1; next <= static_cast<int>(target.size()); ++ next) {
 	  dtable_others(prev, next) = model4.dtable(target_class[next],
 						    source.size(),
 						    target.size(),
 						    prev, 
 						    next);
+#if 0
+	  std::cerr << "non-head"
+		    << " prev: " << prev
+		    << " next: " << next
+		    << " " << dtable_others(prev, next)
+		    << std::endl;
+#endif
+	}
+      
+      //std::cerr << "ntable" << std::endl;
       
       // ntable...
       ntable.clear();
@@ -304,12 +329,20 @@ struct LearnModel4 : public LearnBase
       ntable.resize(source.size() + 1, target.size() + 1);
       
       for (size_type src = 0; src != source.size(); ++ src)
-	for (int fertility = 0; fertility <= static_cast<int>(target.size()); ++ fertility)
+	for (int fertility = 0; fertility <= static_cast<int>(target.size()); ++ fertility) {
 	  ntable(src + 1, fertility) = model4.ntable(source[src], target.size(), fertility);
+	  
+	  //std::cerr << "source: " << source[src] << " fert: "  << fertility << " " << ntable(src + 1, fertility) << std::endl;
+	}
       
+      //std::cerr << "ptable" << std::endl;
+
       // ptable
-      for (int phi0 = 0; phi0 <= static_cast<int>(target.size()); ++ phi0)
+      for (int phi0 = 0; phi0 <= static_cast<int>(target.size()); ++ phi0) {
 	ntable(0, phi0) = model4.ptable(target.size(), phi0);
+	
+	//std::cerr << "source: " << vocab_type::EPSILON << " fert: "  << phi0 << " " << ntable(0, phi0) << std::endl;
+      }
       
       // compute logprob for the given alignment...
       update();
@@ -319,21 +352,29 @@ struct LearnModel4 : public LearnBase
     {
       // first, insertion...
       logprob = ntable(0, aligns.fertility(0));
+
+      //std::cerr << "ptable: " << logprob << std::endl;
       
       // second, fertility...
       for (size_type src = 1; src != aligns.mapped.size(); ++ src)
 	logprob *= ntable(src, aligns.fertility(src));
+
+      //std::cerr << "ntable: " << logprob << std::endl;
       
       // third, lexicon...
       for (size_type trg = 1; trg != aligns.aligns.size(); ++ trg)
 	logprob *= ttable(trg, aligns.aligns[trg]);
+
+      //std::cerr << "ttable: " << logprob << std::endl;
       
       // forth, distortion...
       logprob *= score_distortion<logprob_type>(0, aligns.mapped.size());
 
+      //std::cerr << "logprob: " << logprob << std::endl;
+
       moves.clear();
       swaps.clear();
-
+      
       moves.reserve(aligns.aligns.size(), aligns.mapped.size());
       swaps.reserve(aligns.aligns.size(), aligns.aligns.size());
       
@@ -386,20 +427,30 @@ struct LearnModel4 : public LearnBase
 		    const alignment_type& alignment,
 		    ntable_type& counts)
     {
-      for (size_type src = 1; src != aligns.mapped.size(); ++ src)
+      for (size_type src = 1; src != aligns.mapped.size(); ++ src) {
+	//std::cerr << "fert: " << src << " " << aligns.fertility(src) << std::endl;
 	++ counts(source[src - 1], aligns.fertility(src));
+      }
     }
     
     void accumulate(const sentence_type& source,
 		    const sentence_type& target,
-		    const alignment_type& alignment,
+		    const alignment_type& alignmeent,
 		    dtable_counts_type& counts)
     {
       size_type cept_prev = 0;
       for (size_type cept = 1; cept != aligns.mapped.size(); ++ cept) 
 	if (aligns.fertility(cept)) {
+	  //std::cerr << "cept: " << cept << " fettility: " << aligns.fertility(cept) << std::endl;
+	  
 	  const size_type center_prev = aligns.center(cept_prev);
 	  const size_type head = aligns.mapped[cept].front();
+#if 0
+	  std::cerr << "prev: " << cept_prev
+		    << " center: " << center_prev
+		    << " head: " << head
+		    << std::endl;
+#endif
 	  
 	  ++ counts[std::make_pair(source_class[cept_prev], target_class[head])][head - center_prev];
 	  
@@ -422,7 +473,7 @@ struct LearnModel4 : public LearnBase
 	// allocate enough buffer size...
 	
 	for (int src = 1; src <= source_size; ++ src) {
-	  ttable_type::count_map_type& mapped = counts[source[src]];
+	  ttable_type::count_map_type& mapped = counts[source[src - 1]];
 	  mapped.rehash(mapped.size() + target_size);
 	}
 	
@@ -434,7 +485,7 @@ struct LearnModel4 : public LearnBase
 	counts[vocab_type::EPSILON][target[trg - 1]] += posterior(trg, 0);
 	
 	for (int src = 1; src <= source_size; ++ src)
-	  counts[source[src - 1]][target[trg - 1]] += posterior(trg, 0);
+	  counts[source[src - 1]][target[trg - 1]] += posterior(trg, src);
       }
     }
     
@@ -447,7 +498,8 @@ struct LearnModel4 : public LearnBase
       
       for (int src = 1; src <= source_size; ++ src)
 	for (int fertility = 0; fertility <= target_size; ++ fertility)
-	  counts(source[src - 1], fertility) += posterior_fertility(src, fertility);
+	  if (posterior_fertility(src, fertility) > 0.0) 
+	    counts(source[src - 1], fertility) += posterior_fertility(src, fertility);
     }
 
     void accumulate(const sentence_type& source,
@@ -529,14 +581,14 @@ struct LearnModel4 : public LearnBase
       neighbour_move.clear();
       neighbour_swap.clear();
       
-      neighbour_move.resize(target_size + 1);
-      neighbour_swap.resize(target_size + 1);
+      neighbour_move.resize(target_size + 1, 0.0);
+      neighbour_swap.resize(target_size + 1, 0.0);
       
       fertility_inc.clear();
       fertility_dec.clear();
       
-      fertility_inc.resize(source_size + 1);
-      fertility_dec.resize(source_size + 1);
+      fertility_inc.resize(source_size + 1, 0.0);
+      fertility_dec.resize(source_size + 1, 0.0);
       
       total = 1.0;
       
@@ -559,8 +611,8 @@ struct LearnModel4 : public LearnBase
 	    total += score;
 	    neighbour_swap[j1] += score;
 	    neighbour_swap[j2] += score;
-	    posterior_swap(aligns.aligns[j2], j1) += score;
-	    posterior_swap(aligns.aligns[j1], j2) += score;
+	    posterior_swap(j1, aligns.aligns[j2]) += score;
+	    posterior_swap(j2, aligns.aligns[j1]) += score;
 	  }
 
       const double factor = 1.0 / total;
@@ -569,7 +621,7 @@ struct LearnModel4 : public LearnBase
 	for (index_type i = 0; i <= source_size; ++ i)
 	  posterior(j, i) = (aligns.aligns[j] == i
 			     ? total - (neighbour_move[j] + neighbour_swap[j])
-			     : moves(j, i) + posterior_swap(i, j)) * factor;
+			     : moves(j, i) + posterior_swap(j, i)) * factor;
       
       // fertility...
       for (index_type i = 1; i <= source_size; ++ i) {
@@ -577,10 +629,14 @@ struct LearnModel4 : public LearnBase
 	
 	if (aligns.fertility(i))
 	  posterior_fertility(i, aligns.fertility(i) - 1) += fertility_dec[i] * factor;
+	else if (fertility_dec[i] > 0.0)
+	  std::cerr << "invalid counts? at fertility_dec: " << fertility_dec[i] << std::endl;
 	// otherwise... fail!
 	
 	if (aligns.fertility(i) + 1 <= static_cast<size_type>(target_size))
 	  posterior_fertility(i, aligns.fertility(i) + 1) += fertility_inc[i] * factor;
+	else if (fertility_inc[i] > 0.0)
+	  std::cerr << "invalid counts? at fertility_inc: " << fertility_inc[i] << std::endl;
 	// otherwise.. fail!
       }
     }
@@ -612,11 +668,16 @@ struct LearnModel4 : public LearnBase
       
       if (gain_move <= 1.0 && gain_swap <= 1.0)
 	return false;
-      
-      if (gain_move >= gain_swap)
+
+      if (gain_move >= gain_swap) {
+	//std::cerr << "moving: j=" << move_j << " i=" << move_i << " gain: " << gain_move << std::endl;
+
 	move(move_j, move_i);
-      else
+      } else {
+	//std::cerr << "swapping: j1=" << swap_j1 << " j2=" << swap_j2 << " gain: " << gain_swap << std::endl;
+	
 	swap(swap_j1, swap_j2);
+      }
       
       return true;
     }
@@ -628,11 +689,42 @@ struct LearnModel4 : public LearnBase
       if (i_prev == i_next) return;
       
       // is this correct...?
-      const range_type range1(aligns.prev_cept(i_prev), aligns.next_cept(i_prev));
-      const range_type range2(aligns.prev_cept(i_next), aligns.next_cept(i_next));
+      const range_type range1(aligns.prev_cept(i_prev), utils::bithack::min(aligns.next_cept(i_prev),
+									    static_cast<index_type>(aligns.mapped.size() - 1)));
+      const range_type range2(aligns.prev_cept(i_next), utils::bithack::min(aligns.next_cept(i_next),
+									    static_cast<index_type>(aligns.mapped.size() - 1)));
       
-      aligns.swap(j, i_next);
+      aligns.move(j, i_next);
       logprob *= moves(j, i_next);
+
+      const range_type range1_new(aligns.prev_cept(i_prev), utils::bithack::min(aligns.next_cept(i_prev),
+										static_cast<index_type>(aligns.mapped.size() - 1)));
+      const range_type range2_new(aligns.prev_cept(i_next), utils::bithack::min(aligns.next_cept(i_next),
+										static_cast<index_type>(aligns.mapped.size() - 1)));
+
+      if (range1.second < range2.first || range2.second < range1.first) {
+	if (range1_new.first < range1.first || range1_new.second > range1.second)
+	  std::cerr << "different prev range: j=" << j << " prev: " << i_prev << " next: " << i_next
+		    << " [" << range1.first  << ", " << range1.second << "]"
+		    << " [" << range1_new.first  << ", " << range1_new.second << "]"
+		    << std::endl;
+	if (range2_new.first < range2.first || range2_new.second > range2.second)
+	  std::cerr << "different next range: j=" << j << " prev: " << i_prev << " next: " << i_next
+		    << " [" << range2.first  << ", " << range2.second << "]"
+		    << " [" << range2_new.first  << ", " << range2_new.second << "]"
+		    << std::endl;
+      } else {
+	const range_type range_prev(utils::bithack::min(range1.first, range2.first),
+				    utils::bithack::max(range1.second, range2.second));
+	const range_type range_new(utils::bithack::min(range1_new.first, range2_new.first),
+				   utils::bithack::max(range1_new.second, range2_new.second));
+	
+	if (range_new.first < range_prev.first || range_new.second > range_prev.second)
+	  std::cerr << "different merged range: j=" << j << " prev: " << i_prev << " next: " << i_next
+		    << " [" << range_prev.first  << ", " << range_prev.second << "]"
+		    << " [" << range_new.first  << ", " << range_new.second << "]"
+		    << std::endl;
+      }
       
       std::vector<bool, std::allocator<bool> > modified(aligns.mapped.size(), false);
       
@@ -699,33 +791,39 @@ struct LearnModel4 : public LearnBase
       const range_type range2(aligns.prev_cept(i_next), aligns.next_cept(i_next));
       
       if (range1.second < range2.first) {
-	gain /= score_distortion<double>(range1.first, range1.second);
-	gain /= score_distortion<double>(range2.first, range2.second);
+	const double denom1 = score_distortion<double>(range1.first, range1.second);
+	const double denom2 = score_distortion<double>(range2.first, range2.second);
 	
 	aligns.move(j, i_next);
 	
-	gain *= score_distortion<double>(range1.first, range1.second);
-	gain *= score_distortion<double>(range2.first, range2.second);
+	const double numer1 = score_distortion<double>(range1.first, range1.second);
+	const double numer2 = score_distortion<double>(range2.first, range2.second);
 	
 	aligns.move(j, i_prev);
+	
+	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second < range1.first) {
-	gain /= score_distortion<double>(range2.first, range2.second);
-	gain /= score_distortion<double>(range1.first, range1.second);
+	const double denom2 = score_distortion<double>(range2.first, range2.second);
+	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	
 	aligns.move(j, i_next);
 	
-	gain *= score_distortion<double>(range2.first, range2.second);
-	gain *= score_distortion<double>(range1.first, range1.second);
+	const double numer2 = score_distortion<double>(range2.first, range2.second);
+	const double numer1 = score_distortion<double>(range1.first, range1.second);
 	
 	aligns.move(j, i_prev);
+	
+	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else {
-	gain /= score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
-	
+	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+
 	aligns.move(j, i_next);
 	
-	gain *= score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
 	
 	aligns.move(j, i_prev);
+	
+	gain *= (numer / denom);
       }
       
       return gain;
@@ -751,34 +849,41 @@ struct LearnModel4 : public LearnBase
       const range_type range2(aligns.prev_cept(i2), aligns.next_cept(i2));
 
       if (range1.second < range2.first) {
-	gain /= score_distortion<double>(range1.first, range1.second);
-	gain /= score_distortion<double>(range2.first, range2.second);
+	const double denom1 = score_distortion<double>(range1.first, range1.second);
+	const double denom2 = score_distortion<double>(range2.first, range2.second);
+	
+	aligns.swap(j1, j2);
+
+	const double numer1 = score_distortion<double>(range1.first, range1.second);
+	const double numer2 = score_distortion<double>(range2.first, range2.second);
 	
 	aligns.swap(j1, j2);
 	
-	gain *= score_distortion<double>(range1.first, range1.second);
-	gain *= score_distortion<double>(range2.first, range2.second);
-	
-	aligns.swap(j1, j2);
-	
+	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second < range1.first) {
-	gain /= score_distortion<double>(range2.first, range2.second);
-	gain /= score_distortion<double>(range1.first, range1.second);
+	const double denom2 = score_distortion<double>(range2.first, range2.second);
+	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	
 	aligns.swap(j1, j2);
 	
-	gain *= score_distortion<double>(range2.first, range2.second);
-	gain *= score_distortion<double>(range1.first, range1.second);
+	const double numer2 = score_distortion<double>(range2.first, range2.second);
+	const double numer1 = score_distortion<double>(range1.first, range1.second);
 	
 	aligns.swap(j1, j2);
+	
+	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else {
-	gain /= score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
+						      utils::bithack::max(range1.second, range2.second));
 	
 	aligns.swap(j1, j2);
 	
-	gain *= score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
+						      utils::bithack::max(range1.second, range2.second));
 	
 	aligns.swap(j1, j2);
+	
+	gain *= (numer / denom);
       }
       
       return gain;
@@ -794,11 +899,27 @@ struct LearnModel4 : public LearnBase
 	if (aligns.fertility(cept)) {
 	  const size_type center_prev = aligns.center(cept_prev);
 	  
-	  score *= dtable_head(cept, center_prev, aligns.mapped[cept].front());
+	  score *= dtable_head(cept_prev, center_prev, aligns.mapped[cept].front());
+#if 0
+	  std::cerr << "cept: " << cept
+		    << " prev: " << cept_prev
+		    << " center: " << center_prev
+		    << " head: " << aligns.mapped[cept].front()
+		    << " = " << dtable_head(cept_prev, center_prev, aligns.mapped[cept].front())
+		    << std::endl;
+#endif
 	  
 	  alignment_set_type::aligns_sorted_type::const_iterator jiter_end = aligns.mapped[cept].end();
-	  for (alignment_set_type::aligns_sorted_type::const_iterator jiter = aligns.mapped[cept].begin() + 1; jiter != jiter_end; ++ jiter)
+	  for (alignment_set_type::aligns_sorted_type::const_iterator jiter = aligns.mapped[cept].begin() + 1; jiter != jiter_end; ++ jiter) {
 	    score *= dtable_others(*(jiter - 1), *jiter);
+
+#if 0	    
+	    std::cerr << "prev: " << *(jiter - 1)
+		      << " next: " << *jiter
+		      << " = " << dtable_others(*(jiter - 1), *jiter)
+		      << std::endl;
+#endif
+	  }
 	  
 	  cept_prev = cept;
 	}

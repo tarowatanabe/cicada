@@ -823,7 +823,8 @@ struct ptable_type
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
-  typedef utils::chart<double, std::allocator<double> > table_type;
+  //typedef utils::chart<double, std::allocator<double> > table_type;
+  typedef utils::vector2<double, std::allocator<double> > table_type;
 
   static const int max_length = 128;
   
@@ -842,7 +843,7 @@ struct ptable_type
   void initialize()
   {
     table.clear();
-    table.resize(max_length, 0.0);
+    table.resize(max_length, max_length, 0.0);
     
     for (int m = 1; m != max_length; ++ m)
       for (int phi0 = 0; phi0 <= m; ++ phi0)
@@ -974,7 +975,8 @@ struct ntable_type
   
   void initialize()
   {
-    std::fill(table.begin(), table.end(), 0.0);
+    map.clear();
+    table.clear();
   }
   
   ntable_type& operator+=(const ntable_type& x)
@@ -1838,8 +1840,9 @@ void read_fertility(const path_type& path, ntable_type& fertility)
   qi::rule<iterator_type, std::string(), standard::blank_type>         word;
   qi::rule<iterator_type, fertility_parsed_type(), standard::blank_type> parser; 
   
+  // fertility_size of ntable_type!
   word   %= qi::lexeme[+(standard::char_ - standard::space)];
-  parser %= word >> (qi::double_ % ' ') >> (qi::eol | qi::eoi);
+  parser %= word >> qi::repeat(16)[qi::double_] >> (qi::eol | qi::eoi);
   
   fertility.clear();
   
@@ -1857,11 +1860,8 @@ void read_fertility(const path_type& path, ntable_type& fertility)
     
     if (! qi::phrase_parse(iter, iter_end, parser, standard::blank, fertility_parsed))
       if (iter != iter_end)
-	throw std::runtime_error("global lexicon parsing failed");
+	throw std::runtime_error("fertility parsing failed");
 
-    if (boost::fusion::get<1>(fertility_parsed).size() != ntable_type::fertility_size)
-      throw std::runtime_error("invalid fertility table");
-    
     const word_type word(boost::fusion::get<0>(fertility_parsed));
     
     fertility.assign(word);

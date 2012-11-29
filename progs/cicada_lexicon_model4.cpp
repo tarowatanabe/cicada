@@ -72,13 +72,13 @@ bool single_root_mode = false;
 // parameter...
 double p0 = 0.01;
 double prior_lexicon = 0.01;
-double smooth_lexicon = 1e-20;
+double smooth_lexicon = 1e-100;
 double prior_alignment = 0.01;
-double smooth_alignment = 1e-20;
+double smooth_alignment = 1e-100;
 double prior_distortion = 0.01;
-double smooth_distortion = 1e-20;
+double smooth_distortion = 1e-100;
 double prior_fertility = 0.01;
-double smooth_fertility = 1e-20;
+double smooth_fertility = 1e-100;
 
 double l0_alpha = 100;
 double l0_beta = 0.01;
@@ -245,7 +245,7 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("no file: " + classes_target_file.string());
     
     boost::thread_group workers_read;
-    
+
     // read lexicon
     if (! lexicon_source_target_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon,
@@ -255,7 +255,7 @@ int main(int argc, char ** argv)
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon,
 							    boost::cref(lexicon_target_source_file),
 							    boost::ref(ttable_target_source))));
-    
+
     // read alignment
     if (! alignment_source_target_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_alignment,
@@ -298,7 +298,7 @@ int main(int argc, char ** argv)
 							    boost::ref(classes_target))));
     
     workers_read.join_all();
-    
+
     if (iteration_model1 > 0) {
       if (debug)
 	std::cerr << "start Model1 training" << std::endl;
@@ -1510,6 +1510,12 @@ struct SampleBurnMapper : public SampleMapReduce, public Burner
 	   bitext.target,
 	   bitext.alignment_source_target,
 	   bitext.alignment_target_source);
+#if 0
+      std::cerr << "source: " << bitext.source << std::endl
+		<< "target: " << bitext.target << std::endl
+		<< "align: " << bitext.alignment_source_target << std::endl
+		<< "align: " << bitext.alignment_target_source << std::endl;
+#endif
       
       Burner::viterbi(bitext.source,
 		      bitext.target,
@@ -1648,6 +1654,13 @@ struct SampleMapper : public SampleMapReduce, public Learner
     for (int iter = 0;; ++ iter) {
       queue_bitext.pop(pos);
       if (pos == size_type(-1)) break;
+
+#if 0
+      std::cerr << "source: " << bitexts[pos].source << std::endl
+		<< "target: " << bitexts[pos].target << std::endl
+		<< "alignment: " << bitexts[pos].alignment_source_target << std::endl
+		<< "alignment: " << bitexts[pos].alignment_target_source << std::endl;
+#endif
       
       Learner::sample(bitexts[pos].source,
 		      bitexts[pos].target,
@@ -1792,6 +1805,7 @@ void sample(const Maximizer& maximizer,
     
     bitext_type bitext;
     
+    size_t num_bitext = 0;
     for (;;) {
       bitext.clear();
       
@@ -1800,8 +1814,23 @@ void sample(const Maximizer& maximizer,
       
       if (! is_src || ! is_trg) break;
       
+      if (bitext.source.empty() || bitext.target.empty()) continue;
+      
+      ++ num_bitext;
+      if (debug) {
+	if (num_bitext % 10000 == 0)
+	  std::cerr << '.';
+	if (num_bitext % 1000000 == 0)
+	  std::cerr << '\n';
+      }
+      
       queue_mapper.push_swap(bitext);
     }
+    
+    if (debug && num_bitext >= 10000)
+      std::cerr << std::endl;
+    if (debug)
+      std::cerr << "# of bitexts: " << num_bitext << std::endl;
     
     if (is_src || is_trg)
       throw std::runtime_error("# of samples do not match");
@@ -1926,8 +1955,18 @@ void sample(const Maximizer& maximizer,
 									      maximizer)));
 
 
-    for (map_reduce_type::size_type i = 0; i != bitexts.size(); ++ i)
-      queue_id.push(i);
+    for (map_reduce_type::size_type num_bitext = 0; num_bitext != bitexts.size(); ++ num_bitext) {
+      queue_id.push(num_bitext);
+      
+      if (debug) {
+	if ((num_bitext + 1) % 10000 == 0)
+	  std::cerr << '.';
+	if ((num_bitext + 1) % 1000000 == 0)
+	  std::cerr << '\n';
+      }
+    }
+    if (debug && bitexts.size() >= 10000)
+      std::cerr << std::endl;
     
     for (size_t i = 0; i != mappers.size(); ++ i)
       queue_id.push(map_reduce_type::size_type(-1));
