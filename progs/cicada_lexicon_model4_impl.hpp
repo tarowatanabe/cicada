@@ -689,48 +689,21 @@ struct LearnModel4 : public LearnBase
       if (i_prev == i_next) return;
       
       // is this correct...?
-      const range_type range1(aligns.prev_cept(i_prev), utils::bithack::min(aligns.next_cept(i_prev),
-									    static_cast<index_type>(aligns.mapped.size() - 1)));
-      const range_type range2(aligns.prev_cept(i_next), utils::bithack::min(aligns.next_cept(i_next),
-									    static_cast<index_type>(aligns.mapped.size() - 1)));
+      const range_type range1(aligns.prev_cept(i_prev),
+			      utils::bithack::min(aligns.next_cept(i_prev),
+						  static_cast<index_type>(aligns.mapped.size() - 1)));
+      const range_type range2(aligns.prev_cept(i_next),
+			      utils::bithack::min(aligns.next_cept(i_next),
+						  static_cast<index_type>(aligns.mapped.size() - 1)));
       
       aligns.move(j, i_next);
       logprob *= moves(j, i_next);
-
-      const range_type range1_new(aligns.prev_cept(i_prev), utils::bithack::min(aligns.next_cept(i_prev),
-										static_cast<index_type>(aligns.mapped.size() - 1)));
-      const range_type range2_new(aligns.prev_cept(i_next), utils::bithack::min(aligns.next_cept(i_next),
-										static_cast<index_type>(aligns.mapped.size() - 1)));
-
-      if (range1.second < range2.first || range2.second < range1.first) {
-	if (range1_new.first < range1.first || range1_new.second > range1.second)
-	  std::cerr << "different prev range: j=" << j << " prev: " << i_prev << " next: " << i_next
-		    << " [" << range1.first  << ", " << range1.second << "]"
-		    << " [" << range1_new.first  << ", " << range1_new.second << "]"
-		    << std::endl;
-	if (range2_new.first < range2.first || range2_new.second > range2.second)
-	  std::cerr << "different next range: j=" << j << " prev: " << i_prev << " next: " << i_next
-		    << " [" << range2.first  << ", " << range2.second << "]"
-		    << " [" << range2_new.first  << ", " << range2_new.second << "]"
-		    << std::endl;
-      } else {
-	const range_type range_prev(utils::bithack::min(range1.first, range2.first),
-				    utils::bithack::max(range1.second, range2.second));
-	const range_type range_new(utils::bithack::min(range1_new.first, range2_new.first),
-				   utils::bithack::max(range1_new.second, range2_new.second));
-	
-	if (range_new.first < range_prev.first || range_new.second > range_prev.second)
-	  std::cerr << "different merged range: j=" << j << " prev: " << i_prev << " next: " << i_next
-		    << " [" << range_prev.first  << ", " << range_prev.second << "]"
-		    << " [" << range_new.first  << ", " << range_new.second << "]"
-		    << std::endl;
-      }
       
       std::vector<bool, std::allocator<bool> > modified(aligns.mapped.size(), false);
       
-      for (index_type i = range1.first; i <= range1.second && i < static_cast<index_type>(aligns.mapped.size()); ++ i)
+      for (index_type i = range1.first; i <= range1.second; ++ i)
 	modified[i] = true;
-      for (index_type i = range2.first; i <= range2.second && i < static_cast<index_type>(aligns.mapped.size()); ++ i)
+      for (index_type i = range2.first; i <= range2.second; ++ i)
 	modified[i] = true;
       
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
@@ -749,17 +722,21 @@ struct LearnModel4 : public LearnBase
       
       if (j1 == j2 || i1 == i2) return;
       
-      const range_type range1(aligns.prev_cept(i1), aligns.next_cept(i1));
-      const range_type range2(aligns.prev_cept(i2), aligns.next_cept(i2));
+      const range_type range1(aligns.prev_cept(i1),
+			      utils::bithack::min(aligns.next_cept(i1),
+						  static_cast<index_type>(aligns.mapped.size() - 1)));
+      const range_type range2(aligns.prev_cept(i2),
+			      utils::bithack::min(aligns.next_cept(i2),
+						  static_cast<index_type>(aligns.mapped.size() - 1)));
       
       aligns.swap(j1, j2);
       logprob *= swaps(utils::bithack::min(j1, j2), utils::bithack::max(j1, j2));
       
       std::vector<bool, std::allocator<bool> > modified(aligns.mapped.size(), false);
       
-      for (index_type i = range1.first; i <= range1.second && i < static_cast<index_type>(aligns.mapped.size()); ++ i)
+      for (index_type i = range1.first; i <= range1.second; ++ i)
 	modified[i] = true;
-      for (index_type i = range2.first; i <= range2.second && i < static_cast<index_type>(aligns.mapped.size()); ++ i)
+      for (index_type i = range2.first; i <= range2.second; ++ i)
 	modified[i] = true;
       
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
@@ -786,7 +763,7 @@ struct LearnModel4 : public LearnBase
       gain *= ntable(i_prev, aligns.fertility(i_prev) - 1) / ntable(i_prev, aligns.fertility(i_prev));
       gain *= ntable(i_next, aligns.fertility(i_next) + 1) / ntable(i_next, aligns.fertility(i_next));
       
-      // gain in dtable... is this correct...?
+      // gain in dtable... 
       const range_type range1(aligns.prev_cept(i_prev), aligns.next_cept(i_prev));
       const range_type range2(aligns.prev_cept(i_next), aligns.next_cept(i_next));
       
@@ -815,11 +792,13 @@ struct LearnModel4 : public LearnBase
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else {
-	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
+						      utils::bithack::max(range1.second, range2.second));
 
 	aligns.move(j, i_next);
 	
-	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first), utils::bithack::max(range1.second, range2.second));
+	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
+						      utils::bithack::max(range1.second, range2.second));
 	
 	aligns.move(j, i_prev);
 	
@@ -894,8 +873,11 @@ struct LearnModel4 : public LearnBase
     {
       Prob score = 1.0;
       
+      const index_type cept_first = utils::bithack::max(i1, static_cast<index_type>(1));
+      const index_type cept_last  = utils::bithack::min(i2, static_cast<index_type>(aligns.mapped.size() - 1));
+      
       index_type cept_prev = (i1 ? aligns.prev_cept(i1) : 0);
-      for (index_type cept = utils::bithack::max(i1, 1); cept <= i2 && cept < static_cast<index_type>(aligns.mapped.size()); ++ cept) 
+      for (index_type cept = cept_first; cept <= cept_last; ++ cept) 
 	if (aligns.fertility(cept)) {
 	  const size_type center_prev = aligns.center(cept_prev);
 	  

@@ -71,7 +71,7 @@ opt_parser = OptionParser(
     make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)"),
     make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)"),
     make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)"),
-    make_option("--iteration-model4",  default=0,  action="store", type="int", metavar='ITERATION', help="Model4 iteratins    (default: 0)"),
+    make_option("--iteration-model4",  default=5,  action="store", type="int", metavar='ITERATION', help="Model4 iteratins    (default: 5)"),
     
     ## # of clusters
     make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),

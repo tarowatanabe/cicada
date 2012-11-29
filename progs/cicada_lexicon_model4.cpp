@@ -1842,18 +1842,6 @@ void sample(const Maximizer& maximizer,
     }
     workers_mapper.join_all();
     
-    double objective_source_target = 0;
-    double objective_target_source = 0;
-    
-    for (size_t i = 0; i != mappers.size(); ++ i) {
-      objective_source_target += mappers[i].objective_source_target;
-      objective_target_source += mappers[i].objective_target_source;
-    }
-    
-    if (debug)
-      std::cerr << "log-likelihood for P(target | source): " << objective_source_target << '\n'
-		<< "log-likelihood for P(source | target): " << objective_target_source << '\n';
-    
     // merge dtable counts... (we will dynamically create probability table!)
     // first, initialize all the threaded alignment
     // we need to initialize cache-local dtable, first, since we will clear all the entries again!
