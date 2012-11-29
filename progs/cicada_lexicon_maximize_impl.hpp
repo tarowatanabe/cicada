@@ -98,7 +98,7 @@ struct MaximizeL0
       probs_new[iter->first] = std::max(*piter, std::numeric_limits<double>::min());
   }
 
-   void gradient_descent(const parameter_type& counts, const parameter_type& point, parameter_type& point_new)
+  void gradient_descent(const parameter_type& counts, const parameter_type& point, parameter_type& point_new)
   {
     parameter_type point_curr(point);
     parameter_type point_projected(point.size());

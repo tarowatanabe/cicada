@@ -39,6 +39,8 @@ struct LearnModel4 : public LearnBase
     typedef utils::vector_set<index_type, std::less<index_type>, std::allocator<index_type> > aligns_sorted_type;
     typedef std::vector<aligns_sorted_type, std::allocator<aligns_sorted_type> > aligns_map_type;
     typedef std::vector<size_type, std::allocator<size_type> > sum_type;
+    typedef std::vector<size_type, std::allocator<size_type> > prev_type;
+    typedef std::vector<size_type, std::allocator<size_type> > next_type;
 
     AlignmentSet() {}
     AlignmentSet(const sentence_type& source,
@@ -46,14 +48,14 @@ struct LearnModel4 : public LearnBase
 		 const alignment_type& alignment)
     { assign(source, target, alignment); }
     
-    void alignment(alignment_type& aligns) const
+    void alignment(alignment_type& a) const
     {
-      aligns.clear();
+      a.clear();
       for (index_type src = 1; src != static_cast<index_type>(mapped.size()); ++ src)
 	if (! mapped[src].empty()) {
 	  aligns_sorted_type::const_iterator aiter_end = mapped[src].end();
 	  for (aligns_sorted_type::const_iterator aiter = mapped[src].begin(); aiter != aiter_end; ++ aiter)
-	    aligns.push_back(std::make_pair(src - 1, *aiter - 1));
+	    a.push_back(std::make_pair(src - 1, *aiter - 1));
 	}
     }
 
@@ -62,6 +64,8 @@ struct LearnModel4 : public LearnBase
       aligns.clear();
       mapped.clear();
       sums.clear();
+      prevs.clear();
+      nexts.clear();
     }
 
     void assign(const sentence_type& source,
@@ -73,6 +77,8 @@ struct LearnModel4 : public LearnBase
       aligns.resize(target.size() + 1);
       mapped.resize(source.size() + 1);
       sums.resize(source.size() + 1);
+      prevs.resize(source.size() + 1, 0);
+      nexts.resize(source.size() + 1, 0);
       
       // first, compute one-to-many alignment...
       alignment_type::const_iterator aiter_end = alignment.end();
@@ -86,11 +92,30 @@ struct LearnModel4 : public LearnBase
       // summation
       for (size_type src = 0; src != mapped.size(); ++ src)
 	sums[src] = std::accumulate(mapped[src].begin(), mapped[src].end(), 0);
+
+      // prevs...
+      size_type cept_prev = 0;
+      for (size_type cept = 1; cept != prevs.size(); ++ cept) {
+	prevs[cept] = cept_prev;
+	if (sums[cept])
+	  cept_prev = cept;
+      }
+      
+      // nexts...
+      size_type cept_next = prevs.size();
+      for (difference_type cept = prevs.size() - 1; cept >= 0; -- cept) {
+	nexts[cept] = cept_next;
+	if (sums[cept])
+	  cept_next = cept;
+      }
     }
 
     void move(const index_type j, const index_type i_next)
     {
       const index_type i_prev = aligns[j];
+      
+      const range_type range1(prevs[i_prev], utils::bithack::min(nexts[i_prev], mapped.size() - 1));
+      const range_type range2(prevs[i_next], utils::bithack::min(nexts[i_next], mapped.size() - 1));
       
       aligns[j] = i_next;
       
@@ -99,6 +124,16 @@ struct LearnModel4 : public LearnBase
       
       mapped[i_prev].erase(j);
       mapped[i_next].insert(j);
+      
+      if (range1.second + 1 < range2.first) {
+	update_cept(range1.first, range1.second);
+	update_cept(range2.first, range2.second);
+      } else if (range2.second + 1 < range1.first) {
+	update_cept(range2.first, range2.second);
+	update_cept(range1.first, range1.second);
+      } else
+	update_cept(utils::bithack::min(range1.first,  range2.first),
+		    utils::bithack::max(range1.second, range2.second));
     }
 
     void swap(const index_type j1, const index_type j2)
@@ -131,22 +166,33 @@ struct LearnModel4 : public LearnBase
     
     index_type prev_cept(index_type x) const
     {
+      return prevs[x];
+#if 0
       if (! x) return 0;
       
       index_type pos = x - 1;
       while (pos && ! mapped[pos].size())
 	-- pos;
+
+      if (pos != prevs[x])
+	std::cerr << "prevs differ: " << pos << " " << prevs[x] << std::endl;
       
       return pos;
+#endif
     }
     
     index_type next_cept(index_type x) const
     {
+      return nexts[x];
+#if 0
       size_type pos = x + 1;
       while (pos < mapped.size() && ! mapped[pos].size())
 	++ pos;
-      
+
+      if (pos != nexts[x])
+	std::cerr << "nexts differ: " << pos << " " << nexts[x] << std::endl;
       return pos;
+#endif
     }
 
     void shrink()
@@ -156,11 +202,32 @@ struct LearnModel4 : public LearnBase
       aligns_type(aligns).swap(aligns);
       aligns_map_type(mapped).swap(mapped);
       sum_type(sums).swap(sums);
+      prev_type(prevs).swap(prevs);
+      next_type(nexts).swap(nexts);
+    }
+
+    void update_cept(const index_type i1, const index_type i2)
+    {
+      index_type cept_prev = prevs[i1];
+      for (index_type cept = cept_prev + 1; cept <= i2; ++ cept) {
+	prevs[cept] = cept_prev;
+	if (sums[cept])
+	  cept_prev = cept;
+      }
+      
+      index_type cept_next = nexts[i2];
+      for (index_type cept = cept_next - 1; cept >= i1; -- cept) {
+	nexts[cept] = cept_next;
+	if (sums[cept])
+	  cept_next = cept;
+      }
     }
     
     aligns_type     aligns;
     aligns_map_type mapped;
     sum_type        sums;
+    prev_type       prevs;
+    next_type       nexts;
   };
   
   typedef AlignmentSet alignment_set_type;
@@ -213,7 +280,7 @@ struct LearnModel4 : public LearnBase
     
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > posterior_type;
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
-    
+
     void assign(const sentence_type& source,
 		const sentence_type& target,
 		const classes_type& classes_source,
@@ -392,10 +459,12 @@ struct LearnModel4 : public LearnBase
 	  swaps(j1, j2) = (aligns.aligns[j1] != aligns.aligns[j2] ? score_swap(j1, j2) : 1.0);
     }
     
-    void update_j(const index_type j)
+    template <typename Modified>
+    void update_j(const index_type j, const Modified& modified)
     {
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
-	moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
+	if (! modified[i])
+	  moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
       
       for (index_type j2 = j + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
 	swaps(j, j2) = (aligns.aligns[j] != aligns.aligns[j2] ? score_swap(j, j2) : 1.0);
@@ -404,7 +473,8 @@ struct LearnModel4 : public LearnBase
 	swaps(j1, j) = (aligns.aligns[j1] != aligns.aligns[j] ? score_swap(j1, j) : 1.0);
     }
     
-    void update_i(const index_type i)
+    template <typename Modified>
+    void update_i(const index_type i, const Modified& modified)
     {
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
@@ -442,16 +512,8 @@ struct LearnModel4 : public LearnBase
       size_type cept_prev = 0;
       for (size_type cept = 1; cept != aligns.mapped.size(); ++ cept) 
 	if (aligns.fertility(cept)) {
-	  //std::cerr << "cept: " << cept << " fettility: " << aligns.fertility(cept) << std::endl;
-	  
 	  const size_type center_prev = aligns.center(cept_prev);
 	  const size_type head = aligns.mapped[cept].front();
-#if 0
-	  std::cerr << "prev: " << cept_prev
-		    << " center: " << center_prev
-		    << " head: " << head
-		    << std::endl;
-#endif
 	  
 	  ++ counts[std::make_pair(source_class[cept_prev], target_class[head])][head - center_prev];
 	  
@@ -709,11 +771,11 @@ struct LearnModel4 : public LearnBase
       
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
 	if (modified[i])
-	  update_i(i);
+	  update_i(i, modified);
       
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	if (modified[aligns.aligns[j]])
-	  update_j(j);
+	  update_j(j, modified);
     }
     
     void swap(const index_type j1, const index_type j2)
@@ -742,11 +804,11 @@ struct LearnModel4 : public LearnBase
       
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
 	if (modified[i])
-	  update_i(i);
+	  update_i(i, modified);
       
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	if (modified[aligns.aligns[j]])
-	  update_j(j);
+	  update_j(j, modified);
     }
     
     double score_move(const index_type j, const index_type i_next)
@@ -768,7 +830,7 @@ struct LearnModel4 : public LearnBase
       const range_type range1(aligns.prev_cept(i_prev), aligns.next_cept(i_prev));
       const range_type range2(aligns.prev_cept(i_next), aligns.next_cept(i_next));
       
-      if (range1.second < range2.first) {
+      if (range1.second + 1 < range2.first) {
 	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	const double denom2 = score_distortion<double>(range2.first, range2.second);
 	
@@ -780,7 +842,7 @@ struct LearnModel4 : public LearnBase
 	aligns.move(j, i_prev);
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
-      } else if (range2.second < range1.first) {
+      } else if (range2.second + 1 < range1.first) {
 	const double denom2 = score_distortion<double>(range2.first, range2.second);
 	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	
@@ -828,7 +890,7 @@ struct LearnModel4 : public LearnBase
       const range_type range1(aligns.prev_cept(i1), aligns.next_cept(i1));
       const range_type range2(aligns.prev_cept(i2), aligns.next_cept(i2));
 
-      if (range1.second < range2.first) {
+      if (range1.second + 1 < range2.first) {
 	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	const double denom2 = score_distortion<double>(range2.first, range2.second);
 	
@@ -840,7 +902,7 @@ struct LearnModel4 : public LearnBase
 	aligns.swap(j1, j2);
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
-      } else if (range2.second < range1.first) {
+      } else if (range2.second + 1 < range1.first) {
 	const double denom2 = score_distortion<double>(range2.first, range2.second);
 	const double denom1 = score_distortion<double>(range1.first, range1.second);
 	
@@ -1131,7 +1193,7 @@ struct LearnModel4Posterior : public LearnBase
     phi.resize(source_size + 1, 0.0);
     exp_phi_old.resize(source_size + 1, 1.0);
     
-    for (int iter = 0; iter < 5; ++ iter) {      
+    for (int iter = 0; iter != 5; ++ iter) {      
       exp_phi.clear();
       exp_phi.reserve(source_size + 1);
       exp_phi.resize(source_size + 1, 1.0);
