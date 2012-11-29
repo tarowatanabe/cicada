@@ -39,8 +39,6 @@ struct LearnModel4 : public LearnBase
     typedef utils::vector_set<index_type, std::less<index_type>, std::allocator<index_type> > aligns_sorted_type;
     typedef std::vector<aligns_sorted_type, std::allocator<aligns_sorted_type> > aligns_map_type;
     typedef std::vector<size_type, std::allocator<size_type> > sum_type;
-    typedef std::vector<size_type, std::allocator<size_type> > prev_type;
-    typedef std::vector<size_type, std::allocator<size_type> > next_type;
 
     AlignmentSet() {}
     AlignmentSet(const sentence_type& source,
