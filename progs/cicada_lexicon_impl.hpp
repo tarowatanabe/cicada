@@ -9,6 +9,7 @@
 #define PHOENIX_THREADSAFE
 
 #include <numeric>
+#include <limits>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -1752,11 +1753,13 @@ void write_alignment(const path_type& path, const atable_type& align)
   atable_counts_type::const_iterator citer_end = align.table.end();
   for (atable_counts_type::const_iterator citer = align.table.begin(); citer != citer_end; ++ citer)
     for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
-      if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
-			    citer->first.first,
-			    citer->first.second,
-			    diff,
-			    citer->second[diff]))
+      if (citer->second[diff] > 0.0)
+	if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
+			      citer->first.first,
+			      citer->first.second,
+			      diff,
+			      std::min(std::max(citer->second[diff], std::numeric_limits<double>::min()),
+				       std::numeric_limits<double>::max())))
 	throw std::runtime_error("generation failed");
 }
 
@@ -1820,11 +1823,13 @@ void write_distortion(const path_type& path, const dtable_type& distortion)
   dtable_counts_type::const_iterator citer_end = distortion.table.end();
   for (dtable_counts_type::const_iterator citer = distortion.table.begin(); citer != citer_end; ++ citer)
     for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
-      if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
-			    citer->first.first,
-			    citer->first.second,
-			    diff,
-			    citer->second[diff]))
+      if (citer->second[diff] > 0.0)
+	if (! karma::generate(iter, standard::string << ' ' << standard::string << ' ' << karma::int_ << ' '<< real << '\n',
+			      citer->first.first,
+			      citer->first.second,
+			      diff,
+			      std::min(std::max(citer->second[diff], std::numeric_limits<double>::min()),
+				       std::numeric_limits<double>::max())))
 	throw std::runtime_error("generation failed");
 }
 

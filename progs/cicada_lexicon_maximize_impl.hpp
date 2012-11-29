@@ -5,6 +5,8 @@
 #ifndef __CICADA_LEXICON_MAXIMIZE_IMPL__HPP__
 #define __CICADA_LEXICON_MAXIMIZE_IMPL__HPP__ 1
 
+#include <limits>
+
 #include "utils/mathop.hpp"
 
 struct Maximize
@@ -21,7 +23,7 @@ struct Maximize
     
     const double factor = 1.0 / sum;
     for (typename Counts::const_iterator iter = counts.begin(); iter != iter_end; ++ iter)
-      probs_new[iter->first] = (iter->second + prior) * factor;
+      probs_new[iter->first] = std::max((iter->second + prior) * factor, std::numeric_limits<double>::min());
   }
 };
 
@@ -39,7 +41,8 @@ struct MaximizeBayes
     
     const double sum_digamma = utils::mathop::digamma(sum);
     for (typename Counts::const_iterator iter = counts.begin(); iter != iter_end; ++ iter)
-      probs_new[iter->first] = utils::mathop::exp(utils::mathop::digamma(iter->second + prior) - sum_digamma);
+      probs_new[iter->first] = std::max(utils::mathop::exp(utils::mathop::digamma(iter->second + prior) - sum_digamma),
+					std::numeric_limits<double>::min());
   }
 };
 
@@ -92,7 +95,7 @@ struct MaximizeL0
     parameter_type::const_iterator piter = estimated.begin();
     typename Counts::const_iterator iter_end = counts.end();
     for (typename Counts::const_iterator iter = counts.begin(); iter != iter_end; ++ iter, ++ piter)
-      probs_new[iter->first] = *piter;
+      probs_new[iter->first] = std::max(*piter, std::numeric_limits<double>::min());
   }
 
    void gradient_descent(const parameter_type& counts, const parameter_type& point, parameter_type& point_new)
