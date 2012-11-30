@@ -105,6 +105,8 @@ struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_typ
 
 path_type input_file = "-";
 path_type output_file = "-";
+path_type output_source_file;
+path_type output_target_file;
 
 int debug = 0;
 
@@ -126,6 +128,12 @@ int main(int argc, char ** argv)
 				   && ! boost::filesystem::is_regular_file(output_file)));
 
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+    
+    std::auto_ptr<std::ostream> os_source(! output_source_file.empty() ?
+					  new utils::compress_ostream(output_source_file, 1024 * 1024) : 0);
+    std::auto_ptr<std::ostream> os_target(! output_target_file.empty() ?
+					  new utils::compress_ostream(output_target_file, 1024 * 1024) : 0);
+    
     
     utils::compress_istream is(input_file, 1024 * 1024);
     is.unsetf(std::ios::skipws);
@@ -154,6 +162,26 @@ int main(int argc, char ** argv)
 	}
       }
       os << '\n';
+      
+      if (os_source.get()) {
+	bool initial = true;
+	for (size_t src = 1; src < bitext.source.size(); ++ src) {
+	  if (! initial)
+	    *os_source << ' ';
+	  initial = false;
+	  
+	  *os_source << bitext.source[src].first;
+	}
+	*os_source << '\n';
+      }
+      
+      if (os_target.get()) {
+	if (! bitext.target.empty()) {
+	  std::copy(bitext.target.begin(), bitext.target.end() - 1, std::ostream_iterator<std::string>(*os_target, " "));
+	  *os_target << bitext.target.back();
+	}
+	*os_target << '\n';
+      }
     }
   }
   catch (const std::exception& err) {
@@ -171,8 +199,10 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",         po::value<path_type>(&input_file)->default_value("-"),  "input giza alignment")
-    ("output",        po::value<path_type>(&output_file)->default_value("-"), "output alignment")
+    ("input",         po::value<path_type>(&input_file)->default_value(input_file),   "input giza alignment")
+    ("output",        po::value<path_type>(&output_file)->default_value(output_file), "output alignment")
+    ("output-source", po::value<path_type>(&output_source_file),                      "output source")
+    ("output-target", po::value<path_type>(&output_target_file),                      "output target")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
