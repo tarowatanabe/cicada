@@ -104,14 +104,6 @@ Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
 Support joshua training?
 Support cicada forest converter?
 
-Deprecate old learn-online code...?
-  since it is very complicated and error-prone, almost impossible to maintain.
-  or, simply deprecate non-mpi version?
-
-hypergraph variant of learn-block?
-
-octavian support?
-
 Implement succinct-rtrie:
   this is a trie-like structure, but it's purpose is a reverse index: given id, query data of string.
   strings are stored in a trie, with an index refering to the leaf position of trie of id.
@@ -123,8 +115,6 @@ remote grammar and tree-grammar:
   
 revise static create interface:
   currently, we return reference, but it is safer to return pointer...?
-
-rename learn_block as learn_online_kbest
 
 Earley composition with skipping
    Like phrase-based SMT, allow local skipping... very hard...
@@ -174,8 +164,6 @@ msgpack for succinct storage
 Rearrange learning code by splitting L2 and/or L1 projection
   Especially for online-learning, they can be set up as additional "unified" code
 
-Implement IBM Model 4....
-   Use of the fast hill-climbing trick
-   Use of Gibbs sampling style learning
-     Keep track of a sampled derivation, or the best derivation from previous itereations.
-     Initialize table by the Viterbi alignment before starting more complex model iterations.
+
+Add length-model for Modl1 and HMM?
+  This is not a requirement for parameter estimation, though, we cannot directly compare Model4 wrt perplexity.
