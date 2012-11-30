@@ -59,6 +59,7 @@ bin_PROGRAMS = \
 	cicada_filter_extract_ghkm \
 	cicada_filter_extract_phrase \
 	cicada_filter_extract_scfg \
+	cicada_filter_giza \
 	cicada_filter_join \
 	cicada_filter_kbest \
 	cicada_filter_kbest_moses \
@@ -239,6 +240,9 @@ cicada_filter_config_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_config_moses_SOURCES = cicada_filter_config_moses.cpp
 cicada_filter_config_moses_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_giza_SOURCES = cicada_filter_giza.cpp
+cicada_filter_giza_LDADD   = $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_join_SOURCES = cicada_filter_join.cpp
 cicada_filter_join_LDADD   = $(boost_LDADD) $(perftools_LDADD)

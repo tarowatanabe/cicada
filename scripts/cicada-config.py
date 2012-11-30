@@ -274,6 +274,8 @@ if __name__ == '__main__':
     print "# non-MBR decoding, and output forest or kbests"
     print "# kbest=0 implies forest output, otherwise, kbest outputs"
     print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
+    print "# for a simple, forest output"
+    print "# operation = output:${file}"
     print
 
     print "# MBR decoding"
