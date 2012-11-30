@@ -53,7 +53,7 @@ opt_parser = OptionParser(
     make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
 
-    make_option("--beam", default=200, action="store_true", help="beam size"),
+    make_option("--beam", default=200, type=int, action="store", help="beam size"),
     
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
