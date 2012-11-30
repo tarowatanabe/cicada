@@ -214,7 +214,6 @@ struct LearnModel4 : public LearnBase
       } else
 	update_cept(utils::bithack::min(range1.first,  range2.first),
 		    utils::bithack::max(range1.second, range2.second));
-
     }
     
     void swap(const index_type j1, const index_type j2)
@@ -308,6 +307,8 @@ struct LearnModel4 : public LearnBase
 
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > move_score_type;
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > swap_score_type;
+
+    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > distortion_cache_type;
     
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > posterior_type;
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
@@ -482,6 +483,10 @@ struct LearnModel4 : public LearnBase
       moves.resize(aligns.aligns.size(), aligns.mapped.size(), 0.0);
       swaps.resize(aligns.aligns.size(), aligns.aligns.size(), 0.0);
       
+      distortions.clear();
+      distortions.reserve(aligns.mapped.size(), aligns.mapped.size());
+      distortions.resize(aligns.mapped.size(), aligns.mapped.size(), 0.0);
+      
       // move/swap matrix...
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
@@ -495,17 +500,23 @@ struct LearnModel4 : public LearnBase
     template <typename Modified>
     void update(const Modified& modified)
     {
+      std::fill(distortions.begin(), distortions.end(), 0.0);
+      
+      // update moves...
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
 	if (modified[i])
 	  for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	    moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
       
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
-	if (modified[aligns.aligns[j]]) {
+	if (modified[aligns.aligns[j]])
 	  for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
 	    if (! modified[i])
 	      moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
-
+      
+      // update swaps...
+      for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
+	if (modified[aligns.aligns[j]]) {
 	  for (index_type j2 = j + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
 	    swaps(j, j2) = (aligns.aligns[j] != aligns.aligns[j2] ? score_swap(j, j2) : 1.0);
 	  
@@ -785,29 +796,8 @@ struct LearnModel4 : public LearnBase
       
       if (i_prev == i_next) return;
       
-      // is this correct...?
-      const range_type range1(cepts.prevs[i_prev],
-			      utils::bithack::min(cepts.nexts[i_prev], aligns.mapped.size() - 1));
-      const range_type range2(cepts.prevs[i_next],
-			      utils::bithack::min(cepts.nexts[i_next], aligns.mapped.size() - 1));
-
-#if 0
-      const range_type range1(aligns.prev_cept(i_prev),
-			      utils::bithack::min(aligns.next_cept(i_prev),
-						  static_cast<index_type>(aligns.mapped.size() - 1)));
-      const range_type range2(aligns.prev_cept(i_next),
-			      utils::bithack::min(aligns.next_cept(i_next),
-						  static_cast<index_type>(aligns.mapped.size() - 1)));
-      
-      if (aligns.prev_cept(i_prev) != cepts.prevs[i_prev])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.prev_cept(i_next) != cepts.prevs[i_next])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.next_cept(i_prev) != cepts.nexts[i_prev])
-	std::cerr << "differ nexts" << std::endl;
-      if (aligns.next_cept(i_next) != cepts.nexts[i_next])
-	std::cerr << "differ nexts" << std::endl;
-#endif
+      const range_type range1(cepts.prevs[i_prev], utils::bithack::min(cepts.nexts[i_prev], aligns.mapped.size() - 1));
+      const range_type range2(cepts.prevs[i_next], utils::bithack::min(cepts.nexts[i_next], aligns.mapped.size() - 1));
       
       aligns.move(j, i_next);
       cepts.move(j, i_prev, i_next);
@@ -819,7 +809,7 @@ struct LearnModel4 : public LearnBase
 	modified[i] = true;
       for (index_type i = range2.first; i <= range2.second; ++ i)
 	modified[i] = true;
-
+      
       update(modified);
     }
     
@@ -830,27 +820,8 @@ struct LearnModel4 : public LearnBase
       
       if (j1 == j2 || i1 == i2) return;
 
-      const range_type range1(cepts.prevs[i1],
-			      utils::bithack::min(cepts.nexts[i1], aligns.mapped.size() - 1));
-      const range_type range2(cepts.prevs[i2],
-			      utils::bithack::min(cepts.nexts[i2], aligns.mapped.size() - 1));
-#if 0      
-      const range_type range1(aligns.prev_cept(i1),
-			      utils::bithack::min(aligns.next_cept(i1),
-						  static_cast<index_type>(aligns.mapped.size() - 1)));
-      const range_type range2(aligns.prev_cept(i2),
-			      utils::bithack::min(aligns.next_cept(i2),
-						  static_cast<index_type>(aligns.mapped.size() - 1)));
-
-      if (aligns.prev_cept(i1) != cepts.prevs[i1])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.prev_cept(i2) != cepts.prevs[i2])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.next_cept(i1) != cepts.nexts[i1])
-	std::cerr << "differ nexts" << std::endl;
-      if (aligns.next_cept(i2) != cepts.nexts[i2])
-	std::cerr << "differ nexts" << std::endl;
-#endif
+      const range_type range1(cepts.prevs[i1], utils::bithack::min(cepts.nexts[i1], aligns.mapped.size() - 1));
+      const range_type range2(cepts.prevs[i2], utils::bithack::min(cepts.nexts[i2], aligns.mapped.size() - 1));
       
       aligns.swap(j1, j2);
       cepts.swap(j1, j2);
@@ -882,26 +853,19 @@ struct LearnModel4 : public LearnBase
       gain *= ntable(i_next, aligns.fertility(i_next) + 1) / ntable(i_next, aligns.fertility(i_next));
       
       // gain in dtable... 
-      const range_type range1(cepts.prevs[i_prev], cepts.nexts[i_prev]);
-      const range_type range2(cepts.prevs[i_next], cepts.nexts[i_next]);
-      
-#if 0
-      const range_type range1(aligns.prev_cept(i_prev), aligns.next_cept(i_prev));
-      const range_type range2(aligns.prev_cept(i_next), aligns.next_cept(i_next));
-
-      if (aligns.prev_cept(i_prev) != cepts.prevs[i_prev])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.prev_cept(i_next) != cepts.prevs[i_next])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.next_cept(i_prev) != cepts.nexts[i_prev])
-	std::cerr << "differ nexts" << std::endl;
-      if (aligns.next_cept(i_next) != cepts.nexts[i_next])
-	std::cerr << "differ nexts" << std::endl;
-#endif
+      const range_type range1(utils::bithack::max(cepts.prevs[i_prev], size_type(1)),
+			      utils::bithack::min(cepts.nexts[i_prev], aligns.mapped.size() - 1));
+      const range_type range2(utils::bithack::max(cepts.prevs[i_next], size_type(1)),
+			      utils::bithack::min(cepts.nexts[i_next], aligns.mapped.size() - 1));
       
       if (range1.second + 1 < range2.first) {
-	const double denom1 = score_distortion<double>(range1.first, range1.second);
-	const double denom2 = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == 0.0)
+	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == 0.0)
+	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+	
+	const double denom1 = distortions(range1.first, range1.second);
+	const double denom2 = distortions(range2.first, range2.second);
 	
 	aligns.move(j, i_next);
 	
@@ -912,8 +876,13 @@ struct LearnModel4 : public LearnBase
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second + 1 < range1.first) {
-	const double denom2 = score_distortion<double>(range2.first, range2.second);
-	const double denom1 = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == 0.0)
+	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == 0.0)
+	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+
+	const double denom2 = distortions(range2.first, range2.second);
+	const double denom1 = distortions(range1.first, range1.second);
 	
 	aligns.move(j, i_next);
 	
@@ -924,13 +893,17 @@ struct LearnModel4 : public LearnBase
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else {
-	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
-						      utils::bithack::max(range1.second, range2.second));
+	const range_type range(utils::bithack::min(range1.first,  range2.first),
+			       utils::bithack::max(range1.second, range2.second));
+	
+	if (distortions(range.first, range.second) == 0.0)
+	  distortions(range.first, range.second) = score_distortion<double>(range.first, range.second);
+	
+	const double denom = distortions(range.first, range.second);
 
 	aligns.move(j, i_next);
 	
-	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
-						      utils::bithack::max(range1.second, range2.second));
+	const double numer = score_distortion<double>(range.first, range.second);
 	
 	aligns.move(j, i_prev);
 	
@@ -956,28 +929,22 @@ struct LearnModel4 : public LearnBase
       // no change in ptable and/or ntable...
       
       // gain in dtable...
-      const range_type range1(cepts.prevs[i1], cepts.nexts[i1]);
-      const range_type range2(cepts.prevs[i2], cepts.nexts[i2]);
-#if 0
-      const range_type range1(aligns.prev_cept(i1), aligns.next_cept(i1));
-      const range_type range2(aligns.prev_cept(i2), aligns.next_cept(i2));
-
-      if (aligns.prev_cept(i1) != cepts.prevs[i1])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.prev_cept(i2) != cepts.prevs[i2])
-	std::cerr << "differ prevs" << std::endl;
-      if (aligns.next_cept(i1) != cepts.nexts[i1])
-	std::cerr << "differ nexts" << std::endl;
-      if (aligns.next_cept(i2) != cepts.nexts[i2])
-	std::cerr << "differ nexts" << std::endl;
-#endif
-
+      const range_type range1(utils::bithack::max(cepts.prevs[i1], size_type(1)),
+			      utils::bithack::min(cepts.nexts[i1], aligns.mapped.size() - 1));
+      const range_type range2(utils::bithack::max(cepts.prevs[i2], size_type(1)),
+			      utils::bithack::min(cepts.nexts[i2], aligns.mapped.size() - 1));
+      
       if (range1.second + 1 < range2.first) {
-	const double denom1 = score_distortion<double>(range1.first, range1.second);
-	const double denom2 = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == 0.0)
+	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == 0.0)
+	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+
+	const double denom1 = distortions(range1.first, range1.second);
+	const double denom2 = distortions(range2.first, range2.second);
 	
 	aligns.swap(j1, j2);
-
+	
 	const double numer1 = score_distortion<double>(range1.first, range1.second);
 	const double numer2 = score_distortion<double>(range2.first, range2.second);
 	
@@ -985,8 +952,13 @@ struct LearnModel4 : public LearnBase
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second + 1 < range1.first) {
-	const double denom2 = score_distortion<double>(range2.first, range2.second);
-	const double denom1 = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == 0.0)
+	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == 0.0)
+	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+	
+	const double denom2 = distortions(range2.first, range2.second);
+	const double denom1 = distortions(range1.first, range1.second);
 	
 	aligns.swap(j1, j2);
 	
@@ -997,13 +969,17 @@ struct LearnModel4 : public LearnBase
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else {
-	const double denom = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
-						      utils::bithack::max(range1.second, range2.second));
+	const range_type range(utils::bithack::min(range1.first,  range2.first),
+			       utils::bithack::max(range1.second, range2.second));
+	
+	if (distortions(range.first, range.second) == 0.0)
+	  distortions(range.first, range.second) = score_distortion<double>(range.first, range.second);
+
+	const double denom = distortions(range.first, range.second);
 	
 	aligns.swap(j1, j2);
 	
-	const double numer = score_distortion<double>(utils::bithack::min(range1.first, range2.first),
-						      utils::bithack::max(range1.second, range2.second));
+	const double numer = score_distortion<double>(range.first, range.second);
 	
 	aligns.swap(j1, j2);
 	
@@ -1027,26 +1003,10 @@ struct LearnModel4 : public LearnBase
 	  const size_type center_prev = aligns.center(cept_prev);
 	  
 	  score *= dtable_head(cept_prev, center_prev, aligns.mapped[cept].front());
-#if 0
-	  std::cerr << "cept: " << cept
-		    << " prev: " << cept_prev
-		    << " center: " << center_prev
-		    << " head: " << aligns.mapped[cept].front()
-		    << " = " << dtable_head(cept_prev, center_prev, aligns.mapped[cept].front())
-		    << std::endl;
-#endif
 	  
 	  alignment_set_type::aligns_sorted_type::const_iterator jiter_end = aligns.mapped[cept].end();
-	  for (alignment_set_type::aligns_sorted_type::const_iterator jiter = aligns.mapped[cept].begin() + 1; jiter != jiter_end; ++ jiter) {
+	  for (alignment_set_type::aligns_sorted_type::const_iterator jiter = aligns.mapped[cept].begin() + 1; jiter != jiter_end; ++ jiter)
 	    score *= dtable_others(*(jiter - 1), *jiter);
-
-#if 0	    
-	    std::cerr << "prev: " << *(jiter - 1)
-		      << " next: " << *jiter
-		      << " = " << dtable_others(*(jiter - 1), *jiter)
-		      << std::endl;
-#endif
-	  }
 	  
 	  cept_prev = cept;
 	}
@@ -1073,6 +1033,9 @@ struct LearnModel4 : public LearnBase
       move_score_type(moves).swap(moves);
       swap_score_type(swaps).swap(swaps);
 
+      distortions.clear();
+      distortion_cache_type(distortions).swap(distortions);
+
       posterior.clear();
       posterior_swap.clear();
       posterior_fertility.clear();
@@ -1098,6 +1061,7 @@ struct LearnModel4 : public LearnBase
     // move swap matric
     move_score_type moves;
     swap_score_type swaps;
+    distortion_cache_type distortions;
 
     // posteriors...
     double total;
