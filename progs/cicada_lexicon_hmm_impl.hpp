@@ -195,12 +195,12 @@ struct LearnHMM : public LearnBase
 	
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
-	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {
+	for (size_type next = 1; next != source_size + 2; ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
 	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
-	  for (int prev = 0; prev < static_cast<int>(source_size + 2 - 1); ++ prev, ++ titer1, ++ titer2) {
+	  for (size_type prev = 0; prev != (source_size + 2) - 1; ++ prev, ++ titer1, ++ titer2) {
 	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
 						       source_size, target_size,
 						       prev - 1, next - 1);
@@ -212,7 +212,7 @@ struct LearnHMM : public LearnBase
 	
 	// null transition
 	// we will exclude EOS
-	for (size_type next = 0; next < (source_size + 2) - 1; ++ next) {
+	for (size_type next = 0; next != (source_size + 2) - 1; ++ next) {
 	  const size_type next_none = next + (source_size + 2);
 	  const size_type prev1_none = next;
 	  const size_type prev2_none = next + (source_size + 2);
@@ -298,16 +298,16 @@ struct LearnHMM : public LearnBase
       
       // compute transition table...
       // we start from 1, since there exists no previously aligned word before BOS...
-      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg != target_size + 2; ++ trg) {
 	
 	// alignment into non-null
 	// start from 1 to exlude transition into <s>
-	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next) {
+	for (size_type next = 1; next != source_size + 2; ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
 	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
-	  for (int prev = 0; prev < static_cast<int>(source_size + 2 - 1); ++ prev, ++ titer1, ++ titer2) {
+	  for (size_type prev = 0; prev != (source_size + 2) - 1; ++ prev, ++ titer1, ++ titer2) {
 	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
 						       source_size, target_size,
 						       prev - 1, next - 1);
@@ -319,7 +319,7 @@ struct LearnHMM : public LearnBase
 	
 	// null transition
 	// we will exclude EOS
-	for (size_type next = 0; next < (source_size + 2) - 1; ++ next) {
+	for (size_type next = 0; next != (source_size + 2) - 1; ++ next) {
 	  const size_type next_none = next + (source_size + 2);
 	  const size_type prev1_none = next;
 	  const size_type prev2_none = next + (source_size + 2);
@@ -349,12 +349,12 @@ struct LearnHMM : public LearnBase
       scale.resize(target_size + 2, 1.0);
       
       forward(0, 0) = 1.0;
-      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg != target_size + 2; ++ trg) {
 	// +1 to exclude BOS
 	prob_type*       niter = &(*forward.begin(trg)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
-	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter, ++ eiter) {
+	for (size_type next = 1; next != source_size + 2; ++ next, ++ niter, ++ eiter) {
 	  const prob_type* piter = &(*forward.begin(trg - 1));
 	  const prob_type* titer = &(*transition.begin(trg, next));
 	  
@@ -388,7 +388,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* piter_none1 = &(*forward.begin(trg - 1));
 	const prob_type* piter_none2 = piter_none1 + (source_size + 2);
 	
-	for (size_type next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
+	for (size_type next = 0; next != (source_size + 2) - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
 	  const size_type next_none = next + source_size + 2;
 	  const size_type prev_none1 = next;
 	  const size_type prev_none2 = next + source_size + 2;
@@ -412,7 +412,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* niter = &(*backward.begin(trg + 1)) + 1;
 	const prob_type* eiter = &(*emission.begin(trg + 1)) + 1;
 	
-	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter, ++ eiter) {
+	for (size_type next = 1; next != source_size + 2; ++ next, ++ niter, ++ eiter) {
 	  prob_type*       piter = &(*backward.begin(trg));
 	  const prob_type* titer = &(*transition.begin(trg + 1, next));
 	  
@@ -443,7 +443,7 @@ struct LearnHMM : public LearnBase
 	prob_type*       piter_none1 = &(*backward.begin(trg));
 	prob_type*       piter_none2 = piter_none1 + (source_size + 2);
 
-	for (size_type next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
+	for (size_type next = 0; next != (source_size + 2) - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
 	  const size_type next_none = next + source_size + 2;
 	  const size_type prev_none1 = next;
 	  const size_type prev_none2 = next + source_size + 2;
@@ -612,9 +612,9 @@ struct LearnHMM : public LearnBase
 
       mapped_type mapped((source_size + 2) - 1);
 
-      for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+      for (size_type trg = 1; trg != target_size + 2; ++ trg) {
 	
-	for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev) {
+	for (size_type prev = 0; prev != (source_size + 2) - 1; ++ prev) {
 	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
 	  
 	  // next - prev
@@ -627,7 +627,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
 	// + 1, we will exclude <s>, since we will never aligned to <s>
-	for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ biter, ++ eiter) {
+	for (size_type next = 1; next != source_size + 2; ++ next, ++ biter, ++ eiter) {
 	  const prob_type factor_backward = (*biter) * (*eiter);
 
 	  if (factor_backward > 0.0) {
@@ -637,7 +637,7 @@ struct LearnHMM : public LearnBase
 	    const prob_type* titer_none = &(*transition.begin(trg, next)) + (source_size + 2);
 	    
 	    // - 1 to exlude EOS
-	    for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
+	    for (size_type prev = 0; prev != (source_size + 2) - 1; ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
 	      const double count_word = (*fiter_word) * factor_backward * (*titer_word) * factor;
 	      const double count_none = (*fiter_none) * factor_backward * (*titer_none) * factor;
 	      
@@ -1294,23 +1294,19 @@ struct ViterbiHMM : public ViterbiBase
     const double prob_null  = p0;
     const double prob_align = 1.0 - p0;
     
-    forward_max.clear();
-    forward_sum.clear();
+    forward.clear();
     backptr.clear();
     scale.clear();
     
-    forward_max.clear();
-    forward_sum.clear();
+    forward.clear();
     backptr.clear();
     scale.clear();
 
-    forward_max.reserve(target_size + 2, (source_size + 2) * 2);
-    forward_sum.reserve(target_size + 2, (source_size + 2) * 2);
+    forward.reserve(target_size + 2, (source_size + 2) * 2);
     backptr.reserve(target_size + 2, (source_size + 2) * 2);
     scale.reserve(target_size + 2);
     
-    forward_max.resize(target_size + 2, (source_size + 2) * 2, 0.0);
-    forward_sum.resize(target_size + 2, (source_size + 2) * 2, 0.0);
+    forward.resize(target_size + 2, (source_size + 2) * 2, 0.0);
     backptr.resize(target_size + 2, (source_size + 2) * 2, -1);
     scale.resize(target_size + 2, 1.0);
     
@@ -1332,55 +1328,48 @@ struct ViterbiHMM : public ViterbiBase
     for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
       *ctiter = classes_target[*titer];
     
-    forward_max(0, 0) = 1.0;
-    forward_sum(0, 0) = 1.0;
+    forward(0, 0) = 1.0;
     
     double scale_accumulated = 0.0;
-    for (size_type trg = 1; trg < target_size + 2; ++ trg) {
+    for (size_type trg = 1; trg != target_size + 2; ++ trg) {
       const word_type target_word = (trg == target_size + 1 ? vocab_type::EOS : target[trg - 1]);
       const double emission_none = ttable(vocab_type::EPSILON, target_word);
       
       // + 1 to exclude BOS
-      prob_type* niter_sum = &(*forward_sum.begin(trg)) + 1;
-      prob_type* niter_max = &(*forward_max.begin(trg)) + 1;
-      index_type* biter_max = &(*backptr.begin(trg)) + 1;
+      prob_type* niter = &(*forward.begin(trg)) + 1;
+      index_type* biter = &(*backptr.begin(trg)) + 1;
       
-      for (int next = 1; next < static_cast<int>(source_size + 2); ++ next, ++ niter_sum, ++ niter_max, ++ biter_max) {
+      for (size_type next = 1; next != source_size + 2; ++ next, ++ niter, ++ biter) {
 	const word_type source_word = (next == static_cast<int>(source_size + 1) ? vocab_type::EOS : source[next - 1]);
 	const double emission = ttable(source_word, target_word);
 	
 	if (emission > 0.0) {
-	  const prob_type* piter_sum = &(*forward_sum.begin(trg - 1));
-	  const prob_type* piter_max = &(*forward_max.begin(trg - 1));
+	  const prob_type* piter = &(*forward.begin(trg - 1));
 	  
-	  for (int prev = 0; prev < static_cast<int>((source_size + 2) - 1); ++ prev) {
+	  for (size_type prev = 0; prev != (source_size + 2) - 1; ++ prev) {
 	    const prob_type transition_word = prob_align * atable(source_class[prev], target_class[trg],
 								  source_size, target_size,
 								  prev - 1, next - 1);
 	    
-	    *niter_sum += emission * transition_word * piter_sum[prev];
-	    *niter_sum += emission * transition_word * piter_sum[prev + source_size + 2];
+	    const double prob1 = emission * transition_word * piter[prev];
+	    const double prob2 = emission * transition_word * piter[prev + source_size + 2];
 	    
-	    const double prob1 = emission * transition_word * piter_max[prev];
-	    const double prob2 = emission * transition_word * piter_max[prev + source_size + 2];
-	    
-	    if (prob1 > *niter_max) {
-	      *niter_max = prob1;
-	      *biter_max = prev;
+	    if (prob1 > *niter) {
+	      *niter = prob1;
+	      *biter = prev;
 	    }
-	    if (prob2 > *niter_max) {
-	      *niter_max = prob2;
-	      *biter_max = prev + source_size + 2;
+	    if (prob2 > *niter) {
+	      *niter = prob2;
+	      *biter = prev + source_size + 2;
 	    }
 	  }
 	}
       }
       
-      prob_type* niter_sum_none = &(*forward_sum.begin(trg)) + source_size + 2;
-      prob_type* niter_max_none = &(*forward_max.begin(trg)) + source_size + 2;
-      index_type* biter_max_none = &(*backptr.begin(trg)) + source_size + 2;
+      prob_type* niter_none = &(*forward.begin(trg)) + source_size + 2;
+      index_type* biter_none = &(*backptr.begin(trg)) + source_size + 2;
       
-      for (int next = 0; next < static_cast<int>((source_size + 2) - 1); ++ next, ++ niter_sum_none, ++ niter_max_none, ++ biter_max_none) {
+      for (size_type next = 0; next != (source_size + 2) - 1; ++ next, ++ niter_none, ++ biter_none) {
 	// alignment into none...
 	const int next_none = next + source_size + 2;
 	const int prev_none1 = next;
@@ -1388,30 +1377,25 @@ struct ViterbiHMM : public ViterbiBase
 	
 	const prob_type transition_none = prob_null;
 	
-	*niter_sum_none += forward_sum(trg - 1, prev_none1) * emission_none * transition_none;
-	*niter_sum_none += forward_sum(trg - 1, prev_none2) * emission_none * transition_none;
+	const double prob1 = forward(trg - 1, prev_none1) * emission_none * transition_none;
+	const double prob2 = forward(trg - 1, prev_none2) * emission_none * transition_none;
 	
-	const double prob1 = forward_max(trg - 1, prev_none1) * emission_none * transition_none;
-	const double prob2 = forward_max(trg - 1, prev_none2) * emission_none * transition_none;
-	
-	if (prob1 > *niter_max_none) {
-	  *niter_max_none = prob1;
-	  *biter_max_none = prev_none1;
+	if (prob1 > *niter_none) {
+	  *niter_none = prob1;
+	  *biter_none = prev_none1;
 	}
 	
-	if (prob2 > *niter_max_none) {
-	  *niter_max_none = prob2;
-	  *biter_max_none = prev_none2;
+	if (prob2 > *niter_none) {
+	  *niter_none = prob2;
+	  *biter_none = prev_none2;
 	}
       }
 
-      scale[trg] = std::accumulate(forward_sum.begin(trg), forward_sum.end(trg), 0.0);
+      scale[trg] = std::accumulate(forward.begin(trg), forward.end(trg), 0.0);
       scale[trg] = (scale[trg] == 0.0 ? 1.0 : 1.0 / scale[trg]);
       
-      if (scale[trg] != 1.0) {
-	std::transform(forward_sum.begin(trg), forward_sum.end(trg), forward_sum.begin(trg), std::bind2nd(std::multiplies<double>(), scale[trg]));
-	std::transform(forward_max.begin(trg), forward_max.end(trg), forward_max.begin(trg), std::bind2nd(std::multiplies<double>(), scale[trg]));
-      } 
+      if (scale[trg] != 1.0)
+	std::transform(forward.begin(trg), forward.end(trg), forward.begin(trg), std::bind2nd(std::multiplies<double>(), scale[trg]));
     }
     
     // traverse-back...
@@ -1447,16 +1431,14 @@ struct ViterbiHMM : public ViterbiBase
 
   void shrink()
   {
-    forward_max.clear();
-    forward_sum.clear();
+    forward.clear();
     backptr.clear();
     scale.clear();
     
     source_class.clear();
     target_class.clear();
     
-    forward_type(forward_max).swap(forward_max);
-    forward_type(forward_sum).swap(forward_sum);
+    forward_type(forward).swap(forward);
     backptr_type(backptr).swap(backptr);
     scale_type(scale).swap(scale);
     
@@ -1471,8 +1453,7 @@ struct ViterbiHMM : public ViterbiBase
   
   typedef utils::vector2_aligned<index_type, std::allocator<index_type> > backptr_type;
   
-  forward_type  forward_max;
-  forward_type  forward_sum;
+  forward_type  forward;
   backptr_type  backptr;
   scale_type    scale;
 
@@ -1541,6 +1522,167 @@ struct PosteriorHMM : public ViterbiBase
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
 };
+
+struct ViterbiPosteriorHMM : public ViterbiBase
+{
+  //
+  // we will compute both of viterbi and posterior...
+  //
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  
+  ViterbiPosteriorHMM(const ttable_type& __ttable_source_target,
+		      const ttable_type& __ttable_target_source,
+		      const atable_type& __atable_source_target,
+		      const atable_type& __atable_target_source,
+		      const classes_type& __classes_source,
+		      const classes_type& __classes_target)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		  __atable_source_target, __atable_target_source,
+		  __classes_source, __classes_target) {}
+  
+  typedef LearnHMM::hmm_data_type hmm_data_type;
+  
+
+  template <typename Matrix>
+  void viterbi(const sentence_type& source,
+	       const sentence_type& target,
+	       const ttable_type& ttable,
+	       const atable_type& atable,
+	       const classes_type& classes_source,
+	       const classes_type& classes_target,
+	       alignment_type& alignment,
+	       Matrix& posterior)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm.prepare(source, target, ttable, atable, classes_source, classes_target);
+    
+    hmm.forward_backward(source, target);
+    
+    hmm.estimate_posterior(source, target);
+
+    // posterior...    
+    posterior.reserve(target_size + 1, source_size + 1);
+    posterior.resize(target_size + 1, source_size + 1);
+    
+    for (size_type trg = 0; trg <= target_size; ++ trg)
+      std::copy(hmm.posterior.begin(trg), hmm.posterior.end(trg), posterior.begin(trg));
+    
+    // compute viterbi...
+    maximum.clear();
+    backptr.clear();
+    
+    maximum.reserve(target_size + 2, (source_size + 2) * 2);
+    backptr.reserve(target_size + 2, (source_size + 2) * 2);
+    
+    maximum.resize(target_size + 2, (source_size + 2) * 2, 0.0);
+    backptr.resize(target_size + 2, (source_size + 2) * 2, -1);
+    
+    maximum(0, 0) = 1.0;
+
+    for (size_type trg = 1; trg != target_size + 2; ++ trg) {
+      
+      // +1 to exclude BOS
+      const prob_type* eiter = &(*hmm.emission.begin(trg)) + 1;
+      prob_type*       niter = &(*maximum.begin(trg)) + 1;
+      index_type*      biter = &(*backptr.begin(trg)) + 1;
+      
+      for (size_type next = 1; next != source_size + 2; ++ next, ++ niter, ++ eiter, ++ biter) {
+	const double factor = *eiter;
+	
+	if (factor > 0.0) {
+	  const prob_type* piter = &(*maximum.begin(trg - 1));
+	  const prob_type* titer = &(*hmm.transition.begin(trg, next));
+	  
+	  for (size_type prev = 0; prev != (source_size + 2) * 2; ++ prev, ++ piter, ++ titer) {
+	    const double prob = factor * (*titer) * (*piter);
+	    
+	    if (prob >= *niter) {
+	      *niter = prob;
+	      *biter = prev;
+	    }
+	  }
+	}
+      }
+      
+      prob_type*  niter_none = &(*maximum.begin(trg)) + source_size + 2;
+      index_type* biter_none = &(*backptr.begin(trg)) + source_size + 2;
+      const prob_type* eiter_none = &(*hmm.emission.begin(trg)) + (source_size + 2);
+      const prob_type* piter_none1 = &(*maximum.begin(trg - 1));
+      const prob_type* piter_none2 = piter_none1 + (source_size + 2);
+      
+      for (size_type next = 0; next != (source_size + 2) - 1; ++ next, ++ niter_none, ++ biter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
+	// alignment into none...
+	const size_type next_none = next + source_size + 2;
+	const size_type prev_none1 = next;
+	const size_type prev_none2 = next + source_size + 2;
+	
+	const double prob1 = (*piter_none1) * (*eiter_none) * hmm.transition(trg, next_none, prev_none1);
+	const double prob2 = (*piter_none2) * (*eiter_none) * hmm.transition(trg, next_none, prev_none2);
+	
+	if (prob1 > *niter_none) {
+	  *niter_none = prob1;
+	  *biter_none = prev_none1;
+	}
+	
+	if (prob2 > *niter_none) {
+	  *niter_none = prob2;
+	  *biter_none = prev_none2;
+	}
+      }
+      
+      // scaling...
+      if (hmm.scale[trg] != 1.0)
+	std::transform(maximum.begin(trg), maximum.end(trg), maximum.begin(trg), std::bind2nd(std::multiplies<double>(), hmm.scale[trg]));
+    }
+
+    // traverse-back...
+    alignment.clear();
+    index_type position = backptr(target_size + 2 - 1 , source_size + 2 - 1);
+    for (int trg = target_size; trg >= 1; -- trg) {
+      if (position < static_cast<int>(source_size + 2))
+	alignment.push_back(std::make_pair(position - 1, trg - 1));
+      position = backptr(trg, position);
+    }
+    
+    std::sort(alignment.begin(), alignment.end());
+  }
+  
+  template <typename Matrix>
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source,
+		  Matrix& posterior_source_target,
+		  Matrix& posterior_target_source)
+  {
+    viterbi(source, target, ttable_source_target, atable_source_target, classes_source, classes_target, alignment_source_target, posterior_source_target);
+    viterbi(target, source, ttable_target_source, atable_target_source, classes_target, classes_source, alignment_target_source, posterior_target_source);
+  }
+
+  void shrink()
+  {
+    maximum.clear();
+    backptr.clear();
+    
+    maximum_type(maximum).swap(maximum);
+    backptr_type(backptr).swap(backptr);
+
+    hmm.shrink();
+    
+    ViterbiBase::shrink();
+  }
+  
+  typedef utils::vector2_aligned<prob_type, std::allocator<prob_type> > maximum_type;
+  typedef utils::vector2_aligned<index_type, std::allocator<index_type> > backptr_type;
+  
+  maximum_type  maximum;
+  backptr_type  backptr;
+
+  hmm_data_type hmm;
+};
+
 
 
 struct ITGHMM : public ViterbiBase

@@ -617,7 +617,42 @@ int main(int argc, char ** argv)
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    sample<LearnModel4SymmetricPosterior, ViterbiHMM, MaximizeBayes>(MaximizeBayes(),
+	    sample<LearnModel4SymmetricPosterior, ViterbiPosteriorHMM, MaximizeBayes>(MaximizeBayes(),
+										      iteration_model4,
+										      ttable_source_target,
+										      ttable_target_source,
+										      atable_source_target,
+										      atable_target_source,
+										      dtable_source_target,
+										      dtable_target_source,
+										      ntable_source_target,
+										      ntable_target_source,
+										      ptable_source_target,
+										      ptable_target_source,
+										      classes_source,
+										      classes_target,
+										      aligned_source_target,
+										      aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, ViterbiPosteriorHMM, MaximizeBayes>(MaximizeBayes(),
+									     iteration_model4,
+									     ttable_source_target,
+									     ttable_target_source,
+									     atable_source_target,
+									     atable_target_source,
+									     dtable_source_target,
+									     dtable_target_source,
+									     ntable_source_target,
+									     ntable_target_source,
+									     ptable_source_target,
+									     ptable_target_source,
+									     classes_source,
+									     classes_target,
+									     aligned_source_target,
+									     aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, ViterbiPosteriorHMM, MaximizeBayes>(MaximizeBayes(),
 									     iteration_model4,
 									     ttable_source_target,
 									     ttable_target_source,
@@ -634,7 +669,7 @@ int main(int argc, char ** argv)
 									     aligned_source_target,
 									     aligned_target_source);
 	  else
-	    sample<LearnModel4Symmetric, ViterbiHMM, MaximizeBayes>(MaximizeBayes(),
+	    sample<LearnModel4, ViterbiPosteriorHMM, MaximizeBayes>(MaximizeBayes(),
 								    iteration_model4,
 								    ttable_source_target,
 								    ttable_target_source,
@@ -650,46 +685,46 @@ int main(int argc, char ** argv)
 								    classes_target,
 								    aligned_source_target,
 								    aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    sample<LearnModel4Posterior, ViterbiHMM, MaximizeBayes>(MaximizeBayes(),
-								    iteration_model4,
-								    ttable_source_target,
-								    ttable_target_source,
-								    atable_source_target,
-								    atable_target_source,
-								    dtable_source_target,
-								    dtable_target_source,
-								    ntable_source_target,
-								    ntable_target_source,
-								    ptable_source_target,
-								    ptable_target_source,
-								    classes_source,
-								    classes_target,
-								    aligned_source_target,
-								    aligned_target_source);
-	  else
-	    sample<LearnModel4, ViterbiHMM, MaximizeBayes>(MaximizeBayes(),
-							   iteration_model4,
-							   ttable_source_target,
-							   ttable_target_source,
-							   atable_source_target,
-							   atable_target_source,
-							   dtable_source_target,
-							   dtable_target_source,
-							   ntable_source_target,
-							   ntable_target_source,
-							   ptable_source_target,
-							   ptable_target_source,
-							   classes_source,
-							   classes_target,
-							   aligned_source_target,
-							   aligned_target_source);
 	}
       } else if (pgd_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    sample<LearnModel4SymmetricPosterior, ViterbiHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+	    sample<LearnModel4SymmetricPosterior, ViterbiPosteriorHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+										   iteration_model4,
+										   ttable_source_target,
+										   ttable_target_source,
+										   atable_source_target,
+										   atable_target_source,
+										   dtable_source_target,
+										   dtable_target_source,
+										   ntable_source_target,
+										   ntable_target_source,
+										   ptable_source_target,
+										   ptable_target_source,
+										   classes_source,
+										   classes_target,
+										   aligned_source_target,
+										   aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, ViterbiPosteriorHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+									  iteration_model4,
+									  ttable_source_target,
+									  ttable_target_source,
+									  atable_source_target,
+									  atable_target_source,
+									  dtable_source_target,
+									  dtable_target_source,
+									  ntable_source_target,
+									  ntable_target_source,
+									  ptable_source_target,
+									  ptable_target_source,
+									  classes_source,
+									  classes_target,
+									  aligned_source_target,
+									  aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, ViterbiPosteriorHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
 									  iteration_model4,
 									  ttable_source_target,
 									  ttable_target_source,
@@ -706,7 +741,7 @@ int main(int argc, char ** argv)
 									  aligned_source_target,
 									  aligned_target_source);
 	  else
-	    sample<LearnModel4Symmetric, ViterbiHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
+	    sample<LearnModel4, ViterbiPosteriorHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
 								 iteration_model4,
 								 ttable_source_target,
 								 ttable_target_source,
@@ -722,46 +757,46 @@ int main(int argc, char ** argv)
 								 classes_target,
 								 aligned_source_target,
 								 aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    sample<LearnModel4Posterior, ViterbiHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-								 iteration_model4,
-								 ttable_source_target,
-								 ttable_target_source,
-								 atable_source_target,
-								 atable_target_source,
-								 dtable_source_target,
-								 dtable_target_source,
-								 ntable_source_target,
-								 ntable_target_source,
-								 ptable_source_target,
-								 ptable_target_source,
-								 classes_source,
-								 classes_target,
-								 aligned_source_target,
-								 aligned_target_source);
-	  else
-	    sample<LearnModel4, ViterbiHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-							iteration_model4,
-							ttable_source_target,
-							ttable_target_source,
-							atable_source_target,
-							atable_target_source,
-							dtable_source_target,
-							dtable_target_source,
-							ntable_source_target,
-							ntable_target_source,
-							ptable_source_target,
-							ptable_target_source,
-							classes_source,
-							classes_target,
-							aligned_source_target,
-							aligned_target_source);
 	}
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    sample<LearnModel4SymmetricPosterior, ViterbiHMM, Maximize>(Maximize(),
+	    sample<LearnModel4SymmetricPosterior, ViterbiPosteriorHMM, Maximize>(Maximize(),
+										 iteration_model4,
+										 ttable_source_target,
+										 ttable_target_source,
+										 atable_source_target,
+										 atable_target_source,
+										 dtable_source_target,
+										 dtable_target_source,
+										 ntable_source_target,
+										 ntable_target_source,
+										 ptable_source_target,
+										 ptable_target_source,
+										 classes_source,
+										 classes_target,
+										 aligned_source_target,
+										 aligned_target_source);
+	  else
+	    sample<LearnModel4Symmetric, ViterbiPosteriorHMM, Maximize>(Maximize(),
+									iteration_model4,
+									ttable_source_target,
+									ttable_target_source,
+									atable_source_target,
+									atable_target_source,
+									dtable_source_target,
+									dtable_target_source,
+									ntable_source_target,
+									ntable_target_source,
+									ptable_source_target,
+									ptable_target_source,
+									classes_source,
+									classes_target,
+									aligned_source_target,
+									aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    sample<LearnModel4Posterior, ViterbiPosteriorHMM, Maximize>(Maximize(),
 									iteration_model4,
 									ttable_source_target,
 									ttable_target_source,
@@ -778,7 +813,7 @@ int main(int argc, char ** argv)
 									aligned_source_target,
 									aligned_target_source);
 	  else
-	    sample<LearnModel4Symmetric, ViterbiHMM, Maximize>(Maximize(),
+	    sample<LearnModel4, ViterbiPosteriorHMM, Maximize>(Maximize(),
 							       iteration_model4,
 							       ttable_source_target,
 							       ttable_target_source,
@@ -794,41 +829,6 @@ int main(int argc, char ** argv)
 							       classes_target,
 							       aligned_source_target,
 							       aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    sample<LearnModel4Posterior, ViterbiHMM, Maximize>(Maximize(),
-							       iteration_model4,
-							       ttable_source_target,
-							       ttable_target_source,
-							       atable_source_target,
-							       atable_target_source,
-							       dtable_source_target,
-							       dtable_target_source,
-							       ntable_source_target,
-							       ntable_target_source,
-							       ptable_source_target,
-							       ptable_target_source,
-							       classes_source,
-							       classes_target,
-							       aligned_source_target,
-							       aligned_target_source);
-	  else
-	    sample<LearnModel4, ViterbiHMM, Maximize>(Maximize(),
-						      iteration_model4,
-						      ttable_source_target,
-						      ttable_target_source,
-						      atable_source_target,
-						      atable_target_source,
-						      dtable_source_target,
-						      dtable_target_source,
-						      ntable_source_target,
-						      ntable_target_source,
-						      ptable_source_target,
-						      ptable_target_source,
-						      classes_source,
-						      classes_target,
-						      aligned_source_target,
-						      aligned_target_source);
 	}
       }
     }
@@ -1502,7 +1502,12 @@ struct SampleBurnMapper : public SampleMapReduce, public Burner
 
   void operator()()
   {
+    typedef utils::vector2<double, std::allocator<double> > posterior_type;
+
     Burner::initialize();
+
+    posterior_type posterior_source_target;
+    posterior_type posterior_target_source;
     
     bitext_type bitext;
     
@@ -1515,13 +1520,16 @@ struct SampleBurnMapper : public SampleMapReduce, public Burner
       base(bitext.source,
 	   bitext.target,
 	   bitext.alignment_source_target,
-	   bitext.alignment_target_source);
-
+	   bitext.alignment_target_source,
+	   posterior_source_target,
+	   posterior_target_source);
       
-      Burner::viterbi(bitext.source,
-		      bitext.target,
-		      bitext.alignment_source_target,
-		      bitext.alignment_target_source);
+      Burner::posterior(bitext.source,
+			bitext.target,
+			bitext.alignment_source_target,
+			bitext.alignment_target_source,
+			posterior_source_target,
+			posterior_target_source);
       
       reducer.push_swap(bitext);
       

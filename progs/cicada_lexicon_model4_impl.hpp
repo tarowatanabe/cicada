@@ -319,11 +319,6 @@ struct LearnModel4 : public LearnBase
     {
       aligns.assign(source, target, alignment);
       cepts.assign(aligns);
-#if 0
-      std::cerr << "align: ";
-      std::copy(aligns.aligns.begin(), aligns.aligns.end(), std::ostream_iterator<int>(std::cerr, " "));
-      std::cerr << std::endl;
-#endif
       
       // classes...
       source_class.clear();
@@ -338,6 +333,50 @@ struct LearnModel4 : public LearnBase
       sentence_type::iterator ctiter = target_class.begin() + 1;
       for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
 	*ctiter = classes_target[*titer];      
+    }
+    
+    template <typename Matrix>
+    void assign(const sentence_type& source,
+		const sentence_type& target,
+		const classes_type& classes_source,
+		const classes_type& classes_target,
+		const alignment_type& alignment,
+		const Matrix& posterior)
+    {
+      aligns.assign(source, target, alignment);
+      cepts.assign(aligns);
+      
+      // classes...
+      source_class.clear();
+      target_class.clear();
+      source_class.resize(source.size() + 1,  vocab_type::EPSILON);
+      target_class.resize(target.size() + 1, vocab_type::EPSILON);
+      
+      sentence_type::iterator csiter = source_class.begin() + 1;
+      for (sentence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter, ++ csiter)
+	*csiter = classes_source[*siter];
+      
+      sentence_type::iterator ctiter = target_class.begin() + 1;
+      for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
+	*ctiter = classes_target[*titer];
+      
+      moves.clear();
+      swaps.clear();
+      
+      moves.reserve(aligns.aligns.size(), aligns.mapped.size());
+      swaps.reserve(aligns.aligns.size(), aligns.aligns.size());
+      
+      moves.resize(aligns.aligns.size(), aligns.mapped.size(), 0.0);
+      swaps.resize(aligns.aligns.size(), aligns.aligns.size(), 0.0);
+      
+      for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
+	for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
+	  moves(j, i) = (posterior(j, i) / posterior(j, aligns.aligns[j]));
+      
+      for (index_type j1 = 1; j1 < static_cast<index_type>(aligns.aligns.size()) - 1; ++ j1)
+	for (index_type j2 = j1 + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
+	  swaps(j1, j2) = ((posterior(j1, aligns.aligns[j2]) / posterior(j1, aligns.aligns[j1]))
+			   * (posterior(j2, aligns.aligns[j1]) / posterior(j2, aligns.aligns[j2])));
     }
 
     void assign(const sentence_type& source,
@@ -1169,6 +1208,30 @@ struct LearnModel4 : public LearnBase
     model4.accumulate(target, source, alignment_target_source, ntable_counts_target_source);
     model4.accumulate(target, source, alignment_target_source, dtable_counts_target_source);
   }
+  
+  // approximately learn from alignment + posteriors...
+  template <typename Matrix>
+  void posterior(const sentence_type& source,
+		 const sentence_type& target,
+		 const alignment_type& alignment_source_target,
+		 const alignment_type& alignment_target_source,
+		 const Matrix& posterior_source_target,
+		 const Matrix& posterior_target_source)
+  {
+    model4.assign(source, target, classes_source, classes_target, alignment_source_target, posterior_source_target);
+
+    model4.estimate_posterior(source, target);
+    
+    model4.accumulate(source, target, ntable_counts_source_target);
+    model4.accumulate(source, target, dtable_counts_source_target);
+    
+    model4.assign(target, source, classes_target, classes_source, alignment_target_source, posterior_target_source);
+    
+    model4.estimate_posterior(target, source);
+    
+    model4.accumulate(target, source, ntable_counts_target_source);
+    model4.accumulate(target, source, dtable_counts_target_source);
+  }
 
   void shrink()
   {
@@ -1334,6 +1397,30 @@ struct LearnModel4Posterior : public LearnBase
     model4.accumulate(target, source, alignment_target_source, dtable_counts_target_source);
   }
 
+  // approximately learn from alignment + posteriors...
+  template <typename Matrix>
+  void posterior(const sentence_type& source,
+		 const sentence_type& target,
+		 const alignment_type& alignment_source_target,
+		 const alignment_type& alignment_target_source,
+		 const Matrix& posterior_source_target,
+		 const Matrix& posterior_target_source)
+  {
+    model4.assign(source, target, classes_source, classes_target, alignment_source_target, posterior_source_target);
+
+    model4.estimate_posterior(source, target);
+    
+    model4.accumulate(source, target, ntable_counts_source_target);
+    model4.accumulate(source, target, dtable_counts_source_target);
+    
+    model4.assign(target, source, classes_target, classes_source, alignment_target_source, posterior_target_source);
+    
+    model4.estimate_posterior(target, source);
+    
+    model4.accumulate(target, source, ntable_counts_target_source);
+    model4.accumulate(target, source, dtable_counts_target_source);
+  }
+
   void shrink()
   {
     phi.clear();
@@ -1445,7 +1532,7 @@ struct LearnModel4Symmetric : public LearnBase
 	       const alignment_type& alignment_target_source)
   {
     model4_data_type& model4 = model4_source_target;
-    
+
     model4.assign(source, target, classes_source, classes_target, alignment_source_target);
     
     model4.accumulate(source, target, alignment_source_target, ntable_counts_source_target);
@@ -1455,6 +1542,32 @@ struct LearnModel4Symmetric : public LearnBase
     
     model4.accumulate(target, source, alignment_target_source, ntable_counts_target_source);
     model4.accumulate(target, source, alignment_target_source, dtable_counts_target_source);
+  }
+
+  // approximately learn from alignment + posteriors...
+  template <typename Matrix>
+  void posterior(const sentence_type& source,
+		 const sentence_type& target,
+		 const alignment_type& alignment_source_target,
+		 const alignment_type& alignment_target_source,
+		 const Matrix& posterior_source_target,
+		 const Matrix& posterior_target_source)
+  {
+    model4_data_type& model4 = model4_source_target;
+
+    model4.assign(source, target, classes_source, classes_target, alignment_source_target, posterior_source_target);
+
+    model4.estimate_posterior(source, target);
+    
+    model4.accumulate(source, target, ntable_counts_source_target);
+    model4.accumulate(source, target, dtable_counts_source_target);
+    
+    model4.assign(target, source, classes_target, classes_source, alignment_target_source, posterior_target_source);
+    
+    model4.estimate_posterior(target, source);
+    
+    model4.accumulate(target, source, ntable_counts_target_source);
+    model4.accumulate(target, source, dtable_counts_target_source);
   }
 
   void shrink()
@@ -1595,9 +1708,9 @@ struct LearnModel4SymmetricPosterior : public LearnBase
 	       const alignment_type& alignment_target_source)
   {
     model4_data_type& model4 = model4_source_target;
-    
+
     model4.assign(source, target, classes_source, classes_target, alignment_source_target);
-    
+
     model4.accumulate(source, target, alignment_source_target, ntable_counts_source_target);
     model4.accumulate(source, target, alignment_source_target, dtable_counts_source_target);
     
@@ -1605,6 +1718,32 @@ struct LearnModel4SymmetricPosterior : public LearnBase
     
     model4.accumulate(target, source, alignment_target_source, ntable_counts_target_source);
     model4.accumulate(target, source, alignment_target_source, dtable_counts_target_source);
+  }
+
+  // approximately learn from alignment + posteriors...
+  template <typename Matrix>
+  void posterior(const sentence_type& source,
+		 const sentence_type& target,
+		 const alignment_type& alignment_source_target,
+		 const alignment_type& alignment_target_source,
+		 const Matrix& posterior_source_target,
+		 const Matrix& posterior_target_source)
+  {
+    model4_data_type& model4 = model4_source_target;
+
+    model4.assign(source, target, classes_source, classes_target, alignment_source_target, posterior_source_target);
+    
+    model4.estimate_posterior(source, target);
+    
+    model4.accumulate(source, target, ntable_counts_source_target);
+    model4.accumulate(source, target, dtable_counts_source_target);
+    
+    model4.assign(target, source, classes_target, classes_source, alignment_target_source, posterior_target_source);
+    
+    model4.estimate_posterior(target, source);
+    
+    model4.accumulate(target, source, ntable_counts_target_source);
+    model4.accumulate(target, source, dtable_counts_target_source);
   }
 
   void shrink()
