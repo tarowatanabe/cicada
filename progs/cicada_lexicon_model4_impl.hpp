@@ -191,7 +191,7 @@ struct LearnModel4 : public LearnBase
       }
       
       // nexts...
-      size_type cept_next = prevs.size();
+      difference_type cept_next = prevs.size();
       for (difference_type cept = prevs.size() - 1; cept >= 0; -- cept) {
 	nexts[cept] = cept_next;
 	cept_next = utils::bithack::branch(aligns->sums[cept], cept, cept_next);
