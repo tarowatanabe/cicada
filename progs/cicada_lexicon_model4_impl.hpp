@@ -300,15 +300,15 @@ struct LearnModel4 : public LearnBase
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > matrix_swap_type;
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > matrix_move_type;
     
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > ttable_cache_type;
-    typedef utils::vector3_aligned<double, utils::aligned_allocator<double> > dtable_head_cache_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > dtable_others_cache_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > ntable_cache_type;
+    typedef utils::vector2_aligned<logprob_type, utils::aligned_allocator<logprob_type> > ttable_cache_type;
+    typedef utils::vector3_aligned<logprob_type, utils::aligned_allocator<logprob_type> > dtable_head_cache_type;
+    typedef utils::vector2_aligned<logprob_type, utils::aligned_allocator<logprob_type> > dtable_others_cache_type;
+    typedef utils::vector2_aligned<logprob_type, utils::aligned_allocator<logprob_type> > ntable_cache_type;
 
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > move_score_type;
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > swap_score_type;
 
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > distortion_cache_type;
+    typedef utils::vector2_aligned<logprob_type, utils::aligned_allocator<logprob_type> > distortion_cache_type;
     
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > posterior_type;
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
@@ -470,7 +470,7 @@ struct LearnModel4 : public LearnBase
      //std::cerr << "ttable: " << logprob << std::endl;
       
       // forth, distortion...
-      logprob *= score_distortion<logprob_type>(0, aligns.mapped.size());
+      logprob *= score_distortion(0, aligns.mapped.size());
 
       //std::cerr << "logprob: " << logprob << std::endl;
 
@@ -485,7 +485,7 @@ struct LearnModel4 : public LearnBase
       
       distortions.clear();
       distortions.reserve(aligns.mapped.size(), aligns.mapped.size());
-      distortions.resize(aligns.mapped.size(), aligns.mapped.size(), 0.0);
+      distortions.resize(aligns.mapped.size(), aligns.mapped.size(), logprob_type(0.0));
       
       // move/swap matrix...
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
@@ -500,7 +500,7 @@ struct LearnModel4 : public LearnBase
     template <typename Modified>
     void update(const Modified& modified)
     {
-      std::fill(distortions.begin(), distortions.end(), 0.0);
+      std::fill(distortions.begin(), distortions.end(), logprob_type(0.0));
       
       // update moves...
       for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
@@ -843,7 +843,7 @@ struct LearnModel4 : public LearnBase
       
       if (i_prev == i_next) return 1.0;
       
-      double gain = 1.0;
+      logprob_type gain = 1.0;
       
       // ttable...
       gain *= ttable(j, i_next) / ttable(j, i_prev);
@@ -859,35 +859,35 @@ struct LearnModel4 : public LearnBase
 			      utils::bithack::min(cepts.nexts[i_next], aligns.mapped.size() - 1));
       
       if (range1.second + 1 < range2.first) {
-	if (distortions(range1.first, range1.second) == 0.0)
-	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
-	if (distortions(range2.first, range2.second) == 0.0)
-	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == logprob_type(0.0))
+	  distortions(range1.first, range1.second) = score_distortion(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == logprob_type(0.0))
+	  distortions(range2.first, range2.second) = score_distortion(range2.first, range2.second);
 	
-	const double denom1 = distortions(range1.first, range1.second);
-	const double denom2 = distortions(range2.first, range2.second);
+	const logprob_type denom1 = distortions(range1.first, range1.second);
+	const logprob_type denom2 = distortions(range2.first, range2.second);
 	
 	aligns.move(j, i_next);
 	
-	const double numer1 = score_distortion<double>(range1.first, range1.second);
-	const double numer2 = score_distortion<double>(range2.first, range2.second);
+	const logprob_type numer1 = score_distortion(range1.first, range1.second);
+	const logprob_type numer2 = score_distortion(range2.first, range2.second);
 	
 	aligns.move(j, i_prev);
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second + 1 < range1.first) {
-	if (distortions(range2.first, range2.second) == 0.0)
-	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
-	if (distortions(range1.first, range1.second) == 0.0)
-	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == logprob_type(0.0))
+	  distortions(range2.first, range2.second) = score_distortion(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == logprob_type(0.0))
+	  distortions(range1.first, range1.second) = score_distortion(range1.first, range1.second);
 
-	const double denom2 = distortions(range2.first, range2.second);
-	const double denom1 = distortions(range1.first, range1.second);
+	const logprob_type denom2 = distortions(range2.first, range2.second);
+	const logprob_type denom1 = distortions(range1.first, range1.second);
 	
 	aligns.move(j, i_next);
 	
-	const double numer2 = score_distortion<double>(range2.first, range2.second);
-	const double numer1 = score_distortion<double>(range1.first, range1.second);
+	const logprob_type numer2 = score_distortion(range2.first, range2.second);
+	const logprob_type numer1 = score_distortion(range1.first, range1.second);
 	
 	aligns.move(j, i_prev);
 	
@@ -896,14 +896,14 @@ struct LearnModel4 : public LearnBase
 	const range_type range(utils::bithack::min(range1.first,  range2.first),
 			       utils::bithack::max(range1.second, range2.second));
 	
-	if (distortions(range.first, range.second) == 0.0)
-	  distortions(range.first, range.second) = score_distortion<double>(range.first, range.second);
+	if (distortions(range.first, range.second) == logprob_type(0.0))
+	  distortions(range.first, range.second) = score_distortion(range.first, range.second);
 	
-	const double denom = distortions(range.first, range.second);
+	const logprob_type denom = distortions(range.first, range.second);
 
 	aligns.move(j, i_next);
 	
-	const double numer = score_distortion<double>(range.first, range.second);
+	const logprob_type numer = score_distortion(range.first, range.second);
 	
 	aligns.move(j, i_prev);
 	
@@ -920,7 +920,7 @@ struct LearnModel4 : public LearnBase
 
       if (j1 == j2 || i1 == i2) return 1.0;
       
-      double gain = 1.0;
+      logprob_type gain = 1.0;
       
       // lexicon model...
       gain *= ttable(j1, i2) / ttable(j1, i1);
@@ -935,35 +935,35 @@ struct LearnModel4 : public LearnBase
 			      utils::bithack::min(cepts.nexts[i2], aligns.mapped.size() - 1));
       
       if (range1.second + 1 < range2.first) {
-	if (distortions(range1.first, range1.second) == 0.0)
-	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
-	if (distortions(range2.first, range2.second) == 0.0)
-	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == logprob_type(0.0))
+	  distortions(range1.first, range1.second) = score_distortion(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == logprob_type(0.0))
+	  distortions(range2.first, range2.second) = score_distortion(range2.first, range2.second);
 
-	const double denom1 = distortions(range1.first, range1.second);
-	const double denom2 = distortions(range2.first, range2.second);
+	const logprob_type denom1 = distortions(range1.first, range1.second);
+	const logprob_type denom2 = distortions(range2.first, range2.second);
 	
 	aligns.swap(j1, j2);
 	
-	const double numer1 = score_distortion<double>(range1.first, range1.second);
-	const double numer2 = score_distortion<double>(range2.first, range2.second);
+	const logprob_type numer1 = score_distortion(range1.first, range1.second);
+	const logprob_type numer2 = score_distortion(range2.first, range2.second);
 	
 	aligns.swap(j1, j2);
 	
 	gain *= (numer1 / denom1) * (numer2 / denom2);
       } else if (range2.second + 1 < range1.first) {
-	if (distortions(range2.first, range2.second) == 0.0)
-	  distortions(range2.first, range2.second) = score_distortion<double>(range2.first, range2.second);
-	if (distortions(range1.first, range1.second) == 0.0)
-	  distortions(range1.first, range1.second) = score_distortion<double>(range1.first, range1.second);
+	if (distortions(range2.first, range2.second) == logprob_type(0.0))
+	  distortions(range2.first, range2.second) = score_distortion(range2.first, range2.second);
+	if (distortions(range1.first, range1.second) == logprob_type(0.0))
+	  distortions(range1.first, range1.second) = score_distortion(range1.first, range1.second);
 	
-	const double denom2 = distortions(range2.first, range2.second);
-	const double denom1 = distortions(range1.first, range1.second);
+	const logprob_type denom2 = distortions(range2.first, range2.second);
+	const logprob_type denom1 = distortions(range1.first, range1.second);
 	
 	aligns.swap(j1, j2);
 	
-	const double numer2 = score_distortion<double>(range2.first, range2.second);
-	const double numer1 = score_distortion<double>(range1.first, range1.second);
+	const logprob_type numer2 = score_distortion(range2.first, range2.second);
+	const logprob_type numer1 = score_distortion(range1.first, range1.second);
 	
 	aligns.swap(j1, j2);
 	
@@ -972,14 +972,14 @@ struct LearnModel4 : public LearnBase
 	const range_type range(utils::bithack::min(range1.first,  range2.first),
 			       utils::bithack::max(range1.second, range2.second));
 	
-	if (distortions(range.first, range.second) == 0.0)
-	  distortions(range.first, range.second) = score_distortion<double>(range.first, range.second);
+	if (distortions(range.first, range.second) == logprob_type(0.0))
+	  distortions(range.first, range.second) = score_distortion(range.first, range.second);
 
-	const double denom = distortions(range.first, range.second);
+	const logprob_type denom = distortions(range.first, range.second);
 	
 	aligns.swap(j1, j2);
 	
-	const double numer = score_distortion<double>(range.first, range.second);
+	const logprob_type numer = score_distortion(range.first, range.second);
 	
 	aligns.swap(j1, j2);
 	
@@ -989,10 +989,9 @@ struct LearnModel4 : public LearnBase
       return gain;
     }
     
-    template <typename Prob>
-    Prob score_distortion(const index_type i1, const index_type i2)
+    logprob_type score_distortion(const index_type i1, const index_type i2)
     {
-      Prob score = 1.0;
+      logprob_type score = 1.0;
       
       const index_type cept_first = utils::bithack::max(i1, static_cast<index_type>(1));
       const index_type cept_last  = utils::bithack::min(i2, static_cast<index_type>(aligns.mapped.size() - 1));
