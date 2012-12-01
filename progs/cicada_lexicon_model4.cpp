@@ -2,6 +2,12 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
 #include "cicada_lexicon_impl.hpp"
 
 #include "utils/resource.hpp"
@@ -1510,12 +1516,7 @@ struct SampleBurnMapper : public SampleMapReduce, public Burner
 	   bitext.target,
 	   bitext.alignment_source_target,
 	   bitext.alignment_target_source);
-#if 0
-      std::cerr << "source: " << bitext.source << std::endl
-		<< "target: " << bitext.target << std::endl
-		<< "align: " << bitext.alignment_source_target << std::endl
-		<< "align: " << bitext.alignment_target_source << std::endl;
-#endif
+
       
       Burner::viterbi(bitext.source,
 		      bitext.target,
@@ -2135,10 +2136,22 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
 	     alignment_source_target,
 	     alignment_target_source);
 	
+#if 0
+	std::cerr << "source: " << bitext.source << std::endl
+		  << "target: " << bitext.target << std::endl
+		  << "align: " << alignment_source_target << std::endl
+		  << "align: " << alignment_target_source << std::endl;
+#endif
+
 	Aligner::operator()(bitext.source,
 			    bitext.target,
 			    alignment_source_target,
 			    alignment_target_source);
+	
+#if 0
+	std::cerr << "refined align: " << alignment_source_target << std::endl
+		  << "refined align: " << alignment_target_source << std::endl;
+#endif
       }
       
       reducer_source_target.push(bitext_type(bitext.id, bitext.source, bitext.target, alignment_source_target));
@@ -2189,6 +2202,11 @@ struct ViterbiReducer : public ViterbiMapReduce
   
   void write(std::ostream& os, const bitext_type& bitext)
   {
+    typedef std::ostream_iterator<char> oiter_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+  
     if (moses_mode)
       os << bitext.alignment << '\n';
     else {

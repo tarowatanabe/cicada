@@ -803,12 +803,20 @@ struct LearnModel4 : public LearnBase
       cepts.move(j, i_prev, i_next);
       logprob *= moves(j, i_next);
       
-      std::vector<bool, std::allocator<bool> > modified(aligns.mapped.size(), false);
+      std::vector<char, std::allocator<char> > modified(aligns.mapped.size(), false);
       
-      for (index_type i = range1.first; i <= range1.second; ++ i)
-	modified[i] = true;
-      for (index_type i = range2.first; i <= range2.second; ++ i)
-	modified[i] = true;
+      if (range1.second + 1 < range2.first) {
+	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
+	std::fill(modified.begin() + range2.first, modified.begin() + range2.second + 1, true);
+      } else if (range2.second + 1 < range1.first) {
+	std::fill(modified.begin() + range2.first, modified.begin() + range2.second + 1, true);
+	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
+      } else {
+	const index_type first = utils::bithack::min(range1.first,  range2.first);
+	const index_type last  = utils::bithack::max(range1.second, range2.second);
+	
+	std::fill(modified.begin() + first, modified.begin() + last + 1, true);
+      }
       
       update(modified);
     }
@@ -827,12 +835,20 @@ struct LearnModel4 : public LearnBase
       cepts.swap(j1, j2);
       logprob *= swaps(utils::bithack::min(j1, j2), utils::bithack::max(j1, j2));
       
-      std::vector<bool, std::allocator<bool> > modified(aligns.mapped.size(), false);
+      std::vector<char, std::allocator<char> > modified(aligns.mapped.size(), false);
       
-      for (index_type i = range1.first; i <= range1.second; ++ i)
-	modified[i] = true;
-      for (index_type i = range2.first; i <= range2.second; ++ i)
-	modified[i] = true;
+      if (range1.second + 1 < range2.first) {
+	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
+	std::fill(modified.begin() + range2.first, modified.begin() + range2.second + 1, true);
+      } else if (range2.second + 1 < range1.first) {
+	std::fill(modified.begin() + range2.first, modified.begin() + range2.second + 1, true);
+	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
+      } else {
+	const index_type first = utils::bithack::min(range1.first,  range2.first);
+	const index_type last  = utils::bithack::max(range1.second, range2.second);
+	
+	std::fill(modified.begin() + first, modified.begin() + last + 1, true);
+      }
       
       update(modified);
     }
