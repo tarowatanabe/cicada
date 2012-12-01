@@ -187,16 +187,14 @@ struct LearnModel4 : public LearnBase
       size_type cept_prev = 0;
       for (size_type cept = 1; cept != prevs.size(); ++ cept) {
 	prevs[cept] = cept_prev;
-	if (aligns->sums[cept])
-	  cept_prev = cept;
+	cept_prev = utils::bithack::branch(aligns->sums[cept], cept, cept_prev);
       }
       
       // nexts...
       size_type cept_next = prevs.size();
       for (difference_type cept = prevs.size() - 1; cept >= 0; -- cept) {
 	nexts[cept] = cept_next;
-	if (aligns->sums[cept])
-	  cept_next = cept;
+	cept_next = utils::bithack::branch(aligns->sums[cept], cept, cept_next);
       } 
     }
     
@@ -242,15 +240,13 @@ struct LearnModel4 : public LearnBase
       index_type cept_prev = prevs[i1];
       for (index_type cept = cept_prev + 1; cept <= i2; ++ cept) {
 	prevs[cept] = cept_prev;
-	if (aligns->sums[cept])
-	  cept_prev = cept;
+	cept_prev = utils::bithack::branch(aligns->sums[cept], cept, cept_prev);
       }
       
       index_type cept_next = nexts[i2];
       for (index_type cept = cept_next - 1; cept >= i1; -- cept) {
 	nexts[cept] = cept_next;
-	if (aligns->sums[cept])
-	  cept_next = cept;
+	cept_next = utils::bithack::branch(aligns->sums[cept], cept, cept_next);
       }
     }
     
@@ -387,41 +383,25 @@ struct LearnModel4 : public LearnBase
       
       for (size_type src = 0; src <= source.size(); ++ src)
 	for (int prev = (src != 0); prev <= static_cast<int>(target.size()); ++ prev)
-	  for (int next = 1; next <= static_cast<int>(target.size()); ++ next) {
+	  for (int next = 1; next <= static_cast<int>(target.size()); ++ next)
 	    dtable_head(src, prev, next) = model4.dtable(source_class[src],
 							 target_class[next],
 							 source.size(),
 							 target.size(),
 							 prev,
 							 next);
-#if 0
-	    std::cerr << "head: " << (src ? source[src - 1] : vocab_type::EPSILON)
-		      << " prev: " << prev
-		      << " next: " << next
-		      << " " << dtable_head(src, prev, next)
-		      << std::endl;
-#endif
-	  }
       
       dtable_others.clear();
       dtable_others.reserve(target.size() + 1, target.size() + 1);
       dtable_others.resize(target.size() + 1, target.size() + 1);
       
       for (int prev = 1; prev < static_cast<int>(target.size()); ++ prev)
-	for (int next = prev + 1; next <= static_cast<int>(target.size()); ++ next) {
+	for (int next = prev + 1; next <= static_cast<int>(target.size()); ++ next)
 	  dtable_others(prev, next) = model4.dtable(target_class[next],
 						    source.size(),
 						    target.size(),
 						    prev, 
 						    next);
-#if 0
-	  std::cerr << "non-head"
-		    << " prev: " << prev
-		    << " next: " << next
-		    << " " << dtable_others(prev, next)
-		    << std::endl;
-#endif
-	}
       
       //std::cerr << "ntable" << std::endl;
       
@@ -431,20 +411,14 @@ struct LearnModel4 : public LearnBase
       ntable.resize(source.size() + 1, target.size() + 1);
       
       for (size_type src = 0; src != source.size(); ++ src)
-	for (int fertility = 0; fertility <= static_cast<int>(target.size()); ++ fertility) {
+	for (int fertility = 0; fertility <= static_cast<int>(target.size()); ++ fertility)
 	  ntable(src + 1, fertility) = model4.ntable(source[src], target.size(), fertility);
-	  
-	  //std::cerr << "source: " << source[src] << " fert: "  << fertility << " " << ntable(src + 1, fertility) << std::endl;
-	}
       
       //std::cerr << "ptable" << std::endl;
 
       // ptable
-      for (int phi0 = 0; phi0 <= static_cast<int>(target.size()); ++ phi0) {
+      for (int phi0 = 0; phi0 <= static_cast<int>(target.size()); ++ phi0)
 	ntable(0, phi0) = model4.ptable(target.size(), phi0);
-	
-	//std::cerr << "source: " << vocab_type::EPSILON << " fert: "  << phi0 << " " << ntable(0, phi0) << std::endl;
-      }
       
       // compute logprob for the given alignment...
       update();
