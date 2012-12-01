@@ -74,10 +74,12 @@ struct LearnModel4 : public LearnBase
       mapped.resize(source.size() + 1);
       sums.resize(source.size() + 1);
       
-      // first, compute one-to-many alignment...
+      // first, compute one-to-many alignment with the preference for the left-most source word
       alignment_type::const_iterator aiter_end = alignment.end();
       for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
-	aligns[aiter->target + 1] = aiter->source + 1;
+	aligns[aiter->target + 1] = utils::bithack::branch(aligns[aiter->target + 1] == 0,
+							   aiter->source + 1,
+							   utils::bithack::min(aligns[aiter->target + 1], aiter->source + 1));
       
       // then, compute inverse alignment...
       for (size_type trg = 1; trg != aligns.size(); ++ trg)
@@ -131,7 +133,7 @@ struct LearnModel4 : public LearnBase
     
     index_type prev_cept(index_type x) const
     {
-      if (! x) return 0;
+      if (x <= 1) return 0;
       
       index_type pos = x - 1;
       while (pos && ! mapped[pos].size())
@@ -187,14 +189,14 @@ struct LearnModel4 : public LearnBase
       size_type cept_prev = 0;
       for (size_type cept = 1; cept != prevs.size(); ++ cept) {
 	prevs[cept] = cept_prev;
-	cept_prev = utils::bithack::branch(aligns->sums[cept], cept, cept_prev);
+	cept_prev = utils::bithack::branch(aligns->sums[cept] != 0, cept, cept_prev);
       }
       
       // nexts...
       difference_type cept_next = prevs.size();
       for (difference_type cept = prevs.size() - 1; cept >= 0; -- cept) {
 	nexts[cept] = cept_next;
-	cept_next = utils::bithack::branch(aligns->sums[cept], cept, cept_next);
+	cept_next = utils::bithack::branch(aligns->sums[cept] != 0, cept, cept_next);
       } 
     }
     
@@ -240,13 +242,13 @@ struct LearnModel4 : public LearnBase
       index_type cept_prev = prevs[i1];
       for (index_type cept = cept_prev + 1; cept <= i2; ++ cept) {
 	prevs[cept] = cept_prev;
-	cept_prev = utils::bithack::branch(aligns->sums[cept], cept, cept_prev);
+	cept_prev = utils::bithack::branch(aligns->sums[cept] != 0, cept, cept_prev);
       }
       
       index_type cept_next = nexts[i2];
       for (index_type cept = cept_next - 1; cept >= i1; -- cept) {
 	nexts[cept] = cept_next;
-	cept_next = utils::bithack::branch(aligns->sums[cept], cept, cept_next);
+	cept_next = utils::bithack::branch(aligns->sums[cept] != 0, cept, cept_next);
       }
     }
     
@@ -563,13 +565,13 @@ struct LearnModel4 : public LearnBase
 	mapped.rehash(mapped.size() + target_size);
       }
       
-      for (int trg = 1; trg <= target_size; ++ trg) {
-	const word_type target_word(target[trg - 1]);
-
-	counts[vocab_type::EPSILON][target_word] += posterior(trg, 0);
+      sentence_type::const_iterator titer = target.begin();
+      for (int trg = 1; trg <= target_size; ++ trg, ++ titer) {
+	counts[vocab_type::EPSILON][*titer] += posterior(trg, 0);
 	
-	for (int src = 1; src <= source_size; ++ src)
-	  counts[source[src - 1]][target_word] += posterior(trg, src);
+	sentence_type::const_iterator siter = source.begin();
+	for (int src = 1; src <= source_size; ++ src, ++ siter)
+	  counts[*siter][*titer] += posterior(trg, src);
       }
     }
     
@@ -580,13 +582,11 @@ struct LearnModel4 : public LearnBase
       const int source_size = source.size();
       const int target_size = target.size();
       
-      for (int src = 1; src <= source_size; ++ src) {
-	const word_type source_word(source[src - 1]);
-
+      sentence_type::const_iterator siter = source.begin();
+      for (int src = 1; src <= source_size; ++ src, ++ siter)
 	for (int fertility = 0; fertility <= target_size; ++ fertility)
 	  if (posterior_fertility(src, fertility) > 0.0) 
-	    counts(source_word, fertility) += posterior_fertility(src, fertility);
-      }
+	    counts(*siter, fertility) += posterior_fertility(src, fertility);
     }
 
     void accumulate(const sentence_type& source,
