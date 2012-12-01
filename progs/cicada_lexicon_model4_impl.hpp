@@ -564,10 +564,12 @@ struct LearnModel4 : public LearnBase
       }
       
       for (int trg = 1; trg <= target_size; ++ trg) {
-	counts[vocab_type::EPSILON][target[trg - 1]] += posterior(trg, 0);
+	const word_type target_word(target[trg - 1]);
+
+	counts[vocab_type::EPSILON][target_word] += posterior(trg, 0);
 	
 	for (int src = 1; src <= source_size; ++ src)
-	  counts[source[src - 1]][target[trg - 1]] += posterior(trg, src);
+	  counts[source[src - 1]][target_word] += posterior(trg, src);
       }
     }
     
@@ -578,10 +580,13 @@ struct LearnModel4 : public LearnBase
       const int source_size = source.size();
       const int target_size = target.size();
       
-      for (int src = 1; src <= source_size; ++ src)
+      for (int src = 1; src <= source_size; ++ src) {
+	const word_type source_word(source[src - 1]);
+
 	for (int fertility = 0; fertility <= target_size; ++ fertility)
 	  if (posterior_fertility(src, fertility) > 0.0) 
-	    counts(source[src - 1], fertility) += posterior_fertility(src, fertility);
+	    counts(source_word, fertility) += posterior_fertility(src, fertility);
+      }
     }
 
     void accumulate(const sentence_type& source,
@@ -723,45 +728,47 @@ struct LearnModel4 : public LearnBase
       }
     }
     
-    bool climb()
+    void climb()
     {
-      double gain_move = 0.0;
-      double gain_swap = 0.0;
-      index_type move_j = 0;
-      index_type move_i = 0;
-      index_type swap_j1 = 0;
-      index_type swap_j2 = 0;
+      // hill-climb...
       
-      for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
-	for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
-	  if (moves(j, i) > gain_move) {
-	    gain_move = moves(j, i);
-	    move_j = j;
-	    move_i = i;
-	  }
+      for (int iter = 0; iter != 30; ++ iter) {
+	double gain_move = 0.0;
+	double gain_swap = 0.0;
+	index_type move_j = 0;
+	index_type move_i = 0;
+	index_type swap_j1 = 0;
+	index_type swap_j2 = 0;
       
-      for (index_type j1 = 1; j1 < static_cast<index_type>(aligns.aligns.size()) - 1; ++ j1)
-	for (index_type j2 = j1 + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
-	  if (swaps(j1, j2) > gain_swap) {
-	    gain_swap = swaps(j1, j2);
-	    swap_j1 = j1;
-	    swap_j2 = j2;
-	  }
+	for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
+	  for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
+	    if (moves(j, i) > gain_move) {
+	      gain_move = moves(j, i);
+	      move_j = j;
+	      move_i = i;
+	    }
       
-      if (gain_move <= 1.0 && gain_swap <= 1.0)
-	return false;
+	for (index_type j1 = 1; j1 < static_cast<index_type>(aligns.aligns.size()) - 1; ++ j1)
+	  for (index_type j2 = j1 + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
+	    if (swaps(j1, j2) > gain_swap) {
+	      gain_swap = swaps(j1, j2);
+	      swap_j1 = j1;
+	      swap_j2 = j2;
+	    }
+      
+	if (gain_move <= 1.0 && gain_swap <= 1.0)
+	  return;
 
-      if (gain_move >= gain_swap) {
-	//std::cerr << "moving: j=" << move_j << " i=" << move_i << " gain: " << gain_move << std::endl;
-
-	move(move_j, move_i);
-      } else {
-	//std::cerr << "swapping: j1=" << swap_j1 << " j2=" << swap_j2 << " gain: " << gain_swap << std::endl;
-	
-	swap(swap_j1, swap_j2);
+	if (gain_move >= gain_swap) {
+	  //std::cerr << "moving: j=" << move_j << " i=" << move_i << " gain: " << gain_move << std::endl;
+	  
+	  move(move_j, move_i);
+	} else {
+	  //std::cerr << "swapping: j1=" << swap_j1 << " j2=" << swap_j2 << " gain: " << gain_swap << std::endl;
+	  
+	  swap(swap_j1, swap_j2);
+	}
       }
-      
-      return true;
     }
     
     void move(const index_type j, const index_type i_next)
@@ -1091,10 +1098,8 @@ struct LearnModel4 : public LearnBase
 		  alignment,
 		  model4_type(ttable, dtable, ntable, ptable, classes_source, classes_target));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+    // hill-climb
+    model4.climb();
     
     // update alignment...
     model4.aligns.alignment(alignment);
@@ -1211,10 +1216,8 @@ struct LearnModel4Posterior : public LearnBase
 		  alignment,
 		  model4_type(ttable, dtable, ntable, ptable, classes_source, classes_target));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+    // hill-climb
+    model4.climb();
     
     // compute posterior
     model4.estimate_posterior(source, target);
@@ -1262,10 +1265,8 @@ struct LearnModel4Posterior : public LearnBase
       
       model4.update();
       
-      // maximum 30 iterations...
-      for (int iter = 0; iter != 30; ++ iter)
-	if (! model4.climb())
-	  break;
+      // hill-climb
+      model4.climb();
       
       // compute posterior
       model4.estimate_posterior(source, target);
@@ -1391,14 +1392,10 @@ struct LearnModel4Symmetric : public LearnBase
 					    ptable_target_source,
 					    classes_target,
 					    classes_source));
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_source_target.climb())
-	break;
 
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_target_source.climb())
-	break;
+    // hill-climb
+    model4_source_target.climb();
+    model4_target_source.climb();
     
     // update alignment...
     model4_source_target.aligns.alignment(alignment_source_target);
@@ -1514,14 +1511,9 @@ struct LearnModel4SymmetricPosterior : public LearnBase
 					    classes_target,
 					    classes_source));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_source_target.climb())
-	break;
-
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_target_source.climb())
-	break;
+    // hill-climb
+    model4_source_target.climb();
+    model4_target_source.climb();
     
     model4_source_target.estimate_posterior(source, target);
     model4_target_source.estimate_posterior(target, source);
@@ -1574,14 +1566,9 @@ struct LearnModel4SymmetricPosterior : public LearnBase
       model4_source_target.update();
       model4_target_source.update();
 
-      // maximum 30 iterations...
-      for (int iter = 0; iter != 30; ++ iter)
-	if (! model4_source_target.climb())
-	  break;
-      
-      for (int iter = 0; iter != 30; ++ iter)
-	if (! model4_target_source.climb())
-	  break;
+      // hill-climb
+      model4_source_target.climb();
+      model4_target_source.climb();
 
       model4_source_target.estimate_posterior(source, target);
       model4_target_source.estimate_posterior(target, source);
@@ -1687,10 +1674,8 @@ struct ViterbiModel4 : public ViterbiBase
 			      classes_source,
 			      classes_target));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+    // hill-climb
+    model4.climb();
     
     model4.aligns.alignment(alignment_source_target);
     
@@ -1704,10 +1689,8 @@ struct ViterbiModel4 : public ViterbiBase
 			      classes_target,
 			      classes_source));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+    // hill-climb
+    model4.climb();
     
     model4.aligns.alignment(alignment_target_source);
     
@@ -1770,11 +1753,9 @@ struct PosteriorModel4 : public ViterbiBase
 			      ptable_source_target,
 			      classes_source,
 			      classes_target));
-    
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+
+    // hill-climb
+    model4.climb();
     
     for (size_type trg = 0; trg <= target_size; ++ trg)
       std::copy(model4.posterior.begin(trg), model4.posterior.end(trg), posterior_source_target.begin(trg));
@@ -1789,10 +1770,8 @@ struct PosteriorModel4 : public ViterbiBase
 			      classes_target,
 			      classes_source));
     
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4.climb())
-	break;
+    // hill-climb
+    model4.climb();
     
     for (size_type src = 0; src <= source_size; ++ src)
       std::copy(model4.posterior.begin(src), model4.posterior.end(src), posterior_target_source.begin(src));
@@ -1887,14 +1866,10 @@ struct ITGModel4 : public ViterbiBase
 					    ptable_target_source,
 					    classes_target,
 					    classes_source));
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_source_target.climb())
-	break;
-
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_target_source.climb())
-	break;
+    
+    // hill-climb
+    model4_source_target.climb();
+    model4_target_source.climb();
     
     // compute posterior
     model4_source_target.estimate_posterior(source, target);
@@ -2035,14 +2010,10 @@ struct MaxMatchModel4 : public ViterbiBase
 					    ptable_target_source,
 					    classes_target,
 					    classes_source));
-    // maximum 30 iterations...
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_source_target.climb())
-	break;
 
-    for (int iter = 0; iter != 30; ++ iter)
-      if (! model4_target_source.climb())
-	break;
+    // hill-climb
+    model4_source_target.climb();
+    model4_target_source.climb();
     
     // compute posterior
     model4_source_target.estimate_posterior(source, target);
