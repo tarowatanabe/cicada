@@ -310,6 +310,8 @@ struct LearnModel4 : public LearnBase
     
     typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > posterior_type;
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
+    
+    typedef std::vector<char, std::allocator<char> > modified_type;
 
     void assign(const sentence_type& source,
 		const sentence_type& target,
@@ -823,7 +825,8 @@ struct LearnModel4 : public LearnBase
       cepts.move(j, i_prev, i_next);
       logprob *= moves(j, i_next);
       
-      std::vector<char, std::allocator<char> > modified(aligns.mapped.size(), false);
+      modified.clear();
+      modified.resize(aligns.mapped.size(), false);
       
       if (range1.second + 1 < range2.first) {
 	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
@@ -855,7 +858,8 @@ struct LearnModel4 : public LearnBase
       cepts.swap(j1, j2);
       logprob *= swaps(utils::bithack::min(j1, j2), utils::bithack::max(j1, j2));
       
-      std::vector<char, std::allocator<char> > modified(aligns.mapped.size(), false);
+      modified.clear();
+      modified.resize(aligns.mapped.size(), false);
       
       if (range1.second + 1 < range2.first) {
 	std::fill(modified.begin() + range1.first, modified.begin() + range1.second + 1, true);
@@ -1098,6 +1102,7 @@ struct LearnModel4 : public LearnBase
     move_score_type moves;
     swap_score_type swaps;
     distortion_cache_type distortions;
+    modified_type         modified;
 
     // posteriors...
     double total;
