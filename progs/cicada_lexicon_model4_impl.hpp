@@ -136,7 +136,7 @@ struct LearnModel4 : public LearnBase
       if (x <= 1) return 0;
       
       index_type pos = x - 1;
-      while (pos && ! mapped[pos].size())
+      while (pos && mapped[pos].empty())
 	-- pos;
       
       return pos;
@@ -145,7 +145,7 @@ struct LearnModel4 : public LearnBase
     index_type next_cept(index_type x) const
     {
       size_type pos = x + 1;
-      while (pos < mapped.size() && ! mapped[pos].size())
+      while (pos < mapped.size() && mapped[pos].empty())
 	++ pos;
 
       return pos;
