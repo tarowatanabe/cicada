@@ -817,6 +817,42 @@ struct aligned_type
 };
 
 //
+// e-table for length modeling
+//
+struct etable_type
+{
+  typedef utils::vector2<double, std::allocator<double> > table_type;
+
+  static const int max_length = 128;
+
+  etable_type(const double __lambda=1.0) : lambda(__lambda) { assign(lambda); }
+  
+  double operator()(const int m, const int l) const
+  {
+    if (m < max_length && l < max_length)
+      return table(m, l);
+    else
+      return utils::mathop::pow(lambda * l, double(m)) * utils::mathop::exp(- lambda * l) / utils::mathop::factorial<double>(m);
+  }
+
+  void assign(const double __lambda)
+  {
+    lambda = __lambda;
+    
+    table.clear();
+    table.reserve(max_length, max_length);
+    table.resize(max_length, max_length, 0.0);
+    
+    for (int m = 1; m != max_length; ++ m)
+      for (int l = 1; l != max_length; ++ l)
+	table(m, l) = utils::mathop::pow(lambda * l, double(m)) * utils::mathop::exp(- lambda * l) / utils::mathop::factorial<double>(m);
+  }
+  
+  table_type table;
+  double lambda;
+};
+
+//
 // p-table for NULL alignment
 //
 struct ptable_type
@@ -844,6 +880,7 @@ struct ptable_type
   void initialize()
   {
     table.clear();
+    table.reserve(max_length, max_length);
     table.resize(max_length, max_length, 0.0);
     
     for (int m = 1; m != max_length; ++ m)

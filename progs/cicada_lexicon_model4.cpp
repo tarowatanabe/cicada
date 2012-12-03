@@ -40,6 +40,8 @@ path_type fertility_source_target_file;
 path_type fertility_target_source_file;
 double insertion_source_target = 0.01;
 double insertion_target_source = 0.01;
+double length_source_target = 1.0;
+double length_target_source = 1.0;
 path_type output_lexicon_source_target_file;
 path_type output_lexicon_target_source_file;
 path_type output_alignment_source_target_file;
@@ -1250,13 +1252,16 @@ void learn(const Maximizer& maximizer,
 					       LearnBase(ttable_source_target, ttable_target_source,
 							 atable_source_target, atable_target_source,
 							 classes_source, classes_target)));
+
+  etable_type etable_source_target(length_source_target);
+  etable_type etable_target_source(length_target_source);
   
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
-    
-    utils::resource accumulate_start;
 
+    utils::resource accumulate_start;
+    
     std::vector<ttable_type, std::allocator<ttable_type> > ttable_source_target_new(threads, ttable_type(ttable_source_target.prior,
 													 ttable_source_target.smooth));
     std::vector<ttable_type, std::allocator<ttable_type> > ttable_target_source_new(threads, ttable_type(ttable_target_source.prior,
@@ -1296,7 +1301,11 @@ void learn(const Maximizer& maximizer,
     bitext_set_type bitexts;
     
     size_t num_bitext = 0;
-    
+    size_t length_source = 0;
+    size_t length_target = 0;
+    double objective_source_target = 0.0;
+    double objective_target_source = 0.0;
+
     for (;;) {
       is_src >> bitext.source;
       is_trg >> bitext.target;
@@ -1306,6 +1315,14 @@ void learn(const Maximizer& maximizer,
       if (! is_src || ! is_trg || (is_align.get() && ! *is_align)) break;
       
       if (bitext.source.empty() || bitext.target.empty()) continue;
+
+      length_source += bitext.source.size();
+      length_target += bitext.target.size();
+      
+      objective_source_target += (utils::mathop::log(etable_source_target(bitext.target.size(), bitext.source.size()))
+				  / bitext.target.size());
+      objective_target_source += (utils::mathop::log(etable_target_source(bitext.source.size(), bitext.target.size()))
+				  / bitext.source.size());
       
       bitexts.push_back(bitext);
 
@@ -1348,12 +1365,12 @@ void learn(const Maximizer& maximizer,
     for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
       queue_ttable_target_source[i].push(queue_ttable_type::value_type());
     
-    double objective_source_target = 0;
-    double objective_target_source = 0;
+    objective_source_target /= num_bitext;
+    objective_target_source /= num_bitext;
     
     for (size_t i = 0; i != mappers.size(); ++ i) {
-      objective_source_target += mappers[i].objective_source_target;
-      objective_target_source += mappers[i].objective_target_source;
+      objective_source_target += mappers[i].objective_source_target / num_bitext;
+      objective_target_source += mappers[i].objective_target_source / num_bitext;
     }
     
     if (debug)
@@ -1379,6 +1396,13 @@ void learn(const Maximizer& maximizer,
     // initialize cache
     atable_source_target.initialize_cache();
     atable_target_source.initialize_cache();
+
+    // etable..
+    length_source_target = double(length_target) / length_source;
+    length_target_source = double(length_source) / length_target;
+    
+    etable_source_target.assign(length_source_target);
+    etable_target_source.assign(length_target_source);
     
     workers_reducer_source_target.join_all();
     workers_reducer_target_source.join_all();
@@ -1981,8 +2005,8 @@ void sample(const Maximizer& maximizer,
     double objective_target_source = 0;
     
     for (size_t i = 0; i != mappers.size(); ++ i) {
-      objective_source_target += mappers[i].objective_source_target;
-      objective_target_source += mappers[i].objective_target_source;
+      objective_source_target += mappers[i].objective_source_target / bitexts.size();
+      objective_target_source += mappers[i].objective_target_source / bitexts.size();
     }
     
     if (debug)
@@ -2804,6 +2828,8 @@ void options(int argc, char** argv)
     ("fertility-target-source",  po::value<path_type>(&fertility_target_source_file),  "fertility model for P(source | target)")
     ("insertion-source-target",  po::value<double>(&insertion_source_target)->default_value(insertion_source_target), "insertion model for P(target | source)")
     ("insertion-target-source",  po::value<double>(&insertion_target_source)->default_value(insertion_target_source), "insertion model for P(source | target)")
+    ("length-source-target",  po::value<double>(&length_source_target)->default_value(length_source_target), "length model for P(target | source)")
+    ("length-target-source",  po::value<double>(&length_target_source)->default_value(length_target_source), "length model for P(source | target)")
     
 
     ("output-lexicon-source-target", po::value<path_type>(&output_lexicon_source_target_file), "lexicon model output for P(target | source)")

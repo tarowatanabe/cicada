@@ -23,6 +23,8 @@ path_type span_source_file;
 path_type span_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
+double length_source_target = 1.0;
+double length_target_source = 1.0;
 path_type output_lexicon_source_target_file;
 path_type output_lexicon_target_source_file;
 path_type viterbi_source_target_file;
@@ -543,6 +545,9 @@ void learn(const Maximizer& maximizer,
 						queue_ttable_target_source,
 						LearnBase(ttable_source_target, ttable_target_source)));
   
+  etable_type etable_source_target(length_source_target);
+  etable_type etable_target_source(length_target_source);
+
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
@@ -588,6 +593,10 @@ void learn(const Maximizer& maximizer,
     bitext_set_type bitexts;
     
     size_t num_bitext = 0;
+    size_t length_source = 0;
+    size_t length_target = 0;
+    double objective_source_target = 0.0;
+    double objective_target_source = 0.0;
     
     for (;;) {
       is_src >> bitext.source;
@@ -599,6 +608,14 @@ void learn(const Maximizer& maximizer,
       
       if (bitext.source.empty() || bitext.target.empty()) continue;
       
+      length_source += bitext.source.size();
+      length_target += bitext.target.size();
+      
+      objective_source_target += (utils::mathop::log(etable_source_target(bitext.target.size(), bitext.source.size()))
+				  / bitext.target.size());
+      objective_target_source += (utils::mathop::log(etable_target_source(bitext.source.size(), bitext.target.size()))
+				  / bitext.source.size());
+
       bitexts.push_back(bitext);
 
       ++ num_bitext;
@@ -640,17 +657,24 @@ void learn(const Maximizer& maximizer,
     for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
       queue_ttable_target_source[i].push(queue_ttable_type::value_type());
     
-    double objective_source_target = 0;
-    double objective_target_source = 0;
+    objective_source_target /= num_bitext;
+    objective_target_source /= num_bitext;
     
     for (size_t i = 0; i != mappers.size(); ++ i) {
-      objective_source_target += mappers[i].objective_source_target;
-      objective_target_source += mappers[i].objective_target_source;
+      objective_source_target += mappers[i].objective_source_target / num_bitext;
+      objective_target_source += mappers[i].objective_target_source / num_bitext;
     }
     
     if (debug)
       std::cerr << "log-likelihood for P(target | source): " << objective_source_target << '\n'
 		<< "log-likelihood for P(source | target): " << objective_target_source << '\n';
+    
+    // etable..
+    length_source_target = double(length_target) / length_source;
+    length_target_source = double(length_source) / length_target;
+    
+    etable_source_target.assign(length_source_target);
+    etable_target_source.assign(length_target_source);
     
     workers_reducer_source_target.join_all();
     workers_reducer_target_source.join_all();
@@ -1620,6 +1644,9 @@ void options(int argc, char** argv)
     
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
+    
+    ("length-source-target",  po::value<double>(&length_source_target)->default_value(length_source_target), "length model for P(target | source)")
+    ("length-target-source",  po::value<double>(&length_target_source)->default_value(length_target_source), "length model for P(source | target)")
     
     ("output-lexicon-source-target", po::value<path_type>(&output_lexicon_source_target_file), "lexicon model output for P(target | source)")
     ("output-lexicon-target-source", po::value<path_type>(&output_lexicon_target_source_file), "lexicon model output for P(source | target)")
