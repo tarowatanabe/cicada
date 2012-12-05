@@ -2067,6 +2067,7 @@ struct PhrasePairTargetMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
+    const int iteration_shrink_mask = (1 << 8) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     int non_found_iter = 0;
@@ -2112,6 +2113,9 @@ struct PhrasePairTargetMapper
 	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  }
 	}
+	
+	if ((iter & iteration_shrink_mask) == iteration_shrink_mask)
+	  phrases.shrink();
 	
 	++ iter;
 	
