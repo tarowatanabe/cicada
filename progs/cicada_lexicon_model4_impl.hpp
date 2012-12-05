@@ -2200,11 +2200,471 @@ struct MaxMatchModel4 : public ViterbiBase
   }
   
   matrix_type costs;
-
+  
   model4_data_type model4_source_target;
   model4_data_type model4_target_source;
 };
 
+struct DependencyModel4 : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  
+  DependencyModel4(const ttable_type& __ttable_source_target,
+		   const ttable_type& __ttable_target_source,
+		   const atable_type& __atable_source_target,
+		   const atable_type& __atable_target_source,
+		   const dtable_type& __dtable_source_target,
+		   const dtable_type& __dtable_target_source,
+		   const ntable_type& __ntable_source_target,
+		   const ntable_type& __ntable_target_source,
+		   const ptable_type& __ptable_source_target,
+		   const ptable_type& __ptable_target_source,
+		   const classes_type& __classes_source,
+		   const classes_type& __classes_target)
+  : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		__atable_source_target, __atable_target_source,
+		__dtable_source_target, __dtable_target_source,
+		__ntable_source_target, __ntable_target_source,
+		__ptable_source_target, __ptable_target_source,
+		__classes_source, __classes_target) {}
+  
+  typedef LearnModel4::model4_data_type model4_data_type;
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target)
+  {
+    
+  }
+
+  void shrink()
+  {
+    scores_source.clear();
+    scores_target.clear();
+    scores.clear();
+
+    matrix_type(scores_source).swap(scores_source);
+    matrix_type(scores_target).swap(scores_target);
+    matrix_type(scores).swap(scores);
+    
+    ViterbiBase::shrink();
+  }
+  
+  matrix_type scores_source;
+  matrix_type scores_target;
+  matrix_type scores;
+};
+
+template <typename Analyzer>
+struct __DependencyModel4Base : public DependencyModel4
+{
+  
+  typedef Analyzer analyzer_type;
+  
+  __DependencyModel4Base(const ttable_type& __ttable_source_target,
+			 const ttable_type& __ttable_target_source,
+			 const atable_type& __atable_source_target,
+			 const atable_type& __atable_target_source,
+			 const dtable_type& __dtable_source_target,
+			 const dtable_type& __dtable_target_source,
+			 const ntable_type& __ntable_source_target,
+			 const ntable_type& __ntable_target_source,
+			 const ptable_type& __ptable_source_target,
+			 const ptable_type& __ptable_target_source,
+			 const classes_type& __classes_source,
+			 const classes_type& __classes_target)
+  : DependencyModel4(__ttable_source_target, __ttable_target_source,
+		     __atable_source_target, __atable_target_source,
+		     __dtable_source_target, __dtable_target_source,
+		     __ntable_source_target, __ntable_target_source,
+		     __ptable_source_target, __ptable_target_source,
+		     __classes_source, __classes_target) {}
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& dependency_source,
+		  const dependency_type& dependency_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    DependencyModel4::operator()(source, target, dependency_source, dependency_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! dependency_source.empty()) {
+      projected_target.resize(target_size, - 1);
+      
+      analyzer(scores_target, projected_target);
+    }
+    
+    if (! dependency_target.empty()) {
+      projected_source.resize(source_size, - 1);
+      
+      analyzer(scores_source, projected_source);
+    }
+  }
+
+  void shink()
+  {
+    analyzer.shrink();
+    DependencyModel4::shrink();
+  }
+  
+  analyzer_type analyzer;
+};
+
+typedef __DependencyModel4Base<DependencyHybrid>            DependencyHybridModel4;
+typedef __DependencyModel4Base<DependencyHybridSingleRoot>  DependencyHybridSingleRootModel4;
+typedef __DependencyModel4Base<DependencyDegree2>           DependencyDegree2Model4;
+typedef __DependencyModel4Base<DependencyDegree2SingleRoot> DependencyDegree2SingleRootModel4;
+typedef __DependencyModel4Base<DependencyMST>               DependencyMSTModel4;
+typedef __DependencyModel4Base<DependencyMSTSingleRoot>     DependencyMSTSingleRootModel4;
+
+struct PermutationModel4 : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  
+  typedef std::vector<bool, std::allocator<bool > > assigned_type;
+  
+  PermutationModel4(const ttable_type& __ttable_source_target,
+		    const ttable_type& __ttable_target_source,
+		    const atable_type& __atable_source_target,
+		    const atable_type& __atable_target_source,
+		    const dtable_type& __dtable_source_target,
+		    const dtable_type& __dtable_target_source,
+		    const ntable_type& __ntable_source_target,
+		    const ntable_type& __ntable_target_source,
+		    const ptable_type& __ptable_source_target,
+		    const ptable_type& __ptable_target_source,
+		    const classes_type& __classes_source,
+		    const classes_type& __classes_target)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		  __atable_source_target, __atable_target_source,
+		  __dtable_source_target, __dtable_target_source,
+		  __ntable_source_target, __ntable_target_source,
+		  __ptable_source_target, __ptable_target_source,
+		  __classes_source, __classes_target) {}
+  
+  typedef LearnModel4::model4_data_type model4_data_type;
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& permutation_source,
+		  const dependency_type& permutation_target)
+  {
+    
+  }
+  
+  template <typename Dependency>
+  struct insert_dependency
+  {
+    Dependency& dependency;
+    
+    insert_dependency(Dependency& __dependency) : dependency(__dependency) {}
+
+    template <typename Edge>
+    insert_dependency& operator=(const Edge& edge)
+    {
+      if (edge.second)
+	dependency[edge.second - 1] = edge.first;
+      return *this;
+    }
+    
+    insert_dependency& operator*() { return *this; }
+    insert_dependency& operator++() { return *this; }
+    insert_dependency operator++(int) { return *this; }
+  };
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const dependency_type& permutation_source,
+		  const dependency_type& permutation_target,
+		  dependency_type& projected_source,
+		  dependency_type& projected_target)
+  {
+    //std::cerr << "posterior" << std::endl;
+    
+    operator()(source, target, permutation_source, permutation_target);
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    projected_source.clear();
+    projected_target.clear();
+    
+    if (! permutation_source.empty()) {
+      dependency_target.resize(target_size, - 1);
+      projected_target.resize(target_size, - 1);
+      
+      dependency_per.resize(target_size);
+      dependency_mst.resize(target_size);
+      
+      scores_per = scores_target;
+      scores_mst = scores_target;
+      
+      std::cerr << "optimal dependency" << std::endl;
+      
+      // we will perform dual decomposition!
+      // we will minimize the loss...
+      static const double inf = std::numeric_limits<double>::infinity();
+
+      double dual = inf;
+      size_type epoch = 0;
+      
+      // 50 iteratins will be fine...?
+      bool converged = false;
+      for (;;) {
+	kuhn_munkres_assignment(scores_per, insert_dependency<dependency_type>(dependency_per));
+	mst(scores_mst, dependency_mst);
+	
+	std::cerr << "permutation: " << dependency_per << std::endl;
+	std::cerr << "mst: " << dependency_mst << std::endl;
+
+	double dual_per = 0.0;
+	double dual_mst = 0.0;
+	double primal_per = 0.0;
+	double primal_mst = 0.0;
+	double weight_diff_min = std::numeric_limits<double>::infinity();
+									    
+	for (size_type i = 1; i <= target_size; ++ i) {
+	  dual_per += scores_per(dependency_per[i - 1], i);
+	  dual_mst += scores_mst(dependency_mst[i - 1], i);
+	  primal_per += scores_target(dependency_per[i - 1], i);
+	  primal_mst += scores_target(dependency_mst[i - 1], i);
+	  
+	  if (dependency_per[i - 1] != dependency_mst[i - 1]) {
+	    const double diff = std::fabs(scores_target(dependency_per[i - 1], i) - scores_target(dependency_mst[i - 1], i));
+	    
+	    weight_diff_min = std::min(weight_diff_min, diff);
+	  }
+	}
+
+	const double dual_curr = dual_per + dual_mst;
+	const double primal_curr = primal_per + primal_mst;
+	
+#if 1
+	std::cerr << "dual: " << dual_curr
+		  << " per: " << dual_per
+		  << " mst: " << dual_mst << std::endl;
+	std::cerr << "primal: " << primal_curr
+		  << " per: " << primal_per
+		  << " mst: " << primal_mst << std::endl;
+#endif
+	
+	//
+	// if either dependency_per is sound, we will use the dependency_per
+	//
+
+	// if equal, simply quit.
+	if (dependency_mst == dependency_per) {
+	  dependency_target = dependency_mst;
+	  converged = true;
+	  break;
+	}
+	
+	const bool sound_per = is_permutation(dependency_per);
+	const bool sound_mst = is_permutation(dependency_mst);
+	
+	if (sound_per || sound_mst) {
+	  if (sound_per && sound_mst) {
+	    // find the maximum
+	    double score_per = 0.0;
+	    double score_mst = 0.0;
+	    
+	    for (size_type i = 1; i <= target_size; ++ i) {
+	      score_per += scores_target(dependency_per[i - 1], i);
+	      score_mst += scores_target(dependency_mst[i - 1], i);
+	    }
+	    
+	    if (score_per > score_mst)
+	      dependency_target = dependency_per;
+	    else
+	      dependency_target = dependency_mst;
+	  } else if (sound_per)
+	    dependency_target = dependency_per;
+	  else
+	    dependency_target = dependency_mst;
+	  
+	  converged = true;
+	  break;
+	}
+	
+	const double alpha = weight_diff_min / (1.0 + epoch);
+		
+	for (size_type i = 1; i <= target_size; ++ i)
+	  for (size_type j = 0; j <= target_size; ++ j) 
+	    if (i != j) {
+	      const int y = (dependency_mst[i - 1] == static_cast<int>(j));
+	      const int z = (dependency_per[i - 1] == static_cast<int>(j));
+	      
+	      const double update = - alpha * (y - z);
+	      
+	      scores_mst(i, j) += update;
+	      scores_per(i, j) -= update;
+	    }
+	
+	// increase time when dual increased..
+	//epoch += (dual_curr > dual);
+	dual = dual_curr;
+      }
+      
+      std::cerr << "finished" << std::endl;
+      
+      
+      if (! converged) {
+	//
+	// we will fall-back to hill-climbing solution, starting from the permutation solution... HOW?
+	//
+	
+      }
+      
+      
+      //std::cerr << "project dependency" << std::endl;
+
+      project_dependency(dependency_target, projected_target);
+    }
+    
+    if (! permutation_target.empty()) {
+      dependency_source.resize(source_size, - 1);
+      projected_source.resize(source_size, - 1);
+      
+      kuhn_munkres_assignment(scores_source, insert_dependency<dependency_type>(dependency_source));
+      
+      project_dependency(dependency_source, projected_source);
+    }
+  }
+
+  size_type project_permutation(const dependency_type& permutation, dependency_type& dependency)
+  {
+    const size_type size = permutation.size();
+
+    dependency.resize(size);
+
+    if (size == 1) {
+      dependency.front() = 0;
+      return 1;
+    }
+    
+    assigned.clear();
+    assigned.resize(size, false);
+
+    size_type leaf = size_type(-1);
+
+    for (size_type pos = 0; pos != size; ++ pos) {
+      if (permutation[pos] >= static_cast<int>(size))
+	throw std::runtime_error("invalid permutation: out of range");
+      
+      if (assigned[permutation[pos]])
+	throw std::runtime_error("invalid permutation: duplicates");
+      
+      assigned[permutation[pos]] = true;
+      
+      if (permutation[pos] == static_cast<int>(size - 1))
+	leaf = pos + 1;
+      
+      if (! permutation[pos]) continue;
+      
+      dependency_type::const_iterator iter = std::find(permutation.begin(), permutation.end(), permutation[pos] - 1);
+      if (iter == permutation.end())
+	throw std::runtime_error("invalid permutation: no previous index?");
+      
+      dependency[pos] = (iter - permutation.begin()) + 1;
+    }
+    
+    return leaf;
+  }
+
+  bool is_permutation(const dependency_type& dependency)
+  {
+    const size_type size = dependency.size();
+    
+    if (size <= 1) return true;
+    
+    dependency_type::const_iterator diter_begin = dependency.begin();
+    dependency_type::const_iterator diter_end   = dependency.end();
+    
+    size_type pos_head = 0;
+    for (size_type i = 0; i != size; ++ i) {
+      dependency_type::const_iterator diter = std::find(diter_begin, diter_end, pos_head);
+      if (diter == diter_end)
+	return false;
+      pos_head = (diter - diter_begin) + 1;
+    }
+    return true;
+  }
+
+  void project_dependency(const dependency_type& dependency, dependency_type& permutation)
+  {
+    const size_type size = dependency.size();
+    
+    permutation.resize(size);
+    
+    if (size == 1) {
+      permutation.front() = 0;
+      return;
+    }
+
+    //std::cerr << "dependency: " << dependency << std::endl;
+    
+    dependency_type::const_iterator diter_begin = dependency.begin();
+    dependency_type::const_iterator diter_end   = dependency.end();
+    
+    size_type pos_head = 0;
+    for (size_type i = 0; i != size; ++ i) {
+      dependency_type::const_iterator diter = std::find(diter_begin, diter_end, pos_head);
+      if (diter == diter_end)
+	throw std::runtime_error("no head?");
+      
+      const size_type pos_dep = (diter - diter_begin) + 1;
+      
+      //std::cerr << "pos-dep: " << pos_dep << std::endl;
+
+      permutation[pos_dep - 1] = i;
+      pos_head = pos_dep;
+    }
+
+    //std::cerr << "permutation: " << permutation << std::endl;
+    
+  }
+
+  void shrink()
+  {
+    scores_source.clear();
+    scores_target.clear();
+    scores.clear();
+
+    matrix_type(scores_source).swap(scores_source);
+    matrix_type(scores_target).swap(scores_target);
+    matrix_type(scores).swap(scores);
+
+    ViterbiBase::shrink();
+  }
+  
+  matrix_type scores_source;
+  matrix_type scores_target;
+  matrix_type scores;
+
+  assigned_type   assigned;
+  dependency_type dependency_source;
+  dependency_type dependency_target;
+  
+  matrix_type scores_per;
+  matrix_type scores_mst;
+
+  dependency_type dependency_mst;
+  dependency_type dependency_per;
+  
+  DependencyMSTSingleRoot mst;
+};
 
 
 #endif

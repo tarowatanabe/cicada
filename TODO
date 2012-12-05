@@ -163,7 +163,3 @@ msgpack for succinct storage
 
 Rearrange learning code by splitting L2 and/or L1 projection
   Especially for online-learning, they can be set up as additional "unified" code
-
-
-Add length-model for Modl1 and HMM?
-  This is not a requirement for parameter estimation, though, we cannot directly compare Model4 wrt perplexity.
