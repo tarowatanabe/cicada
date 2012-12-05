@@ -46,6 +46,8 @@
 #include <cicada/alignment.hpp>
 #include <cicada/tree_rule.hpp>
 
+#include <utils/group_aligned_code.hpp>
+#include <utils/byte_aligned_code.hpp>
 #include <utils/piece.hpp>
 #include <utils/space_separator.hpp>
 #include <utils/tempfile.hpp>
@@ -1748,6 +1750,7 @@ struct PhrasePairTargetMapper
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
 
+#if 0
   struct PhraseSet
   {
     typedef uint32_t length_type;
@@ -1819,11 +1822,12 @@ struct PhrasePairTargetMapper
     bool empty() const { return lengths.empty(); }
     size_t size() const { return lengths.size() >> 1; }
 
-    void swap(PhraseSet& x)
+    void shrink()
     {
-      buffer.swap(x.buffer);
-      lengths.swap(x.lengths);
-      last.swap(x.last);
+      clear();
+      
+      buffer_type(buffer).swap(buffer);
+      lengths_type(lengths).swap(lengths);
     }
     
     void push_back(const std::string& x)
@@ -1835,6 +1839,116 @@ struct PhrasePairTargetMapper
       buffer.insert(buffer.end(), x.begin() + pos, x.end());
       lengths.push_back(pos);
       lengths.push_back(x.size() - pos);
+      last = x;
+    }
+
+    const_iterator begin() const { return const_iterator(buffer.begin(), buffer.end(),
+							 lengths.begin(), lengths.end()); }
+    const_iterator end() const { return const_iterator(); }
+    
+    buffer_type  buffer;
+    lengths_type lengths;
+    std::string  last;
+  };
+#endif
+  struct PhraseSet
+  {
+    typedef uint32_t length_type;
+    typedef char     char_type;
+
+    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
+    typedef std::vector<char_type, std::allocator<char_type> > lengths_type;
+    
+    struct const_iterator
+    {
+      const_iterator() {}
+      const_iterator(typename buffer_type::const_iterator  __biter,
+		     typename buffer_type::const_iterator  __biter_end,
+		     typename lengths_type::const_iterator __liter,
+		     typename lengths_type::const_iterator __liter_end)
+	: biter(__biter), biter_end(__biter_end),
+	  liter(__liter), liter_end(__liter_end)
+      {
+	operator++();
+      }
+
+      const std::string& operator*() const
+      {
+	return curr;
+      }
+      
+      const_iterator& operator++()
+      {
+	if (biter == biter_end || liter == liter_end) {
+	  curr.clear();
+	  return *this;
+	}
+
+	length_type pos = 0;
+	length_type diff = 0;
+	
+	liter += utils::byte_aligned_decode(pos,  &(*liter));
+	liter += utils::byte_aligned_decode(diff, &(*liter));
+	
+	curr.replace(curr.begin() + pos, curr.end(), biter, biter + diff);
+	biter += diff;
+	
+	return *this;
+      }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr == y.curr;
+      }
+      
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr != y.curr;
+      }
+      
+      typename buffer_type::const_iterator  biter;
+      typename buffer_type::const_iterator  biter_end;
+      typename lengths_type::const_iterator liter;
+      typename lengths_type::const_iterator liter_end;
+      
+      std::string curr;
+    };
+    
+    void clear()
+    {
+      buffer.clear();
+      lengths.clear();
+      last.clear();
+    }
+    
+    bool empty() const { return lengths.empty(); }
+
+    void shrink()
+    {
+      clear();
+      
+      buffer_type(buffer).swap(buffer);
+      lengths_type(lengths).swap(lengths);
+    }
+    
+    void push_back(const std::string& x)
+    {
+      size_type pos = 0;
+      const size_type pos_last = utils::bithack::min(last.size(), x.size());
+      for (/**/; pos != pos_last && x[pos] == last[pos]; ++ pos) {}
+      
+      buffer.insert(buffer.end(), x.begin() + pos, x.end());
+      
+      lengths.resize(lengths.size() + 16);
+      
+      lengths_type::iterator liter = lengths.end() - 16;
+      liter += utils::byte_aligned_encode(pos, &(*liter));
+      liter += utils::byte_aligned_encode(x.size() - pos, &(*liter));
+      
+      lengths.erase(liter, lengths.end());
+      
       last = x;
     }
 
@@ -1947,7 +2061,7 @@ struct PhrasePairTargetMapper
     
     phrase_set_type phrases;
     simple_type     counts;
-    count_type      observed(0);
+    size_t          observed(0);
     
     root_count_set_type::iterator riter;
     
@@ -1966,19 +2080,25 @@ struct PhrasePairTargetMapper
       if (curr.source != counts.source) {
 	
 	if (! phrases.empty()) {
+#if 0
 	  if (observed != phrases.size())
 	    throw std::runtime_error("invalid observation count");
+#endif
 
 	  counts.counts.push_back(observed);
 	  
+	  size_t i = 0;
 	  typename phrase_set_type::const_iterator piter_end = phrases.end();
-	  for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+	  for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter, ++ i) {
 	    const std::string& phrase = *piter;
 	    
 	    const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
 	    
 	    queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
 	  }
+	  
+	  if (i != observed)
+	    throw std::runtime_error("invalid observation count");
 
 	  phrases.clear();
 	}
@@ -1987,7 +2107,7 @@ struct PhrasePairTargetMapper
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
 	  if (malloc_full) {
-	    phrase_set_type(phrases).swap(phrases);
+	    phrases.shrink();
 	    
 	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  }
@@ -2030,13 +2150,16 @@ struct PhrasePairTargetMapper
     }
     
     if (! phrases.empty()) {
+#if 0
       if (observed != phrases.size())
 	throw std::runtime_error("invalid observation count");
+#endif
       
       counts.counts.push_back(observed);
       
+      size_t i = 0;
       typename phrase_set_type::const_iterator piter_end = phrases.end();
-      for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter) {
+      for (typename phrase_set_type::const_iterator piter = phrases.begin(); piter != piter_end; ++ piter, ++ i) {
 	const std::string& phrase = *piter;
 	
 	const int shard = hasher(phrase.begin(), phrase.end(), 0) % queues.size();
@@ -2044,8 +2167,10 @@ struct PhrasePairTargetMapper
 	queues[shard]->push(simple_type(phrase, counts.source, counts.counts));
       }
       
-      phrases.clear();
-      phrase_set_type(phrases).swap(phrases);
+      if (i != observed)
+	throw std::runtime_error("invalid observation count");
+      
+      phrases.shrink();
     }
     
     //
