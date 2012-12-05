@@ -41,7 +41,9 @@
 
 #include <boost/tokenizer.hpp>
 
-#ifdef HAVE_SNAPPY
+#include <codec/lz4.hpp>
+
+#if 0
 #include <snappy.h>
 #endif
 
@@ -1580,7 +1582,16 @@ public:
   
   void encode(const std::string& data)
   {
-#ifdef HAVE_SNAPPY
+    buffer.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(codec::lz4_compressor());
+    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+    os.write(data.c_str(), data.size());
+    os.reset();    
+    
+#if 0
+#if 0
     const size_t max_length = snappy::MaxCompressedLength(data.size());
     buffer.reserve(max_length);
     buffer.resize(max_length);
@@ -1597,11 +1608,30 @@ public:
     os.write(data.c_str(), data.size());
     os.reset();
 #endif
+#endif
   }
   
   std::string decode() const
   {
-#ifdef HAVE_SNAPPY
+    std::string output;
+    
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
+
+    char buf[1024];
+    
+    do {
+      is.read(buf, 1024);
+      std::copy(buf, buf + is.gcount(), std::back_inserter(output));
+    } while (is);
+    
+    is.reset();
+
+    return output;    
+    
+#if 0
+#if 0
     std::string output;
     snappy::Uncompress(&(*buffer.begin()), buffer.size(), &output);
     return output;
@@ -1622,6 +1652,7 @@ public:
     is.reset();
 
     return output;
+#endif
 #endif
   }
   
