@@ -45,6 +45,23 @@
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
+struct RegularizeAdaGrad
+{
+  weight_set_type grads2;
+  
+  double operator()(const feature_type& feat, const double& eta) const
+  {
+    const double grad2 = grads2[feat];
+    
+    return (grad2 == 0.0 ? eta : eta / utils::mathop::sqrt(grad2));
+  }
+  
+  void update(const feature_type& feat, const double& grad)
+  {
+    grads2[feat] += grad * grad;
+  }
+};
+
 struct LearnBase
 {
   typedef size_t    size_type;
@@ -482,7 +499,10 @@ struct LearnXBLEUL2 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * eta;
+      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -525,6 +545,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
   
   double weight_scale;
   double weight_norm;
+
+  RegularizeAdaGrad adagrad;
 };
 
 struct LearnXBLEUL1 : public LearnXBLEU
@@ -569,7 +591,10 @@ struct LearnXBLEUL1 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      x += - static_cast<double>(giter->second) * eta;
+      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       // apply penalty
       apply(x, penalties[giter->first], penalty);
@@ -599,6 +624,8 @@ struct LearnXBLEUL1 : public LearnXBLEU
   
   penalty_set_type penalties;
   double penalty;
+
+  RegularizeAdaGrad adagrad;
 };
 
 struct LearnExpectedLoss : public LearnBase
@@ -723,7 +750,10 @@ struct LearnExpectedLoss : public LearnBase
       // we will update "minus" value...
       
       double& x = weights[eiter->first];
-      const double alpha = - static_cast<double>(eiter->second) * eta * k_norm;
+      const double alpha = - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta) * k_norm;
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -772,7 +802,8 @@ struct LearnExpectedLoss : public LearnBase
   
   double weight_scale;
   double weight_norm;
-
+  
+  RegularizeAdaGrad adagrad;
 };
 
 struct LearnExpectedLossL1 : public LearnBase
@@ -891,7 +922,10 @@ struct LearnExpectedLossL1 : public LearnBase
       double& x = weights[eiter->first];
       
       // update weight ... we will update "minus" value
-      x += - static_cast<double>(eiter->second) * eta * k_norm;
+      x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta) * k_norm;
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
       
       // apply penalty
       apply(x, penalties[eiter->first], penalty);
@@ -927,6 +961,8 @@ struct LearnExpectedLossL1 : public LearnBase
 
   penalty_set_type penalties;
   double penalty;
+
+  RegularizeAdaGrad adagrad;
 };
 
 struct LearnOExpectedLoss : public LearnBase
@@ -1407,7 +1443,11 @@ struct LearnPegasos : public LearnOnlineMargin
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	  double& x = weights[fiter->first];
-	  const double alpha = eta * k_norm * fiter->second;
+	  
+	  const double alpha = (adagrad_mode ? adagrad(fiter->first, eta) : eta) * k_norm * fiter->second;
+	  
+	  if (adagrad_mode)
+	    adagrad.update(fiter->first, fiter->second);
 	  
 	  a_norm += alpha * alpha;
 	  pred += 2.0 * x * alpha;
@@ -1450,6 +1490,8 @@ struct LearnPegasos : public LearnOnlineMargin
   double    weight_norm;
   
   weight_set_type weights_peg;
+
+  RegularizeAdaGrad adagrad;
 };
 
 // optimized-Pegasos learner
@@ -2110,7 +2152,10 @@ struct LearnSGDL1 : public LearnLR
       double& x = weights[eiter->first];
       
       // update weight ... we will update "minus" value
-      x += - static_cast<double>(eiter->second) * eta * k_norm;
+      x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta) * k_norm;
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
       
       // apply penalty
       apply(x, penalties[eiter->first], penalty);
@@ -2140,6 +2185,8 @@ struct LearnSGDL1 : public LearnLR
   
   penalty_set_type penalties;
   double penalty;
+
+  RegularizeAdaGrad adagrad;
 };
 
 // SGDL2 learner
@@ -2214,7 +2261,10 @@ struct LearnSGDL2 : public LearnLR
       // we will update "minus" value...
       
       double& x = weights[eiter->first];
-      const double alpha = - static_cast<double>(eiter->second) * eta * k_norm;
+      const double alpha = - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta) * k_norm;
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -2258,6 +2308,8 @@ struct LearnSGDL2 : public LearnLR
   
   double weight_scale;
   double weight_norm;
+  
+  RegularizeAdaGrad adagrad;
 };
 
 // SGDL2 learner

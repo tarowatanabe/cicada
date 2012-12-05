@@ -108,6 +108,7 @@ double eta0 = 0.2;
 int order = 4;
 
 // additional misc parameters...
+bool adagrad_mode = false;
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
@@ -1291,6 +1292,7 @@ void options(int argc, char** argv)
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
     
+    ("adagrad",             po::bool_switch(&adagrad_mode),       "AdaGrad for adaptive gradient")
     ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")

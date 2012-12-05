@@ -67,6 +67,22 @@ struct LearnBase
   
 };
 
+struct RegularizeAdaGrad
+{
+  weight_set_type grads2;
+  
+  double operator()(const feature_type& feat, const double& eta) const
+  {
+    const double grad2 = grads2[feat];
+    
+    return (grad2 == 0.0 ? eta : eta / utils::mathop::sqrt(grad2));
+  }
+  
+  void update(const feature_type& feat, const double& grad)
+  {
+    grads2[feat] += grad * grad;
+  }
+};
 
 struct LearnXBLEU : public LearnBase
 {
@@ -686,7 +702,10 @@ struct LearnXBLEUL2 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * eta;
+      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -729,6 +748,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
   
   double weight_scale;
   double weight_norm;
+
+  RegularizeAdaGrad adagrad;
 };
 
 struct LearnXBLEUL1 : public LearnXBLEU
@@ -769,7 +790,10 @@ struct LearnXBLEUL1 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      x += - static_cast<double>(giter->second) * eta;
+      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       // apply penalty
       apply(x, penalties[giter->first], penalty);
@@ -799,6 +823,8 @@ struct LearnXBLEUL1 : public LearnXBLEU
   
   penalty_set_type penalties;
   double penalty;
+
+  RegularizeAdaGrad adagrad;
 };
 
 
@@ -984,7 +1010,10 @@ struct LearnSGDL2 : public LearnLR
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * eta * k_norm;
+      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta) * k_norm;
+
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -1025,6 +1054,8 @@ struct LearnSGDL2 : public LearnLR
   
   double weight_scale;
   double weight_norm;
+
+  RegularizeAdaGrad adagrad;
 };
 
 
@@ -1073,7 +1104,10 @@ struct LearnSGDL1 : public LearnLR
       double& x = weights[giter->first];
       
       // update weight ... we will update "minus" value
-      x += - static_cast<double>(giter->second) * eta * k_norm;
+      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta) * k_norm;
+      
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
       
       // apply penalty
       apply(x, penalties[giter->first], penalty);
@@ -1101,6 +1135,8 @@ struct LearnSGDL1 : public LearnLR
   
   penalty_set_type penalties;
   double penalty;
+  
+  RegularizeAdaGrad adagrad;
 };
 
 
