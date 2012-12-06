@@ -14,6 +14,7 @@
 #include <cicada/parse.hpp>
 #include <cicada/grammar_simple.hpp>
 #include <cicada/grammar_unknown.hpp>
+#include <cicada/compose_phrase.hpp>
 
 #include <cicada/operation/functional.hpp>
 #include <cicada/operation/parse.hpp>
@@ -855,11 +856,16 @@ namespace cicada
       utils::resource start;
       
       grammar_parse.assign(lattice);
-	
+      
+      
+      cicada::compose_phrase(goal, grammar_parse, distortion, lattice, parsed, yield_source);
+      
+#if 0
       if (weights_one)
 	cicada::parse_phrase(goal, grammar_parse, weight_function_one<weight_type>(), size, distortion, lattice, parsed, yield_source);
       else
 	cicada::parse_phrase(goal, grammar_parse, weight_function<weight_type>(*weights_parse), size, distortion, lattice, parsed, yield_source);
+#endif
       
       utils::resource end;
     

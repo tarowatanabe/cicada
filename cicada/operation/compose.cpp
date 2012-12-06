@@ -543,8 +543,8 @@ namespace cicada
       utils::resource start;
 
       grammar_compose.assign(lattice);
-    
-      cicada::compose_phrase(goal, grammar_compose, distortion, lattice, composed);
+      
+      cicada::compose_phrase(goal, grammar_compose, distortion, lattice, composed, yield_source);
     
       utils::resource end;
     
