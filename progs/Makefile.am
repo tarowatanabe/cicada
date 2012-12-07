@@ -175,14 +175,14 @@ cicada_extract_ghkm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_extract_ghkm_mpi_SOURCES  = cicada_extract_ghkm_mpi.cpp cicada_extract_ghkm_impl.hpp
 cicada_extract_ghkm_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_extract_ghkm_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_extract_ghkm_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_phrase_SOURCES = cicada_extract_phrase.cpp cicada_extract_phrase_impl.hpp
 cicada_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_phrase_mpi_SOURCES  = cicada_extract_phrase_mpi.cpp cicada_extract_phrase_impl.hpp
 cicada_extract_phrase_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_extract_phrase_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_extract_phrase_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_rule_SOURCES = cicada_extract_rule.cpp
 cicada_extract_rule_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -192,10 +192,10 @@ cicada_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_extract_scfg_mpi_SOURCES  = cicada_extract_scfg_mpi.cpp cicada_extract_scfg_impl.hpp
 cicada_extract_scfg_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_extract_scfg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_extract_scfg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_score_SOURCES = cicada_extract_score.cpp cicada_extract_score_impl.hpp
-cicada_extract_score_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC)  $(boost_LDADD) $(perftools_LDADD)
+cicada_extract_score_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_score_mpi_SOURCES  = cicada_extract_score_mpi.cpp cicada_extract_score_impl.hpp
 cicada_extract_score_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
@@ -209,7 +209,7 @@ cicada_extract_tree_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_extract_tree_mpi_SOURCES  = cicada_extract_tree_mpi.cpp cicada_extract_tree_impl.hpp
 cicada_extract_tree_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_charniak_SOURCES = cicada_filter_charniak.cpp
 cicada_filter_charniak_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
