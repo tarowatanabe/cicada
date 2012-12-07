@@ -369,8 +369,8 @@ struct ExtractGHKM
   
   typedef hypergraph_type::id_type id_type;
   
-  typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_type;
-  typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
+  typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+  typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
 
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
