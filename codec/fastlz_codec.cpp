@@ -12,8 +12,8 @@ namespace codec
 {
   namespace detail
   {
-    const fastlz_param::size_type fastlz_param::chunk_size = 8 * 1024 * 1024;
-    const fastlz_param::size_type fastlz_param::bound_size = (8 * 1024 * 1024 + ((8 * 1024 * 1024) >> 4)) + 4;
+    const fastlz_param::size_type fastlz_param::chunk_size = 1024 * 1024;
+    const fastlz_param::size_type fastlz_param::bound_size = (1024 * 1024 + ((1024 * 1024) >> 4)) + 4;
   };
 
   fastlz_compressor_impl::fastlz_compressor_impl()

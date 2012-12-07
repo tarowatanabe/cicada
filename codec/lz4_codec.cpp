@@ -12,8 +12,8 @@ namespace codec
 {
   namespace detail
   {
-    const lz4_param::size_type lz4_param::chunk_size = 8 * 1024 * 1024;
-    const lz4_param::size_type lz4_param::bound_size = LZ4_compressBound(8 * 1024 * 1024) + 4;
+    const lz4_param::size_type lz4_param::chunk_size = 1024 * 1024;
+    const lz4_param::size_type lz4_param::bound_size = LZ4_compressBound(1024 * 1024) + 4;
   };
 
   lz4_compressor_impl::lz4_compressor_impl()

@@ -22,8 +22,8 @@ namespace codec
     quicklz_param::quicklz_param(const quicklz_param&x) : pimpl(new quicklz_param_impl()) {}
     quicklz_param::~quicklz_param() { delete pimpl; }
     
-    const quicklz_param::size_type quicklz_param::chunk_size = 8 * 1024 * 1024;
-    const quicklz_param::size_type quicklz_param::bound_size = chunk_size + 400 + 4;
+    const quicklz_param::size_type quicklz_param::chunk_size = 1024 * 1024;
+    const quicklz_param::size_type quicklz_param::bound_size = 1024 * 1024 + 400 + 4;
   };
   
   quicklz_compressor_impl::quicklz_compressor_impl()
