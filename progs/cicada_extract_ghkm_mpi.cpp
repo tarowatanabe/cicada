@@ -144,8 +144,8 @@ int main(int argc, char** argv)
 	stream[rank].reset(new ostream_type());
 	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	stream[rank]->push(boost::iostreams::zlib_compressor(), 256);
-	stream[rank]->push(*device[rank], 256);
+	stream[rank]->push(boost::iostreams::zlib_compressor());
+	stream[rank]->push(*device[rank]);
 
 	ranks[rank - 1] = rank;
       }
@@ -254,12 +254,12 @@ int main(int argc, char** argv)
 	std::cerr << "extract counts"
 		  << " cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time()
 		  << " user time: " << end_extract.user_time() - start_extract.user_time()
-		<< std::endl;
+		  << std::endl;
       
     } else {
       boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::zlib_decompressor(), 256);
-      stream.push(utils::mpi_device_source(0, bitext_tag, 4096), 256);
+      stream.push(boost::iostreams::zlib_decompressor());
+      stream.push(utils::mpi_device_source(0, bitext_tag, 4096));
       
       bitext_type bitext;
       
