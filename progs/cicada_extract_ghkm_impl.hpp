@@ -939,6 +939,11 @@ struct ExtractGHKM
     
     tree_rule_set_type& trees;
   };
+
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
+  buffer_type buffer_source;
+  buffer_type buffer_target;
   
   bool construct_rule_pair(const hypergraph_type& graph,
 			   const sentence_type& sentence,
@@ -1105,17 +1110,22 @@ struct ExtractGHKM
       rule_target = tree_rule_type(rule_target.label, trees.begin(), trees.end());
     }
     
-    rule_pair.source.clear();
-    rule_pair.target.clear();
+    {
+      buffer_source.clear();
+      buffer_target.clear();
+      
+      boost::iostreams::filtering_ostream os_source;
+      boost::iostreams::filtering_ostream os_target;
+      
+      os_source.push(boost::iostreams::back_inserter(buffer_source));
+      os_target.push(boost::iostreams::back_inserter(buffer_target));
+      
+      os_source << rule_source;
+      os_target << rule_target;
+    }
     
-    boost::iostreams::filtering_ostream os_source;
-    boost::iostreams::filtering_ostream os_target;
-    
-    os_source.push(boost::iostreams::back_inserter(rule_pair.source));
-    os_target.push(boost::iostreams::back_inserter(rule_pair.target));
-    
-    os_source << rule_source;
-    os_target << rule_target;
+    rule_pair.source.assign(buffer_source.begin(), buffer_source.end());
+    rule_pair.target.assign(buffer_target.begin(), buffer_target.end());
 
     return true;
   }

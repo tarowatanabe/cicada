@@ -1649,6 +1649,10 @@ struct ExtractTree
 
   tree_rule_set_type trees;
 
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
+  buffer_type buffer;
+
   template <typename FrontierAlignment>
   void construct_rule(const FrontierAlignment& frontier_alignment,
 		      const hypergraph_type& graph,
@@ -1708,12 +1712,16 @@ struct ExtractTree
     }
     
     // dump into rule...
-    edge.rule.clear();
-    boost::iostreams::filtering_ostream os;
+    {
+      buffer.clear();
+      
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::back_inserter(buffer));
+      
+      os << tree_rule;
+    }
 
-    os.push(boost::iostreams::back_inserter(edge.rule));
-    
-    os << tree_rule;
+    edge.rule.assign(buffer.begin(), buffer.end());
   }
   
   template <typename FrontierAlignment, typename Derivations, typename Iterator, typename PosMap, typename Covered>
