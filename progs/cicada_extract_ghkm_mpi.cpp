@@ -109,7 +109,7 @@ int main(int argc, char** argv)
     if (mpi_rank == 0)
       prepare_directory(output_file);
 
-    static const size_t queue_size = 8;
+    static const size_t queue_size = 4;
     
     queue_type queue(queue_size);
     task_type task(queue, output_file, non_terminal,
