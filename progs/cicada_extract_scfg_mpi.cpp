@@ -285,7 +285,7 @@ int main(int argc, char** argv)
 	if (queue.size() < queue_size && device.test()) {
 	  found = true;
 	  
-	  if (queue.size() < queue_size && stream >> bitext) {
+	  if (stream >> bitext) {
 	    if (! bitext.source.empty() && ! bitext.target.empty())
 	      queue.push_swap(bitext);
 	  } else
