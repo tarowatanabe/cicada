@@ -1750,6 +1750,116 @@ struct PhrasePairTargetMapper
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
   
+  struct PhraseSet
+  {
+    typedef uint32_t length_type;
+    typedef char     char_type;
+
+    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
+    typedef std::vector<char_type, std::allocator<char_type> > lengths_type;
+    
+    struct const_iterator
+    {
+      const_iterator() {}
+      const_iterator(typename buffer_type::const_iterator  __biter,
+		     typename buffer_type::const_iterator  __biter_end,
+		     typename lengths_type::const_iterator __liter,
+		     typename lengths_type::const_iterator __liter_end)
+	: biter(__biter), biter_end(__biter_end),
+	  liter(__liter), liter_end(__liter_end)
+      {
+	operator++();
+      }
+
+      const std::string& operator*() const
+      {
+	return curr;
+      }
+      
+      const_iterator& operator++()
+      {
+	if (biter == biter_end || liter == liter_end) {
+	  curr.clear();
+	  return *this;
+	}
+
+	length_type pos = 0;
+	length_type diff = 0;
+	
+	liter += utils::byte_aligned_decode(pos,  &(*liter));
+	liter += utils::byte_aligned_decode(diff, &(*liter));
+	
+	curr.replace(curr.begin() + pos, curr.end(), biter, biter + diff);
+	biter += diff;
+	
+	return *this;
+      }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr == y.curr;
+      }
+      
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y)
+      {
+	return x.curr != y.curr;
+      }
+      
+      typename buffer_type::const_iterator  biter;
+      typename buffer_type::const_iterator  biter_end;
+      typename lengths_type::const_iterator liter;
+      typename lengths_type::const_iterator liter_end;
+      
+      std::string curr;
+    };
+    
+    void clear()
+    {
+      buffer.clear();
+      lengths.clear();
+      last.clear();
+    }
+    
+    bool empty() const { return lengths.empty(); }
+
+    void shrink()
+    {
+      clear();
+      
+      buffer_type(buffer).swap(buffer);
+      lengths_type(lengths).swap(lengths);
+    }
+    
+    void push_back(const std::string& x)
+    {
+      size_type pos = 0;
+      const size_type pos_last = utils::bithack::min(last.size(), x.size());
+      for (/**/; pos != pos_last && x[pos] == last[pos]; ++ pos) {}
+      
+      buffer.insert(buffer.end(), x.begin() + pos, x.end());
+      
+      lengths.resize(lengths.size() + 16);
+      
+      lengths_type::iterator liter = lengths.end() - 16;
+      liter += utils::byte_aligned_encode(pos, &(*liter));
+      liter += utils::byte_aligned_encode(x.size() - pos, &(*liter));
+      
+      lengths.erase(liter, lengths.end());
+      
+      last = x;
+    }
+
+    const_iterator begin() const { return const_iterator(buffer.begin(), buffer.end(),
+							 lengths.begin(), lengths.end()); }
+    const_iterator end() const { return const_iterator(); }
+    
+    buffer_type  buffer;
+    lengths_type lengths;
+    std::string  last;
+  };
+
 #if 0
   struct PhraseSet
   {
@@ -1762,16 +1872,17 @@ struct PhrasePairTargetMapper
     struct const_iterator
     {
       const_iterator() {}
-      const_iterator(typename buffer_type::const_iterator  __biter,
-		     typename buffer_type::const_iterator  __biter_end,
+      const_iterator(const buffer_type& buffer,
 		     typename lengths_type::const_iterator __liter,
 		     typename lengths_type::const_iterator __liter_end)
-	: biter(__biter), biter_end(__biter_end),
-	  liter(__liter), liter_end(__liter_end)
+	: liter(__liter), liter_end(__liter_end)
       {
+	stream.push(codec::lz4_compressor());
+	stream.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
+	
 	operator++();
       }
-
+      
       const std::string& operator*() const
       {
 	return curr;
@@ -1779,41 +1890,33 @@ struct PhrasePairTargetMapper
       
       const_iterator& operator++()
       {
-	if (biter == biter_end || liter == liter_end) {
+	if (liter == liter_end) {
 	  curr.clear();
 	  return *this;
 	}
-
+	
 	length_type pos = 0;
 	length_type diff = 0;
 	
 	liter += utils::byte_aligned_decode(pos,  &(*liter));
 	liter += utils::byte_aligned_decode(diff, &(*liter));
 	
-	curr.replace(curr.begin() + pos, curr.end(), biter, biter + diff);
-	biter += diff;
+	buf.resize(diff);
+	stream.read((char*) &(*buf.begin()), diff);
+	
+	curr.replace(curr.begin() + pos, curr.end(), buf.begin(), buf.end());
 	
 	return *this;
       }
       
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.curr == y.curr;
-      }
+      operator bool() const { return ! curr.empty(); }
       
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.curr != y.curr;
-      }
-      
-      typename buffer_type::const_iterator  biter;
-      typename buffer_type::const_iterator  biter_end;
       typename lengths_type::const_iterator liter;
       typename lengths_type::const_iterator liter_end;
       
       std::string curr;
+      buffer_type buf;
+      boost::iostreams::filtering_istream stream;
     };
     
     void clear()
@@ -1851,127 +1954,17 @@ struct PhrasePairTargetMapper
       
       last = x;
     }
-
-    const_iterator begin() const { return const_iterator(buffer.begin(), buffer.end(),
-							 lengths.begin(), lengths.end()); }
-    const_iterator end() const { return const_iterator(); }
+    
+    const_iterator begin() const { return const_iterator(buffer, lengths.begin(), lengths.end()); }
     
     buffer_type  buffer;
     lengths_type lengths;
     std::string  last;
+    
+    boost::iostreams::filtering_ostream stream;
+    codec::lz4_compressor               filter;
   };
 #endif
-  
-  struct PhraseSet
-  {
-    typedef uint32_t length_type;
-    typedef char     char_type;
-
-    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
-    typedef std::vector<char_type, std::allocator<char_type> > lengths_type;
-    
-    struct const_iterator
-    {
-      const_iterator() {}
-      const_iterator(typename buffer_type::const_iterator  __biter,
-		     typename buffer_type::const_iterator  __biter_end,
-		     typename lengths_type::const_iterator __liter,
-		     typename lengths_type::const_iterator __liter_end)
-	: biter(__biter), biter_end(__biter_end),
-	  liter(__liter), liter_end(__liter_end)
-      {
-	operator++();
-      }
-
-      const std::string& operator*() const
-      {
-	return curr;
-      }
-      
-      const_iterator& operator++()
-      {
-	if (biter == biter_end || liter == liter_end) {
-	  curr.clear();
-	  return *this;
-	}
-
-	length_type pos = 0;
-	length_type diff = 0;
-	
-	liter += utils::byte_aligned_decode(pos,  &(*liter));
-	liter += utils::byte_aligned_decode(diff, &(*liter));
-	
-	curr.replace(curr.begin() + pos, curr.end(), biter, biter + diff);
-	biter += diff;
-	
-	return *this;
-      }
-      
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.curr == y.curr;
-      }
-      
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.curr != y.curr;
-      }
-      
-      typename buffer_type::const_iterator  biter;
-      typename buffer_type::const_iterator  biter_end;
-      typename lengths_type::const_iterator liter;
-      typename lengths_type::const_iterator liter_end;
-      
-      std::string curr;
-    };
-    
-    void clear()
-    {
-      buffer.clear();
-      lengths.clear();
-      last.clear();
-    }
-    
-    bool empty() const { return lengths.empty(); }
-
-    void shrink()
-    {
-      clear();
-      
-      buffer_type(buffer).swap(buffer);
-      lengths_type(lengths).swap(lengths);
-    }
-    
-    void push_back(const std::string& x)
-    {
-      size_type pos = 0;
-      const size_type pos_last = utils::bithack::min(last.size(), x.size());
-      for (/**/; pos != pos_last && x[pos] == last[pos]; ++ pos) {}
-      
-      buffer.insert(buffer.end(), x.begin() + pos, x.end());
-      
-      lengths.resize(lengths.size() + 16);
-      
-      lengths_type::iterator liter = lengths.end() - 16;
-      liter += utils::byte_aligned_encode(pos, &(*liter));
-      liter += utils::byte_aligned_encode(x.size() - pos, &(*liter));
-      
-      lengths.erase(liter, lengths.end());
-      
-      last = x;
-    }
-
-    const_iterator begin() const { return const_iterator(buffer.begin(), buffer.end(),
-							 lengths.begin(), lengths.end()); }
-    const_iterator end() const { return const_iterator(); }
-    
-    buffer_type  buffer;
-    lengths_type lengths;
-    std::string  last;
-  };
-
   
   typedef PhraseSet phrase_set_type;
 
