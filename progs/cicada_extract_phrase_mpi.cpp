@@ -133,7 +133,10 @@ int main(int argc, char** argv)
       utils::compress_istream is_alg(alignment_file, 1024 * 1024);
       
       bitext_type bitext;
-
+      std::string line_source;
+      std::string line_target;
+      std::string line_alignment;
+      
       int non_found_iter = 0;
       size_t num_samples = 0;
       while (is_src && is_trg && is_alg) {
@@ -145,6 +148,7 @@ int main(int argc, char** argv)
 	    found = true;
 
 	    if (device[rank]->flush(true) == 0) {
+#if 0
 	      while (is_src && is_trg && is_alg) {
 		is_src >> bitext.source;
 		is_trg >> bitext.target;
@@ -152,10 +156,16 @@ int main(int argc, char** argv)
 		
 		if (! bitext.source.empty() && ! bitext.target.empty()) break;
 	      }
+#endif
+	      std::getline(is_src, line_source);
+	      std::getline(is_trg, line_target);
+	      std::getline(is_alg, line_alignment);
 	      
 	      if (! is_src || ! is_trg || ! is_alg) break;
 	      
-	      *stream[rank] << bitext << '\n';
+	      //*stream[rank] << bitext << '\n';
+	      *stream[rank] << line_source << " ||| " << line_target << " ||| " << line_alignment << '\n';
+	      
 	      ++ num_samples;
 	      
 	      if (debug) {
@@ -250,9 +260,10 @@ int main(int argc, char** argv)
 	if (device.test()) {
 	  found = true;
 	  
-	  if (stream >> bitext)
-	    queue.push_swap(bitext);
-	  else
+	  if (stream >> bitext) {
+	    if (! bitext.source.empty() && ! bitext.target.empty())
+	      queue.push_swap(bitext);
+	  } else
 	    break;
 	}
 	

@@ -153,7 +153,7 @@ int main(int argc, char** argv)
 					      ? new utils::compress_istream(spans_target_file, 1024 * 1024) : 0);
       
       bitext_type bitext;
-
+      
       int non_found_iter = 0;
       size_t num_samples = 0;
       while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
@@ -279,9 +279,10 @@ int main(int argc, char** argv)
 	if (device.test()) {
 	  found = true;
 	  
-	  if (stream >> bitext)
-	    queue.push_swap(bitext);
-	  else
+	  if (stream >> bitext) {
+	    if (! bitext.source.empty() && ! bitext.target.empty())
+	      queue.push_swap(bitext);
+	  } else
 	    break;
 	}
 	
