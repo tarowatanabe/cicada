@@ -168,29 +168,32 @@ int main(int argc, char** argv)
 	
 	rank_set_type::const_iterator riter_end = ranks.end();
 	for (rank_set_type::const_iterator riter = ranks.begin(); riter != riter_end && is_src && is_trg && is_alg; ++ riter)
-	  if (device[*riter]->test() && device[*riter]->flush(true) == 0) {
+	  if (device[*riter]->test()) {
 	    
-	    while (is_src && is_trg && is_alg) {
-	      is_src >> bitext.source;
-	      is_trg >> bitext.target;
-	      is_alg >> bitext.alignment;
-	      
-	      if (bitext.source.is_valid() && ! bitext.target.empty()) break;
-	    }
-	    
-	    if (! is_src || ! is_trg || ! is_alg) break;
-	    
-	    *stream[*riter] << bitext << '\n';
-	    ++ num_samples;
-	    if (debug) {
-	      if (num_samples % 10000 == 0)
-		std::cerr << '.';
-	      if (num_samples % 1000000 == 0)
-		std::cerr << std::endl;
-	    }
 	    found = true;
+	    
+	    if (device[*riter]->flush(true) == 0) {
+	      while (is_src && is_trg && is_alg) {
+		is_src >> bitext.source;
+		is_trg >> bitext.target;
+		is_alg >> bitext.alignment;
+		
+		if (bitext.source.is_valid() && ! bitext.target.empty()) break;
+	      }
+	      
+	      if (! is_src || ! is_trg || ! is_alg) break;
+	      
+	      *stream[*riter] << bitext << '\n';
+	      ++ num_samples;
+	      if (debug) {
+		if (num_samples % 10000 == 0)
+		  std::cerr << '.';
+		if (num_samples % 1000000 == 0)
+		  std::cerr << std::endl;
+	      }
+	    }
 	  }
-
+	
 	if (found)
 	  std::random_shuffle(ranks.begin(), ranks.end(), rgen);
 	

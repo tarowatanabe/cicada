@@ -160,32 +160,36 @@ int main(int argc, char** argv)
 	bool found = false;
 	
 	for (int rank = 1; rank != mpi_size && is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg); ++ rank) 
-	  if (device[rank]->test() && device[rank]->flush(true) == 0) {
+	  if (device[rank]->test()) {
 	    
-	    while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
-	      is_src >> bitext.source;
-	      is_trg >> bitext.target;
-	      is_alg >> bitext.alignment;
-	      if (is_span_src.get())
-		*is_span_src >> bitext.spans_source;
-	      
-	      if (is_span_trg.get())
-		*is_span_trg >> bitext.spans_target;
-	      
-	      if (! bitext.source.empty() && ! bitext.target.empty()) break;
-	    }
-	    
-	    if (! is_src || ! is_trg || ! is_alg || (is_span_src.get() && ! *is_span_src) || (is_span_trg.get() && ! *is_span_trg)) break;
-	    
-	    *stream[rank] << bitext << '\n';
-	    ++ num_samples;
-	    if (debug) {
-	      if (num_samples % 10000 == 0)
-		std::cerr << '.';
-	      if (num_samples % 1000000 == 0)
-		std::cerr << std::endl;
-	    }
 	    found = true;
+	    
+	    if (device[rank]->flush(true) == 0) {
+	      
+	      while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
+		is_src >> bitext.source;
+		is_trg >> bitext.target;
+		is_alg >> bitext.alignment;
+		if (is_span_src.get())
+		  *is_span_src >> bitext.spans_source;
+		
+		if (is_span_trg.get())
+		  *is_span_trg >> bitext.spans_target;
+		
+		if (! bitext.source.empty() && ! bitext.target.empty()) break;
+	      }
+	      
+	      if (! is_src || ! is_trg || ! is_alg || (is_span_src.get() && ! *is_span_src) || (is_span_trg.get() && ! *is_span_trg)) break;
+	      
+	      *stream[rank] << bitext << '\n';
+	      ++ num_samples;
+	      if (debug) {
+		if (num_samples % 10000 == 0)
+		  std::cerr << '.';
+		if (num_samples % 1000000 == 0)
+		  std::cerr << std::endl;
+	      }
+	    }
 	  }
 	
 	if (! found && is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg) && queue.size() < queue_size) {
