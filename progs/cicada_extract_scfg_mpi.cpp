@@ -282,10 +282,10 @@ int main(int argc, char** argv)
       for (;;) {
 	bool found = false;
 	
-	if (device.test()) {
+	if (queue.size() < queue_size && device.test()) {
 	  found = true;
 	  
-	  if (stream >> bitext) {
+	  if (queue.size() < queue_size && stream >> bitext) {
 	    if (! bitext.source.empty() && ! bitext.target.empty())
 	      queue.push_swap(bitext);
 	  } else
