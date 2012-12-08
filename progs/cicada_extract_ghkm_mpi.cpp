@@ -263,15 +263,32 @@ int main(int argc, char** argv)
 		  << std::endl;
       
     } else {
+      utils::mpi_device_source device(0, bitext_tag, 4096);
+
       boost::iostreams::filtering_istream stream;
       stream.push(boost::iostreams::zlib_decompressor(), 256);
       //stream.push(codec::lz4_decompressor());
-      stream.push(utils::mpi_device_source(0, bitext_tag, 4096), 256);
+      stream.push(device, 256);
       
       bitext_type bitext;
+      int non_found_iter = 0;
+      for (;;) {
+	bool found = false;
+	
+	if (device.test()) {
+	  found = true;
+	  
+	  if (stream >> bitext)
+	    queue.push_swap(bitext);
+	  else
+	    break;
+	}
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
       
-      while (stream >> bitext)
-	queue.push_swap(bitext);
+      //while (stream >> bitext)
+      //  queue.push_swap(bitext);
 
       // termination...
       queue.push(bitext_type());
