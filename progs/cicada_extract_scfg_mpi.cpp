@@ -153,6 +153,11 @@ int main(int argc, char** argv)
 					      ? new utils::compress_istream(spans_target_file, 1024 * 1024) : 0);
       
       bitext_type bitext;
+      std::string line_source;
+      std::string line_target;
+      std::string line_alignment;
+      std::string line_span_source;
+      std::string line_span_target;
       
       int non_found_iter = 0;
       size_t num_samples = 0;
@@ -165,23 +170,24 @@ int main(int argc, char** argv)
 	    found = true;
 	    
 	    if (device[rank]->flush(true) == 0) {
+	      std::getline(is_src, line_source);
+	      std::getline(is_trg, line_target);
+	      std::getline(is_alg, line_alignment);
 	      
-	      while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
-		is_src >> bitext.source;
-		is_trg >> bitext.target;
-		is_alg >> bitext.alignment;
-		if (is_span_src.get())
-		  *is_span_src >> bitext.spans_source;
-		
-		if (is_span_trg.get())
-		  *is_span_trg >> bitext.spans_target;
-		
-		if (! bitext.source.empty() && ! bitext.target.empty()) break;
-	      }
+	      if (is_span_src.get())
+		std::getline(*is_span_src, line_span_source);
+	      if (is_span_trg.get())
+		std::getline(*is_span_trg, line_span_target);
 	      
 	      if (! is_src || ! is_trg || ! is_alg || (is_span_src.get() && ! *is_span_src) || (is_span_trg.get() && ! *is_span_trg)) break;
 	      
-	      *stream[rank] << bitext << '\n';
+	      *stream[rank] << line_source
+			    << " ||| " << line_target
+			    << " ||| " << line_alignment
+			    << " ||| " << line_span_source
+			    << " ||| " << line_span_target
+			    << '\n';
+	      
 	      ++ num_samples;
 	      if (debug) {
 		if (num_samples % 10000 == 0)

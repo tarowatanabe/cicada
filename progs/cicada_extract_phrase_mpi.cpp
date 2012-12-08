@@ -148,22 +148,12 @@ int main(int argc, char** argv)
 	    found = true;
 
 	    if (device[rank]->flush(true) == 0) {
-#if 0
-	      while (is_src && is_trg && is_alg) {
-		is_src >> bitext.source;
-		is_trg >> bitext.target;
-		is_alg >> bitext.alignment;
-		
-		if (! bitext.source.empty() && ! bitext.target.empty()) break;
-	      }
-#endif
 	      std::getline(is_src, line_source);
 	      std::getline(is_trg, line_target);
 	      std::getline(is_alg, line_alignment);
 	      
 	      if (! is_src || ! is_trg || ! is_alg) break;
 	      
-	      //*stream[rank] << bitext << '\n';
 	      *stream[rank] << line_source << " ||| " << line_target << " ||| " << line_alignment << '\n';
 	      
 	      ++ num_samples;
