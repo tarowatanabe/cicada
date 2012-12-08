@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     if (mpi_rank == 0)
       prepare_directory(output_file);
 
-    static const size_t queue_size = 1024;
+    static const size_t queue_size = 64;
     
     queue_type queue(queue_size);
     task_type task(queue, output_file, max_length, max_fertility, inverse, max_malloc);
@@ -121,8 +121,8 @@ int main(int argc, char** argv)
 	stream[rank].reset(new ostream_type());
 	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	stream[rank]->push(boost::iostreams::zlib_compressor());
-	//stream[rank]->push(codec::lz4_compressor());
+	//stream[rank]->push(boost::iostreams::zlib_compressor());
+	stream[rank]->push(codec::lz4_compressor());
 	stream[rank]->push(*device[rank]);
       }
 
@@ -238,8 +238,8 @@ int main(int argc, char** argv)
       utils::mpi_device_source device(0, bitext_tag, 4096);
       
       boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::zlib_decompressor());
-      //stream.push(codec::lz4_decompressor());
+      //stream.push(boost::iostreams::zlib_decompressor());
+      stream.push(codec::lz4_decompressor());
       stream.push(device);
       
       bitext_type bitext;
