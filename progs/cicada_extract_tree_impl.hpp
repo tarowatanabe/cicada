@@ -76,27 +76,36 @@ struct Bitext
     target.clear();
     alignment.clear();
   }
-  
-  friend
-  std::istream& operator>>(std::istream& is, Bitext& bitext)
+
+  void assign(const std::string& line)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
+    clear();
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end  = line.end();
+    
+    if ((! source.assign(iter, end))
+	|| (! qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
+	|| (! target.assign(iter, end))
+	|| (! qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
+	|| (! alignment.assign(iter, end))
+	|| iter != end)
+      clear();
+  }
+  
+  friend
+  std::istream& operator>>(std::istream& is, Bitext& bitext)
+  {
+    
+    
     bitext.clear();
     std::string line;
-    if (std::getline(is, line)) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end  = line.end();
-      
-      if((!bitext.source.assign(iter, end))
-	 || (!qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
-	 || (!bitext.target.assign(iter, end))
-	 || (!qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
-	 || (!bitext.alignment.assign(iter, end))
-	 || iter != end)
-	bitext.clear();
-    }
+    if (std::getline(is, line))
+      bitext.assign(line);
+    
     return is;
   }
   
