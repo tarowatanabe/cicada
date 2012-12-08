@@ -1,5 +1,5 @@
 2012-12-xx
-New: faster sample distribution for mpi-based phrase/scfg/ghkm/tree-based extraction
+New: faster MapReduce for mpi-based phrase/scfg/ghkm/tree-based extraction
 
 2012-12-5
 New: added IBM Model 4 training
