@@ -171,22 +171,22 @@ int main(int argc, char** argv)
 
 	    found = true;
 	    
-	    if (device[*riter]->flush(true) == 0) {
-	      std::getline(is_src, line_source);
-	      std::getline(is_trg, line_target);
-	      std::getline(is_alg, line_alignment);
-	      
-	      if (! is_src || ! is_trg || ! is_alg) break;
-	      
-	      *stream[*riter] << line_source << " ||| " << line_target << " ||| " << line_alignment << '\n';
-	      
-	      ++ num_samples;
-	      if (debug) {
-		if (num_samples % 10000 == 0)
-		  std::cerr << '.';
-		if (num_samples % 1000000 == 0)
-		  std::cerr << std::endl;
-	      }
+	    if (device[*riter]->flush(true)) continue;
+	    
+	    std::getline(is_src, line_source);
+	    std::getline(is_trg, line_target);
+	    std::getline(is_alg, line_alignment);
+	    
+	    if (! is_src || ! is_trg || ! is_alg) break;
+	    
+	    *stream[*riter] << line_source << " ||| " << line_target << " ||| " << line_alignment << '\n';
+	    
+	    ++ num_samples;
+	    if (debug) {
+	      if (num_samples % 10000 == 0)
+		std::cerr << '.';
+	      if (num_samples % 1000000 == 0)
+		std::cerr << std::endl;
 	    }
 	  }
 	
