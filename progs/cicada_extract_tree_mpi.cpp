@@ -140,10 +140,10 @@ int main(int argc, char** argv)
       
       for (int rank = 1; rank < mpi_size; ++ rank) {
 	stream[rank].reset(new ostream_type());
-	device[rank].reset(new odevice_type(rank, bitext_tag, 128 * 1024, false, true));
+	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	//stream[rank]->push(boost::iostreams::zlib_compressor());
-	stream[rank]->push(codec::lz4_compressor());
+	stream[rank]->push(boost::iostreams::zlib_compressor());
+	//stream[rank]->push(codec::lz4_compressor());
 	stream[rank]->push(*device[rank]);
 	
 	ranks[rank - 1] = rank;
@@ -259,11 +259,11 @@ int main(int argc, char** argv)
 		  << std::endl;
       
     } else {
-      utils::mpi_device_source device(0, bitext_tag, 128 * 1024);
+      utils::mpi_device_source device(0, bitext_tag, 4096);
       
       boost::iostreams::filtering_istream stream;
-      //stream.push(boost::iostreams::zlib_decompressor());
-      stream.push(codec::lz4_decompressor());
+      stream.push(boost::iostreams::zlib_decompressor());
+      //stream.push(codec::lz4_decompressor());
       stream.push(device);
       
       bitext_type bitext;
