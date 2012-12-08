@@ -121,9 +121,9 @@ int main(int argc, char** argv)
 	stream[rank].reset(new ostream_type());
 	device[rank].reset(new odevice_type(rank, bitext_tag, 4096, false, true));
 	
-	stream[rank]->push(boost::iostreams::zlib_compressor(), 256);
+	stream[rank]->push(boost::iostreams::zlib_compressor());
 	//stream[rank]->push(codec::lz4_compressor());
-	stream[rank]->push(*device[rank], 256);
+	stream[rank]->push(*device[rank]);
       }
 
       utils::resource start_extract;
@@ -238,9 +238,9 @@ int main(int argc, char** argv)
       utils::mpi_device_source device(0, bitext_tag, 4096);
       
       boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::zlib_decompressor(), 256);
+      stream.push(boost::iostreams::zlib_decompressor());
       //stream.push(codec::lz4_decompressor());
-      stream.push(device, 256);
+      stream.push(device);
       
       bitext_type bitext;
       int non_found_iter = 0;
