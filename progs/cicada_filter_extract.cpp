@@ -129,14 +129,15 @@ int main(int argc, char** argv)
       
       // push-heap and swap line
       // we memory the temporary score_min and perform pruning
+      const double& score = phrase_pair.counts.front();
       
       if (heap.size() >= nbest) {
-	if (phrase_pair.counts.front() < score_min)
+	if (score < score_min)
 	  continue;
       } else
-	score_min = std::min(score_min, phrase_pair.counts.front());
+	score_min = std::min(score_min, score);
       
-      heap.push_back(score_phrase_pair_type(phrase_pair.counts.front()));
+      heap.push_back(score_phrase_pair_type(score));
       heap.back().line.swap(line);
       std::push_heap(heap.begin(), heap.end(), std::less<score_phrase_pair_type>());
     }
