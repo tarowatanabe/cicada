@@ -67,7 +67,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 int buffer_size = 1024 * 1024;
-int nbest = 100;
+size_t nbest = 100;
 
 int debug = 0;
 
@@ -88,8 +88,9 @@ int main(int argc, char** argv)
     phrase_pair_type     phrase_pair;
     
     heap_type heap;
+    double score_min = std::numeric_limits<double>::infinity();
     
-    PhrasePairParser    parser;
+    PhrasePairParser  parser;
     std::string line;
     
     while (std::getline(is, line)) {
@@ -98,7 +99,7 @@ int main(int argc, char** argv)
       
       if (phrase_pair.source != source_prev) {
 	if (! heap.empty()) {
-	  if (static_cast<int>(heap.size()) <= nbest) {
+	  if (heap.size() <= nbest) {
 	    heap_type::iterator iter_end = heap.end();
 	    for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
 	      os << iter->line << '\n';
@@ -122,17 +123,26 @@ int main(int argc, char** argv)
 	}
 	
 	heap.clear();
+	score_min = std::numeric_limits<double>::infinity();
 	source_prev = phrase_pair.source;
       }
       
       // push-heap and swap line
+      // we memory the temporary score_min and perform pruning
+      
+      if (heap.size() >= nbest) {
+	if (phrase_pair.counts.front() < score_min)
+	  continue;
+      } else
+	score_min = std::min(score_min, phrase_pair.counts.front());
+      
       heap.push_back(score_phrase_pair_type(phrase_pair.counts.front()));
       heap.back().line.swap(line);
       std::push_heap(heap.begin(), heap.end(), std::less<score_phrase_pair_type>());
     }
     
     if (! heap.empty()) {
-      if (static_cast<int>(heap.size()) <= nbest) {
+      if (heap.size() <= nbest) {
 	heap_type::iterator iter_end = heap.end();
 	for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
 	  os << iter->line << '\n';
@@ -173,7 +183,7 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("nbest", po::value<int>(&nbest)->default_value(nbest), "nbest of pairs (wrt to joint-count)")
+    ("nbest", po::value<size_t>(&nbest)->default_value(nbest), "nbest of pairs (wrt to joint-count)")
     
     ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
