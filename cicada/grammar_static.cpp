@@ -998,6 +998,11 @@ namespace cicada
     
     if (file == path()) return;
     
+    if (debug)
+      std::cerr << "grammar writing at: " << file.string() << std::endl;
+    
+    utils::resource start;
+
     repository_type rep(file, repository_type::write);
     
     rule_db.write(rep.path("rule"));
@@ -1043,6 +1048,14 @@ namespace cicada
     
     rep["feature-size"]   = utils::lexical_cast<std::string>(feature_size);
     rep["attribute-size"] = utils::lexical_cast<std::string>(attribute_size);
+
+    utils::resource end;
+    
+    if (debug)
+      std::cerr << "writing:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
   }
   
   void GrammarStaticImpl::read_binary(const std::string& parameter)

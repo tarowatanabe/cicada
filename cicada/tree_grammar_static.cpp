@@ -927,6 +927,11 @@ namespace cicada
     typedef utils::repository repository_type;
     
     if (file == path()) return;
+
+    if (debug)
+      std::cerr << "grammar writing at: " << file.string() << std::endl;
+    
+    utils::resource start;
     
     repository_type rep(file, repository_type::write);
     
@@ -976,6 +981,14 @@ namespace cicada
     rep["feature-size"] = utils::lexical_cast<std::string>(feature_size);
     rep["attribute-size"] = utils::lexical_cast<std::string>(attribute_size);
     rep["cky"] = utils::lexical_cast<std::string>(cky);
+
+    utils::resource end;
+    
+    if (debug)
+      std::cerr << "writing:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
   }
   
   
