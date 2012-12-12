@@ -195,6 +195,8 @@ if __name__ == '__main__':
 
     if options.fallback:
         print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
+        print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(optins.glue)
+        print "# tree-grammar = fallback"
         print
 
     ### feature-functions
