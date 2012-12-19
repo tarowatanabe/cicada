@@ -163,3 +163,14 @@ msgpack for succinct storage
 
 Rearrange learning code by splitting L2 and/or L1 projection
   Especially for online-learning, they can be set up as additional "unified" code
+
+Add asynchronous online learning inspired by the David Chiang's parallel method
+   We will not distribute support vectors, but simply send "diffs"  and receive "result"
+   How to handle adaptive learning rate scaling?
+
+Non-linear features
+   The decoder uses non-linear combination with hidden layers... How to implement on cicada?
+   Use a special dot-product function which project all the features to the hidden layers, then, perform combination
+     - Training should perform hyper-edge-wise, not a simple sentence-wise training...
+     - Thus, we will dump forest, and perform forest-wise training, or dump k-best trees represented as a set of hypergraphs.
+
