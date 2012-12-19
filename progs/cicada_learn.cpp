@@ -541,6 +541,7 @@ struct OptimizeXBLEU
     if (regularize_l1) {
       param.orthantwise_c = C;
       param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+      param.orthantwise_start = 1;
     } else
       param.orthantwise_c = 0.0;
     
@@ -548,8 +549,14 @@ struct OptimizeXBLEU
     
     objective_opt = std::numeric_limits<double>::infinity();
     double objective = 0.0;
-        
+    
+    // swapping...!
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    
+    // swapping...!
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
     
     if (debug)
       std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
@@ -1177,6 +1184,9 @@ struct OptimizeXBLEU
     
     OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
     
+    // swapping...!
+    std::swap(optimizer.weights[feature_type(feature_type::id_type(0))], optimizer.weights[optimizer.feature_scale]);
+    
     queue_type queue;
     task_set_type tasks(threads, task_type(queue,
 					   optimizer.forests,
@@ -1331,6 +1341,10 @@ struct OptimizeXBLEU
       optimizer.weights_opt = optimizer.weights;
     }
     
+    // swapping...!
+    std::swap(optimizer.weights[feature_type(feature_type::id_type(0))], optimizer.weights[optimizer.feature_scale]);
+    std::swap(g[0], g[optimizer.feature_scale.id()]);
+    
     return objective;
   }
 };
@@ -1360,7 +1374,7 @@ struct OptimizeLBFGS
     
     objective_opt = std::numeric_limits<double>::infinity();
     double objective = 0.0;
-    
+
     const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
     if (debug)
