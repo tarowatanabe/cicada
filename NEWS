@@ -1,8 +1,8 @@
-2012-12-xx
+2012-12-19
 New: faster MapReduce for mpi-based phrase/scfg/ghkm/tree-based extraction
 
 2012-12-5
-New: added IBM Model 4 training
+New: added IBM Model 4 training. Now, Model 1 -> HMM -> Model 4 training is the default.
 
 2012-11-27
 Bugfix: kbest-based (mert) learner/oracle computer core dump!
