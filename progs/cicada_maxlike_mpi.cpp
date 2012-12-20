@@ -304,10 +304,11 @@ struct OptimizeLBFGS
     lbfgs_parameter_t param;
     lbfgs_parameter_init(&param);
     
-    if (regularize_l1) {
+    param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+    
+    if (regularize_l1)
       param.orthantwise_c = C;
-      param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
-    } else
+    else
       param.orthantwise_c = 0.0;
     
     param.max_iterations = iteration;
