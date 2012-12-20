@@ -1,5 +1,7 @@
-2013-x-xx
+2012-12-20
 New: support L1 regularization for xBLEU
+Bugfix: Use of a rather conventional backtracking line search strategy, not the strategy of the original LBFGS
+	to avoid line-search failure
 
 2012-12-19
 New: faster MapReduce for mpi-based phrase/scfg/ghkm/tree-based extraction
