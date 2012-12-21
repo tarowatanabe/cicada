@@ -174,3 +174,10 @@ Non-linear features
      - Training should perform hyper-edge-wise, not a simple sentence-wise training...
      - Thus, we will dump forest, and perform forest-wise training, or dump k-best trees represented as a set of hypergraphs.
 
+Transform matrix into column-major to avoid confusion with fortran/BLAS etc. and use of "standard" matrix
+  Eigen, armagillo, vienna-cl?
+  I think eigen is easier since it can plug by copying headers...
+
+Use of "float" not "double" for better integration with GPUs
+#  And people will not care such precision...
+
