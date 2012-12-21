@@ -164,9 +164,9 @@ class PBS:
         if memory >= 1.0:
             mem=":mem=%dgb" %(int(memory))
         elif memory >= 0.001:
-            mem=":mem=%dmb" %(int(amount * 1000))
+            mem=":mem=%dmb" %(int(memory * 1000))
         elif memory >= 0.000001:
-            mem=":mem=%dkb" %(int(amount * 1000 * 1000))
+            mem=":mem=%dkb" %(int(memory * 1000 * 1000))
 
         pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1%s\n" %(threads, mem))
 
