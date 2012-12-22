@@ -19,30 +19,9 @@ namespace cicada
   {
     std::string BleuS::description() const
     {
-      std::vector<double, std::allocator<double> > precisions;
-      
-      const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
-      
-      double score = 0.0;
-      
-      for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	const double logp = std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
-	
-	score += logp;
-	
-	precisions.push_back(std::exp(logp));
-      }
-      
-      score /= ngrams_hypothesis.size();
-      score += penalty;
-      
       std::ostringstream stream;
-      stream << "bleus: " << std::exp(score) << ' ';
-      if (! precisions.empty()) {
-	std::copy(precisions.begin(), precisions.end() - 1, std::ostream_iterator<double>(stream, "|"));
-	stream << precisions.back();
-      }
-      stream << " penalty: " << std::exp(penalty);
+      
+      stream << "bleus: " << score() << " bleu: " << bleu << " penalty: " << penalty;
       
       return stream.str();
     }
@@ -52,23 +31,15 @@ namespace cicada
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"bleus\",";
-      stream << "\"reference\":[";
-      stream << escaper(length_reference);
-      for (size_t i = 0; i != ngrams_reference.size(); ++ i)
-	stream << ',' << escaper(ngrams_reference[i]);
-      stream << "],";
-      stream << "\"hypothesis\":[";
-      stream << escaper(length_hypothesis);
-      for (size_t i = 0; i != ngrams_hypothesis.size(); ++ i)
-	stream << ',' << escaper(ngrams_hypothesis[i]);
-      stream << "]";
-      stream << '}';
+      stream << "\"bleu\":" << escaper(bleu) 
+	     << ','
+	     << "\"penalty\":" << escaper(penalty)
+	     << '}';
       
       return stream.str();
     }
 
-    typedef std::vector<double, std::allocator<double> > bleus_parsed_type;
-    typedef std::pair<bleus_parsed_type, bleus_parsed_type> bleus_parsed_pair_type;
+    typedef std::pair<double, double> bleus_parsed_pair_type;
 
     template <typename Iterator>
     struct bleus_parser : boost::spirit::qi::grammar<Iterator, bleus_parsed_pair_type(), boost::spirit::standard::space_type>
@@ -78,22 +49,17 @@ namespace cicada
 	namespace qi = boost::spirit::qi;
 	namespace standard = boost::spirit::standard;
 	
-	double_values %= double_value % ',';
-	
 	bleus_parsed %= (qi::lit('{')
 			 >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"bleus\"") >> qi::lit(',')
-			 >> qi::lit("\"reference\"") >> qi::lit(':')
-			 >> qi::lit('[') >> double_values >> qi::lit(']') >> qi::lit(',')
-			 >> qi::lit("\"hypothesis\"") >> qi::lit(':')
-			 >> qi::lit('[') >> double_values >> qi::lit(']')
+			 >> qi::lit("\"bleu\"") >> qi::lit(':') >> double_value >> qi::lit(',')
+			 >> qi::lit("\"penalty\"") >> qi::lit(':') >> double_value
 			 >> qi::lit('}'));
-	  
+	
       }
       
       typedef boost::spirit::standard::space_type space_type;
       
       double_base64_parser<Iterator> double_value;
-      boost::spirit::qi::rule<Iterator, bleus_parsed_type(), space_type> double_values;
       boost::spirit::qi::rule<Iterator, bleus_parsed_pair_type(), space_type> bleus_parsed;
     };
 
@@ -111,12 +77,10 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<BleuS> bleus(new BleuS(0));
+      std::auto_ptr<BleuS> bleus(new BleuS());
       
-      bleus->length_reference = bleus_parsed.first.front();
-      bleus->ngrams_reference.insert(bleus->ngrams_reference.end(), bleus_parsed.first.begin() + 1, bleus_parsed.first.end());
-      bleus->length_hypothesis = bleus_parsed.second.front();
-      bleus->ngrams_hypothesis.insert(bleus->ngrams_hypothesis.end(), bleus_parsed.second.begin() + 1, bleus_parsed.second.end());
+      bleus->bleu = bleus_parsed.first;
+      bleus->penalty = bleus_parsed.second;
       
       return score_ptr_type(bleus.release());
     }
@@ -164,13 +128,19 @@ namespace cicada
       typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 	
       typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
+      typedef utils::simple_vector<count_type, std::allocator<count_type> > ngram_counts_type;
 	
       sentence_type sentence;
       tokenize(__sentence, sentence);
-	
-      std::auto_ptr<BleuS> bleus(new BleuS(order));
+      
+      std::auto_ptr<BleuS> bleus(new BleuS());
       counts_set_type counts(order);
-	
+      
+      ngram_counts_type ngrams_reference(order, 0);
+      ngram_counts_type ngrams_hypothesis(order, 0);
+      count_type        length_reference(0);
+      count_type        length_hypothesis(0);
+      
       const int hypothesis_size = sentence.size();
 	
       int reference_size = 0;
@@ -186,12 +156,12 @@ namespace cicada
 	  reference_size = utils::bithack::min(reference_size, *siter);
       }
 	
-      bleus->length_hypothesis += hypothesis_size;
-      bleus->length_reference  += reference_size;
+      length_hypothesis += hypothesis_size;
+      length_reference  += reference_size;
 	
       // collect total counts...
       for (int n = 0; n < utils::bithack::min(order, hypothesis_size); ++ n)
-	bleus->ngrams_reference[n] += hypothesis_size - n;
+	ngrams_reference[n] += hypothesis_size - n;
 	
       // collect ngrams matched with references
       sentence_type::const_iterator siter_end = sentence.end();
@@ -213,9 +183,25 @@ namespace cicada
       for (int n = 0; n < order; ++ n) {
 	counts_type::const_iterator citer_end = counts[n].end();
 	for (counts_type::const_iterator citer = counts[n].begin(); citer != citer_end; ++ citer)
-	  bleus->ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
+	  ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
       }
+      
+      bleus->penalty = 1;
+      if (ngrams_hypothesis[0] == 0.0)
+	bleus->bleu = 0.0;
+      else {
+	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
+	double score = 0.0;
+	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n)
+	  score += std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
+	
+	score /= ngrams_hypothesis.size();
+	score += penalty;
+	
+	bleus->bleu = std::exp(score);
+      }
+      
       return score_ptr_type(bleus.release());
     }
     

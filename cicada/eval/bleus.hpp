@@ -31,29 +31,13 @@ namespace cicada
     {
     public:
       typedef double count_type;
-      
-      typedef utils::simple_vector<count_type, std::allocator<count_type> > ngram_counts_type;
 
-    public:      
-      BleuS(const int order)
-	: ngrams_reference(order, 0),  ngrams_hypothesis(order, 0),
-	  length_reference(0), length_hypothesis(0) {}
+    public:
+      BleuS() : bleu(0), penalty(0) {}
       
       double score() const
       {
-	if (ngrams_hypothesis.empty() || ngrams_hypothesis[0] == 0.0) return 0.0;
-	
-	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
-	
-	double score = 0.0;
-	
-	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n)
-	  score += std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
-	
-	score /= ngrams_hypothesis.size();
-	score += penalty;
-	
-	return std::exp(score);
+	return (penalty == 0.0 ? 0.0 : bleu / penalty);
       }
 
       double loss() const { return 1.0 - score(); }
@@ -68,10 +52,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 	
-	return (ngrams_reference == rhs->ngrams_reference
-		&& ngrams_hypothesis == rhs->ngrams_hypothesis
-		&& length_reference == rhs->length_reference
-		&& length_hypothesis == rhs->length_hypothesis);
+	return (bleu == rhs->bleu && penalty == rhs->penalty);
       }
 
       void assign(const score_type& score)
@@ -80,11 +61,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 	
-	ngrams_reference  = rhs->ngrams_reference;
-	ngrams_hypothesis = rhs->ngrams_hypothesis;
-	
-	length_reference  = rhs->length_reference;
-	length_hypothesis = rhs->length_hypothesis;
+	bleu    = rhs->bleu;
+	penalty = rhs->penalty;
       }
       
       void plus_equal(const score_type& score)
@@ -92,12 +70,9 @@ namespace cicada
 	const BleuS* rhs = dynamic_cast<const BleuS*>(&score);
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
-	
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  rhs->ngrams_reference.begin(),  ngrams_reference.begin(),  std::plus<count_type>());
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), rhs->ngrams_hypothesis.begin(), ngrams_hypothesis.begin(), std::plus<count_type>());
-	
-	length_reference  += rhs->length_reference;
-	length_hypothesis += rhs->length_hypothesis;
+
+	bleu    += rhs->bleu;
+	penalty += rhs->penalty;
       }
       
       void minus_equal(const score_type& score)
@@ -105,35 +80,26 @@ namespace cicada
 	const BleuS* rhs = dynamic_cast<const BleuS*>(&score);
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
-	
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  rhs->ngrams_reference.begin(),  ngrams_reference.begin(),  std::minus<count_type>());
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), rhs->ngrams_hypothesis.begin(), ngrams_hypothesis.begin(), std::minus<count_type>());
-	
-	length_reference  -= rhs->length_reference;
-	length_hypothesis -= rhs->length_hypothesis;
+
+	bleu    -= rhs->bleu;
+	penalty -= rhs->penalty;
       }
       
       void multiplies_equal(const double& scale)
       {
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  ngrams_reference.begin(),  std::bind2nd(std::multiplies<count_type>(), scale));
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), ngrams_hypothesis.begin(), std::bind2nd(std::multiplies<count_type>(), scale));
-	
-	length_reference  *= scale;
-	length_hypothesis *= scale;
+	bleu    *= scale;
+	penalty *= scale;
       }
       
       void divides_equal(const double& scale)
       {
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  ngrams_reference.begin(),  std::bind2nd(std::divides<count_type>(), scale));
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), ngrams_hypothesis.begin(), std::bind2nd(std::divides<count_type>(), scale));
-	
-	length_reference  /= scale;
-	length_hypothesis /= scale;
+	bleu    /= scale;
+	penalty /= scale;
       }
       
       score_ptr_type zero() const
       {
-	return score_ptr_type(new BleuS(ngrams_hypothesis.size()));
+	return score_ptr_type(new BleuS());
       }
 
       score_ptr_type clone() const
@@ -147,10 +113,8 @@ namespace cicada
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
       static score_ptr_type decode(const utils::piece& encoded);
 
-      ngram_counts_type ngrams_reference;
-      ngram_counts_type ngrams_hypothesis;
-      count_type        length_reference;
-      count_type        length_hypothesis;
+      count_type bleu;
+      count_type penalty;
     };
     
 
