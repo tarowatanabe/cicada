@@ -366,17 +366,8 @@ namespace cicada
 	
 	// for count set representation
 	states_counts.clear();
-	
-	score.reset();
       }
-
-      void insert(const score_ptr_type& __score)
-      {
-	score = __score;
-	
-	if (score && ! dynamic_cast<const cicada::eval::BleuS*>(score.get()))
-	  throw std::runtime_error("this is not a bleus-score!");
-      }
+      
       
       void insert(const sentence_type& __sentence)
       {
@@ -546,51 +537,25 @@ namespace cicada
 	
 	const count_set_type& counts = (exact ? counts_bleus : __counts);
 
-	const cicada::eval::BleuS* __bleus = (score ? dynamic_cast<const cicada::eval::BleuS*>(score.get()) : 0);
 	
-	if (__bleus && __bleus->length_reference > 0) {
-	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
-	  const double reference_length  = ref_size(hypothesis_length);
+	if (hypothesis_size == 0 || counts.empty() || counts[0] == 0.0) return 0.0;
+	
+	const double hypothesis_length = tst_size(hypothesis_size, scaling);
+	const double reference_length  = ref_size(hypothesis_length);
+	
+	double bleus = brevity_penalty(hypothesis_length, reference_length);
+	
+	const double factor = 1.0 / order;
+	for (int n = 1; n <= order; ++ n) {
+	  const double smooth = double(n != 1);
 	  
-	  double bleus = brevity_penalty(hypothesis_length + __bleus->length_hypothesis, reference_length + __bleus->length_reference);
-	  
-	  const size_t ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	  
-	  double count0 = 0.0;
-	  const double factor = 1.0 / order;
-	  for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
-	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
-				  + (n <= __bleus->ngrams_hypothesis.size() ? double(__bleus->ngrams_hypothesis[n - 1]) : 0.0));
-	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
-				  + (n <= __bleus->ngrams_reference.size() ? double(__bleus->ngrams_reference[n - 1]) : 0.0));
-	    
-	    bleus += (std::log(count + (n != 1)) - std::log(norm + (n != 1))) * factor;
-	    
-	    if (n == 1)
-	      count0 = count;
-	  }
-	  
-	  return (count0 == 0.0 ? 0.0 : std::exp(bleus));
-	} else {
-	  if (hypothesis_size == 0 || counts.empty() || counts[0] == 0.0) return 0.0;
-	  
-	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
-	  const double reference_length  = ref_size(hypothesis_length);
-	  
-	  double bleus = brevity_penalty(hypothesis_length, reference_length);
-	  
-	  const double factor = 1.0 / order;
-	  for (int n = 1; n <= order; ++ n) {
-	    const double smooth = double(n != 1);
-	    
-	    if (n <= static_cast<int>(counts.size()))
-	      bleus += (std::log(counts[n - 1] + smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
-	    else
-	      bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
-	  }
-	  
-	  return std::exp(bleus);
+	  if (n <= static_cast<int>(counts.size()))
+	    bleus += (std::log(counts[n - 1] + smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
+	  else
+	    bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
 	}
+	
+	return std::exp(bleus);
       }
 
       double tst_size(int length, const bool scaling=true) const
@@ -632,8 +597,6 @@ namespace cicada
       size_set_type  sizes;
       
       states_count_set_type states_counts;
-      
-      score_ptr_type score;
 
       int order;
       bool exact;
@@ -810,11 +773,5 @@ namespace cicada
 	throw std::runtime_error("no reference set?");
     }
     
-
-    void BleuS::assign(const score_ptr_type& score)
-    {
-      pimpl->insert(score);
-    }
-
   };
 };

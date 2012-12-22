@@ -86,7 +86,7 @@ namespace cicada
       
       // bleus specific...
       virtual bool error_metric() const { return false; }
-      virtual void assign(const score_ptr_type& score);
+      virtual void assign(const score_ptr_type& score) {}
       
     private:
       impl_type* pimpl;
