@@ -8,6 +8,7 @@
 
 //
 // Base class for NN layer
+// We assume that input/outputs are simply one-dimensional (thus, we do not handle image, but "sentence")
 //
 // We will hold all the data in single precision, not double precision for compatibility
 // with GPU (via tensor_type).

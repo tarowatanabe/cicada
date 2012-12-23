@@ -19,17 +19,6 @@ namespace cicada
     public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
-
-      double function(const double& value) const
-      {
-	return 1.0 / (1.0 + std::exp(- value));
-      }
-      
-      double derivative(const double& value) const
-      {
-	const double z = function(value);
-	return (1.0 - z) * z;
-      }
     };
   };
 };
