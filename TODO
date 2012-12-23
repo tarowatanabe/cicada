@@ -181,3 +181,4 @@ Transform matrix into column-major to avoid confusion with fortran/BLAS etc. and
 Use of "float" not "double" for better integration with GPUs
 #  And people will not care such precision...
 
+Use of eigen for weight vector maintenance... (for potentially faster computation...)
