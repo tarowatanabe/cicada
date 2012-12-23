@@ -8,20 +8,26 @@
 
 #include <cmath>
 
+#include <cicada/neuron/layer.hpp>
+
 namespace cicada
 {
   namespace neuron
   {
-    struct tanh
+    class Tanh : public Layer
     {
-      double operator()(const double& value) const
+    public:
+      virtual void forward(const tensor_type& data_input);
+      virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
+
+      double function(const double& value) const
       {
         return std::tanh(vaue);
       }
       
       double derivative(const double& value) const
       {
-	const double z = operator()(value);
+	const double z = function(value);
 	return 1.0 - z * z;
       }
     };
