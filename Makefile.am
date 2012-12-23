@@ -1,7 +1,7 @@
 
 ACLOCAL_AMFLAGS = -I config
 
-SUBDIRS = utils codec succinct_db libstemmer_c wn liblinear liblbfgs cicada progs scripts
+SUBDIRS = utils codec succinct_db libstemmer_c wn liblinear liblbfgs eigen cicada progs scripts
 
 EXTRA_DIST = \
 TODO \

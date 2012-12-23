@@ -21,8 +21,6 @@ namespace cicada
     public:
       tensor_type weight;
       tensor_type bias;
-      tensor_type gradient_weight;
-      tensor_type gradient_bias;
     };
   };
 };
