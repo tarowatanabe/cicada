@@ -16,6 +16,7 @@
 #include <cicada/feature.hpp>
 
 #include <utils/bithack.hpp>
+#include <utils/aligned_allocator.hpp>
 
 namespace cicada
 {
@@ -29,7 +30,7 @@ namespace cicada
   template <typename Tp, typename Alloc >
   class FeatureVectorLinear;
 
-  template <typename Tp, typename Alloc=std::allocator<Tp> >
+  template <typename Tp, typename Alloc=utils::aligned_allocator<Tp> >
   class WeightVector
   {
   public:

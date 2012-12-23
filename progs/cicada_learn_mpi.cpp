@@ -826,7 +826,7 @@ struct OptimizeXBLEU
       //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
     }
 
-    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::WeightVector<weight_type > gradient_type;
     typedef std::vector<gradient_type, std::allocator<gradient_type> > gradients_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
 
@@ -1587,7 +1587,7 @@ struct OptimizeLBFGS
   {
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
+    typedef cicada::WeightVector<weight_type > gradient_static_type;
 
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
 

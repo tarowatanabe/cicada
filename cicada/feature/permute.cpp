@@ -44,7 +44,7 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
 
-      typedef cicada::WeightVector<double, std::allocator<double> > weight_set_type;
+      typedef cicada::WeightVector<double> weight_set_type;
       
       PermuteImpl() : feature("permute"), collapse(false) {}
 

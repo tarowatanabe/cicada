@@ -105,7 +105,7 @@ struct OptimizerBase
   
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-  typedef cicada::WeightVector<weight_type, std::allocator<weight_type> >  expectation_type;
+  typedef cicada::WeightVector<weight_type >  expectation_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > inside_set_type;
   
