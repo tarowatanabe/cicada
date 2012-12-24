@@ -22,8 +22,7 @@ namespace cicada
       tensor_type weight;
       tensor_type bias;
       
-      size_type frame_input;
-      size_type frame_output;
+      size_type frame;
       size_type kW;
       size_type dW;
     };
