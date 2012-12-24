@@ -182,3 +182,7 @@ Use of "float" not "double" for better integration with GPUs
 #  And people will not care such precision...
 
 Use of eigen for weight vector maintenance... (for potentially faster computation...)
+
+Revise the neuron modules to support computation with more dimensions (not assuming single dimension...)
+
+Add "embedding" structure to hold word-embedding features (a float-vector!)

@@ -10,6 +10,8 @@
 
 #include <cicada/neuron/layer.hpp>
 
+#include <Eigen/Core>
+
 namespace cicada
 {
   namespace neuron
@@ -17,11 +19,18 @@ namespace cicada
     class Min : public Layer
     {
     public:
-      virtual void forward(const tensor_type& data_input);
-      virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
+      Min(const bool __dimension=false) : dimension(__dimension) {}
       
     public:
-      tensor_type::IndexType index;
+      virtual void forward(const tensor_type& data_input);
+      virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
+
+    private:
+      typedef Eigen::Matrix<int, Eigen::Dynamic, 1> index_set_type;
+      
+    private:
+      index_set_type indices;
+      bool dimension;
     };
   };
 };

@@ -17,8 +17,14 @@ namespace cicada
     class Mean : public Layer
     {
     public:
+      Mean(const bool __dimension=false) : dimension(__dimension) {}
+
+    public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
+      
+    private:
+      bool dimension;
     };
   };
 };
