@@ -15,7 +15,7 @@ namespace cicada
     
     void Sqrt::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.array() = 0.5 * gradient_output.array() / data_output.array();
+      gradient_input = 0.5 * gradient_output.array() / data_output.array();
     }
   }
 }

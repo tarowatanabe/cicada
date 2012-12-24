@@ -15,7 +15,7 @@ namespace cicada
     
     void Square::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.array() = 2.0 * gradient_output.array() * data_input.array();
+      gradient_input = 2.0 * gradient_output.array() * data_input.array();
     }
   }
 }
