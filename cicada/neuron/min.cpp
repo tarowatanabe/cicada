@@ -1,4 +1,6 @@
-
+//
+//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include "cicada/neuron/min.hpp"
 
