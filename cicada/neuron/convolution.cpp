@@ -13,7 +13,7 @@ namespace cicada
       const size_type n_frame_input  = data_input.cols();
       const size_type n_frame_output = (n_frame_input - kW) / dW + 1;
       
-      data_output.resize(frame_output, n_frame_output);
+      data_output.resize(frame, n_frame_output);
       
       for (size_type k = 0; k != n_frame_output; ++ k)
 	data_output.col(k) = data_input.block(0, k * dW, data_input.rows(), kW).rowwise().sum().array() * weight.array() + bias.array();
