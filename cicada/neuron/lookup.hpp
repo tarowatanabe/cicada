@@ -12,6 +12,8 @@
 
 #include <cicada/neuron/layer.hpp>
 
+#include <vector>
+
 namespace cicada
 {
   namespace neuron
@@ -26,10 +28,11 @@ namespace cicada
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
+      
     public:
-      size_type   size;
-      tensor_type weight;
-      tensor_type gradient_weight;
+      size_type     size;
+      tensor_type   weight;
+      tensor_type   gradient_weight;
     };
   };
 };

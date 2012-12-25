@@ -8,9 +8,9 @@
 
 #include <cmath>
 
-#include <cicada/neuron/layer.hpp>
+#include <vector>
 
-#include <Eigen/Core>
+#include <cicada/neuron/layer.hpp>
 
 namespace cicada
 {
@@ -26,8 +26,9 @@ namespace cicada
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) {}
       virtual layer_ptr_type clone() const { return layer_ptr_type(new Min(*this)); }
+
     private:
-      typedef Eigen::Matrix<int, Eigen::Dynamic, 1> index_set_type;
+      typedef std::vector<int, std::allocator<int> > index_set_type;
       
     private:
       index_set_type indices;

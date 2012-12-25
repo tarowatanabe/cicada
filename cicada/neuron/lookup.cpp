@@ -15,7 +15,7 @@ namespace cicada
       if (data_input.cols() != 1)
 	throw std::runtime_error("invalid input");
 
-      data_output.resize(size, data_input.rows());
+      data_output.conservativeResize(size, data_input.rows());
       
       // we will cast data_input as a sequence of index...
       const uint32_t* first = reinterpret_cast<const uint32_t*>(data_input.data());
@@ -27,7 +27,7 @@ namespace cicada
 	  const size_type frame_first = weight.cols();
 	  const size_type frame_last  = *first + 1;
 	  
-	  weight.conservativeResize(Eigen::NoChange, *first + 1);
+	  weight.conservativeResize(size, *first + 1);
 	  for (size_type i = frame_first; i != frame_last; ++ i)
 	    weight.col(i).setRandom();
 	}
@@ -50,7 +50,7 @@ namespace cicada
       if (gradient_output.rows() != size)
 	throw std::runtime_error("invalid gradient output");
       
-      gradient_weight.resizeLike(weight);
+      gradient_weight.conservativeResizeLike(weight);
       
       // we do not clear all, but only required part...
       //gradient_weight.setZero();
