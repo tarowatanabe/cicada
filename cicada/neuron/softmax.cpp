@@ -2,7 +2,11 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <climits>
+
 #include "cicada/neuron/softmax.hpp"
+
+#include "utils/mathop.hpp"
 
 namespace cicada
 {
@@ -15,8 +19,8 @@ namespace cicada
       const double infty = - std::numeric_limits<double>::infinity();
       
       double logsum = infty;
-      for (size_type i = 0; i != data_input.size(); ++ i) {
-	const double value = data_input[i];
+      for (difference_type i = 0; i != data_input.rows(); ++ i) {
+	const double value = data_input.col(0)[i];
 	
 	if (logsum == infty)
 	  logsum = value;

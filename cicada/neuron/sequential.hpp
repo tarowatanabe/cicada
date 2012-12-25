@@ -6,6 +6,8 @@
 #ifndef __CICADA__NEURON_SEQUENTIAL__HPP__
 #define __CICADA__NEURON_SEQUENTIAL__HPP__ 1
 
+#include <vector>
+
 #include <cicada/neuron/layer.hpp>
 
 namespace cicada
@@ -28,6 +30,7 @@ namespace cicada
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
+      virtual layer_ptr_type clone() const;
     private:
       typedef std::vector<layer_ptr_type, std::allocator<layer_ptr_type> > layer_set_type;
       

@@ -17,13 +17,13 @@ namespace cicada
     void Linear::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
       // assume eigen's operator!
-      gradient_input = weight.transpose() * gradient_output + 1;
+      gradient_input = (weight.transpose() * gradient_output).array() + 1.0;
     }
     
     void Linear::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_weight += gradient_output * data_input.transpose();
-      gradient_bias   += gradient_output;
+      gradient_weight = gradient_output * data_input.transpose();
+      gradient_bias   = gradient_output;
     }
   }
 }

@@ -15,7 +15,7 @@ namespace cicada
     
     void Log::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.array() = data_input.array() / gradient_output.array();
+      gradient_input = data_input.array() / gradient_output.array();
     }
   }
 }

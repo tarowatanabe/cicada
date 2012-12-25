@@ -17,6 +17,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <Eigen/Core>
+
 namespace cicada
 {
   namespace neuron
@@ -30,6 +32,9 @@ namespace cicada
       typedef Layer                         layer_type;
       typedef boost::shared_ptr<layer_type> layer_ptr_type;
       
+      typedef float parameter_type;
+      typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
+      
     public:
       Layer() {}
       virtual ~Layer() {}
@@ -39,15 +44,10 @@ namespace cicada
       virtual void forward(const tensor_type& data_input) = 0;
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
-      
+      virtual layer_ptr_type clone() const = 0;
     public:
-      // we will explicitly comment out unused data structure...!
-      
-      //tensor_type data_input;
       tensor_type data_output;
-      
       tensor_type gradient_input;
-      //tensor_type gradient_output;
     };
   };
 };

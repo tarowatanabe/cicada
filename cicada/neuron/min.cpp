@@ -18,14 +18,14 @@ namespace cicada
 	for (size_type row = 0; row != data_input.rows(); ++ row) {
 	  int col_min = 0;
 	  data_output.col(0)[row] = data_input.row(row).minCoeff(&col_min);
-	  indices[row] = row_min;
+	  indices[row] = col_min;
 	}
       } else {
 	// select column and compute row-min!
 	data_output.resize(data_input.cols(), 1);
-	indices.resize(data_input.cols(),);
+	indices.resize(data_input.cols());
 	
-	for (size_tyep col = 0; col != data_input.cols(); ++ col) {
+	for (size_type col = 0; col != data_input.cols(); ++ col) {
 	  int row_min = 0;
 	  data_output.col(0)[col] = data_input.col(col).minCoeff(&row_min);
 	  indices[col] = row_min;

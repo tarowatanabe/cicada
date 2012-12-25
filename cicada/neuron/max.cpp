@@ -18,14 +18,14 @@ namespace cicada
 	for (size_type row = 0; row != data_input.rows(); ++ row) {
 	  int col_max = 0;
 	  data_output.col(0)[row] = data_input.row(row).maxCoeff(&col_max);
-	  indices[row] = row_max;
+	  indices[row] = col_max;
 	}
       } else {
 	// select column and compute row-max!
 	data_output.resize(data_input.cols(), 1);
 	indices.resize(data_input.cols());
 	
-	for (size_tyep col = 0; col != data_input.cols(); ++ col) {
+	for (size_type col = 0; col != data_input.cols(); ++ col) {
 	  int row_max = 0;
 	  data_output.col(0)[col] = data_input.col(col).maxCoeff(&row_max);
 	  indices[col] = row_max;

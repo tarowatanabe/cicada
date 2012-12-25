@@ -33,9 +33,15 @@ namespace cicada
     void Convolution::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
     {
       const size_type n_frame_output = gradient_output.cols();
+
+      gradient_weight.resizeLike(weight);
+      gradient_bias.resizeLike(bias);
+
+      gradient_weight.setZero();
+      gradient_bias.setZero();
       
       for (size_type k = 0; k != n_frame_output; ++ k) {
-	gradient_weight += data_input.block(0, k * dW, data_input.rows(), kW).rowwise().sum().array() * gradient_output.col(k).array();
+	gradient_weight.array() += data_input.block(0, k * dW, data_input.rows(), kW).rowwise().sum().array() * gradient_output.col(k).array();
 	gradient_bias   += gradient_output.col(k);
       }
     }

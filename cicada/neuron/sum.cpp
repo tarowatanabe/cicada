@@ -10,19 +10,10 @@ namespace cicada
   {
     void Sum::forward(const tensor_type& data_input)
     {
-      if (dimension) {
-	// select row and compute column-sum
-	data_output.resize(data_input.rows(), 1);
-	
-	for (size_type row = 0; row != data_input.rows(); ++ row)
-	  data_output.col(0)[row] = data_input.row(row).sum();
-      } else {
-	// select column and compute row-sum
-	data_output.resize(data_input.cols(), 1);
-	
-	for (size_type col = 0; col != data_input.cols(); ++ col)
-	  data_output.col(0)[col] = data_input.col(col).sum();
-      }
+      if (dimension)
+	data_output = data_input.rowwise().sum();
+      else
+	data_output = data_input.colwise().sum().transpose();
     }
     
     void Sum::backward(const tensor_type& data_input, const tensor_type& gradient_output)

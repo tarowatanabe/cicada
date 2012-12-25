@@ -10,6 +10,7 @@ msgpack_main_impl.hpp
 noinst_LTLIBRARIES = \
 libcicada-feature.la \
 libcicada-matcher.la \
+libcicada-neuron.la \
 libcicada-semiring.la \
 libcicada-eval.la \
 libcicada-format.la \
@@ -27,6 +28,7 @@ formatdir    = $(pkgincludedir)/cicada/format
 headdir      = $(pkgincludedir)/cicada/head
 matcherdir   = $(pkgincludedir)/cicada/matcher
 msgpackdir   = $(pkgincludedir)/cicada/msgpack
+neurondir    = $(pkgincludedir)/cicada/neuron
 operationdir = $(pkgincludedir)/cicada/operation
 optimizedir  = $(pkgincludedir)/cicada/optimize
 semiringdir  = $(pkgincludedir)/cicada/semiring
@@ -278,6 +280,51 @@ msgpack/symbol.hpp \
 msgpack/symbol_vector.hpp \
 msgpack/tree_rule.hpp \
 msgpack/weight_vector.hpp
+
+dist_neuron_HEADERS = \
+neuron/abs.hpp \
+neuron/convolution.hpp \
+neuron/copy.hpp \
+neuron/exp.hpp \
+neuron/hardtanh.hpp \
+neuron/layer.hpp \
+neuron/linear.hpp \
+neuron/log.hpp \
+neuron/max.hpp \
+neuron/mean.hpp \
+neuron/min.hpp \
+neuron/power.hpp \
+neuron/sequential.hpp \
+neuron/sigmoid.hpp \
+neuron/softmax.hpp \
+neuron/sqrt.hpp \
+neuron/square.hpp \
+neuron/sum.hpp \
+neuron/tanh.hpp
+
+libcicada_neuron_la_SOURCES = \
+neuron/abs.cpp \
+neuron/convolution.cpp \
+neuron/copy.cpp \
+neuron/hardtanh.cpp \
+neuron/exp.cpp \
+neuron/linear.cpp \
+neuron/log.cpp \
+neuron/max.cpp \
+neuron/mean.cpp \
+neuron/min.cpp \
+neuron/power.cpp \
+neuron/sequential.cpp \
+neuron/sigmoid.cpp \
+neuron/softmax.cpp \
+neuron/sqrt.cpp \
+neuron/square.cpp \
+neuron/sum.cpp \
+neuron/tanh.cpp
+
+
+
+libcicada_neuron_la_CPPFLAGS = $(AM_CPPFLAGS) -I../eigen
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -553,6 +600,7 @@ libcicada_la_LIBADD = \
 	libcicada-head.la \
 	libcicada-feature.la \
 	libcicada-matcher.la \
+	libcicada-neuron.la \
 	libcicada-optimize.la \
 	libcicada-operation.la \
 	libcicada-semiring.la \

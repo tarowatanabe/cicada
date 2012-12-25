@@ -8,7 +8,7 @@ namespace cicada
 {
   namespace neuron
   {
-    double abs_derivative(double x)
+    float abs_derivative(float x)
     {
       return (x >= 0.0 ? 1.0 : -1.0);
     }
@@ -20,7 +20,7 @@ namespace cicada
     
     void Abs::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.array() = (data_input.array().unaryExpr(std::ptr_fun(abs_derivative))) * gradient_output.array();
+      gradient_input = (data_input.array().unaryExpr(std::ptr_fun(abs_derivative))) * gradient_output.array();
     }
   }
 }

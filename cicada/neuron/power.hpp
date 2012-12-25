@@ -17,10 +17,13 @@ namespace cicada
     class Power : public Layer
     {
     public:
+      Power(const double __pow=1.0) : pow(__pow) {}
+    public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) {}
-    public:
+      virtual layer_ptr_type clone() const { return layer_ptr_type(new Power(*this)); }
+    private:
       double pow;
     };
   };

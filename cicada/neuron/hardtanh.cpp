@@ -8,12 +8,12 @@ namespace cicada
 {
   namespace neuron
   {
-    double hardtanh(double x)
+    float hardtanh(float x)
     {
       return (x < - 1 ? -1.0 : (x > 1 ? 1.0 : x));
     }
-
-    double hardtanh_derivative(double x)
+    
+    float hardtanh_derivative(float x)
     {
       return (x < - 1.0 || x > 1.0 ? 0.0 : 1.0);
     }

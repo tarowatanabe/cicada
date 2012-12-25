@@ -10,7 +10,7 @@ namespace cicada
   {
     void Sigmoid::forward(const tensor_type& data_input)
     {
-      data_putput = 1.0 / ((- data_input.array()).exp() + 1.0);
+      data_output = 1.0 / ((- data_input.array()).exp() + 1.0);
     }
     
     void Sigmoid::backward(const tensor_type& data_input, const tensor_type& gradient_output)
