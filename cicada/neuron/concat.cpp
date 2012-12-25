@@ -52,7 +52,7 @@ namespace cicada
     
     void Concat::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.conservativeResizeLike(data_input);
+      gradient_input.resizeLike(data_input);
       gradient_input.setZero();
       
       if (dimension) {

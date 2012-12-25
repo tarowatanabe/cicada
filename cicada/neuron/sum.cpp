@@ -18,7 +18,7 @@ namespace cicada
     
     void Sum::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.conservativeResizeLike(data_input);
+      gradient_input.resizeLike(data_input);
       
       if (dimension) {
 	for (int row = 0; row != data_input.rows(); ++ row)

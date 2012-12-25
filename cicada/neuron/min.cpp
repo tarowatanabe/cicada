@@ -12,7 +12,7 @@ namespace cicada
     {
       if (dimension) {
 	// select row and compute column-min
-	data_output.conservativeResize(data_input.rows(), 1);
+	data_output.resize(data_input.rows(), 1);
 	indices.resize(data_input.rows());
 	
 	for (size_type row = 0; row != data_input.rows(); ++ row) {
@@ -22,7 +22,7 @@ namespace cicada
 	}
       } else {
 	// select column and compute row-min!
-	data_output.conservativeResize(data_input.cols(), 1);
+	data_output.resize(data_input.cols(), 1);
 	indices.resize(data_input.cols());
 	
 	for (size_type col = 0; col != data_input.cols(); ++ col) {
@@ -35,7 +35,7 @@ namespace cicada
     
     void Min::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input.conservativeResizeLike(data_input);
+      gradient_input.resizeLike(data_input);
       gradient_input.setZero();
       
       if (dimension) {
