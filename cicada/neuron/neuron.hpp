@@ -15,6 +15,7 @@
 #include <neuron/layer.hpp>
 #include <neuron/linear.hpp>
 #include <neuron/log.hpp>
+#include <neuron/lookup.hpp>
 #include <neuron/max.hpp>
 #include <neuron/mean.hpp>
 #include <neuron/min.hpp>
