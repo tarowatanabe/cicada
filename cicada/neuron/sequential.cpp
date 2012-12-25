@@ -36,5 +36,19 @@ namespace cicada
       layers.front().backward(data_input, *gradient_curr);
       gradient_input = layers.front().gradient_input;
     }
+
+    void Sequential::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
+    {
+      const tensor_type* gradient_curr = &gradient_output;
+      
+      if (layers.size() > 1)
+	for (size_type i = layers.size() - 1; i != 0; --i) {
+	  layers[i].accumulate(layers[i - 1].data_output, *gradient_curr);
+	  
+	  *gradient_curr = &lauyers[i].gradient_input;
+	}
+      
+      layers.front().accumulate(data_input, *gradient_curr);
+    }
   }
 }
