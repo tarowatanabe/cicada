@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 #include <cstddef>
-#include <cstdint>
+#include <stdint.h>
 
 #include "cicada/neuron/lookup.hpp"
 
