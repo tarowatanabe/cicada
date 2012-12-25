@@ -51,8 +51,16 @@ namespace cicada
 	throw std::runtime_error("invalid gradient output");
       
       gradient_weight.resizeLike(weight);
-      gradient_weight.setZero();
-            
+      
+      // we do not clear all, but only required part...
+      //gradient_weight.setZero();
+      {
+	const uint32_t* first = reinterpret_cast<const uint32_t*>(data_input.data());
+	const uint32_t* last = first + data_input.rows();
+	for (/**/; first != last; ++ first)
+	  gradient_weight.col(*first).setZero();
+      }
+      
       const uint32_t* first = reinterpret_cast<const uint32_t*>(data_input.data());
       const uint32_t* last = first + data_input.rows();
       for (size_type frame = 0; first != last; ++ first, ++ frame)

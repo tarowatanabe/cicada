@@ -283,6 +283,7 @@ msgpack/weight_vector.hpp
 
 dist_neuron_HEADERS = \
 neuron/abs.hpp \
+neuron/concat.hpp \
 neuron/convolution.hpp \
 neuron/copy.hpp \
 neuron/exp.hpp \
@@ -295,6 +296,7 @@ neuron/max.hpp \
 neuron/mean.hpp \
 neuron/min.hpp \
 neuron/neuron.hpp \
+neuron/parallel.hpp \
 neuron/power.hpp \
 neuron/sequential.hpp \
 neuron/sigmoid.hpp \
@@ -306,6 +308,7 @@ neuron/tanh.hpp
 
 libcicada_neuron_la_SOURCES = \
 neuron/abs.cpp \
+neuron/concat.cpp \
 neuron/convolution.cpp \
 neuron/copy.cpp \
 neuron/hardtanh.cpp \
@@ -316,6 +319,7 @@ neuron/lookup.cpp \
 neuron/max.cpp \
 neuron/mean.cpp \
 neuron/min.cpp \
+neuron/parallel.cpp \
 neuron/power.cpp \
 neuron/sequential.cpp \
 neuron/sigmoid.cpp \

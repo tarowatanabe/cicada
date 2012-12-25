@@ -7,6 +7,7 @@
 #define __CICADA__NEURON_NEURON__HPP__ 1
 
 #include <neuron/abs.hpp>
+#include <neuron/concat.hpp>
 #include <neuron/convolution.hpp>
 #include <neuron/copy.hpp>
 #include <neuron/exp.hpp>
@@ -17,6 +18,7 @@
 #include <neuron/max.hpp>
 #include <neuron/mean.hpp>
 #include <neuron/min.hpp>
+#include <neuron/parallel.hpp>
 #include <neuron/power.hpp>
 #include <neuron/sequential.hpp>
 #include <neuron/sigmoid.hpp>
