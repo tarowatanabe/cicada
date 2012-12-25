@@ -19,5 +19,11 @@ namespace cicada
       // assume eigen's operator!
       gradient_input = weight.transpose() * gradient_output + 1;
     }
+    
+    void Linear::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
+    {
+      gradient_weight += gradient_output * data_input.transpose();
+      gradient_bias   += gradient_output;
+    }
   }
 }

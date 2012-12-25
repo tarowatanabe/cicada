@@ -38,6 +38,7 @@ namespace cicada
       // we want to allow sparse input.... currently, we support only dense input....
       virtual void forward(const tensor_type& data_input) = 0;
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
+      virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       
     public:
       // we will explicitly comment out unused data structure...!
