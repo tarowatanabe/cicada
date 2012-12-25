@@ -3,6 +3,7 @@
 //
 
 #include <stdexcept>
+#include <cstdint>
 
 #include "cicada/neuron/lookup.hpp"
 
