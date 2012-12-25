@@ -19,6 +19,10 @@ namespace cicada
     class Lookup : public Layer
     {
     public:
+      Lookup(size_type __size) : size(__size) {}
+      Lookup(const tensor_type& __weight) : size(__weight.rows()), weight(__weight) {}
+      
+    public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);

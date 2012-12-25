@@ -15,6 +15,10 @@ namespace cicada
     class Linear : public Layer
     {
     public:
+      Linear(size_type size_input, size_type size_output);
+      Linear(const tensor_type& __weight, const tensor_type& __bias);
+
+    public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);

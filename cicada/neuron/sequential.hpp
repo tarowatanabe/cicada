@@ -20,9 +20,16 @@ namespace cicada
       void clear() { layers.clear(); }
       
       void push_back(const layer_ptr_type& layer) { layers.push_back(layer); }
+      void push_back(Layer* layer) { layers.push_back(layer_ptr_type(layer)); }
       
       inline const layer_ptr_type& operator[](size_type pos) const { return layers[pos]; }
       inline       layer_ptr_type& operator[](size_type pos)       { return layers[pos]; }
+
+      inline const layer_ptr_type& front() const { return layers.front(); }
+      inline       layer_ptr_type& front()       { return layers.front(); }
+      
+      inline const layer_ptr_type& back() const { return layers.back(); }
+      inline       layer_ptr_type& back()       { return layers.back(); }
       
       size_type size() const { return layers.size(); }
       bool empty() const { return layers.empty(); }

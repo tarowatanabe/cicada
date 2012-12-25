@@ -290,9 +290,11 @@ neuron/hardtanh.hpp \
 neuron/layer.hpp \
 neuron/linear.hpp \
 neuron/log.hpp \
+neuron/lookup.hpp \
 neuron/max.hpp \
 neuron/mean.hpp \
 neuron/min.hpp \
+neuron/neuron.hpp \
 neuron/power.hpp \
 neuron/sequential.hpp \
 neuron/sigmoid.hpp \
@@ -310,6 +312,7 @@ neuron/hardtanh.cpp \
 neuron/exp.cpp \
 neuron/linear.cpp \
 neuron/log.cpp \
+neuron/lookup.cpp \
 neuron/max.cpp \
 neuron/mean.cpp \
 neuron/min.cpp \
@@ -322,9 +325,7 @@ neuron/square.cpp \
 neuron/sum.cpp \
 neuron/tanh.cpp
 
-
-
-libcicada_neuron_la_CPPFLAGS = $(AM_CPPFLAGS) -I../eigen
+libcicada_neuron_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -628,6 +629,7 @@ hypergraph_main \
 lattice_main \
 lexicon_main \
 matcher_main \
+neuron_main \
 ngram_pyp_main \
 optimize_qp_main \
 parameter_main \
@@ -695,6 +697,9 @@ lexicon_main_LDADD = libcicada.la
 
 matcher_main_SOURCES = matcher_main.cpp
 matcher_main_LDADD = libcicada.la
+
+neuron_main_SOURCES = neuron_main.cpp
+neuron_main_LDADD = libcicada.la
 
 ngram_pyp_main_SOURCES = ngram_pyp_main.cpp
 ngram_pyp_main_LDADD = libcicada.la
