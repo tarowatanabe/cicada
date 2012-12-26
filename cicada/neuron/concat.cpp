@@ -2,6 +2,13 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <iterator>
+
+#include <boost/spirit/include/karma.hpp>
+
 #include "cicada/neuron/concat.hpp"
 
 #include <stdexcept>
@@ -92,6 +99,24 @@ namespace cicada
 	cloned->layers[i] = layers[i]->clone();
       
       return layer_ptr_type(cloned.release());
+    }
+
+    std::ostream& Concat::write(std::ostream& os) const
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      karma::generate(std::ostream_iterator<char>(os),
+		      karma::lit('{')
+		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"concat\"")
+		      << ',' << karma::lit("\"dimension\"") << ':' << karma::bool_
+		      << ',' << karma::lit("\"layers\"") << ':' << (karma::lit('[') << (karma::stream % ',') << karma::lit(']'))
+		      << '}',
+		      dimension,
+		      layers);
+      
+      return os;
     }
   }
 }

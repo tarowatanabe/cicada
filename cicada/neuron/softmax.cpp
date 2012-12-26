@@ -2,7 +2,13 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <climits>
+#include <iterator>
+
+#include <boost/spirit/include/karma.hpp>
 
 #include "cicada/neuron/softmax.hpp"
 
@@ -40,6 +46,17 @@ namespace cicada
       const double sum = (gradient_output.array() * data_output.array()).sum();
       
       gradient_input = (gradient_output.array() - sum) * data_output.array();
+    }
+
+    std::ostream& SoftMax::write(std::ostream& os) const
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      karma::generate(std::ostream_iterator<char>(os), karma::lit("{\"neuron\":\"softmax\"}"));
+      
+      return os;
     }
   }
 }

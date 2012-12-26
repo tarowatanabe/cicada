@@ -16,6 +16,7 @@
 //
 
 #include <string>
+#include <iostream>
 
 #include <boost/shared_ptr.hpp>
 
@@ -49,11 +50,24 @@ namespace cicada
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual layer_ptr_type clone() const = 0;
-
+      virtual std::ostream& write(std::ostream& os) const = 0;
     public:
       static layer_ptr_type construct(std::string::const_iterator& iter, std::string::const_iterator end);
       static layer_ptr_type construct(const utils::piece& data);
       
+    public:
+      friend
+      std::ostream& operator<<(std::ostream& os, const layer_type& x)
+      {
+	return x.write(os);
+      }
+      
+      friend
+      std::ostream& operator<<(std::ostream& os, const layer_ptr_type& x)
+      {
+	return x->write(os);
+      }
+
     public:
       tensor_type data_output;
       tensor_type gradient_input;

@@ -48,6 +48,7 @@ namespace cicada
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual layer_ptr_type clone() const;
+      virtual std::ostream& write(std::ostream& os) const;
       
     private:
       typedef std::vector<layer_ptr_type, std::allocator<layer_ptr_type> > layer_set_type;

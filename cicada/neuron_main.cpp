@@ -20,7 +20,9 @@ int main(int argc, char** argv)
 	    << "bias" << std::endl
 	    << dynamic_cast<cicada::neuron::Linear&>(*m1.front()).bias << std::endl;
 
-  
+  std::cout << m1 << std::endl
+	    << m1.front() << std::endl
+	    << m1.back() << std::endl;
 
   const cicada::neuron::Layer::tensor_type input = cicada::neuron::Layer::tensor_type::Random(10, 1);
   

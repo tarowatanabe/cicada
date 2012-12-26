@@ -2,6 +2,13 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <iterator>
+
+#include <boost/spirit/include/karma.hpp>
+
 #include "cicada/neuron/max.hpp"
 
 namespace cicada
@@ -46,5 +53,22 @@ namespace cicada
 	  gradient_input.col(col)[indices[col]] = gradient_output.col(0)[col];
       }
     }
+
+    std::ostream& Max::write(std::ostream& os) const
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      karma::generate(std::ostream_iterator<char>(os),
+		      karma::lit('{')
+		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"max\"")
+		      << ',' << "\"dimension\"" << ':' << karma::bool_
+		      << '}',
+		      dimension);
+      
+      return os;
+    }
+
   }
 }

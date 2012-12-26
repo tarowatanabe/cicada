@@ -180,12 +180,11 @@ namespace cicada
       std::string::const_iterator iter_end(data.end());
       
       layer_ptr_type layer = construct(iter, iter_end);
-
+      
       if (iter != iter_end)
 	throw std::runtime_error("neuron layer parsing failed");
-
+      
       return layer;
     }
-      
   }
 }

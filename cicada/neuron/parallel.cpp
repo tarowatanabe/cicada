@@ -2,6 +2,13 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <iterator>
+
+#include <boost/spirit/include/karma.hpp>
+
 #include "cicada/neuron/parallel.hpp"
 
 #include <stdexcept>
@@ -105,6 +112,26 @@ namespace cicada
 	cloned->layers[i] = layers[i]->clone();
       
       return layer_ptr_type(cloned.release());
+    }
+
+    std::ostream& Parallel::write(std::ostream& os) const
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      karma::generate(std::ostream_iterator<char>(os),
+		      karma::lit('{')
+		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"parallel\"")
+		      << ',' << karma::lit("\"input\"") << ':' << karma::bool_
+		      << ',' << karma::lit("\"output\"") << ':' << karma::bool_
+		      << ',' << karma::lit("\"layers\"") << ':' << (karma::lit('[') << (karma::stream % ',') << karma::lit(']'))
+		      << '}',
+		      dimension_input,
+		      dimension_output,
+		      layers);
+      
+      return os;
     }
   }
 }

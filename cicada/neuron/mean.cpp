@@ -2,6 +2,13 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <iterator>
+
+#include <boost/spirit/include/karma.hpp>
+
 #include "cicada/neuron/mean.hpp"
 
 namespace cicada
@@ -27,6 +34,22 @@ namespace cicada
 	for (int col = 0; col != data_input.cols(); ++ col)
 	  gradient_input.col(col).setConstant(gradient_output.col(0)[col] / data_input.rows());
       }
+    }
+
+    std::ostream& Mean::write(std::ostream& os) const
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      karma::generate(std::ostream_iterator<char>(os),
+		      karma::lit('{')
+		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"mean\"")
+		      << ',' << "\"dimension\"" << ':' << karma::bool_
+		      << '}',
+		      dimension);
+      
+      return os;
     }
   }
 }
