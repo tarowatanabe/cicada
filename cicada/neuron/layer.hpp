@@ -15,9 +15,13 @@
 // For GPU implementation, we will use openCL...
 //
 
+#include <string>
+
 #include <boost/shared_ptr.hpp>
 
 #include <Eigen/Core>
+
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -45,6 +49,11 @@ namespace cicada
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual layer_ptr_type clone() const = 0;
+
+    public:
+      static layer_ptr_type construct(std::string::const_iterator& iter, std::string::const_iterator end);
+      static layer_ptr_type construct(const utils::piece& data);
+      
     public:
       tensor_type data_output;
       tensor_type gradient_input;

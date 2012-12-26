@@ -2,12 +2,36 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <stdexcept>
+
 #include "cicada/neuron/convolution.hpp"
 
 namespace cicada
 {
   namespace neuron
   {
+    Convolution::Convolution(size_type __frame, size_type __kW, size_type __dW)
+      : frame(__frame), kW(__kW), dW(__dW)
+    {
+      weight = tensor_type(frame, 1);
+      bias   = tensor_type(frame, 1);
+    }
+    
+    Convolution::Convolution(const tensor_type& __weight, const tensor_type& __bias, size_type __kW, size_type __dW)
+      : weight(__weight), bias(__bias), kW(__kW), dW(__dW)
+    {
+      frame = weight.rows();
+
+      if (weight.rows() != bias.rows())
+	throw std::runtime_error("invalid weight/bias");
+      if (weight.cols() != bias.cols())
+	throw std::runtime_error("invalid weight/bias");
+      if (weight.cols() != 1)
+	throw std::runtime_error("invalid weight");
+      if (bias.cols() != 1)
+	throw std::runtime_error("invalid bias");
+    }
+
     void Convolution::forward(const tensor_type& data_input)
     {
       const size_type n_frame_input  = data_input.cols();

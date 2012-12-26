@@ -19,6 +19,13 @@ namespace cicada
     public:
       Concat(const bool __dimension=false) : dimension(__dimension) {}
       
+      template <typename Iterator>
+      Concat(Iterator first,
+	     Iterator last,
+	     const bool __dimension=false)
+	: layers(first, last),
+	  dimension(__dimension) {}
+      
     public:
       void clear() { layers.clear(); }
       

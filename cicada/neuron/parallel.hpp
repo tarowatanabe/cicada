@@ -19,6 +19,15 @@ namespace cicada
     public:
       Parallel(const bool __dimension_input=false, const bool __dimension_output=false)
 	: dimension_input(__dimension_input), dimension_output(__dimension_output) {}
+
+      template <typename Iterator>
+      Parallel(Iterator first,
+	       Iterator last,
+	       const bool __dimension_input,
+	       const bool __dimension_output)
+	: layers(first, last),
+	  dimension_input(__dimension_input),
+	  dimension_output(__dimension_output) {}
       
     public:
       void clear() { layers.clear(); }

@@ -17,6 +17,12 @@ namespace cicada
     class Sequential : public Layer
     {
     public:
+      Sequential() {}
+      
+      template <typename Iterator>
+      Sequential(Iterator first, Iterator last) : layers(first, last) {}
+      
+    public:
       void clear() { layers.clear(); }
       
       void push_back(const layer_ptr_type& layer) { layers.push_back(layer); }

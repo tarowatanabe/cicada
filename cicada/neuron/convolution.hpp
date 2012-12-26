@@ -15,6 +15,10 @@ namespace cicada
     class Convolution : public Layer
     {
     public:
+      Convolution(size_type frame, size_type kW=1, size_type dW=1);
+      Convolution(const tensor_type& weight, const tensor_type& bias, size_type kW=1, size_type dW=1);
+      
+    public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
