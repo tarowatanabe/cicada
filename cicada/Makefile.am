@@ -291,6 +291,7 @@ neuron/hardtanh.hpp \
 neuron/layer.hpp \
 neuron/linear.hpp \
 neuron/log.hpp \
+neuron/logsoftmax.hpp \
 neuron/lookup.hpp \
 neuron/max.hpp \
 neuron/mean.hpp \
@@ -317,6 +318,7 @@ neuron/layer.cpp \
 neuron/exp.cpp \
 neuron/linear.cpp \
 neuron/log.cpp \
+neuron/logsoftmax.cpp \
 neuron/lookup.cpp \
 neuron/max.cpp \
 neuron/mean.cpp \

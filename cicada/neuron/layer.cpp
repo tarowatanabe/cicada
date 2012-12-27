@@ -106,6 +106,8 @@ namespace cicada
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Linear>(qi::_1, qi::_2))]
 		     | qi::lit("\"log\"")
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Log>())]
+		     | (qi::lit("\"log-softmax\"") | qi::lit("\"logsoftmax\""))
+		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::LogSoftMax>())]
 		     | (qi::lit("\"lookup\"")
 			>> ',' >> qi::lit("\"size\"") >> ':' >> qi::int_)
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Lookup>(qi::_1))]
