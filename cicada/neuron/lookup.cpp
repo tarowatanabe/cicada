@@ -7,6 +7,8 @@
 
 #include <iterator>
 #include <stdexcept>
+#include <memory>
+
 #include <cstddef>
 #include <stdint.h>
 
@@ -27,6 +29,12 @@ namespace cicada
 {
   namespace neuron
   {
+    Lookup::Lookup(size_type __size) : size(__size), weight(new tensor_type()) {}
+    
+    Lookup::Lookup(const tensor_type& __weight) : size(__weight.rows()), weight(new tensor_type(__weight)) {}
+    
+    Lookup::Lookup(const tensor_ptr_type& __weight) : size(__weight->rows()), weight(__weight) {}
+
     void Lookup::forward(const tensor_type& data_input)
     {
       if (data_input.cols() != 1)
@@ -39,17 +47,17 @@ namespace cicada
       const uint32_t* last = first + data_input.rows();
       for (size_type frame = 0; first != last; ++ first, ++ frame) {
 	// perform resizing of weight
-	if (*first >= weight.cols()) {
+	if (*first >= weight->cols()) {
 	  // from weight.cols() to *first + 1, assign random value...!
-	  const size_type frame_first = weight.cols();
+	  const size_type frame_first = weight->cols();
 	  const size_type frame_last  = *first + 1;
 	  
-	  weight.conservativeResize(size, *first + 1);
+	  weight->conservativeResize(size, *first + 1);
 	  for (size_type i = frame_first; i != frame_last; ++ i)
-	    weight.col(i).setRandom();
+	    weight->col(i).setRandom();
 	}
 	
-	data_output.col(frame) = weight.col(*first);
+	data_output.col(frame) = weight->col(*first);
       }
     }
     
@@ -67,7 +75,7 @@ namespace cicada
       if (gradient_output.rows() != size)
 	throw std::runtime_error("invalid gradient output");
       
-      gradient_weight.resizeLike(weight);
+      gradient_weight.resizeLike(*weight);
       
       // we do not clear all, but only required part...
       //gradient_weight.setZero();
@@ -82,6 +90,29 @@ namespace cicada
       const uint32_t* last = first + data_input.rows();
       for (size_type frame = 0; first != last; ++ first, ++ frame)
 	gradient_weight.col(*first) += gradient_output.col(frame);
+    }
+
+    Lookup::layer_ptr_type Lookup::clone(const bool share) const
+    {
+      std::auto_ptr<Lookup> cloned(new Lookup(*this));
+      
+      if (! share)
+	cloned->weight.reset(new tensor_type(*weight));
+      
+      return layer_ptr_type(cloned.release());
+    }
+
+    void Lookup::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Lookup* other = dynamic_cast<const Lookup*>(x.get());
+      
+      if (! other)
+	throw std::runtime_error("invalid parameter sharing");
+      
+      weight = other->weight;
     }
 
     template <typename Iterator>
@@ -177,7 +208,7 @@ namespace cicada
 		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"lookup\"")
 		      << ',' << karma::lit("\"weight\"") << ':' << tensor
 		      << '}',
-		      weight);
+		      *weight);
       
       return os;
     }

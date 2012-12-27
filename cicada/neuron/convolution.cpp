@@ -7,6 +7,7 @@
 
 #include <iterator>
 #include <stdexcept>
+#include <memory>
 
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
@@ -28,22 +29,37 @@ namespace cicada
     Convolution::Convolution(size_type __frame, size_type __kW, size_type __dW)
       : frame(__frame), kW(__kW), dW(__dW)
     {
-      weight = tensor_type(frame, 1);
-      bias   = tensor_type(frame, 1);
+      weight.reset(new tensor_type(frame, 1));
+      bias.reset(new tensor_type(frame, 1));
     }
     
     Convolution::Convolution(const tensor_type& __weight, const tensor_type& __bias, size_type __kW, size_type __dW)
+      : weight(new tensor_type(__weight)), bias(new tensor_type(__bias)), kW(__kW), dW(__dW)
+    {
+      frame = weight->rows();
+
+      if (weight->rows() != bias->rows())
+	throw std::runtime_error("invalid weight/bias");
+      if (weight->cols() != bias->cols())
+	throw std::runtime_error("invalid weight/bias");
+      if (weight->cols() != 1)
+	throw std::runtime_error("invalid weight");
+      if (bias->cols() != 1)
+	throw std::runtime_error("invalid bias");
+    }
+
+    Convolution::Convolution(const tensor_ptr_type& __weight, const tensor_ptr_type& __bias, size_type __kW, size_type __dW)
       : weight(__weight), bias(__bias), kW(__kW), dW(__dW)
     {
-      frame = weight.rows();
+      frame = weight->rows();
 
-      if (weight.rows() != bias.rows())
+      if (weight->rows() != bias->rows())
 	throw std::runtime_error("invalid weight/bias");
-      if (weight.cols() != bias.cols())
+      if (weight->cols() != bias->cols())
 	throw std::runtime_error("invalid weight/bias");
-      if (weight.cols() != 1)
+      if (weight->cols() != 1)
 	throw std::runtime_error("invalid weight");
-      if (bias.cols() != 1)
+      if (bias->cols() != 1)
 	throw std::runtime_error("invalid bias");
     }
 
@@ -55,7 +71,7 @@ namespace cicada
       data_output.resize(frame, n_frame_output);
       
       for (size_type k = 0; k != n_frame_output; ++ k)
-	data_output.col(k) = data_input.block(0, k * dW, data_input.rows(), kW).rowwise().sum().array() * weight.array() + bias.array();
+	data_output.col(k) = data_input.block(0, k * dW, data_input.rows(), kW).rowwise().sum().array() * weight->array() + bias->array();
     }
     
     void Convolution::backward(const tensor_type& data_input, const tensor_type& gradient_output)
@@ -66,15 +82,15 @@ namespace cicada
       const size_type n_frame_output = gradient_output.cols();
       
       for (size_type k = 0; k != n_frame_output; ++ k)
-	gradient_input.block(0, k * dW, data_input.rows(), kW) += (gradient_output.col(k).transpose() * weight).replicate(1, kW);
+	gradient_input.block(0, k * dW, data_input.rows(), kW) += (gradient_output.col(k).transpose() * (*weight)).replicate(1, kW);
     }
 
     void Convolution::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
     {
       const size_type n_frame_output = gradient_output.cols();
 
-      gradient_weight.resizeLike(weight);
-      gradient_bias.resizeLike(bias);
+      gradient_weight.resizeLike(*weight);
+      gradient_bias.resizeLike(*bias);
 
       gradient_weight.setZero();
       gradient_bias.setZero();
@@ -84,6 +100,33 @@ namespace cicada
 	gradient_bias   += gradient_output.col(k);
       }
     }
+    
+    Convolution::layer_ptr_type Convolution::clone(const bool share) const
+    {
+      std::auto_ptr<Convolution> cloned(new Convolution(*this));
+      
+      if (! share) {
+	cloned->weight.reset(new tensor_type(*weight));
+	cloned->bias.reset(new tensor_type(*bias));
+      }
+      
+      return layer_ptr_type(cloned.release());
+    }
+
+    void Convolution::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Convolution* other = dynamic_cast<const Convolution*>(x.get());
+      
+      if (! other)
+	throw std::runtime_error("invalid parameter sharing");
+      
+      weight = other->weight;
+      bias   = other->bias;
+    }
+
 
     template <typename Iterator>
     struct tensor_generator_grammar : boost::spirit::karma::grammar<Iterator, const Layer::tensor_type&()>
@@ -181,8 +224,8 @@ namespace cicada
 		      << ',' << karma::lit("\"kW\"") << ':' << karma::int_
 		      << ',' << karma::lit("\"dW\"") << ':' << karma::int_
 		      << '}',
-		      weight,
-		      bias,
+		      *weight,
+		      *bias,
 		      kW,
 		      dW);
       

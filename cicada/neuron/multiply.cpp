@@ -23,22 +23,46 @@ namespace cicada
 {
   namespace neuron
   {
-    Multiply::Multiply() : weight(tensor_type::Random(1, 1)) {}
-    Multiply::Multiply(const tensor_type& __weight) : weight(__weight) {}
+    Multiply::Multiply() : weight(new tensor_type(tensor_type::Random(1, 1))) {}
+    Multiply::Multiply(const tensor_type& __weight) : weight(new tensor_type(__weight)) {}
+    Multiply::Multiply(const tensor_ptr_type& __weight) : weight(__weight) {}
     
     void Multiply::forward(const tensor_type& data_input)
     {
-      data_output = data_input.array() * weight.col(0)[0];
+      data_output = data_input.array() * weight->col(0)[0];
     }
     
     void Multiply::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      gradient_input = gradient_output.array() * weight.col(0)[0];
+      gradient_input = gradient_output.array() * weight->col(0)[0];
     }
     
     void Multiply::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
     {
       gradient_weight = data_input.transpose() * gradient_output;
+    }
+
+    Multiply::layer_ptr_type Multiply::clone(const bool share) const
+    {
+      std::auto_ptr<Multiply> cloned(new Multiply(*this));
+      
+      if (! share)
+	cloned->weight.reset(new tensor_type(*weight));
+      
+      return layer_ptr_type(cloned.release());
+    }
+
+    void Multiply::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Multiply* other = dynamic_cast<const Multiply*>(x.get());
+      
+      if (! other)
+	throw std::runtime_error("invalid parameter sharing");
+      
+      weight = other->weight;
     }
     
     template <typename Iterator>
@@ -134,7 +158,7 @@ namespace cicada
 		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"multiply\"")
 		      << ',' << "\"weight\"" << ':' << tensor
 		      << '}',
-		      weight);
+		      *weight);
       
       return os;
     }

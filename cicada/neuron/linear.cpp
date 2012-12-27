@@ -32,51 +32,87 @@ namespace cicada
       if (! size_output)
 	throw std::runtime_error("invalid output size");
       
-      weight = tensor_type::Random(size_output, size_input);
-      bias   = tensor_type::Random(size_output, 1);
+      weight.reset(new tensor_type(tensor_type::Random(size_output, size_input)));
+      bias.reset(new tensor_type(tensor_type::Random(size_output, 1)));
     }
     
     Linear::Linear(const tensor_type& __weight, const tensor_type& __bias)
-      : weight(__weight), bias(__bias)
+      : weight(new tensor_type(__weight)), bias(new tensor_type(__bias))
     {
-      if (bias.cols() != 1)
+      if (bias->cols() != 1)
 	throw std::runtime_error("invalid bias");
       
-      if (bias.rows() != weight.rows())
+      if (bias->rows() != weight->rows())
+	throw std::runtime_error("invalid weight");
+    }
+
+    Linear::Linear(const tensor_ptr_type& __weight, const tensor_ptr_type& __bias)
+      : weight(__weight), bias(__bias)
+    {
+      if (bias->cols() != 1)
+	throw std::runtime_error("invalid bias");
+      
+      if (bias->rows() != weight->rows())
 	throw std::runtime_error("invalid weight");
     }
 
     void Linear::forward(const tensor_type& data_input)
     {
-      if (data_input.rows() != weight.cols())
+      if (data_input.rows() != weight->cols())
 	throw std::runtime_error("invalid input");
       
-      data_output = bias + weight * data_input;
+      data_output = (*bias) + (*weight) * data_input;
     }
     
     void Linear::backward(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      if (data_input.rows() != weight.cols())
+      if (data_input.rows() != weight->cols())
 	throw std::runtime_error("invalid input");
 
-      if (weight.rows() != gradient_output.rows())
+      if (weight->rows() != gradient_output.rows())
 	throw std::runtime_error("invalid gradient output");
       
-      gradient_input = (weight.transpose() * gradient_output).array() + 1.0;
+      gradient_input = (weight->transpose() * gradient_output).array() + 1.0;
     }
     
     void Linear::accumulate(const tensor_type& data_input, const tensor_type& gradient_output)
     {
-      if (data_input.rows() != weight.cols())
+      if (data_input.rows() != weight->cols())
 	throw std::runtime_error("invalid input");
       
-      if (weight.rows() != gradient_output.rows())
+      if (weight->rows() != gradient_output.rows())
 	throw std::runtime_error("invalid gradient output");
       
       gradient_weight = gradient_output * data_input.transpose();
       gradient_bias   = gradient_output;
     }
     
+    Linear::layer_ptr_type Linear::clone(const bool share) const
+    {
+      std::auto_ptr<Linear> cloned(new Linear(*this));
+      
+      if (! share) {
+	cloned->weight.reset(new tensor_type(*weight));
+	cloned->bias.reset(new tensor_type(*bias));
+      }
+      
+      return layer_ptr_type(cloned.release());
+    }
+
+    void Linear::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Linear* other = dynamic_cast<const Linear*>(x.get());
+      
+      if (! other)
+	throw std::runtime_error("invalid parameter sharing");
+      
+      weight = other->weight;
+      bias   = other->bias;
+    }
+
     template <typename Iterator>
     struct tensor_generator_grammar : boost::spirit::karma::grammar<Iterator, const Layer::tensor_type&()>
     {
@@ -171,8 +207,8 @@ namespace cicada
 		      << ',' << karma::lit("\"weight\"") << ':' << tensor
 		      << ',' << karma::lit("\"bias\"") << ':' << tensor
 		      << '}',
-		      weight,
-		      bias);
+		      *weight,
+		      *bias);
       
       return os;
     }

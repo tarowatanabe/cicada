@@ -6,13 +6,13 @@
 #define PHOENIX_THREADSAFE
 
 #include <iterator>
+#include <stdexcept>
+#include <memory>
 
 #include <boost/spirit/include/karma.hpp>
 
 #include "cicada/neuron/concat.hpp"
 
-#include <stdexcept>
-#include <memory>
 
 namespace cicada
 {
@@ -91,14 +91,28 @@ namespace cicada
       }
     }
 
-    Concat::layer_ptr_type Concat::clone() const
+    Concat::layer_ptr_type Concat::clone(const bool share) const
     {
       std::auto_ptr<Concat> cloned(new Concat(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
-	cloned->layers[i] = layers[i]->clone();
+	cloned->layers[i] = layers[i]->clone(share);
       
       return layer_ptr_type(cloned.release());
+    }
+
+    void Concat::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Concat* other = dynamic_cast<const Concat*>(x.get());
+      
+      if (! other || layers.size() != other->layers.size())
+	throw std::runtime_error("invalid parameter sharing");
+      
+      for (size_type i = 0; i != layers.size(); ++ i)
+	layers[i]->share(other->layers[i]);
     }
 
     std::ostream& Concat::write(std::ostream& os) const

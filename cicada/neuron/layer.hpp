@@ -38,7 +38,9 @@ namespace cicada
       typedef boost::shared_ptr<layer_type> layer_ptr_type;
       
       typedef float parameter_type;
+      
       typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
+      typedef boost::shared_ptr<tensor_type>                                tensor_ptr_type;
       
     public:
       Layer() {}
@@ -49,7 +51,8 @@ namespace cicada
       virtual void forward(const tensor_type& data_input) = 0;
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output) = 0;
-      virtual layer_ptr_type clone() const = 0;
+      virtual layer_ptr_type clone(const bool share=false) const = 0;
+      virtual void share(const layer_ptr_type& x) = 0;
       virtual std::ostream& write(std::ostream& os) const = 0;
     public:
       static layer_ptr_type construct(std::string::const_iterator& iter, std::string::const_iterator end);

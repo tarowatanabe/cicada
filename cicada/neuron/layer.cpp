@@ -56,11 +56,11 @@ namespace cicada
 
 	tensor = (qi::lit('{')
 		  >> (qi::lit("\"row\"") >> ':' >> qi::int_ >> ','>> qi::lit("\"column\"") >> ':' >> qi::int_)
-		  [qi::_val = phoenix::construct<Layer::tensor_type>(qi::_1, qi::_2)]
+		  [qi::_val = phoenix::construct<Layer::tensor_ptr_type>(phoenix::new_<tensor_type>(qi::_1, qi::_2))]
 		  >> ',' >> qi::lit("\"tensor\"") >> ':' 
-		  >> (qi::lit('[') [qi::_a = matrix_begin(qi::_val),
-				    qi::_b = qi::_a + (phoenix::bind(&tensor_type::rows, qi::_val)
-						       * phoenix::bind(&tensor_type::cols, qi::_val))]
+		  >> (qi::lit('[') [qi::_a = matrix_begin(*qi::_val),
+				    qi::_b = qi::_a + (phoenix::bind(&tensor_type::rows, *qi::_val)
+						       * phoenix::bind(&tensor_type::cols, *qi::_val))]
 		      >> ((qi::lit('[')
 			   >> ((qi::float_ [qi::_pass = qi::_a != qi::_b, *qi::_a = qi::_1, ++ qi::_a]) % ',')
 			   >> qi::lit(']')) % ',')
@@ -166,7 +166,7 @@ namespace cicada
 
       boost::phoenix::function<matrix_begin_func> const matrix_begin;
       
-      boost::spirit::qi::rule<Iterator, Layer::tensor_type(), space_type, boost::spirit::qi::locals<float* /*_a*/, float* /*_b*/> > tensor;
+      boost::spirit::qi::rule<Iterator, Layer::tensor_ptr_type(), space_type, boost::spirit::qi::locals<float* /*_a*/, float* /*_b*/> > tensor;
       boost::spirit::qi::rule<Iterator, layer_ptr_set_type(), space_type> layers;
       boost::spirit::qi::rule<Iterator, ptr_type(), space_type> layer;
     };

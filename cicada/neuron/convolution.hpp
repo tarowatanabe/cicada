@@ -17,17 +17,19 @@ namespace cicada
     public:
       Convolution(size_type frame, size_type kW=1, size_type dW=1);
       Convolution(const tensor_type& weight, const tensor_type& bias, size_type kW=1, size_type dW=1);
+      Convolution(const tensor_ptr_type& weight, const tensor_ptr_type& bias, size_type kW=1, size_type dW=1);
       
     public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
-      virtual layer_ptr_type clone() const { return layer_ptr_type(new Convolution(*this)); }
+      virtual layer_ptr_type clone(const bool share=false) const;
+      virtual void share(const layer_ptr_type& x);
       virtual std::ostream& write(std::ostream& os) const;
     public:
-      tensor_type weight;
-      tensor_type bias;
-
+      tensor_ptr_type weight;
+      tensor_ptr_type bias;
+      
       tensor_type gradient_weight;
       tensor_type gradient_bias;
       

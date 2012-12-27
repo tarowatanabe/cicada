@@ -104,14 +104,28 @@ namespace cicada
       }
     }
 
-    Parallel::layer_ptr_type Parallel::clone() const
+    Parallel::layer_ptr_type Parallel::clone(const bool share) const
     {
       std::auto_ptr<Parallel> cloned(new Parallel(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
-	cloned->layers[i] = layers[i]->clone();
+	cloned->layers[i] = layers[i]->clone(share);
       
       return layer_ptr_type(cloned.release());
+    }
+
+    void Parallel::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Parallel* other = dynamic_cast<const Parallel*>(x.get());
+      
+      if (! other || layers.size() != other->layers.size())
+	throw std::runtime_error("invalid parameter sharing");
+      
+      for (size_type i = 0; i != layers.size(); ++ i)
+	layers[i]->share(other->layers[i]);
     }
 
     std::ostream& Parallel::write(std::ostream& os) const

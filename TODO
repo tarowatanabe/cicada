@@ -186,3 +186,9 @@ Use of eigen for weight vector maintenance... (for potentially faster computatio
 Revise the neuron modules to support computation with more dimensions (not assuming single dimension...)
 
 Add "embedding" structure to hold word-embedding features (a float-vector!)
+
+Do we add "loss" module to compute losses?
+
+Do we add "training" module?
+
+Implement LBFGS/CG by templates since this may conflict with float/double based implementation of liblbfgs

@@ -60,14 +60,28 @@ namespace cicada
       layers.front()->accumulate(data_input, *gradient_curr);
     }
 
-    Sequential::layer_ptr_type Sequential::clone() const
+    Sequential::layer_ptr_type Sequential::clone(const bool share) const
     {
       std::auto_ptr<Sequential> cloned(new Sequential(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
-	cloned->layers[i] = layers[i]->clone();
+	cloned->layers[i] = layers[i]->clone(share);
       
       return layer_ptr_type(cloned.release());
+    }
+    
+    void Sequential::share(const layer_ptr_type& x)
+    {
+      if (! x)
+	throw std::runtime_error("no layer?");
+      
+      const Sequential* other = dynamic_cast<const Sequential*>(x.get());
+      
+      if (! other || layers.size() != other->layers.size())
+	throw std::runtime_error("invalid parameter sharing");
+      
+      for (size_type i = 0; i != layers.size(); ++ i)
+	layers[i]->share(other->layers[i]);
     }
     
     std::ostream& Sequential::write(std::ostream& os) const
