@@ -28,6 +28,17 @@ namespace cicada
     public:
       typedef cicada::Feature feature_type;
       
+    private:
+      typedef utils::indexed_set<feature_type,
+				 boost::hash<feature_type>,
+				 std::equal_to<feature_type>,
+				 std::allocator<feature_type > > feature_map_type;
+
+    public:
+      typedef feature_map_type::iterator       iterator;
+      typedef feature_map_type::const_iterator const_iterator;
+      typedef feature_map_type::index_type     index_type;
+      
     public:
       Features() {}
       
@@ -35,11 +46,16 @@ namespace cicada
       Features(Iterator first, Iterator last) : features(first, last) {}
       
     public:
+      const feature_type& operator[](index_type x) { return features[x]; }
       
       template <typename Iterator>
       void insert(Iterator first, Iterator last) { features.insert(first, last); }
       
-      void insert(const feature_type& feature) { features.insert(feature); }
+      std::pair<iterator, bool> insert(const feature_type& x) { return features.insert(x); }
+      const_iterator find(const feature_type& x) const { return features.find(x); }
+      
+      const_iterator begin() const { return features.begin(); }
+      const_iterator end() const { return features.end(); }
       
       void clear() { features.clear(); }
       
@@ -53,12 +69,6 @@ namespace cicada
       virtual layer_ptr_type clone() const { return layer_ptr_type(new Features(*this)); }
       virtual std::ostream& write(std::ostream& os) const;
 
-    private:
-      typedef utils::indexed_set<feature_type,
-				 boost::hash<feature_type>,
-				 std::equal_to<feature_type>,
-				 std::allocator<feature_type > > feature_map_type;
-      typedef feature_map_type::index_type index_type;
       
     private:
       feature_map_type features;
