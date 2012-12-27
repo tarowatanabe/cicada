@@ -55,6 +55,7 @@ bool tree_grammar_list = false;
 
 feature_parameter_set_type feature_parameters;
 bool feature_list = false;
+path_type output_feature;
 
 op_set_type ops;
 bool op_list = false;
@@ -181,6 +182,14 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "statistics"<< '\n'
 		<< stats;
+    
+    if (! output_feature.empty()) {
+      utils::compress_ostream os(output_feature, 1024 * 1024);
+      
+      for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+	if (! feature_type(id).empty())
+	  os << feature_type(id) << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -568,8 +577,9 @@ void options(int argc, char** argv)
     ("tree-grammar-list", po::bool_switch(&tree_grammar_list),                                 "list of available grammar specifications")
     
     // models...
-    ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
-    ("feature-function-list", po::bool_switch(&feature_list),                                           "list of available feature function(s)")
+    ("feature-function",        po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
+    ("feature-function-list",   po::bool_switch(&feature_list),                                           "list of available feature function(s)")
+    ("output-feature-function", po::value<path_type>(&output_feature),                                    "output feature function(s)")
 
     //operatins...
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")

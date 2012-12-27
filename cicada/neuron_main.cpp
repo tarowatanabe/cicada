@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <sstream>
 
 #include "neuron/neuron.hpp"
 
@@ -23,6 +24,13 @@ int main(int argc, char** argv)
   std::cout << m1 << std::endl
 	    << m1.front() << std::endl
 	    << m1.back() << std::endl;
+  
+  std::ostringstream sstr;
+  sstr << m1;
+
+  cicada::neuron::Layer::layer_ptr_type layers(cicada::neuron::Layer::construct(sstr.str()));
+
+  std::cout << "re-generated: " << layers << std::endl;
 
   const cicada::neuron::Layer::tensor_type input = cicada::neuron::Layer::tensor_type::Random(10, 1);
   

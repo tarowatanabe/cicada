@@ -61,6 +61,7 @@ bool tree_grammar_list = false;
 
 feature_parameter_set_type feature_parameters;
 bool feature_list = false;
+path_type output_feature;
 
 op_set_type ops;
 bool op_list = false;
@@ -80,6 +81,7 @@ void options(int argc, char** argv);
 void cicada_stdout(operation_set_type& operations);
 void cicada_process(operation_set_type& operations);
 void synchronize();
+void merge_features();
 void merge_statistics(const operation_set_type& operations, operation_set_type::statistics_type& statistics);
 
 int main(int argc, char ** argv)
@@ -196,6 +198,16 @@ int main(int argc, char ** argv)
     if (mpi_rank == 0 && debug)
       std::cerr << "statistics"<< '\n'
 		<< statistics;
+
+    merge_features();
+    
+    if (mpi_rank == 0 && ! output_feature.empty()) {
+      utils::compress_ostream os(output_feature, 1024 * 1024);
+      
+      for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+	if (! feature_type(id).empty())
+	  os << feature_type(id) << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -208,6 +220,7 @@ enum {
   sample_tag = 1000,
   result_tag,
   notify_tag,
+  feature_tag,
   stat_tag,
 };
 
@@ -229,6 +242,33 @@ int loop_sleep(bool found, int non_found_iter)
     non_found_iter = 0;
   }
   return non_found_iter;
+}
+
+void merge_features()
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::zlib_decompressor());
+      is.push(utils::mpi_device_source(rank, feature_tag, 4096));
+      
+      std::string line;
+      while (std::getline(is, line))
+	if (! line.empty())
+	  feature_type(line);
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_sink(0, feature_tag, 4096));
+    
+    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+      if (! feature_type(id).empty())
+	os << feature_type(id) << '\n';
+  }
 }
 
 void merge_statistics(const operation_set_type& operations,
@@ -996,8 +1036,9 @@ void options(int argc, char** argv)
     ("tree-grammar-list", po::bool_switch(&tree_grammar_list),                                 "list of available grammar specifications")
     
     // models...
-    ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
-    ("feature-function-list", po::bool_switch(&feature_list),                                           "list of available feature function(s)")
+    ("feature-function",        po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
+    ("feature-function-list",   po::bool_switch(&feature_list),                                           "list of available feature function(s)")
+    ("output-feature-function", po::value<path_type>(&output_feature),                                    "output feature function(s)")
     
     //operatins...
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")

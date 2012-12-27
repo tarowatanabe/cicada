@@ -8,9 +8,11 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_bind.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_container.hpp>
 #include <boost/spirit/include/phoenix_object.hpp>
+#include <boost/spirit/include/phoenix_statement.hpp>
 #include <boost/spirit/include/phoenix_fusion.hpp>
 
 #include <boost/thread.hpp>
@@ -31,6 +33,8 @@ namespace cicada
     template <typename Iterator>
     struct layer_parser_grammar : boost::spirit::qi::grammar<Iterator, Layer::layer_ptr_type(), boost::spirit::standard::space_type>
     {
+      typedef Layer::tensor_type tensor_type;
+
       typedef Layer::layer_ptr_type ptr_type;
       typedef std::vector<ptr_type, std::allocator<ptr_type> > layer_ptr_set_type;
 
@@ -62,8 +66,9 @@ namespace cicada
 		  >> (qi::lit("\"row\"") >> ':' >> qi::int_ >> ','>> qi::lit("\"column\"") >> ':' >> qi::int_)
 		  [qi::_val = phoenix::construct<Layer::tensor_type>(qi::_1, qi::_2)]
 		  >> ',' >> qi::lit("\"tensor\"") >> ':' 
-		  >> (qi::lit('[') [qi::_a = matrix_begin(qi::_val)]
-		      >> ((qi::lit('[') >> ((qi::float_ [*qi::_a = qi::_1, ++ qi::_a]) % ',') >> qi::lit(']')) % ',')
+		  >> (qi::lit('[') [qi::_a = matrix_begin(qi::_val),
+				    qi::_b = qi::_a + phoenix::bind(&tensor_type::rows, qi::_val) * phoenix::bind(&tensor_type::cols, qi::_val)]
+		      >> ((qi::lit('[') >> ((qi::float_ [qi::_pass = qi::_a != qi::_b, *qi::_a = qi::_1, ++ qi::_a]) % ',') >> qi::lit(']')) % ',')
 		      >> qi::lit(']'))
 		  >> qi::lit('}'));
 	
@@ -169,7 +174,7 @@ namespace cicada
       
       boost::phoenix::function<matrix_begin_func> const matrix_begin;
       
-      boost::spirit::qi::rule<Iterator, Layer::tensor_type(), space_type, boost::spirit::qi::locals<float* /*_a*/> > tensor;
+      boost::spirit::qi::rule<Iterator, Layer::tensor_type(), space_type, boost::spirit::qi::locals<float* /*_a*/, float* /*_b*/> > tensor;
       boost::spirit::qi::rule<Iterator, layer_ptr_set_type(), space_type> layers;
       boost::spirit::qi::rule<Iterator, ptr_type(), space_type> layer;
     };
