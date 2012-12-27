@@ -19,6 +19,7 @@
 #include <neuron/max.hpp>
 #include <neuron/mean.hpp>
 #include <neuron/min.hpp>
+#include <neuron/multiply.hpp>
 #include <neuron/parallel.hpp>
 #include <neuron/power.hpp>
 #include <neuron/sequential.hpp>

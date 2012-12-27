@@ -3,8 +3,8 @@
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__NEURON_POWER__HPP__
-#define __CICADA__NEURON_POWER__HPP__ 1
+#ifndef __CICADA__NEURON_MULTIPLY__HPP__
+#define __CICADA__NEURON_MULTIPLY__HPP__ 1
 
 #include <cmath>
 
@@ -14,18 +14,21 @@ namespace cicada
 {
   namespace neuron
   {
-    class Power : public Layer
+    class Multiply : public Layer
     {
     public:
-      Power(const double __pow=1.0) : pow(__pow) {}
+      Multiply();
+      Multiply(const tensor_type& weight);
     public:
       virtual void forward(const tensor_type& data_input);
       virtual void backward(const tensor_type& data_input, const tensor_type& gradient_output);
       virtual void accumulate(const tensor_type& data_input, const tensor_type& gradient_output);
-      virtual layer_ptr_type clone() const { return layer_ptr_type(new Power(*this)); }
+      virtual layer_ptr_type clone() const { return layer_ptr_type(new Multiply(*this)); }
       virtual std::ostream& write(std::ostream& os) const;
-    private:
-      double pow;
+      
+    public:
+      tensor_type weight;
+      tensor_type gradient_weight;
     };
   };
 };

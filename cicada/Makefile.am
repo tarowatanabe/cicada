@@ -295,6 +295,7 @@ neuron/lookup.hpp \
 neuron/max.hpp \
 neuron/mean.hpp \
 neuron/min.hpp \
+neuron/multiply.hpp \
 neuron/neuron.hpp \
 neuron/parallel.hpp \
 neuron/power.hpp \
@@ -320,6 +321,7 @@ neuron/lookup.cpp \
 neuron/max.cpp \
 neuron/mean.cpp \
 neuron/min.cpp \
+neuron/multiply.cpp \
 neuron/parallel.cpp \
 neuron/power.cpp \
 neuron/sequential.cpp \

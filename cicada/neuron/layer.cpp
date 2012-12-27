@@ -121,6 +121,11 @@ namespace cicada
 		     | (qi::lit("\"min\"")
 			>> ',' >> qi::lit("\"dimension\"") >> ':' >> qi::bool_)
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Min>(qi::_1))]
+		     | qi::lit("\"multiply\"")
+		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Multiply>())]
+		     | (qi::lit("\"multiply\"")
+			>> ',' >> qi::lit("\"weight\"") >> ':' >> tensor)
+		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Multiply>(qi::_1))]
 		     | (qi::lit("\"parallel\"")
 			>> ',' >> qi::lit("\"input\"") >> ':' >> qi::bool_
 			>> ',' >> qi::lit("\"output\"") >> ':' >> qi::bool_
