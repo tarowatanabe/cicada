@@ -40,13 +40,15 @@ namespace utils
     indexed_set(const size_type __size=8, const Hash& __hash=Hash(), const Equal& __equal=Equal())
       : impl(__size, __hash, __equal) {}
     
+    template <typename Iterator>
+    indexed_set(Iterator first, Iterator last, const size_type __size=8, const Hash& __hash=Hash(), const Equal& __equal=Equal())
+      : impl(__size, __hash, __equal) { insert(first, last); }
     
   public:
     void assign(const indexed_set& x) { impl.assign(x.impl); }
     void swap(indexed_set& x) { impl.swap(x.impl); }
     
   public:
-    
     const Tp& operator[](index_type x) const { return impl[x]; }
 
     const_iterator begin() const { return impl.begin(); }
@@ -56,6 +58,13 @@ namespace utils
     bool empty() const { return impl.empty(); }
     size_type size() const { return impl.size(); }
     void clear() { impl.clear(); }
+
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first)
+	insert(*first);
+    }
     
     std::pair<iterator, bool> insert(const value_type& x) { return impl.insert(x); }
     const_iterator find(const value_type& x) const { return impl.find(x); }

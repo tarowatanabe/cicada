@@ -18,8 +18,11 @@
 #include <vector>
 
 #include "cicada/neuron/neuron.hpp"
+#include "cicada/feature.hpp"
 
 #include "utils/thread_specific_ptr.hpp"
+
+#include "utils/json_string_parser.hpp"
 
 namespace cicada
 {
@@ -29,8 +32,10 @@ namespace cicada
     struct layer_parser_grammar : boost::spirit::qi::grammar<Iterator, Layer::layer_ptr_type(), boost::spirit::standard::space_type>
     {
       typedef Layer::layer_ptr_type ptr_type;
-
       typedef std::vector<ptr_type, std::allocator<ptr_type> > layer_ptr_set_type;
+
+      typedef cicada::Feature feature_type;
+      typedef std::vector<feature_type, std::allocator<feature_type> > feature_set_type;
       
       struct matrix_begin_func
       {
@@ -50,6 +55,8 @@ namespace cicada
 	namespace qi = boost::spirit::qi;
 	namespace standard = boost::spirit::standard;
 	namespace phoenix = boost::phoenix;
+
+	features %= qi::lit('[') >> (feature % ',') >> qi::lit(']');
 	
 	tensor = (qi::lit('{')
 		  >> (qi::lit("\"row\"") >> ':' >> qi::int_ >> ','>> qi::lit("\"column\"") >> ':' >> qi::int_)
@@ -87,6 +94,11 @@ namespace cicada
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Copy>())]
 		     | qi::lit("\"exp\"")
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Exp>())]
+		     | qi::lit("\"features\"")
+		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Features>())]
+		     | (qi::lit("\"features\"")
+			>> ',' >> qi::lit("\"features\"") >> qi::lit(':') >> features)
+		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::Features>(phoenix::begin(qi::_1), phoenix::end(qi::_1)))]
 		     | (qi::lit("\"hardtanh\"") | qi::lit("\"hard-tanh\""))
 		     [qi::_val = phoenix::construct<ptr_type>(phoenix::new_<neuron::HardTanh>())]
 		     | (qi::lit("\"linear\"")
@@ -151,6 +163,9 @@ namespace cicada
       }
       
       typedef boost::spirit::standard::space_type space_type;
+
+      utils::json_string_parser<Iterator> feature;
+      boost::spirit::qi::rule<Iterator, feature_set_type(), space_type> features;
       
       boost::phoenix::function<matrix_begin_func> const matrix_begin;
       

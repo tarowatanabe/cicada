@@ -287,6 +287,7 @@ neuron/concat.hpp \
 neuron/convolution.hpp \
 neuron/copy.hpp \
 neuron/exp.hpp \
+neuron/features.hpp \
 neuron/hardtanh.hpp \
 neuron/layer.hpp \
 neuron/linear.hpp \
@@ -314,6 +315,7 @@ neuron/copy.cpp \
 neuron/hardtanh.cpp \
 neuron/layer.cpp \
 neuron/exp.cpp \
+neuron/features.cpp \
 neuron/linear.cpp \
 neuron/log.cpp \
 neuron/lookup.cpp \

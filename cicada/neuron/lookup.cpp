@@ -170,12 +170,14 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
+      tensor_generator_grammar<std::ostream_iterator<char> > tensor;
+
       karma::generate(std::ostream_iterator<char>(os),
 		      karma::lit('{')
 		      << karma::lit("\"neuron\"") << ':' << karma::lit("\"lookup\"")
-		      << ',' << karma::lit("\"size\"") << ':' << karma::int_
+		      << ',' << karma::lit("\"weight\"") << ':' << tensor
 		      << '}',
-		      size);
+		      weight);
       
       return os;
     }

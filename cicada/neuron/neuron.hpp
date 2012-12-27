@@ -11,6 +11,7 @@
 #include <neuron/convolution.hpp>
 #include <neuron/copy.hpp>
 #include <neuron/exp.hpp>
+#include <neuron/features.hpp>
 #include <neuron/hardtanh.hpp>
 #include <neuron/layer.hpp>
 #include <neuron/linear.hpp>
