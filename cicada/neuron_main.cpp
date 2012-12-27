@@ -6,6 +6,40 @@
 
 #include "utils/random_seed.hpp"
 
+template <typename L>
+void test_dimenstion(const char* name)
+{
+  L sum1(false);
+  L sum2(true);
+  
+  const cicada::neuron::Layer::tensor_type input = cicada::neuron::Layer::tensor_type::Random(3, 7);
+  
+  sum1.forward(input);
+  sum2.forward(input);
+  
+  std::cout << name << " input:" << std::endl
+	    << input << std::endl
+	    << name << " forward1:" << std::endl
+	    << sum1.data_output << std::endl
+	    << name << " forward2:" << std::endl
+	    << sum2.data_output << std::endl;
+  
+  const cicada::neuron::Layer::tensor_type grad1 = cicada::neuron::Layer::tensor_type::Random(7, 1);
+  const cicada::neuron::Layer::tensor_type grad2 = cicada::neuron::Layer::tensor_type::Random(3, 1);
+  
+  sum1.backward(input, grad1);
+  sum2.backward(input, grad2);
+  
+  std::cout << name << " grad1:"<< std::endl
+	    << grad1 << std::endl
+	    << name << " backward1:" << std::endl
+	    << sum1.gradient_input << std::endl
+	    << name << " grad2:"<< std::endl
+	    << grad2 << std::endl
+	    << name << " backward2:" << std::endl
+	    << sum2.gradient_input << std::endl;
+}
+
 int main(int argc, char** argv)
 {
   std::srand(utils::random_seed());
@@ -43,4 +77,11 @@ int main(int argc, char** argv)
 	    << m1.data_output << std::endl
 	    << "linear" << std::endl
 	    << m1.front()->data_output << std::endl;
+  
+  // summation
+
+  test_dimenstion<cicada::neuron::Sum>("sum");
+  test_dimenstion<cicada::neuron::Mean>("mean");
+  test_dimenstion<cicada::neuron::Max>("max");
+  test_dimenstion<cicada::neuron::Min>("min");
 }
