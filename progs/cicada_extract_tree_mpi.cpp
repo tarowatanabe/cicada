@@ -305,6 +305,7 @@ int main(int argc, char** argv)
       
       for (int rank = 1; rank != mpi_size; ++ rank) {
 	boost::iostreams::filtering_istream is;
+	is.push(boost::iostreams::zlib_decompressor());
 	is.push(utils::mpi_device_source(rank, file_tag, 4096));
 	
 	std::string line;
@@ -318,6 +319,7 @@ int main(int argc, char** argv)
       
     } else {
       boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::zlib_compressor());
       os.push(utils::mpi_device_sink(0, file_tag, 4096));
       
       task_type::path_set_type::const_iterator piter_end = task.paths.end();
