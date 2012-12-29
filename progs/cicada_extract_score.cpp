@@ -324,8 +324,10 @@ void merge_counts(path_set_type& counts_files)
     
     path_set_type counts_files_new;
     
-    path_set_type::const_iterator iter = counts_files.begin();
-    while (iter != counts_files.end() && iter + 1 != counts_files.end()) {
+    path_set_type::iterator iter     = counts_files.begin();
+    path_set_type::iterator iter_end = std::min(iter + std::max(256, 2 * threads), counts_files.end());
+    
+    while (iter != iter_end && iter + 1 != iter_end) {
       const path_type file1 = *iter;
       ++ iter;
       const path_type file2 = *iter;
@@ -341,8 +343,8 @@ void merge_counts(path_set_type& counts_files)
       queue.push(merge_type(file1, file2, counts_file));
     }
     
-    if (iter != counts_files.end())
-      counts_files_new.push_back(*iter);
+    // insert into counts-files-new
+    counts_files_new.insert(counts_files_new.end(), iter, counts_files.end());
     
     // termination..
     for (int i = 0; i != threads; ++ i)
