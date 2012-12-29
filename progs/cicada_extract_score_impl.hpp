@@ -1563,9 +1563,9 @@ struct PhrasePairReverseReducer
   // merge from smallest files...
   void merge_counts(path_set_type& paths)
   {
-    if (paths.size() <= 128) return;
+    if (paths.size() <= 16) return;
 
-    while (paths.size() > 128) {
+    while (paths.size() > 16) {
       
       // sort according to the file-size...
       std::sort(paths.begin(), paths.end(), less_file_size());
@@ -2332,9 +2332,9 @@ struct PhrasePairTargetReducer
   // merge from smallest files...
   void merge_counts(path_set_type& paths)
   {
-    if (paths.size() <= 128) return;
+    if (paths.size() <= 16) return;
 
-    while (paths.size() > 128) {
+    while (paths.size() > 16) {
       
       // sort according to the file-size...
       std::sort(paths.begin(), paths.end(), less_file_size());
