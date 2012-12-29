@@ -1566,7 +1566,6 @@ struct PhrasePairReverseReducer
     if (paths.size() <= 16) return;
 
     while (paths.size() > 16) {
-      
       // sort according to the file-size...
       std::sort(paths.begin(), paths.end(), less_file_size());
       
@@ -2290,8 +2289,7 @@ struct PhrasePairTargetReducer
       return boost::filesystem::file_size(x) < boost::filesystem::file_size(y);
     }
   };
-
-
+  
   // merge counts from two streams into os..
   void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
   {
