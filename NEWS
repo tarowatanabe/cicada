@@ -1,6 +1,8 @@
-2013-x-x
+2012-12-30
 INCOMPATIBLE: The bleuS metric is completely a sentence-wise metric, and document-wise scoring is performed by
 	      simple averaging.
+Bugfix: merge counts when large # of count files are extracted
+Bugfix: better parallelization of counts extraction
 
 2012-12-20
 New: support L1 regularization for xBLEU
