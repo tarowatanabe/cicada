@@ -626,34 +626,34 @@ struct PhrasePairParser
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
 
-bool operator()(std::istream& is, phrase_pair_type& phrase_pair)
-{
-  phrase_pair.clear();
-
-  std::string line;
-  if (! getline(is, line)) return false;
-
-  return operator()(line, phrase_pair);
-}
-
-bool operator()(const std::string& line, phrase_pair_type& phrase_pair)
-{
-  phrase_pair.clear();
-
-  std::string::const_iterator iter = line.begin();
-  std::string::const_iterator end = line.end();
-
-  const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, phrase_pair);
-
-  if (result && iter == end)
-    return true;
-  else {
-    std::cerr << "WARNING: parsing failed: " << line << std::endl;
-    return false;
+  bool operator()(std::istream& is, phrase_pair_type& phrase_pair)
+  {
+    phrase_pair.clear();
+    
+    std::string line;
+    if (! getline(is, line)) return false;
+    
+    return operator()(line, phrase_pair);
   }
-}
-
-phrase_pair_parser<std::string::const_iterator> grammar;
+  
+  bool operator()(const std::string& line, phrase_pair_type& phrase_pair)
+  {
+    phrase_pair.clear();
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, phrase_pair);
+    
+    if (result && iter == end)
+      return true;
+    else {
+      std::cerr << "WARNING: parsing failed: " << line << std::endl;
+      return false;
+    }
+  }
+  
+  phrase_pair_parser<std::string::const_iterator> grammar;
 };
 
 
