@@ -1,4 +1,4 @@
-2012-12-30
+2012-12-29
 INCOMPATIBLE: The bleuS metric is completely a sentence-wise metric, and document-wise scoring is performed by
 	      simple averaging.
 Bugfix: merge counts when large # of count files are extracted
