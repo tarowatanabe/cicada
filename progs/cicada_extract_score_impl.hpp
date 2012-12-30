@@ -524,7 +524,7 @@ struct RootCountParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-      label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      label %= qi::lexeme[+(standard::char_ - (+standard::space >> "|||" >> +standard::space))];
 
       count %= 'B' >> count_base64 | qi::double_;
 
@@ -607,7 +607,7 @@ struct PhrasePairParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      phrase %= qi::lexeme[+(standard::char_ - (+standard::space >> "|||" >> +standard::space))];
       point %= qi::int_ >> '-' >> qi::int_;
       alignment %= *point;
       
@@ -700,7 +700,7 @@ struct PhrasePairSimpleParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      phrase %= qi::lexeme[+(standard::char_ - (+standard::space >> "|||" >> +standard::space))];
 
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> counts;
@@ -781,7 +781,7 @@ struct PhraseCountParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      phrase %= qi::lexeme[+(standard::char_ - (+standard::space >> "|||" >> +standard::space))];
       
       counts %= +('B' >> count_base64 | qi::double_);
       phrase_count %= phrase >> "|||" >> counts;
