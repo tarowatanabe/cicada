@@ -1565,24 +1565,33 @@ struct PhrasePairReverseReducer
   // merge from smallest files...
   void merge_counts(path_set_type& paths)
   {
-    if (paths.size() <= 16) return;
+    typedef std::pair<size_t, path_type> size_path_type;
+    typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
 
-    while (paths.size() > 16) {
+    if (paths.size() <= 16) return;
+    
+    size_path_set_type size_paths;
+    
+    path_set_type::const_iterator piter_end = paths.end();
+    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
+      size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
+
+    while (size_paths.size() > 16) {
+      
       // sort according to the file-size...
-      std::sort(paths.begin(), paths.end(), less_file_size());
+      std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
       
-      const path_type file1 = paths.front();
-      paths.erase(paths.begin());
+      const path_type file1 = size_paths.back().second;
+      size_paths.pop_back();
       
-      const path_type file2 = paths.front();
-      paths.erase(paths.begin());
+      const path_type file2 = size_paths.back().second;
+      size_paths.pop_back();
       
       const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.reversed.XXXXXX");
       utils::tempfile::insert(counts_file_tmp);
       const path_type counts_file = counts_file_tmp.string() + ".gz";
       utils::tempfile::insert(counts_file);
       
-      paths.push_back(counts_file);
       {
 	utils::compress_istream is1(file1, 1024 * 1024);
 	utils::compress_istream is2(file2, 1024 * 1024);
@@ -1598,7 +1607,15 @@ struct PhrasePairReverseReducer
       
       utils::tempfile::erase(file1);
       utils::tempfile::erase(file2);
+      
+      size_paths.push_back(size_path_type(boost::filesystem::file_size(counts_file), counts_file));
     }
+    
+    paths.clear();
+    
+    size_path_set_type::const_iterator siter_end = size_paths.end();
+    for (size_path_set_type::const_iterator siter = size_paths.begin(); siter != siter_end; ++ siter)
+      paths.push_back(siter->second);
   }
   
 
@@ -2333,25 +2350,33 @@ struct PhrasePairTargetReducer
   // merge from smallest files...
   void merge_counts(path_set_type& paths)
   {
+    typedef std::pair<size_t, path_type> size_path_type;
+    typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
+    
     if (paths.size() <= 16) return;
-
-    while (paths.size() > 16) {
+    
+    size_path_set_type size_paths;
+    
+    path_set_type::const_iterator piter_end = paths.end();
+    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
+      size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
+    
+    while (size_paths.size() > 16) {
       
       // sort according to the file-size...
-      std::sort(paths.begin(), paths.end(), less_file_size());
+      std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
       
-      const path_type file1 = paths.front();
-      paths.erase(paths.begin());
+      const path_type file1 = size_paths.back().second;
+      size_paths.pop_back();
       
-      const path_type file2 = paths.front();
-      paths.erase(paths.begin());
+      const path_type file2 = size_paths.back().second;
+      size_paths.pop_back();
       
       const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.target.XXXXXX");
       utils::tempfile::insert(counts_file_tmp);
       const path_type counts_file = counts_file_tmp.string() + ".gz";
       utils::tempfile::insert(counts_file);
       
-      paths.push_back(counts_file);
       {
 	utils::compress_istream is1(file1, 1024 * 1024);
 	utils::compress_istream is2(file2, 1024 * 1024);
@@ -2367,7 +2392,15 @@ struct PhrasePairTargetReducer
       
       utils::tempfile::erase(file1);
       utils::tempfile::erase(file2);
+      
+      size_paths.push_back(size_path_type(boost::filesystem::file_size(counts_file), counts_file));
     }
+
+    paths.clear();
+    
+    size_path_set_type::const_iterator siter_end = size_paths.end();
+    for (size_path_set_type::const_iterator siter = size_paths.begin(); siter != siter_end; ++ siter)
+      paths.push_back(siter->second);
   }
   
 
