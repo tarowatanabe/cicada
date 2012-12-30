@@ -241,7 +241,12 @@ struct TaskMerge
     typedef PhrasePair       rule_pair_type;
     typedef PhrasePairParser rule_pair_parser_type;
 
+    typedef utils::unordered_set<path_type, boost::hash<path_type>, std::equal_to<path_type>,
+				 std::allocator<path_type> >::type path_temporary_type;
+
     rule_pair_parser_type parser;
+
+    path_temporary_type temp;
     
     while (files.size() > size && files.size() >= 2) {
       std::sort(files.begin(), files.end(), greater_file_size());
@@ -258,6 +263,8 @@ struct TaskMerge
       utils::tempfile::insert(counts_file);
       
       files.push_back(counts_file);
+
+      temp.insert(counts_file);
 
       utils::compress_istream is1(file1, 1024 * 1024);
       utils::compress_istream is2(file2, 1024 * 1024);
@@ -295,6 +302,16 @@ struct TaskMerge
       while (parsed2) {
 	os << rule2 << '\n';
 	parsed2 = parser(is2, rule2);
+      }
+      
+      if (temp.find(file1) != temp.end()) {
+	boost::filesystem::remove(file1);
+	utils::tempfile::erase(file1);
+      }
+      
+      if (temp.find(file2) != temp.end()) {
+	boost::filesystem::remove(file2);
+	utils::tempfile::erase(file2);
       }
     }
   }
