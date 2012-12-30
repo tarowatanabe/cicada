@@ -244,64 +244,73 @@ struct TaskMerge
     typedef utils::unordered_set<path_type, boost::hash<path_type>, std::equal_to<path_type>,
 				 std::allocator<path_type> >::type path_temporary_type;
 
+    typedef std::pair<size_t, path_type> size_path_type;
+    typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
+    
+    size_path_set_type size_files;
+    
+    path_set_type::const_iterator fiter_end = files.end();
+    for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter)
+      size_files.push_back(size_path_type(boost::filesystem::file_size(*fiter), *fiter));
+    
     rule_pair_parser_type parser;
-
+    
     path_temporary_type temp;
     
-    while (files.size() > size && files.size() >= 2) {
-      std::sort(files.begin(), files.end(), greater_file_size());
+    while (size_files.size() > size && size_files.size() >= 2) {
+      std::sort(size_files.begin(), size_files.end(), std::greater<size_path_type>());
       
-      const path_type file1 = files.back();
-      files.pop_back();
+      const path_type file1 = size_files.back().second;
+      size_files.pop_back();
       
-      const path_type file2 = files.back();
-      files.pop_back();
+      const path_type file2 = size_files.back().second;
+      size_files.pop_back();
       
       const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.merged.XXXXXX");
       utils::tempfile::insert(counts_file_tmp);
       const path_type counts_file = counts_file_tmp.string() + ".gz";
       utils::tempfile::insert(counts_file);
       
-      files.push_back(counts_file);
-
       temp.insert(counts_file);
 
-      utils::compress_istream is1(file1, 1024 * 1024);
-      utils::compress_istream is2(file2, 1024 * 1024);
+      {
+	utils::compress_istream is1(file1, 1024 * 1024);
+	utils::compress_istream is2(file2, 1024 * 1024);
       
-      utils::compress_ostream os(counts_file, 1024 * 1024);
-      os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+	utils::compress_ostream os(counts_file, 1024 * 1024);
+	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
-      rule_pair_type rule1;
-      rule_pair_type rule2;
+	rule_pair_type rule1;
+	rule_pair_type rule2;
       
-      bool parsed1 = parser(is1, rule1);
-      bool parsed2 = parser(is2, rule2);
+	bool parsed1 = parser(is1, rule1);
+	bool parsed2 = parser(is2, rule2);
       
-      while (parsed1 && parsed2) {
-	if (rule1 < rule2) {
+	while (parsed1 && parsed2) {
+	  if (rule1 < rule2) {
+	    os << rule1 << '\n';
+	    parsed1 = parser(is1, rule1);
+	  } else if (rule2 < rule1) {
+	    os << rule2 << '\n';
+	    parsed2 = parser(is2, rule2);
+	  } else {
+	    rule1.increment(rule2.counts.begin(), rule2.counts.end());
+	    os << rule1 << '\n';
+	    parsed1 = parser(is1, rule1);
+	    parsed2 = parser(is2, rule2);
+	  }
+	}
+      
+	// dump remaining...
+	while (parsed1) {
 	  os << rule1 << '\n';
 	  parsed1 = parser(is1, rule1);
-	} else if (rule2 < rule1) {
+	}
+      
+	while (parsed2) {
 	  os << rule2 << '\n';
 	  parsed2 = parser(is2, rule2);
-	} else {
-	  rule1.increment(rule2.counts.begin(), rule2.counts.end());
-	  os << rule1 << '\n';
-	  parsed1 = parser(is1, rule1);
-	  parsed2 = parser(is2, rule2);
 	}
-      }
-      
-      // dump remaining...
-      while (parsed1) {
-	os << rule1 << '\n';
-	parsed1 = parser(is1, rule1);
-      }
-      
-      while (parsed2) {
-	os << rule2 << '\n';
-	parsed2 = parser(is2, rule2);
       }
       
       if (temp.find(file1) != temp.end()) {
@@ -313,7 +322,15 @@ struct TaskMerge
 	boost::filesystem::remove(file2);
 	utils::tempfile::erase(file2);
       }
+      
+      size_files.push_back(size_path_type(boost::filesystem::file_size(counts_file), counts_file));
     }
+    
+    files.clear();
+    
+    size_path_set_type::const_iterator siter_end = size_files.end();
+    for (size_path_set_type::const_iterator siter = size_files.begin(); siter != siter_end; ++ siter)
+      files.push_back(siter->second);
   }
   
   path_set_type& files;
