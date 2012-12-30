@@ -397,7 +397,7 @@ void score_counts(const path_type& output_file,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024));
+      queues_mapper[i][j].reset(new queue_type(1024 * 8));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
@@ -451,7 +451,7 @@ void target_counts(const path_map_type& reversed_files,
   root_count_map_type root_counts(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(1024 * threads));
+    queues[shard].reset(new queue_type(1024 *8 * threads));
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
@@ -520,7 +520,7 @@ void source_counts(const path_set_type& counts_files,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024));
+      queues_mapper[i][j].reset(new queue_type(1024 * 8));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
@@ -590,7 +590,7 @@ void reverse_counts(const path_set_type& counts_files,
   queue_ptr_set_type  queues(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(1024 * threads));
+    queues[shard].reset(new queue_type(1024 * 8 * threads));
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
