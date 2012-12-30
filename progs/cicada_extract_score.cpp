@@ -232,40 +232,37 @@ int main(int argc, char** argv)
 
 struct TaskMerge
 {
-  struct merge_type
-  {
-    path_type file1;
-    path_type file2;
-    path_type merged;
-    
-    merge_type() : file1(), file2(), merged() {}
-    merge_type(const path_type& __file1,
-	       const path_type& __file2,
-	       const path_type& __merged)
-      : file1(__file1), file2(__file2), merged(__merged) {}
-  };
-  
-  typedef utils::lockfree_list_queue<merge_type, std::allocator<merge_type> > queue_type;
-  
-  TaskMerge(queue_type& __queue) : queue(__queue) {}
+  TaskMerge(path_set_type& __files,
+	    const path_type& __prefix,
+	    const size_t& __size) : files(__files), prefix(__prefix), size(__size) {}
   
   void operator()()
   {
     typedef PhrasePair       rule_pair_type;
     typedef PhrasePairParser rule_pair_parser_type;
-    
-    rule_pair_parser_type parser;
-    merge_type merge;
 
-    for (;;) {
-      queue.pop(merge);
+    rule_pair_parser_type parser;
+    
+    while (files.size() > size && files.size() >= 2) {
+      std::sort(files.begin(), files.end(), greater_file_size());
       
-      if (merge.merged.empty()) break;
+      const path_type file1 = files.back();
+      files.pop_back();
       
-      utils::compress_istream is1(merge.file1, 1024 * 1024);
-      utils::compress_istream is2(merge.file2, 1024 * 1024);
+      const path_type file2 = files.back();
+      files.pop_back();
       
-      utils::compress_ostream os(merge.merged, 1024 * 1024);
+      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.merged.XXXXXX");
+      utils::tempfile::insert(counts_file_tmp);
+      const path_type counts_file = counts_file_tmp.string() + ".gz";
+      utils::tempfile::insert(counts_file);
+      
+      files.push_back(counts_file);
+
+      utils::compress_istream is1(file1, 1024 * 1024);
+      utils::compress_istream is2(file2, 1024 * 1024);
+      
+      utils::compress_ostream os(counts_file, 1024 * 1024);
       os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       rule_pair_type rule1;
@@ -288,76 +285,50 @@ struct TaskMerge
 	  parsed2 = parser(is2, rule2);
 	}
       }
-
+      
       // dump remaining...
       while (parsed1) {
 	os << rule1 << '\n';
 	parsed1 = parser(is1, rule1);
       }
-
+      
       while (parsed2) {
 	os << rule2 << '\n';
 	parsed2 = parser(is2, rule2);
-      }      
+      }
     }
   }
   
-  queue_type& queue;
+  path_set_type& files;
+  path_type      prefix;
+  size_t         size;
 };
 
 void merge_counts(path_set_type& counts_files)
 {
   typedef TaskMerge task_type;
-  typedef task_type::merge_type merge_type;
-  typedef task_type::queue_type queue_type;
 
-  const path_type tmpdir = utils::tempfile::tmp_dir();
+  typedef std::vector<path_set_type, std::allocator<path_set_type> > path_map_type;
+
+  std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
   
-  while (counts_files.size() > 256) {
-    queue_type queue;
-    
-    boost::thread_group workers;
-    for (int i = 0; i != threads; ++ i)
-      workers.add_thread(new boost::thread(task_type(queue)));
-    
-    // we will merge into half...
-    std::sort(counts_files.begin(), counts_files.end(), less_file_size());
-    
-    path_set_type counts_files_new;
-    
-    path_set_type::iterator iter     = counts_files.begin();
-    path_set_type::iterator iter_end = std::min(iter + std::max(256, 2 * threads), counts_files.end());
-    
-    while (iter != iter_end && iter + 1 != iter_end) {
-      const path_type file1 = *iter;
-      ++ iter;
-      const path_type file2 = *iter;
-      ++ iter;
-      
-      const path_type counts_file_tmp = utils::tempfile::file_name(tmpdir / "cicada.extract.XXXXXX");
-      utils::tempfile::insert(counts_file_tmp);
-      const path_type counts_file = counts_file_tmp.string() + ".gz";
-      utils::tempfile::insert(counts_file);
-      
-      counts_files_new.push_back(counts_file);
-      
-      queue.push(merge_type(file1, file2, counts_file));
-    }
-    
-    // insert into counts-files-new
-    counts_files_new.insert(counts_files_new.end(), iter, counts_files.end());
-    
-    // termination..
-    for (int i = 0; i != threads; ++ i)
-      queue.push(merge_type());
-    
-    workers.join_all();
-    
-    counts_files.swap(counts_files_new);
-  }
+  path_map_type mapped_files(threads);
+  for (size_t i = 0; i != counts_files.size(); ++ i)
+    mapped_files[i % threads].push_back(counts_files[i]);
   
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 128 / threads)));
+  
+  workers.join_all();
+  
+  counts_files.clear();
+  for (int i = 0; i != threads; ++ i)
+    counts_files.insert(counts_files.end(), mapped_files[i].begin(), mapped_files[i].end());
+
   std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
 }
+
 
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
@@ -504,8 +475,12 @@ void source_counts(const path_set_type& counts_files,
   typedef std::vector<queue_ptr_set_type, std::allocator<queue_ptr_set_type> > queue_ptr_map_type;
   
   path_map_type mapped_files(threads);
-  for (size_t i = 0; i != counts_files.size(); ++ i)
+  for (size_t i = 0; i != counts_files.size(); ++ i) {
+    if (! boost::filesystem::exists(counts_files[i]))
+      throw std::runtime_error("no file? " + counts_files[i].string());
+    
     mapped_files[i % threads].push_back(counts_files[i]);
+  }
 
   source_files.clear();
   source_files.reserve(threads);
@@ -523,7 +498,7 @@ void source_counts(const path_set_type& counts_files,
       queues_mapper[i][j].reset(new queue_type(1024 * 64));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
-  
+
   boost::thread_group reducers;
   for (int shard = 0; shard != threads; ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(queues_reducer[shard],
