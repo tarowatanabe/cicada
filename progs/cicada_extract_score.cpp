@@ -25,7 +25,8 @@ typedef std::vector<path_type, std::allocator<path_type> >         path_set_type
 typedef std::vector<path_set_type, std::allocator<path_set_type> > path_map_type;
 
 typedef RootCount root_count_type;
-typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
+			     std::allocator<root_count_type> >::type root_count_set_type;
 typedef std::vector<root_count_set_type, std::allocator<root_count_set_type> > root_count_map_type;
 
 struct less_file_size

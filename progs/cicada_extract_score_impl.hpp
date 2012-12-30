@@ -150,7 +150,6 @@ public:
   {
     return y < x;
   }
-
 };
 
 class PhrasePair
@@ -862,7 +861,10 @@ struct PhrasePairSource
   typedef PhraseCount      phrase_count_type;
   typedef PhrasePairSimple simple_type;
 
-  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+  typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
+			     std::allocator<root_count_type> >::type root_count_set_type;
+
+
   
   typedef utils::lockfree_list_queue<simple_type, std::allocator<simple_type> > queue_type;
   
@@ -1712,7 +1714,8 @@ struct PhrasePairTarget
   
   typedef utils::chunk_vector<simple_type, 4096 / sizeof(simple_type), std::allocator<simple_type> > simple_set_type;
 
-  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+  typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
+			       std::allocator<root_count_type> >::type root_count_set_type;
   
   typedef utils::lockfree_list_queue<simple_type, std::allocator<simple_type> > queue_type;
   
@@ -2477,7 +2480,8 @@ struct PhrasePairScore
   typedef RootCount        root_count_type;
   typedef PhraseCount      phrase_count_type;
   
-  typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
+  typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
+			       std::allocator<root_count_type> >::type root_count_set_type;
   
   typedef utils::lockfree_list_queue<phrase_pair_type, std::allocator<phrase_pair_type> > queue_type;
   
