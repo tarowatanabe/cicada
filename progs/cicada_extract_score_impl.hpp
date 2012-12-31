@@ -1226,6 +1226,7 @@ struct PhrasePairSourceReducer
 	counts.increment(curr.counts.begin(), curr.counts.end());
       }
       
+      buffer_queue->first.clear();
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
 	pqueue.push(buffer_queue);
@@ -3065,6 +3066,7 @@ struct PhrasePairScoreReducer
       else
 	counts.back().increment(curr.counts.begin(), curr.counts.end());
       
+      buffer_queue->first.clear();
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
 	pqueue.push(buffer_queue);
