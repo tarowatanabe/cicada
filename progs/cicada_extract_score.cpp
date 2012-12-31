@@ -343,7 +343,7 @@ void merge_counts(path_set_type& counts_files)
   typedef TaskMerge task_type;
 
   typedef std::vector<path_set_type, std::allocator<path_set_type> > path_map_type;
-
+  
   std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
   
   path_map_type mapped_files(threads);
@@ -352,7 +352,7 @@ void merge_counts(path_set_type& counts_files)
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 1 /*128 / threads*/)));
+    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 128 / threads)));
   
   workers.join_all();
   
@@ -402,7 +402,7 @@ void score_counts(const path_type& output_file,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024 * 64));
+      queues_mapper[i][j].reset(new queue_type(1024 * 4));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
@@ -456,7 +456,7 @@ void target_counts(const path_map_type& reversed_files,
   root_count_map_type root_counts(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(1024 * 64 * threads));
+    queues[shard].reset(new queue_type(1024 * 4 * threads));
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
@@ -529,7 +529,7 @@ void source_counts(const path_set_type& counts_files,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024 * 64));
+      queues_mapper[i][j].reset(new queue_type(1024 * 4));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
 
@@ -599,7 +599,7 @@ void reverse_counts(const path_set_type& counts_files,
   queue_ptr_set_type  queues(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(1024 * 64 * threads));
+    queues[shard].reset(new queue_type(1024 * 4 * threads));
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
