@@ -13,6 +13,8 @@
 #include <iostream>
 #include <string>
 
+#include <Eigen/Core>
+
 #include <cicada/feature.hpp>
 
 #include <utils/bithack.hpp>
@@ -51,6 +53,10 @@ namespace cicada
     typedef typename weight_vector_type::iterator        iterator;
     typedef typename weight_vector_type::const_reference const_reference;
     typedef typename weight_vector_type::reference       reference;
+
+  public:
+    typedef Eigen::Map<Eigen::Matrix<Tp, Eigen::Dynamic, 1> > matrix_type;
+    typedef Eigen::Map<Eigen::Array<Tp, Eigen::Dynamic, 1> > array_type;
 
   public:
     WeightVector() {}
@@ -105,34 +111,44 @@ namespace cicada
     
     const_reference back() const { return __values.back(); }
     reference back() { return __values.back(); }
+
+    matrix_type matrix() const { return matrix_type(const_cast<Tp*>(&(*__values.begin())), __values.size()); }
+    matrix_type matrix()       { return matrix_type(&(*__values.begin()), __values.size()); }
+
+    array_type array() const { return array_type(const_cast<Tp*>(&(*__values.begin())), __values.size()); }
+    array_type array()       { return array_type(&(*__values.begin()), __values.size()); }
     
   public:
     // operators...
     template <typename T>
     self_type& operator+=(const T& x)
     {
-      std::transform(begin(), end(), begin(), std::bind2nd(std::plus<Tp>(), x));
+      array() += x;
+      //std::transform(begin(), end(), begin(), std::bind2nd(std::plus<Tp>(), x));
       return *this;
     }
     
     template <typename T>
     self_type& operator-=(const T& x)
     {
-      std::transform(begin(), end(), begin(), std::bind2nd(std::minus<Tp>(), x));
+      array() -= x;
+      //std::transform(begin(), end(), begin(), std::bind2nd(std::minus<Tp>(), x));
       return *this;
     }
     
     template <typename T>
     self_type& operator*=(const T& x)
     {
-      std::transform(begin(), end(), begin(), std::bind2nd(std::multiplies<Tp>(), x));
+      array() *= x;
+      //std::transform(begin(), end(), begin(), std::bind2nd(std::multiplies<Tp>(), x));
       return *this;
     }
     
     template <typename T>
     self_type& operator/=(const T& x)
     {
-      std::transform(begin(), end(), begin(), std::bind2nd(std::divides<Tp>(), x));
+      array() /= x;
+      //std::transform(begin(), end(), begin(), std::bind2nd(std::divides<Tp>(), x));
       return *this;
     }
     
@@ -143,8 +159,12 @@ namespace cicada
 	__values.reserve(x.size());
 	__values.resize(x.size());
       }
+
+      if (size() == x.size())
+	array() += x.array();
+      else
+	std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::plus<Tp>());
       
-      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::plus<Tp>());
       return *this;
     }
     
@@ -156,7 +176,11 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::minus<Tp>());
+      if (size() == x.size())
+	array() -= x.array();
+      else
+	std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::minus<Tp>());
+      
       return *this;
     }
     
@@ -168,11 +192,15 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      // transform
-      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::multiplies<Tp>());
-      
-      //std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::multiplies<Tp>(), Tp()));
-      std::fill(begin() + x.size(), end(), Tp());
+      if (size() == x.size())
+	array() *= x.array();
+      else {
+	// transform
+	std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::multiplies<Tp>());
+	
+	//std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::multiplies<Tp>(), Tp()));
+	std::fill(begin() + x.size(), end(), Tp());
+      }
       
       return *this;
     }
@@ -185,9 +213,13 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::divides<Tp>());
-      
-      std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::divides<Tp>(), Tp()));
+      if (size() == x.size())
+	array() /= x.array();
+      else {
+	std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::divides<Tp>());
+	
+	std::transform(begin() + x.size(), end(), begin() + x.size(), std::bind2nd(std::divides<Tp>(), Tp()));
+      }
       
       return *this;
     }

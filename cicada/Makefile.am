@@ -654,7 +654,8 @@ tokenizer_main \
 transducer_main \
 tree_grammar_mutable_main \
 tree_grammar_static_main \
-tree_rule_main
+tree_rule_main \
+weight_vector_main
 
 noinst_DATA = .gitignore
 
@@ -757,3 +758,7 @@ tree_grammar_static_main_LDADD = libcicada.la
 
 tree_rule_main_SOURCES = tree_rule_main.cpp
 tree_rule_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
+
+weight_vector_main_SOURCES = weight_vector_main.cpp symbol.cpp vocab.cpp feature.cpp
+weight_vector_main_CPPFLAGS = $(AM_CPPFLAGS)
+weight_vector_main_LDADD = $(LIBUTILS) $(MSGPACK_LDFLAGS)
