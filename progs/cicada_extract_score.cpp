@@ -402,7 +402,7 @@ void score_counts(const path_type& output_file,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024 * 256));
+      queues_mapper[i][j].reset(new queue_type(1024));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
@@ -529,7 +529,7 @@ void source_counts(const path_set_type& counts_files,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024 * 256));
+      queues_mapper[i][j].reset(new queue_type(1024));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
 
