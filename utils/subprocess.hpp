@@ -166,7 +166,6 @@ namespace utils
       
       if (__pid >= 0) {
 	int status = 0;
-	int ret = 0;
 	do {
 	  const int ret = ::waitpid(__pid, &status, 0);
 	  
