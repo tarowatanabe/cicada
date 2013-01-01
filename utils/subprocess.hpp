@@ -168,8 +168,15 @@ namespace utils
 	int status = 0;
 	int ret = 0;
 	do {
-	  ret = ::waitpid(__pid, &status, 0);
-	} while ((ret == -1 && errno == EINTR) || (ret != -1 && !WIFEXITED(status)));
+	  const int ret = ::waitpid(__pid, &status, 0);
+	  
+	  if (ret == __pid)
+	    break;
+	  else if (ret < 0 && errno == EINTR)
+	    continue;
+	  else // error...
+	    break; 
+	} while (true);
 	
 	__pid = -1;
       }
