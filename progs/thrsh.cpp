@@ -36,8 +36,9 @@ int getoptions(int argc, char** argv);
 
 void run_command(const std::string& command)
 {
-  utils::subprocess run(command);
+  utils::subprocess run(command, false, false);
 
+#if 0
   ::close(run.desc_write());
   run.desc_write() = -1;
 
@@ -52,6 +53,7 @@ void run_command(const std::string& command)
     if (is.gcount() > 0)
       std::cout.write(buffer, is.gcount());
   } while (is);
+#endif
   
 #if 0
   static const size_t buffer_size = 1024;
