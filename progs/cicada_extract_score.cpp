@@ -352,7 +352,7 @@ void merge_counts(path_set_type& counts_files)
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 128 / threads)));
+    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 1 /*128 / threads*/)));
   
   workers.join_all();
   
