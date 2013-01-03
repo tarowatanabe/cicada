@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -35,14 +35,20 @@ namespace cicada
     typedef ptrdiff_t difference_type;
     
   private:
-    typedef std::pair<const feature_type, Tp> __value_type;
     typedef Eigen::SparseVector<Tp> vector_type;
     
   public:
+    typedef FeatureVectorSparse<Tp, Alloc> self_type;
+    
+  public:
+    FeatureVectorSparse() : vector_() {}
+    FeatureVectorSparse(const self_type& x) : vector_(x.vector_) { }
     
     
     
     
+  private:
+    vector_type vector_;
   };
 };
 

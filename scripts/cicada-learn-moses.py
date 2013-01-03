@@ -180,6 +180,7 @@ class PBS:
         pipe = popen.stdin
         
         pipe.write("#!/bin/sh\n")
+        pipe.write("#PBS -S /bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -W block=true\n")
         pipe.write("#PBS -e /dev/null\n")

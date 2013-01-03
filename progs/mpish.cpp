@@ -37,11 +37,12 @@ int getoptions(int argc, char** argv);
 
 void run_command(const std::string& command)
 {
-  utils::subprocess run(command);
+  utils::subprocess run(command, false, false);
 
+#if 0
   ::close(run.desc_write());
   run.desc_write() = -1;
-
+  
   boost::iostreams::filtering_istream is;
   is.push(boost::iostreams::file_descriptor_source(run.desc_read(), boost::iostreams::close_handle));
 
@@ -53,6 +54,7 @@ void run_command(const std::string& command)
     if (is.gcount() > 0)
       std::cout.write(buffer, is.gcount());
   } while (is);
+#endif
   
 #if 0
   const size_t buffer_size = 1024;

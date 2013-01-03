@@ -27,10 +27,14 @@ namespace utils
   {
     
   public:
-    explicit subprocess(const std::string& sh_command)
-      : __pid(-1), __pread(-1), __pwrite(-1) { open(sh_command); }
-    explicit subprocess(const boost::filesystem::path& command)
-      : __pid(-1), __pread(-1), __pwrite(-1) { open(command); }
+    explicit subprocess(const std::string& sh_command,
+			const bool open_stdin=true,
+			const bool open_stdout=true)
+      : __pid(-1), __pread(-1), __pwrite(-1) { open(sh_command, open_stdin, open_stdout); }
+    explicit subprocess(const boost::filesystem::path& command,
+			const bool open_stdin=true,
+			const bool open_stdout=true)
+      : __pid(-1), __pread(-1), __pwrite(-1) { open(command, open_stdin, open_stdout); }
     ~subprocess() { close(); }
   private:
     subprocess(const subprocess& x) {}
@@ -49,39 +53,55 @@ namespace utils
 	::kill(__pid, SIGTERM);
     }
 
-    void open(const std::string& sh_command)
+    void open(const std::string& sh_command,
+	      const bool open_stdin=true,
+	      const bool open_stdout=true)
     {
       int pin[2] = {-1, -1};
       int pout[2] = {-1, -1};
     
-      if (::pipe(pin) < 0)
+      if (open_stdin && ::pipe(pin) < 0)
 	throw std::runtime_error(std::string("pipe(): ") + strerror(errno));
-      if (::pipe(pout) < 0) {
-	::close(pin[0]);
-	::close(pin[1]);
+      
+      if (open_stdout && ::pipe(pout) < 0) {
+	if (pin[0] >= 0) {
+	  ::close(pin[0]);
+	  ::close(pin[1]);
+	}
+	
 	throw std::runtime_error(std::string("pipe(): ") + strerror(errno));
       }
       
       const pid_t pid = ::fork();
       if (pid < 0) {
-	::close(pin[0]);
-	::close(pin[1]);
-	::close(pout[0]);
-	::close(pout[1]);
+	if (pin[0] >= 0) {
+	  ::close(pin[0]);
+	  ::close(pin[1]);
+	}
+	
+	if (pout[0] >= 0) {
+	  ::close(pout[0]);
+	  ::close(pout[1]);
+	}
+	
 	throw std::runtime_error(std::string("fork(): ") + strerror(errno));
       }
       
       if (pid == 0) {
 	// child process...
 	// redirect input...
-	::close(pin[1]);
-	::dup2(pin[0], STDIN_FILENO);
-	::close(pin[0]);
+	if (pin[0] >= 0) {
+	  ::close(pin[1]);
+	  ::dup2(pin[0], STDIN_FILENO);
+	  ::close(pin[0]);
+	}
 	
 	// redirect output...
-	::close(pout[0]);
-	::dup2(pout[1], STDOUT_FILENO);
-	::close(pout[1]);
+	if (pout[0] >= 0) {
+	  ::close(pout[0]);
+	  ::dup2(pout[1], STDOUT_FILENO);
+	  ::close(pout[1]);
+	}
 	
 	__pid = ::getpid();
 	
@@ -90,8 +110,10 @@ namespace utils
 	::_exit(errno);  // not exit(errno)!
       } else {
 	// parent process...
-	::close(pin[0]);
-	::close(pout[1]);
+	if (pin[0] >= 0)
+	  ::close(pin[0]);
+	if (pout[1] >= 0)
+	  ::close(pout[1]);
 	
 	__pid = pid;
 	__pread = pout[0];
@@ -99,39 +121,54 @@ namespace utils
       }
     }
 
-    void open(const boost::filesystem::path& command)
+    void open(const boost::filesystem::path& command,
+	      const bool open_stdin=true,
+	      const bool open_stdout=true)
     {     
       int pin[2] = {-1, -1};
       int pout[2] = {-1, -1};
-    
-      if (::pipe(pin) < 0)
+      
+      if (open_stdin && ::pipe(pin) < 0)
 	throw std::runtime_error(std::string("pipe(): ") + strerror(errno));
-      if (::pipe(pout) < 0) {
-	::close(pin[0]);
-	::close(pin[1]);
+      
+      if (open_stdout && ::pipe(pout) < 0) {
+	if (pin[0] >= 0) {
+	  ::close(pin[0]);
+	  ::close(pin[1]);
+	}
+	
 	throw std::runtime_error(std::string("pipe(): ") + strerror(errno));
       }
       
       const pid_t pid = ::fork();
       if (pid < 0) {
-	::close(pin[0]);
-	::close(pin[1]);
-	::close(pout[0]);
-	::close(pout[1]);
+	if (pin[0] >= 0) {
+	  ::close(pin[0]);	
+	  ::close(pin[1]);
+	}
+	if (pout[0] >= 0) {
+	  ::close(pout[0]);
+	  ::close(pout[1]);
+	}
+	
 	throw std::runtime_error(std::string("fork(): ") + strerror(errno));
       }
       
       if (pid == 0) {
 	// child process...
 	// redirect input...
-	::close(pin[1]);
-	::dup2(pin[0], STDIN_FILENO);
-	::close(pin[0]);
+	if (pin[0] >= 0) {
+	  ::close(pin[1]);
+	  ::dup2(pin[0], STDIN_FILENO);
+	  ::close(pin[0]);
+	}
 	
 	// redirect output...
-	::close(pout[0]);
-	::dup2(pout[1], STDOUT_FILENO);
-	::close(pout[1]);
+	if (pout[0] >= 0) {
+	  ::close(pout[0]);
+	  ::dup2(pout[1], STDOUT_FILENO);
+	  ::close(pout[1]);
+	}
 	
 	__pid = ::getpid();
 
@@ -144,8 +181,10 @@ namespace utils
 	::_exit(errno);  // not exit(errno)!
       } else {
 	// parent process...
-	::close(pin[0]);
-	::close(pout[1]);
+	if (pin[0] >= 0)
+	  ::close(pin[0]);
+	if (pout[1] >= 0)
+	  ::close(pout[1]);
 	
 	__pid = pid;
 	__pread = pout[0];
