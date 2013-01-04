@@ -1027,12 +1027,12 @@ struct PhrasePairSourceMapper
 	  queues[shard]->push_swap(counts);
 	}
 	
-	if ((iter & iteration_mask) == iteration_mask)
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	//if ((iter & iteration_mask) == iteration_mask)
+	//  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	
 	++ iter;
 	
-	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	//non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 
 	counts.swap(curr);
       } else
@@ -1428,12 +1428,12 @@ struct PhrasePairReverseMapper
 	  queues[shard]->push_swap(counts);
 	}
 	
-	if ((iter & iteration_mask) == iteration_mask)
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	//if ((iter & iteration_mask) == iteration_mask)
+	//  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	
 	++ iter;
 	
-	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 
 	counts.swap(curr);
       } else
@@ -2142,6 +2142,7 @@ struct PhrasePairTargetMapper
 	  phrases.clear();
 	}
 	
+#if 0
 	if ((iter & iteration_mask) == iteration_mask) {
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
@@ -2151,13 +2152,14 @@ struct PhrasePairTargetMapper
 	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  }
 	}
+#endif
 	
 	if ((iter & iteration_shrink_mask) == iteration_shrink_mask)
 	  phrases.shrink();
 	
 	++ iter;
 	
-	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
 	
