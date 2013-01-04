@@ -1147,25 +1147,10 @@ struct PhrasePairSourceReducer
       return x->first.front() > y->first.front();
     }
   };
-  
-  template <typename Counts>
-  void read_phrase_pair(queue_type& queue, Counts& counts)
-  {
-    simple_type phrase_pair;
-
-    while (counts.size() < 256) {
-      queue.pop(phrase_pair);
-      
-      if (phrase_pair.source.empty()) break;
-      
-      counts.push_back(phrase_pair);
-    }
-  }
-  
+    
   void operator()()
   {
-    typedef std::deque<simple_type, std::allocator<simple_type> > buffer_type;
-    typedef std::pair<buffer_type, queue_type*> buffer_queue_type;
+    typedef std::pair<simple_type, queue_type*> buffer_queue_type;
     typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_queue_type*, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
     
@@ -1181,17 +1166,11 @@ struct PhrasePairSourceReducer
 	
 	buffer_queue->second = &(*queue);
 	
-	read_phrase_pair(*buffer_queue->second, buffer_queue->first);
-	
-	if (! buffer_queue->first.empty())
-	  pqueue.push(buffer_queue);
-#if 0
 	queue->pop_swap(buffer_queue->first);
 	buffer_queue->second = &(*queue);
 	
 	if (! buffer_queue->first.source.empty())
 	  pqueue.push(buffer_queue);
-#endif
       }
     }
     
@@ -1215,8 +1194,7 @@ struct PhrasePairSourceReducer
       buffer_queue_type* buffer_queue(pqueue.top());
       pqueue.pop();
       
-      //simple_type& curr = buffer_queue->first;
-      simple_type& curr = buffer_queue->first.front();
+      simple_type& curr = buffer_queue->first;
       
       if (curr.source != counts.source) {
 	if (observed) {
@@ -1256,20 +1234,10 @@ struct PhrasePairSourceReducer
 	counts.increment(curr.counts.begin(), curr.counts.end());
       }
       
-      buffer_queue->first.pop_front();
-      
-      if (buffer_queue->first.empty())
-	read_phrase_pair(*buffer_queue->second, buffer_queue->first);
-      
-      if (! buffer_queue->first.empty())
-	pqueue.push(buffer_queue);
-      
-#if 0
       buffer_queue->first.clear();
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
 	pqueue.push(buffer_queue);
-#endif
     }
     
     if (observed) {
