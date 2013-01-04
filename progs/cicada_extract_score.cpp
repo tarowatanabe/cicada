@@ -533,6 +533,13 @@ void source_counts(const path_set_type& counts_files,
       queues_reducer[j][i] = queues_mapper[i][j];
     }
 
+  boost::thread_group mappers;
+  for (int shard = 0; shard != threads; ++ shard)
+    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						     queues_mapper[shard],
+						     max_malloc,
+						     debug)));
+
   boost::thread_group reducers;
   for (int shard = 0; shard != threads; ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(queues_reducer[shard],
@@ -541,14 +548,7 @@ void source_counts(const path_set_type& counts_files,
 						       joint_counts[shard],
 						       source_counts[shard],
 						       max_malloc,
-						       debug)));
-  boost::thread_group mappers;
-  for (int shard = 0; shard != threads; ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
-						     queues_mapper[shard],
-						     max_malloc,
-						     debug)));
-  
+						       debug)));  
   
   mappers.join_all();
   reducers.join_all();
