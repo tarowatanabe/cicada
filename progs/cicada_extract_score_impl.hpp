@@ -1139,18 +1139,28 @@ struct PhrasePairSourceReducer
   {
     bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
     {
-      return x->first > y->first;
+      return x->first.front() > y->first.front();
     }
     
     bool operator()(const Tp* x, const Tp* y) const
     {
-      return x->first > y->first;
+      return x->first.front() > y->first.front();
     }
   };
   
+  template <typename Counts>
+  void read_phrase_pair(queue_type& queue, Counts& counts)
+  {
+    simple_type phrase_pair;
+    
+    while (counts.size() < 256 && queue.pop_swap(phrase_pair) && ! phrase_pair.source.empty())
+      counts.push_back(phrase_pair);
+  }
+  
   void operator()()
   {
-    typedef std::pair<simple_type, queue_type*> buffer_queue_type;
+    typedef std::deque<simple_type, std::allocator<simple_type> > buffer_type;
+    typedef std::pair<buffer_type, queue_type*> buffer_queue_type;
     typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_queue_type*, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
     
@@ -1164,11 +1174,19 @@ struct PhrasePairSourceReducer
 	
 	buffer_queue_type* buffer_queue = &buffer_queues[pos];
 	
+	buffer_queue->second = &(*queue);
+	
+	read_phrase_pair(*buffer_queue->second, buffer_queue->first);
+	
+	if (! buffer_queue->first.empty())
+	  pqueue.push(buffer_queue);
+#if 0
 	queue->pop_swap(buffer_queue->first);
 	buffer_queue->second = &(*queue);
 	
 	if (! buffer_queue->first.source.empty())
 	  pqueue.push(buffer_queue);
+#endif
       }
     }
     
@@ -1192,7 +1210,8 @@ struct PhrasePairSourceReducer
       buffer_queue_type* buffer_queue(pqueue.top());
       pqueue.pop();
       
-      simple_type& curr = buffer_queue->first;
+      //simple_type& curr = buffer_queue->first;
+      simple_type& curr = buffer_queue->first.front();
       
       if (curr.source != counts.source) {
 	if (observed) {
@@ -1232,10 +1251,20 @@ struct PhrasePairSourceReducer
 	counts.increment(curr.counts.begin(), curr.counts.end());
       }
       
+      buffer_queue->first.pop_front();
+      
+      if (buffer_queue->first.empty())
+	read_phrase_pair(*buffer_queue->second, buffer_queue->first);
+      
+      if (! buffer_queue->first.empty())
+	pqueue.push(buffer_queue);
+      
+#if 0
       buffer_queue->first.clear();
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
 	pqueue.push(buffer_queue);
+#endif
     }
     
     if (observed) {
@@ -1534,37 +1563,39 @@ struct PhrasePairReverseReducer
   // merge counts from two streams into os..
   void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
   {
+    std::string line1;
+    std::string line2;
     simple_type simple1;
     simple_type simple2;
     
-    bool parsed1 = parser(is1, simple1);
-    bool parsed2 = parser(is2, simple2);
+    bool parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+    bool parsed2 = std::getline(is2, line2) && parser(line2, simple2);
     
     while (parsed1 && parsed2) {
       if (simple1 < simple2) {
 	generator(os, simple1) << '\n';
-	parsed1 = parser(is1, simple1);
+	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
       } else if (simple2 < simple1) {
 	generator(os, simple2) << '\n';
-	parsed2 = parser(is2, simple2);
+	parsed2 = std::getline(is2, line2) && parser(line2, simple2);
       } else {
 	simple1.increment(simple2.counts.begin(), simple2.counts.end());
 	generator(os, simple1) << '\n';
 	
-	parsed1 = parser(is1, simple1);
-	parsed2 = parser(is2, simple2);
+	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+	parsed2 = std::getline(is2, line2) && parser(line2, simple2);	
       }
     }
     
     // dump remaining...
     while (parsed1) {
       generator(os, simple1) << '\n';
-      parsed1 = parser(is1, simple1);
+      parsed1 = std::getline(is1, line1) && parser(line1, simple1);
     }
     
     while (parsed2) {
       generator(os, simple2) << '\n';
-      parsed2 = parser(is2, simple2);
+      parsed2 = std::getline(is2, line2) && parser(line2, simple2);
     }
   }
   
@@ -2320,37 +2351,40 @@ struct PhrasePairTargetReducer
   // merge counts from two streams into os..
   void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
   {
+    std::string line1;
+    std::string line2;
+    
     simple_type simple1;
     simple_type simple2;
     
-    bool parsed1 = parser(is1, simple1);
-    bool parsed2 = parser(is2, simple2);
+    bool parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+    bool parsed2 = std::getline(is2, line2) && parser(line2, simple2);
     
     while (parsed1 && parsed2) {
       if (simple1 < simple2) {
 	generator(os, simple1) << '\n';
-	parsed1 = parser(is1, simple1);
+	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
       } else if (simple2 < simple1) {
 	generator(os, simple2) << '\n';
-	parsed2 = parser(is2, simple2);
+	parsed2 = std::getline(is2, line2) && parser(line2, simple2);
       } else {
 	simple1.increment(simple2.counts.begin(), simple2.counts.end());
 	generator(os, simple1) << '\n';
 	
-	parsed1 = parser(is1, simple1);
-	parsed2 = parser(is2, simple2);
+	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+	parsed2 = std::getline(is2, line2) && parser(line2, simple2);	
       }
     }
     
     // dump remaining...
     while (parsed1) {
       generator(os, simple1) << '\n';
-      parsed1 = parser(is1, simple1);
+      parsed1 = std::getline(is1, line1) && parser(line1, simple1);
     }
     
     while (parsed2) {
       generator(os, simple2) << '\n';
-      parsed2 = parser(is2, simple2);
+      parsed2 = std::getline(is2, line2) && parser(line2, simple2);
     }
   }
   
