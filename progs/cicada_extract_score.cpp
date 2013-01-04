@@ -280,36 +280,39 @@ struct TaskMerge
 	utils::compress_ostream os(counts_file, 1024 * 1024);
 	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
+	std::string line1;
+	std::string line2;
+
 	rule_pair_type rule1;
 	rule_pair_type rule2;
       
-	bool parsed1 = parser(is1, rule1);
-	bool parsed2 = parser(is2, rule2);
+	bool parsed1 = std::getline(is1, line1) && parser(line1, rule1);
+	bool parsed2 = std::getline(is2, line2) && parser(line2, rule2);
       
 	while (parsed1 && parsed2) {
 	  if (rule1 < rule2) {
 	    os << rule1 << '\n';
-	    parsed1 = parser(is1, rule1);
+	    parsed1 = std::getline(is1, line1) && parser(line1, rule1);
 	  } else if (rule2 < rule1) {
 	    os << rule2 << '\n';
-	    parsed2 = parser(is2, rule2);
+	    parsed2 = std::getline(is2, line2) && parser(line2, rule2);
 	  } else {
 	    rule1.increment(rule2.counts.begin(), rule2.counts.end());
 	    os << rule1 << '\n';
-	    parsed1 = parser(is1, rule1);
-	    parsed2 = parser(is2, rule2);
+	    parsed1 = std::getline(is1, line1) && parser(line1, rule1);
+	    parsed2 = std::getline(is2, line2) && parser(line2, rule2);
 	  }
 	}
       
 	// dump remaining...
 	while (parsed1) {
 	  os << rule1 << '\n';
-	  parsed1 = parser(is1, rule1);
+	  parsed1 = std::getline(is1, line1) && parser(line1, rule1);
 	}
       
 	while (parsed2) {
 	  os << rule2 << '\n';
-	  parsed2 = parser(is2, rule2);
+	  parsed2 = std::getline(is2, line2) && parser(line2, rule2);
 	}
       }
       
