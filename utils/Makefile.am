@@ -161,6 +161,7 @@ compress_stream_main \
 double_base64_main \
 filesystem_main \
 group_aligned_code_main \
+hashmurmur_main \
 icu_filter_main \
 indexed_set_main \
 istream_line_iterator_main \
@@ -316,6 +317,9 @@ filesystem_main_SOURCES = filesystem_main.cpp
 filesystem_main_LDADD = $(LIBUTILS)
 
 group_aligned_code_main_SOURCES = group_aligned_code_main.cpp
+
+hashmurmur_main_SOURCES = hashmurmur_main.cpp
+hashmurmur_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
 
 icu_filter_main_SOURCES = icu_filter_main.cpp
 icu_filter_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
