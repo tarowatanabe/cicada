@@ -1,4 +1,5 @@
 2013-1-x
+Bugfix: removed spurious "locking" by "not" checking malloced resources very frequently
 Revised the kbest loading in learn/oracle/mert/convex_hull code
 
 2012-12-29

@@ -1009,12 +1009,6 @@ struct PhrasePairSourceMapper
     
     simple_type counts;
 
-    int iter = 0;
-    const int iteration_mask = (1 << 10) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-    bool malloc_full = false;
-    int non_found_iter = 0;
-    
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1027,13 +1021,6 @@ struct PhrasePairSourceMapper
 	  queues[shard]->push_swap(counts);
 	}
 	
-	//if ((iter & iteration_mask) == iteration_mask)
-	//  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	
-	++ iter;
-	
-	//non_found_iter = loop_sleep(! malloc_full, non_found_iter);
-
 	counts.swap(curr);
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
@@ -1054,6 +1041,8 @@ struct PhrasePairSourceMapper
     
     // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    int non_found_iter = 0;
+    
     counts.clear();
     
     while (1) {
@@ -1407,12 +1396,6 @@ struct PhrasePairReverseMapper
     
     simple_type counts;
 
-    int iter = 0;
-    const int iteration_mask = (1 << 10) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-    bool malloc_full = false;
-    int non_found_iter = 0;
-    
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1427,13 +1410,6 @@ struct PhrasePairReverseMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
-	
-	//if ((iter & iteration_mask) == iteration_mask)
-	//  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	
-	++ iter;
-	
-	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 
 	counts.swap(curr);
       } else
@@ -1458,6 +1434,8 @@ struct PhrasePairReverseMapper
     
      // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    int non_found_iter = 0;
+
     counts.clear();
     
     while (1) {
@@ -1892,112 +1870,6 @@ struct PhrasePairTargetMapper
     lengths_type lengths;
     std::string  last;
   };
-
-#if 0
-  struct PhraseSet
-  {
-    typedef uint32_t length_type;
-    typedef char     char_type;
-
-    typedef std::vector<char_type, std::allocator<char_type> > buffer_type;
-    typedef std::vector<char_type, std::allocator<char_type> > lengths_type;
-    
-    struct const_iterator
-    {
-      const_iterator() {}
-      const_iterator(const buffer_type& buffer,
-		     typename lengths_type::const_iterator __liter,
-		     typename lengths_type::const_iterator __liter_end)
-	: liter(__liter), liter_end(__liter_end)
-      {
-	stream.push(codec::lz4_compressor());
-	stream.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
-	
-	operator++();
-      }
-      
-      const std::string& operator*() const
-      {
-	return curr;
-      }
-      
-      const_iterator& operator++()
-      {
-	if (liter == liter_end) {
-	  curr.clear();
-	  return *this;
-	}
-	
-	length_type pos = 0;
-	length_type diff = 0;
-	
-	liter += utils::byte_aligned_decode(pos,  &(*liter));
-	liter += utils::byte_aligned_decode(diff, &(*liter));
-	
-	buf.resize(diff);
-	stream.read((char*) &(*buf.begin()), diff);
-	
-	curr.replace(curr.begin() + pos, curr.end(), buf.begin(), buf.end());
-	
-	return *this;
-      }
-      
-      operator bool() const { return ! curr.empty(); }
-      
-      typename lengths_type::const_iterator liter;
-      typename lengths_type::const_iterator liter_end;
-      
-      std::string curr;
-      buffer_type buf;
-      boost::iostreams::filtering_istream stream;
-    };
-    
-    void clear()
-    {
-      buffer.clear();
-      lengths.clear();
-      last.clear();
-    }
-    
-    bool empty() const { return lengths.empty(); }
-
-    void shrink()
-    {
-      clear();
-      
-      buffer_type(buffer).swap(buffer);
-      lengths_type(lengths).swap(lengths);
-    }
-    
-    void push_back(const std::string& x)
-    {
-      size_type pos = 0;
-      const size_type pos_last = utils::bithack::min(last.size(), x.size());
-      for (/**/; pos != pos_last && x[pos] == last[pos]; ++ pos) {}
-      
-      buffer.insert(buffer.end(), x.begin() + pos, x.end());
-      
-      lengths.resize(lengths.size() + 16);
-      
-      lengths_type::iterator liter = lengths.end() - 16;
-      liter += utils::byte_aligned_encode(pos, &(*liter));
-      liter += utils::byte_aligned_encode(x.size() - pos, &(*liter));
-      
-      lengths.erase(liter, lengths.end());
-      
-      last = x;
-    }
-    
-    const_iterator begin() const { return const_iterator(buffer, lengths.begin(), lengths.end()); }
-    
-    buffer_type  buffer;
-    lengths_type lengths;
-    std::string  last;
-    
-    boost::iostreams::filtering_ostream stream;
-    codec::lz4_compressor               filter;
-  };
-#endif
   
   typedef PhraseSet phrase_set_type;
 
@@ -2104,11 +1976,7 @@ struct PhrasePairTargetMapper
     root_count_set_type::iterator riter;
     
     int iter = 0;
-    const int iteration_mask = (1 << 10) - 1;
     const int iteration_shrink_mask = (1 << 8) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-    bool malloc_full = false;
-    int non_found_iter = 0;
 
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -2119,11 +1987,6 @@ struct PhrasePairTargetMapper
       if (curr.source != counts.source) {
 	
 	if (! phrases.empty()) {
-#if 0
-	  if (observed != phrases.size())
-	    throw std::runtime_error("invalid observation count");
-#endif
-
 	  counts.counts.push_back(observed);
 	  
 	  size_t i = 0;
@@ -2142,24 +2005,10 @@ struct PhrasePairTargetMapper
 	  phrases.clear();
 	}
 	
-#if 0
-	if ((iter & iteration_mask) == iteration_mask) {
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	  
-	  if (malloc_full) {
-	    phrases.shrink();
-	    
-	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	  }
-	}
-#endif
-	
 	if ((iter & iteration_shrink_mask) == iteration_shrink_mask)
 	  phrases.shrink();
 	
 	++ iter;
-	
-	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
 	
@@ -2194,11 +2043,6 @@ struct PhrasePairTargetMapper
     }
     
     if (! phrases.empty()) {
-#if 0
-      if (observed != phrases.size())
-	throw std::runtime_error("invalid observation count");
-#endif
-      
       counts.counts.push_back(observed);
       
       size_t i = 0;
@@ -2222,6 +2066,8 @@ struct PhrasePairTargetMapper
     //
     
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    int non_found_iter = 0;
+
     counts.clear();
 
     for (;;) {
@@ -2673,12 +2519,6 @@ struct PhrasePairScoreMapper
     
     phrase_pair_type counts;
     
-    int iter = 0;
-    const int iteration_mask = (1 << 10) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-    bool malloc_full = false;
-    int non_found_iter = 0;
-
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -2693,14 +2533,6 @@ struct PhrasePairScoreMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
-	
-	
-	//if ((iter & iteration_mask) == iteration_mask)
-	//   malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-	
-	++ iter;
-	
-	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
       } else
@@ -2726,6 +2558,8 @@ struct PhrasePairScoreMapper
     // termination...
     // we will terminate asynchronously...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    int non_found_iter = 0;
+    
     counts.clear();
     
     while (1) {
