@@ -1258,13 +1258,17 @@ struct Task
   {
     void operator()(rule_pair_set_type& rule_pairs) const
     {
-      if (rule_pairs.size() < 1024 || utils::malloc_stats::used() <= malloc_threshold) return;
+      if (rule_pairs.size() < 1024 * 4
+	  || (min_counts_size && rule_pairs.size() < min_counts_size)
+	  || utils::malloc_stats::used() <= malloc_threshold) return;
+      
+      if (! min_counts_size)
+	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 2;
       
       dump(rule_pairs);
-      rule_pairs.clear();
       
-      if (utils::malloc_stats::used() > malloc_threshold) 
-	rule_pair_set_type(rule_pairs).swap(rule_pairs);
+      rule_pairs.clear();
+      rule_pair_set_type(rule_pairs).swap(rule_pairs);
     }
 
     typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;
@@ -1310,11 +1314,13 @@ struct Task
 	   const size_t __malloc_threshold)
       : output(__output),
 	paths(__paths),
-	malloc_threshold(__malloc_threshold) {}
+	malloc_threshold(__malloc_threshold),
+	min_counts_size(0) {}
     
     const path_type& output;
     path_set_type& paths;
     const size_t malloc_threshold;
+    size_t min_counts_size;
 
     RulePairGenerator generator;
   };

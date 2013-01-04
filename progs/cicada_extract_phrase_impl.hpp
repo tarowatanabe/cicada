@@ -569,8 +569,9 @@ struct Task
     bitext_type bitext;
     phrase_pair_set_type phrase_pairs;
     
-    const int iteration_mask = (1 << 3) - 1;
+    const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    size_t min_counts_size = 0;
     
     for (int iter = 0;/**/; ++ iter) {
       bitext.clear();
@@ -580,12 +581,17 @@ struct Task
       
       extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);
       
-      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
-	dump(phrase_pairs);
-	phrase_pairs.clear();
+      if (((iter & iteration_mask) == iteration_mask)
+	  && (! min_counts_size || phrase_pairs.size() > min_counts_size)
+	  && (utils::malloc_stats::used() > malloc_threshold)) {
 	
-	if (utils::malloc_stats::used() > malloc_threshold)
-	  phrase_pair_set_type(phrase_pairs).swap(phrase_pairs);
+	if (! min_counts_size)
+	  min_counts_size = phrase_pairs.size() >> 2;
+	
+	dump(phrase_pairs);
+	
+	phrase_pairs.clear();
+	phrase_pair_set_type(phrase_pairs).swap(phrase_pairs);
       }
     }
     
