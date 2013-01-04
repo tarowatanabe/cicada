@@ -289,7 +289,7 @@ struct TaskRead
     typedef kbest_feature_parser<iter_type> parser_type;
     
     parser_type parser;
-    kbest_feature_type kbest;
+    kbest_feature_type kbest_feature;
 
     for (;;) {
       path_type path;
@@ -304,19 +304,19 @@ struct TaskRead
       iter_type iter_end;
       
       while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
+	boost::fusion::get<1>(kbest_feature).clear();
+	boost::fusion::get<2>(kbest_feature).clear();
 	
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	const size_t& id = boost::fusion::get<0>(kbest_feature);
 	
 	if (id >= kbests.size())
 	  kbests.resize(id + 1);
 	
-	kbests[id].push_back(hypothesis_type(kbest));
+	kbests[id].push_back(hypothesis_type(kbest_feature));
       }
     }
   }

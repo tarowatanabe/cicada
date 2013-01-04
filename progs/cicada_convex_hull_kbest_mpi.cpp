@@ -361,7 +361,7 @@ void read_tstset(const path_set_type& files,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   parser_type parser;
-  kbest_feature_type kbest;
+  kbest_feature_type kbest_feature;
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
@@ -380,21 +380,21 @@ void read_tstset(const path_set_type& files,
 	iter_type iter_end;
 	
 	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
+	  boost::fusion::get<1>(kbest_feature).clear();
+	  boost::fusion::get<2>(kbest_feature).clear();
 	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  const size_t& id = boost::fusion::get<0>(kbest);
+	  const size_t& id = boost::fusion::get<0>(kbest_feature);
 	  
 	  if (id != i)
 	    throw std::runtime_error("id mismatch?");
 	  if (i >= hypotheses.size())
 	    throw std::runtime_error("invalid id?");
 	  
-	  hypotheses[id].push_back(hypothesis_type(kbest));
+	  hypotheses[id].push_back(hypothesis_type(kbest_feature));
 	}
       }
     } else {
@@ -405,21 +405,21 @@ void read_tstset(const path_set_type& files,
       iter_type iter_end;
 	
       while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
+	boost::fusion::get<1>(kbest_feature).clear();
+	boost::fusion::get<2>(kbest_feature).clear();
 	  
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	const size_t& id = boost::fusion::get<0>(kbest_feature);
 	
 	if (static_cast<int>(id % mpi_size) != mpi_rank) continue;
 	
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id?");
 	
-	hypotheses[id].push_back(hypothesis_type(kbest));
+	hypotheses[id].push_back(hypothesis_type(kbest_feature));
       }
     }
   }
