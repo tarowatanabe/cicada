@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
     
-    if (counts_files.size() > 256) {
+    if (counts_files.size() > 128) {
       if (debug)
 	std::cerr << "merge counts: " << counts_files.size() << std::endl;
       
