@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 
 //
 // k-best learner
@@ -1861,7 +1861,7 @@ struct OptimizeXBLEU
 	  
 	// first pass... compute margin and Z
 	for (size_type k = 0; k != kbests[id].size(); ++ k) {
-	  const hypothesis_type& kbest = kbests[id][k];
+	  //const hypothesis_type& kbest = kbests[id][k];
 	  
 	  const double margin  = cicada::dot_product(weights, features_kbest[id][k].begin(), features_kbest[id][k].end(), 0.0);
 	    
@@ -2813,7 +2813,7 @@ struct TaskReadUnite
     typedef kbest_feature_parser<iter_type> parser_type;
     
     parser_type parser;
-    kbest_feature_type kbest;
+    kbest_feature_type kbest_feature;
 
     for (;;) {
       path_pair_type paths;
@@ -2831,19 +2831,19 @@ struct TaskReadUnite
       iter_type iter_end;
       
       while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
+	boost::fusion::get<1>(kbest_feature).clear();
+	boost::fusion::get<2>(kbest_feature).clear();
 	
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	const size_t& id = boost::fusion::get<0>(kbest_feature);
 	
 	if (id >= hypotheses.size())
 	  hypotheses.resize(id + 1);
 	
-	hypotheses[id].push_back(hypothesis_type(kbest));
+	hypotheses[id].push_back(hypothesis_type(kbest_feature));
       }
     }
   }
@@ -2867,7 +2867,7 @@ struct TaskReadSync
     typedef kbest_feature_parser<iter_type> parser_type;
     
     parser_type parser;
-    kbest_feature_type kbest;
+    kbest_feature_type kbest_feature;
 
     for (;;) {
       path_pair_type paths;
@@ -2892,30 +2892,34 @@ struct TaskReadSync
       if (! boost::fusion::get<0>(paths).empty()) {
 	utils::compress_istream is(boost::fusion::get<0>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
-	  
+	
 	iter_type iter(is);
 	iter_type iter_end;
-	  
+	
 	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
+	  boost::fusion::get<1>(kbest_feature).clear();
+	  boost::fusion::get<2>(kbest_feature).clear();
 	    
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  kbests.back().push_back(hypothesis_type(kbest));
-	  
-	  hypothesis_type& kbest = kbests.back().back();
-	  
-	  if (! scorers.empty()) {
-	    kbest.score = scorers[refpos]->score(sentence_type(kbest.sentence.begin(), kbest.sentence.end()));
-	    kbest.loss  = kbest.score->loss();
-	  } else
-	    kbest.loss = 1;
+	  kbests.back().push_back(hypothesis_type(kbest_feature));
+	}
+	
+	if (! scorers.empty()) {
+	  hypothesis_set_type::iterator kiter_end = kbests.back().end();
+	  for (hypothesis_set_type::iterator kiter = kbests.back().begin(); kiter != kiter_end; ++ kiter) {
+	    kiter->score = scorers[refpos]->score(sentence_type(kiter->sentence.begin(), kiter->sentence.end()));
+	    kiter->loss  = kiter->score->loss();
+	  }
+	} else {
+	  hypothesis_set_type::iterator kiter_end = kbests.back().end();
+	  for (hypothesis_set_type::iterator kiter = kbests.back().begin(); kiter != kiter_end; ++ kiter)
+	    kiter->loss = 1;
 	}
       }
-
+      
       if (! boost::fusion::get<1>(paths).empty()) {
 	utils::compress_istream is(boost::fusion::get<1>(paths), 1024 * 1024);
 	is.unsetf(std::ios::skipws);
@@ -2924,22 +2928,26 @@ struct TaskReadSync
 	iter_type iter_end;
 	  
 	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
+	  boost::fusion::get<1>(kbest_feature).clear();
+	  boost::fusion::get<2>(kbest_feature).clear();
 	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest_feature))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  oracles.back().push_back(hypothesis_type(kbest));
-
-	  hypothesis_type& oracle = oracles.back().back();
-	  
-	  if (! scorers.empty()) {
-	    oracle.score = scorers[refpos]->score(sentence_type(oracle.sentence.begin(), oracle.sentence.end()));
-	    oracle.loss  = oracle.score->loss();
-	  } else
-	    oracle.loss = 0.0;
+	  oracles.back().push_back(hypothesis_type(kbest_feature));
+	}
+	
+	if (! scorers.empty()) {
+	  hypothesis_set_type::iterator oiter_end = oracles.back().end();
+	  for (hypothesis_set_type::iterator oiter = oracles.back().begin(); oiter != oiter_end; ++ oiter) {
+	    oiter->score = scorers[refpos]->score(sentence_type(oiter->sentence.begin(), oiter->sentence.end()));
+	    oiter->loss  = oiter->score->loss();
+	  }
+	} else {
+	  hypothesis_set_type::iterator oiter_end = oracles.back().end();
+	  for (hypothesis_set_type::iterator oiter = oracles.back().begin(); oiter != oiter_end; ++ oiter)
+	    oiter->loss = 0;
 	}
       }
     }
