@@ -1139,12 +1139,12 @@ struct PhrasePairSourceReducer
   {
     bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
     {
-      return x->first.front() > y->first.front();
+      return x->first > y->first;
     }
     
     bool operator()(const Tp* x, const Tp* y) const
     {
-      return x->first.front() > y->first.front();
+      return x->first > y->first;
     }
   };
     
