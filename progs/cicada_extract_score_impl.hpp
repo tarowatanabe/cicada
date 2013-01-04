@@ -1152,9 +1152,14 @@ struct PhrasePairSourceReducer
   void read_phrase_pair(queue_type& queue, Counts& counts)
   {
     simple_type phrase_pair;
-    
-    while (counts.size() < 256 && queue.pop_swap(phrase_pair) && ! phrase_pair.source.empty())
+
+    while (counts.size() < 256) {
+      queue.pop(phrase_pair);
+      
+      if (phrase_pair.source.empty()) break;
+      
       counts.push_back(phrase_pair);
+    }
   }
   
   void operator()()
