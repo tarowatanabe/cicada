@@ -1185,6 +1185,7 @@ struct PhrasePairSourceReducer
     
     utils::compress_ostream os(path, 1024 * 1024);
     simple_type counts;
+    std::string root_source;
     size_type observed = 0;
     
     root_count_set_type::iterator jiter;
@@ -1202,14 +1203,16 @@ struct PhrasePairSourceReducer
 	  
 	  generator(os, phrase_count_type(counts.source, counts.counts)) << '\n';
 	}
+
+	root_source = extract_root(curr.source);
 	
 	// increment root_observed(lhs+rhs)
-	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	jiter = joint_counts.insert(root_source+extract_root(curr.target)).first;
 	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*jiter).observed += 1;
 	
 	// increment root_observed(lhs)
-	riter = root_counts.insert(extract_root(curr.source)).first;
+	riter = root_counts.insert(root_source).first;
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).observed += 1;
 	
@@ -1217,7 +1220,7 @@ struct PhrasePairSourceReducer
 	observed = 1;
       } else if (curr.target != counts.target) {
 	// increment root_observed(lhs+rhs)
-	jiter = joint_counts.insert(extract_root(curr.source)+extract_root(curr.target)).first;
+	jiter = joint_counts.insert(root_source+extract_root(curr.target)).first;
 	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*jiter).observed += 1;
 	
