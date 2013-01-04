@@ -1408,7 +1408,7 @@ struct PhrasePairReverseMapper
     simple_type counts;
 
     int iter = 0;
-    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     int non_found_iter = 0;
@@ -2104,7 +2104,7 @@ struct PhrasePairTargetMapper
     root_count_set_type::iterator riter;
     
     int iter = 0;
-    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask = (1 << 10) - 1;
     const int iteration_shrink_mask = (1 << 8) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
@@ -2672,7 +2672,7 @@ struct PhrasePairScoreMapper
     phrase_pair_type counts;
     
     int iter = 0;
-    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     int non_found_iter = 0;
