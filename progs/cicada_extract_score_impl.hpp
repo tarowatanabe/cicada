@@ -844,14 +844,20 @@ struct PhraseCountGenerator
   }
 };
 
+struct PhrasePairExtractor
+{
+  typedef uint32_t                           hash_value_type;
+  typedef utils::hashmurmur<hash_value_type> hasher_type;
+};
+
 // compute observation counts for source-side
 struct PhrasePairSource
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
-
-  typedef uint32_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  
+  typedef PhrasePairExtractor::hash_value_type hash_value_type;
+  typedef PhrasePairExtractor::hasher_type     hasher_type;
 
   typedef boost::filesystem::path                            path_type;
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -1247,8 +1253,8 @@ struct PhrasePairReverse
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
-  typedef uint64_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  typedef PhrasePairExtractor::hash_value_type hash_value_type;
+  typedef PhrasePairExtractor::hasher_type     hasher_type;
 
   typedef boost::filesystem::path                            path_type;
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -1719,8 +1725,8 @@ struct PhrasePairTarget
   
   typedef double count_type;
   
-  typedef uint64_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  typedef PhrasePairExtractor::hash_value_type hash_value_type;
+  typedef PhrasePairExtractor::hasher_type     hasher_type;
   
   typedef boost::filesystem::path                            path_type;
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -2503,8 +2509,8 @@ struct PhrasePairScore
 
   typedef double count_type;
   
-  typedef uint64_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  typedef PhrasePairExtractor::hash_value_type hash_value_type;
+  typedef PhrasePairExtractor::hasher_type     hasher_type;
 
   typedef boost::filesystem::path                            path_type;
   typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
