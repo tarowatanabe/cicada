@@ -4663,7 +4663,11 @@ void read_kbest(const scorer_document_type& scorers,
 	  
 	  kbests[i].push_back(hypothesis_type(kbest_feature));
 	}
-	
+      }
+    }
+    
+    for (size_t i = 0; i != kbests.size(); ++ i) 
+      if (! kbests[i].empty()) {
 	if (! scorers.empty()) {
 	  if (i >= scorers.size())
 	    throw std::runtime_error("reference positions out of index");
@@ -4679,7 +4683,6 @@ void read_kbest(const scorer_document_type& scorers,
 	    kiter->loss = 1;
 	}
       }
-    }
     
     kbest_map.reserve(kbests.size());
     kbest_map.resize(kbests.size());
@@ -4687,7 +4690,6 @@ void read_kbest(const scorer_document_type& scorers,
       kbest_map[seg] = seg;
     
   } else {
-    
     const size_type refset_size = scorers.size() / kbest_path.size();
     
     for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
@@ -4806,21 +4808,6 @@ void read_kbest(const scorer_document_type& scorers,
 	  
 	  kbests[i].push_back(hypothesis_type(kbest_feature));
 	}
-	
-	if (! scorers.empty()) {
-	  if (i >= scorers.size())
-	    throw std::runtime_error("reference positions out of index");
-	  
-	  hypothesis_set_type::iterator kiter_end = kbests[i].end();
-	  for (hypothesis_set_type::iterator kiter = kbests[i].begin(); kiter != kiter_end; ++ kiter) {
-	    kiter->score = scorers[i]->score(sentence_type(kiter->sentence.begin(), kiter->sentence.end()));
-	    kiter->loss  = kiter->score->loss();
-	  }
-	} else {
-	  hypothesis_set_type::iterator kiter_end = kbests[i].end();
-	  for (hypothesis_set_type::iterator kiter = kbests[i].begin(); kiter != kiter_end; ++ kiter)
-	    kiter->loss = 1;
-	}
       }
     }
     
@@ -4861,7 +4848,29 @@ void read_kbest(const scorer_document_type& scorers,
 	  
 	  oracles[i].push_back(hypothesis_type(kbest_feature));
 	}
-	
+      }
+    }
+    
+    for (size_t i = 0; i != kbests.size(); ++ i) 
+      if (! kbests[i].empty()) {
+	if (! scorers.empty()) {
+	  if (i >= scorers.size())
+	    throw std::runtime_error("reference positions out of index");
+	  
+	  hypothesis_set_type::iterator kiter_end = kbests[i].end();
+	  for (hypothesis_set_type::iterator kiter = kbests[i].begin(); kiter != kiter_end; ++ kiter) {
+	    kiter->score = scorers[i]->score(sentence_type(kiter->sentence.begin(), kiter->sentence.end()));
+	    kiter->loss  = kiter->score->loss();
+	  }
+	} else {
+	  hypothesis_set_type::iterator kiter_end = kbests[i].end();
+	  for (hypothesis_set_type::iterator kiter = kbests[i].begin(); kiter != kiter_end; ++ kiter)
+	    kiter->loss = 1;
+	}
+      }
+    
+    for (size_t i = 0; i != oracles.size(); ++ i) 
+      if (! oracles[i].empty()) {
 	if (! scorers.empty()) {
 	  if (i >= scorers.size())
 	    throw std::runtime_error("reference positions out of index");
@@ -4877,7 +4886,6 @@ void read_kbest(const scorer_document_type& scorers,
 	    oiter->loss = 0;
 	}
       }
-    }
     
   } else {
     // synchronous reading...
