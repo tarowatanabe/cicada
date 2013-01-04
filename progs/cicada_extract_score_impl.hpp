@@ -1682,7 +1682,7 @@ struct PhrasePairReverseReducer
     int num_termination = 0;
     
     size_type min_counts_size = 0;
-    const size_type iteration_mask = (1 << 5) - 1;
+    const size_type iteration_mask = (1 << 10) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
@@ -2472,7 +2472,7 @@ struct PhrasePairTargetReducer
     int num_termination = 0;
     
     size_type min_counts_size = 0;
-    const size_type iteration_mask = (1 << 5) - 1;
+    const size_type iteration_mask = (1 << 10) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
