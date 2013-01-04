@@ -934,12 +934,12 @@ struct PhrasePairSourceMapper
     }
   };
 
+  std::string line;
+  phrase_pair_type phrase_pair;
+
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    std::string line;
-    phrase_pair_type phrase_pair;
-
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
@@ -1327,12 +1327,12 @@ struct PhrasePairReverseMapper
     }
   };
 
+  std::string line;
+  phrase_pair_type phrase_pair;
+
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    std::string line;
-    phrase_pair_type phrase_pair;
-
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
@@ -2039,12 +2039,12 @@ struct PhrasePairTargetMapper
   simple_parser_type    parser;
   simple_generator_type generator;
 
+  std::string line;
+  simple_type phrase_pair;
+
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
-  {
-    std::string line;
-    simple_type phrase_pair;
-    
+  {    
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! parser(line, phrase_pair)) continue;
       
@@ -2582,12 +2582,12 @@ struct PhrasePairScoreMapper
     }
   };
 
+  std::string line;
+  phrase_pair_type phrase_pair;
+
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
-  {
-    std::string line;
-    phrase_pair_type phrase_pair;
-    
+  {    
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
@@ -2875,12 +2875,12 @@ struct PhrasePairScoreReducer
   simple_parser_type simple_parser;
   phrase_parser_type phrase_parser;
 
+  std::string line;
+  simple_type phrase_pair;
+
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    std::string line;
-    simple_type phrase_pair;
-    
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! simple_parser(line, phrase_pair)) continue;
       
