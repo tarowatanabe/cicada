@@ -2695,12 +2695,12 @@ struct PhrasePairScoreMapper
 	}
 	
 	
-	if ((iter & iteration_mask) == iteration_mask)
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	//if ((iter & iteration_mask) == iteration_mask)
+	//   malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	
 	++ iter;
 	
-	non_found_iter = loop_sleep(! malloc_full, non_found_iter);
+	// non_found_iter = loop_sleep(! malloc_full, non_found_iter);
 	
 	counts.swap(curr);
       } else
