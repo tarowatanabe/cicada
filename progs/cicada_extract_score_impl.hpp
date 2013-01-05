@@ -846,7 +846,7 @@ struct PhraseCountGenerator
 
 struct PhrasePairExtractor
 {
-  typedef uint32_t                           hash_value_type;
+  typedef uint64_t                           hash_value_type;
   typedef utils::hashmurmur<hash_value_type> hasher_type;
 };
 
