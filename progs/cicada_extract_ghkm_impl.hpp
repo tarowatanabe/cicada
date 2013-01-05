@@ -1896,8 +1896,11 @@ struct Task
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs, dumper);
       
-      if ((iter & iter_mask) == iter_mask)
+      if ((iter & iter_mask) == iter_mask) {
+	dumper(rule_pairs);
+	
 	extractor.clear();
+      }
     }
     
     dumper.dump(rule_pairs);

@@ -546,7 +546,7 @@ struct ExtractSCFG
     
     span_pair_set_type::const_iterator niter_begin = (exhaustive ? spans.begin() : spans_unique.begin());
     span_pair_set_type::const_iterator niter_end   = (exhaustive ? spans.end()   : spans_unique.end());
-    
+
     // first non-terminal...
     if (max_rank >= 1)
       for (span_pair_set_type::const_iterator niter1 = niter_begin; niter1 != niter_end; ++ niter1) 
@@ -663,6 +663,8 @@ struct ExtractSCFG
 
       dumper(rule_pairs);
     }
+
+    const size_t iter_mask = (1 << 5) - 1;
     
     span_pair_set_type::const_iterator iter_begin = (constrained ? spans_unique.begin() : spans.begin());
     span_pair_set_type::const_iterator iter_end   = (constrained ? spans_unique.end()   : spans.end());
@@ -769,7 +771,8 @@ struct ExtractSCFG
 	
 	rule_pair_list.clear();
 
-	dumper(rule_pairs);
+	if (((iter - iter_begin) & iter_mask) == iter_mask)
+	  dumper(rule_pairs);
       }
     }
   }
@@ -1333,13 +1336,18 @@ struct Task
     
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
     
-    for (;;) {
+    const int iter_mask = (1 << 4) - 1;
+    
+    for (int iter = 0;/**/; ++ iter) {
       bitext.clear();
       queue.pop_swap(bitext);
       
       if (bitext.source.empty()) break;
       
       extractor(bitext.source, bitext.target, bitext.alignment, bitext.spans_source, bitext.spans_target, rule_pairs, dumper);
+      
+      if ((iter & iter_mask) == iter_mask)
+	dumper(rule_pairs);
     }
     
     dumper.dump(rule_pairs);
