@@ -4697,6 +4697,10 @@ void read_kbest(const scorer_document_type& scorers,
       }
     }
     
+    // uniques...
+    unique_kbest(kbests);
+    
+    // compute scores...
     for (size_t i = 0; i != kbests.size(); ++ i) 
       if (! kbests[i].empty()) {
 	if (! scorers.empty()) {
@@ -4715,6 +4719,7 @@ void read_kbest(const scorer_document_type& scorers,
 	}
       }
     
+    // kbest-mapping
     kbest_map.reserve(kbests.size());
     kbest_map.resize(kbests.size());
     for (size_t seg = 0; seg != kbests.size(); ++ seg)
@@ -4778,11 +4783,11 @@ void read_kbest(const scorer_document_type& scorers,
 	}
       }
     }
+    
+    // kbest-mapping
+    kbest_map_type(kbest_map).swap(kbest_map);
   }
 
-  // uniques...
-  unique_kbest(kbests);
-  kbest_map_type(kbest_map).swap(kbest_map);
 }
   
 void read_kbest(const scorer_document_type& scorers,
@@ -4842,6 +4847,7 @@ void read_kbest(const scorer_document_type& scorers,
       }
     }
     
+    // kbest-mapping...
     kbest_map.reserve(kbests.size());
     kbest_map.resize(kbests.size());
     for (size_t seg = 0; seg != kbests.size(); ++ seg)
@@ -4882,6 +4888,11 @@ void read_kbest(const scorer_document_type& scorers,
       }
     }
     
+    // uniques...
+    unique_kbest(kbests);
+    unique_kbest(oracles);  
+    
+    // compute scores...
     for (size_t i = 0; i != kbests.size(); ++ i) 
       if (! kbests[i].empty()) {
 	if (! scorers.empty()) {
@@ -5017,14 +5028,10 @@ void read_kbest(const scorer_document_type& scorers,
 	}
       }
     }
+
+    // shrink kbest-mapping..
+    kbest_map_type(kbest_map).swap(kbest_map);
   }
-  
-
-  // uniques...
-  unique_kbest(kbests);
-  unique_kbest(oracles);  
-
-  kbest_map_type(kbest_map).swap(kbest_map);
 }
 
 

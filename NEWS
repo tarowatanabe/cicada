@@ -1,3 +1,7 @@
+2013-1-x
+INCOMPATIBLE: ngram feature computes "exact" score when prefixed by <s> during upper bound estimates
+Faster and less-memory kbest loading in learn/oracle/mert/convex_hull
+
 2013-1-4
 Bugfix: removed spurious "locking" by "not" checking malloced resources very frequently
 Revised the kbest loading in learn/oracle/mert/convex_hull code
