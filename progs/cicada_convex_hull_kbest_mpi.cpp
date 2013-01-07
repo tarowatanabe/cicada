@@ -467,51 +467,41 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
   }
 }
 
-struct TaskInit
+template <typename Tp>
+struct hashp : boost::hash<Tp>
 {
-  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  typedef boost::hash<Tp> hasher_type;
   
-  template <typename Tp>
-  struct hashp : boost::hash<Tp>
+  size_t operator()(const Tp* x) const
   {
-    typedef boost::hash<Tp> hasher_type;
-    
-    size_t operator()(const Tp* x) const
-    {
-      return x ? hasher_type::operator()(*x) : size_t(0);
-    }
-  };
+    return x ? hasher_type::operator()(*x) : size_t(0);
+  }
+};
+
+template <typename Tp>
+struct equalp : std::equal_to<Tp>
+{
+  typedef std::equal_to<Tp> equal_type;
   
-  template <typename Tp>
-  struct equalp : std::equal_to<Tp>
+  bool operator()(const Tp* x, const Tp* y) const
   {
-    typedef std::equal_to<Tp> equal_type;
-    
-    bool operator()(const Tp* x, const Tp* y) const
-    {
-      return (x == y) || (x && y && equal_type::operator()(*x, *y));
-    }
-  };
-  
+    return (x == y) || (x && y && equal_type::operator()(*x, *y));
+  }
+};
+
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers)
+{
   typedef const hypothesis_type* value_type;
   typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
 			       std::allocator<value_type> >::type hypothesis_unique_type;
+  
+  hypothesis_unique_type uniques;
 
-  TaskInit(queue_type&                 __queue,
-	   hypothesis_map_type&        __hypotheses,
-	   const scorer_document_type& __scorers)
-    : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
-
-  void operator()()
-  {
-    hypothesis_unique_type uniques;
-
-    for (;;) {
-      int id = 0;
-      queue.pop(id);
-      if (id < 0) break;
-      
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
       uniques.clear();
+      
       hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
       for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
 	uniques.insert(&(*hiter));
@@ -530,29 +520,6 @@ struct TaskInit
       
       hypotheses[id].swap(merged);
     }
-  }
-
-  queue_type&                 queue;
-  hypothesis_map_type&        hypotheses;
-  const scorer_document_type& scorers;
-};
-
-void initialize_score(hypothesis_map_type& hypotheses,
-		      const scorer_document_type& scorers)
-{
-  typedef TaskInit task_type;
-  typedef task_type::queue_type queue_type;
-
-  queue_type queue;
-  
-  boost::thread worker(task_type(queue, hypotheses, scorers));
-  
-  for (size_t id = 0; id != hypotheses.size(); ++ id)
-    if (! hypotheses[id].empty())
-      queue.push(id);
-  queue.push(-1);
-  
-  worker.join();
 }
 
 void options(int argc, char** argv)
