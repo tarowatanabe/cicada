@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -251,7 +251,13 @@ namespace cicada
       {
 	typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
-	if (approximate)
+	const size_type length = std::distance(first, last);
+	
+	if (length == 0)
+	  return state_score_type(ngram_state_type(), 0.0);
+	
+	// if *first == bos, then we perform exact scoring...
+	if (approximate || *first == id_bos)
 	  return ngram_estimate(first, last, __ngram_score_logprob(*ngram), value_type());
 	else
 	  return ngram_estimate(first, last, __ngram_score_logbound(*ngram), value_type());

@@ -2750,28 +2750,57 @@ struct TaskUnique
 	     hypothesis_map_type& __kbests)
     : queue(__queue), kbests(__kbests) {}
 
-  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+  template <typename Tp>
+  struct hashp : boost::hash<Tp>
+  {
+    typedef boost::hash<Tp> hasher_type;
+    
+    size_t operator()(const Tp* x) const
+    {
+      return x ? hasher_type::operator()(*x) : size_t(0);
+    }
+  };
+  
+  template <typename Tp>
+  struct equalp : std::equal_to<Tp>
+  {
+    typedef std::equal_to<Tp> equal_type;
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return (x == y) || (x && y && equal_type::operator()(*x, *y));
+    }
+  };
+  
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
 
   void operator()()
   {
-    hypothesis_unique_type hypotheses;
+    hypothesis_unique_type uniques;
 
     for (;;) {
       int id = 0;
       queue.pop(id);
       if (id < 0) break;
+
+      uniques.clear();
       
-      hypotheses.clear();
-      hypotheses.insert(kbests[id].begin(), kbests[id].end());
+      hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+      for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	uniques.insert(&(*kiter));
       
-      // clear
-      kbests[id].clear();
-      hypothesis_set_type(kbests[id]).swap(kbests[id]);
+      hypothesis_set_type merged;
+      merged.reserve(uniques.size());
       
-      // reserve and assign
-      kbests[id].reserve(hypotheses.size());
-      kbests[id].insert(kbests[id].end(), hypotheses.begin(), hypotheses.end());
+      hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+      for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
+	merged.push_back(*(*uiter));
+      
+      uniques.clear();
+      
+      kbests[id].swap(merged);
     }
   }
   

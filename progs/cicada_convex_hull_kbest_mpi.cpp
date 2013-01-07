@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -471,8 +471,31 @@ struct TaskInit
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
-  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+  template <typename Tp>
+  struct hashp : boost::hash<Tp>
+  {
+    typedef boost::hash<Tp> hasher_type;
+    
+    size_t operator()(const Tp* x) const
+    {
+      return x ? hasher_type::operator()(*x) : size_t(0);
+    }
+  };
+  
+  template <typename Tp>
+  struct equalp : std::equal_to<Tp>
+  {
+    typedef std::equal_to<Tp> equal_type;
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return (x == y) || (x && y && equal_type::operator()(*x, *y));
+    }
+  };
+  
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
 
   TaskInit(queue_type&                 __queue,
 	   hypothesis_map_type&        __hypotheses,
@@ -481,25 +504,31 @@ struct TaskInit
 
   void operator()()
   {
-    hypothesis_unique_type kbests;
+    hypothesis_unique_type uniques;
 
     for (;;) {
       int id = 0;
       queue.pop(id);
       if (id < 0) break;
       
-      kbests.clear();
-      kbests.insert(hypotheses[id].begin(), hypotheses[id].end());
+      uniques.clear();
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	uniques.insert(&(*hiter));
       
-      hypotheses[id].clear();
-      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      hypothesis_set_type merged;
+      merged.reserve(uniques.size());
       
-      hypotheses[id].reserve(kbests.size());
-      hypotheses[id].insert(hypotheses[id].end(), kbests.begin(), kbests.end());
+      hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+      for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	merged.push_back(*(*uiter));
+	
+	merged.back().score = scorers[id]->score(sentence_type(merged.back().sentence.begin(), merged.back().sentence.end()));
+      }
       
-      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
-      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
-	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+      uniques.clear();
+      
+      hypotheses[id].swap(merged);
     }
   }
 

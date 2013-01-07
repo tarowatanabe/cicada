@@ -4591,23 +4591,54 @@ double optimize_mert(const scorer_document_type& scorers,
   
 }
 
+template <typename Tp>
+struct hashp : boost::hash<Tp>
+{
+  typedef boost::hash<Tp> hasher_type;
+  
+  size_t operator()(const Tp* x) const
+  {
+    return x ? hasher_type::operator()(*x) : size_t(0);
+  }
+};
+
+template <typename Tp>
+struct equalp : std::equal_to<Tp>
+{
+  typedef std::equal_to<Tp> equal_type;
+  
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return (x == y) || (x && y && equal_type::operator()(*x, *y));
+  }
+};
+
 void unique_kbest(hypothesis_map_type& kbests)
 {
-  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
   
   hypothesis_unique_type uniques;
   
   for (size_t id = 0; id != kbests.size(); ++ id) 
     if (! kbests[id].empty()) {
       uniques.clear();
-      uniques.insert(kbests[id].begin(), kbests[id].end());
       
-      kbests[id].clear();
-      hypothesis_set_type(kbests[id]).swap(kbests[id]);
+      hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+      for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter)
+	uniques.insert(&(*kiter));
       
-      kbests[id].reserve(uniques.size());
-      kbests[id].insert(kbests[id].end(), uniques.begin(), uniques.end());
+      hypothesis_set_type merged;
+      merged.reserve(uniques.size());
+      
+      hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+      for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
+	merged.push_back(*(*uiter));
+      
+      uniques.clear();
+      
+      kbests[id].swap(merged);
     }
 }
 

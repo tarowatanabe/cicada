@@ -945,28 +945,58 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
   return 0.0;
 }
 
+template <typename Tp>
+struct hashp : boost::hash<Tp>
+{
+  typedef boost::hash<Tp> hasher_type;
+    
+  size_t operator()(const Tp* x) const
+  {
+    return x ? hasher_type::operator()(*x) : size_t(0);
+  }
+};
+  
+template <typename Tp>
+struct equalp : std::equal_to<Tp>
+{
+  typedef std::equal_to<Tp> equal_type;
+    
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return (x == y) || (x && y && equal_type::operator()(*x, *y));
+  }
+};
+
 void initialize_score(hypothesis_map_type& hypotheses,
 		      const scorer_document_type& scorers)
 {
-  typedef utils::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
-			       std::allocator<hypothesis_type> >::type hypothesis_unique_type;
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
   
   hypothesis_unique_type uniques;
 
   for (size_t id = 0; id != hypotheses.size(); ++ id)
     if (! hypotheses[id].empty()) {
       uniques.clear();
-      uniques.insert(hypotheses[id].begin(), hypotheses[id].end());
       
-      hypotheses[id].clear();
-      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	uniques.insert(&(*hiter));
       
-      hypotheses[id].reserve(uniques.size());
-      hypotheses[id].insert(hypotheses[id].end(), uniques.begin(), uniques.end());
+      hypothesis_set_type merged;
+      merged.reserve(uniques.size());
       
-      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
-      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
-	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+      hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+      for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	merged.push_back(*(*uiter));
+	
+	merged.back().score = scorers[id]->score(sentence_type(merged.back().sentence.begin(), merged.back().sentence.end()));
+      }
+      
+      uniques.clear();
+      
+      hypotheses[id].swap(merged);
     }
 }
 
