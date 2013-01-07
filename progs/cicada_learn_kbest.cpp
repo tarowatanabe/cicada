@@ -3175,10 +3175,6 @@ void read_kbest(const scorer_document_type& scorers,
       tasks[i].kbests.clear();
       tasks[i].oracles.clear();
     }
-    
-    // uniques...
-    unique_kbest(kbests);
-    unique_kbest(oracles);
   }
 }
 
@@ -3308,9 +3304,6 @@ void read_kbest(const scorer_document_type& scorers,
       
       tasks[i].kbests.clear();
     }
-    
-    // uniques...
-    unique_kbest(kbests);
   }
 }
 
