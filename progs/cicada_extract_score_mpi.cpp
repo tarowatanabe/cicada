@@ -492,6 +492,30 @@ void reduce_root_counts(root_count_set_type& root_counts)
   }
 }
 
+
+struct progress_mapper
+{
+  progress_mapper() : i(0) {}
+  
+  void operator()() const
+  {
+    ++ const_cast<size_t&>(i);
+    
+    if (i % 10000 == 0)
+      std::cerr << '.';
+    if (i % 1000000 == 0)
+      std::cerr << std::endl;
+  }
+  
+  void final() const
+  {
+    if ((i % 10000) % 100)
+      std::cerr << std::endl;
+  }
+  
+  size_t i;
+};
+
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files)
 {

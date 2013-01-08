@@ -1,3 +1,7 @@
+2013-1-x
+Bugfix: throw when disk is full + added --temporary option to extract_score in order to assingn temporary directory
+	from command line.
+
 2013-1-7
 INCOMPATIBLE: ngram feature computes "exact" score when prefixed by <s> during upper bound estimates
 Faster and less-memory kbest loading in learn/oracle/mert/convex_hull

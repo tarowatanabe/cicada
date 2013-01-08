@@ -967,13 +967,29 @@ struct PhrasePairSourceMapper
       tm.tv_sec = 0;
       tm.tv_nsec = 2000001;
       nanosleep(&tm, NULL);
-
+      
       non_found_iter = 0;
     }
     return non_found_iter;
   }
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+    
+    void final() const {}
+  };
   
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
@@ -1022,6 +1038,8 @@ struct PhrasePairSourceMapper
 	}
 	
 	counts.swap(curr);
+	
+	progress();
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
       
@@ -1038,7 +1056,7 @@ struct PhrasePairSourceMapper
       const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
       queues[shard]->push_swap(counts);
     }
-    
+
     // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     int non_found_iter = 0;
@@ -1060,6 +1078,8 @@ struct PhrasePairSourceMapper
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
+
+    progress.final();
   }
 };
 
@@ -1136,8 +1156,24 @@ struct PhrasePairSourceReducer
       return x->first > y->first;
     }
   };
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
     
+    void final() const {}
+  };
+  
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef std::pair<simple_type, queue_type*> buffer_queue_type;
     typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
@@ -1221,6 +1257,8 @@ struct PhrasePairSourceReducer
 	counts.increment(curr.counts.begin(), curr.counts.end());
 	
 	observed += 1;
+	
+	progress();
       } else {
 	const_cast<root_count_type&>(*jiter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
@@ -1240,6 +1278,7 @@ struct PhrasePairSourceReducer
       generator(os, phrase_count_type(counts.source, counts.counts)) << '\n';
     }
     
+    progress.final();
   }
 };
 
@@ -1362,7 +1401,23 @@ struct PhrasePairReverseMapper
     return non_found_iter;
   }
 
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+    
+    void final() const {}
+  };
+  
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
@@ -1414,6 +1469,8 @@ struct PhrasePairReverseMapper
 	}
 
 	counts.swap(curr);
+	
+	progress();
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
       
@@ -1455,6 +1512,8 @@ struct PhrasePairReverseMapper
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
+
+    progress.final();
   }
 };
 
@@ -1653,8 +1712,24 @@ struct PhrasePairReverseReducer
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
       generator(os, *(*siter)) << '\n';
   }
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+    
+    void final() const {}
+  };
   
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     simple_type        reversed;
     simple_unique_type counts;
@@ -1938,8 +2013,24 @@ struct PhrasePairTargetMapper
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+    
+    void final() const {}
+  };
   
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
@@ -2030,6 +2121,8 @@ struct PhrasePairTargetMapper
 	
 	phrases.push_back(counts.target);
 	observed += 1;
+	
+	progress();
       } else {
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	counts.increment(curr.counts.begin(), curr.counts.end());
@@ -2062,11 +2155,7 @@ struct PhrasePairTargetMapper
       
       phrases.shrink();
     }
-    
-    //
-    // map-merged files by inversing
-    //
-    
+
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     int non_found_iter = 0;
 
@@ -2087,6 +2176,8 @@ struct PhrasePairTargetMapper
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
+
+    progress.final();
   }
   
   inline
@@ -2312,7 +2403,23 @@ struct PhrasePairTargetReducer
       generator(os, *(*siter)) << '\n';
   }
 
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+
+    void final() const {}
+  };
+  
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     // we already know that the entries are uniqued through the previous map-reduce!
     
@@ -2486,8 +2593,24 @@ struct PhrasePairScoreMapper
     }
     return non_found_iter;
   }
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+
+    void final() const {}
+  };
   
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
@@ -2539,6 +2662,8 @@ struct PhrasePairScoreMapper
 	}
 	
 	counts.swap(curr);
+	
+	progress();
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
       
@@ -2581,6 +2706,8 @@ struct PhrasePairScoreMapper
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
+
+    progress.final();
   }
 };
 
@@ -2759,8 +2886,24 @@ struct PhrasePairScoreReducer
 	counts.back().increment(phrase.counts.begin(), phrase.counts.end());
     }
   }
+
+  struct EmptyProgress
+  {
+    void operator()() const
+    {
+      
+    }
+    
+    void final() const {}
+  };
   
   void operator()()
+  {
+    operator()(EmptyProgress());
+  }
+  
+  template <typename Progress>
+  void operator()(const Progress& progress)
   {
     typedef std::pair<phrase_pair_type, queue_type*> buffer_queue_type;
     typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
@@ -2893,6 +3036,8 @@ struct PhrasePairScoreReducer
 	}
 	
 	counts.push_back(curr);
+
+	progress();
 	
 	// next target...
 	if (queue_target.empty())
@@ -2937,6 +3082,8 @@ struct PhrasePairScoreReducer
       
       dump_phrase_pair(counts, source, target);
     }
+
+    progress.final();
   }
   
 };
