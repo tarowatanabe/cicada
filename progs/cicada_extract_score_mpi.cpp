@@ -543,7 +543,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
 
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 3;
+  static const size_t buffer_size_max = buffer_size << 2;
   static const size_t queue_size      = 1024;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -753,7 +753,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 3;
+  static const size_t buffer_size_max = buffer_size << 2;
   static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -973,7 +973,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 3;
+  static const size_t buffer_size_max = buffer_size << 2;
   static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -1191,7 +1191,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
-  static const size_t buffer_size_max = buffer_size << 3;
+  static const size_t buffer_size_max = buffer_size << 2;
   static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
