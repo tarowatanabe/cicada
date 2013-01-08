@@ -612,6 +612,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
+	    found = true;
+	    
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
 	    else
@@ -822,6 +824,8 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(simple, true)) {
+	    found = true;
+	    
 	    if (! simple.source.empty())
 	      generator(*stream[rank], simple) << '\n';
 	    else 
@@ -1035,6 +1039,8 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(target, true)) {
+	    found = true;
+	    
 	    if (! target.source.empty())
 	      generator(*stream[rank], target) << '\n';
 	    else 
@@ -1257,6 +1263,8 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	  }
 	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(reversed, true)) {
+	    found = true;
+	    
 	    if (! reversed.source.empty())
 	      generator(*stream[rank], reversed) << '\n';
 	    else
