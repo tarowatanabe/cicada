@@ -586,8 +586,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max
-		   || utils::malloc_stats::used() < malloc_threshold) {
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
@@ -797,8 +796,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max
-		   || utils::malloc_stats::used() < malloc_threshold) {
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(simple, true)) {
 	    if (! simple.source.empty())
 	      generator(*stream[rank], simple) << '\n';
@@ -1011,8 +1009,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max
-		   || utils::malloc_stats::used() < malloc_threshold) {
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(target, true)) {
 	    if (! target.source.empty())
 	      generator(*stream[rank], target) << '\n';
@@ -1234,8 +1231,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max
-		   || utils::malloc_stats::used() < malloc_threshold) {
+	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
 	  if (queues[rank]->pop_swap(reversed, true)) {
 	    if (! reversed.source.empty())
 	      generator(*stream[rank], reversed) << '\n';
