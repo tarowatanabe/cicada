@@ -37,6 +37,9 @@ opt_parser = OptionParser(
     make_option("--score-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="grammar score directory (default: ${model_dir})"),
 
+    make_option("--temporary-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="temporary directory (default: ${model_dir})"),
+
     ### source/target flags
     make_option("--f", default="", action="store", type="string",
                 metavar="FILE-OR-SUFFIX", help="source (or 'French')  language file or suffix"),
@@ -835,6 +838,7 @@ class ExtractScore(Extract):
     def __init__(self, cicada=None,
                  counts_dir="",
                  score_dir="",
+                 temporary_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
@@ -878,8 +882,8 @@ class ExtractScore(Extract):
         command += option
         command += " --max-malloc %g" %(max_malloc)
         
-        if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
-            command += " --temporary \"%s\"" %(os.environ['TMPDIR_SPEC'])
+        if options.temporary_dir:
+            command += " --temporary \"%s\"" %(temporary_dir)
         
         if mpi:
             command += " --prog \"%s\"" %(prog_name)
@@ -914,6 +918,10 @@ if __name__ == '__main__':
         options.counts_dir = options.model_dir
     if not options.score_dir:
         options.score_dir = options.model_dir
+
+    if not options.temporary_dir:
+        if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
+            options.temporary_dir = os.environ['TMPDIR_SPEC']
 
     cicada = CICADA(options.cicada_dir)
 
@@ -1022,6 +1030,7 @@ if __name__ == '__main__':
         score = ExtractScore(cicada=cicada,
                              counts_dir=options.counts_dir,
                              score_dir=options.score_dir,
+                             temporary_dir=options.temporary_dir,
                              phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                              debug=options.debug)

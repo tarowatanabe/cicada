@@ -40,6 +40,9 @@ opt_parser = OptionParser(
     make_option("--index-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="grammar index directory (default: ${model_dir})"),
 
+    make_option("--temporary-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="temporary directory (default: ${model_dir})"),
+
     make_option("--lexicon-source-target", default="", action="store", type="string",
                 metavar="LEXICON", help="lexicon for P(target | source) (default: ${lexical_dir}/lex.f2n)"),
     make_option("--lexicon-target-source", default="", action="store", type="string",
@@ -542,6 +545,7 @@ class Index(UserString.UserString):
                  root_joint="",
                  root_source="",
                  root_target="",
+                 temporary_dir="",
                  prior=0.1,
                  kbest=0,
                  quantize=None,
@@ -624,8 +628,8 @@ class Index(UserString.UserString):
         command_indexer += " --input %s" %(input_path)
         command_indexer += " --output \"%s\"" %(output)
         
-        if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
-            command_indexer += " --temporary \"%s\"" %(os.environ['TMPDIR_SPEC'])
+        if temporary_dir:
+            command_indexer += " --temporary \"%s\"" %(temporary_dir)
             
         if plain:
             command += " --output \"%s\"" %(output)
@@ -722,6 +726,10 @@ if __name__ == '__main__':
     if not options.lexicon_target_source:
         options.lexicon_target_source = os.path.join(options.lexical_dir, "lex.n2f")
 
+    if not options.temporary_dir:
+        if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
+            options.temporary_dir = os.environ['TMPDIR_SPEC']
+
     cicada = CICADA(options.cicada_dir)
 
     indexer = None
@@ -791,6 +799,7 @@ if __name__ == '__main__':
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
                           root_target=scores.root_target,
+                          temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
                           quantize=options.quantize,
@@ -822,6 +831,7 @@ if __name__ == '__main__':
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
                           root_target=scores.root_target,
+                          temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
                           quantize=options.quantize,
@@ -849,6 +859,7 @@ if __name__ == '__main__':
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
                           root_target=scores.root_target,
+                          temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
                           quantize=options.quantize,

@@ -598,8 +598,10 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
+
+	const size_t committed = device[rank]->committed();
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	if (committed < buffer_size) {
 	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(phrase_pair, true)) {
 	    found = true;
 	    
@@ -610,9 +612,9 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	} else {
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
-	    found = true;
+	    found |= (committed < buffer_size_max);
 	    
 	    if (! phrase_pair.source.empty())
 	      generator(*stream[rank], phrase_pair) << '\n';
@@ -810,8 +812,10 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
+
+	const size_t committed = device[rank]->committed();
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	if (committed < buffer_size) {
 	  while (static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(simple, true)) {
 	    found = true;
 	    
@@ -822,16 +826,16 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	} else {
 	  if (queues[rank]->pop_swap(simple, true)) {
-	    found = true;
+	    found |= (committed < buffer_size_max);
 	    
 	    if (! simple.source.empty())
 	      generator(*stream[rank], simple) << '\n';
 	    else 
 	      stream[rank].reset();
 	  }
-	} 
+	}
       }
     }
     
@@ -1025,8 +1029,10 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
+
+	const size_t committed = static_cast<size_t>(device[rank]->committed());
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	if (committed < buffer_size) {
 	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(target, true); ++ i) {
 	    found = true;
 	    
@@ -1037,9 +1043,9 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	} else {
 	  if (queues[rank]->pop_swap(target, true)) {
-	    found = true;
+	    found |= (committed < buffer_size_max);
 	    
 	    if (! target.source.empty())
 	      generator(*stream[rank], target) << '\n';
@@ -1249,8 +1255,10 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (device[rank]->test() && device[rank]->flush(true))
 	  found = true;
+
+	const size_t committed = device[rank]->committed();
 	
-	if (static_cast<size_t>(device[rank]->committed()) < buffer_size) {
+	if (committed < buffer_size) {
 	  for (int i = 0; i != 128 && static_cast<size_t>(device[rank]->committed()) < buffer_size && queues[rank]->pop_swap(reversed, true); ++ i) {
 	    found = true;
 	    
@@ -1261,9 +1269,9 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else if (static_cast<size_t>(device[rank]->committed()) < buffer_size_max) {
+	} else {
 	  if (queues[rank]->pop_swap(reversed, true)) {
-	    found = true;
+	    found |= (committed < buffer_size_max);
 	    
 	    if (! reversed.source.empty())
 	      generator(*stream[rank], reversed) << '\n';
