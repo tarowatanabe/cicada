@@ -520,7 +520,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 3;
-  static const size_t queue_size      = 1024 * 8;
+  static const size_t queue_size      = 1024;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -639,7 +639,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  const size_t queue_size  = 1024 * 64;
+  const size_t queue_size  = 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
@@ -728,7 +728,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 3;
-  static const size_t queue_size      = 1024 * 8;
+  static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -849,7 +849,7 @@ void source_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  const size_t queue_size  = 1024 * 64;
+  const size_t queue_size  = 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
@@ -946,7 +946,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 3;
-  static const size_t queue_size      = 1024 * 8;
+  static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1063,7 +1063,7 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  const size_t queue_size  = 1024 * 64;
+  const size_t queue_size  = 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
@@ -1162,7 +1162,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   
   static const size_t buffer_size     = 1024 * 1024 * 4;
   static const size_t buffer_size_max = buffer_size << 3;
-  static const size_t queue_size      = 1024 * 8;
+  static const size_t queue_size      = 1024;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1306,7 +1306,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  const size_t queue_size  = 1024 * 64;
+  const size_t queue_size  = 1024 * 16;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   path_set_type reversed_files;
