@@ -2,6 +2,7 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <cstdlib>
 #include <stdexcept>
 #include <iostream>
 #include <vector>
@@ -24,6 +25,9 @@ int main(int argc, char** argv)
   try {
     variable_set_type variables;
     options(argc, argv, variables);
+
+    if (variables.count("temporary") && ! variables["temporary"].as<std::string>().empty())
+      ::setenv("TMPDIR_SPEC", variables["temporary"].as<std::string>().data(), 1);
     
     if (! variables.count("input"))
       throw std::runtime_error("no input file");
@@ -50,8 +54,9 @@ void options(int argc, char** argv, variable_set_type& variables)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<std::string>()->default_value("-"),   "input in text format")
-    ("output", po::value<std::string>(), "output in binary format")
+    ("input",     po::value<std::string>()->default_value("-"), "input in text format")
+    ("output",    po::value<std::string>(),                     "output in binary format")
+    ("temporary", po::value<std::string>(),                     "temporary directory")
     
     ("help", "help message");
 

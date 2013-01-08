@@ -623,7 +623,10 @@ class Index(UserString.UserString):
 
         command_indexer += " --input %s" %(input_path)
         command_indexer += " --output \"%s\"" %(output)
-
+        
+        if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
+            command_indexer += " --temporary \"%s\"" %(os.environ['TMPDIR_SPEC'])
+            
         if plain:
             command += " --output \"%s\"" %(output)
         else:
