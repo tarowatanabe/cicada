@@ -612,7 +612,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else {
+	} else if (committed < buffer_size_max || utils::malloc_stats::used() < malloc_threshold) {
 	  if (queues[rank]->pop_swap(phrase_pair, true)) {
 	    found |= (committed < buffer_size_max);
 	    
@@ -826,7 +826,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else {
+	} else if (committed < buffer_size_max || utils::malloc_stats::used() < malloc_threshold) {
 	  if (queues[rank]->pop_swap(simple, true)) {
 	    found |= (committed < buffer_size_max);
 	    
@@ -1043,7 +1043,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else {
+	} else if (committed < buffer_size_max || utils::malloc_stats::used() < malloc_threshold) {
 	  if (queues[rank]->pop_swap(target, true)) {
 	    found |= (committed < buffer_size_max);
 	    
@@ -1269,7 +1269,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 	      break;
 	    }
 	  }
-	} else {
+	} else if (committed < buffer_size_max || utils::malloc_stats::used() < malloc_threshold) {
 	  if (queues[rank]->pop_swap(reversed, true)) {
 	    found |= (committed < buffer_size_max);
 	    
