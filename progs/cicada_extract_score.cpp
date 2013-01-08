@@ -47,6 +47,7 @@ struct greater_file_size
 
 path_set_type input_files;
 path_type output_file = "";
+path_type temporary_dir = "";
 
 bool score_phrase = false;
 bool score_scfg   = false;
@@ -82,6 +83,9 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    if (! temporary_dir.empty())
+      ::setenv("TMPDIR_SPEC", temporary_dir.string().data(), 1);
 
     if (output_file.empty())
       throw std::runtime_error("no output file?");
@@ -633,6 +637,7 @@ void options(int argc, char** argv)
   opts_config.add_options()
     ("input",                  po::value<path_set_type>(&input_files)->multitoken(), "input files")
     ("output",                 po::value<path_type>(&output_file),                   "output directory")
+    ("temporary",              po::value<path_type>(&temporary_dir),                 "temporary directory")
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")

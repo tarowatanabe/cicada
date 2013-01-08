@@ -878,6 +878,9 @@ class ExtractScore(Extract):
         command += option
         command += " --max-malloc %g" %(max_malloc)
         
+        if os.environ.has_key('TMPDIR_SPEC'):
+            command += " --temporary \"%s\"" %(os.environ['TMPDIR_SPEC'])
+        
         if mpi:
             command += " --prog \"%s\"" %(prog_name)
         else:

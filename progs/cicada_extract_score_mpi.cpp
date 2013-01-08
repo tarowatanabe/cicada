@@ -5,6 +5,7 @@
 #include "cicada_extract_score_impl.hpp"
 #include "cicada_output_impl.hpp"
 
+#include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
@@ -58,6 +59,7 @@ struct greater_file_size
 
 path_set_type input_files;
 path_type output_file = "";
+path_type temporary_dir = "";
 
 bool score_phrase = false;
 bool score_scfg   = false;
@@ -109,7 +111,7 @@ int main(int argc, char** argv)
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
+    
   try {
     std::vector<const char*, std::allocator<const char*> > args;
     args.reserve(argc);
@@ -119,9 +121,12 @@ int main(int argc, char** argv)
     
     options(argc, argv);
     
+    if (! temporary_dir.empty())
+      ::setenv("TMPDIR_SPEC", temporary_dir.string().data(), 1);
+    
     if (output_file.empty())
       throw std::runtime_error("no output file?");
-        
+    
     if (int(score_phrase) + score_scfg + score_ghkm != 1)
       throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
 
@@ -1408,6 +1413,7 @@ void options(int argc, char** argv)
   opts_config.add_options()
     ("input",                  po::value<path_set_type>(&input_files)->multitoken(), "input files")
     ("output",                 po::value<path_type>(&output_file),                   "output directory")
+    ("temporary",              po::value<path_type>(&temporary_dir),                 "temporary directory")
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")

@@ -34,7 +34,6 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/map_file.hpp"
-#include "utils/tempfile.hpp"
 #include "utils/mulvector2.hpp"
 #include "utils/mathop.hpp"
 #include "utils/unordered_set.hpp"
