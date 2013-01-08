@@ -1173,6 +1173,8 @@ struct PhrasePairSourceReducer
     }
     
     utils::compress_ostream os(path, 1024 * 1024);
+    os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+    
     simple_type counts;
     std::string root_source;
     size_type observed = 0;
