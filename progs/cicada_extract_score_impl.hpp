@@ -1245,6 +1245,8 @@ struct PhrasePairSourceReducer
 	
 	counts.swap(curr);
 	observed = 1;
+
+	progress();
       } else if (curr.target != counts.target) {
 	// increment root_observed(lhs+rhs)
 	jiter = joint_counts.insert(root_source+extract_root(curr.target)).first;
@@ -2113,6 +2115,7 @@ struct PhrasePairTargetMapper
 	const_cast<root_count_type&>(*riter).increment(counts.counts.begin(), counts.counts.end());
 	const_cast<root_count_type&>(*riter).observed += 1;
 	
+	progress();
       } else if (curr.target != counts.target) {
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	
@@ -3025,6 +3028,7 @@ struct PhrasePairScoreReducer
 	if (counts.back().target != target.target)
 	  throw std::runtime_error("target mismatch? " + counts.back().target + " target: " + target.target);
 	
+	progress();
       } else if (counts.back().target != curr.target) {
 	if (! counts.empty()) {
 	  if (debug >= 4)
@@ -3036,8 +3040,6 @@ struct PhrasePairScoreReducer
 	}
 	
 	counts.push_back(curr);
-
-	progress();
 	
 	// next target...
 	if (queue_target.empty())
@@ -3062,6 +3064,7 @@ struct PhrasePairScoreReducer
 	if (counts.back().target != target.target)
 	  throw std::runtime_error("target mismatch? " + counts.back().target + " simple: " + target.target);
 	
+	progress();
       } else if (counts.back().alignment != curr.alignment)
 	counts.push_back(curr);
       else
