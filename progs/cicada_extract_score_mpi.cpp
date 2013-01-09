@@ -452,33 +452,65 @@ void synchronize_reducer(utils::mpi_intercomm& mapper)
 
 void reduce_root_counts(root_count_set_type& root_counts)
 {
+  typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   if (mpi_rank == 0) {
+    device_ptr_set_type device(mpi_size);
+    stream_ptr_set_type stream(mpi_size);
+    
+    for (int rank = 1; rank < mpi_size; ++ rank) {
+      device[rank].reset(new device_type(rank, root_count_tag, 4096));
+      stream[rank].reset(new stream_type());
+      
+      //stream[rank]->push(boost::iostreams::zlib_decompressor());
+      stream[rank]->push(codec::lz4_decompressor());
+      stream[rank]->push(*device[rank]);
+    }
+    
     RootCountParser parser;
     root_count_type root_count;
-    
     std::string line;
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      boost::iostreams::filtering_istream is;
-      //is.push(boost::iostreams::zlib_decompressor());
-      is.push(codec::lz4_decompressor());
-      is.push(utils::mpi_device_source(rank, root_count_tag, 4096));
+    
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
       
-      while (std::getline(is, line)) {
-	if (! parser(line, root_count)) {
-	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
-	  continue;
+      for (int rank = 1; rank < mpi_size; ++ rank)
+	while (stream[rank] && device[rank] && device[rank]->test()) {
+	  if (std::getline(*stream[rank], line)) {
+	    if (! parser(line, root_count)) {
+	      std::cerr << "warning: root-count parsing failed: " << line << std::endl;
+	      continue;
+	    }
+	    
+	    std::pair<root_count_set_type::iterator, bool> result = root_counts.insert(root_count);
+	    if (! result.second) {
+	      const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+	      const_cast<root_count_type&>(*result.first).observed += root_count.observed;
+	    }
+	  } else {
+	    stream[rank].reset();
+	    device[rank].reset();
+	  }
+	  
+	  found = true;
 	}
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_counts.insert(root_count);
-	if (! result.second) {
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-	  const_cast<root_count_type&>(*result.first).observed += root_count.observed;
-	}
-      }
+      
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
+    
   } else {
     boost::iostreams::filtering_ostream os;
     //os.push(boost::iostreams::zlib_compressor());
