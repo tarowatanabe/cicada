@@ -492,28 +492,38 @@ void reduce_root_counts(root_count_set_type& root_counts)
   }
 }
 
-
-struct progress_mapper
+template <typename Mapper>
+struct progress_mapper : public Mapper
 {
-  progress_mapper() : i(0) {}
-  
-  void operator()() const
+  progress_mapper(const Mapper& mapper) : Mapper(mapper) {}
+
+  void operator()()
   {
-    ++ const_cast<size_t&>(i);
+    Mapper::operator()(progress_type());
+  }
+  
+  struct progress_type
+  {
+    progress_type() : i(0) {}
     
-    if (i % 10000 == 0)
-      std::cerr << '.';
-    if (i % 1000000 == 0)
-      std::cerr << std::endl;
-  }
+    void operator()() const
+    {
+      ++ const_cast<size_t&>(i);
+      
+      if (i % 100000 == 0)
+	std::cerr << '.';
+      if (i % 10000000 == 0)
+	std::cerr << std::endl;
+    }
+    
+    void final() const
+    {
+      if ((i % 100000) % 100)
+	std::cerr << std::endl;
+    }
   
-  void final() const
-  {
-    if ((i % 10000) % 100)
-      std::cerr << std::endl;
-  }
-  
-  size_t i;
+    size_t i;
+  };
 };
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
@@ -582,7 +592,10 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   generator_type   generator;
   
   boost::thread_group mapper;
-  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
+  if (mpi_rank == 0 && debug)
+    mapper.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files, queues, max_malloc, debug))));
+  else
+    mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
 
   const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
@@ -792,8 +805,12 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
   
   if (debug >= 2)
     std::cerr << "source counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
-  
-  boost::thread mapper(mapper_type(mapped_files, queues, max_malloc, debug));
+
+  boost::thread_group mapper;
+  if (mpi_rank == 0 && debug)
+    mapper.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files, queues, max_malloc, debug))));
+  else
+    mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
   simple_type simple;
   simple_generator_type generator;
@@ -849,7 +866,7 @@ void source_counts_mapper(utils::mpi_intercomm& reducer,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  mapper.join();
+  mapper.join_all();
 }
 
 template <typename Extractor>
@@ -1010,7 +1027,11 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
   if (debug >= 2)
     std::cerr << "target counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
   
-  boost::thread mapper(mapper_type(counts_files, queues, root_counts, max_malloc, debug));
+  boost::thread_group mapper;
+  if (mpi_rank == 0 && debug)
+    mapper.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(counts_files, queues, root_counts, max_malloc, debug))));
+  else
+    mapper.add_thread(new boost::thread(mapper_type(counts_files, queues, root_counts, max_malloc, debug)));
   
   simple_type target;
   simple_generator_type generator;
@@ -1066,7 +1087,7 @@ void target_counts_mapper(utils::mpi_intercomm& reducer,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  mapper.join();
+  mapper.join_all();
 }
 
 void target_counts_reducer(utils::mpi_intercomm& mapper,
@@ -1236,7 +1257,10 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
     std::cerr << "reverse counts: rank: " << mpi_rank << " files: " << mapped_files.size() << std::endl;
 
   boost::thread_group mapper;
-  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
+  if (mpi_rank == 0 && debug)
+    mapper.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files, queues, max_malloc, debug))));
+  else
+    mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
   simple_type           reversed;
   simple_generator_type generator;

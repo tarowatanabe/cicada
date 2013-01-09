@@ -234,6 +234,40 @@ int main(int argc, char** argv)
   return 0;
 }
 
+template <typename Mapper>
+struct progress_mapper : public Mapper
+{
+  progress_mapper(const Mapper& mapper) : Mapper(mapper) {}
+
+  void operator()()
+  {
+    Mapper::operator()(progress_type());
+  }
+  
+  struct progress_type
+  {
+    progress_type() : i(0) {}
+    
+    void operator()() const
+    {
+      ++ const_cast<size_t&>(i);
+      
+      if (i % 100000 == 0)
+	std::cerr << '.';
+      if (i % 10000000 == 0)
+	std::cerr << std::endl;
+    }
+    
+    void final() const
+    {
+      if ((i % 100000) % 100)
+	std::cerr << std::endl;
+    }
+  
+    size_t i;
+  };
+};
+
 struct TaskMerge
 {
   TaskMerge(path_set_type& __files,
@@ -427,11 +461,18 @@ void score_counts(const path_type& output_file,
   }
   
   boost::thread_group mappers;
-  for (int shard = 0; shard != threads; ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
-						     queues_mapper[shard],
-						     max_malloc,
-						     debug)));
+  for (int shard = 0; shard != threads; ++ shard) {
+    if (shard == 0 && debug)
+      mappers.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files[shard],
+										    queues_mapper[shard],
+										    max_malloc,
+										    debug))));
+    else
+      mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						       queues_mapper[shard],
+						       max_malloc,
+						       debug)));
+  }
   
   mappers.join_all();
   reducers.join_all();
@@ -475,12 +516,20 @@ void target_counts(const path_map_type& reversed_files,
 						       debug)));
   
   boost::thread_group mappers;
-  for (size_t shard = 0; shard != queues.size(); ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(reversed_files[shard],
-						     queues,
-						     root_counts[shard],
-						     max_malloc,
-						     debug)));
+  for (size_t shard = 0; shard != queues.size(); ++ shard) {
+    if (shard == 0 && debug)
+      mappers.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(reversed_files[shard],
+										    queues,
+										    root_counts[shard],
+										    max_malloc,
+										    debug))));
+    else
+      mappers.add_thread(new boost::thread(mapper_type(reversed_files[shard],
+						       queues,
+						       root_counts[shard],
+						       max_malloc,
+						       debug)));
+  }
   
   reducers.join_all();
   mappers.join_all();
@@ -551,11 +600,18 @@ void source_counts(const path_set_type& counts_files,
 						       debug)));  
   
   boost::thread_group mappers;
-  for (int shard = 0; shard != threads; ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
-						     queues_mapper[shard],
-						     max_malloc,
-						     debug)));
+  for (int shard = 0; shard != threads; ++ shard) {
+    if (shard == 0 && debug)
+      mappers.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files[shard],
+										    queues_mapper[shard],
+										    max_malloc,
+										    debug))));
+    else
+      mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						       queues_mapper[shard],
+						       max_malloc,
+						       debug)));
+  }
 
   mappers.join_all();
   reducers.join_all();
@@ -618,11 +674,18 @@ void reverse_counts(const path_set_type& counts_files,
 						       debug)));
 
   boost::thread_group mappers;
-  for (size_t shard = 0; shard != queues.size(); ++ shard)
-    mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
-						     queues,
-						     max_malloc,
-						     debug)));
+  for (size_t shard = 0; shard != queues.size(); ++ shard) {
+    if (shard == 0 && debug)
+      mappers.add_thread(new boost::thread(progress_mapper<mapper_type>(mapper_type(mapped_files[shard],
+										    queues,
+										    max_malloc,
+										    debug))));
+    else
+      mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
+						       queues,
+						       max_malloc,
+						       debug)));
+  }
   
   reducers.join_all();
   mappers.join_all();
