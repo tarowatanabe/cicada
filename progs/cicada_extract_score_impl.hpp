@@ -1621,7 +1621,7 @@ struct PhrasePairReverseReducer
     typedef std::pair<size_t, path_type> size_path_type;
     typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
 
-    if (paths.size() <= 16) return;
+    if (paths.size() <= 64) return;
     
     size_path_set_type size_paths;
     
@@ -1629,7 +1629,7 @@ struct PhrasePairReverseReducer
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
       size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
 
-    while (size_paths.size() > 16) {
+    while (size_paths.size() > 64) {
       
       // sort according to the file-size...
       std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
@@ -2311,7 +2311,7 @@ struct PhrasePairTargetReducer
     typedef std::pair<size_t, path_type> size_path_type;
     typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
     
-    if (paths.size() <= 16) return;
+    if (paths.size() <= 64) return;
     
     size_path_set_type size_paths;
     
@@ -2319,7 +2319,7 @@ struct PhrasePairTargetReducer
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
       size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
     
-    while (size_paths.size() > 16) {
+    while (size_paths.size() > 64) {
       
       // sort according to the file-size...
       std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
