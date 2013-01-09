@@ -477,7 +477,8 @@ if __name__ == '__main__':
         
         qsub.run(Program(cicada.cicada_filter_config_moses,
                          Option('--input', options.config),
-                         Option('--output', weights_config)))
+                         Option('--output', weights_config)),
+                 name="config")
     else:
         weights_config = os.path.join(options.root_dir, options.prefix + ".0.weights")
         
@@ -533,7 +534,8 @@ if __name__ == '__main__':
                          config_bias_features,
                          config_bias_weight,
                          Option('--input', Quoted(options.config)),
-                         Option('--output', Quoted(config))))
+                         Option('--output', Quoted(config))),
+                 name="config")
         
         print "moses %s @ %s" %(decoded, time.ctime())
         
@@ -569,7 +571,8 @@ if __name__ == '__main__':
                          Option('--refset', Quoted(options.refset)),
                          Option('--tstset', Quoted(decoded)),
                          Option('--output', Quoted(mteval)),
-                         Option('--scorer', options.scorer)))
+                         Option('--scorer', options.scorer)),
+                 name="evaluate")
         
         print "oracle %s @ %s" %(oracle, time.ctime())
         
@@ -669,4 +672,5 @@ if __name__ == '__main__':
             qsub.run(Program(cicada.cicada_filter_weights,
                              Option('--output', Quoted(weights)),
                              Option(weiset[-2] + ":scale=%g" %(1.0 - options.interpolate)),
-                             Option(weights_learn + ":scale=%g" %(options.interpolate))))
+                             Option(weights_learn + ":scale=%g" %(options.interpolate))),
+                     name="interpolate")

@@ -1508,7 +1508,7 @@ namespace cicada
     utils::resource end;
 
     if (debug) {
-      if (num_line % 10000000 != 0)
+      if ((num_line % 100000) % 100)
 	std::cerr << std::endl;
 
       std::cerr << "# of rules: " << num_line << std::endl;
@@ -1853,7 +1853,7 @@ namespace cicada
     utils::resource end;
     
     if (debug) {
-      if (num_line % 10000000 != 0)
+      if ((num_line % 100000) % 100)
 	std::cerr << std::endl;
       
       std::cerr << "# of rules: " << num_line << std::endl;

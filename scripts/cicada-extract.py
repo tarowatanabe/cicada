@@ -870,7 +870,9 @@ class ExtractScore(Extract):
 
         if not os.path.exists(self.counts):
             raise ValueError, "no counts? %s" %(self.counts)
-                
+
+        self.name = "extract-score"
+        
         prog_name = cicada.cicada_extract_score
         if mpi:
             prog_name = cicada.cicada_extract_score_mpi

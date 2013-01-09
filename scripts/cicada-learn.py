@@ -542,7 +542,8 @@ if __name__ == '__main__':
                          Option('--kbest', options.kbest),
                          Option('--file', "directory=%s" %(decoded)),
                          Option('--input', Quoted(options.config)),
-                         Option('--output', Quoted(config))))
+                         Option('--output', Quoted(config))),
+                 name="config")
         
         print "decode %s @ %s" %(decoded, time.ctime())
         
@@ -599,7 +600,8 @@ if __name__ == '__main__':
                              Option('--refset', Quoted(options.refset)),
                              Option('--tstset', Quoted(onebest)),
                              Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+                             Option('--scorer', options.scorer)),
+                     name="evaluate")
         else:
             print "evaluate %s @ %s" %(mteval, time.ctime())
             
@@ -607,7 +609,8 @@ if __name__ == '__main__':
                              Option('--refset', Quoted(options.refset)),
                              Option('--tstset', Quoted(decoded)),
                              Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+                             Option('--scorer', options.scorer)),
+                     name="evaluate")
         
         print "oracle %s @ %s" %(oracle, time.ctime())
         
@@ -717,4 +720,5 @@ if __name__ == '__main__':
             qsub.run(Program(cicada.cicada_filter_weights,
                              Option('--output', Quoted(weights)),
                              Option(weiset[-2] + ":scale=%g" %(1.0 - options.interpolate)),
-                             Option(weights_learn + ":scale=%g" %(options.interpolate))))
+                             Option(weights_learn + ":scale=%g" %(options.interpolate))),
+                     name="interpolate")

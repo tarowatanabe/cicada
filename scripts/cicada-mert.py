@@ -482,7 +482,8 @@ if __name__ == '__main__':
                          Option('--kbest', options.kbest),
                          Option('--file', "directory=%s" %(decoded)),
                          Option('--input', Quoted(options.config)),
-                         Option('--output', Quoted(config))))
+                         Option('--output', Quoted(config))),
+                 name="config")
         
         print "decode %s @ %s" %(decoded, time.ctime())
         
@@ -539,7 +540,8 @@ if __name__ == '__main__':
                              Option('--refset', Quoted(options.refset)),
                              Option('--tstset', Quoted(onebest)),
                              Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+                             Option('--scorer', options.scorer)),
+                     name="evaluate")
         else:
             print "evaluate %s @ %s" %(mteval, time.ctime())
             
@@ -547,7 +549,8 @@ if __name__ == '__main__':
                              Option('--refset', Quoted(options.refset)),
                              Option('--tstset', Quoted(decoded)),
                              Option('--output', Quoted(mteval)),
-                             Option('--scorer', options.scorer)))
+                             Option('--scorer', options.scorer)),
+                     name="evaluate")
         
         print "mert %s @ %s" %(weights, time.ctime())
 

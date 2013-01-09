@@ -1343,7 +1343,7 @@ void learn(const Maximizer& maximizer,
     if (! bitexts.empty())
       queue_bitext.push_swap(bitexts);
     
-    if (debug && num_bitext >= 10000)
+    if (debug && ((num_bitext % 10000) % 100))
       std::cerr << std::endl;
     if (debug)
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
@@ -1860,7 +1860,7 @@ void sample(const Maximizer& maximizer,
       queue_mapper.push_swap(bitext);
     }
     
-    if (debug && num_bitext >= 10000)
+    if (debug && ((num_bitext % 10000) % 100))
       std::cerr << std::endl;
     if (debug)
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
@@ -1986,7 +1986,7 @@ void sample(const Maximizer& maximizer,
 	  std::cerr << '\n';
       }
     }
-    if (debug && bitexts.size() >= 10000)
+    if (debug && ((bitexts.size() % 10000) % 100))
       std::cerr << std::endl;
     
     for (size_t i = 0; i != mappers.size(); ++ i)
@@ -2409,7 +2409,7 @@ void viterbi(const ttable_type& ttable_source_target,
     }
   }
   
-  if (debug && bitext.id >= 10000)
+  if (debug && ((bitext.id % 10000) % 100))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
@@ -2769,7 +2769,7 @@ void posterior(const ttable_type& ttable_source_target,
     }
   }
   
-  if (debug && bitext.id >= 10000)
+  if (debug && ((bitext.id % 10000) % 100))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
