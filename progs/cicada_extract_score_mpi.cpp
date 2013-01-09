@@ -680,7 +680,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  const size_t queue_size  = 1024 * 16;
+  const size_t queue_size  = 1024;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
@@ -898,7 +898,7 @@ void source_counts_reducer(utils::mpi_intercomm& mapper,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  const size_t queue_size  = 1024 * 16;
+  const size_t queue_size  = 1024;
   const size_t buffer_size = 1024 * 1024 * 4;
   
   istream_ptr_set_type stream(mpi_size);
