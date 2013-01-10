@@ -146,9 +146,10 @@ class PBS:
         pipe = cStringIO.StringIO()
         
         pipe.write("#!/bin/sh\n")
+        pipe.write("#PBS -S /bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
-        pipe.write("#PBS -e /dev/null\n")
-        pipe.write("#PBS -o /dev/null\n")
+        pipe.write("#PBS -e localhost:/dev/null\n")
+        pipe.write("#PBS -o localhost:/dev/null\n")
         pipe.write("#PBS -W block=true\n")
         
         if after:
