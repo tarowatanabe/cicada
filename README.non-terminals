@@ -5,7 +5,7 @@ Non-terminals are represented by [.+] with special flags:
    The refinements are indicated by "bits." See Symbol::annotate() and Symbol::annotated().
    
    if a non-terminal contains '^', it is a binarized non-terminal so that we can erase
-   it to reproduce original hyperedge. See Symbol::binarizedd().
+   it to reproduce original hyperedge. See Symbol::binarized().
       
    '~' are used to indicate left-binarized label sequence after '^'
    '_' are used to indicate right-binarized label sequence after '^'
