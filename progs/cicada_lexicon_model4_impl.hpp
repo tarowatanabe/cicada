@@ -692,13 +692,12 @@ struct LearnModel4 : public LearnBase
 
     double objective(const double factor) const
     {
-      const logprob_type logtotal(total);
-      
-      return (cicada::semiring::log(logprob_gain * logtotal) * factor
-	      + cicada::semiring::log(logprob_ptable * logtotal) * factor
-	      + cicada::semiring::log(logprob_ntable * logtotal) * factor
-	      + cicada::semiring::log(logprob_ttable * logtotal) * factor
-	      + cicada::semiring::log(logprob_dtable * logtotal) * factor);
+      return (std::log(total) * factor
+	      + cicada::semiring::log(logprob_gain) * factor
+	      + cicada::semiring::log(logprob_ptable) * factor
+	      + cicada::semiring::log(logprob_ntable) * factor
+	      + cicada::semiring::log(logprob_ttable) * factor
+	      + cicada::semiring::log(logprob_dtable) * factor);
     }
     
     void estimate_posterior(const sentence_type& __source,

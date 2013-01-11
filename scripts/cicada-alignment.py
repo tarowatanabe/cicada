@@ -84,7 +84,7 @@ opt_parser = OptionParser(
     
     ## options for lexicon model training
     make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: %default)"),
-    make_option("--insertion-p1",    default=0.01, action="store", type="float", metavar='P1',    help="parameter for insertion (default: %default)"),
+    make_option("--insertion-p1",    default=0.01, action="store", type="float", metavar='P1',    help="parameter for NULL insertion (default: %default)"),
     make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: %default)"),
     make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: %default)"),
     make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: %default)"),
