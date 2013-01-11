@@ -63,6 +63,9 @@ int main(int argc, char** argv)
   process("[BAD,4]", 3);
   process("[GOOD,5]", 3);
 
+  process("[1]", 4);
+  process("[1,3]", 1);
+  
   process("[BAD@1]", 3);
   process("[BAD@1,5]", 3);
   process("[BAD@2]", 3);
