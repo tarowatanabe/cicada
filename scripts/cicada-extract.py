@@ -68,16 +68,16 @@ opt_parser = OptionParser(
                 help="alignment methods (default: grow-diag-final-and)"),
     
     # steps
-    make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: 4)"),
-    make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: 6)"),
+    make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: %default)"),
+    make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: %default)"),
 
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
-    make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
+    make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: %default)"),
     make_option("--lexicon-variational", default=None, action="store_true", help="variational Bayes estimates"),
     make_option("--lexicon-l0",          default=None, action="store_true", help="L0 regularization"),
-    make_option("--lexicon-l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
-    make_option("--lexicon-l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
+    make_option("--lexicon-l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: %default)"),
+    make_option("--lexicon-l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: %default)"),
 
     # option for extraction
     make_option("--phrase", default=None, action="store_true", help="extract phrase"),
@@ -85,35 +85,35 @@ opt_parser = OptionParser(
     make_option("--ghkm",   default=None, action="store_true", help="extract GHKM (tree-to-string)"),
     make_option("--tree",   default=None, action="store_true", help="extract tree-to-tree"),
 
-    make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule (default: [x])"),
+    make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule (default: %default)"),
 
     make_option("--max-sentence-length", default=0, action="store", type="int",
                 metavar="LENGTH", help="maximum sentence size (default: 0 == no limit)"),
     
     make_option("--max-span-source", default=15, action="store", type="int",
-                metavar="LENGTH", help="maximum source span size (default: 15)"),
+                metavar="LENGTH", help="maximum source span size (default: %default)"),
     make_option("--max-span-target", default=15, action="store", type="int",
-                metavar="LENGTH", help="maximum target span size (default: 15)"),
+                metavar="LENGTH", help="maximum target span size (default: %default)"),
     make_option("--min-hole-source", default=1, action="store", type="int",
-                metavar="LENGTH", help="minimum source hole size (default: 1)"),
+                metavar="LENGTH", help="minimum source hole size (default: %default)"),
     make_option("--min-hole-target", default=1, action="store", type="int",
-                metavar="LENGTH", help="minimum target hole size (default: 1)"),
+                metavar="LENGTH", help="minimum target hole size (default: %default)"),
     make_option("--max-length", default=7, action="store", type="int",
-                metavar="LENGTH", help="maximum terminal length (default: 7)"),
+                metavar="LENGTH", help="maximum terminal length (default: %default)"),
     make_option("--max-fertility", default=4, action="store", type="int",
-                metavar="FERTILITY", help="maximum terminal fertility (default: 4)"),
+                metavar="FERTILITY", help="maximum terminal fertility (default: %default)"),
     make_option("--max-nodes", default=15, action="store", type="int",
-                metavar="NODES", help="maximum rule nodes (default: 15)"),
+                metavar="NODES", help="maximum rule nodes (default: %default)"),
     make_option("--max-height", default=4, action="store", type="int",
-                metavar="HEIGHT", help="maximum rule height (default: 4)"),
+                metavar="HEIGHT", help="maximum rule height (default: %default)"),
     make_option("--max-compose", default=0, action="store", type="int",
-                metavar="COMPOSE", help="maximum rule composition (default: 0)"),
+                metavar="COMPOSE", help="maximum rule composition (default: %default)"),
     make_option("--max-rank", default=2, action="store", type="int",
-                metavar="RANK", help="maximum rule rank (default: 2)"),
+                metavar="RANK", help="maximum rule rank (default: %default)"),
     make_option("--max-scope", default=0, action="store", type="int",
-                metavar="SCOPE", help="maximum rule scope (default: 0)"),
+                metavar="SCOPE", help="maximum rule scope (default: %default)"),
     make_option("--cutoff", default=0.0, action="store", type="float",
-                help="cutoff counts (default: 0.0)"),
+                help="cutoff counts (default: %default)"),
     make_option("--collapse-source", default=None, action="store_true",
                 help="collapse source side for CKY parsing"),
     make_option("--collapse-target", default=None, action="store_true",
@@ -130,7 +130,7 @@ opt_parser = OptionParser(
     
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -153,7 +153,7 @@ opt_parser = OptionParser(
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),

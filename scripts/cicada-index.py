@@ -49,7 +49,7 @@ opt_parser = OptionParser(
                 metavar="LEXICON", help="lexicon for P(source | target) (default: ${lexical_dir}/lex.n2f)"),
 
     ## smoothing...
-    make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
+    make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: %default)"),
     
     ## feature/attribute names
     make_option("--feature",   default=[], action="append", type="string", help="feature definitions"),
@@ -78,8 +78,8 @@ opt_parser = OptionParser(
     make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
     
-    make_option("--threshold-insertion", default=0.5, action="store", type="float", help="threshold for insertion (default: 0.5)"),
-    make_option("--threshold-deletion",  default=0.5, action="store", type="float", help="threshold for deletion (default: 0.5)"),
+    make_option("--threshold-insertion", default=0.5, action="store", type="float", help="threshold for insertion (default: %default)"),
+    make_option("--threshold-deletion",  default=0.5, action="store", type="float", help="threshold for deletion (default: %default)"),
     
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),
@@ -87,10 +87,10 @@ opt_parser = OptionParser(
     
     ## kbest options
     make_option("--kbest", default=0, action="store", type="float",
-                metavar="KBEST", help="kbest max count of rules"),
+                metavar="KBEST", help="kbest max count of rules (default: %default)"),
     ## max-malloc
-    make_option("--max-malloc", default=4, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 4)"),
+    make_option("--max-malloc", default=8, action="store", type="float",
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -111,7 +111,7 @@ opt_parser = OptionParser(
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),

@@ -33,14 +33,14 @@ opt_parser = OptionParser(
     make_option("--config", default="", action="store", type="string",
                 metavar="CONFIG", help="cicada config file"),
     make_option("--compose", default="compose-cky", action="store", type="string",
-                metavar="COMPOSE", help="forest composition algorithm (default: compose-cky)"),
+                metavar="COMPOSE", help="forest composition algorithm (default: %default)"),
     make_option("--preprocess", default="", action="store", type="string",
                 metavar="OPERATION", help="operations before forest composition"),
     make_option("--postprocess", default="", action="store", type="string",
                 metavar="OPERATION", help="operations after forest composition"),
     
     make_option("--C", default=1e-5, action="store", type="float",
-                metavar="C", help="hyperparameter (default: 1e-5)"),
+                metavar="C", help="hyperparameter (default: %default)"),
     
     make_option("--regularize-l1", action="store_true",
                 metavar="REGULARIZER", help="L1 regularization"),
@@ -48,17 +48,17 @@ opt_parser = OptionParser(
                 metavar="REGULARIZER", help="L2 regularization"),
     
     make_option("--cube-size", default=400, action="store", type="int",
-                metavar="SIZE", help="cube size for oracle computation (default: 400)"),
+                metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
-                metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
+                metavar="SCORER", help="scorer for oracle computation (default: %default)"),
     make_option("--learn", default="lbfgs", action="store", type="string",
-                metavar="LEARN", help="learning algorithms from [lbfgs, sgd, pegasos, mira, cw, arow, nherd, xbleu] (default: lbfgs)"),
+                metavar="LEARN", help="learning algorithms from [lbfgs, sgd, pegasos, mira, cw, arow, nherd, xbleu] (default: %default)"),
     make_option("--learn-options", default="", action="store", type="string",
                 metavar="OPTION", help="additional learning options"),
         
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -81,7 +81,7 @@ opt_parser = OptionParser(
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),

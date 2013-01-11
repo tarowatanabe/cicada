@@ -28,11 +28,11 @@ opt_parser = OptionParser(
     
     ### only affect grammars
     make_option("--max-span", default=15, action="store", type="int",
-                metavar="LENGTH", help="maximum span size (default: 15)"),
+                metavar="LENGTH", help="maximum span size (default: %default)"),
     
     ### glues
-    make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: [s])"),
-    make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: [x])"),
+    make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: %default)"),
+    make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: %default)"),
     
     make_option("--straight", default=None, action="store_true", help="straight gulue rule"),
     make_option("--invert",   default=None, action="store_true", help="invert gulue rule"),
@@ -53,7 +53,7 @@ opt_parser = OptionParser(
     make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
 
-    make_option("--beam", default=200, type=int, action="store", help="beam size"),
+    make_option("--beam", default=200, type=int, action="store", help="beam size (default: %default)"),
     
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),

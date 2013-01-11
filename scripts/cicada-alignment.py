@@ -61,20 +61,20 @@ opt_parser = OptionParser(
     
     # alignment method
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
-                help="alignment methods (default: grow-diag-final-and)"),
+                help="alignment methods (default: %default)"),
     
     # steps
-    make_option("--first-step", default=1, action="store", type="int", metavar='STEP', help="first step (default: 1)"),
-    make_option("--last-step",  default=3, action="store", type="int", metavar='STEP', help="last step  (default: 3)"),
+    make_option("--first-step", default=1, action="store", type="int", metavar='STEP', help="first step (default: %default)"),
+    make_option("--last-step",  default=3, action="store", type="int", metavar='STEP', help="last step  (default: %default)"),
     
     ## iteratin
-    make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)"),
-    make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)"),
-    make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)"),
-    make_option("--iteration-model4",  default=5,  action="store", type="int", metavar='ITERATION', help="Model4 iteratins    (default: 5)"),
+    make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: %default)"),
+    make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: %default)"),
+    make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: %default)"),
+    make_option("--iteration-model4",  default=5,  action="store", type="int", metavar='ITERATION', help="Model4 iteratins    (default: %default)"),
     
     ## # of clusters
-    make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
+    make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: %default)"),
     
     ## training parameters
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
@@ -83,20 +83,20 @@ opt_parser = OptionParser(
     make_option("--l0",          default=None, action="store_true", help="L0 regularization"),
     
     ## options for lexicon model training
-    make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 0.01)"),
-    make_option("--insertion-p0",    default=0.01, action="store", type="float", metavar='P0',    help="parameter for insertion (default: 0.01)"),
-    make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.01)"),
-    make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.01)"),
-    make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: 0.01)"),
-    make_option("--prior-fertility", default=0.01, action="store", type="float", metavar="PRIOR", help="fertility model prior (default: 0.01)"),
+    make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: %default)"),
+    make_option("--insertion-p0",    default=0.01, action="store", type="float", metavar='P0',    help="parameter for insertion (default: %default)"),
+    make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: %default)"),
+    make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: %default)"),
+    make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: %default)"),
+    make_option("--prior-fertility", default=0.01, action="store", type="float", metavar="PRIOR", help="fertility model prior (default: %default)"),
     
-    make_option("--smooth-lexicon",   default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-100)"),
-    make_option("--smooth-alignment", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-100)"),
-    make_option("--smooth-distortion", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for distortion model (default: 1e-100)"),
-    make_option("--smooth-fertility", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for fertility model (default: 1e-100)"),
+    make_option("--smooth-lexicon",   default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: %default)"),
+    make_option("--smooth-alignment", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: %default)"),
+    make_option("--smooth-distortion", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for distortion model (default: %default)"),
+    make_option("--smooth-fertility", default=1e-100, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for fertility model (default: %default)"),
 
-    make_option("--l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: 100)"),
-    make_option("--l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: 0.01)"),
+    make_option("--l0-alpha", default=100, action="store", type="float", help="L0 regularization parameter (default: %default)"),
+    make_option("--l0-beta",  default=0.01, action="store", type="float", help="L0 regularization parameter (default: %default)"),
     
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -107,12 +107,12 @@ opt_parser = OptionParser(
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
     ## PBS
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),

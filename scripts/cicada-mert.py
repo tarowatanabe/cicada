@@ -22,7 +22,7 @@ opt_parser = OptionParser(
     make_option("--root-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="root directory for outputs"),
     make_option("--prefix", default="mert", action="store", type="string",
-                metavar="PREFIX", help="prefix for outputs (default: mert)"),
+                metavar="PREFIX", help="prefix for outputs (default: %default)"),
 
     
     make_option("--devset", default="", action="store", type="string",
@@ -34,9 +34,9 @@ opt_parser = OptionParser(
                 metavar="CONFIG", help="cicada config file"),
 
     make_option("--iteration", default=10, action="store", type="int",
-                metavar="ITERATION", help="# of iterations (default: 10)"),
+                metavar="ITERATION", help="# of iterations (default: %default)"),
     make_option("--iteration-first", default=1, action="store", type="int",
-                metavar="ITERATION", help="The first iteration (default: 1)"),
+                metavar="ITERATION", help="The first iteration (default: %default)"),
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
     
@@ -45,20 +45,20 @@ opt_parser = OptionParser(
     make_option("--bound-upper", default="", action="store", type="string",
                 metavar="FILE", help="upper bounds for weights"),
     make_option("--parameter-lower", default=-1.0, action="store", type="float",
-                help="lower parameter value (default: -1)"),
+                help="lower parameter value (default: %default)"),
     make_option("--parameter-upper", default=1.0, action="store", type="float",
-                help="upper parameter value (default: 1)"),
+                help="upper parameter value (default: %default)"),
     make_option("--mert-options", default='', action="store", type="string",
                 help="other MERT options"),
 
     make_option("--direction", default=8, action="store", type="int",
-                help="# of random directions"),
+                help="# of random directions (default: %default)"),
     make_option("--restart", default=2, action="store", type="int",
-                help="# of random restarts"),
+                help="# of random restarts (default: %default)"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
-                metavar="SCORER", help="scorer for oracle computation (default: bleu:order=4,exact=true)"),
+                metavar="SCORER", help="scorer for oracle computation (default: %default)"),
     make_option("--kbest", default=0, action="store", type="int",
-                metavar="KBEST", help="kbest size (default: 0)"),
+                metavar="KBEST", help="kbest size (default: %default)"),
     make_option("--forest", default=None, action="store_true",
                 help="forest based learning"),
     make_option("--iterative", default=None, action="store_true",
@@ -66,7 +66,7 @@ opt_parser = OptionParser(
         
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -89,7 +89,7 @@ opt_parser = OptionParser(
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
