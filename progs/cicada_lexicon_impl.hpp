@@ -865,15 +865,15 @@ struct ptable_type
 
   static const int max_length = 128;
   
-  ptable_type(const double __p0=0.01) : p0(__p0) { initialize(); }
+  ptable_type(const double __p1=0.01) : p1(__p1) { initialize(); }
   
   double operator()(const int m, const int phi0) const
   {
     if (m < max_length && phi0 < max_length)
       return table(phi0, m);
     else
-      return (std::pow(1.0 - p0, utils::bithack::max(m - phi0 * 2, 0))
-	      * std::pow(p0, phi0)
+      return (std::pow(1.0 - p1, utils::bithack::max(m - phi0 * 2, 0))
+	      * std::pow(p1, phi0)
 	      * binomial(m - phi0, phi0));
   }
   
@@ -885,8 +885,8 @@ struct ptable_type
     
     for (int m = 1; m != max_length; ++ m)
       for (int phi0 = 0; phi0 <= m; ++ phi0)
-	table(phi0, m) = (std::pow(1.0 - p0, utils::bithack::max(m - phi0 * 2, 0))
-			  * std::pow(p0, phi0)
+	table(phi0, m) = (std::pow(1.0 - p1, utils::bithack::max(m - phi0 * 2, 0))
+			  * std::pow(p1, phi0)
 			  * binomial(m - phi0, phi0));
   }
 
@@ -900,7 +900,7 @@ struct ptable_type
   }
   
   table_type table;
-  double p0;
+  double p1;
 };
 
 // n-model table...

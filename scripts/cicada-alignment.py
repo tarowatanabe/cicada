@@ -84,7 +84,7 @@ opt_parser = OptionParser(
     
     ## options for lexicon model training
     make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: %default)"),
-    make_option("--insertion-p0",    default=0.01, action="store", type="float", metavar='P0',    help="parameter for insertion (default: %default)"),
+    make_option("--insertion-p1",    default=0.01, action="store", type="float", metavar='P1',    help="parameter for insertion (default: %default)"),
     make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: %default)"),
     make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: %default)"),
     make_option("--prior-distortion", default=0.01, action="store", type="float", metavar="PRIOR", help="distortion model prior (default: %default)"),
@@ -460,7 +460,7 @@ class Giza:
                  smooth_distortion=1e-20,
                  smooth_fertility=1e-20,
                  p0=1e-4,
-                 insertion_p0=1e-4,
+                 insertion_p1=1e-4,
                  symmetric=None,
                  posterior=None,
                  variational=None,
@@ -557,7 +557,7 @@ class Giza:
         command += " --l0-beta %g" %(l0_beta)
         
         self.p0 = p0
-        self.insertion_p0 = insertion_p0
+        self.insertion_p1 = insertion_p1
         self.prior_lexicon    = prior_lexicon
         self.prior_alignment  = prior_alignment
         self.prior_distortion  = prior_distortion
@@ -575,8 +575,8 @@ class Giza:
             command += " --smooth-alignment %.20g" %(smooth_alignment)
 
         if iteration_model4 > 0:
-            command += " --insertion-source-target %.20g" %(insertion_p0)
-            command += " --insertion-target-source %.20g" %(insertion_p0)
+            command += " --insertion-source-target %.20g" %(insertion_p1)
+            command += " --insertion-target-source %.20g" %(insertion_p1)
 
             command += " --prior-distortion %.20g" %(prior_distortion)
             command += " --smooth-distortion %.20g" %(smooth_distortion)
@@ -730,8 +730,8 @@ class AlignmentPosterior:
             command += " --alignment-target-source \"%s\"" %(compressed_file(giza.alignment_target_source))
 
         if learn_model4:
-            command += " --insertion-source-target %.20g" %(giza.insertion_p0)
-            command += " --insertion-target-source %.20g" %(giza.insertion_p0)
+            command += " --insertion-source-target %.20g" %(giza.insertion_p1)
+            command += " --insertion-target-source %.20g" %(giza.insertion_p1)
             command += " --distortion-source-target \"%s\"" %(compressed_file(giza.distortion_source_target))
             command += " --distortion-target-source \"%s\"" %(compressed_file(giza.distortion_target_source))
             command += " --fertility-source-target \"%s\"" %(compressed_file(giza.fertility_source_target))
@@ -834,9 +834,9 @@ class Aligner:
             command += " \\\n"
 
         if learn_model4:
-            command += " --insertion-source-target %.20g" %(giza.insertion_p0)
+            command += " --insertion-source-target %.20g" %(giza.insertion_p1)
             command += " \\\n"
-            command += " --insertion-target-source %.20g" %(giza.insertion_p0)
+            command += " --insertion-target-source %.20g" %(giza.insertion_p1)
             command += " \\\n"
             command += " --distortion-source-target \"%s\"" %(os.path.realpath(compressed_file(giza.distortion_source_target)))
             command += " \\\n"
@@ -972,7 +972,7 @@ if __name__ == '__main__':
                 smooth_distortion=options.smooth_distortion,
                 smooth_fertility=options.smooth_fertility,
                 p0=options.p0,
-                insertion_p0=options.insertion_p0,
+                insertion_p1=options.insertion_p1,
                 symmetric=options.symmetric,
                 posterior=options.posterior,
                 variational=options.variational,
