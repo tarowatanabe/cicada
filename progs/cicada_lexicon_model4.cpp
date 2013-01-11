@@ -1375,7 +1375,11 @@ void learn(const Maximizer& maximizer,
     
     if (debug)
       std::cerr << "log-likelihood for P(target | source): " << objective_source_target << '\n'
-		<< "log-likelihood for P(source | target): " << objective_target_source << '\n';
+		<< "       entropy for P(target | source): " << std::exp(- objective_source_target) << '\n'
+		<< "    perplexity for P(target | source): " << - (objective_source_target / std::log(2.0)) << '\n'
+		<< "log-likelihood for P(source | target): " << objective_target_source << '\n'
+		<< "       entropy for P(source | target): " << std::exp(- objective_target_source) << '\n'
+		<< "    perplexity for P(source | target): " << - (objective_target_source / std::log(2.0)) << '\n';
     
     // merge atable counts... (we will dynamically create probability table!)
     // first, initialize all the threaded alignment
