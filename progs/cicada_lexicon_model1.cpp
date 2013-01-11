@@ -666,12 +666,12 @@ void learn(const Maximizer& maximizer,
     }
     
     if (debug)
-      std::cerr << "log-likelihood for P(target | source): " << objective_source_target << '\n'
-		<< "       entropy for P(target | source): " << std::exp(- objective_source_target) << '\n'
-		<< "    perplexity for P(target | source): " << - (objective_source_target / std::log(2.0)) << '\n'
-		<< "log-likelihood for P(source | target): " << objective_target_source << '\n'
-		<< "       entropy for P(source | target): " << std::exp(- objective_target_source) << '\n'
-		<< "    perplexity for P(source | target): " << - (objective_target_source / std::log(2.0)) << '\n';
+      std::cerr << "P(target | source) log-likelihood: " << objective_source_target << '\n'
+		<< "                          entropy: " << std::exp(- objective_source_target) << '\n'
+		<< "                       perplexity: " << (- objective_source_target / std::log(2.0)) << '\n'
+		<< "P(source | target) log-likelihood: " << objective_target_source << '\n'
+		<< "                          entropy: " << std::exp(- objective_target_source) << '\n'
+		<< "                       perplexity: " << (- objective_target_source / std::log(2.0)) << '\n';
     
     // etable..
     length_source_target = double(length_target) / length_source;
