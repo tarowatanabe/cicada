@@ -38,7 +38,7 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="grammar score directory (default: ${model_dir})"),
 
     make_option("--temporary-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="temporary directory (default: ${model_dir})"),
+                metavar="DIRECTORY", help="temporary directory"),
 
     ### source/target flags
     make_option("--f", default="", action="store", type="string",
@@ -884,7 +884,7 @@ class ExtractScore(Extract):
         command += option
         command += " --max-malloc %g" %(max_malloc)
         
-        if options.temporary_dir:
+        if temporary_dir:
             command += " --temporary \"%s\"" %(temporary_dir)
         
         if mpi:
@@ -924,7 +924,9 @@ if __name__ == '__main__':
     if not options.temporary_dir:
         if os.environ.has_key('TMPDIR_SPEC') and os.environ['TMPDIR_SPEC']:
             options.temporary_dir = os.environ['TMPDIR_SPEC']
-
+    else:
+        os.environ['TMPDIR_SPEC'] = options.temporary_dir
+        
     cicada = CICADA(options.cicada_dir)
 
     mpi = None
