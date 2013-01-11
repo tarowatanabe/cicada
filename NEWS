@@ -1,3 +1,7 @@
+2013-x-x
+Faster grammar extraction and scoring by eliminating spurious locking
+Better help messages in python scripts with default values
+
 2013-1-9
 Bugfix: throw when disk is full + added --temporary option to extract_score in order to assingn temporary directory
 	from command line.
