@@ -469,28 +469,35 @@ struct LearnModel4 : public LearnBase
     
     void update()
     {
+      // gain...
+      logprob_gain = 1.0;
+      
       // first, insertion...
-      logprob = ntable(0, aligns.fertility(0));
-
-      //std::cerr << "ptable: " << logprob << std::endl;
+      logprob_ptable = ntable(0, aligns.fertility(0));
+      
+      //std::cerr << "ptable: " << logprob_ptable << std::endl;
       
       // second, fertility...
+      logprob_ntable = 1.0;
       for (size_type src = 1; src != aligns.mapped.size(); ++ src)
-	logprob *= ntable(src, aligns.fertility(src));
-
-      //std::cerr << "ntable: " << logprob << std::endl;
+	logprob_ntable *= ntable(src, aligns.fertility(src));
+      
+      //std::cerr << "ntable: " << logprob_ntable << std::endl;
       
       // third, lexicon...
+      logprob_ttable = 1.0;
       for (size_type trg = 1; trg != aligns.aligns.size(); ++ trg)
-	logprob *= ttable(trg, aligns.aligns[trg]);
+	logprob_ttable *= ttable(trg, aligns.aligns[trg]);
 
-     //std::cerr << "ttable: " << logprob << std::endl;
+      //std::cerr << "ttable: " << logprob_ttable << std::endl;
       
       // forth, distortion...
-      logprob *= score_distortion<logprob_type>(0, aligns.mapped.size());
+      logprob_dtable = score_distortion<logprob_type>(0, aligns.mapped.size());
 
-      //std::cerr << "logprob: " << logprob << std::endl;
-
+      //std::cerr << "dtable: " << logprob_dtable << std::endl;
+      
+      //std::cerr << "logprob: " << (logprob_ptable * logprob_ntable * logprob_ttable * logprob_dtable) << std::endl;
+      
       moves.clear();
       swaps.clear();
       
@@ -683,9 +690,15 @@ struct LearnModel4 : public LearnBase
 	}
     }
 
-    double objective() const
+    double objective(const double factor) const
     {
-      return cicada::semiring::log(logprob * total);
+      const logprob_type logtotal(total);
+      
+      return (cicada::semiring::log(logprob_gain * logtotal) * factor
+	      + cicada::semiring::log(logprob_ptable * logtotal) * factor
+	      + cicada::semiring::log(logprob_ntable * logtotal) * factor
+	      + cicada::semiring::log(logprob_ttable * logtotal) * factor
+	      + cicada::semiring::log(logprob_dtable * logtotal) * factor);
     }
     
     void estimate_posterior(const sentence_type& __source,
@@ -823,7 +836,7 @@ struct LearnModel4 : public LearnBase
       
       aligns.move(j, i_next);
       cepts.move(j, i_prev, i_next);
-      logprob *= moves(j, i_next);
+      logprob_gain *= moves(j, i_next);
       
       modified.clear();
       modified.resize(aligns.mapped.size(), false);
@@ -856,7 +869,7 @@ struct LearnModel4 : public LearnBase
       
       aligns.swap(j1, j2);
       cepts.swap(j1, j2);
-      logprob *= swaps(utils::bithack::min(j1, j2), utils::bithack::max(j1, j2));
+      logprob_gain *= swaps(utils::bithack::min(j1, j2), utils::bithack::max(j1, j2));
       
       modified.clear();
       modified.resize(aligns.mapped.size(), false);
@@ -1085,7 +1098,12 @@ struct LearnModel4 : public LearnBase
     }
     
     // alignment and model score
-    logprob_type       logprob;
+    logprob_type       logprob_gain;
+    logprob_type       logprob_ptable;
+    logprob_type       logprob_ntable;
+    logprob_type       logprob_ttable;
+    logprob_type       logprob_dtable;
+    
     alignment_set_type  aligns;
     alignment_cept_type cepts;
     
@@ -1152,7 +1170,7 @@ struct LearnModel4 : public LearnBase
     model4.estimate_posterior(source, target);
     
     // udpate objective
-    objective += model4.objective() / target.size();
+    objective += model4.objective(1.0 / target.size());
     
     // accumulate...
     model4.accumulate(source, target, counts_ttable);
@@ -1291,7 +1309,7 @@ struct LearnModel4Posterior : public LearnBase
     model4.estimate_posterior(source, target);
 
     // udpate objective
-    objective += model4.objective() / target.size();
+    objective += model4.objective(1.0 / target.size());
       
     phi.clear();
     exp_phi_old.clear();
@@ -1498,8 +1516,8 @@ struct LearnModel4Symmetric : public LearnBase
     model4_target_source.estimate_posterior(target, source);
     
     // update objective
-    objective_source_target += model4_source_target.objective() / target.size();
-    objective_target_source += model4_target_source.objective() / source.size();
+    objective_source_target += model4_source_target.objective(1.0 / target.size());
+    objective_target_source += model4_target_source.objective(1.0 / source.size());
     
     // ttable update...
     const size_type source_size = source.size();
@@ -1636,8 +1654,8 @@ struct LearnModel4SymmetricPosterior : public LearnBase
     model4_source_target.estimate_posterior(source, target);
     model4_target_source.estimate_posterior(target, source);
 
-    objective_source_target += model4_source_target.objective() / target.size();
-    objective_target_source += model4_target_source.objective() / source.size();
+    objective_source_target += model4_source_target.objective(1.0 / target.size());
+    objective_target_source += model4_target_source.objective(1.0 / source.size());
 
     phi.clear();
     exp_phi.clear();
