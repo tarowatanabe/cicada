@@ -433,7 +433,7 @@ struct atable_type
     //
     // range-second is always positive, the range-second can range from 0 to (range.second - range.first) + 2, including BOS/EOS
     //
-    
+
     cache_type* cache = &const_cast<cache_type&>(cache_unk);
     cache_set_type::const_iterator citer = caches.find(classes);
     if (citer != caches.end())
@@ -1198,7 +1198,9 @@ struct dtable_type
     // range-second is always positive, the range-second can range from 0 to (range.second - range.first) + 2, including BOS/EOS
     //
     
-    cache_type* cache = &const_cast<cache_type&>(cache_unk);
+    cache_type* cache = &const_cast<cache_type&>(classes.first == vocab_type::NONE
+						 ? cache_none_unk
+						 : cache_unk);
     cache_set_type::const_iterator citer = caches.find(classes);
     if (citer != caches.end())
       cache = &const_cast<cache_type&>(citer->second);
@@ -1284,6 +1286,7 @@ struct dtable_type
       caches[aiter->first].clear();
     
     cache_unk.clear();
+    cache_none_unk.clear();
   };
   
   dtable_type& operator+=(const dtable_type& x)
@@ -1309,6 +1312,7 @@ struct dtable_type
   // caching....
   cache_set_type caches;
   cache_type     cache_unk;
+  cache_type     cache_none_unk;
 };
 
 struct LearnBase
