@@ -66,6 +66,7 @@ bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
 bool pgd_mode = false;
+bool dynamic_mode = false;
 
 bool moses_mode = false;
 bool itg_mode = false;
@@ -1667,15 +1668,17 @@ struct SampleReducer : public Maximizer
   aligned_type& aligned_new;
 };
 
-template <typename Learner>
+template <typename Learner, typename Base>
 struct SampleMapper : public SampleMapReduce, public Learner
 {
   SampleMapper(queue_id_type& __queue_bitext,
 	       queue_ttable_set_type& __queue_ttable_source_target,
 	       queue_ttable_set_type& __queue_ttable_target_source,
 	       bitext_set_type& __bitexts,
-	       const LearnBase& __base)
-    : Learner(__base),
+	       const LearnBase& __learn_base,
+	       const Base& __base)
+    : Learner(__learn_base),
+      base(__base),
       queue_bitext(__queue_bitext),
       queue_ttable_source_target(__queue_ttable_source_target),
       queue_ttable_target_source(__queue_ttable_target_source),
@@ -1683,8 +1686,15 @@ struct SampleMapper : public SampleMapReduce, public Learner
   
   void operator()()
   {
+    typedef utils::vector2<double, std::allocator<double> > posterior_type;
+    
     Learner::initialize();
     
+    alignment_type alignment_source_target;
+    alignment_type alignment_target_source;
+    posterior_type posterior_source_target;
+    posterior_type posterior_target_source;
+
     size_type pos = 0;
     
     const int iter_mask = (1 << 8) - 1;
@@ -1698,19 +1708,36 @@ struct SampleMapper : public SampleMapReduce, public Learner
 		<< "alignment: " << bitexts[pos].alignment_source_target << std::endl
 		<< "alignment: " << bitexts[pos].alignment_target_source << std::endl;
 #endif
-      
-      Learner::sample(bitexts[pos].source,
-		      bitexts[pos].target,
-		      bitexts[pos].alignment_source_target,
-		      bitexts[pos].alignment_target_source);
+
+      if (dynamic_mode) {
+	base(bitexts[pos].source,
+	     bitexts[pos].target,
+	     alignment_source_target,
+	     alignment_target_source,
+	     posterior_source_target,
+	     posterior_target_source);
+	
+	Learner::sample(bitexts[pos].source,
+			bitexts[pos].target,
+			alignment_source_target,
+			alignment_target_source);
+      } else 
+	Learner::sample(bitexts[pos].source,
+			bitexts[pos].target,
+			bitexts[pos].alignment_source_target,
+			bitexts[pos].alignment_target_source);
       
       if ((iter & iter_mask) == iter_mask) {
 	dump();
+	
+	base.shrink();
 	Learner::shrink();
       }
     }
     
     dump();
+    
+    base.shrink();
     Learner::shrink();
   }
 
@@ -1759,12 +1786,14 @@ struct SampleMapper : public SampleMapReduce, public Learner
     Learner::aligned_target_source.clear();
   }
   
+  Base base;
+
   queue_id_type& queue_bitext;
   queue_ttable_set_type& queue_ttable_source_target;
   queue_ttable_set_type& queue_ttable_target_source;
 
   bitext_set_type& bitexts;
-  
+    
   utils::hashmurmur<size_t> hasher;
 };
 
@@ -1791,8 +1820,8 @@ void sample(const Maximizer& maximizer,
   
   typedef SampleBurnMapper<Learner, Base> burn_mapper_type;
   typedef SampleBurnReducer               burn_reducer_type;
-  typedef SampleMapper<Learner>        mapper_type;
-  typedef SampleReducer<Maximizer>     reducer_type;
+  typedef SampleMapper<Learner, Base>     mapper_type;
+  typedef SampleReducer<Maximizer>        reducer_type;
   
   typedef map_reduce_type::bitext_type     bitext_type;
   typedef map_reduce_type::bitext_set_type bitext_set_type;
@@ -1941,7 +1970,10 @@ void sample(const Maximizer& maximizer,
 							 dtable_source_target, dtable_target_source,
 							 ntable_source_target, ntable_target_source,
 							 ptable_source_target, ptable_target_source,
-							 classes_source, classes_target)));
+							 classes_source, classes_target),
+					       Base(ttable_source_target, ttable_target_source,
+						    atable_source_target, atable_target_source,
+						    classes_source, classes_target)));
   
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
@@ -2867,6 +2899,7 @@ void options(int argc, char** argv)
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
     ("pgd",               po::bool_switch(&pgd_mode),               "projected gradient descent")
+    ("dynamic",           po::bool_switch(&dynamic_mode),           "dynamically re-compute alignment")
     
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")

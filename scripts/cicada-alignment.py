@@ -79,6 +79,7 @@ opt_parser = OptionParser(
     ## training parameters
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
     make_option("--posterior",   default=None, action="store_true", help="posterior constrained training"),
+    make_option("--dynamic",     default=None, action="store_true", help="dynamically recompute base alignment"),
     make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
     make_option("--l0",          default=None, action="store_true", help="L0 regularization"),
     
@@ -463,6 +464,7 @@ class Giza:
                  insertion_p1=1e-4,
                  symmetric=None,
                  posterior=None,
+                 dynamic=None,
                  variational=None,
                  l0=None,
                  l0_alpha=10,
@@ -548,6 +550,9 @@ class Giza:
             command += " --symmetric"
         if posterior:
             command += " --posterior"
+        if dynamic and iteration_model4 > 0:
+            command += " --dynamic"
+
         if variational:
             command += " --variational-bayes"
         if l0:
@@ -974,6 +979,7 @@ if __name__ == '__main__':
                 p0=options.p0,
                 insertion_p1=options.insertion_p1,
                 symmetric=options.symmetric,
+                dynamic=options.dynamic,
                 posterior=options.posterior,
                 variational=options.variational,
                 l0=options.l0,
