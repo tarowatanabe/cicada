@@ -5,6 +5,8 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
+#include <unistd.h>
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
@@ -379,9 +381,10 @@ namespace cicada
       output_data.buffer.clear();
 	
       if (output_data.os) {
-	if (! directory.empty())
+	if (! directory.empty()) {
 	  output_data.os.reset();
-	else
+	  ::sync();
+	} else
 	  *output_data.os << std::flush;
       }
     }
@@ -397,6 +400,8 @@ namespace cicada
       if (output_data.use_buffer)
 	os_buffer.push(boost::iostreams::back_inserter(const_cast<std::string&>(output_data.buffer)));
       else if (! output_data.os) {
+	::sync();
+	
 	const path_type path = (! file.empty() ? file  : directory / (utils::lexical_cast<std::string>(id) + ".gz"));
 	const_cast<boost::shared_ptr<std::ostream>&>(output_data.os).reset(new utils::compress_ostream(path, 1024 * 1024));
       }
