@@ -20,7 +20,6 @@ void prepare_directory(const boost::filesystem::path& path)
     boost::filesystem::create_directories(path);
   }
 
-  ::sync();
   while (! boost::filesystem::exists(path)) {
     ::sync();
     boost::thread::yield();
@@ -37,6 +36,7 @@ void prepare_directory(const boost::filesystem::path& path)
       boost::thread::yield();
     }
   }
+
   ::sync();
 }
 
