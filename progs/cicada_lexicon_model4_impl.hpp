@@ -786,12 +786,7 @@ struct LearnModel4 : public LearnBase
     {
       // hill-climb...
       
-      // we will perform more iterations based on the sentence lengths
-      const int max_iter = utils::bithack::max(30,
-					       static_cast<int>(utils::bithack::min(aligns.aligns.size(),
-										    aligns.mapped.size())));
-					       
-      for (int iter = 0; iter != max_iter; ++ iter) {
+      for (int iter = 0; iter != 30; ++ iter) {
 	double gain_move = 0.0;
 	double gain_swap = 0.0;
 	index_type move_j = 0;
@@ -815,7 +810,7 @@ struct LearnModel4 : public LearnBase
 	      swap_j2 = j2;
 	    }
 	
-	if (gain_move <= 1.0 + 1e-7 && gain_swap <= 1.0 + 1e-7)
+	if (gain_move <= 1.0 && gain_swap <= 1.0)
 	  return;
 
 	if (gain_move >= gain_swap) {
