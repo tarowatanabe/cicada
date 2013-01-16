@@ -288,7 +288,7 @@ namespace cicada
 	  size_type length = last - first;
 	  const size_type offset = offsets[1];
 	  
-	  if (length <= 128) {
+	  if (length <= 32) {
 	    for (/**/; first != last && ids[first - offset] < id; ++ first);
 	    return first;
 	  } else {
@@ -300,14 +300,6 @@ namespace cicada
 	      
 	      first  = utils::bithack::branch(is_less, middle + 1, first);
 	      length = utils::bithack::branch(is_less, length - half - 1, half);
-	      
-#if 0
-	      if (ids[middle - offset] < id) {
-		first = middle + 1;
-		length = length - half - 1;
-	      } else
-		length = half;
-#endif
 	    }
 	    return first;
 	  }
