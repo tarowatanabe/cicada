@@ -479,7 +479,7 @@ namespace cicada
       // otherwise...
       size_type length = last - first;
       
-      if (length <= 128) {
+      if (length <= 32) {
 	for (/**/; first != last && index_[first] < id; ++ first);
 	return first;
       } else {
