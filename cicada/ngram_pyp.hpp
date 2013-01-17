@@ -482,7 +482,7 @@ namespace cicada
       // this is not a lower-bound, but search!
       const size_type length = last - first;
 
-      if (length <= 64)
+      if (length <= 128)
 	return (utils::linear_search(index_.begin() + first, index_.begin() + last, id)
 		- index_.begin());
       else
@@ -495,7 +495,7 @@ namespace cicada
       // otherwise...
       size_type length = last - first;
       
-      if (length <= 64) {
+      if (length <= 128) {
 	for (/**/; first != last && index_[first] < id; ++ first);
 	return first;
       } else {

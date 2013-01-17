@@ -293,7 +293,7 @@ namespace cicada
 	else {
 	  const size_type length = last - first;
 
-	  if (length <= 64)
+	  if (length <= 128)
 	    return offset + (utils::linear_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
 			     - ids.begin());
 	  else
@@ -314,12 +314,12 @@ namespace cicada
 	  first -= offset;
 	  last  -= offset;
 	  
-	  if (length <= 64) {
+	  if (length <= 128) {
 	    for (/**/; first != last && ids[first] < id; ++ first);
 	    return first + offset;
 	  } else {
 	    while (length > 0) {
-	      const size_t half  = length >> 2;
+	      const size_t half  = length >> 1;
 	      const size_t middle = first + half;
 
 	      const bool is_less = ids[middle] < id;
