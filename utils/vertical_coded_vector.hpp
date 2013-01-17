@@ -62,7 +62,7 @@ namespace utils
     self_type operator+(difference_type __n) const { self_type __tmp = *this; return __tmp += __n; }
     self_type operator-(difference_type __n) const { self_type __tmp = *this; return __tmp -= __n; }
     
-    size_type        __pos;
+    difference_type  __pos;
     const impl_type* __impl;
   };
 
