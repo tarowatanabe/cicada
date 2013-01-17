@@ -470,11 +470,11 @@ namespace cicada
       
       if (pos_first == pos_last) return size_type(-1);
       
-      const size_type child = search(pos_first, pos_last, id);
-      return utils::bithack::branch(child != pos_last, child, size_type(-1));
+      //const size_type child = search(pos_first, pos_last, id);
+      //return utils::bithack::branch(child != pos_last, child, size_type(-1));
       
-      //const size_type child = lower_bound(pos_first, pos_last, id);
-      //return utils::bithack::branch(child != pos_last && !(id < index_[child]), child, size_type(-1));
+      const size_type child = lower_bound(pos_first, pos_last, id);
+      return utils::bithack::branch(child != pos_last && !(id < index_[child]), child, size_type(-1));
     }
     
     size_type search(size_type first, size_type last, const id_type& id) const
@@ -499,22 +499,6 @@ namespace cicada
 	for (/**/; first != last && index_[first] < id; ++ first);
 	return first;
       } else {
-	const id_type id_front = index_[first];
-	if (id <= id_front)
-	  return first;
-	
-	++ first;
-	-- length;
-	
-	// next, check back...
-	const id_type id_back = index_[last - 1];
-	if (id_back <= id)
-	  return utils::bithack::branch(id_back == id, last - 1, last);
-	
-	-- last;
-	-- length;
-	
-	// third, binary search...
 	while (length > 0) {
 	  const size_t half  = length >> 1;
 	  const size_t middle = first + half;
