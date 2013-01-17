@@ -319,7 +319,7 @@ namespace cicada
 	    return first + offset;
 	  } else {
 	    while (length > 0) {
-	      const size_t half  = length >> 1;
+	      const size_t half  = length >> 2;
 	      const size_t middle = first + half;
 
 	      const bool is_less = ids[middle] < id;
