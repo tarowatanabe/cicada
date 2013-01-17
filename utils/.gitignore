@@ -64,6 +64,7 @@ restaurant_main
 rwphase_main
 rwspinlock_main
 rwticket_main
+search_main
 simple_vector_main
 small_vector_main
 spinlock_main

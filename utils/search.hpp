@@ -55,9 +55,9 @@ namespace utils
   
   template <> struct __interpolation_pivot<8>
   {
-    size_t operator()() const
+    size_t operator()(uint64_t offset, uint64_t range, uint64_t width) const
     {
-      const uint64_t ret = static_cast<utint64_t>(float(offset) / float(range) * float(width));
+      const uint64_t ret = static_cast<uint64_t>(float(offset) / float(range) * float(width));
       
       return utils::bithack::branch(ret < width, ret, width - 1);
     }
@@ -84,7 +84,7 @@ namespace utils
     
     // back <= val
     if (! (val < back))
-      return (back < val ? __last, last);
+      return (back < val ? __last : last);
     
     // search the range [first + 1, last - 1]
     
@@ -92,9 +92,10 @@ namespace utils
     Iterator middle;
     difference_type diff;
     difference_type length = std::distance(first, last);
+    __interpolation_pivot<sizeof(value_type)> interpolation;
     
     while (length > 1) {
-      diff = 1 + __interpolation_pivot<sizeof()>()(val - front, back - front, length - 1);
+      diff = 1 + interpolation(val - front, back - front, length - 1);
       middle = first;
       std::advance(middle, diff);
       pivot = *middle;
@@ -105,7 +106,7 @@ namespace utils
 	length -= diff;
       } else if (val < pivot) {
 	last = middle;
-	back = pitov;
+	back = pivot;
 	length = diff;
       } else
 	return middle;
@@ -135,7 +136,7 @@ namespace utils
     
     // back <= val
     if (! comp(val, back))
-      return (comp(back, val) ? __last, last);
+      return (comp(back, val) ? __last : last);
     
     // search the range [first + 1, last - 1]
     
@@ -143,9 +144,10 @@ namespace utils
     Iterator middle;
     difference_type diff;
     difference_type length = std::distance(first, last);
+    __interpolation_pivot<sizeof(value_type)> interpolation;
     
     while (length > 1) {
-      diff = 1 + __interpolation_pivot<sizeof()>()(val - front, back - front, length - 1);
+      diff = 1 + interpolation(val - front, back - front, length - 1);
       middle = first;
       std::advance(middle, diff);
       pivot = *middle;
@@ -156,7 +158,7 @@ namespace utils
 	length -= diff;
       } else if (comp(val, pivot)) {
 	last = middle;
-	back = pitov;
+	back = pivot;
 	length = diff;
       } else
 	return middle;

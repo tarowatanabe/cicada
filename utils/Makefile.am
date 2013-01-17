@@ -181,6 +181,7 @@ restaurant_main \
 rwphase_main \
 rwspinlock_main \
 rwticket_main \
+search_main \
 simple_vector_main \
 small_vector_main \
 spinlock_main \
@@ -357,6 +358,10 @@ piece_main_LDADD = $(LIBUTILS)
 
 program_options_main_SOURCES = program_options_main.cpp
 program_options_main_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LIBS)
+
+search_main_SOURCES = search_main.cpp
+search_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
+search_main_LDADD = $(BOOST_THREAD_LIBS)
 
 simple_vector_main_SOURCES = simple_vector_main.cpp
 simple_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
