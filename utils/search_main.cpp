@@ -95,6 +95,6 @@ int main(int argc, char** argv)
   std::cerr << "32000, 1000, 2000" << std::endl;
   random_test<int>(32000, 1000, 2000);
 
-  std::cerr << "32000000, 10000, 2000" << std::endl;
-  random_test<int>(32000000, 10000, 2000);
+  std::cerr << "32000000, 10000, 20000" << std::endl;
+  random_test<int>(32000000, 10000, 20000);
 }
