@@ -485,11 +485,8 @@ namespace cicada
       if (length <= 64)
 	return (utils::linear_search(index_.begin() + first, index_.begin() + last, id)
 		- index_.begin());
-      else if (length <= 1024)
-	return (utils::binary_search(index_.begin() + first, index_.begin() + last, id)
-		- index_.begin());
       else
-	return (utils::interpolation_search(index_.begin() + first, index_.begin() + last, id)
+	return (utils::binary_search(index_.begin() + first, index_.begin() + last, id)
 		- index_.begin());
     }
     

@@ -296,11 +296,8 @@ namespace cicada
 	  if (length <= 64)
 	    return offset + (utils::linear_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
 			     - ids.begin());
-	  else if (length <= 1024)
-	    return offset + (utils::binary_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
-			     - ids.begin());
 	  else
-	    return offset + (utils::interpolation_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
+	    return offset + (utils::binary_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
 			     - ids.begin());
 	}
       }
