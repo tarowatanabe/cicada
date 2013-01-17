@@ -312,8 +312,28 @@ namespace cicada
 	  // otherwise...
 	  size_type length = last - first;
 	  first -= offset;
-	  last  -= offset;
 	  
+	  // binary search
+	  while (length > 64) {
+	    const size_t half  = length >> 1;
+	    const size_t middle = first + half;
+	    
+	    const bool is_less = ids[middle] < id;
+	    
+	    first  = utils::bithack::branch(is_less, middle + 1, first);
+	    length = utils::bithack::branch(is_less, length - half - 1, half);
+	  }
+	  
+	  // linear search
+	  last = first + length;
+	  for (/**/; first != last && ids[first] < id; ++ first) {}
+	  return first + offset;
+	  
+#if 0
+	  size_type length = last - first;
+	  first -= offset;
+	  last  -= offset;
+
 	  if (length <= 128) {
 	    for (/**/; first != last && ids[first] < id; ++ first);
 	    return first + offset;
@@ -329,6 +349,7 @@ namespace cicada
 	    }
 	    return first + offset;
 	  }
+#endif
 	}
       }
       
