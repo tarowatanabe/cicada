@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__NGRAM_INDEX__HPP__
@@ -28,6 +28,7 @@
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
+#include <utils/search.hpp>
 
 namespace cicada
 {
@@ -250,10 +251,15 @@ namespace cicada
 	
 	if (pos_first == pos_last) return size_type(-1);
 	
+	const size_type child = search(pos_first, pos_last, id);
+	return utils::bithack::branch(child != pos_last, child, size_type(-1));
+	
+#if 0
 	const size_type child = lower_bound(pos_first, pos_last, id);
 	const size_type found_child_mask = size_type(child != pos_last && operator[](child) == id) - 1;
 	
 	return ((~found_child_mask) & child) | found_child_mask;
+#endif
       }
             
       size_type find(size_type pos, const id_type& id) const
@@ -280,7 +286,19 @@ namespace cicada
 	    return __find(pos, id);
         }
       }
-    
+      
+      size_type search(size_type first, size_type last, const id_type& id) const
+      {
+	// this is not a lower-bound, but search!
+	const size_type offset = offsets[1];
+
+	if (last <= offset)
+	  return std::min(size_type(id), last); // unigram!
+	else
+	  return offset + (utils::interpolation_search(ids.begin() + first - offset, ids.begin() + last - offset, id)
+			   - ids.begin());
+      }
+      
       size_type lower_bound(size_type first, size_type last, const id_type& id) const
       {
 	if (last <= offsets[1])

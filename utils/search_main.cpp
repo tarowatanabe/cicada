@@ -32,6 +32,11 @@ void random_test(Tp upper, size_t entries, size_t queries)
     
     typename bucket_type::iterator biter = utils::binary_search(buckets.begin(), buckets.end(), key);
     typename bucket_type::iterator iiter = utils::interpolation_search(buckets.begin(), buckets.end(), key);
+    typename bucket_type::iterator liter = utils::linear_search(buckets.begin(), buckets.end(), key);
+    
+    if (liter != biter) {
+      std::cerr << "different linear result...?" << std::endl;
+    }
 
     if (biter != iiter) {
       std::cerr << "different result...?" << std::endl;
@@ -54,6 +59,11 @@ void random_test(Tp upper, size_t entries, size_t queries)
   for (size_t i = 0; i != buckets.size(); ++ i) {
     typename bucket_type::iterator biter = utils::binary_search(buckets.begin(), buckets.end(), buckets[i]);
     typename bucket_type::iterator iiter = utils::interpolation_search(buckets.begin(), buckets.end(), buckets[i]);
+    typename bucket_type::iterator liter = utils::linear_search(buckets.begin(), buckets.end(), buckets[i]);
+
+    if (liter != biter) {
+      std::cerr << "different linear result...?" << std::endl;
+    }
 
     if (biter != iiter) {
       std::cerr << "different result...?" << std::endl;
