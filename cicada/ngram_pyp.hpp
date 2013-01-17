@@ -495,6 +495,23 @@ namespace cicada
       // otherwise...
       size_type length = last - first;
       
+      while (length > 64) {
+	const size_t half  = length >> 1;
+	const size_t middle = first + half;
+	
+	const bool is_less = index_[middle] < id;
+	
+	first  = utils::bithack::branch(is_less, middle + 1, first);
+	length = utils::bithack::branch(is_less, length - half - 1, half);
+      }
+      
+      last = first + length;
+      for (/**/; first != last && index_[first] < id; ++ first) {}
+      return first;
+      
+#if 0
+      size_type length = last - first;
+      
       if (length <= 128) {
 	for (/**/; first != last && index_[first] < id; ++ first);
 	return first;
@@ -510,6 +527,7 @@ namespace cicada
 	}
 	return first;
       }
+#endif
     }
     
   private:
