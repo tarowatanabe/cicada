@@ -105,6 +105,7 @@ restaurant_vector.hpp \
 rwspinlock.hpp \
 rwticket.hpp \
 sampler.hpp \
+search.hpp \
 simple_vector.hpp \
 slice_sampler.hpp \
 small_vector.hpp \

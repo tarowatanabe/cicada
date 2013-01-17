@@ -192,3 +192,5 @@ Do we add "loss" module to compute losses?
 Do we add "training" module?
 
 Implement LBFGS/CG by templates since this may conflict with float/double based implementation of liblbfgs
+
+Implement kenlm like probing data structure
