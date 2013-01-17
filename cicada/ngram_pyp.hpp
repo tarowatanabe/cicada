@@ -470,18 +470,27 @@ namespace cicada
       
       if (pos_first == pos_last) return size_type(-1);
       
-      //const size_type child = search(pos_first, pos_last, id);
-      //return utils::bithack::branch(child != pos_last, child, size_type(-1));
+      const size_type child = search(pos_first, pos_last, id);
+      return utils::bithack::branch(child != pos_last, child, size_type(-1));
       
-      const size_type child = lower_bound(pos_first, pos_last, id);
-      return utils::bithack::branch(child != pos_last && !(id < index_[child]), child, size_type(-1));
+      //const size_type child = lower_bound(pos_first, pos_last, id);
+      //return utils::bithack::branch(child != pos_last && !(id < index_[child]), child, size_type(-1));
     }
     
     size_type search(size_type first, size_type last, const id_type& id) const
     {
       // this is not a lower-bound, but search!
-      return (utils::interpolation_search(index_.begin() + first, index_.begin() + last, id)
-	      - index_.begin());
+      const size_type length = last - first;
+
+      if (length <= 64)
+	return (utils::linear_search(index_.begin() + first, index_.begin() + last, id)
+		- index_.begin());
+      else if (length <= 1024)
+	return (utils::binary_search(index_.begin() + first, index_.begin() + last, id)
+		- index_.begin());
+      else
+	return (utils::interpolation_search(index_.begin() + first, index_.begin() + last, id)
+		- index_.begin());
     }
     
     size_type lower_bound(size_type first, size_type last, const id_type& id) const
