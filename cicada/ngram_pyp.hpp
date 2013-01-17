@@ -479,6 +479,29 @@ namespace cicada
       // otherwise...
       size_type length = last - first;
       
+      if (length == 0)
+	return first;
+      
+      const id_type id_front = index_[first];
+      if (id <= id_front)
+	return first;
+      else if (length == 1)
+	return last;
+      
+      ++ first;
+      -- length;
+      
+      // next, check back...
+      const id_type id_back = index_[last - 1];
+      if (length == 1)
+	return utils::bithack::branch(id <= id_back, last - 1, last);
+      else if (id_back <= id)
+	return utils::bithack::branch(id_back == id, last - 1, last);
+      
+      -- last;
+      -- length;
+      
+      // third, linear search or binary search...
       if (length <= 32) {
 	for (/**/; first != last && index_[first] < id; ++ first);
 	return first;
