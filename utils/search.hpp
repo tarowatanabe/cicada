@@ -31,7 +31,7 @@ namespace utils
   template <typename Iterator, typename Tp>
   Iterator binary_search(Iterator first, Iterator last, const Tp& val)
   {
-    Iterator iter = std::lower_bound(first, last);
+    Iterator iter = std::lower_bound(first, last, val);
     
     return (iter != last && !(val < *iter) ? iter : last);
   }
@@ -39,7 +39,7 @@ namespace utils
   template <typename Iterator, typename Tp, typename Compare>
   Iterator binary_search(Iterator first, Iterator last, const Tp& val, Compare comp)
   {
-    Iterator iter = std::lower_bound(first, last, comp);
+    Iterator iter = std::lower_bound(first, last, val, comp);
     
     return (iter != last && ! comp(val, *iter) ? iter : last);
   }
@@ -115,57 +115,6 @@ namespace utils
     return __last;
   }
 
-  template <typename Iterator, typename Tp, typename Compare>
-  Iterator interpolation_search(Iterator first, Iterator last, const Tp& val, Compare comp)
-  {
-    typedef typename std::iterator_traits<Iterator>::value_type      value_type;
-    typedef typename std::iterator_traits<Iterator>::difference_type difference_type;
-    
-    if (first == last) return first;
-    
-    value_type front = *first;
-    
-    // val <= front
-    if (! comp(front, val))
-      return (comp(val, front) ? last : first);
-    
-    // we will work with the range of [first, last], not a conventional [first, last)
-    Iterator __last = last;
-    -- last;
-    value_type back = *last;
-    
-    // back <= val
-    if (! comp(val, back))
-      return (comp(back, val) ? __last : last);
-    
-    // search the range [first + 1, last - 1]
-    
-    value_type pivot;
-    Iterator middle;
-    difference_type diff;
-    difference_type length = std::distance(first, last);
-    __interpolation_pivot<sizeof(value_type)> interpolation;
-    
-    while (length > 1) {
-      diff = 1 + interpolation(val - front, back - front, length - 1);
-      middle = first;
-      std::advance(middle, diff);
-      pivot = *middle;
-      
-      if (comp(pivot, val)) {
-	first = middle;
-	front = pivot;
-	length -= diff;
-      } else if (comp(val, pivot)) {
-	last = middle;
-	back = pivot;
-	length = diff;
-      } else
-	return middle;
-    }
-    
-    return __last;
-  }
 
 };
 
