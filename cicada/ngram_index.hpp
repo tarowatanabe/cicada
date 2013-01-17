@@ -311,21 +311,23 @@ namespace cicada
 	else {
 	  // otherwise...
 	  size_type length = last - first;
+	  first -= offset;
+	  last  -= offset;
 	  
 	  if (length <= 64) {
-	    for (/**/; first != last && ids[first - offset] < id; ++ first);
-	    return first;
+	    for (/**/; first != last && ids[first] < id; ++ first);
+	    return first + offset;
 	  } else {
 	    while (length > 0) {
 	      const size_t half  = length >> 1;
 	      const size_t middle = first + half;
 
-	      const bool is_less = ids[middle - offset] < id;
+	      const bool is_less = ids[middle] < id;
 	      
 	      first  = utils::bithack::branch(is_less, middle + 1, first);
 	      length = utils::bithack::branch(is_less, length - half - 1, half);
 	    }
-	    return first;
+	    return first + offset;
 	  }
 	}
       }
