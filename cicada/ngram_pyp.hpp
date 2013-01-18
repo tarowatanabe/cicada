@@ -25,7 +25,6 @@
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
 #include <utils/mathop.hpp>
-#include <utils/search.hpp>
 
 namespace cicada
 {
@@ -470,46 +469,12 @@ namespace cicada
       
       if (pos_first == pos_last) return size_type(-1);
       
-      //const size_type child = search(pos_first, pos_last, id);
-      //return utils::bithack::branch(child != pos_last, child, size_type(-1));
-      
       const size_type child = lower_bound(pos_first, pos_last, id);
       return utils::bithack::branch(child != pos_last && !(id < index_[child]), child, size_type(-1));
     }
     
-    size_type search(size_type first, size_type last, const id_type& id) const
-    {
-      // this is not a lower-bound, but search!
-      const size_type length = last - first;
-
-      if (length <= 128)
-	return (utils::linear_search(index_.begin() + first, index_.begin() + last, id)
-		- index_.begin());
-      else
-	return (utils::binary_search(index_.begin() + first, index_.begin() + last, id)
-		- index_.begin());
-    }
-    
     size_type lower_bound(size_type first, size_type last, const id_type& id) const
     {
-      // otherwise...
-      size_type length = last - first;
-      
-      while (length > 64) {
-	const size_t half  = length >> 1;
-	const size_t middle = first + half;
-	
-	const bool is_less = index_[middle] < id;
-	
-	first  = utils::bithack::branch(is_less, middle + 1, first);
-	length = utils::bithack::branch(is_less, length - half - 1, half);
-      }
-      
-      last = first + length;
-      for (/**/; first != last && index_[first] < id; ++ first) {}
-      return first;
-      
-#if 0
       size_type length = last - first;
       
       if (length <= 128) {
@@ -527,7 +492,6 @@ namespace cicada
 	}
 	return first;
       }
-#endif
     }
     
   private:
