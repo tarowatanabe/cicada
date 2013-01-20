@@ -1307,7 +1307,7 @@ struct ExtractGHKM
 	  node_set_type::const_iterator titer_end = eiter->tails.end();
 	  for (node_set_type::const_iterator titer = eiter->tails.begin(); is_valid && titer != titer_end; ++ titer) {
 	    tails.push_back(reloc_node[*titer]);
-	    is_valid = tails.back() >= 0;
+	    is_valid = reloc_node[*titer] >= 0;
 	  }
 	  
 	  if (is_valid)

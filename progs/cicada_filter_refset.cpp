@@ -55,10 +55,10 @@ int main(int argc, char** argv)
       
       sentence_map_type refsets;
       
-      for (path_set_type::const_iterator iter = input_files.begin(); iter != input_files.end(); ++ iter) {
+      for (path_set_type::const_iterator iiter = input_files.begin(); iiter != input_files.end(); ++ iiter) {
 	typedef boost::spirit::istream_iterator iter_type;
 	  
-	utils::compress_istream is(*iter, 1024 * 1024);
+	utils::compress_istream is(*iiter, 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	
 	iter_type iter(is);
