@@ -95,9 +95,9 @@ namespace utils
     {
       typedef node_type* pointer;
       
-      volatile pointer        ptr0;
-      volatile pointer        ptr1;
-      volatile entry_holder_type entry;
+      volatile pointer  ptr0;
+      volatile pointer  ptr1;
+      entry_holder_type entry;
       
       volatile pointer current(int32_t version) { return ((version & 0x01) ? ptr1 : ptr0); }
       volatile pointer* non_current_ptr(int32_t version) { return ((version & 0x01) ? &ptr0 : &ptr1); } 
