@@ -188,7 +188,9 @@ namespace cicada
       
       size_type parent(size_type pos) const
       {
-	return (pos < offsets[1] ? size_type(-1) : positions.select(pos + 1 - offsets[1], true) + (offsets[1] + 1) - pos - 1);
+	const size_type offset = offsets[1];
+	
+	return (pos < offset ? size_type(-1) : positions.select(pos + 1 - offset, true) + (offset + 1) - pos - 1);
       }
 
       bool has_child(size_type pos) const
@@ -206,18 +208,19 @@ namespace cicada
       
       size_type children_last(size_type pos) const
       {
-	if (pos == size_type(-1) || pos >= position_size()) {
-	  const size_type is_root_mask = size_type(pos == size_type(-1)) - 1;
-	  return ((~is_root_mask) & offsets[1]) | (is_root_mask & size());
+	const size_type offset = offsets[1];
+	
+	if (pos == size_type(-1))
+	  return offset;
+	else if (pos >= position_size())
+	  return size();
+	else {
+	  position_set_type::size_type last = positions.select(pos + 2 - 1, false);
+	  
+	  return utils::bithack::branch(last == position_set_type::size_type(-1), size(), (last + 1 + offset + 1) - (pos + 2));
+	  
+	  //return (last == position_set_type::size_type(-1) ? size() : (last + 1 + offset + 1) - (pos + 2));
 	}
-	
-	position_set_type::size_type last = positions.select(pos + 2 - 1, false);
-
-	const size_type last_mask = size_type(last == position_set_type::size_type(-1)) - 1;
-	
-	return ((~last_mask) & size()) | (last_mask & ((last + 1 + offsets[1] + 1) - (pos + 2)));
-	
-	//return (last == position_set_type::size_type(-1) ? size() : (last + 1 + offsets[1] + 1) - (pos + 2));
       }
       
       template <typename Iterator>
@@ -284,7 +287,7 @@ namespace cicada
 	const size_type offset = offsets[1];
 
 	if (last <= offset)
-	  return std::min(size_type(id), last); // unigram!
+	  return utils::bithack::min(size_type(id), last); // unigram!
 	else {
 	  // otherwise...
 	  size_type length = last - first;
