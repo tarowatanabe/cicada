@@ -277,17 +277,17 @@ namespace utils
     template <typename Tp, size_t N>
     _Value operator()(const Tp (&x)[N], _Value seed=0) const
     { 
-      //return __static_hashxx<sizeof(Tp) * N, sizeof(_Value)>::hash((const uint8_t*) x, seed);
+      return __static_hashxx<sizeof(Tp) * N, sizeof(_Value)>::hash((const uint8_t*) x, seed);
       
-      return __dynamic_hashxx<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp) * N, seed);
+      //return __dynamic_hashxx<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp) * N, seed);
     }
     
     template <typename Tp>
     _Value operator()(const Tp& x, _Value seed=0) const
     {
-      //return __static_hashxx<sizeof(Tp), sizeof(_Value)>::hash((const uint8_t*) &x, seed);
+      return __static_hashxx<sizeof(Tp), sizeof(_Value)>::hash((const uint8_t*) &x, seed);
       
-      return __dynamic_hashxx<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp), seed);
+      //return __dynamic_hashxx<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp), seed);
     }
     
     template <typename Iterator>
