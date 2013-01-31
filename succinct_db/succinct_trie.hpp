@@ -23,7 +23,6 @@
 #include <utils/map_file.hpp>
 #include <utils/repository.hpp>
 #include <utils/succinct_vector.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/filesystem.hpp>
 #include <utils/packed_vector.hpp>
 #include <utils/packed_device.hpp>
