@@ -45,8 +45,6 @@
 
 namespace utils
 {
-  
-
   template <size_t _Length, size_t _Size>
   struct __static_hashxx {};
 

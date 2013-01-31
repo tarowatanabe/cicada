@@ -25,7 +25,6 @@
 #include <utils/repository.hpp>
 #include <utils/map_file.hpp>
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/filesystem.hpp>
 
 namespace utils
