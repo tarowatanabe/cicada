@@ -135,7 +135,7 @@ namespace utils
       
       const uint8_t* bEnd = p + Len;
       
-      uint32_t h32 = __static_hashxx16<Len, Len >= 16>::hash(p, seed) + Len;
+      uint32_t h32 = __static_hashxx16<Len, Len >= 16>::hash(p, seed) + static_cast<uint32_t>(Len);
       
       while (p <= bEnd - 4) {
 	h32 += XXH_LE32(p) * PRIME32_3;
@@ -232,7 +232,7 @@ namespace utils
       } else
 	h32  = seed + PRIME32_5;
       
-      h32 += len;
+      h32 += static_cast<uint32_t>(len);
       
       while (p <= bEnd - 4) {
 	h32 += XXH_LE32(p) * PRIME32_3;
