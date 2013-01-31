@@ -45,6 +45,120 @@
 
 namespace utils
 {
+  template <size_t Len, bool Loop>
+  struct __static_hashxx16 {};
+  
+  template <size_t Len>
+  struct __static_hashxx16<Len, true>
+  {
+    static inline
+    uint32_t XXH_rotl32(uint32_t x, uint32_t r)
+    {
+      return (x << r) | (x >> (32 - r));
+    }
+
+    template <typename Iterator>
+    static inline
+    uint32_t XXH_LE32(Iterator p)
+    {
+      return *((uint32_t*) p);
+    }
+    
+    template <typename Iterator>
+    static inline
+    uint32_t hash(Iterator& p, uint32_t seed)
+    {
+      static const uint32_t PRIME32_1 = 2654435761U;
+      static const uint32_t PRIME32_2 = 2246822519U;
+      //static const uint32_t PRIME32_3 = 3266489917U;
+      //static const uint32_t PRIME32_4 =  668265263U;
+      //static const uint32_t PRIME32_5 =  374761393U;
+      
+      const uint8_t* const limit = (p + Len) - 16;
+      uint32_t v1 = seed + PRIME32_1 + PRIME32_2;
+      uint32_t v2 = seed + PRIME32_2;
+      uint32_t v3 = seed + 0;
+      uint32_t v4 = seed - PRIME32_1;
+      
+      do {
+	v1 += XXH_LE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
+	v2 += XXH_LE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
+	v3 += XXH_LE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
+	v4 += XXH_LE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
+      } while (p <= limit) ;
+      
+      return XXH_rotl32(v1, 1) + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
+    }
+  };
+  
+  template <size_t Len>
+  struct __static_hashxx16<Len, false>
+  {
+    template <typename Iterator>
+    static inline
+    uint32_t hash(Iterator& p, uint32_t seed)
+    {
+      //static const uint32_t PRIME32_1 = 2654435761U;
+      //static const uint32_t PRIME32_2 = 2246822519U;
+      //static const uint32_t PRIME32_3 = 3266489917U;
+      //static const uint32_t PRIME32_4 =  668265263U;
+      static const uint32_t PRIME32_5 =  374761393U;
+
+      return seed + PRIME32_5;
+    }
+  };
+  
+  template <size_t Len>
+  struct __static_hashxx_impl
+  {
+    static inline
+    uint32_t XXH_rotl32(uint32_t x, uint32_t r)
+    {
+      return (x << r) | (x >> (32 - r));
+    }
+
+    template <typename Iterator>
+    static inline
+    uint32_t XXH_LE32(Iterator p)
+    {
+      return *((uint32_t*) p);
+    }
+    
+    static inline
+    uint32_t hash(const uint8_t* p, uint32_t seed)
+    {
+      static const uint32_t PRIME32_1 = 2654435761U;
+      static const uint32_t PRIME32_2 = 2246822519U;
+      static const uint32_t PRIME32_3 = 3266489917U;
+      static const uint32_t PRIME32_4 =  668265263U;
+      static const uint32_t PRIME32_5 =  374761393U;
+      
+      const uint8_t* bEnd = p + Len;
+      
+      uint32_t h32 = __static_hashxx16<Len, Len >= 16>::hash(p, seed) + Len;
+      
+      while (p <= bEnd - 4) {
+	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 = XXH_rotl32(h32, 17) * PRIME32_4 ;
+	p += 4;
+      }
+      
+      while (p < bEnd) {
+	h32 += (*p) * PRIME32_5;
+	h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
+	++ p;
+      }
+
+      h32 ^= h32 >> 15;
+      h32 *= PRIME32_2;
+      h32 ^= h32 >> 13;
+      h32 *= PRIME32_3;
+      h32 ^= h32 >> 16;
+
+      return h32; 
+    }
+  };
+  
   template <size_t _Length, size_t _Size>
   struct __static_hashxx {};
 
@@ -54,7 +168,7 @@ namespace utils
     static inline
     uint32_t hash(const uint8_t* data, uint32_t seed)
     {
-      //return __static_hashxx_impl<_Length, _Length & 0x03, 4>::hash(data, seed);
+      return __static_hashxx_impl<_Length>::hash(data, seed);
     }
   };
   
@@ -64,7 +178,7 @@ namespace utils
     static inline
     uint64_t hash(const uint8_t* data, uint64_t seed)
     {
-      //return __static_hashxx_impl<_Length, _Length & 0x03, 4>::hash(data, seed);
+      return __static_hashxx_impl<_Length>::hash(data, seed);
     }
   };
   
