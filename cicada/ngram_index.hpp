@@ -261,10 +261,14 @@ namespace cicada
       {
 	if (id == id_type(-1))
 	  return size_type(-1);
-	else if (pos == size_type(-1)) {
-          const size_type child_mask = size_type(id < offsets[1]) - 1;
-          return (~child_mask & size_type(id)) | child_mask;
-        } else {
+	else if (pos == size_type(-1))
+	  return utils::bithack::branch(id < offsets[1], size_type(id), size_type(-1));
+	else {
+	  // if id <= 21bit range and last <= 21bit range
+	  //   use simple caching
+	  // else
+	  //   lock-base caching
+	  
 	  // lock here!
 	  trylock_type lock(const_cast<spinlock_type&>(spinlock_pos));
 	  

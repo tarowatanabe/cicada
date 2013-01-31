@@ -227,7 +227,7 @@ namespace utils
   struct __static_hashmurmur<_Length, 8>
   {
     static inline
-    uint32_t hash(const uint8_t* data, uint32_t seed)
+    uint64_t hash(const uint8_t* data, uint64_t seed)
     {
       return __static_hashmurmur_impl<_Length, _Length & 0x03, 8>::hash(data, seed);
     }

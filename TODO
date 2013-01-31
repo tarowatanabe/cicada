@@ -194,3 +194,6 @@ Do we add "training" module?
 Implement LBFGS/CG by templates since this may conflict with float/double based implementation of liblbfgs
 
 Implement kenlm like probing data structure
+
+Implement potentially faster xxhash
+  Use the xxhash for internal caching

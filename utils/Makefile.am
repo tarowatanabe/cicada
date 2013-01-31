@@ -63,6 +63,7 @@ filesystem.hpp \
 group_aligned_code.hpp \
 group_aligned_code_offsets.hpp \
 hashmurmur.hpp \
+hashxx.hpp \
 icu_filter.hpp \
 indexed_hashtable.hpp \
 indexed_map.hpp \
@@ -163,6 +164,7 @@ double_base64_main \
 filesystem_main \
 group_aligned_code_main \
 hashmurmur_main \
+hashxx_main \
 icu_filter_main \
 indexed_set_main \
 istream_line_iterator_main \
@@ -322,6 +324,9 @@ group_aligned_code_main_SOURCES = group_aligned_code_main.cpp
 
 hashmurmur_main_SOURCES = hashmurmur_main.cpp
 hashmurmur_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
+
+hashxx_main_SOURCES = hashxx_main.cpp
+hashxx_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
 
 icu_filter_main_SOURCES = icu_filter_main.cpp
 icu_filter_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
