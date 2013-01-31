@@ -26,14 +26,47 @@ int main(int argc, char** argv)
   
   // random queries...
   for (size_t i = 0; i != 1024 * 4; ++ i) {
-    uint64_t key = gen();
-    key <<= 32;
-    key |= gen();
-    
-    if (hasher32(key) != hasher32(&key, (&key) + 1, 0))
-      std::cerr << "different 32-bit hash...?" << std::endl;
-    if (hasher64(key) != hasher64(&key, (&key) + 1, 0))
-      std::cerr << "different 64-bit hash...?" << std::endl;
+    {
+      uint64_t key[4];
+      
+      for (size_t j = 0; j != 4; ++ j) {
+	key[j] = gen();
+	key[j] <<= 32;
+	key[j] |= gen();
+      }
+      
+      if (hasher32(key) != hasher32(key, key + 4, 0))
+	std::cerr << "different 32-bit hash...?" << std::endl;
+      if (hasher64(key) != hasher64(key, key + 4, 0))
+	std::cerr << "different 64-bit hash...?" << std::endl;
+    }
+    {
+      uint64_t key[3];
+      
+      for (size_t j = 0; j != 3; ++ j) {
+	key[j] = gen();
+	key[j] <<= 32;
+	key[j] |= gen();
+      }
+      
+      if (hasher32(key) != hasher32(key, key + 3, 0))
+	std::cerr << "different 32-bit hash...?" << std::endl;
+      if (hasher64(key) != hasher64(key, key + 3, 0))
+	std::cerr << "different 64-bit hash...?" << std::endl;      
+    }
+
+    {
+      uint64_t key;
+      
+      key = gen();
+      key <<= 32;
+      key |= gen();
+      
+      if (hasher32(key) != hasher32(&key, &key + 1, 0))
+	std::cerr << "different 32-bit hash...?" << std::endl;
+      if (hasher64(key) != hasher64(&key, &key + 1, 0))
+	std::cerr << "different 64-bit hash...?" << std::endl;            
+    }
   }
 
   while (std::getline(std::cin, line))

@@ -336,12 +336,16 @@ namespace utils
     _Value operator()(const Tp (&x)[N], _Value seed=0) const
     { 
       return __static_hashmurmur<sizeof(Tp) * N, sizeof(_Value)>::hash((const uint8_t*) x, seed);
+      
+      //return __dynamic_hashmurmur<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp) * N, seed);
     }
     
     template <typename Tp>
     _Value operator()(const Tp& x, _Value seed=0) const
     {
       return __static_hashmurmur<sizeof(Tp), sizeof(_Value)>::hash((const uint8_t*) &x, seed);
+      
+      //return __dynamic_hashmurmur<sizeof(_Value)>::hash((const uint8_t*) &x, ((const uint8_t*) &x) + sizeof(Tp), seed);
     }
     
     template <typename Iterator>
