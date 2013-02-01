@@ -18,6 +18,7 @@
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/array_power2.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include "symbol.hpp"
 

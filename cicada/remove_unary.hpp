@@ -10,7 +10,6 @@
 #include <cicada/vocab.hpp>
 #include <cicada/sort_topologically.hpp>
 
-#include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 #include <utils/small_vector.hpp>
 

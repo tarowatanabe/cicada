@@ -10,7 +10,6 @@
 #include "cicada/weight_vector.hpp"
 
 #include "utils/lexical_cast.hpp"
-#include "utils/hashmurmur.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 #include "utils/indexed_trie.hpp"

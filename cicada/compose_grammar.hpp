@@ -19,7 +19,6 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {

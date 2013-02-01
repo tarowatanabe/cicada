@@ -9,7 +9,7 @@
 #include <cicada/binarize_base.hpp>
 
 #include <utils/unordered_map.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 
 namespace cicada
 {
@@ -25,17 +25,17 @@ namespace cicada
     typedef hypergraph_type::edge_type::node_set_type  tail_set_type;
     typedef std::pair<tail_set_type, symbol_set_type > tail_symbol_pair_type;
 
-    struct tail_set_hash : public utils::hashmurmur<size_t>
+    struct tail_set_hash : public utils::hashxx<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
       size_t operator()(const tail_set_type& x) const {
 	return hasher_type::operator()(x.begin(), x.end(), 0);
       }
     };
 
-    struct tail_symbol_pair_hash : public utils::hashmurmur<size_t>
+    struct tail_symbol_pair_hash : public utils::hashxx<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
       
       size_t operator()(const tail_symbol_pair_type& x) const {
 	return hasher_type::operator()(x.first.begin(), x.first.end(), hasher_type::operator()(x.second.begin(), x.second.end(), 0));

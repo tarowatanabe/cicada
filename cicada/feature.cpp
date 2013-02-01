@@ -4,6 +4,7 @@
 
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include "feature.hpp"
 

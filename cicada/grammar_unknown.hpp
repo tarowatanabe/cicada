@@ -16,7 +16,7 @@
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 #include <utils/trie_compact.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 
 namespace cicada
 {
@@ -48,7 +48,7 @@ namespace cicada
     
     typedef utils::compact_map<uchar_type, double,
 			       unassigned_unigram, unassigned_unigram,
-			       utils::hashmurmur<size_t>, std::equal_to<uchar_type>,
+			       utils::hashxx<size_t>, std::equal_to<uchar_type>,
 			       std::allocator<std::pair<const uchar_type, double> > > unigram_set_type;
     
     typedef utils::trie_compact<symbol_type, unigram_set_type,

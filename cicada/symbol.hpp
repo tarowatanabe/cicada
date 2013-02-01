@@ -17,7 +17,6 @@
 #include <boost/thread.hpp>
 
 #include <utils/indexed_set.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/rwticket.hpp>
 #include <utils/piece.hpp>

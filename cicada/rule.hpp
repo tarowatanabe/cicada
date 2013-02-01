@@ -15,6 +15,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include <boost/shared_ptr.hpp>
 

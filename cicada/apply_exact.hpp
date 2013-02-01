@@ -15,7 +15,6 @@
 
 #include <utils/compact_map.hpp>
 #include <utils/small_vector.hpp>
-#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {

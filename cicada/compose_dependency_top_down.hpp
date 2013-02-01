@@ -16,7 +16,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort_topologically.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/bithack.hpp>
 #include <utils/bit_vector.hpp>
 #include <utils/unordered_set.hpp>
@@ -59,7 +59,7 @@ namespace cicada
     typedef utils::bit_vector<1024> coverage_type;
     typedef boost::fusion::tuple<const coverage_type*, int, int> state_type;
     
-    typedef utils::unordered_map<state_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<state_type>,
+    typedef utils::unordered_map<state_type, hypergraph_type::id_type, utils::hashxx<size_t>, std::equal_to<state_type>,
 				 std::allocator<std::pair<state_type, hypergraph_type::id_type> > >::type state_set_type;
   
     typedef utils::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,

@@ -14,7 +14,6 @@
 #include <cicada/sort_topologically.hpp>
 
 #include <utils/bithack.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/chart.hpp>
 
 namespace cicada

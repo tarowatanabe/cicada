@@ -14,7 +14,6 @@
 
 #include <boost/array.hpp>
 
-#include <utils/hashmurmur.hpp>
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
 #include <utils/map_file.hpp>

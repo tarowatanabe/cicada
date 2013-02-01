@@ -9,7 +9,7 @@
 #include <cicada/binarize_base.hpp>
 
 #include <utils/indexed_set.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/compact_map.hpp>
 
 #include <boost/fusion/tuple.hpp>
@@ -22,9 +22,9 @@ namespace cicada
     typedef hypergraph_type::edge_type::node_set_type  tail_set_type;
 
     template <typename Seq>
-    struct hash_sequence : utils::hashmurmur<size_t>
+    struct hash_sequence : utils::hashxx<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
       
       size_t operator()(const Seq& x) const
       {
@@ -51,7 +51,7 @@ namespace cicada
     
     typedef utils::compact_map<internal_type, hypergraph_type::id_type,
 			       unassigned_key, unassigned_key,
-			       utils::hashmurmur<size_t>, std::equal_to<internal_type>,
+			       utils::hashxx<size_t>, std::equal_to<internal_type>,
 			       std::allocator<std::pair<const internal_type, hypergraph_type::id_type> > > node_map_type;
 
     

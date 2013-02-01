@@ -16,7 +16,6 @@
 #include <boost/thread.hpp>
 
 #include <utils/indexed_set.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/rwticket.hpp>
 #include <utils/piece.hpp>
 #include <utils/chunk_vector.hpp>

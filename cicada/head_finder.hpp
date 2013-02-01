@@ -15,7 +15,6 @@
 #include <cicada/hypergraph.hpp>
 
 #include <utils/unordered_map.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada

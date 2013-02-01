@@ -16,6 +16,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {

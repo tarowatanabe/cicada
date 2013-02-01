@@ -10,7 +10,6 @@
 #include "cicada/tokenizer.hpp"
 
 #include "utils/space_separator.hpp"
-#include "utils/hashmurmur.hpp"
 #include "utils/trie_compact.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"

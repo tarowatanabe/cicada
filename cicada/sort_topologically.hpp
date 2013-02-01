@@ -10,7 +10,7 @@
 
 #include <cicada/hypergraph.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/compact_set.hpp>
 
 namespace cicada
@@ -76,7 +76,7 @@ namespace cicada
     {
       typedef utils::compact_set<id_type,
 				 unassigned_key, unassigned_key,
-				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 utils::hashxx<size_t>, std::equal_to<id_type>,
 				 std::allocator<id_type> > id_set_type;
       
       sorted.clear();

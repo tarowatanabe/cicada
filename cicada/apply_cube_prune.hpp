@@ -15,7 +15,7 @@
 #include <utils/compact_map.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
@@ -102,11 +102,11 @@ namespace cicada
     typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
-    struct candidate_hash_type : public utils::hashmurmur<size_t>
+    struct candidate_hash_type : public utils::hashxx<size_t>
     {
       size_t operator()(const candidate_type* x) const
       {
-	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
+	return (x == 0 ? size_t(0) : utils::hashxx<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
       }
     };
     struct candidate_equal_type

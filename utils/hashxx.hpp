@@ -107,7 +107,7 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t h32)
+    uint32_t hash(Iterator& p, uint32_t& h32)
     {
       for (size_t i = 0; i != Loop; ++ i) {
 	h32 += XXH_LE32(p) * PRIME32_3;
@@ -123,7 +123,7 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t h32)
+    uint32_t hash(Iterator& p, uint32_t& h32)
     {
       return h32;
     }
@@ -134,7 +134,7 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t h32)
+    uint32_t hash(Iterator& p, uint32_t& h32)
     {
       for (size_t i = 0; i != Loop; ++ i) {
 	h32 += (*p) * PRIME32_5;
@@ -150,7 +150,7 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t h32)
+    uint32_t hash(Iterator& p, uint32_t& h32)
     {
       return h32;
     }
@@ -164,9 +164,9 @@ namespace utils
     {
       uint32_t h32 = __static_hashxx16<(Len >> 4)>::hash(p, seed) + static_cast<uint32_t>(Len);
       
-      h32 = __static_hashxx4<((Len >> 2) & 0x03)>::hash(p, h32);
+      __static_hashxx4<((Len >> 2) & 0x03)>::hash(p, h32);
       
-      h32 = __static_hashxx1<(Len & 0x03)>::hash(p, h32);
+      __static_hashxx1<(Len & 0x03)>::hash(p, h32);
       
       h32 ^= h32 >> 15;
       h32 *= PRIME32_2;

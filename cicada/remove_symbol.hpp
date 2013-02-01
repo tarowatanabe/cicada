@@ -18,7 +18,6 @@
 #include <cicada/sort_topologically.hpp>
 #include <cicada/feature_vector_linear.hpp>
 
-#include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/bithack.hpp>

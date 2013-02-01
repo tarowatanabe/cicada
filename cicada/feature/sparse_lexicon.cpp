@@ -20,6 +20,7 @@
 #include "utils/array_power2.hpp"
 #include "utils/small_vector.hpp"
 #include "utils/compact_set.hpp"
+#include "utils/hashxx.hpp"
 
 namespace cicada
 {
@@ -27,7 +28,7 @@ namespace cicada
   {
 
 
-    class SparseLexiconImpl : public utils::hashmurmur<size_t>
+    class SparseLexiconImpl : public utils::hashxx<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -44,7 +45,7 @@ namespace cicada
       typedef cicada::ClusterStemmer normalizer_type;
       typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
 
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
 
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -85,7 +86,7 @@ namespace cicada
 
       typedef utils::compact_set<word_pair_type,
 				 unassigned_key, unassigned_key,
-				 utils::hashmurmur<size_t>, std::equal_to<word_pair_type>,
+				 utils::hashxx<size_t>, std::equal_to<word_pair_type>,
 				 std::allocator<word_pair_type> > word_pair_unique_type;
 
       typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
