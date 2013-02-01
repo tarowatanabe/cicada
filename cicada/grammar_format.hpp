@@ -12,8 +12,6 @@
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/format.hpp>
 
-#include <utils/hashmurmur.hpp>
-
 namespace cicada
 {
   class GrammarFormat : public GrammarMutable

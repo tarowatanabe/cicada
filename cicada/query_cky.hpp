@@ -19,7 +19,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/indexed_set.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
@@ -81,9 +81,9 @@ namespace cicada
 
     typedef std::pair<symbol_type, int> symbol_level_type;
     
-    struct symbol_level_hash : public utils::hashmurmur<size_t>
+    struct symbol_level_hash : public utils::hashxx<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
       
       size_t operator()(const symbol_level_type& x) const
       {
