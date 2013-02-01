@@ -27,6 +27,29 @@ void test_hash(Gen& gen, const Hasher32& hasher32, const Hasher64& hasher64)
   }
 }
 
+template <size_t Num>
+struct test_hash_loop
+{
+  template <typename Gen, typename Hasher32, typename Hasher64>
+  static inline
+  void test(Gen& gen, const Hasher32& hasher32, const Hasher64& hasher64)
+  {
+    test_hash<Num>(gen, hasher32, hasher64);
+    
+    test_hash_loop<Num-1>::test(gen, hasher32, hasher64);
+  }
+};
+
+template <>
+struct test_hash_loop<0>
+{
+  template <typename Gen, typename Hasher32, typename Hasher64>
+  static inline
+  void test(Gen& gen, const Hasher32& hasher32, const Hasher64& hasher64)
+  {
+  }
+};
+
 int main(int argc, char** argv)
 {
   std::string line;
@@ -41,45 +64,7 @@ int main(int argc, char** argv)
   boost::variate_generator<boost::mt19937, boost::uniform_int<uint32_t> > gen(generator, range);
   
   // random queries...
-  test_hash<1>(gen, hasher32, hasher64);
-  test_hash<2>(gen, hasher32, hasher64);
-  test_hash<3>(gen, hasher32, hasher64);
-  test_hash<4>(gen, hasher32, hasher64);
-  test_hash<5>(gen, hasher32, hasher64);
-  test_hash<6>(gen, hasher32, hasher64);
-  test_hash<7>(gen, hasher32, hasher64);
-  test_hash<8>(gen, hasher32, hasher64);
-  test_hash<9>(gen, hasher32, hasher64);
-  test_hash<10>(gen, hasher32, hasher64);
-  test_hash<11>(gen, hasher32, hasher64);
-  test_hash<12>(gen, hasher32, hasher64);
-  test_hash<13>(gen, hasher32, hasher64);
-  test_hash<14>(gen, hasher32, hasher64);
-  test_hash<15>(gen, hasher32, hasher64);
-  test_hash<16>(gen, hasher32, hasher64);
-  test_hash<17>(gen, hasher32, hasher64);
-  test_hash<18>(gen, hasher32, hasher64);
-  test_hash<19>(gen, hasher32, hasher64);
-  test_hash<20>(gen, hasher32, hasher64);
-  test_hash<21>(gen, hasher32, hasher64);
-  test_hash<22>(gen, hasher32, hasher64);
-  test_hash<23>(gen, hasher32, hasher64);
-  test_hash<24>(gen, hasher32, hasher64);
-  test_hash<25>(gen, hasher32, hasher64);
-  test_hash<26>(gen, hasher32, hasher64);
-  test_hash<27>(gen, hasher32, hasher64);
-  test_hash<28>(gen, hasher32, hasher64);
-  test_hash<29>(gen, hasher32, hasher64);
-  test_hash<30>(gen, hasher32, hasher64);
-  test_hash<31>(gen, hasher32, hasher64);
-  test_hash<32>(gen, hasher32, hasher64);
-  test_hash<33>(gen, hasher32, hasher64);
-  test_hash<34>(gen, hasher32, hasher64);
-  test_hash<35>(gen, hasher32, hasher64);
-  test_hash<36>(gen, hasher32, hasher64);
-  test_hash<37>(gen, hasher32, hasher64);
-  test_hash<38>(gen, hasher32, hasher64);
-  test_hash<39>(gen, hasher32, hasher64);
+  test_hash_loop<256>::test(gen, hasher32, hasher64);
 
   // read and compute
   while (std::getline(std::cin, line))
