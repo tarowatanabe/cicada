@@ -45,6 +45,7 @@ compress_stream_main
 double_base64_main
 filesystem_main
 group_aligned_code_main
+hash_main
 hashmurmur_main
 hashmurmur3_main
 hashxx_main

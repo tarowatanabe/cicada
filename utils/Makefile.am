@@ -164,6 +164,7 @@ compress_stream_main \
 double_base64_main \
 filesystem_main \
 group_aligned_code_main \
+hash_main \
 hashmurmur_main \
 hashmurmur3_main \
 hashxx_main \
@@ -323,6 +324,9 @@ filesystem_main_SOURCES = filesystem_main.cpp
 filesystem_main_LDADD = $(LIBUTILS)
 
 group_aligned_code_main_SOURCES = group_aligned_code_main.cpp
+
+hash_main_SOURCES = hash_main.cpp
+hash_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
 
 hashmurmur_main_SOURCES = hashmurmur_main.cpp
 hashmurmur_main_LDADD = $(LIBUTILS) $(BOOST_IOSTREAMS_LDFLAGS)
