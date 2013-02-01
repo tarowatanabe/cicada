@@ -134,7 +134,7 @@ namespace utils
     uint64_t hash(Iterator first, Iterator last, uint64_t seed)
     {
       const uint8_t * data = (const uint8_t*)first;
-      size_t len = last - first;
+      uint64_t len = last - first;
       const size_t nblocks = len >> 4;
       
       uint64_t h1 = seed;
@@ -149,8 +149,8 @@ namespace utils
       const uint64_t * blocks = (const uint64_t *)(data);
       
       for (size_t i = 0; i != nblocks; i++) {
-	uint64_t k1 = getblock(blocks,i*2+0);
-	uint64_t k2 = getblock(blocks,i*2+1);
+	uint64_t k1 = getblock(blocks,(i << 1)+0);
+	uint64_t k2 = getblock(blocks,(i << 1)+1);
 	
 	k1 *= c1; k1  = rotl64(k1,31); k1 *= c2; h1 ^= k1;
 	
