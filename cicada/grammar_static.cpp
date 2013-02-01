@@ -37,6 +37,9 @@
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
 
+#include "utils/hashmurmur.hpp"
+#include "utils/hashxx.hpp"
+
 #include <boost/lexical_cast.hpp>
 
 #include <boost/filesystem.hpp>
@@ -407,10 +410,12 @@ namespace cicada
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
+      typedef utils::hashxx<uint32_t> hasher_type;
+
       FeatureVectorCODEC   feature_codec;
       AttributeVectorCODEC attribute_codec;
       
-      const size_type cache_pos = hasher_type::operator()(node) & (cache_rule_sets.size() - 1);
+      const size_type cache_pos = hasher_type()(node) & (cache_rule_sets.size() - 1);
       
       cache_rule_set_type& cache = const_cast<cache_rule_set_type&>(cache_rule_sets[cache_pos]);
       
@@ -537,7 +542,9 @@ namespace cicada
 				     const cache_phrase_set_type& cache_phrases,
 				     const phrase_db_type& phrase_db) const
     {
-      const size_type cache_pos = hasher_type::operator()(pos, lhs.id()) & (cache_phrases.size() - 1);
+      typedef utils::hashxx<uint32_t> hasher_type;
+      
+      const size_type cache_pos = hasher_type()(pos, lhs.id()) & (cache_phrases.size() - 1);
       
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       if (cache.pos != pos || ! cache.rule || cache.rule->lhs != lhs) {
@@ -1280,12 +1287,12 @@ namespace cicada
     
     typedef DataStream<Transducer::feature_set_type, FeatureVectorCODEC>     feature_stream_type;
     typedef DataStream<Transducer::attribute_set_type, AttributeVectorCODEC> attribute_stream_type;
+
+    typedef GrammarStaticImpl::hasher_type hasher_type;
     
     template <typename Data>
-    struct VocabStream : public utils::hashmurmur<uint64_t>
+    struct VocabStream : public hasher_type
     {
-      typedef utils::hashmurmur<uint64_t> hasher_type;
-
       VocabStream(const path_type& path)
       {
 	typedef succinctdb::succinct_hash_stream<char, std::allocator<char> > succinct_hash_stream_type;

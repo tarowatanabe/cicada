@@ -40,6 +40,9 @@
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
 
+#include "utils/hashmurmur.hpp"
+#include "utils/hashxx.hpp"
+
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/filesystem.hpp>
@@ -388,10 +391,12 @@ namespace cicada
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
+      typedef utils::hashxx<uint32_t> hasher_type;
+      
       FeatureVectorCODEC   feature_codec;
       AttributeVectorCODEC attribute_codec;
-
-      const size_type cache_pos = hasher_type::operator()(node) & (cache_rule.size() - 1);
+      
+      const size_type cache_pos = hasher_type()(node) & (cache_rule.size() - 1);
       
       cache_rule_pair_set_type& cache = const_cast<cache_rule_pair_set_type&>(cache_rule[cache_pos]);
       
@@ -498,9 +503,11 @@ namespace cicada
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
     {
+      typedef utils::hashxx<uint32_t> hasher_type;
+      
       TreeRuleCODEC codec;
 
-      const size_type cache_pos = hasher_type::operator()(pos) & (caches.size() - 1);
+      const size_type cache_pos = hasher_type()(pos) & (caches.size() - 1);
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
@@ -1183,11 +1190,11 @@ namespace cicada
     typedef DataStream<TreeTransducer::feature_set_type, FeatureVectorCODEC>     feature_stream_type;
     typedef DataStream<TreeTransducer::attribute_set_type, AttributeVectorCODEC> attribute_stream_type;
     
+    typedef TreeGrammarStaticImpl::hasher_type hasher_type;
+    
     template <typename Data>
-    struct VocabStream : public utils::hashmurmur<uint64_t>
+    struct VocabStream : public hasher_type
     {
-      typedef utils::hashmurmur<uint64_t> hasher_type;
-
       VocabStream(const path_type& path)
       {
 	typedef succinctdb::succinct_hash_stream<char, std::allocator<char> > succinct_hash_stream_type;
@@ -1266,8 +1273,8 @@ namespace cicada
     typedef std::vector<char, std::allocator<char> > codes_type;
     typedef typename codes_type::size_type size_type;
     
-    typedef uint64_t                           hash_value_type;
-    typedef utils::hashmurmur<hash_value_type> hasher_type;
+    typedef TreeGrammarStaticImpl::hash_value_type hash_value_type;
+    typedef TreeGrammarStaticImpl::hasher_type     hasher_type;
 
     buffer.clear();
     codes_type codes;
