@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__NGRAM_CACHE__HPP__
@@ -8,7 +8,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/vector2.hpp>
 #include <utils/array_power2.hpp>
 
@@ -16,7 +16,7 @@ namespace cicada
 {
 
   template <typename Key, typename Score>
-  class NGramCache : public utils::hashxx<size_t>
+  class NGramCache : public utils::hashmurmur3<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -26,7 +26,7 @@ namespace cicada
     typedef Key   symbol_type;
     typedef Score score_type;
     
-    typedef utils::hashxx<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     static const size_type cache_size = 1024 * 64;
     

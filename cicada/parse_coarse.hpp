@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_COARSE__HPP__
@@ -21,7 +21,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bithack.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/indexed_set.hpp>
@@ -284,7 +284,7 @@ namespace cicada
 	closure_score_type() : closure(), score() {}
 	closure_score_type(const closure_type& __closure, const score_type& __score) : closure(__closure), score(__score) {}
       };
-      typedef typename utils::unordered_map<id_type, closure_score_type, utils::hashxx<size_t>, std::equal_to<id_type>,
+      typedef typename utils::unordered_map<id_type, closure_score_type, utils::hashmurmur3<size_t>, std::equal_to<id_type>,
 					    std::allocator<std::pair<const id_type, closure_score_type> > >::type closure_set_type;
       
       typedef utils::indexed_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_map_type;

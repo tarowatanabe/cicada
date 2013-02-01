@@ -143,7 +143,7 @@ struct PYP
     friend
     size_t hash_value(span_type const& x)
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       return hasher_type()(x.first, x.last);
     }
@@ -188,7 +188,7 @@ struct PYP
     friend
     size_t hash_value(span_pair_type const& x)
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       return hasher_type()(x);
     }
@@ -257,7 +257,7 @@ struct PYP
     friend
     size_t hash_value(phrase_type const& x)
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       return hasher_type()(x.begin(), x.end(), 0);
     }
@@ -298,7 +298,7 @@ struct PYP
     friend
     size_t hash_value(phrase_pair_type const& x)
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
     }
@@ -471,10 +471,10 @@ struct PYPPhrase
   typedef phrase_set_type::index_type id_type;
   typedef std::pair<id_type, id_type> id_pair_type;
   
-  typedef utils::symbol_set<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type> > phrase_pair_set_type;
+  typedef utils::symbol_set<id_pair_type, utils::hashmurmur3<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type> > phrase_pair_set_type;
   
   
-  //typedef utils::restaurant<id_pair_type, utils::hashmurmur<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type > > table_type;
+  //typedef utils::restaurant<id_pair_type, utils::hashmurmur3<size_t>, std::equal_to<id_pair_type>, std::allocator<id_pair_type > > table_type;
   typedef utils::restaurant_vector<> table_type;
   
   PYPPhrase(const double& __p0,
@@ -853,7 +853,7 @@ struct PYPGraph
   
   typedef utils::compact_set<span_pairs_type,
 			     span_pairs_unassigned, span_pairs_unassigned,
-			     utils::hashmurmur<size_t>, std::equal_to<span_pairs_type>,
+			     utils::hashmurmur3<size_t>, std::equal_to<span_pairs_type>,
 			     std::allocator<span_pairs_type> > span_pairs_unique_type;
 
   typedef utils::chart<logprob_type, std::allocator<logprob_type> > unigram_type;

@@ -25,6 +25,7 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/vector2.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <cicada/optimize/line_search.hpp>
 
@@ -691,12 +692,12 @@ struct OptimizeCP
   }
 
   template <typename LabelSet, typename FeatureSet>
-  struct h_matrix : public utils::hashmurmur<size_t>
+  struct h_matrix : public utils::hashmurmur3<size_t>
   {
     h_matrix(const LabelSet& __labels, const FeatureSet& __features)
       : labels(__labels), features(__features) {}
     
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     double operator()(int i, int j) const
     {
@@ -1153,12 +1154,12 @@ struct OptimizeMIRA
   
 
   template <typename LabelSet, typename FeatureSet>
-  struct h_matrix : public utils::hashmurmur<size_t>
+  struct h_matrix : public utils::hashmurmur3<size_t>
   {
     h_matrix(const LabelSet& __labels, const FeatureSet& __features)
       : labels(__labels), features(__features) {}
     
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     double operator()(int i, int j) const
     {

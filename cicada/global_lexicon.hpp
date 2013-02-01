@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__GLOBAL_LEXICON__HPP__
@@ -17,6 +17,7 @@
 
 #include <utils/array_power2.hpp>
 #include <utils/mathop.hpp>
+#include <utils/hashmurmur3.hpp>
 
 //
 // we assume that the lexicon probabilities are estimated by nicttm/learn_lexicon
@@ -26,7 +27,7 @@
 namespace cicada
 {
 
-  class GlobalLexicon : public utils::hashmurmur<uint64_t>
+  class GlobalLexicon : public utils::hashmurmur3<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -40,8 +41,7 @@ namespace cicada
     
     typedef float weight_type;
     
-    typedef uint64_t                           hash_value_type;
-    typedef utils::hashmurmur<hash_value_type> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
   private:
     typedef word_id_type key_type;

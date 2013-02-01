@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__BINARIZE_DEPENDENCY__HPP__
@@ -8,7 +8,7 @@
 
 #include <cicada/binarize_base.hpp>
 
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 
 // we assume that every hyperedge takes the structure of:
 // 
@@ -38,9 +38,9 @@ namespace cicada
 
     typedef std::pair<symbol_type, tail_set_type> binarized_type;
     
-    struct binarized_hash : public utils::hashxx<size_t>
+    struct binarized_hash : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const binarized_type& x) const {
 	return hasher_type::operator()(x.second.begin(), x.second.end(), x.first.id());

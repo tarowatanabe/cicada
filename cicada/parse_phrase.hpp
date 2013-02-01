@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_PHRASE__HPP__
@@ -20,7 +20,7 @@
 
 
 #include <utils/chunk_vector.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bit_vector.hpp>
 #include <utils/unordered_map.hpp>
 
@@ -100,7 +100,7 @@ namespace cicada
     typedef utils::simple_vector<phrase_candidate_type, std::allocator<phrase_candidate_type> > phrase_candidate_set_type;
 
     
-    typedef typename utils::unordered_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashxx<size_t>, std::equal_to<transducer_type::id_type>,
+    typedef typename utils::unordered_map<transducer_type::id_type, phrase_candidate_set_type, utils::hashmurmur3<size_t>, std::equal_to<transducer_type::id_type>,
 					  std::allocator<std::pair<const transducer_type::id_type, phrase_candidate_set_type> > >::type phrase_candidate_map_type;
     typedef std::vector<phrase_candidate_map_type, std::allocator<phrase_candidate_map_type> > phrase_candidate_table_type;
     

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // a model composed of many feature functions
@@ -17,6 +17,8 @@
 #include <cicada/ngram_count_set.hpp>
 
 #include <boost/shared_ptr.hpp>
+
+#include <utils/hashmurmur3.hpp>
 
 namespace cicada
 {
@@ -76,9 +78,9 @@ namespace cicada
       state_type operator()() const { return state_type(); }
     };
 
-    struct state_hash : public utils::hashmurmur<size_t>
+    struct state_hash : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       state_hash(size_t __state_size)
 	: state_size(__state_size) {}

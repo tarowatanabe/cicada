@@ -32,6 +32,7 @@
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 #include <utils/compact_map.hpp>
+#include <utils/hashmurmur3.hpp>
 
 namespace cicada
 {
@@ -111,7 +112,7 @@ namespace cicada
       
       typedef utils::compact_map<id_type, id_type,
 				 unassigned_id<id_type>, unassigned_id<id_type>,
-				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 utils::hashmurmur3<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
 
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;

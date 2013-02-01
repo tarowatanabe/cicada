@@ -12,7 +12,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/inside_outside.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
@@ -57,11 +57,11 @@ namespace cicada
 
     typedef context_pair_type state_type;
     
-    struct state_hash_type : public utils::hashmurmur<size_t>
+    struct state_hash_type : public utils::hashmurmur3<size_t>
     {
       size_t operator()(const state_type& x) const
       {
-	typedef utils::hashmurmur<size_t> hasher_type;
+	typedef utils::hashmurmur3<size_t> hasher_type;
 	
 	return hasher_type::operator()(x.first.begin(), x.first.end(), hasher_type::operator()(x.second.begin(), x.second.end(), 0));
       }

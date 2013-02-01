@@ -50,7 +50,7 @@
 #include <utils/piece.hpp>
 #include <utils/space_separator.hpp>
 #include <utils/tempfile.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/array_power2.hpp>
@@ -122,7 +122,7 @@ public:
   friend
   size_t  hash_value(RootCount const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     return hasher_type()(x.label.begin(), x.label.end(), 0);
   }
@@ -195,7 +195,7 @@ public:
   friend
   size_t  hash_value(PhrasePair const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     return hasher_type()(x.source.begin(), x.source.end(),
 			 hasher_type()(x.target.begin(), x.target.end(),
@@ -288,7 +288,7 @@ public:
   friend
   size_t  hash_value(PhrasePairSimple const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
   }
@@ -357,7 +357,7 @@ public:
   friend
   size_t  hash_value(PhraseCount const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     return hasher_type()(x.phrase.begin(), x.phrase.end(), 0);
   }
@@ -846,8 +846,8 @@ struct PhraseCountGenerator
 
 struct PhrasePairExtractor
 {
-  typedef uint64_t                           hash_value_type;
-  typedef utils::hashmurmur<hash_value_type> hasher_type;
+  typedef uint64_t                            hash_value_type;
+  typedef utils::hashmurmur3<hash_value_type> hasher_type;
 };
 
 // compute observation counts for source-side

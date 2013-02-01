@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_lexicon_impl.hpp"
@@ -10,6 +10,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/mathop.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -895,7 +896,7 @@ struct LearnMapper : public Learner
   queue_ttable_set_type& queue_ttable_source_target;
   queue_ttable_set_type& queue_ttable_target_source;
   
-  utils::hashmurmur<size_t> hasher;
+  //utils::hashmurmur3<size_t> hasher;
 };
 
 template <typename TableSet, typename Table>

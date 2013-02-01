@@ -87,7 +87,7 @@ struct PYPTranslit
     friend
     size_t hash_value(segment_pair_type const& x)
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
     }

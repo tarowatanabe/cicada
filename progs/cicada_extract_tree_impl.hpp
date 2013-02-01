@@ -46,6 +46,7 @@
 #include <utils/std_heap.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
+#include <utils/hashmurmur3.hpp>
 
 struct Bitext
 {
@@ -146,7 +147,7 @@ struct RulePair
   friend
   size_t hash_value(RulePair const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     return hasher_type()(x.source.begin(), x.source.end(),
 			 hasher_type()(x.target.begin(), x.target.end(),
@@ -377,7 +378,7 @@ struct ExtractTree
   typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
   typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
   
-  typedef utils::unordered_map<range_type, node_set_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
+  typedef utils::unordered_map<range_type, node_set_type, utils::hashmurmur3<size_t>, std::equal_to<range_type>,
 			       std::allocator<std::pair<const range_type, node_set_type> > >::type range_map_type;
   
   typedef std::vector<bool, std::allocator<bool> > covered_type;
@@ -887,11 +888,11 @@ struct ExtractTree
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
       typedef utils::compact_map<range_type, id_type,
 				 unassigned_range, deleted_range,
-				 utils::hashmurmur<size_t>, std::equal_to<range_type>,
+				 utils::hashmurmur3<size_t>, std::equal_to<range_type>,
 				 std::allocator<std::pair<const range_type, id_type> > > range_node_map_type;
       typedef utils::compact_set<range_type,
 				 unassigned_range, deleted_range,
-				 utils::hashmurmur<size_t>, std::equal_to<range_type>,
+				 utils::hashmurmur3<size_t>, std::equal_to<range_type>,
 				 std::allocator<range_type> > range_set_type;
     
       typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
@@ -1450,11 +1451,11 @@ struct ExtractTree
   
   typedef std::pair<range_type, range_set_type> range_tail_type;
   
-  struct range_tail_hash : public utils::hashmurmur<size_t>
+  struct range_tail_hash : public utils::hashmurmur3<size_t>
   {
     size_t operator()(const range_tail_type& x) const
     {
-      return utils::hashmurmur<size_t>::operator()(x.second.begin(), x.second.end(), x.first.first + x.first.second);
+      return utils::hashmurmur3<size_t>::operator()(x.second.begin(), x.second.end(), x.first.first + x.first.second);
     }
   };
 

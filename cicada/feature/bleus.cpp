@@ -1,11 +1,11 @@
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <map>
 
 #include "utils/space_separator.hpp"
-#include "utils/hashxx.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
@@ -117,9 +117,9 @@ namespace cicada
     
       typedef utils::simple_vector<count_type, std::allocator<count_type> > count_set_type;
       
-      struct count_set_hash : public utils::hashxx<size_t>
+      struct count_set_hash : public utils::hashmurmur3<size_t>
       {
-	typedef utils::hashxx<size_t> hasher_type;
+	typedef utils::hashmurmur3<size_t> hasher_type;
 	
 	size_t operator()(const count_set_type& x) const
 	{

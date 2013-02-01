@@ -19,7 +19,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/spinlock.hpp"
@@ -67,11 +67,11 @@ format: ICU's number/date format rules\n\
   }
   
   template <typename Tp>
-  struct hash_string : public utils::hashmurmur<size_t>
+  struct hash_string : public utils::hashmurmur3<size_t>
   {
     size_t operator()(const Tp& x) const
     {
-      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
     }
   };
 

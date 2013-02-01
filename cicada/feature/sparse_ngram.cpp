@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "sparse_ngram.hpp"
@@ -16,14 +16,14 @@
 #include "utils/indexed_trie.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/small_vector.hpp"
-#include "utils/hashxx.hpp"
+#include "utils/hashmurmur3.hpp"
 
 namespace cicada
 {
   namespace feature
   {
 
-    class SparseNGramImpl : public utils::hashxx<size_t>
+    class SparseNGramImpl : public utils::hashmurmur3<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -67,7 +67,7 @@ namespace cicada
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
 
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
 
       struct CacheContext
       {

@@ -29,7 +29,6 @@
 #include <boost/math/special_functions/expm1.hpp>
 
 #include <utils/bithack.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>

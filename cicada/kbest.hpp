@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__KBEST__HPP__
@@ -15,7 +15,7 @@
 #include <utils/bithack.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/compact_set.hpp>
@@ -123,11 +123,11 @@ namespace cicada
     
     typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_list_type;
     
-    struct derivation_hash_type : public utils::hashxx<size_t>
+    struct derivation_hash_type : public utils::hashmurmur3<size_t>
     {
       size_t operator()(const derivation_type* x) const
       {
-	return (x == 0 ? size_t(0) : utils::hashxx<size_t>::operator()(x->j.begin(), x->j.end(), (uintptr_t) x->edge));
+	return (x == 0 ? size_t(0) : utils::hashmurmur3<size_t>::operator()(x->j.begin(), x->j.end(), (uintptr_t) x->edge));
       }
     };
     

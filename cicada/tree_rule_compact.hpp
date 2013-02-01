@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__TREE_RULE_COMPACT__HPP__
@@ -11,7 +11,7 @@
 #include <cicada/tree_rule.hpp>
 
 #include <utils/simple_vector.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 namespace cicada
 {
@@ -73,7 +73,7 @@ namespace cicada
     }
     
   public:
-    friend size_t hash_value(TreeRuleCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
+    friend size_t hash_value(TreeRuleCompact const& x) { return utils::hashmurmur3<size_t>()(x.impl.begin(), x.impl.end(), 0); }
     friend bool operator==(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl == y.impl; }
     friend bool operator!=(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl != y.impl; }
     friend bool operator<(const TreeRuleCompact& x, const TreeRuleCompact& y) { return x.impl < y.impl; }

@@ -35,6 +35,7 @@
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/hashmurmur3.hpp>
 
 struct Bitext
 {
@@ -129,7 +130,7 @@ struct RulePair
   friend
   size_t hash_value(RulePair const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     return hasher_type()(x.source.begin(), x.source.end(),
 			 hasher_type()(x.target.begin(), x.target.end(),
@@ -264,7 +265,7 @@ struct ExtractSCFG
     friend
     size_t hash_value(span_pair_type const& x)
     {
-      return utils::hashmurmur<size_t>()(x, 0);
+      return utils::hashmurmur3<size_t>()(x, 0);
     }
     
     friend
@@ -374,7 +375,7 @@ struct ExtractSCFG
   {
     typedef utils::chart<symbol_type, std::allocator<std::string> > label_chart_type;
     
-    typedef utils::unordered_map<span_type, symbol_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+    typedef utils::unordered_map<span_type, symbol_type, utils::hashmurmur3<size_t>, std::equal_to<span_type>,
 				 std::allocator<std::pair<const span_type, symbol_type> > >::type label_map_type;
     
     label_map_type   label_map;

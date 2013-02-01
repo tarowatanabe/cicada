@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__ALIGNMENT__HPP__
@@ -20,7 +20,7 @@
 #include <utility>
 #include <string>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -173,13 +173,13 @@ namespace cicada
   inline
   size_t hash_value(Alignment::point_type const& x)
   {
-    return utils::hashmurmur<size_t>()(x, 0);
+    return utils::hashmurmur3<size_t>()(x, 0);
   }
   
   inline
   size_t hash_value(Alignment const& x)
   { 
-    return utils::hashmurmur<size_t>()(x.__align.begin(), x.__align.end(), 0);
+    return utils::hashmurmur3<size_t>()(x.__align.begin(), x.__align.end(), 0);
   }
   
   inline

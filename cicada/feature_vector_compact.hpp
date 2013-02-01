@@ -13,7 +13,7 @@
 
 #include <cicada/feature.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bithack.hpp>
 #include <utils/byte_aligned_code.hpp>
 #include <utils/simple_vector.hpp>
@@ -417,7 +417,7 @@ namespace cicada
     }
     
   public:
-    friend size_t hash_value(FeatureVectorCompact const& x) { return utils::hashmurmur<size_t>()(x.impl.begin(), x.impl.end(), 0); }
+    friend size_t hash_value(FeatureVectorCompact const& x) { return utils::hashmurmur3<size_t>()(x.impl.begin(), x.impl.end(), 0); }
     
     friend bool operator==(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl == y.impl; }
     friend bool operator!=(const FeatureVectorCompact& x, const FeatureVectorCompact& y) { return x.impl != y.impl; }

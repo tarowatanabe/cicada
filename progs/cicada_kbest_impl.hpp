@@ -22,6 +22,7 @@
 #include <utils/base64.hpp>
 #include <utils/double_base64_parser.hpp>
 #include <utils/double_base64_generator.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/eval.hpp"
@@ -92,7 +93,7 @@ void swap(hypothesis_type& x, hypothesis_type& y)
 inline
 size_t hash_value(hypothesis_type const& x)
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  typedef utils::hashmurmur3<size_t> hasher_type;
   
   return hasher_type()(x.sentence.begin(), x.sentence.end(), hash_value(x.features));
 }

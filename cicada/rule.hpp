@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__RULE__HPP__
@@ -15,7 +15,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -64,7 +64,7 @@ namespace cicada
   inline
   size_t hash_value(Rule const& x)
   {
-    return utils::hashmurmur<size_t>()(x.rhs.begin(), x.rhs.end(), x.lhs.id());
+    return utils::hashmurmur3<size_t>()(x.rhs.begin(), x.rhs.end(), x.lhs.id());
   }
 
   inline

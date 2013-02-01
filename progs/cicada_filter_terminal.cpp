@@ -25,7 +25,6 @@
 #include <boost/tokenizer.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "utils/hashmurmur.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/bithack.hpp"

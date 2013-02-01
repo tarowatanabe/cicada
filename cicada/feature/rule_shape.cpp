@@ -15,7 +15,7 @@
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
 #include "utils/compact_map.hpp"
-#include "utils/hashxx.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -53,7 +53,7 @@ namespace cicada
       
       typedef utils::trie_compact<int, std::string,
 				  unassigned_key<int>, 
-				  utils::hashxx<size_t>, std::equal_to<int>,
+				  utils::hashmurmur3<size_t>, std::equal_to<int>,
 				  std::allocator<std::pair<const int, std::string> > > trie_type;
       
       typedef std::vector<feature_type, std::allocator<feature_type> > cache_unigram_type;
@@ -63,7 +63,7 @@ namespace cicada
       
       typedef utils::compact_map<id_type, feature_type,
 				 unassigned_key<id_type>, unassigned_key<id_type>,
-				 utils::hashxx<size_t>, std::equal_to<id_type>,
+				 utils::hashmurmur3<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, feature_type> > > node_map_type;
       typedef std::deque<node_map_type, std::allocator<node_map_type> > cache_bigram_type;
 

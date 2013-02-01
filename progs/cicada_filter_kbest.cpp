@@ -43,7 +43,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/subprocess.hpp"
 #include "utils/lockfree_list_queue.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/lexical_cast.hpp"
@@ -86,7 +86,7 @@ struct hypothesis_type
 inline
 size_t hash_value(hypothesis_type const& x)
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  typedef utils::hashmurmur3<size_t> hasher_type;
   
   return hasher_type()(x.sentence.begin(), x.sentence.end(), hasher_type()(x.features.begin(), x.features.end(), 0));
 }

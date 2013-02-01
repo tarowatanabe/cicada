@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__SORT_TOPOLOGICALLY__HPP__
@@ -10,7 +10,7 @@
 
 #include <cicada/hypergraph.hpp>
 
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/compact_set.hpp>
 
 namespace cicada
@@ -76,7 +76,7 @@ namespace cicada
     {
       typedef utils::compact_set<id_type,
 				 unassigned_key, unassigned_key,
-				 utils::hashxx<size_t>, std::equal_to<id_type>,
+				 utils::hashmurmur3<size_t>, std::equal_to<id_type>,
 				 std::allocator<id_type> > id_set_type;
       
       sorted.clear();

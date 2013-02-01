@@ -52,7 +52,7 @@
 
 namespace cicada
 {
-  struct TreeGrammarMutableImpl : public utils::hashmurmur<uint64_t>
+  struct TreeGrammarMutableImpl
   {
     friend class TreeGrammarMutable;
 

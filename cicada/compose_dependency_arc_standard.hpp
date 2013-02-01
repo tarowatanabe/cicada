@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__COMPOSE_DEPENDENCY_ARC_STANDARD__HPP__
@@ -17,7 +17,7 @@
 #include <cicada/sort_topologically.hpp>
 
 #include <utils/chunk_vector.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bithack.hpp>
 #include <utils/chart.hpp>
 #include <utils/compact_map.hpp>
@@ -90,7 +90,7 @@ namespace cicada
 
     typedef utils::compact_map<id_type, hypergraph_type::id_type,
 			       unassigned_key, unassigned_key, 
-			       utils::hashxx<size_t>, std::equal_to<id_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<id_type>,
 			       std::allocator<std::pair<const id_type, hypergraph_type::id_type> > > node_map_type;
     
     void operator()(const lattice_type& lattice,

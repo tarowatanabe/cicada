@@ -25,7 +25,7 @@
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
@@ -91,7 +91,7 @@ namespace cicada
       bool operator>=(const State& x, const State& y) { return x.state >= y.state; }
       
       friend
-      size_t  hash_value(State const& x) { return utils::hashmurmur<size_t>()(x.state); }
+      size_t  hash_value(State const& x) { return utils::hashmurmur3<size_t>()(x.state); }
       
     private:
       state_type state;
@@ -99,10 +99,10 @@ namespace cicada
 
     typedef State state_type;
 
-    struct Shard : public utils::hashxx<size_t>
+    struct Shard : public utils::hashmurmur3<size_t>
     {
     private:
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
     public:
       typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> >   id_set_type;
@@ -579,7 +579,7 @@ namespace cicada
     state_type suffix(const state_type& state) const
     {
       typedef std::vector<id_type, std::allocator<id_type> > context_type;
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       // root or unigram's suffix is root
       if (state.is_root() || state.is_root_shard()) return state_type();

@@ -347,9 +347,9 @@ struct OptimizeLinear
   //
   // typedef for unique sentences
   //
-  struct hash_sentence : public utils::hashmurmur<size_t>
+  struct hash_sentence : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {
@@ -1057,9 +1057,9 @@ struct OptimizeSVM
   typedef std::vector<double, std::allocator<double> > alpha_set_type;
   typedef std::vector<double, std::allocator<double> > f_set_type;
   
-  struct hash_sentence : public utils::hashmurmur<size_t>
+  struct hash_sentence : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {

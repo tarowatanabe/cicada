@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_AGENDA__HPP__
@@ -21,7 +21,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashxx.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
@@ -92,7 +92,7 @@ namespace cicada
     
     
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
-    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashxx<size_t>, std::equal_to<transducer_type::id_type>,
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur3<size_t>, std::equal_to<transducer_type::id_type>,
 					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
@@ -285,7 +285,7 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    typedef utils::hashxx<size_type> traversal_hash_type;
+    typedef utils::hashmurmur3<size_type> traversal_hash_type;
     struct traversal_equal_type
     {
       bool operator()(const traversal_type& x, const traversal_type& y) const
@@ -308,9 +308,9 @@ namespace cicada
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
     typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
     
-    struct edge_active_hash_type : public utils::hashxx<size_t>
+    struct edge_active_hash_type : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const edge_type* x) const
       {
@@ -326,9 +326,9 @@ namespace cicada
       }
     };
     
-    struct edge_passive_hash_type : public utils::hashxx<size_t>
+    struct edge_passive_hash_type : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashxx<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const edge_type* x) const
       {

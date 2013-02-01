@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__DEPENDENCY__HPP__
@@ -18,7 +18,7 @@
 #include <utility>
 #include <string>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -129,7 +129,7 @@ namespace cicada
   inline
   size_t hash_value(Dependency const& x)
   { 
-    return utils::hashmurmur<size_t>()(x.__dep.begin(), x.__dep.end(), 0);
+    return utils::hashmurmur3<size_t>()(x.__dep.begin(), x.__dep.end(), 0);
   }
 
   inline

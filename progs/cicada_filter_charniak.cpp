@@ -28,7 +28,7 @@
 #include "cicada/vocab.hpp"
 #include "cicada/sort.hpp"
 
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/chart.hpp"
@@ -150,9 +150,9 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
 
 typedef cicada::HyperGraph hypergraph_type;
 
-struct string_hash : public utils::hashmurmur<size_t>
+struct string_hash : public utils::hashmurmur3<size_t>
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  typedef utils::hashmurmur3<size_t> hasher_type;
   
   size_t operator()(const std::string& x) const
   {

@@ -1839,9 +1839,9 @@ int main(int argc, char ** argv)
 
 struct TaskVocab
 {
-  struct string_hash : public utils::hashmurmur<size_t>
+  struct string_hash : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     size_t operator()(const std::string& x) const
     {

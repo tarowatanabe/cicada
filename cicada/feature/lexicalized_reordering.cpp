@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <utility>
@@ -12,7 +12,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/piece.hpp"
-#include "utils/hashxx.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -50,11 +50,11 @@ namespace cicada
       
       typedef utils::simple_vector<float, std::allocator<float> > feature_cache_type;
       
-      struct feature_cache_hash_type : public utils::hashxx<size_t>
+      struct feature_cache_hash_type : public utils::hashmurmur3<size_t>
       {
 	size_t operator()(const feature_cache_type& x) const
 	{
-	  return utils::hashxx<size_t>::operator()(x.begin(), x.end(), 0);
+	  return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
 	}
       };
       typedef utils::indexed_set<feature_cache_type, feature_cache_hash_type, std::equal_to<feature_cache_type>,

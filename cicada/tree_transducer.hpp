@@ -23,7 +23,7 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -118,7 +118,7 @@ namespace cicada
   inline
   size_t hash_value(TreeTransducer::edge_type const& x)
   {
-    return utils::hashmurmur<size_t>()(x.id);
+    return utils::hashmurmur3<size_t>()(x.id);
   }
 
   

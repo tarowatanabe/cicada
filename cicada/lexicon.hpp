@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__LEXICON__HPP__
@@ -18,13 +18,13 @@
 #include <succinct_db/succinct_trie_db.hpp>
 
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <boost/filesystem/path.hpp>
 
 namespace cicada
 {
-  class Lexicon : public utils::hashmurmur<uint64_t>
+  class Lexicon : public utils::hashmurmur3<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -36,8 +36,7 @@ namespace cicada
 
     typedef float weight_type;
     
-    typedef uint64_t                           hash_value_type;
-    typedef utils::hashmurmur<hash_value_type> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     typedef boost::filesystem::path path_type;
     

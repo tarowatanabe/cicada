@@ -47,7 +47,6 @@
 #include "operation/viterbi.hpp"
 
 #include "utils/resource.hpp"
-#include "utils/hashmurmur.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
