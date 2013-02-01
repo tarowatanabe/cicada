@@ -21,6 +21,7 @@
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
@@ -28,7 +29,7 @@
 
 namespace cicada
 {
-  class NGramPYP : public utils::hashmurmur<size_t>
+  class NGramPYP : public utils::hashxx<size_t>
   {
   public:
     typedef Symbol                  word_type;
@@ -76,7 +77,7 @@ namespace cicada
     typedef State state_type;
     
   private:
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashxx<size_t> hasher_type;
     
     typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> >       id_set_type;
     typedef utils::packed_vector_mapped<count_type, std::allocator<count_type> > count_set_type;
@@ -213,7 +214,7 @@ namespace cicada
 	spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_pos_[pos & 0x07].mutex));
 	
 	if (lock) {
-	  const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos_.size() - 1);
+	  const size_type cache_pos = hasher_type::operator()(pos, id) & (caches_pos_.size() - 1);
 	  cache_pos_type& cache = const_cast<cache_pos_type&>(caches_pos_[cache_pos]);
 	  if (cache.pos != pos || cache.id != id) {
 	    cache.pos      = pos;
@@ -420,7 +421,7 @@ namespace cicada
       spinlock_type::trylock_type lock(const_cast<spinlock_type::mutex_type&>(spinlock_prob_[pos & 0x07].mutex));
       
       if (lock) {
-	const size_type cache_pos = hasher_type::operator()(word, pos) &(caches_prob_.size() - 1);
+	const size_type cache_pos = hasher_type::operator()(pos, word) &(caches_prob_.size() - 1);
 	cache_prob_type& cache = const_cast<cache_prob_type&>(caches_prob_[cache_pos]);
 	
 	if (cache.pos != pos || cache.word != word) {

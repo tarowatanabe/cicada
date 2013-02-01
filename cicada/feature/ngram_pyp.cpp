@@ -13,7 +13,7 @@
 
 #include "utils/vector2.hpp"
 #include "utils/array_power2.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashxx.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
@@ -23,7 +23,7 @@ namespace cicada
 {
   namespace feature
   {
-    class NGramPYPImpl : public utils::hashmurmur<size_t>
+    class NGramPYPImpl : public utils::hashxx<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -52,7 +52,7 @@ namespace cicada
       
       typedef rule_type::symbol_set_type phrase_type;
       
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashxx<size_t> hasher_type;
 
 
       struct CacheContext

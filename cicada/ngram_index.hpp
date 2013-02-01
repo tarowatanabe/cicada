@@ -25,6 +25,7 @@
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/hashxx.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
@@ -98,8 +99,11 @@ namespace cicada
 
     typedef State state_type;
 
-    struct Shard : public hasher_type
+    struct Shard : public utils::hashxx<size_t>
     {
+    private:
+      typedef utils::hashxx<size_t> hasher_type;
+      
     public:
       typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> >   id_set_type;
       typedef utils::succinct_vector_mapped<std::allocator<int32_t> >          position_set_type;
@@ -273,7 +277,7 @@ namespace cicada
 	  trylock_type lock(const_cast<spinlock_type&>(spinlock_pos));
 	  
 	  if (lock) {
-	    const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos.size() - 1);
+	    const size_type cache_pos = hasher_type::operator()(pos, id) & (caches_pos.size() - 1);
 	    cache_pos_type& cache = const_cast<cache_pos_type&>(caches_pos[cache_pos]);
 	    if (cache.pos != pos || cache.id != id) {
 	      cache.pos      = pos;
@@ -575,6 +579,7 @@ namespace cicada
     state_type suffix(const state_type& state) const
     {
       typedef std::vector<id_type, std::allocator<id_type> > context_type;
+      typedef utils::hashxx<size_t> hasher_type;
       
       // root or unigram's suffix is root
       if (state.is_root() || state.is_root_shard()) return state_type();
@@ -585,7 +590,8 @@ namespace cicada
       if (state.node() < shard.offsets[2])
 	return state_type(size_type(-1), shard[state.node()]);
       
-      const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
+      //const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
+      const size_type cache_pos = hasher_type()(state) & (shard.caches_suffix.size() - 1);
       
       // trylock...
       {
