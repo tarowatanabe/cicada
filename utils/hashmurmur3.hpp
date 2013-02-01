@@ -140,8 +140,8 @@ namespace utils
       uint64_t h1 = seed;
       uint64_t h2 = seed;
       
-      const uint64_t c1 = 0x87c37b91114253d5LLU;
-      const uint64_t c2 = 0x4cf5ad432745937fLLU;
+      const uint64_t c1 = 0x87c37b91114253d5ULL;
+      const uint64_t c2 = 0x4cf5ad432745937fULL;
       
       //----------
       // body
