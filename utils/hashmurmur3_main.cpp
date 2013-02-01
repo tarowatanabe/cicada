@@ -8,6 +8,7 @@
 #include <utils/search.hpp>
 #include <utils/random_seed.hpp>
 #include <utils/unordered_set.hpp>
+#include <utils/resource.hpp>
 
 #include "hashmurmur3.hpp"
 
@@ -64,7 +65,13 @@ int main(int argc, char** argv)
   boost::variate_generator<boost::mt19937, boost::uniform_int<uint32_t> > gen(generator, range);
   
   // random queries...
+  utils::resource start;
   test_hash_loop<256>::test(gen, hasher32, hasher64);
+  utils::resource end;
+
+  std::cout << "cpu time: " << (end.cpu_time() - start.cpu_time())
+            << " user time: " << (end.user_time() - start.user_time())
+            << std::endl;
 
   // read and compute
   while (std::getline(std::cin, line))
