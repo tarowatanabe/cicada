@@ -107,14 +107,13 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t& h32)
+    void hash(Iterator& p, uint32_t& h32)
     {
-      for (size_t i = 0; i != Loop; ++ i) {
-	h32 += XXH_LE32(p) * PRIME32_3;
-	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
-	p += 4;
-      }
-      return h32;
+      h32 += XXH_LE32(p) * PRIME32_3;
+      h32 = XXH_rotl32(h32, 17) * PRIME32_4;
+      p += 4;
+      
+      __static_hashxx4<Loop - 1>::hash(p, h32);
     }
   };
 
@@ -123,9 +122,9 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t& h32)
+    void hash(Iterator& p, uint32_t& h32)
     {
-      return h32;
+      
     }
   };
   
@@ -134,14 +133,13 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t& h32)
+    void hash(Iterator& p, uint32_t& h32)
     {
-      for (size_t i = 0; i != Loop; ++ i) {
-	h32 += (*p) * PRIME32_5;
-	h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
-	++ p;
-      }
-      return h32;
+      h32 += (*p) * PRIME32_5;
+      h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
+      ++ p;
+      
+      __static_hashxx1<Loop - 1>::hash(p, h32);
     }
   };
 
@@ -150,9 +148,9 @@ namespace utils
   {
     template <typename Iterator>
     static inline
-    uint32_t hash(Iterator& p, uint32_t& h32)
+    void hash(Iterator& p, uint32_t& h32)
     {
-      return h32;
+      
     }
   };
   
@@ -233,19 +231,37 @@ namespace utils
 	h32  = seed + PRIME32_5;
       
       h32 += static_cast<uint32_t>(len);
-      
-      while (p <= bEnd - 4) {
+
+      switch ((len >> 2) & 0x03) {
+      case 3:
 	h32 += XXH_LE32(p) * PRIME32_3;
-	h32 = XXH_rotl32(h32, 17) * PRIME32_4 ;
+	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
+	p += 4;
+      case 2:
+	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
+	p += 4;
+      case 1:
+	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
 	p += 4;
       }
       
-      while (p < bEnd) {
+      switch (len & 0x03) {
+      case 3:
 	h32 += (*p) * PRIME32_5;
-	h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
+	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
+	++ p;
+      case 2:
+	h32 += (*p) * PRIME32_5;
+	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
+	++ p;
+      case 1:
+	h32 += (*p) * PRIME32_5;
+	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
 	++ p;
       }
-
+      
       h32 ^= h32 >> 15;
       h32 *= PRIME32_2;
       h32 ^= h32 >> 13;
