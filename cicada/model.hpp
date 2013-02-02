@@ -113,7 +113,7 @@ namespace cicada
       
       bool operator()(const state_type& x, const state_type& y) const
       {
-	return std::lexicographical_compare(x.base, x.base + state_size, y.base, y.base + state_size);
+	return (! x.base && y.base) || (x.base && y.base && std::lexicographical_compare(x.base, x.base + state_size, y.base, y.base + state_size));
       }
     
       size_t state_size;
