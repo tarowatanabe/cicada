@@ -391,12 +391,10 @@ namespace cicada
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
       FeatureVectorCODEC   feature_codec;
       AttributeVectorCODEC attribute_codec;
       
-      const size_type cache_pos = hasher_type()(node) & (cache_rule.size() - 1);
+      const size_type cache_pos = node & (cache_rule.size() - 1);
       
       cache_rule_pair_set_type& cache = const_cast<cache_rule_pair_set_type&>(cache_rule[cache_pos]);
       
@@ -503,11 +501,9 @@ namespace cicada
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
       TreeRuleCODEC codec;
 
-      const size_type cache_pos = hasher_type()(pos) & (caches.size() - 1);
+      const size_type cache_pos = pos & (caches.size() - 1);
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
