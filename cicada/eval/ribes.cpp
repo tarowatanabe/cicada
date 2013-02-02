@@ -13,7 +13,7 @@
 #include "utils/mathop.hpp"
 #include "utils/bit_vector.hpp"
 #include "utils/unordered_map.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include <boost/functional/hash.hpp>
 #include <boost/math/special_functions/binomial.hpp>
@@ -133,7 +133,7 @@ namespace cicada
       
       typedef utils::unordered_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
 				   std::allocator<std::pair<const unigram_type, int> > >::type unigram_count_type;
-      typedef utils::unordered_map<bigram_type, int, utils::hashmurmur3<size_t>, std::equal_to<bigram_type>,
+      typedef utils::unordered_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
 				   std::allocator<std::pair<const bigram_type, int> > >::type bigram_count_type;
       
       void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams, bigram_count_type& bigrams) const

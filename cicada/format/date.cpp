@@ -23,7 +23,7 @@
 #include "date.hpp"
 
 #include "utils/unordered_map.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
@@ -36,7 +36,7 @@ namespace cicada
 {
   namespace format
   {
-    struct DateImpl : public utils::hashmurmur3<size_t>
+    struct DateImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef icu::DateFormat parser_type;
@@ -48,7 +48,7 @@ namespace cicada
       typedef cicada::Format::phrase_type     phrase_type;
       typedef cicada::Format::phrase_set_type phrase_set_type;
       
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
 
       struct cache_type
       {
