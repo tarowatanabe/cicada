@@ -8,7 +8,7 @@
 
 #include <cicada/binarize_base.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 // we assume that every hyperedge takes the structure of:
 // 
@@ -38,9 +38,9 @@ namespace cicada
 
     typedef std::pair<symbol_type, tail_set_type> binarized_type;
     
-    struct binarized_hash : public utils::hashmurmur<size_t>
+    struct binarized_hash : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const binarized_type& x) const {
 	return hasher_type::operator()(x.second.begin(), x.second.end(), x.first.id());

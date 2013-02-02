@@ -16,7 +16,7 @@
 #include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
@@ -104,11 +104,11 @@ namespace cicada
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
         
     
-    struct candidate_hash_type : public utils::hashmurmur<size_t>
+    struct candidate_hash_type : public utils::hashmurmur3<size_t>
     {
       size_t operator()(const candidate_type* x) const
       {
-	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
+	return (x == 0 ? size_t(0) : utils::hashmurmur3<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
       }
     };
     struct candidate_equal_type

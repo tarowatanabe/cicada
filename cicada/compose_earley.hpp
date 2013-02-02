@@ -25,7 +25,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/unordered_set.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/lexical_cast.hpp>
@@ -201,7 +201,7 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    typedef utils::hashmurmur<size_type> traversal_hash_type;
+    typedef utils::hashmurmur3<size_type> traversal_hash_type;
     
     struct traversal_equal_type
     {
@@ -222,9 +222,9 @@ namespace cicada
 			       std::allocator<traversal_type> > traversal_set_type;
     
     // edge hash/comparison
-   struct edge_unique_hash_type : public utils::hashmurmur<size_t>
+   struct edge_unique_hash_type : public utils::hashmurmur3<size_t>
    {
-     typedef utils::hashmurmur<size_t> hasher_type;
+     typedef utils::hashmurmur3<size_t> hasher_type;
      
      size_t operator()(const edge_type* x) const
      {
@@ -252,11 +252,11 @@ namespace cicada
       }
     };
     
-    struct edge_active_hash_type : public utils::hashmurmur<size_t>
+    struct edge_active_hash_type : public utils::hashmurmur3<size_t>
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->last.second, x->last.first);
+	return utils::hashmurmur3<size_t>::operator()(x->last.second, x->last.first);
       }
     };
     
@@ -268,11 +268,11 @@ namespace cicada
       }
     };
 
-    struct edge_passive_hash_type : public utils::hashmurmur<size_t>
+    struct edge_passive_hash_type : public utils::hashmurmur3<size_t>
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->first.second, x->first.first);
+	return utils::hashmurmur3<size_t>::operator()(x->first.second, x->first.first);
       }
     };
     
@@ -298,7 +298,7 @@ namespace cicada
     
     typedef utils::compact_map<transducer_id_type, hypergraph_type::id_type, 
 			       transducer_id_unassigned, transducer_id_unassigned,
-			       utils::hashmurmur<size_t>, std::equal_to<transducer_id_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<transducer_id_type>,
 			       std::allocator<std::pair<const transducer_id_type, hypergraph_type::id_type> > > terminal_node_set_type;
     
     struct edge_unassigned
@@ -317,7 +317,7 @@ namespace cicada
 
     typedef utils::compact_set<hypergraph_type::id_type,
 			       goal_unassigned, goal_unassigned,
-			       utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<hypergraph_type::id_type>,
 			       std::allocator<hypergraph_type::id_type> > goal_node_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;

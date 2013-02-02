@@ -21,7 +21,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/b_heap.hpp>
@@ -31,6 +31,8 @@
 #include <utils/small_vector.hpp>
 #include <utils/mulvector2.hpp>
 #include <utils/compact_map.hpp>
+
+#include <boost/functional/hash/hash.hpp>
 
 namespace cicada
 {
@@ -169,11 +171,11 @@ namespace cicada
     typedef RuleCandidate rule_candidate_type;
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     
-    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, boost::hash<transducer_type::id_type>, std::equal_to<transducer_type::id_type>,
 					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
-    typedef typename utils::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+    typedef typename utils::unordered_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
 					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
     
     typedef std::pair<symbol_type, int> symbol_level_type;
@@ -184,9 +186,9 @@ namespace cicada
       symbol_level_type operator()() const { return symbol_level_type(symbol_type(), -1); }
     };
         
-    struct symbol_level_hash : public utils::hashmurmur<size_t>
+    struct symbol_level_hash : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const symbol_level_type& x) const
       {
@@ -202,7 +204,7 @@ namespace cicada
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
 
     typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type,
-					  utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+					  utils::hashmurmur3<size_t>, std::equal_to<symbol_level_pair_type>,
 					  std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > >::type unary_rule_map_type;
     
     typedef utils::small_vector<int, std::allocator<int> > index_set_type;

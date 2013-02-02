@@ -28,7 +28,7 @@
 #include <utils/compact_map.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bithack.hpp>
 
 namespace cicada
@@ -189,7 +189,7 @@ namespace cicada
     };
     typedef Traversal traversal_type;
     
-    typedef utils::hashmurmur<size_type> traversal_hash_type;
+    typedef utils::hashmurmur3<size_type> traversal_hash_type;
     
     struct traversal_equal_type
     {
@@ -210,9 +210,9 @@ namespace cicada
 			       std::allocator<traversal_type> > traversal_set_type;
     
     // edge hash/comparison
-    struct edge_unique_hash_type : public utils::hashmurmur<size_t>
+    struct edge_unique_hash_type : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const edge_type* x) const
       {
@@ -240,9 +240,9 @@ namespace cicada
       }
     };
     
-    struct edge_node_hash_type : public utils::hashmurmur<size_t>
+    struct edge_node_hash_type : public utils::hashmurmur3<size_t>
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       size_t operator()(const edge_type* x) const
       {

@@ -18,7 +18,7 @@
 #include <cicada/hypergraph.hpp>
 
 #include <utils/chunk_vector.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bit_vector.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/unordered_map.hpp>
@@ -124,7 +124,7 @@ namespace cicada
     
     typedef utils::compact_map<span_node_type, hypergraph_type::id_type,
 			       span_node_unassigned, span_node_unassigned,
-			       utils::hashmurmur<size_t>, std::equal_to<span_node_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<span_node_type>,
 			       std::allocator<std::pair<const span_node_type, hypergraph_type::id_type> > > span_node_map_type;
 
     typedef std::vector<int, std::allocator<int> > node_set_type;

@@ -18,13 +18,13 @@
 #include <succinct_db/succinct_trie_db.hpp>
 
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <boost/filesystem/path.hpp>
 
 namespace cicada
 {
-  class Lexicon : public utils::hashmurmur<size_t>
+  class Lexicon : public utils::hashmurmur3<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -36,7 +36,7 @@ namespace cicada
 
     typedef float weight_type;
     
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     typedef boost::filesystem::path path_type;
     
@@ -153,7 +153,7 @@ namespace cicada
 	return cache.next;
       } else {
 	// we are root!
-	const size_type cache_pos = hasher_type::operator()(word.id()) & (caches_root.size() - 1);
+	const size_type cache_pos = word.id() & (caches_root.size() - 1);
 	cache_root_type& cache = const_cast<cache_root_type&>(caches_root[cache_pos]);
 	
 	if (cache.word != word.id())  {
