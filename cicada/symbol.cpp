@@ -11,6 +11,7 @@
 #include <boost/spirit/include/phoenix.hpp>
 
 #include <boost/xpressive/xpressive.hpp>
+#include <boost/functional/hash/hash.hpp>
 
 #include <utils/atomicop.hpp>
 #include <utils/lexical_cast.hpp>
@@ -18,7 +19,6 @@
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur.hpp>
 
 #include "symbol.hpp"
 
@@ -29,11 +29,11 @@ namespace cicada
 {
   struct SymbolImpl
   {
-    typedef Symbol::symbol_map_type               symbol_map_type;
-    typedef Symbol::id_type id_type;
-    typedef Symbol::mutex_type mutex_type;
+    typedef Symbol::symbol_map_type symbol_map_type;
+    typedef Symbol::id_type         id_type;
+    typedef Symbol::mutex_type      mutex_type;
     
-    typedef utils::indexed_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
+    typedef utils::indexed_set<id_type, boost::hash<id_type>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
     
     struct symbol_cache_type
     {
