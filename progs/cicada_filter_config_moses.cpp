@@ -26,13 +26,13 @@
 #include "utils/compress_stream.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
 
-struct feature_hash : public utils::hashmurmur3<size_t>
+struct feature_hash : public utils::hashmurmur<size_t>
 {
-  typedef utils::hashmurmur3<size_t> hasher_type;
+  typedef utils::hashmurmur<size_t> hasher_type;
   
   size_t operator()(const std::string& x) const
   {

@@ -12,7 +12,7 @@
 #include <stdexcept>
 
 #include <utils/bithack.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace utils
 {
@@ -443,7 +443,7 @@ namespace utils
   inline
   size_t hash_value(bit_vector<_N> const& x)
   {
-    return utils::hashmurmur3<size_t>()(x.begin(), x.end(), 0);
+    return utils::hashmurmur<size_t>()(x.begin(), x.end(), 0);
   }
 
   

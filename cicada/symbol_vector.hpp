@@ -14,7 +14,7 @@
 #include <cicada/symbol.hpp>
 
 #include <utils/small_vector.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -163,7 +163,7 @@ namespace cicada
   inline
   size_t hash_value(SymbolVector const& x)
   {
-    return utils::hashmurmur3<size_t>()(x.begin(), x.end(), 0);
+    return utils::hashmurmur<size_t>()(x.begin(), x.end(), 0);
   }
     
   inline

@@ -12,7 +12,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -125,7 +125,7 @@ namespace cicada
   };
   
   inline
-  size_t hash_value(Sentence const& x) { return utils::hashmurmur3<size_t>()(x.__sent.begin(), x.__sent.end(), 0); }
+  size_t hash_value(Sentence const& x) { return utils::hashmurmur<size_t>()(x.__sent.begin(), x.__sent.end(), 0); }
   
   inline
   bool operator==(const Sentence& x, const Sentence& y) { return x.__sent == y.__sent; }

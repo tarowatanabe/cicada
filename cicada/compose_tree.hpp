@@ -21,7 +21,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
@@ -110,9 +110,9 @@ namespace cicada
     typedef rule_type::symbol_set_type                symbol_set_type;
     
     template <typename Seq>
-    struct hash_sequence : utils::hashmurmur3<size_t>
+    struct hash_sequence : utils::hashmurmur<size_t>
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const Seq& x) const
       {
@@ -137,11 +137,11 @@ namespace cicada
 
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
 			       unassigned_key<internal_label_type>, unassigned_key<internal_label_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
 			       unassigned_key<terminal_label_type>, unassigned_key<terminal_label_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
     struct State
@@ -167,7 +167,7 @@ namespace cicada
     
     typedef utils::compact_map<symbol_type, hypergraph_type::id_type,
 			       utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<symbol_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     

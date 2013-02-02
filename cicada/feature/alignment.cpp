@@ -8,7 +8,7 @@
 #include "utils/piece.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/simple_vector.hpp"
 
@@ -146,7 +146,7 @@ namespace cicada
 	typedef boost::fusion::tuple<symbol_type, symbol_type, symbol_type, symbol_type, int> item_type;
 	typedef boost::array<feature_type, 5> features_type;
 	
-	typedef utils::unordered_map<item_type, features_type, utils::hashmurmur3<size_t>, std::equal_to<item_type>,
+	typedef utils::unordered_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
 				     std::allocator<std::pair<const item_type, features_type> > >::type feature_map_type;
 	
       public:

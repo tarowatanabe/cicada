@@ -16,7 +16,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/bithack.hpp>
 #include <utils/piece.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {
@@ -190,7 +190,7 @@ namespace cicada
     for (TreeRule::const_iterator aiter = x.begin(); aiter != x.end(); ++ aiter)
       seed = __hash_value_tree_rule(*aiter, seed);
     
-    return utils::hashmurmur3<size_t>()(x.label.id(), seed);
+    return utils::hashmurmur<size_t>()(x.label.id(), seed);
   }
   
   inline

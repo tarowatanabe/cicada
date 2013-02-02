@@ -15,7 +15,7 @@
 #include "utils/indexed_trie.hpp"
 #include "utils/chunk_vector.hpp"
 #include "utils/unordered_map.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/array.hpp>
@@ -63,7 +63,7 @@ namespace cicada
       typedef std::vector<dependency_set_type, std::allocator<dependency_set_type> > dependency_map_type;
       
       
-      typedef utils::indexed_trie<dependency_type, utils::hashmurmur3<size_t>, std::equal_to<dependency_type>, std::allocator<dependency_type> > dependency_index_type;
+      typedef utils::indexed_trie<dependency_type, utils::hashmurmur<size_t>, std::equal_to<dependency_type>, std::allocator<dependency_type> > dependency_index_type;
 
       typedef utils::simple_vector<feature_type, std::allocator<feature_type> > feature_list_type;
       //typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
@@ -72,7 +72,7 @@ namespace cicada
 
       
       typedef std::pair<dependency_type, dependency_type> dependency_pair_type;
-      typedef utils::unordered_map<dependency_pair_type, feature_list_type, utils::hashmurmur3<size_t>, std::equal_to<dependency_pair_type>,
+      typedef utils::unordered_map<dependency_pair_type, feature_list_type, utils::hashmurmur<size_t>, std::equal_to<dependency_pair_type>,
 				   std::allocator<std::pair<const dependency_pair_type, feature_list_type> > >::type feature_order_map_type;
       
       // temporary...

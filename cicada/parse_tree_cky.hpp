@@ -24,7 +24,7 @@
 #include <utils/indexed_set.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/b_heap.hpp>
@@ -228,24 +228,24 @@ namespace cicada
     typedef utils::simple_vector<tree_candidate_type, std::allocator<tree_candidate_type> > tree_candidate_set_type;
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     
-    typedef typename utils::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur3<size_t>, std::equal_to<tree_transducer_type::id_type>,
+    typedef typename utils::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
 					  std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > >::type tree_candidate_map_type;
-    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur3<size_t>, std::equal_to<transducer_type::id_type>,
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
 					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<tree_candidate_map_type, std::allocator<tree_candidate_map_type> > tree_candidate_table_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
 
-    typedef typename utils::unordered_set<const tree_candidate_type*, utils::hashmurmur3<size_t>, std::equal_to<const tree_candidate_type*>,
+    typedef typename utils::unordered_set<const tree_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const tree_candidate_type*>,
 					  std::allocator<const tree_candidate_type*> >::type unary_tree_set_type;
-    typedef typename utils::unordered_set<const rule_candidate_type*, utils::hashmurmur3<size_t>, std::equal_to<const rule_candidate_type*>,
+    typedef typename utils::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
 					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
   
     typedef std::pair<symbol_type, int> symbol_level_type;
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
     
-    typedef typename utils::unordered_map<symbol_level_pair_type, unary_tree_set_type, utils::hashmurmur3<size_t>, std::equal_to<symbol_level_pair_type>,
+    typedef typename utils::unordered_map<symbol_level_pair_type, unary_tree_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 					  std::allocator< std::pair<const symbol_level_pair_type, unary_tree_set_type> > >::type unary_tree_map_type;
-    typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur3<size_t>, std::equal_to<symbol_level_pair_type>,
+    typedef typename utils::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 					  std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > >::type unary_rule_map_type;
 
     typedef utils::small_vector<int, std::allocator<int> > index_set_type;
@@ -313,9 +313,9 @@ namespace cicada
     typedef utils::mulvector2<passive_type, std::allocator<passive_type> > passive_map_type;
     typedef typename passive_map_type::const_reference passive_set_type;
 
-    struct symbol_level_hash : public utils::hashmurmur3<size_t>
+    struct symbol_level_hash : public utils::hashmurmur<size_t>
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const symbol_level_type& x) const
       {
@@ -350,9 +350,9 @@ namespace cicada
     typedef rule_type::symbol_set_type                symbol_set_type;
     
     template <typename Seq>
-    struct hash_sequence : utils::hashmurmur3<size_t>
+    struct hash_sequence : utils::hashmurmur<size_t>
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const Seq& x) const
       {
@@ -379,11 +379,11 @@ namespace cicada
     
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
 			       unassigned_key<internal_label_type>,  unassigned_key<internal_label_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
 			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
+			       utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
     struct less_non_terminal

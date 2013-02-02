@@ -16,7 +16,7 @@
 #include <cicada/feature.hpp>
 
 #include <utils/vector_map.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 //
 // feature vector, for use as "temporary" linear vector for faster access, w/o sorting
@@ -448,7 +448,7 @@ namespace cicada
     FeatureVectorLinear<T1,A1> operator*(const FeatureVectorLinear<T1,A1>& x, const FeatureVectorCompact& y);
     
     friend
-    size_t hash_value(FeatureVectorLinear const& x) { return utils::hashmurmur3<size_t>()(x.__map.begin(), x.__map.end(), 0); }
+    size_t hash_value(FeatureVectorLinear const& x) { return utils::hashmurmur<size_t>()(x.__map.begin(), x.__map.end(), 0); }
     
     friend bool operator==(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map == y.__map; }
     friend bool operator!=(const FeatureVectorLinear& x, const FeatureVectorLinear& y) { return x.__map != y.__map; }

@@ -12,7 +12,7 @@
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 #include <utils/lexical_cast.hpp>
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -32,11 +32,11 @@ chinese: Chinese signature\n\
   }
   
   template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
+  struct hash_string : public utils::hashmurmur<size_t>
   {
     size_t operator()(const Tp& x) const
     {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
+      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
     }
   };
 

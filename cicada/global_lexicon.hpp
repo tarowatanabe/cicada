@@ -17,7 +17,7 @@
 
 #include <utils/array_power2.hpp>
 #include <utils/mathop.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 //
 // we assume that the lexicon probabilities are estimated by nicttm/learn_lexicon
@@ -27,7 +27,7 @@
 namespace cicada
 {
 
-  class GlobalLexicon : public utils::hashmurmur3<size_t>
+  class GlobalLexicon : public utils::hashmurmur<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -41,7 +41,7 @@ namespace cicada
     
     typedef float weight_type;
     
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
     
   private:
     typedef word_id_type key_type;

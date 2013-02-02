@@ -8,7 +8,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/vector2.hpp>
 #include <utils/array_power2.hpp>
 
@@ -16,7 +16,7 @@ namespace cicada
 {
 
   template <typename Key, typename Score>
-  class NGramCache : public utils::hashmurmur3<size_t>
+  class NGramCache : public utils::hashmurmur<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -26,7 +26,7 @@ namespace cicada
     typedef Key   symbol_type;
     typedef Score score_type;
     
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
 
     static const size_type cache_size = 1024 * 64;
     

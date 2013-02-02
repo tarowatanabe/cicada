@@ -16,7 +16,7 @@
 #include <cicada/feature.hpp>
 
 #include <utils/compact_map.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {
@@ -46,7 +46,7 @@ namespace cicada
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
     typedef typename utils::compact_map<key_type, data_type,
 					utils::unassigned<key_type>, utils::deleted<key_type>,
-					utils::hashmurmur3<size_t>, std::equal_to<key_type>,
+					utils::hashmurmur<size_t>, std::equal_to<key_type>,
 					alloc_type> vector_type;
     
     typedef FeatureVector<Tp, Alloc> self_type;

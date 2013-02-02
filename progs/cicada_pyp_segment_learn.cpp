@@ -168,7 +168,7 @@ struct PYPWord
       double lambda;
     };
     
-    typedef utils::unordered_map<id_type, poisson_type, utils::hashmurmur3<size_t>, std::equal_to<id_type>,
+    typedef utils::unordered_map<id_type, poisson_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, poisson_type> > >::type poisson_set_type;
     
     template <typename Iterator>
@@ -200,7 +200,7 @@ struct PYPWord
     void sample_parameters(Iterator first, Iterator last, Sampler& sampler)
     {
       typedef std::pair<double, double> count_type;
-      typedef utils::unordered_map<id_type, count_type, utils::hashmurmur3<size_t>, std::equal_to<id_type>,
+      typedef utils::unordered_map<id_type, count_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
 				   std::allocator<std::pair<const id_type, count_type> > >::type count_set_type;
 
     
@@ -1107,9 +1107,9 @@ struct PYPGraph
   
   typedef utils::simple_vector<segment_type, std::allocator<segment_type> > segment_set_type;
   
-  struct segment_set_hash_type : public utils::hashmurmur3<size_t>
+  struct segment_set_hash_type : public utils::hashmurmur<size_t>
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
     
     size_t operator()(const segment_set_type& x) const
     {

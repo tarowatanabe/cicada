@@ -13,7 +13,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
@@ -78,9 +78,9 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      struct string_hash : public utils::hashmurmur3<size_t>
+      struct string_hash : public utils::hashmurmur<size_t>
       {
-	typedef utils::hashmurmur3<size_t> hasher_type;
+	typedef utils::hashmurmur<size_t> hasher_type;
 	
 	size_t operator()(const std::string& x) const
 	{

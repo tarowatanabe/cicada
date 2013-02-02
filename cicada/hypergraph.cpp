@@ -20,7 +20,7 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
@@ -454,7 +454,7 @@ namespace cicada
     
     typedef utils::compact_map<const rule_type*, int,
 			       null_const_ptr<rule_type>, null_const_ptr<rule_type>,
-			       utils::hashmurmur3<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
+			       utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
     karma::generate(iterator_type(os), '{');
     

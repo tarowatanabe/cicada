@@ -19,7 +19,7 @@
 #include <utils/bithack.hpp>
 #include <utils/memory.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include <boost/functional/hash/hash.hpp>
 
@@ -56,7 +56,7 @@ namespace utils
     
     struct node_hash_type : public Hash
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       node_hash_type() {}
       node_hash_type(const Hash& x) : Hash(x) {}

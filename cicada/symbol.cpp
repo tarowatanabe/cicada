@@ -18,7 +18,7 @@
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include "symbol.hpp"
 
@@ -33,7 +33,7 @@ namespace cicada
     typedef Symbol::id_type id_type;
     typedef Symbol::mutex_type mutex_type;
     
-    typedef utils::indexed_set<id_type, utils::hashmurmur3<size_t>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
+    typedef utils::indexed_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > non_terminal_set_type;
     
     struct symbol_cache_type
     {

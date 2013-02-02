@@ -139,7 +139,7 @@ struct PYP
     friend
     size_t hash_value(span_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.first, x.last);
     }
@@ -184,7 +184,7 @@ struct PYP
     friend
     size_t hash_value(span_pair_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x);
     }
@@ -234,7 +234,7 @@ struct PYP
     friend
     size_t hash_value(phrase_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.begin(), x.end(), 0);
     }
@@ -280,7 +280,7 @@ struct LexiconModel
     friend
     size_t hash_value(word_pair_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.source.id(), x.target.id());
     }
@@ -810,7 +810,7 @@ struct PYPDistortion
     friend
     size_t hash_value(distortion_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.non_terminal.id(), x.distortion);
     }
@@ -1036,7 +1036,7 @@ struct PYPSynAlign
     friend
     size_t hash_value(rule_pair_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       if (x.target)
 	return hasher_type()(x.target->begin(), x.target->end(), x.source ? hash_value(*(x.source)) : size_t(0));
@@ -1183,7 +1183,7 @@ struct PYPGraph
     friend
     size_t hash_value(span_type const& x)
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
       
       return hasher_type()(x.last, x.first);
     }
@@ -1197,9 +1197,9 @@ struct PYPGraph
 
   typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
     
-  struct span_set_hash : public utils::hashmurmur3<size_t>
+  struct span_set_hash : public utils::hashmurmur<size_t>
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
     
     size_t operator()(const span_set_type& x) const
     {

@@ -33,7 +33,7 @@
 #include <utils/alloc_vector.hpp>
 #include <utils/bithack.hpp>
 #include <utils/unordered_map.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/spinlock.hpp>
@@ -183,7 +183,7 @@ struct atable_counts_type
   
   typedef std::pair<word_type, word_type> class_pair_type;
   
-  typedef utils::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur3<size_t>, std::equal_to<class_pair_type>,
+  typedef utils::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			       std::allocator<std::pair<const class_pair_type, difference_map_type> > >::type counts_type;
 
   typedef difference_map_type mapped_type;
@@ -374,7 +374,7 @@ struct atable_type
     spinlock_type       mutex;
   };
   
-  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur3<size_t>, std::equal_to<class_pair_type>,
+  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			       std::allocator<std::pair<const class_pair_type, cache_type> > >::type cache_set_type;
   
   
@@ -1140,7 +1140,7 @@ struct dtable_type
     spinlock_type       mutex;
   };
   
-  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur3<size_t>, std::equal_to<class_pair_type>,
+  typedef utils::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			       std::allocator<std::pair<const class_pair_type, cache_type> > >::type cache_set_type;
   
   

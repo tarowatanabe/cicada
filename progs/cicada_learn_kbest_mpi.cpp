@@ -800,9 +800,9 @@ struct OptimizeOnlineMargin
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
 
-  struct hash_sentence : public utils::hashmurmur3<size_t>
+  struct hash_sentence : public utils::hashmurmur<size_t>
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {
@@ -1677,9 +1677,9 @@ struct OptimizeCP
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
 
-  struct hash_sentence : public utils::hashmurmur3<size_t>
+  struct hash_sentence : public utils::hashmurmur<size_t>
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {

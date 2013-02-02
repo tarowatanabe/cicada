@@ -16,14 +16,14 @@
 #include "utils/indexed_trie.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/small_vector.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 namespace cicada
 {
   namespace feature
   {
 
-    class SparseNGramImpl : public utils::hashmurmur3<size_t>
+    class SparseNGramImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -67,7 +67,7 @@ namespace cicada
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
 
-      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef utils::hashmurmur<size_t> hasher_type;
 
       struct CacheContext
       {

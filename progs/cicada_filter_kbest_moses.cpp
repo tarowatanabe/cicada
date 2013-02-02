@@ -37,7 +37,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/hashmurmur3.hpp"
+#include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -76,9 +76,9 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
 
 typedef std::vector<std::string, std::allocator<std::string> > feature_set_type;
 
-struct hash_feature : public utils::hashmurmur3<size_t>
+struct hash_feature : public utils::hashmurmur<size_t>
 {
-  typedef utils::hashmurmur3<size_t> hasher_type;
+  typedef utils::hashmurmur<size_t> hasher_type;
   
   size_t operator()(const std::string& x) const
   {

@@ -18,13 +18,13 @@
 #include <succinct_db/succinct_trie_db.hpp>
 
 #include <utils/array_power2.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include <boost/filesystem/path.hpp>
 
 namespace cicada
 {
-  class Lexicon : public utils::hashmurmur3<size_t>
+  class Lexicon : public utils::hashmurmur<size_t>
   {
   public:
     typedef size_t    size_type;
@@ -36,7 +36,7 @@ namespace cicada
 
     typedef float weight_type;
     
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef utils::hashmurmur<size_t> hasher_type;
 
     typedef boost::filesystem::path path_type;
     
