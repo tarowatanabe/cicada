@@ -16,7 +16,7 @@ namespace cicada
 {
 
   template <typename Key, typename Score>
-  class NGramCache : public utils::hashmurmur<size_t>
+  class NGramCache : public utils::hashmurmur3<size_t>
   {
   public:
     typedef size_t    size_type;
