@@ -19,7 +19,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/bithack.hpp>
 
 namespace utils
@@ -230,7 +230,7 @@ namespace utils
   inline
   size_t hash_value(basic_piece<_T> const& x)
   {
-    return utils::hashmurmur<size_t>()(x.begin(), x.end(), 0);
+    return utils::hashmurmur3<size_t>()(x.begin(), x.end(), 0);
   }
 
   template <typename _T>
