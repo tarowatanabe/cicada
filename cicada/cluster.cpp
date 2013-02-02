@@ -18,7 +18,7 @@
 #include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/spinlock.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 #include <boost/thread.hpp>
 
@@ -123,11 +123,11 @@ namespace cicada
   }
   
   template <typename Tp>
-  struct hash_string : public utils::hashmurmur<size_t>
+  struct hash_string : public utils::hashmurmur3<size_t>
   {
     size_t operator()(const Tp& x) const
     {
-      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
     }
   };
 

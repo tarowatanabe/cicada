@@ -13,7 +13,7 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/bichart.hpp"
 #include "utils/chart.hpp"
 
@@ -187,7 +187,7 @@ namespace cicada
 	friend
 	size_t hash_value(span_type const& x)
 	{
-	  typedef utils::hashmurmur<size_t> hasher_type;
+	  typedef utils::hashmurmur3<size_t> hasher_type;
       
 	  return hasher_type()(x.first, x.last);
 	}
@@ -219,7 +219,7 @@ namespace cicada
 	friend
 	size_t hash_value(span_pair_type const& x)
 	{
-	  typedef utils::hashmurmur<size_t> hasher_type;
+	  typedef utils::hashmurmur3<size_t> hasher_type;
 	  
 	  return hasher_type()(x);
 	}

@@ -17,7 +17,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -85,9 +85,9 @@ namespace cicada
 	}
       };
       
-      struct state_hash_type : public utils::hashmurmur<size_t>
+      struct state_hash_type : public utils::hashmurmur3<size_t>
       {
-	typedef utils::hashmurmur<size_t> hasher_type;
+	typedef utils::hashmurmur3<size_t> hasher_type;
 	
 	size_t operator()(const state_type& state) const
 	{

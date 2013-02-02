@@ -29,7 +29,6 @@ namespace cicada
     
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
-    typedef uint64_t  hash_value_type;
     
     typedef boost::filesystem::path path_type;
     

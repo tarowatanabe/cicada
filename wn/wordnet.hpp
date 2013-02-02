@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 namespace wn
 {
@@ -44,7 +44,7 @@ namespace wn
   inline
   size_t hash_value(const WordNet::synset_type& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     return hasher_type()(x.pos.begin(), x.pos.end(), hasher_type()(x.word.begin(), x.word.end(), x.sense));
   }

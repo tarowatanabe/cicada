@@ -11,7 +11,7 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/unordered_map.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/chart.hpp"
 #include "utils/piece.hpp"
 
@@ -54,7 +54,7 @@ namespace cicada
 
       typedef utils::chart<std::string, std::allocator<std::string> > label_chart_type;
       
-      typedef utils::unordered_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+      typedef utils::unordered_map<span_type, std::string, utils::hashmurmur3<size_t>, std::equal_to<span_type>,
 				   std::allocator<std::pair<const span_type, std::string> > >::type label_map_type;
       
       typedef FeatureBuilder feature_builder_type;

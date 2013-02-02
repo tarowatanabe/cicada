@@ -5,7 +5,7 @@
 #include <map>
 
 #include "utils/space_separator.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/trie_compact.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
@@ -118,9 +118,9 @@ namespace cicada
     
       typedef utils::simple_vector<count_type, std::allocator<count_type> > count_set_type;
       
-      struct count_set_hash : public utils::hashmurmur<size_t>
+      struct count_set_hash : public utils::hashmurmur3<size_t>
       {
-	typedef utils::hashmurmur<size_t> hasher_type;
+	typedef utils::hashmurmur3<size_t> hasher_type;
 	
 	size_t operator()(const count_set_type& x) const
 	{

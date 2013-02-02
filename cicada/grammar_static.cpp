@@ -38,7 +38,7 @@
 #include "utils/unordered_map.hpp"
 
 #include "utils/hashmurmur.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -304,7 +304,7 @@ namespace cicada
 
     typedef utils::compact_map<word_node_type, size_type,
 			       unassigned_cache, deleted_cache,
-			       utils::hashmurmur<size_t>, std::equal_to<word_node_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<word_node_type>,
 			       std::allocator<std::pair<const word_node_type, size_type> > > cache_node_type;
 
   public:
@@ -540,7 +540,7 @@ namespace cicada
 				     const cache_phrase_set_type& cache_phrases,
 				     const phrase_db_type& phrase_db) const
     {
-      typedef utils::hashmurmur<size_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       const size_type cache_pos = hasher_type()(pos, lhs.id()) & (cache_phrases.size() - 1);
       

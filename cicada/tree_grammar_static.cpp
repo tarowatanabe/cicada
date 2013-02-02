@@ -39,8 +39,6 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
-
-#include "utils/hashmurmur.hpp"
 #include "utils/hashmurmur.hpp"
 
 #include <boost/lexical_cast.hpp>

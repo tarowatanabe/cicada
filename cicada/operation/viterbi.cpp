@@ -1,8 +1,10 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
+
+#include <boost/functional/hash/hash.hpp>
 
 #include "cicada/operation/functional.hpp"
 #include "cicada/operation/traversal.hpp"
@@ -14,7 +16,6 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
-#include <utils/hashmurmur.hpp>
 #include <utils/compact_map.hpp>
 
 namespace cicada
@@ -81,7 +82,7 @@ namespace cicada
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
       typedef utils::compact_map<id_type, id_type,
 				 unassigned_id<id_type>, unassigned_id<id_type>,
-				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 boost::hash<id_type>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
       typedef cicada::operation::edge_traversal::edge_set_type edge_set_type;
 

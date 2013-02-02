@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -9,6 +9,8 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
+
+#include <boost/functional/hash/hash.hpp>
 
 #include <iostream>
 #include <iterator>
@@ -32,7 +34,6 @@
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 #include <utils/compact_map.hpp>
-#include <utils/hashmurmur.hpp>
 
 namespace cicada
 {
@@ -112,7 +113,7 @@ namespace cicada
       
       typedef utils::compact_map<id_type, id_type,
 				 unassigned_id<id_type>, unassigned_id<id_type>,
-				 utils::hashmurmur<size_t>, std::equal_to<id_type>,
+				 boost::hash<id_type>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, id_type> > > node_map_type;
 
       typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
