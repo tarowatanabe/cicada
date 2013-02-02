@@ -60,9 +60,9 @@ namespace cicada
       typedef std::vector<segment_type, std::allocator<segment_type> >        segment_set_type;
       typedef std::deque<segment_set_type, std::allocator<segment_set_type> > segment_document_type;
       
-      static const double interval_min = 1e-4;
-      static const double interval_offset_lower = 200.0;
-      static const double interval_offset_upper = 0.2;
+      static const double interval_min;
+      static const double interval_offset_lower;
+      static const double interval_offset_upper;
       static double value_min;
       static double value_max;
       
