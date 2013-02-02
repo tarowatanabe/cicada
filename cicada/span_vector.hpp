@@ -16,7 +16,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/piece.hpp>
 
 namespace cicada
@@ -191,13 +191,13 @@ namespace cicada
   inline
   size_t hash_value(SpanVector const& x)
   { 
-    return utils::hashmurmur<size_t>()(x.__spans.begin(), x.__spans.end(), 0);
+    return utils::hashmurmur3<size_t>()(x.__spans.begin(), x.__spans.end(), 0);
   }
   
   inline
   size_t hash_value(SpanVector::span_type const& x)
   { 
-    return utils::hashmurmur<size_t>()(x);
+    return utils::hashmurmur3<size_t>()(x);
   }
 
   inline
