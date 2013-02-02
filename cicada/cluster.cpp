@@ -18,7 +18,7 @@
 #include <utils/unordered_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/spinlock.hpp>
-#include <utils/hashmurmur3.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/thread.hpp>
 
@@ -122,16 +122,7 @@ namespace cicada
     clusters.write(rep.path("clusters"));
   }
   
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
-  typedef utils::unordered_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, Cluster, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, Cluster> > >::type cluster_map_type;
 
   namespace impl

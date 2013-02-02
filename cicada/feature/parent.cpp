@@ -78,17 +78,7 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      struct string_hash : public utils::hashmurmur3<size_t>
-      {
-	typedef utils::hashmurmur3<size_t> hasher_type;
-	
-	size_t operator()(const std::string& x) const
-	{
-	  return hasher_type::operator()(x.begin(), x.end(), 0);
-	}
-      };
-      
-      typedef utils::indexed_set<std::string, string_hash, std::equal_to<std::string>, std::allocator<std::string> > string_map_type;
+      typedef utils::indexed_set<std::string, boost::hash<utils::piece>, std::equal_to<std::string>, std::allocator<std::string> > string_map_type;
       
       typedef string_map_type::index_type id_type;
 

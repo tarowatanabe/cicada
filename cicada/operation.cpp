@@ -4,7 +4,6 @@
 
 #include "operation.hpp"
 
-#include "utils/hashmurmur3.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/thread_specific_ptr.hpp"
@@ -19,15 +18,7 @@ namespace cicada
     typedef Operation::weight_set_type   weight_set_type;
     typedef Operation::weights_path_type weights_path_type;
     
-    struct hash_string : public utils::hashmurmur3<size_t>
-    {
-      size_t operator()(const std::string& x) const
-      {
-	return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-      }
-    };
-    
-    typedef utils::unordered_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
+    typedef utils::unordered_map<std::string, weights_path_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 				 std::allocator<std::pair<const std::string, weights_path_type> > >::type weight_map_type;
 
 #ifdef HAVE_TLS

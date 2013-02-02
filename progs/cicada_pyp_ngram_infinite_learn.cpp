@@ -1233,16 +1233,6 @@ int main(int argc, char ** argv)
 
 struct TaskVocab
 {
-  struct string_hash : public utils::hashmurmur<size_t>
-  {
-    typedef utils::hashmurmur<size_t> hasher_type;
-    
-    size_t operator()(const std::string& x) const
-    {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
-    }
-  };
-  
   template <typename Tp>
   struct greater_second
   {
@@ -1258,7 +1248,7 @@ struct TaskVocab
   };
   
   typedef uint64_t count_type;
-  typedef utils::unordered_map<std::string, count_type, string_hash, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
+  typedef utils::unordered_map<std::string, count_type, boost::hash<utils::piece>, std::equal_to<std::string>, std::allocator<std::pair<const std::string, count_type> > >::type vocab_type;
   
   typedef std::vector<const vocab_type::value_type*, std::allocator<const vocab_type::value_type*> > sorted_type;
 

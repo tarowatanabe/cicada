@@ -12,7 +12,6 @@
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 #include <utils/lexical_cast.hpp>
-#include "utils/hashmurmur3.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -31,18 +30,9 @@ chinese: Chinese signature\n\
     return desc;
   }
   
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
   typedef boost::shared_ptr<Signature> signature_ptr_type;
   
-  typedef utils::unordered_map<std::string, signature_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, signature_ptr_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, signature_ptr_type> > >::type signature_map_type;
 
 #ifdef HAVE_TLS

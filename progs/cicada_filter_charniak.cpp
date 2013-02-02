@@ -150,17 +150,8 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
 
 typedef cicada::HyperGraph hypergraph_type;
 
-struct string_hash : public utils::hashmurmur<size_t>
-{
-  typedef utils::hashmurmur<size_t> hasher_type;
-  
-  size_t operator()(const std::string& x) const
-  {
-    return hasher_type::operator()(x.begin(), x.end(), 0);
-  }
-};
 
-typedef utils::unordered_map<std::string, hypergraph_type::id_type, string_hash, std::equal_to<std::string>,
+typedef utils::unordered_map<std::string, hypergraph_type::id_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			     std::allocator<std::pair<const std::string, hypergraph_type::id_type> > >::type node_map_type;
 
 typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_chart_type;

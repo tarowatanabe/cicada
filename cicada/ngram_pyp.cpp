@@ -8,7 +8,6 @@
 #include "utils/unordered_map.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/thread_specific_ptr.hpp"
-#include "utils/hashmurmur3.hpp"
 
 #include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
@@ -79,16 +78,7 @@ namespace cicada
     offset_set_type(offsets_).swap(offsets_);
   }
 
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
-  typedef utils::unordered_map<std::string, NGramPYP, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, NGramPYP, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, NGramPYP> > >::type ngram_pyp_map_type;
 
   namespace impl

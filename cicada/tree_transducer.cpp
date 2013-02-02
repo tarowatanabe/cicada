@@ -13,7 +13,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
-#include "utils/hashmurmur3.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/spinlock.hpp"
@@ -42,17 +41,7 @@ fallback: fallback source-to-target transfer rule\n\
     return desc;
   }
 
-
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
-  typedef utils::unordered_map<std::string, TreeTransducer::transducer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, TreeTransducer::transducer_ptr_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, TreeTransducer::transducer_ptr_type> > >::type tree_transducer_map_type;
   
   namespace impl

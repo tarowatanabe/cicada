@@ -11,7 +11,6 @@
 #include "matcher/wordnet.hpp"
 
 #include <utils/unordered_map.hpp>
-#include <utils/hashmurmur3.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 
@@ -32,18 +31,9 @@ wordnet: matching by wordnet synsets\n\
     return desc;
   }
 
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-  
   typedef boost::shared_ptr<Matcher> matcher_ptr_type;
 
-  typedef utils::unordered_map<std::string, matcher_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, matcher_ptr_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, matcher_ptr_type> > >::type matcher_map_type;
 
 #ifdef HAVE_TLS

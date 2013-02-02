@@ -22,7 +22,6 @@
 #include "utils/spinlock.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/thread_specific_ptr.hpp"
-#include "utils/hashmurmur3.hpp"
 
 namespace cicada
 {
@@ -210,16 +209,7 @@ namespace cicada
     rep["smooth"] = boost::lexical_cast<std::string>(smooth);
   }
   
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
-  typedef utils::unordered_map<std::string, Lexicon, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, Lexicon, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, Lexicon> > >::type lexicon_map_type;
 
   namespace impl

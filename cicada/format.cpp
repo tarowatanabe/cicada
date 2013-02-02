@@ -9,7 +9,6 @@
 #include "format/number.hpp"
 
 #include <utils/unordered_map.hpp>
-#include <utils/hashmurmur3.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
@@ -41,18 +40,9 @@ number: number format\n\
     return desc;
   }
 
-  template <typename Tp>
-  struct hash_string : public utils::hashmurmur3<size_t>
-  {
-    size_t operator()(const Tp& x) const
-    {
-      return utils::hashmurmur3<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-  
   typedef boost::shared_ptr<Format> format_ptr_type;
   
-  typedef utils::unordered_map<std::string, format_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
+  typedef utils::unordered_map<std::string, format_ptr_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			       std::allocator<std::pair<const std::string, format_ptr_type> > >::type format_map_type;
   
 #ifdef HAVE_TLS
