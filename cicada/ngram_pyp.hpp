@@ -20,7 +20,7 @@
 
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
@@ -28,7 +28,7 @@
 
 namespace cicada
 {
-  class NGramPYP : public utils::hashmurmur<size_t>
+  class NGramPYP : public utils::hashmurmur3<size_t>
   {
   public:
     typedef Symbol                  word_type;
@@ -68,7 +68,7 @@ namespace cicada
       bool operator>=(const State& x, const State& y) { return x.state_ >= y.state_; }
       
       friend
-      size_t  hash_value(State const& x) { return utils::hashmurmur<size_t>()(x.state_); }
+      size_t  hash_value(State const& x) { return utils::hashmurmur3<size_t>()(x.state_); }
       
     private:      
       state_type state_;
@@ -76,7 +76,7 @@ namespace cicada
     typedef State state_type;
     
   private:
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> >       id_set_type;
     typedef utils::packed_vector_mapped<count_type, std::allocator<count_type> > count_set_type;

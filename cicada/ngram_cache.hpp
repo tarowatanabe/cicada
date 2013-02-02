@@ -8,7 +8,7 @@
 
 #include <cicada/symbol.hpp>
 
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/vector2.hpp>
 #include <utils/array_power2.hpp>
 
@@ -26,7 +26,7 @@ namespace cicada
     typedef Key   symbol_type;
     typedef Score score_type;
     
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     static const size_type cache_size = 1024 * 64;
     
