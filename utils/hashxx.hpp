@@ -81,10 +81,11 @@ namespace utils
       uint32_t v4 = seed - PRIME32_1;
       
       for (size_t i = 0; i != Loop; ++ i) {
-	v1 += XXH_LE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
-	v2 += XXH_LE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
-	v3 += XXH_LE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
-	v4 += XXH_LE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
+	v1 += XXH_LE32(p)      * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1;
+	v2 += XXH_LE32(p +  4) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1;
+	v3 += XXH_LE32(p +  8) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1;
+	v4 += XXH_LE32(p + 12) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1;
+	p += 16;
       };
       
       return XXH_rotl32(v1, 1) + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
@@ -102,55 +103,53 @@ namespace utils
     }
   };
 
-  template <size_t Loop>
+  template <size_t Loop, size_t Remain>
   struct __static_hashxx4 : __base_hashxx
   {
     template <typename Iterator>
     static inline
     void hash(Iterator& p, uint32_t& h32)
     {
-      h32 += XXH_LE32(p) * PRIME32_3;
+      h32 += XXH_LE32(p + ((Remain - Loop) << 2)) * PRIME32_3;
       h32 = XXH_rotl32(h32, 17) * PRIME32_4;
-      p += 4;
       
-      __static_hashxx4<Loop - 1>::hash(p, h32);
+      __static_hashxx4<Loop - 1, Remain>::hash(p, h32);
     }
   };
 
-  template <>
-  struct __static_hashxx4<0>
+  template <size_t Remain>
+  struct __static_hashxx4<0, Remain>
   {
     template <typename Iterator>
     static inline
     void hash(Iterator& p, uint32_t& h32)
     {
-      
+      p += (Remain << 2);
     }
   };
   
-  template <size_t Loop>
+  template <size_t Loop, size_t Remain>
   struct __static_hashxx1 : __base_hashxx
   {
     template <typename Iterator>
     static inline
     void hash(Iterator& p, uint32_t& h32)
     {
-      h32 += (*p) * PRIME32_5;
+      h32 += (*(p + Remain - Loop)) * PRIME32_5;
       h32 = XXH_rotl32(h32, 11) * PRIME32_1 ;
-      ++ p;
       
-      __static_hashxx1<Loop - 1>::hash(p, h32);
+      __static_hashxx1<Loop - 1, Remain>::hash(p, h32);
     }
   };
 
-  template <>
-  struct __static_hashxx1<0>
+  template <size_t Remain>
+  struct __static_hashxx1<0, Remain>
   {
     template <typename Iterator>
     static inline
     void hash(Iterator& p, uint32_t& h32)
     {
-      
+      p += Remain;
     }
   };
   
@@ -162,9 +161,9 @@ namespace utils
     {
       uint32_t h32 = __static_hashxx16<(Len >> 4)>::hash(p, seed) + static_cast<uint32_t>(Len);
       
-      __static_hashxx4<((Len >> 2) & 0x03)>::hash(p, h32);
+      __static_hashxx4<((Len >> 2) & 0x03), ((Len >> 2) & 0x03)>::hash(p, h32);
       
-      __static_hashxx1<(Len & 0x03)>::hash(p, h32);
+      __static_hashxx1<(Len & 0x03), (Len & 0x03)>::hash(p, h32);
       
       h32 ^= h32 >> 15;
       h32 *= PRIME32_2;
@@ -220,10 +219,11 @@ namespace utils
 	uint32_t v4 = seed - PRIME32_1;
 	
 	do {
-	  v1 += XXH_LE32(p) * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1; p+=4;
-	  v2 += XXH_LE32(p) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1; p+=4;
-	  v3 += XXH_LE32(p) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1; p+=4;
-	  v4 += XXH_LE32(p) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1; p+=4;
+	  v1 += XXH_LE32(p)      * PRIME32_2; v1 = XXH_rotl32(v1, 13); v1 *= PRIME32_1;
+	  v2 += XXH_LE32(p +  4) * PRIME32_2; v2 = XXH_rotl32(v2, 13); v2 *= PRIME32_1;
+	  v3 += XXH_LE32(p +  8) * PRIME32_2; v3 = XXH_rotl32(v3, 13); v3 *= PRIME32_1;
+	  v4 += XXH_LE32(p + 12) * PRIME32_2; v4 = XXH_rotl32(v4, 13); v4 *= PRIME32_1;
+	  p += 16;
 	} while (p <= limit) ;
 	
 	h32 = XXH_rotl32(v1, 1) + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18);
@@ -232,35 +232,35 @@ namespace utils
       
       h32 += static_cast<uint32_t>(len);
 
-      switch ((len >> 2) & 0x03) {
+      const size_t remain4 = (len >> 2) & 0x03;
+      switch (remain4) {
       case 3:
-	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 += XXH_LE32(p + ((remain4 - 3) << 2)) * PRIME32_3;
 	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
-	p += 4;
       case 2:
-	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 += XXH_LE32(p + ((remain4 - 2) << 2)) * PRIME32_3;
 	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
-	p += 4;
       case 1:
-	h32 += XXH_LE32(p) * PRIME32_3;
+	h32 += XXH_LE32(p + ((remain4 - 1) << 2)) * PRIME32_3;
 	h32 = XXH_rotl32(h32, 17) * PRIME32_4;
-	p += 4;
       }
+
+      p += (remain4 << 2);
       
-      switch (len & 0x03) {
+      const size_t remain1 = len & 0x03;
+      switch (remain1) {
       case 3:
-	h32 += (*p) * PRIME32_5;
+	h32 += (*(p + remain1 - 3)) * PRIME32_5;
 	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
-	++ p;
       case 2:
-	h32 += (*p) * PRIME32_5;
+	h32 += (*(p + remain1 - 2)) * PRIME32_5;
 	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
-	++ p;
       case 1:
-	h32 += (*p) * PRIME32_5;
+	h32 += (*(p + remain1 - 1)) * PRIME32_5;
 	h32 = XXH_rotl32(h32, 11) * PRIME32_1;
-	++ p;
       }
+
+      p += remain1;
       
       h32 ^= h32 >> 15;
       h32 *= PRIME32_2;

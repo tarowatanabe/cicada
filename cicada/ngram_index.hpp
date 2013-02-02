@@ -277,7 +277,7 @@ namespace cicada
 	  trylock_type lock(const_cast<spinlock_type&>(spinlock_pos));
 	  
 	  if (lock) {
-	    const size_type cache_pos = hasher_type::operator()(pos, id) & (caches_pos.size() - 1);
+	    const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos.size() - 1);
 	    cache_pos_type& cache = const_cast<cache_pos_type&>(caches_pos[cache_pos]);
 	    if (cache.pos != pos || cache.id != id) {
 	      cache.pos      = pos;

@@ -391,7 +391,7 @@ namespace cicada
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
-      typedef utils::hashmurmur3<uint32_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       FeatureVectorCODEC   feature_codec;
       AttributeVectorCODEC attribute_codec;
@@ -503,7 +503,7 @@ namespace cicada
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
     {
-      typedef utils::hashmurmur3<uint32_t> hasher_type;
+      typedef utils::hashmurmur3<size_t> hasher_type;
       
       TreeRuleCODEC codec;
 
