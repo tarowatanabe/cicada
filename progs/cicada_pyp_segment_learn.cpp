@@ -57,12 +57,14 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/rwticket.hpp"
+#include "utils/hashmurmru.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
+#include <boost/functional/hash/hash.hpp>
 
 #include <unicode/uchar.h>
 #include <unicode/uscript.h>
@@ -168,7 +170,7 @@ struct PYPWord
       double lambda;
     };
     
-    typedef utils::unordered_map<id_type, poisson_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+    typedef utils::unordered_map<id_type, poisson_type, boost::hash<id_type>, std::equal_to<id_type>,
 				 std::allocator<std::pair<const id_type, poisson_type> > >::type poisson_set_type;
     
     template <typename Iterator>
@@ -200,7 +202,7 @@ struct PYPWord
     void sample_parameters(Iterator first, Iterator last, Sampler& sampler)
     {
       typedef std::pair<double, double> count_type;
-      typedef utils::unordered_map<id_type, count_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+      typedef utils::unordered_map<id_type, count_type, boost::hash<id_type>, std::equal_to<id_type>,
 				   std::allocator<std::pair<const id_type, count_type> > >::type count_set_type;
 
     
@@ -1107,9 +1109,9 @@ struct PYPGraph
   
   typedef utils::simple_vector<segment_type, std::allocator<segment_type> > segment_set_type;
   
-  struct segment_set_hash_type : public utils::hashmurmur<size_t>
+  struct segment_set_hash_type : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     size_t operator()(const segment_set_type& x) const
     {

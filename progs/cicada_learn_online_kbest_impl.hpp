@@ -35,7 +35,7 @@
 #include "utils/piece.hpp"
 #include "utils/config.hpp"
 #include "utils/mathop.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -1250,9 +1250,9 @@ struct LearnOnlineMargin : public LearnBase
   //
   // typedef for unique sentences
   //
-  struct hash_sentence : public utils::hashmurmur<size_t>
+  struct hash_sentence : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {

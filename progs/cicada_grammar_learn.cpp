@@ -47,7 +47,7 @@
 #include <boost/iostreams/device/array.hpp>
 
 #include <utils/bithack.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 #include <utils/unordered_map.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>
@@ -390,9 +390,9 @@ struct Maximize
   }
 };
 
-struct MaximizeBayes : public utils::hashmurmur<size_t>
+struct MaximizeBayes : public utils::hashmurmur3<size_t>
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  typedef utils::hashmurmur3<size_t> hasher_type;
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
 
@@ -905,9 +905,9 @@ symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const b
     return symbol;
 }
 
-struct Annotator : public utils::hashmurmur<size_t>
+struct Annotator : public utils::hashmurmur3<size_t>
 {
-  typedef utils::hashmurmur<size_t> hasher_type;
+  typedef utils::hashmurmur3<size_t> hasher_type;
   
   Annotator(const int __bits) : bits(__bits) {}
   

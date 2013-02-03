@@ -21,7 +21,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/compact_set.hpp"
 #include "utils/compact_map.hpp"
-#include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -152,7 +152,7 @@ struct ttable_pair_type
   {
     typedef utils::compact_map<word_pair_type, count_type,
 			       word_pair_unassigned, word_pair_unassigned,
-			       utils::hashmurmur<size_t>, std::equal_to<word_pair_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<word_pair_type>,
 			       std::allocator<std::pair<const word_pair_type, count_type> > > counts_type;
 
     typedef counts_type::value_type      value_type;

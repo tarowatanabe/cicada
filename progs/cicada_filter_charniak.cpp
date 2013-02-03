@@ -28,7 +28,6 @@
 #include "cicada/vocab.hpp"
 #include "cicada/sort.hpp"
 
-#include "utils/hashmurmur.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/chart.hpp"

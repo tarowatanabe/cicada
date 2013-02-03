@@ -26,30 +26,20 @@
 #include "utils/compress_stream.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
-#include "utils/hashmurmur.hpp"
 
 typedef boost::filesystem::path path_type;
 
-struct feature_hash : public utils::hashmurmur<size_t>
-{
-  typedef utils::hashmurmur<size_t> hasher_type;
-  
-  size_t operator()(const std::string& x) const
-  {
-    return hasher_type::operator()(x.begin(), x.end(), 0);
-  }
-};
 
 typedef boost::fusion::tuple<std::string, int, double> feature_weight_type;
 
 typedef std::vector<double, std::allocator<double> > weight_set_type;
 
-typedef utils::unordered_map<std::string, weight_set_type, feature_hash, std::equal_to<std::string>,
+typedef utils::unordered_map<std::string, weight_set_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 			     std::allocator<std::pair<const std::string, weight_set_type> > >::type feature_weight_set_type;
-typedef utils::unordered_map<std::string, std::string, feature_hash, std::equal_to<std::string>,
+typedef utils::unordered_map<std::string, std::string, boost::hash<utils::piece>, std::equal_to<std::string>,
 			     std::allocator<std::pair<const std::string, std::string> > >::type feature_map_type;
 
-typedef utils::unordered_set<std::string, feature_hash, std::equal_to<std::string>, std::allocator<std::string> >::type feature_consumed_type;
+typedef utils::unordered_set<std::string, boost::hash<utils::piece>, std::equal_to<std::string>, std::allocator<std::string> >::type feature_consumed_type;
 
 template <typename Iterator>
 struct feature_weight_parser : boost::spirit::qi::grammar<Iterator, feature_weight_type()>

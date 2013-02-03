@@ -32,7 +32,7 @@
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/vector2.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 struct Bitext
 {
@@ -112,7 +112,7 @@ struct PhrasePair
   friend
   size_t hash_value(PhrasePair const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     return hasher_type()(x.source.begin(), x.source.end(),
 			 hasher_type()(x.target.begin(), x.target.end(),

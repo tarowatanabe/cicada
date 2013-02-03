@@ -49,7 +49,7 @@
 #include <utils/vector_set.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
-#include <utils/hashmurmur.hpp>
+#include <utils/hashmurmur3.hpp>
 
 struct Bitext
 {
@@ -150,7 +150,7 @@ struct RulePair
   friend
   size_t hash_value(RulePair const& x)
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
     
     return hasher_type()(x.source.begin(), x.source.end(),
 			 hasher_type()(x.target.begin(), x.target.end(),
@@ -462,11 +462,11 @@ struct ExtractGHKM
 
   typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_local_type;
 
-  struct node_set_hash : public utils::hashmurmur<size_t>
+  struct node_set_hash : public utils::hashmurmur3<size_t>
   {
     size_t operator()(const edge_set_local_type& edges) const
     {
-      return utils::hashmurmur<size_t>::operator()(edges.begin(), edges.end(), 0);
+      return utils::hashmurmur3<size_t>::operator()(edges.begin(), edges.end(), 0);
     }
   };
 
@@ -1336,11 +1336,11 @@ struct ExtractGHKM
     typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
     typedef utils::compact_map<range_type, id_type,
 			       unassigned_range, deleted_range,
-			       utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<range_type>,
 			       std::allocator<std::pair<const range_type, id_type> > > range_node_map_type;
     typedef utils::compact_set<range_type,
 			       unassigned_range, deleted_range,
-			       utils::hashmurmur<size_t>, std::equal_to<range_type>,
+			       utils::hashmurmur3<size_t>, std::equal_to<range_type>,
 			       std::allocator<range_type> > range_set_type;
 
     // construc derivations wrt non-aligned words...

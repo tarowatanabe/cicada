@@ -10,7 +10,6 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/mathop.hpp"
-#include "utils/hashmurmur.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -895,8 +894,6 @@ struct LearnMapper : public Learner
   queue_bitext_type& queue_bitext;
   queue_ttable_set_type& queue_ttable_source_target;
   queue_ttable_set_type& queue_ttable_target_source;
-  
-  //utils::hashmurmur<size_t> hasher;
 };
 
 template <typename TableSet, typename Table>

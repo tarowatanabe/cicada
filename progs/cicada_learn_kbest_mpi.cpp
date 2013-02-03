@@ -37,6 +37,7 @@
 #include "utils/mulvector2.hpp"
 #include "utils/mathop.hpp"
 #include "utils/unordered_set.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -800,13 +801,13 @@ struct OptimizeOnlineMargin
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
 
-  struct hash_sentence : public utils::hashmurmur<size_t>
+  struct hash_sentence : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {
-      return hasher_type()(x.begin(), x.end(), 0);
+      return hasher_type::operator()(x.begin(), x.end(), 0);
     }
   };
   typedef typename utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
@@ -1677,13 +1678,13 @@ struct OptimizeCP
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
 
-  struct hash_sentence : public utils::hashmurmur<size_t>
+  struct hash_sentence : public utils::hashmurmur3<size_t>
   {
-    typedef utils::hashmurmur<size_t> hasher_type;
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
     size_t operator()(const hypothesis_type::sentence_type& x) const
     {
-      return hasher_type()(x.begin(), x.end(), 0);
+      return hasher_type::operator()(x.begin(), x.end(), 0);
     }
   };
   typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
