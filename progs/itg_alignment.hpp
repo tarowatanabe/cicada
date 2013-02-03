@@ -21,7 +21,10 @@ namespace detail
 #if 1
   struct ITGAlignment
   {
-    static const double threshold = 1e-3;
+    static double threshold()
+    {
+      return 1e-3;
+    }
     
     typedef cicada::SpanVector       span_set_type;
     typedef span_set_type::span_type span_type;
@@ -295,7 +298,7 @@ namespace detail
       const int V = target_size;
       const int L = T + V;
       
-      double beam = std::log(threshold);
+      double beam = std::log(threshold());
       do {
 	
 	for (int l = 1; l != L; ++ l) {
@@ -456,7 +459,7 @@ namespace detail
 	  }
 	}
 	
-	beam += std::log(threshold);
+	beam += std::log(threshold());
       } while (chart(0, T, 0, V) == infinity);
     }
 
