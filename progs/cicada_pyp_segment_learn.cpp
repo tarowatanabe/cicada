@@ -57,7 +57,7 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/rwticket.hpp"
-#include "utils/hashmurmru.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
