@@ -197,7 +197,3 @@ Implement kenlm like probing data structure
 
 Implement potentially faster xxhash
   Use the xxhash for internal caching
-
-unstable approximated feature application
-  This is due by hash function when score are equal....
-  Use of additional comparison for stability...?
