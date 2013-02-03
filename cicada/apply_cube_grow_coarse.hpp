@@ -6,6 +6,8 @@
 #ifndef __CICADA__APPLY_CUBE_GROW_COARSE__HPP__
 #define __CICADA__APPLY_CUBE_GROW_COARSE__HPP__ 1
 
+#include <numeric>
+
 #include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/model.hpp>
@@ -124,7 +126,12 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score < y->score;
+	return (x->score < y->score) || (!(y->score < x->score) && cardinality(x->j) > cardinality(y->j));
+      }
+      
+      size_t cardinality(const index_set_type& x) const
+      {
+	return std::accumulate(x.begin(), x.end(), 0);
       }
     };
     
