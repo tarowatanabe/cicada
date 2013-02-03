@@ -254,7 +254,7 @@ namespace cicada
 			    const std::string& locale_str_target)
     {
       // pre-defined rule-set
-      typedef utils::unordered_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
+      typedef utils::unordered_map<std::string, impl_type, boost::hash<utils::piece>, std::equal_to<std::string>,
 				   std::allocator<std::pair<const std::string, impl_type> > >::type impl_map_type;
       
       const icu::Locale locale_source(locale_str_source.c_str());
