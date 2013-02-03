@@ -6,6 +6,8 @@
 #ifndef __CICADA__APPLY_CUBE_PRUNE__HPP__
 #define __CICADA__APPLY_CUBE_PRUNE__HPP__ 1
 
+#include <numeric>
+
 #include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/model.hpp>
@@ -122,7 +124,12 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score < y->score;
+	return (x->score < y->score) || (!(y->score < x->score) && cardinality(x->j) > cardinality(y->j));
+      }
+
+      size_t cardinality(const index_set_type& x) const
+      {
+	return std::accumulate(x.begin(), x.end(), 0);
       }
     };
     
@@ -131,12 +138,17 @@ namespace cicada
       // we will use greater, so that simple sort will yield estimated score order...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score > y->score;
+	return (x->score > y->score) || (!(y->score > x->score) && cardinality(x->j) < cardinality(y->j));
       }
-
+      
       bool operator()(const node_score_type& x, const node_score_type& y) const
       {
-	return x.score > y.score;
+	return (x.score > y.score) || (!(y.score > x.score) && x.node < y.node);
+      }
+
+      size_t cardinality(const index_set_type& x) const
+      {
+	return std::accumulate(x.begin(), x.end(), 0);
       }
     };
 
