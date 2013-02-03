@@ -1,17 +1,19 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "decode.hpp"
 #include "encode.hpp"
 #include "bleu.hpp"
 
-#include <map>
 #include <sstream>
 #include <iterator>
 #include <memory>
 
 #include "utils/bithack.hpp"
+#include "utils/unordered_map.hpp"
+
+#include <boost/functional/hash/hash.hpp>
 
 namespace cicada
 {
@@ -136,7 +138,7 @@ namespace cicada
     void BleuScorer::insert(const sentence_type& __sentence)
     {
       typedef ngram_set_type::id_type id_type;
-      typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+      typedef utils::unordered_map<id_type, count_type, boost::hash<id_type>, std::equal_to<id_type>, std::allocator<std::pair<const id_type, count_type> > >::type counts_type;
 
       sentence_type sentence;
       counts_type counts;
@@ -165,8 +167,8 @@ namespace cicada
     BleuScorer::score_ptr_type BleuScorer::score(const sentence_type& __sentence) const
     {
       typedef ngram_set_type::id_type id_type;
-      typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
-	
+      typedef utils::unordered_map<id_type, count_type, boost::hash<id_type>, std::equal_to<id_type>, std::allocator<std::pair<const id_type, count_type> > >::type counts_type;
+      
       typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
 	
       sentence_type sentence;

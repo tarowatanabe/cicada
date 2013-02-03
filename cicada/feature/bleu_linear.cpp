@@ -1,13 +1,12 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
-
-#include <map>
 
 #include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/tokenizer.hpp"
+#include "utils/unordered_map.hpp"
 
 #include "utils/space_separator.hpp"
 #include "utils/trie_compact.hpp"
@@ -18,6 +17,7 @@
 
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/functional/hash/hash.hpp>
 
 namespace cicada
 {
@@ -299,7 +299,7 @@ namespace cicada
       
       void insert(const sentence_type& __sentence)
       {
-	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+	typedef utils::unordered_map<id_type, count_type, boost::hash<id_type>, std::equal_to<id_type>, std::allocator<std::pair<const id_type, count_type> > >::type counts_type;
 	
 	sentence_type __sentence_tokenized;
 	if (tokenizer)
