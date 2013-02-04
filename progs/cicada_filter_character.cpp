@@ -183,7 +183,7 @@ void options(int argc, char** argv)
     ("input",       po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",      po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("color",         po::bool_switch(&color), "colorize output (yellow for Katakana, green for maybe-symbol Katakana)")
+    ("color",         po::bool_switch(&color), "colorize output (yellow for Katakana, green for maybe-symbol Katakana, red for punctuation/symbol/mark)")
         
     ("help", "help message");
   
