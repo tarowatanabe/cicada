@@ -63,13 +63,43 @@ int main(int argc, char** argv)
   generator.seed(utils::random_seed());
   boost::uniform_int<uint32_t> range(0, 255);
   boost::variate_generator<boost::mt19937, boost::uniform_int<uint32_t> > gen(generator, range);
+
+  {
+    utils::resource start;
+    test_hash_loop<16>::test(gen, utils::hashxx<uint32_t>(), utils::hashxx<uint64_t>());
+    utils::resource end;
+    
+    std::cout << "short hashxx cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << " user time: " << (end.user_time() - start.user_time())
+	      << std::endl;
+  }
+
+  {
+    utils::resource start;
+    test_hash_loop<16>::test(gen, utils::hashmurmur<uint32_t>(), utils::hashmurmur<uint64_t>());
+    utils::resource end;
+    
+    std::cout << "short hashmurmur cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << " user time: " << (end.user_time() - start.user_time())
+	      << std::endl;
+  }
+
+  {
+    utils::resource start;
+    test_hash_loop<16>::test(gen, utils::hashmurmur3<uint32_t>(), utils::hashmurmur3<uint64_t>());
+    utils::resource end;
+    
+    std::cout << "short hashmurmur3 cpu time: " << (end.cpu_time() - start.cpu_time())
+	      << " user time: " << (end.user_time() - start.user_time())
+	      << std::endl;
+  }
   
   {
     utils::resource start;
     test_hash_loop<256>::test(gen, utils::hashxx<uint32_t>(), utils::hashxx<uint64_t>());
     utils::resource end;
     
-    std::cout << "hashxx cpu time: " << (end.cpu_time() - start.cpu_time())
+    std::cout << "medium hashxx cpu time: " << (end.cpu_time() - start.cpu_time())
 	      << " user time: " << (end.user_time() - start.user_time())
 	      << std::endl;
   }
@@ -79,7 +109,7 @@ int main(int argc, char** argv)
     test_hash_loop<256>::test(gen, utils::hashmurmur<uint32_t>(), utils::hashmurmur<uint64_t>());
     utils::resource end;
     
-    std::cout << "hashmurmur cpu time: " << (end.cpu_time() - start.cpu_time())
+    std::cout << "medium hashmurmur cpu time: " << (end.cpu_time() - start.cpu_time())
 	      << " user time: " << (end.user_time() - start.user_time())
 	      << std::endl;
   }
@@ -89,9 +119,8 @@ int main(int argc, char** argv)
     test_hash_loop<256>::test(gen, utils::hashmurmur3<uint32_t>(), utils::hashmurmur3<uint64_t>());
     utils::resource end;
     
-    std::cout << "hashmurmur3 cpu time: " << (end.cpu_time() - start.cpu_time())
+    std::cout << "medium hashmurmur3 cpu time: " << (end.cpu_time() - start.cpu_time())
 	      << " user time: " << (end.user_time() - start.user_time())
 	      << std::endl;
   }
-
 }
