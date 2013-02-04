@@ -87,7 +87,8 @@ struct color_char_filter : public boost::iostreams::output_filter
 
     if (! mode) {
       // back into utf-8!
-      const UScriptCode script = (UScriptCode) u_getIntPropertyValue(uchar, UCHAR_SCRIPT);
+      const UScriptCode   script        = (UScriptCode) u_getIntPropertyValue(uchar, UCHAR_SCRIPT);
+      const UCharCategory category_mask = (UCharCategory) u_getIntPropertyValue(uchar, UCHAR_GENERAL_CATEGORY_MASK);
       bool reset = false;
       
       if (script == USCRIPT_KATAKANA) {
@@ -106,7 +107,11 @@ struct color_char_filter : public boost::iostreams::output_filter
 		 || uchar == 0x1f213) {
 	// supplemental ranges taken by "grep" of KATAKANA in UnicodeData.txt
 	boost::iostreams::put(s, 0x1b);
-	boost::iostreams::write(s, "[44m", 4);
+	boost::iostreams::write(s, "[42m", 4);
+	reset = true;
+      } else if (category_mask & (U_GC_P_MASK | U_GC_S_MASK | U_GC_M_MASK)) {
+	boost::iostreams::put(s, 0x1b);
+	boost::iostreams::write(s, "[41m", 4);
 	reset = true;
       }
       
@@ -154,9 +159,12 @@ int main(int argc, char** argv)
     
     utils::push_compress_ostream(os, output_file, 1024 * 1024 * (! flush_output));
     
-    std::string line;
-    while (std::getline(is, line))
-      os << line << '\n';
+    char buffer[4096];
+    do {
+      is.read(buffer, 4096);
+      if (is.gcount() > 0)
+	os.write(buffer, is.gcount());
+    } while (is);
   }
   catch(std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -175,7 +183,7 @@ void options(int argc, char** argv)
     ("input",       po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",      po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("color",         po::bool_switch(&color), "colorize output (green for Hiragana, yellow for Katakana, blue for either)")
+    ("color",         po::bool_switch(&color), "colorize output (yellow for Katakana, green for maybe-symbol Katakana)")
         
     ("help", "help message");
   
