@@ -1,14 +1,15 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
-
-#include <map>
 
 #include <cicada/sentence.hpp>
 
 #include <boost/algorithm/string/erase.hpp>
 
 #include "grammar_format.hpp"
+
+#include <utils/unordered_map.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -33,7 +34,7 @@ namespace cicada
       
       if (! phrases.empty()) {
 	typedef cicada::Sentence phrase_type;
-	typedef std::map<std::string, feature_set_type, std::less<std::string>, std::allocator<std::pair<const std::string, feature_set_type> > > unique_set_type;
+	typedef utils::unordered_map<std::string, feature_set_type, boost::hash<utils::piece>, std::equal_to<std::string>, std::allocator<std::pair<const std::string, feature_set_type> > >::type unique_set_type;
 
 	unique_set_type uniques;
 	format_type::phrase_set_type::const_iterator piter_end = phrases.end();
