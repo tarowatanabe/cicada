@@ -90,6 +90,42 @@ namespace utils
     }
   }
 
+  template <typename Sink>
+  inline
+  Sink& utf8_sink(Sink& sink, unsigned int code)
+  {
+    if (code <= 0x7f) {
+      sink.put(code);
+    } else if (code <= 0x7ff) {
+      sink.put(((code >> 6) & 0x1f) | 0xc0);
+      sink.put(((code     ) & 0x3f) | 0x80);
+    } else if (code <= 0xffff) {
+      sink.put(((code >> 12) & 0x0f) | 0xe0);
+      sink.put(((code >>  6) & 0x3f) | 0x80);
+      sink.put(((code      ) & 0x3f) | 0x80);
+    } else if (code <= 0x1fffff) {
+      sink.put(((code >> 18) & 0x07) | 0xf0);
+      sink.put(((code >> 12) & 0x3f) | 0x80);
+      sink.put(((code >>  6) & 0x3f) | 0x80);
+      sink.put(((code      ) & 0x3f) | 0x80);
+    } else if (code <= 0x3ffffff) {
+      sink.put(((code >> 24) & 0x03) | 0xf8);
+      sink.put(((code >> 18) & 0x3f) | 0x80);
+      sink.put(((code >> 12) & 0x3f) | 0x80);
+      sink.put(((code >>  6) & 0x3f) | 0x80);
+      sink.put(((code      ) & 0x3f) | 0x80);
+    } else if (code <= 0x7fffffff) {
+      sink.put(((code >> 30) & 0x01) | 0xfc);
+      sink.put(((code >> 24) & 0x3f) | 0x80);
+      sink.put(((code >> 18) & 0x3f) | 0x80);
+      sink.put(((code >> 12) & 0x3f) | 0x80);
+      sink.put(((code >>  6) & 0x3f) | 0x80);
+      sink.put(((code      ) & 0x3f) | 0x80);
+    } else
+      throw std::runtime_error("out of range");
+    
+    return sink;
+  }
 };
 
 #endif

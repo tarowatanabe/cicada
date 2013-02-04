@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // bitext filter
@@ -19,6 +19,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
+
+#include <boost/iostreams/concepts.hpp>
 
 #include <cicada/vocab.hpp>
 #include <cicada/stemmer.hpp>
@@ -146,7 +148,8 @@ int main(int argc, char** argv)
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
     
-    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+    boost::iostreams::filtering_ostream os;
+    utils::push_compress_ostream(os, output_file, 1024 * 1024 * (! flush_output));
     
     typedef boost::spirit::istream_iterator iiter_type;
     typedef std::ostream_iterator<char>     oiter_type;

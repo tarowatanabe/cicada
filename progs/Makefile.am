@@ -54,6 +54,7 @@ bin_PROGRAMS = \
 	cicada_extract_tree_mpi \
 	cicada_filter_alignment \
 	cicada_filter_bitext \
+	cicada_filter_character \
 	cicada_filter_config \
 	cicada_filter_config_moses \
 	cicada_filter_extract \
@@ -235,6 +236,9 @@ cicada_filter_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perf
 
 cicada_filter_bitext_SOURCES = cicada_filter_bitext.cpp
 cicada_filter_bitext_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_character_SOURCES = cicada_filter_character.cpp
+cicada_filter_character_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_text_SOURCES = cicada_filter_text.cpp
 cicada_filter_text_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

@@ -52,6 +52,7 @@ cicada_extract_tree
 cicada_extract_tree_mpi
 cicada_filter_alignment
 cicada_filter_bitext
+cicada_filter_character
 cicada_filter_config
 cicada_filter_config_moses
 cicada_filter_extract
