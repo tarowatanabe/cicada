@@ -50,7 +50,7 @@ struct TransLit
   void initialize(const std::string& name)
   {
     UErrorCode status = U_ZERO_ERROR;
-    trans.reset(icu::Transliterator::createInstance(UnicodeString::fromUTF8(name),
+    trans.reset(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8(name),
 						    UTRANS_FORWARD, status));
     
     if (U_FAILURE(status))
@@ -68,7 +68,7 @@ struct TransLit
       throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
   }
   
-  boost::shared_ptr<Transliterator> trans;
+  boost::shared_ptr<icu::Transliterator> trans;
 };
 
 class Replace
@@ -172,7 +172,7 @@ private:
   icu::UnicodeString substitute;
 };
 
-struct ostream_sink : public ByteSink
+struct ostream_sink : public icu::ByteSink
 {
   
   ostream_sink(std::ostream& _os) : os(_os) {}
@@ -303,7 +303,7 @@ int main(int argc, char** argv)
     
     std::string line;
     while (std::getline(is, line)) {
-      icu::UnicodeString uline = UnicodeString::fromUTF8(line);
+      icu::UnicodeString uline = icu::UnicodeString::fromUTF8(line);
       
       trans->transliterate(uline);
       
@@ -467,7 +467,7 @@ int main(int argc, char** argv)
       sink.write('\n');
     }
   }
-  catch(std::exception& err) {
+  catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
     return -1;
   }
@@ -495,13 +495,13 @@ Transliterator* initialize()
     
   if (sgml_entity) {
     static const char* table_sgml2entity[] = {
-#include "../utils/sgml_entity_table.hpp"
+#include "utils/sgml_entity_table.hpp"
     };
     
-    const int sgml_table_size = sizeof(table_sgml2entity) / sizeof(char*);
+    const size_t sgml_table_size = sizeof(table_sgml2entity) / sizeof(char*);
 
     icu::UnicodeString rules_entity;
-    for (int i = 0; i < sgml_table_size; ++ i) {
+    for (size_t i = 0; i < sgml_table_size; ++ i) {
       rules_entity += icu::UnicodeString::fromUTF8(table_sgml2entity[i]);
       rules_entity += '\n';
     }
