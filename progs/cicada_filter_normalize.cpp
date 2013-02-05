@@ -196,8 +196,8 @@ bool halfwidth = false;
 bool simplified = false;
 bool traditional = false;
 
-bool merge_digits = false;
-bool split_digits = false;
+bool merge_digit = false;
+bool split_digit = false;
 
 bool merge_ideographic = false;
 bool split_ideographic = false;
@@ -252,8 +252,8 @@ int main(int argc, char** argv)
     if (simplified && traditional)
       throw std::runtime_error("You cannot specify both Simplified/Traditional Hanzi conversion");
     
-    if (split_digits && merge_digits)
-      throw std::runtime_error("You cannot split and merge digits");
+    if (split_digit && merge_digit)
+      throw std::runtime_error("You cannot split and merge digit");
     
     if (split_ideographic && merge_ideographic)
       throw std::runtime_error("You cannot split and merge ideographic");
@@ -297,8 +297,8 @@ int main(int argc, char** argv)
       
       trans->transliterate(uline);
       
-      // digits...
-      if (split_digits) {
+      // digit...
+      if (split_digit) {
 	static ReplaceAll replace("(?<=[[:White_Space:]])([[:^Numeric_Type=None:]])(?=[[:^Numeric_Type=None:]]+[[:White_Space:]])", "$1 ");
 	
 	uline = ' ' + uline + ' ';
@@ -306,7 +306,7 @@ int main(int argc, char** argv)
 	uline.trim();
       }
 
-      if (merge_digits) {
+      if (merge_digit) {
 	static ReplaceAll replace("(?<=[[:White_Space:]])([[:^Numeric_Type=None:]])[[:White_Space:]]+(?=[[:^Numeric_Type=None:]]+[[:White_Space:]])", "$1");
 	  
 	uline = ' ' + uline + ' ';
@@ -560,7 +560,7 @@ icu::Transliterator* initialize()
     // xml entities
     rules += "\\u0022 <> '&quot;';\n";
     rules += "\\u0026 <> '&amp;';\n";
-    rules += "\\u0027 <> '&apos;';\n";
+    //rules += "\\u0027 <> '&apos;';\n";
     rules += "\\u003c <> '&lt;';\n";
     rules += "\\u003e <> '&gt;';\n";
   }
@@ -619,8 +619,8 @@ void options(int argc, char** argv)
     ("simplified",  po::bool_switch(&simplified),  "traditional to simplified Hanzi conversion")
     ("traditional", po::bool_switch(&traditional), "simplied to traditional Hanzi conversion")
 
-    ("merge-digits", po::bool_switch(&merge_digits), "merge digits")
-    ("split-digits", po::bool_switch(&split_digits), "split digits")
+    ("merge-digit", po::bool_switch(&merge_digit), "merge digit")
+    ("split-digit", po::bool_switch(&split_digit), "split digit")
     
     ("merge-ideographic", po::bool_switch(&merge_ideographic), "merge ideographic")
     ("split-ideographic", po::bool_switch(&split_ideographic), "split ideographic")
