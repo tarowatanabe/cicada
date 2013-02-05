@@ -197,11 +197,14 @@ bool remove_control = false;
 
 bool sgml_entity = false;
 
-bool simplified = false;
-bool traditional = false;
+bool lower = false;
+bool upper = false;
 
 bool fullwidth = false;
 bool halfwidth = false;
+
+bool simplified = false;
+bool traditional = false;
 
 bool merge_digits = false;
 bool split_digits = false;
@@ -214,6 +217,9 @@ bool split_hiragana = false;
 
 bool merge_katakana = false;
 bool split_katakana = false;
+
+bool merge_hangul = false;
+bool split_hangul = false;
 
 bool merge_symbol = false;
 bool split_symbol = false;
@@ -247,12 +253,15 @@ int main(int argc, char** argv)
     if (normalize_nfkc && normalize_nfc)
       throw std::runtime_error("You cannot specify both NFKC/NFC normalization");
 
-    if (simplified && traditional)
-      throw std::runtime_error("You cannot specify both Simplified/Traditional Hanzi conversion");
-    
+    if (lower && upper)
+      throw std::runtime_error("You cannot specify both lower/upper conversion");
+
     if (fullwidth && halfwidth)
       throw std::runtime_error("You cannot specify both Fullwidth and Halfwidth conversion");
 
+    if (simplified && traditional)
+      throw std::runtime_error("You cannot specify both Simplified/Traditional Hanzi conversion");
+    
     if (split_digits && merge_digits)
       throw std::runtime_error("You cannot split and merge digits");
     
@@ -264,6 +273,9 @@ int main(int argc, char** argv)
 
     if (split_katakana && merge_katakana)
       throw std::runtime_error("You cannot split and merge katakana");
+
+    if (split_hangul && merge_hangul)
+      throw std::runtime_error("You cannot split and merge hangul");
 
     if (split_symbol && merge_symbol)
       throw std::runtime_error("You cannot split and merge symbol");
@@ -343,6 +355,17 @@ int main(int argc, char** argv)
       
       if (merge_katakana) {
 	static Replace replace("(?<=[[:Katakana:][\\u3099-\\u309C][\\u30A0][\\u30FB-\\u30FC][\\uFF65][\\uFF70][\\uFF9e-\\uFF9F][\\U0001F201-\\U0001F202][\\U0001F213]])[[:White_Space:]]+(?=[[:Katakana:][\\u3099-\\u309C][\\u30A0][\\u30FB-\\u30FC][\\uFF65][\\uFF70][\\uFF9e-\\uFF9F][\\U0001F201-\\U0001F202][\\U0001F213]])", "");
+	replace(uline);
+      }
+
+      // hangul
+      if (split_hangul) {
+	static Replace replace("(?<=[[:Hangul:]])(?=[[:Hangul:]])", " ");
+	replace(uline);
+      }
+      
+      if (merge_hangul) {
+	static Replace replace("(?<=[[:Hangul:]])[[:White_Space:]]+(?=[[:Hangul:]])", "");
 	replace(uline);
       }
 
@@ -496,6 +519,16 @@ Transliterator* initialize()
     rules += icu::UnicodeString::fromUTF8(":: SGMLEntities ;\n");
     rules += icu::UnicodeString::fromUTF8(":: Hex-Any;\n");
   }
+
+  if (normalize_nfc)
+    rules += icu::UnicodeString::fromUTF8(":: NFC; \n");
+  if (normalize_nfkc)
+    rules += icu::UnicodeString::fromUTF8(":: NFKC; \n");
+  
+  if (lower)
+    rules += icu::UnicodeString::fromUTF8(":: Any-Lower; \n");
+  if (upper)
+    rules += icu::UnicodeString::fromUTF8(":: Any-Upper; \n");
   
   if (fullwidth)
     rules += icu::UnicodeString::fromUTF8(":: Halfwidth-Fullwidth ;\n");
@@ -506,12 +539,7 @@ Transliterator* initialize()
     rules += icu::UnicodeString::fromUTF8(":: Traditional-Simplified; \n");
   if (traditional)
     rules += icu::UnicodeString::fromUTF8(":: Simplified-Traditional; \n");
-  
-  if (normalize_nfc)
-    rules += icu::UnicodeString::fromUTF8(":: NFC; \n");
-  if (normalize_nfkc)
-    rules += icu::UnicodeString::fromUTF8(":: NFKC; \n");
-  
+    
   UErrorCode status = U_ZERO_ERROR;
   UParseError status_parse;
   std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules("FullNormalizer", rules,
@@ -535,6 +563,9 @@ void options(int argc, char** argv)
     ("remove-control", po::bool_switch(&remove_control), "remove non white-space controls")
     
     ("entity", po::bool_switch(&sgml_entity), "convert SGML entities")
+
+    ("lower", po::bool_switch(&lower),  "lower conversion")
+    ("upper", po::bool_switch(&upper),  "upper conversion")
     
     ("fullwidth", po::bool_switch(&fullwidth),  "halfwidth to fullwidth conversion")
     ("halfwidth", po::bool_switch(&halfwidth),  "fullwidth to halfwidth conversion")
@@ -553,6 +584,9 @@ void options(int argc, char** argv)
 
     ("merge-katakana", po::bool_switch(&merge_katakana), "merge katakana")
     ("split-katakana", po::bool_switch(&split_katakana), "split katakana")
+
+    ("merge-hangul", po::bool_switch(&merge_hangul), "merge hangul")
+    ("split-hangul", po::bool_switch(&split_hangul), "split hangul")
 
     ("merge-symbol", po::bool_switch(&merge_symbol), "merge symbol")
     ("split-symbol", po::bool_switch(&split_symbol), "split symbol")
