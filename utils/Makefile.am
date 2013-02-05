@@ -232,7 +232,8 @@ noinst_DATA = .gitignore
 	done
 
 noinst_HEADERS = \
-bitpack_impl.hpp
+bitpack_impl.hpp \
+sgml_entity_table.hpp 
 
 bitpack8.cpp  : bitpack_impl.hpp bitpack8_impl.hpp
 bitpack16.cpp  : bitpack_impl.hpp bitpack16_impl.hpp
@@ -257,6 +258,9 @@ group_aligned_code.hpp : group_aligned_code_offsets.hpp
 
 group_aligned_code_offsets.hpp : group_aligned_code_offsets.py
 	./group_aligned_code_offsets.py > group_aligned_code_offsets.hpp
+
+sgml_entity_table.hpp : parse-sgml-entity.py
+	cat ../sgml_entity/*.ent | ./parse-sgml-entity.py > sgml_entity_table.hpp
 
 alloc_vector_main_SOURCES = alloc_vector_main.cpp
 alloc_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 

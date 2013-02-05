@@ -54,7 +54,6 @@ bin_PROGRAMS = \
 	cicada_extract_tree_mpi \
 	cicada_filter_alignment \
 	cicada_filter_bitext \
-	cicada_filter_character \
 	cicada_filter_config \
 	cicada_filter_config_moses \
 	cicada_filter_extract \
@@ -65,6 +64,7 @@ bin_PROGRAMS = \
 	cicada_filter_join \
 	cicada_filter_kbest \
 	cicada_filter_kbest_moses \
+	cicada_filter_normalize \
 	cicada_filter_charniak \
 	cicada_filter_dependency \
 	cicada_filter_penntreebank \
@@ -237,8 +237,8 @@ cicada_filter_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perf
 cicada_filter_bitext_SOURCES = cicada_filter_bitext.cpp
 cicada_filter_bitext_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_filter_character_SOURCES = cicada_filter_character.cpp
-cicada_filter_character_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_filter_normalize_SOURCES = cicada_filter_normalize.cpp sgml_entity_table.hpp
+cicada_filter_normalize_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_text_SOURCES = cicada_filter_text.cpp
 cicada_filter_text_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

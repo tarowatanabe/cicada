@@ -52,7 +52,6 @@ cicada_extract_tree
 cicada_extract_tree_mpi
 cicada_filter_alignment
 cicada_filter_bitext
-cicada_filter_character
 cicada_filter_config
 cicada_filter_config_moses
 cicada_filter_extract
@@ -63,6 +62,7 @@ cicada_filter_giza
 cicada_filter_join
 cicada_filter_kbest
 cicada_filter_kbest_moses
+cicada_filter_normalize
 cicada_filter_charniak
 cicada_filter_dependency
 cicada_filter_penntreebank
