@@ -239,7 +239,7 @@ bool color = false;
 std::string codepage_from = "utf-8";
 std::string codepage_to   = "utf-8";
 
-Transliterator* initialize();
+icu::Transliterator* initialize();
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -286,7 +286,7 @@ int main(int argc, char** argv)
     if (split_mark && merge_mark)
       throw std::runtime_error("You cannot split and merge mark");
 
-    std::auto_ptr<Transliterator> trans(initialize());
+    std::auto_ptr<icu::Transliterator> trans(initialize());
 
     boost::iostreams::filtering_istream is;
     is.push(utils::icu_filter(codepage_from, "utf-8", utils::icu_filter::stop));
@@ -474,7 +474,7 @@ int main(int argc, char** argv)
   return 0;
 }
 
-Transliterator* initialize()
+icu::Transliterator* initialize()
 {
   icu::UnicodeString rules;
   
