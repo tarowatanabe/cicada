@@ -532,40 +532,40 @@ void options(int argc, char** argv)
     ("input",       po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",      po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
-    ("remove-control", utils::true_false_switch(&remove_control), "remove non white-space controls")
+    ("remove-control", po::bool_switch(&remove_control), "remove non white-space controls")
     
-    ("entity", utils::true_false_switch(&sgml_entity), "convert SGML entities")
+    ("entity", po::bool_switch(&sgml_entity), "convert SGML entities")
     
-    ("fullwidth", utils::true_false_switch(&fullwidth),  "halfwidth to fullwidth conversion")
-    ("halfwidth", utils::true_false_switch(&halfwidth),  "fullwidth to halfwidth conversion")
+    ("fullwidth", po::bool_switch(&fullwidth),  "halfwidth to fullwidth conversion")
+    ("halfwidth", po::bool_switch(&halfwidth),  "fullwidth to halfwidth conversion")
     
-    ("simplified",  utils::true_false_switch(&simplified),  "traditional to simplified Hanzi conversion")
-    ("traditional", utils::true_false_switch(&traditional), "simplied to traditional Hanzi conversion")
+    ("simplified",  po::bool_switch(&simplified),  "traditional to simplified Hanzi conversion")
+    ("traditional", po::bool_switch(&traditional), "simplied to traditional Hanzi conversion")
 
-    ("merge-digits", utils::true_false_switch(&merge_digits), "merge digits")
-    ("split-digits", utils::true_false_switch(&split_digits), "split digits")
+    ("merge-digits", po::bool_switch(&merge_digits), "merge digits")
+    ("split-digits", po::bool_switch(&split_digits), "split digits")
     
-    ("merge-ideographic", utils::true_false_switch(&merge_ideographic), "merge ideographic")
-    ("split-ideographic", utils::true_false_switch(&split_ideographic), "split ideographic")
+    ("merge-ideographic", po::bool_switch(&merge_ideographic), "merge ideographic")
+    ("split-ideographic", po::bool_switch(&split_ideographic), "split ideographic")
 
-    ("merge-hiragana", utils::true_false_switch(&merge_hiragana), "merge hiragana")
-    ("split-hiragana", utils::true_false_switch(&split_hiragana), "split hiragana")
+    ("merge-hiragana", po::bool_switch(&merge_hiragana), "merge hiragana")
+    ("split-hiragana", po::bool_switch(&split_hiragana), "split hiragana")
 
-    ("merge-katakana", utils::true_false_switch(&merge_katakana), "merge katakana")
-    ("split-katakana", utils::true_false_switch(&split_katakana), "split katakana")
+    ("merge-katakana", po::bool_switch(&merge_katakana), "merge katakana")
+    ("split-katakana", po::bool_switch(&split_katakana), "split katakana")
 
-    ("merge-symbol", utils::true_false_switch(&merge_symbol), "merge symbol")
-    ("split-symbol", utils::true_false_switch(&split_symbol), "split symbol")
+    ("merge-symbol", po::bool_switch(&merge_symbol), "merge symbol")
+    ("split-symbol", po::bool_switch(&split_symbol), "split symbol")
 
-    ("merge-punctuation", utils::true_false_switch(&merge_punctuation), "merge punctuation")
-    ("split-punctuation", utils::true_false_switch(&split_punctuation), "split punctuation")
+    ("merge-punctuation", po::bool_switch(&merge_punctuation), "merge punctuation")
+    ("split-punctuation", po::bool_switch(&split_punctuation), "split punctuation")
 
-    ("merge-mark", utils::true_false_switch(&merge_mark), "merge mark")
-    ("split-mark", utils::true_false_switch(&split_mark), "split mark")
+    ("merge-mark", po::bool_switch(&merge_mark), "merge mark")
+    ("split-mark", po::bool_switch(&split_mark), "split mark")
     
-    ("normalize-nfkc",  utils::true_false_switch(&normalize_nfkc),  "normalize NFKC")
-    ("normalize-nfc",   utils::true_false_switch(&normalize_nfc),   "normalize NFC")
-    ("normalize-space", utils::true_false_switch(&normalize_space), "normalize space")
+    ("normalize-nfkc",  po::bool_switch(&normalize_nfkc),  "normalize NFKC")
+    ("normalize-nfc",   po::bool_switch(&normalize_nfc),   "normalize NFC")
+    ("normalize-space", po::bool_switch(&normalize_space), "normalize space")
     
     ("color",         po::bool_switch(&color), "colorize output (yellow for Katakana, green for maybe-symbol Katakana, red for punctuation/symbol/mark)")
     
