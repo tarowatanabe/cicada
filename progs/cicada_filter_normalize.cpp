@@ -185,6 +185,7 @@ path_type output_file = "-";
 bool remove_control = false;
 
 bool sgml_entity = false;
+bool entity_sgml = false;
 
 bool lower = false;
 bool upper = false;
@@ -235,6 +236,9 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    if (sgml_entity && entity_sgml)
+      throw std::runtime_error("You cannot specify both SGML/entity and entit/SGML conversion");
 
     if (normalize_nfkc && normalize_nfc)
       throw std::runtime_error("You cannot specify both NFKC/NFC normalization");
@@ -506,6 +510,39 @@ icu::Transliterator* initialize()
     rules += icu::UnicodeString::fromUTF8(":: Hex-Any;\n");
   }
 
+  if (entity_sgml) {
+    static const char* table_sgml2entity[] = {
+#include "utils/sgml_entity_table_inverse.hpp"
+    };
+    
+    const size_t sgml_table_size = sizeof(table_sgml2entity) / sizeof(char*);
+    
+    icu::UnicodeString rules_entity;
+
+    rules_entity += ":: [[:^Latin:][\\x00-\\x7f]]; \n";
+    for (size_t i = 0; i < sgml_table_size; ++ i) {
+      rules_entity += icu::UnicodeString::fromUTF8(table_sgml2entity[i]);
+      rules_entity += '\n';
+    }
+    
+    UErrorCode status = U_ZERO_ERROR;
+    UParseError status_parse;
+    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGML"),
+										  rules_entity,
+										  UTRANS_FORWARD, status_parse, status));
+    if (U_FAILURE(status)) {
+      std::cerr << "parse error:"
+		<< " line: " << status_parse.line
+		<< " offset: " << status_parse.offset
+		<< std::endl;
+      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+    }
+    
+    icu::Transliterator::registerInstance(trans.release());
+    
+    rules += icu::UnicodeString::fromUTF8(":: EntitySGML ;\n");
+  }
+
   if (normalize_nfc)
     rules += icu::UnicodeString::fromUTF8(":: NFC; \n");
   if (normalize_nfkc)
@@ -548,7 +585,8 @@ void options(int argc, char** argv)
 
     ("remove-control", po::bool_switch(&remove_control), "remove non white-space controls")
     
-    ("entity", po::bool_switch(&sgml_entity), "convert SGML entities")
+    ("sgml-entity", po::bool_switch(&sgml_entity), "convert SGML entities as characters")
+    ("entity-sgml", po::bool_switch(&entity_sgml), "convert characters as SGML entities")
 
     ("lower", po::bool_switch(&lower),  "lower conversion")
     ("upper", po::bool_switch(&upper),  "upper conversion")
