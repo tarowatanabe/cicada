@@ -33,14 +33,21 @@ struct TransLit
 	   const std::string& pattern) { initialize(name, pattern); }
   
   TransLit(const std::string& name) { initialize(name); }
+  ~TransLit() { clear(); }
   
-  void operator()(icu::UnicodeString& data) { trans->transliterate(data); }
+  const icu::UnicodeString& operator()(icu::UnicodeString& data) { trans->transliterate(data); return data; }
+  
+  void clear()
+  {
+    if (trans) delete trans;
+    trans = 0;
+  }
   
   void initialize(const std::string& name)
   {
     UErrorCode status = U_ZERO_ERROR;
-    trans.reset(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8(name),
-						    UTRANS_FORWARD, status));
+    trans = icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8(name),
+						UTRANS_FORWARD, status);
     
     if (U_FAILURE(status))
       throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
@@ -50,17 +57,17 @@ struct TransLit
   {
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    trans.reset(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8(name), icu::UnicodeString::fromUTF8(pattern),
-						     UTRANS_FORWARD, status_parse, status));
+    trans = icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8(name), icu::UnicodeString::fromUTF8(pattern),
+						 UTRANS_FORWARD, status_parse, status);
     
     if (U_FAILURE(status))
       throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
   }
   
-  boost::shared_ptr<icu::Transliterator> trans;
+  icu::Transliterator* trans;
 };
 
-class Replace
+struct Replace
 {
   
 public:
@@ -108,7 +115,7 @@ private:
   icu::UnicodeString substitute;
 };
 
-class ReplaceAll
+struct ReplaceAll
 {
   
 public:
@@ -186,6 +193,9 @@ bool remove_control = false;
 
 bool sgml_entity = false;
 bool entity_sgml = false;
+
+bool latin = false;
+bool ascii = false;
 
 bool lower = false;
 bool upper = false;
@@ -569,6 +579,12 @@ icu::Transliterator* initialize()
     rules += icu::UnicodeString::fromUTF8(":: NFC; \n");
   if (normalize_nfkc)
     rules += icu::UnicodeString::fromUTF8(":: NFKC; \n");
+
+  if (latin)
+    rules += icu::UnicodeString::fromUTF8(":: Any-Latin; \n");
+
+  if (ascii)
+    rules += icu::UnicodeString::fromUTF8(":: Latin-ASCII; \n");
   
   if (lower)
     rules += icu::UnicodeString::fromUTF8(":: Any-Lower; \n");
@@ -609,6 +625,9 @@ void options(int argc, char** argv)
     
     ("sgml-entity", po::bool_switch(&sgml_entity), "convert SGML entities as characters")
     ("entity-sgml", po::bool_switch(&entity_sgml), "convert characters as SGML entities")
+    
+    ("latin", po::bool_switch(&latin), "Latin conversion")
+    ("ascii", po::bool_switch(&ascii), "ASCII conversion")
 
     ("lower", po::bool_switch(&lower),  "lower conversion")
     ("upper", po::bool_switch(&upper),  "upper conversion")
