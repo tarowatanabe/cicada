@@ -405,9 +405,9 @@ int main(int argc, char** argv)
 	for (iter.setToStart(); iter.hasNext(); /**/) {
 	  const UChar32 uchar = iter.next32PostInc();
 	    
-	  const UScriptCode   script        = (UScriptCode)   u_getIntPropertyValue(uchar, UCHAR_SCRIPT);
-	  const UCharCategory category_mask = (UCharCategory) u_getIntPropertyValue(uchar, UCHAR_GENERAL_CATEGORY_MASK);
-	  const UNumericType  numeric       = (UNumericType)  u_getIntPropertyValue(uchar, UCHAR_NUMERIC_TYPE);
+	  const UScriptCode   script        = static_cast<UScriptCode>(u_getIntPropertyValue(uchar, UCHAR_SCRIPT));
+	  const UCharCategory category_mask = static_cast<UCharCategory>(u_getIntPropertyValue(uchar, UCHAR_GENERAL_CATEGORY_MASK));
+	  const UNumericType  numeric       = static_cast<UNumericType>(u_getIntPropertyValue(uchar, UCHAR_NUMERIC_TYPE));
 	  bool reset = false;
 	    
 	  if (script == USCRIPT_KATAKANA) {
