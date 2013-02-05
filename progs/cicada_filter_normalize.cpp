@@ -519,7 +519,7 @@ icu::Transliterator* initialize()
     
     icu::UnicodeString rules_entity;
 
-    rules_entity += ":: [[:^Latin:][\\x00-\\x7f]]; \n";
+    rules_entity += ":: [[:^Latin:]-[\\x00-\\x7f]]; \n";
     for (size_t i = 0; i < sgml_table_size; ++ i) {
       rules_entity += icu::UnicodeString::fromUTF8(table_sgml2entity[i]);
       rules_entity += '\n';
