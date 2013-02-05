@@ -46,7 +46,14 @@ for name in entities.keys():
         else:
             umapped += "\\\\u%04x" %(value)
 
-    inverse[umapped] = name
+    if inverse.has_key(umapped):
+        name_old = inverse[umapped]
+        
+        # we prefer lower-case
+        if name > name_old:
+            inverse[umapped] = name
+    else:
+        inverse[umapped] = name
 
 maps = inverse.keys()
 maps.sort()

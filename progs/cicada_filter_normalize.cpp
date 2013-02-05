@@ -519,7 +519,6 @@ icu::Transliterator* initialize()
     
     icu::UnicodeString rules_entity;
 
-    rules_entity += ":: [[:^Latin:]-[\\x00-\\x7f]]; \n";
     for (size_t i = 0; i < sgml_table_size; ++ i) {
       rules_entity += icu::UnicodeString::fromUTF8(table_sgml2entity[i]);
       rules_entity += '\n';
@@ -527,7 +526,7 @@ icu::Transliterator* initialize()
     
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGML"),
+    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGMLRules"),
 										  rules_entity,
 										  UTRANS_FORWARD, status_parse, status));
     if (U_FAILURE(status)) {
@@ -539,8 +538,31 @@ icu::Transliterator* initialize()
     }
     
     icu::Transliterator::registerInstance(trans.release());
+
+    {
+      UErrorCode status = U_ZERO_ERROR;
+      UParseError status_parse;
+      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGML"),
+										    ":: [[:^Latin:]-[\\x00-\\x7f]] ; :: EntitySGMLRules ;",
+										    UTRANS_FORWARD, status_parse, status));
+      if (U_FAILURE(status)) {
+	std::cerr << "parse error:"
+		  << " line: " << status_parse.line
+		  << " offset: " << status_parse.offset
+		  << std::endl;
+	throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+      }
+
+      icu::Transliterator::registerInstance(trans.release());
+    }
     
     rules += icu::UnicodeString::fromUTF8(":: EntitySGML ;\n");
+    // xml entities
+    rules += "\\u003c <> '&lt;';\n";
+    rules += "\\u003e <> '&gt;';\n";
+    rules += "\\u0026 <> '&amp;';\n";
+    rules += "\\u0027 <> '&apos;';\n";
+    rules += "\\u0022 <> '&quot;';\n";
   }
 
   if (normalize_nfc)
