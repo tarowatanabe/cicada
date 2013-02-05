@@ -4,28 +4,17 @@
 //
 
 #include <iostream>
-#include <vector>
 #include <utility>
 #include <string>
-#include <algorithm>
-#include <iterator>
 #include <memory>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
-
-#include <boost/iostreams/concepts.hpp>
 
 #include "utils/icu_filter.hpp"
-#include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/subprocess.hpp"
-#include "utils/lockfree_list_queue.hpp"
-#include "utils/lexical_cast.hpp"
-#include "utils/utf8.hpp"
 
 #include <unicode/utypes.h>
 #include <unicode/unistr.h>
@@ -244,9 +233,6 @@ void options(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-  namespace qi = boost::spirit::qi;
-  namespace karma = boost::spirit::karma;
-  
   try {
     options(argc, argv);
 
