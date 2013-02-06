@@ -1,0 +1,637 @@
+	    #
+	    # Special character list index
+	    #
+	    %spec_char = (
+	    #
+	    # The following three columns define the RB2GB special
+	    # character mapping between Red Book, Green Book, and Blue Book.
+	    #
+	    #	Red Book            Green Book          Blue Book +Index
+	    #	------------------  ------------------  ----------------
+		"\{open\ oversize\ parenthesis\}",  "(",    # 
+		"\{close\ oversize\ parenthesis\}", ")",    # 
+		"\{open\ oversize\ brace\}",        "{",    # 
+		"\{close\ oversize\ brace\}",       "}",    # 
+		"\{open\ oversize\ bracket\}",      "[",    # 
+		"\{close\ oversize\ bracket\}",     "]",    # 
+		"\{square\ root}",    ".sqroot.",         # 29-
+		"\{cube\ root}",      ".cuberoot.",       # 54-
+		"\{fourth\ root}",    ".fourthroot.",     # 196-
+		"&lsquo;",          "\`",               # 1-
+		"&rsquo;",          "\`",               # 2-
+		"&apos;",           "\'",               # 3-
+		"&prop;",           ".varies.",         # 4-
+		"&equiv;",          ".ident.",          # 5- & 57
+		"&nequiv;",         ".notident.",       # 6-
+		"&part;",           ".differential.",   # 7-
+		"&lsqb;",           "\[",               # 8-
+		"&rsqb;",           "\]",               # 9,171-
+		"&emsp;",           " ",                # 10,173-
+		"&ensp;",           " ",                # 11-
+		"&thinsp;",         " ",                # 12-
+		"&mdash;",          "--",               # 13-
+		"&hyphen;",         "-",                #
+		"&ndash;",          "-",                # 14-
+		"&nldr;",           ".",                # 15-
+		"&ne;",             ".noteq.",          # 16-
+		"&tilde;",          ".about.",          # 18-
+		"&middot;",         ".multidot.",       # 19-
+		"&deg;",            ".degree.",         # 20-
+		"&lE;",             ".ltoreq.",         # 23-
+		"&gE;",             ".gtoreq.",         # 24-
+		"&cong;",           ".congruent.",      # 25-
+		"&ap;",             ".apprxeq.",        # 26-
+		"&cent;",           ".cent.",           # 27-
+		"&infin;",          ".infin.",          # 28-
+		"&plus;",           "\+",               # 30-
+		"&minus;",          "\-",               # 31-
+		"&equals;",         "\=",               # 32-
+		"&times;",          ".times.",          # 33-
+		"&divide;",         ".div.",            # 34-
+		"&plusmn;",         ".\+\-.",           # 35-
+		"&mnplus;",         ".\-\+.",           # 36-
+		"&ldquo;",          "\"",               # 37-
+		"&rdquo;",          "\"",               # 38-
+		"&rlarr2;",         ".revreaction.",    # 39-
+		"&prime;",          "\'",               # 40-
+		"&Prime;",          "\"",               # 41-
+		"&rarr;",           ".fwdarw.",         # 43-
+		"&there4;",         ".thrfore.",        # 44-
+		"&becaus;",         ".BECAUSE.",        # 45-
+		"&sharp;",          ".music-sharp.",    # 46-
+		"&flat;",           ".music-flat.",     # 47-
+		"&quest;",          "?",                # 48-
+		"&excl;",           "\!",               # 49-
+		"&boxH;",           ".dbd.",            # 50-
+		"&verbar;",         ".vertline.",       # 51-
+		"&uarr;",           ".uparw.",          # 52-
+		"&blank;",          ".hoarfrost.",      # 53-
+		"&lcub;",           "\{",               # 55-
+		"&rcub;",           "\}",               # 56-
+		"&square;",         ".quadrature.",     # 58-
+		"&nabla;",          ".gradient.",       # 59-
+		"&agr;",            ".alpha.",          # 60-
+		"&oplus;",          ".sym.",            # 61-
+		"&bgr;",            ".beta.",           # 62-
+		"&ominus;",         ".crclbar.",        # 63-
+		"&Ggr;",            ".GAMMA.",          # 64-
+		"&ggr;",            ".gamma.",          # 65-
+		"&Dgr;",            ".DELTA.",          # 66 & 42
+		"&dgr;",            ".delta.",          # 67-
+		"&egr;",            ".epsilon.",        # 68-
+		"&Egr;",            ".EPSILON.",        # 69-
+		"&zgr;",            ".zeta.",           # 70-
+		"&fnof;",           ".function.",       # 71-
+		"&eegr;",           ".eta.",            # 72-
+		"&THgr;",           ".THETA.",          # 73-
+		"&thgr;",           ".theta.",          # 74-
+		"&darr;",           ".dwnarw.",         # 75-
+		"&igr;",            ".iota.",           # 76-
+		"&larr;",           ".rarw.",           # 77-
+		"&kgr;",            ".kappa.",          # 78-
+		"&Lgr;",            ".LAMBDA.",         # 79-
+		"&lgr;",            ".lambda.",         # 80-
+		"&par;",            ".parallel.",       # 81-
+		"&mgr;",            ".mu.",             # 82-
+		"&ngr;",            ".nu.",             # 84-
+		"&Xgr;",            ".XI.",             # 85-
+		"&xgr;",            ".xi.",             # 86-
+		"&ogr;",            ".omicron.",        # 88-
+		"&pgr;",            ".pi.",             # 90-
+		"&rgr;",            ".rho.",            # 92-
+		"&Sgr;",            ".SIGMA.",          # 93-
+		"&sgr;",            ".sigma.",          # 94-
+		"&tgr;",            ".tau.",            # 96-
+		"&Ugr;",            ".UPSILON.",        # 97-
+		"&ugr;",            ".upsilon.",        # 98-
+		"&phgr;",           ".phi.",            # 100-
+		"&PHgr;",           ".PHI.",            # 101-
+		"&khgr;",           ".chi.",            # 102-
+		"&psgr;",           ".psi.",            # 104-
+		"&PSgr;",           ".PSI.",            # 105-
+		"&OHgr;",           ".OMEGA.",          # 106-
+		"&ohgr;",            ".omega.",         # 107-
+		"&bull;",           ".cndot.",          # 108 & 500
+		"&cap;",            ".andgate.",        # 109 & 512
+		"&ang;",            ".angle.",          # 110-
+		"&permil;",         ".Salinity.",       # 129-
+		"&frac18;",         "1\/8",             # 150,152
+		"&lsim;",           ".ltorsim.",        # 155-
+		"&frac38;",         "3\/8",             # 154,156-
+		"&gsim;",           ".gtorsim.",        # 157-
+		"&frac58;",         "5\/8",             # 158,160-
+		"&frac78;",         "7\/8",             # 162,164-
+		"&frac13;",         "1\/3",             # 166,188-
+		"&sime;",           ".perspectiveto.",  # 167-
+		"&commat;",         "\@",               # 169-
+		"&frac23;",         "2\/3",             # 170,172
+		"<chg[^>]+>",       ".\[.",             #
+		"</chg>",           ".\].",             #
+		"&frac14;",         "1\/4",             # 174,176-
+		"&frac12;",         "1\/2",             # 178-
+		"&half;",           "1\/2",             # 180-
+		"&frac34;",         "3\/4",             # 182,184-
+		"&Quadbond;",       ".quadbond.",       # 185-
+		"&num;",            "\#",               # 190-
+		"&nlt;",            ".notlessthan.",    # 191-
+		"&ngt;",            ".notgreaterthan.", # 192-
+		"&natur;",          ".music-natural.",  # 193-
+		"&esdot;",          ".apprch.",         # 194-
+		"&perp;",           ".perp.",           # 195-
+		"&trade;",          ".TM.",             # 198-
+		"<HIL><SP><PDAT>SM<\/PDAT><\/SP><\/HIL>",      ".SM.",             # 199  Not caught here ... fixed in processHIL.
+		"&reg;",            ".RTM.",            # 200-
+		"&copy;",           ".COPYRGT.",        # 201-
+		"&cir;",            ".circle.",         # 501-
+		"&ocir;",           ".circleincircle.", # 502-
+		"&Lhalfcircle;",    ".lhalfcircle.",    # 503-
+		"&Rhalfcircle;",    ".rhalfcircle.",    # 504-
+		"&Dottedcircle;",   ".dottedcircle.",   # 505-
+		"&Tophorzbrace;",   ".THorizBrace.",    # 506-
+		"&Bothorzbrace;",   ".BHorizBrace.",    # 507-
+		"&Dotlhalfcircle;", ".dotlhalfcircle.", # 508-
+		"&Dotrhalfcircle;", ".dotrhalfcircle.", # 509-
+		"&Dotthalfcircle;", ".dotthalfcircle.", # 510-
+		"&Dotbhalfcircle;", ".dotbhalfcircle.", # 511-
+		"&male;",           ".male.",           # 515-
+		"&female;",         ".female.",         # 516-
+		"&sect;",           ".sctn.",           # 517-
+		"&empty;",          ".0.",              # 518,519-
+		"&cup;",            ".orgate.",         # 520 & 513
+		"&angst;",          ".ANG.",            # 521-
+		"&aring;",          ".ang.",            # 522-
+		"&oelig;",          ".oe butted.",      # 523-
+		"&aelig;",          ".ae butted.",      # 524-
+		"&ccedil;",         ".cedilla.",        # 525-
+		"&oslash;",         ".o slashed.",      # 526-
+		"&Oslash;",         ".O slashed.",      # 527-
+		"&Hslashed;",       ".h slashed.",      # 528-
+		"&Pi;",             ".PI.",             # 529-
+		"&notin;",          ".epsilon slash.",  # 530-
+		"&isin;",           ".di-elect cons.",  # 531-
+		"&sub;",            ".OR right.",       # 532-
+		"&sup;",            ".OR left.",        # 533-
+		"&image;",          ".Fourier.",        # 534-
+		"&pound;",          ".English Pound.",  # 535-
+		"&yen;",            ".Yen.",            # 536-
+		"&boxur;",          ".left brkt-bot.",  # 537-
+		"&boxdl;",          ".right brkt-top.", # 538-
+		"&boxdr;",          ".left brkt-top.",  # 539-
+		"&boxul;",          ".right brkt-bot.", # 540-
+		"&boxvr;",          ".perp-right.",     # 541-
+		"&boxvl;",          ".perp-left.",      # 542-
+		"&brvbar;",         ".linevert split.", # 543-
+		"&bsol;",           ".backslash.",      # 544-
+		"&Parenopenst;",    ".paren open-st.",  # 545-
+		"&Parenclosest;",   ".paren close-st.", # 546-
+		"&Brketopenst;",    ".brket open-st.",  # 547-
+		"&Brketclosest;",   ".brket close-st.", # 548-
+		"&exist;",          ".E-backward.",     # 549-
+		"&forall;",         ".A-inverted.",     # 550-
+		"&Centerline;",     ".centerline.",     # 551-
+		"&para;",           ".paragraph.",      # 552-
+		"&Asteriskpseud;",  ".asterisk-pseud.", # 553-
+		"&dagger;",         ".dagger.",         # 554-
+		"&Dagger;",         ".dagger-dbl.",     # 555-
+		"&dArr;",           ".arrow-down dbl.", # 557-
+		"&check;",          ".check mark.",     # 558-
+		"&curren;",         ".sunburst.",       # 559-
+		"&star;",           ".star.",           # 560-
+		"&starf;",          ".star-solid.",     # 561-
+		"&rect;",           ".rect-hollow.",    # 562-
+		"&Rectversolid;",   ".rect-ver-solid.", # 563-
+		"&Rectsolid;",      ".rect-solid.",     # 564-
+		"&hearts;",         ".heart.",          # 565-
+		"&diam;",           ".diamond.",        # 566-
+		"&diams;",          ".diamond-solid.",  # 567-
+		"&utrif;",          ".tangle-solidup.", # 568-
+		"&dtrif;",          ".tangle-soliddn.", # 569-
+		"&squf;",           ".box-solid.",      # 570-
+		"&Ovalhollow;",     ".oval-hollow.",    # 571-
+		"&Ovalsolid;",      ".oval-solid.",     # 572-
+		"&odot;",           ".circle-w/dot.",   # 573-
+		"&Circlesolid;",    ".circle-solid.",   # 574-
+		"&compfn;",         ".smallcircle.",    # 601,602-
+		"&int;",            ".intg.",           # 17,114,605-
+		"&xcirc;",          ".largecircle.",    # 603,701-
+		"&frac15;",         "1\/5",             # Fraction 1/5
+		"&frac25;",         "2\/5",             # Fraction 2/5
+		"&frac35;",         "3\/5",             # Fraction 3/5
+		"&frac45;",         "4\/5",             # Fraction 4/5
+		"&frac16;",         "1\/6",             # Fraction 1/6
+		"&frac56;",         "5\/6",             # Fraction 5/6
+		"&auml;",           "a",                # small a, dieresis or umlaut mark
+		"&Auml;",           "A",                # capital A, dieresis or umlaut mark
+		"&euml;",           "e",                # small e, dieresis or umlaut mark
+		"&Euml;",           "E",                # capital E, dieresis or umlaut mark
+		"&iuml;",           "i",                # small i, dieresis or umlaut mark
+		"&Iuml;",           "I",                # capital I, dieresis or umlaut mark
+		"&ouml;",           "o",                # small o, dieresis or umlaut mark
+		"&Ouml;",           "O",                # capital O, dieresis or umlaut mark
+		"&uuml;",           "u",                # small u, dieresis or umlaut mark
+		"&Uuml;",           "U",                # capital U, dieresis or umlaut mark
+		"&yuml;",           "y",                # small y, dieresis or umlaut mark
+		"&Yuml;",           "Y",                # capital Y, dieresis or umlaut mark
+		"&aacute;",         "a",                # small a, acute accent
+		"&Aacute;",         "A",                # capital A, acute accent
+		"&eacute;",         "e",                # small e, acute accent
+		"&Eacute;",         "E",                # capital E, acute accent
+		"&iacute;",         "i",                # small i, acute accent
+		"&Iacute;",         "I",                # capital I, acute accent
+		"&oacute;",         "o",                # small o, acute accent
+		"&Oacute;",         "O",                # capital O, acute accent
+		"&uacute;",         "u",                # small u, acute accent
+		"&Uacute;",         "U",                # capital U, acute accent
+		"&yacute;",         "y",                # small y, acute accent
+		"&Yacute;",         "Y",                # capital Y, acute accent
+		"&cacute;",         "c",                # small c, acute accent
+		"&Cacute;",         "C",                # capital C, acute accent
+		"&gacute;",         "g",                # small g, acute accent
+		"&lacute;",         "l",                # small l, acute accent
+		"&Lacute;",         "L",                # capital L, acute accent
+		"&nacute;",         "n",                # small n, acute accent
+		"&Nacute;",         "N",                # capital N, acute accent
+		"&racute;",         "r",                # small r, acute accent
+		"&Racute;",         "R",                # capital R, acute accent
+		"&sacute;",         "s",                # small s, acute accent
+		"&Sacute;",         "S",                # capital S, acute accent
+		"&zacute;",         "z",                # small z, acute accent
+		"&Zacute;",         "Z",                # capital Z, acute accent
+		"&agrave;",         "a",                # small a, grave accent
+		"&Agrave;",         "A",                # capital A, grave accent
+		"&egrave;",         "e",                # small e, grave accent
+		"&Egrave;",         "E",                # capital E, grave accent
+		"&igrave;",         "i",                # small i, grave accent
+		"&Igrave;",         "I",                # capital I, grave accent
+		"&ograve;",         "o",                # small o, grave accent
+		"&Ograve;",         "O",                # capital O, grave accent
+		"&ugrave;",         "u",                # small u, grave accent
+		"&Ugrave;",         "U",                # capital U, grave accent
+		"&acirc;",          "a",                # small a, circumflex accent
+		"&Acirc;",          "A",                # capital A, circumflex accent
+		"&ecirc;",          "e",                # small e, circumflex accent
+		"&Ecirc;",          "E",                # capital E, circumflex accent
+		"&icirc;",          "i",                # small i, circumflex accent
+		"&Icirc;",          "I",                # capital I, circumflex accent
+		"&ocirc;",          "o",                # small o, circumflex accent
+		"&Ocirc;",          "O",                # capital O, circumflex accent
+		"&ucirc;",          "u",                # small u, circumflex accent
+		"&Ucirc;",          "U",                # capital U, circumflex accent
+		"&ccirc;",          "c",                # small c, circumflex accent
+		"&Ccirc;",          "C",                # capital C, circumflex accent
+		"&gcirc;",          "g",                # small g, circumflex accent
+		"&Gcirc;",          "G",                # capital G, circumflex accent
+		"&hcirc;",          "h",                # small h, circumflex accent
+		"&Hcirc;",          "H",                # capital H, circumflex accent
+		"&jcirc;",          "j",                # small j, circumflex accent
+		"&Jcirc;",          "J",                # capital J, circumflex accent
+		"&scirc;",          "s",                # small s, circumflex accent
+		"&Scirc;",          "S",                # capital S, circumflex accent
+		"&wcirc;",          "w",                # small w, circumflex accent
+		"&Wcirc;",          "W",                # capital W, circumflex accent
+		"&ycirc;",          "y",                # small y, circumflex accent
+		"&Ycirc;",          "Y",                # capital Y, circumflex accent
+		"&plusacir;",       "+",                # plus (+), circumflex accent above
+		"&plusdo;",         "+",                # dotplus B: plus sign, dot above
+		"&cdot;",           "c",                # small c, dot above
+		"&Cdot;",           "C",                # capital C, dot above
+		"&edot;",           "e",                # small e, dot above
+		"&Edot;",           "E",                # capital E, dot above
+		"&gdot;",           "g",                # small g, dot above
+		"&Gdot;",           "G",                # capital G, dot above
+		"&Idot;",           "I",                # capital I, dot above
+		"&zdot;",           "z",                # small z, dot above
+		"&Zdot;",           "Z",                # capital Z, dot above
+		"&minusd;",         "-",                # dotminus B: minus sign, dot above
+		"&atilde;",         "a",                # small a, tilde
+		"&Atilde;",         "A",                # capital A, tilde
+		"&ntilde;",         "n",                # small n, tilde
+		"&Ntilde;",         "N",                # capital N, tilde
+		"&otilde;",         "o",                # small o, tilde
+		"&Otilde;",         "O",                # capital O, tilde
+		"&itilde;",         "i",                # small i, tilde
+		"&Itilde;",         "I",                # capital I, tilde
+		"&utilde;",         "u",                # small u, tilde
+		"&Utilde;",         "U",                # capital U, tilde
+		"&Gacute;",         "G",                # new
+		"&idot;",           "i");               # new
+
+	    #
+	    # Special character list index
+	    #
+	    %spec_char = (
+	    #
+	    # The following three columns define the RB2GB special
+	    # character mapping between Red Book, Green Book, and Blue Book.
+	    #
+	    #	Red Book            Green Book          Blue Book +Index
+	    #	------------------  ------------------  ----------------
+		"\{open\ oversize\ parenthesis\}",  "(",    # 
+		"\{close\ oversize\ parenthesis\}", ")",    # 
+		"\{open\ oversize\ brace\}",        "{",    # 
+		"\{close\ oversize\ brace\}",       "}",    # 
+		"\{open\ oversize\ bracket\}",      "[",    # 
+		"\{close\ oversize\ bracket\}",     "]",    # 
+		"\{square\ root}",    ".sqroot.",         # 29-
+		"\{cube\ root}",      ".cuberoot.",       # 54-
+		"\{fourth\ root}",    ".fourthroot.",     # 196-
+		"&lsquo;",          "\`",               # 1-
+		"&rsquo;",          "\`",               # 2-
+		"&apos;",           "\'",               # 3-
+		"&prop;",           ".varies.",         # 4-
+		"&equiv;",          ".ident.",          # 5- & 57
+		"&nequiv;",         ".notident.",       # 6-
+		"&part;",           ".differential.",   # 7-
+		"&lsqb;",           "\[",               # 8-
+		"&rsqb;",           "\]",               # 9,171-
+		"&emsp;",           " ",                # 10,173-
+		"&ensp;",           " ",                # 11-
+		"&thinsp;",         " ",                # 12-
+		"&mdash;",          "--",               # 13-
+		"&hyphen;",         "-",                #
+		"&ndash;",          "-",                # 14-
+		"&nldr;",           ".",                # 15-
+		"&ne;",             ".noteq.",          # 16-
+		"&tilde;",          ".about.",          # 18-
+		"&middot;",         ".multidot.",       # 19-
+		"&deg;",            ".degree.",         # 20-
+		"&lt;",             "<",                # 21-
+		"&gt;",             ">",                # 22-
+		"&lE;",             ".ltoreq.",         # 23-
+		"&gE;",             ".gtoreq.",         # 24-
+		"&cong;",           ".congruent.",      # 25-
+		"&ap;",             ".apprxeq.",        # 26-
+		"&cent;",           ".cent.",           # 27-
+		"&infin;",          ".infin.",          # 28-
+		"&plus;",           "\+",               # 30-
+		"&minus;",          "\-",               # 31-
+		"&equals;",         "\=",               # 32-
+		"&times;",          ".times.",          # 33-
+		"&divide;",         ".div.",            # 34-
+		"&plusmn;",         ".\+\-.",           # 35-
+		"&mnplus;",         ".\-\+.",           # 36-
+		"&ldquo;",          "\"",               # 37-
+		"&rdquo;",          "\"",               # 38-
+		"&rlarr2;",         ".revreaction.",    # 39-
+		"&prime;",          "\'",               # 40-
+		"&Prime;",          "\"",               # 41-
+		"&rarr;",           ".fwdarw.",         # 43-
+		"&there4;",         ".thrfore.",        # 44-
+		"&becaus;",         ".BECAUSE.",        # 45-
+		"&sharp;",          ".music-sharp.",    # 46-
+		"&flat;",           ".music-flat.",     # 47-
+		"&quest;",          "?",                # 48-
+		"&excl;",           "\!",               # 49-
+		"&boxH;",           ".dbd.",            # 50-
+		"&verbar;",         ".vertline.",       # 51-
+		"&uarr;",           ".uparw.",          # 52-
+		"&blank;",          ".hoarfrost.",      # 53-
+		"&lcub;",           "\{",               # 55-
+		"&rcub;",           "\}",               # 56-
+		"&square;",         ".quadrature.",     # 58-
+		"&nabla;",          ".gradient.",       # 59-
+		"&agr;",            ".alpha.",          # 60-
+		"&oplus;",          ".sym.",            # 61-
+		"&bgr;",            ".beta.",           # 62-
+		"&ominus;",         ".crclbar.",        # 63-
+		"&Ggr;",            ".GAMMA.",          # 64-
+		"&ggr;",            ".gamma.",          # 65-
+		"&Dgr;",            ".DELTA.",          # 66 & 42
+		"&dgr;",            ".delta.",          # 67-
+		"&egr;",            ".epsilon.",        # 68-
+		"&Egr;",            ".EPSILON.",        # 69-
+		"&zgr;",            ".zeta.",           # 70-
+		"&fnof;",           ".function.",       # 71-
+		"&eegr;",           ".eta.",            # 72-
+		"&THgr;",           ".THETA.",          # 73-
+		"&thgr;",           ".theta.",          # 74-
+		"&darr;",           ".dwnarw.",         # 75-
+		"&igr;",            ".iota.",           # 76-
+		"&larr;",           ".rarw.",           # 77-
+		"&kgr;",            ".kappa.",          # 78-
+		"&Lgr;",            ".LAMBDA.",         # 79-
+		"&lgr;",            ".lambda.",         # 80-
+		"&par;",            ".parallel.",       # 81-
+		"&mgr;",            ".mu.",             # 82-
+		"&ngr;",            ".nu.",             # 84-
+		"&Xgr;",            ".XI.",             # 85-
+		"&xgr;",            ".xi.",             # 86-
+		"&ogr;",            ".omicron.",        # 88-
+		"&pgr;",            ".pi.",             # 90-
+		"&rgr;",            ".rho.",            # 92-
+		"&Sgr;",            ".SIGMA.",          # 93-
+		"&sgr;",            ".sigma.",          # 94-
+		"&tgr;",            ".tau.",            # 96-
+		"&Ugr;",            ".UPSILON.",        # 97-
+		"&ugr;",            ".upsilon.",        # 98-
+		"&phgr;",           ".phi.",            # 100-
+		"&PHgr;",           ".PHI.",            # 101-
+		"&khgr;",           ".chi.",            # 102-
+		"&psgr;",           ".psi.",            # 104-
+		"&PSgr;",           ".PSI.",            # 105-
+		"&OHgr;",           ".OMEGA.",          # 106-
+		"&ohgr;",            ".omega.",         # 107-
+		"&bull;",           ".cndot.",          # 108 & 500
+		"&cap;",            ".andgate.",        # 109 & 512
+		"&ang;",            ".angle.",          # 110-
+		"&permil;",         ".Salinity.",       # 129-
+		"&frac18;",         "1\/8",             # 150,152
+		"&lsim;",           ".ltorsim.",        # 155-
+		"&frac38;",         "3\/8",             # 154,156-
+		"&gsim;",           ".gtorsim.",        # 157-
+		"&frac58;",         "5\/8",             # 158,160-
+		"&frac78;",         "7\/8",             # 162,164-
+		"&frac13;",         "1\/3",             # 166,188-
+		"&sime;",           ".perspectiveto.",  # 167-
+		"&commat;",         "\@",               # 169-
+		"&frac23;",         "2\/3",             # 170,172
+		"<chg[^>]+>",       ".\[.",             #
+		"</chg>",           ".\].",             #
+		"&frac14;",         "1\/4",             # 174,176-
+		"&frac12;",         "1\/2",             # 178-
+		"&half;",           "1\/2",             # 180-
+		"&frac34;",         "3\/4",             # 182,184-
+		"&Quadbond;",       ".quadbond.",       # 185-
+		"&num;",            "\#",               # 190-
+		"&nlt;",            ".notlessthan.",    # 191-
+		"&ngt;",            ".notgreaterthan.", # 192-
+		"&natur;",          ".music-natural.",  # 193-
+		"&esdot;",          ".apprch.",         # 194-
+		"&perp;",           ".perp.",           # 195-
+		"&trade;",          ".TM.",             # 198-
+		"<HIL><SP><PDAT>SM<\/PDAT><\/SP><\/HIL>",      ".SM.",             # 199  Not caught here ... fixed in processHIL.
+		"&reg;",            ".RTM.",            # 200-
+		"&copy;",           ".COPYRGT.",        # 201-
+		"&cir;",            ".circle.",         # 501-
+		"&ocir;",           ".circleincircle.", # 502-
+		"&Lhalfcircle;",    ".lhalfcircle.",    # 503-
+		"&Rhalfcircle;",    ".rhalfcircle.",    # 504-
+		"&Dottedcircle;",   ".dottedcircle.",   # 505-
+		"&Tophorzbrace;",   ".THorizBrace.",    # 506-
+		"&Bothorzbrace;",   ".BHorizBrace.",    # 507-
+		"&Dotlhalfcircle;", ".dotlhalfcircle.", # 508-
+		"&Dotrhalfcircle;", ".dotrhalfcircle.", # 509-
+		"&Dotthalfcircle;", ".dotthalfcircle.", # 510-
+		"&Dotbhalfcircle;", ".dotbhalfcircle.", # 511-
+		"&male;",           ".male.",           # 515-
+		"&female;",         ".female.",         # 516-
+		"&sect;",           ".sctn.",           # 517-
+		"&empty;",          ".0.",              # 518,519-
+		"&cup;",            ".orgate.",         # 520 & 513
+		"&angst;",          ".ANG.",            # 521-
+		"&aring;",          ".ang.",            # 522-
+		"&oelig;",          ".oe butted.",      # 523-
+		"&aelig;",          ".ae butted.",      # 524-
+		"&ccedil;",         ".cedilla.",        # 525-
+		"&oslash;",         ".o slashed.",      # 526-
+		"&Oslash;",         ".O slashed.",      # 527-
+		"&Hslashed;",       ".h slashed.",      # 528-
+		"&Pi;",             ".PI.",             # 529-
+		"&notin;",          ".epsilon slash.",  # 530-
+		"&isin;",           ".di-elect cons.",  # 531-
+		"&sub;",            ".OR right.",       # 532-
+		"&sup;",            ".OR left.",        # 533-
+		"&image;",          ".Fourier.",        # 534-
+		"&pound;",          ".English Pound.",  # 535-
+		"&yen;",            ".Yen.",            # 536-
+		"&boxur;",          ".left brkt-bot.",  # 537-
+		"&boxdl;",          ".right brkt-top.", # 538-
+		"&boxdr;",          ".left brkt-top.",  # 539-
+		"&boxul;",          ".right brkt-bot.", # 540-
+		"&boxvr;",          ".perp-right.",     # 541-
+		"&boxvl;",          ".perp-left.",      # 542-
+		"&brvbar;",         ".linevert split.", # 543-
+		"&bsol;",           ".backslash.",      # 544-
+		"&Parenopenst;",    ".paren open-st.",  # 545-
+		"&Parenclosest;",   ".paren close-st.", # 546-
+		"&Brketopenst;",    ".brket open-st.",  # 547-
+		"&Brketclosest;",   ".brket close-st.", # 548-
+		"&exist;",          ".E-backward.",     # 549-
+		"&forall;",         ".A-inverted.",     # 550-
+		"&Centerline;",     ".centerline.",     # 551-
+		"&para;",           ".paragraph.",      # 552-
+		"&Asteriskpseud;",  ".asterisk-pseud.", # 553-
+		"&dagger;",         ".dagger.",         # 554-
+		"&Dagger;",         ".dagger-dbl.",     # 555-
+		"&dArr;",           ".arrow-down dbl.", # 557-
+		"&check;",          ".check mark.",     # 558-
+		"&curren;",         ".sunburst.",       # 559-
+		"&star;",           ".star.",           # 560-
+		"&starf;",          ".star-solid.",     # 561-
+		"&rect;",           ".rect-hollow.",    # 562-
+		"&Rectversolid;",   ".rect-ver-solid.", # 563-
+		"&Rectsolid;",      ".rect-solid.",     # 564-
+		"&hearts;",         ".heart.",          # 565-
+		"&diam;",           ".diamond.",        # 566-
+		"&diams;",          ".diamond-solid.",  # 567-
+		"&utrif;",          ".tangle-solidup.", # 568-
+		"&dtrif;",          ".tangle-soliddn.", # 569-
+		"&squf;",           ".box-solid.",      # 570-
+		"&Ovalhollow;",     ".oval-hollow.",    # 571-
+		"&Ovalsolid;",      ".oval-solid.",     # 572-
+		"&odot;",           ".circle-w/dot.",   # 573-
+		"&Circlesolid;",    ".circle-solid.",   # 574-
+		"&compfn;",         ".smallcircle.",    # 601,602-
+		"&int;",            ".intg.",           # 17,114,605-
+		"&xcirc;",          ".largecircle.",    # 603,701-
+		"&frac15;",         "1\/5",             # Fraction 1/5
+		"&frac25;",         "2\/5",             # Fraction 2/5
+		"&frac35;",         "3\/5",             # Fraction 3/5
+		"&frac45;",         "4\/5",             # Fraction 4/5
+		"&frac16;",         "1\/6",             # Fraction 1/6
+		"&frac56;",         "5\/6",             # Fraction 5/6
+		"&auml;",           "a",                # small a, dieresis or umlaut mark
+		"&Auml;",           "A",                # capital A, dieresis or umlaut mark
+		"&euml;",           "e",                # small e, dieresis or umlaut mark
+		"&Euml;",           "E",                # capital E, dieresis or umlaut mark
+		"&iuml;",           "i",                # small i, dieresis or umlaut mark
+		"&Iuml;",           "I",                # capital I, dieresis or umlaut mark
+		"&ouml;",           "o",                # small o, dieresis or umlaut mark
+		"&Ouml;",           "O",                # capital O, dieresis or umlaut mark
+		"&uuml;",           "u",                # small u, dieresis or umlaut mark
+		"&Uuml;",           "U",                # capital U, dieresis or umlaut mark
+		"&yuml;",           "y",                # small y, dieresis or umlaut mark
+		"&Yuml;",           "Y",                # capital Y, dieresis or umlaut mark
+		"&aacute;",         "a",                # small a, acute accent
+		"&Aacute;",         "A",                # capital A, acute accent
+		"&eacute;",         "e",                # small e, acute accent
+		"&Eacute;",         "E",                # capital E, acute accent
+		"&iacute;",         "i",                # small i, acute accent
+		"&Iacute;",         "I",                # capital I, acute accent
+		"&oacute;",         "o",                # small o, acute accent
+		"&Oacute;",         "O",                # capital O, acute accent
+		"&uacute;",         "u",                # small u, acute accent
+		"&Uacute;",         "U",                # capital U, acute accent
+		"&yacute;",         "y",                # small y, acute accent
+		"&Yacute;",         "Y",                # capital Y, acute accent
+		"&cacute;",         "c",                # small c, acute accent
+		"&Cacute;",         "C",                # capital C, acute accent
+		"&gacute;",         "g",                # small g, acute accent
+		"&lacute;",         "l",                # small l, acute accent
+		"&Lacute;",         "L",                # capital L, acute accent
+		"&nacute;",         "n",                # small n, acute accent
+		"&Nacute;",         "N",                # capital N, acute accent
+		"&racute;",         "r",                # small r, acute accent
+		"&Racute;",         "R",                # capital R, acute accent
+		"&sacute;",         "s",                # small s, acute accent
+		"&Sacute;",         "S",                # capital S, acute accent
+		"&zacute;",         "z",                # small z, acute accent
+		"&Zacute;",         "Z",                # capital Z, acute accent
+		"&agrave;",         "a",                # small a, grave accent
+		"&Agrave;",         "A",                # capital A, grave accent
+		"&egrave;",         "e",                # small e, grave accent
+		"&Egrave;",         "E",                # capital E, grave accent
+		"&igrave;",         "i",                # small i, grave accent
+		"&Igrave;",         "I",                # capital I, grave accent
+		"&ograve;",         "o",                # small o, grave accent
+		"&Ograve;",         "O",                # capital O, grave accent
+		"&ugrave;",         "u",                # small u, grave accent
+		"&Ugrave;",         "U",                # capital U, grave accent
+		"&acirc;",          "a",                # small a, circumflex accent
+		"&Acirc;",          "A",                # capital A, circumflex accent
+		"&ecirc;",          "e",                # small e, circumflex accent
+		"&Ecirc;",          "E",                # capital E, circumflex accent
+		"&icirc;",          "i",                # small i, circumflex accent
+		"&Icirc;",          "I",                # capital I, circumflex accent
+		"&ocirc;",          "o",                # small o, circumflex accent
+		"&Ocirc;",          "O",                # capital O, circumflex accent
+		"&ucirc;",          "u",                # small u, circumflex accent
+		"&Ucirc;",          "U",                # capital U, circumflex accent
+		"&ccirc;",          "c",                # small c, circumflex accent
+		"&Ccirc;",          "C",                # capital C, circumflex accent
+		"&gcirc;",          "g",                # small g, circumflex accent
+		"&Gcirc;",          "G",                # capital G, circumflex accent
+		"&hcirc;",          "h",                # small h, circumflex accent
+		"&Hcirc;",          "H",                # capital H, circumflex accent
+		"&jcirc;",          "j",                # small j, circumflex accent
+		"&Jcirc;",          "J",                # capital J, circumflex accent
+		"&scirc;",          "s",                # small s, circumflex accent
+		"&Scirc;",          "S",                # capital S, circumflex accent
+		"&wcirc;",          "w",                # small w, circumflex accent
+		"&Wcirc;",          "W",                # capital W, circumflex accent
+		"&ycirc;",          "y",                # small y, circumflex accent
+		"&Ycirc;",          "Y",                # capital Y, circumflex accent
+		"&plusacir;",       "+",                # plus (+), circumflex accent above
+		"&plusdo;",         "+",                # dotplus B: plus sign, dot above
+		"&cdot;",           "c",                # small c, dot above
+		"&Cdot;",           "C",                # capital C, dot above
+		"&edot;",           "e",                # small e, dot above
+		"&Edot;",           "E",                # capital E, dot above
+		"&gdot;",           "g",                # small g, dot above
+		"&Gdot;",           "G",                # capital G, dot above
+		"&Idot;",           "I",                # capital I, dot above
+		"&zdot;",           "z",                # small z, dot above
+		"&Zdot;",           "Z",                # capital Z, dot above
+		"&minusd;",         "-",                # dotminus B: minus sign, dot above
+		"&atilde;",         "a",                # small a, tilde
+		"&Atilde;",         "A",                # capital A, tilde
+		"&ntilde;",         "n",                # small n, tilde
+		"&Ntilde;",         "N",                # capital N, tilde
+		"&otilde;",         "o",                # small o, tilde
+		"&Otilde;",         "O",                # capital O, tilde
+		"&itilde;",         "i",                # small i, tilde
+		"&Itilde;",         "I",                # capital I, tilde
+		"&utilde;",         "u",                # small u, tilde
+		"&Utilde;",         "U",                # capital U, tilde
+		"&Gacute;",         "G",                # new
+		"&idot;",           "i");               # new
