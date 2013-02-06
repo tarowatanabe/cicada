@@ -564,14 +564,14 @@ icu::Transliterator* initialize()
 
       icu::Transliterator::registerInstance(trans.release());
     }
-    
-    rules += icu::UnicodeString::fromUTF8(":: EntitySGML ;\n");
+
     // xml entities
     rules += "\\u0022 <> '&quot;';\n";
     rules += "\\u0026 <> '&amp;';\n";
     //rules += "\\u0027 <> '&apos;';\n";
     rules += "\\u003c <> '&lt;';\n";
-    rules += "\\u003e <> '&gt;';\n";
+    rules += "\\u003e <> '&gt;';\n";    
+    rules += icu::UnicodeString::fromUTF8(":: EntitySGML ;\n");
   }
 
   if (normalize_nfc)
