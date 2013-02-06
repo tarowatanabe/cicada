@@ -193,6 +193,9 @@ bool remove_control = false;
 bool sgml_entity = false;
 bool entity_sgml = false;
 
+bool uspatent_entity = false;
+bool entity_uspatent = false;
+
 bool latin = false;
 bool ascii = false;
 
@@ -245,6 +248,9 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    if (uspatent_entity && entity_uspatent)
+      throw std::runtime_error("You cannot specify both USPATENT/entity and entit/USPATENT conversion");
 
     if (sgml_entity && entity_sgml)
       throw std::runtime_error("You cannot specify both SGML/entity and entit/SGML conversion");
@@ -498,7 +504,7 @@ icu::Transliterator* initialize()
     };
     
     const size_t sgml_table_size = sizeof(table_sgml2entity) / sizeof(char*);
-
+    
     icu::UnicodeString rules_entity;
     for (size_t i = 0; i < sgml_table_size; ++ i) {
       rules_entity += icu::UnicodeString::fromUTF8(table_sgml2entity[i]);
@@ -573,6 +579,59 @@ icu::Transliterator* initialize()
     rules += "\\u003e <> '&gt;';\n";    
     rules += icu::UnicodeString::fromUTF8(":: EntitySGML ;\n");
   }
+  
+  if (uspatent_entity) {
+    static const char* table_uspatent2entity[] = {
+#include "utils/uspatent_table.hpp"
+    };
+    
+    const size_t uspatent_table_size = sizeof(table_uspatent2entity) / sizeof(char*);
+    
+    icu::UnicodeString rules_entity;
+    for (size_t i = 0; i < uspatent_table_size; ++ i) {
+      rules_entity += icu::UnicodeString::fromUTF8(table_uspatent2entity[i]);
+      rules_entity += '\n';
+    }
+    
+    UErrorCode status = U_ZERO_ERROR;
+    UParseError status_parse;
+    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("USPatentEntities"),
+										  rules_entity,
+										  UTRANS_FORWARD, status_parse, status));
+    if (U_FAILURE(status))
+      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+    
+    icu::Transliterator::registerInstance(trans.release());
+    
+    rules += icu::UnicodeString::fromUTF8(":: USPatentEntities ;\n");
+  }
+
+  if (entity_uspatent) {
+    static const char* table_uspatent2entity[] = {
+#include "utils/uspatent_table.hpp"
+    };
+    
+    const size_t uspatent_table_size = sizeof(table_uspatent2entity) / sizeof(char*);
+    
+    icu::UnicodeString rules_entity;
+    for (size_t i = 0; i < uspatent_table_size; ++ i) {
+      rules_entity += icu::UnicodeString::fromUTF8(table_uspatent2entity[i]);
+      rules_entity += '\n';
+    }
+    
+    UErrorCode status = U_ZERO_ERROR;
+    UParseError status_parse;
+    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntityUSPatent"),
+										  rules_entity,
+										  UTRANS_REVERSE, status_parse, status));
+    if (U_FAILURE(status))
+      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+    
+    icu::Transliterator::registerInstance(trans.release());
+    
+    rules += icu::UnicodeString::fromUTF8(":: EntityUSPatent ;\n");
+  }
+
 
   if (normalize_nfc)
     rules += icu::UnicodeString::fromUTF8(":: NFC; \n");
@@ -624,6 +683,9 @@ void options(int argc, char** argv)
     
     ("sgml-entity", po::bool_switch(&sgml_entity), "convert SGML entities as characters")
     ("entity-sgml", po::bool_switch(&entity_sgml), "convert characters as SGML entities")
+
+    ("uspatent-entity", po::bool_switch(&uspatent_entity), "convert old uspatent entities as characters")
+    ("entity-uspatent", po::bool_switch(&entity_uspatent), "convert characters as old uspatent entities")
     
     ("latin", po::bool_switch(&latin), "Latin conversion")
     ("ascii", po::bool_switch(&ascii), "ASCII conversion")

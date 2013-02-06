@@ -16,7 +16,7 @@ for line in sys.stdin:
     entity = result.group(1)
     mapped = result.group(2)
 
-    if mapped[0] != '.' or mapped[-1] != '.': continue
+    if len(mapped) <= 1 or mapped[0] != '.' or mapped[-1] != '.': continue
     if entity[0] != '&' or entity[-1] != ';': continue
 
     mapped = mapped.replace('\\', '')
@@ -34,5 +34,5 @@ def compare(x, y):
 names.sort(compare)
 
 for name in names:
-    sys.stdout.write("\"'%s' <> '%s'\",\n" %(name, entities[name]))
+    sys.stdout.write("\"'%s' <> '%s';\",\n" %(name, entities[name]))
     
