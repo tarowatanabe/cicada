@@ -64,7 +64,7 @@ int main (void)
     cg_parameter Parm ;
 
     /* allocate space for solution */
-    n = 1000000 ;
+    n = 100 ;
     x = (double *) malloc (n*sizeof (double)) ;
 
     /* set starting guess */

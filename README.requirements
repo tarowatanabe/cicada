@@ -342,3 +342,14 @@ CityHash, by Geoff Pike and Jyrki Alakuijala
 
 We provide reference implementations in C++, with a friendly MIT license.
 
+==========================================================
+CG_DESCENT
+
+cg_descent is a conjugate gradient algorithm for solving
+an unconstrained minimization problem of the form:
+
+                    min f (x)
+
+The algorithm is developed in the following papers
+(see www.math.ufl.edu/~hager/papers/CG):
+

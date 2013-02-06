@@ -15,6 +15,8 @@
       |                    Version 5.2  (April 17, 2012)               |
       |                    Version 5.3  (May 18, 2012)                 |
       |                    Version 6.0  (November 6, 2012)             |
+      |                    Version 6.1  (January 27, 2013)             |
+      |                    Version 6.2  (February 2, 2013)             |
       |                                                                |
       |           William W. Hager    and   Hongchao Zhang             |
       |          hager@math.ufl.edu       hozhang@math.lsu.edu         |
@@ -1392,7 +1394,7 @@ int cg_descent /*  return status of solution process:
                 cg_copy0 (wsub+(mp+1), vsub, j) ;
 
 
-                /* save old direct d in gtemp */
+                /* save old direction d in gtemp */
                 cg_copy (gtemp, d, n) ;
 
                 /* d = Zk (sigma - H)ghat */
@@ -2968,7 +2970,6 @@ PRIVATE void cg_copy0
         y [i] = x [i] ;
         i++ ;
     }
-
     return ;
 }
 
@@ -3759,9 +3760,9 @@ void cg_default
 {
     /* T => print final function value
        F => no printout of final function value */
-    Parm->PrintFinal = FALSE ;
+    Parm->PrintFinal = TRUE ;
 
-   /* Level 0 = no printing, ... , Level 3 = maximum printing */
+    /* Level 0 = no printing, ... , Level 3 = maximum printing */
     Parm->PrintLevel = 0 ;
 
     /* T => print parameters values
@@ -4189,4 +4190,18 @@ Version 6.0 Changes:
   It is now possible to utilize the BLAS, if they are available, by
   commenting out a line in the file cg_blas.h. See the README file for
   the details.
+
+Version 6.1 Changes:
+  Fixed problems connected with memory handling in the MATLAB version
+  of the code. These errors only arise when using some versions of MATLAB.
+  Replaced "malloc" in the cg_descent mex routine with "mxMalloc".
+  Thanks to Stephen Vavasis for reporting this error that occurred when
+  using MATLAB version R2012a, 7.14.
+
+Version 6.2 Changes:
+  When using cg_descent in MATLAB, the input starting guess is no longer
+  overwritten by the final solution. This makes the cg_descent mex function
+  compliant with MATLAB's convention for the treatment of input arguments.
+  Thanks to Dan Scholnik, Naval Research Laboratory, for pointing out this
+  inconsistency with MATLAB convention in earlier versions of cg_descent.
 */
