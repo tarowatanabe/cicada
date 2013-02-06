@@ -1,0 +1,36 @@
+#ignore objects and archives.
+*.[oa]
+*.lo
+*.la
+
+# libtool related stuff
+.libs
+.deps
+
+
+## ignore backup
+*~
+
+### makefiles
+Makefile
+Makefile.in
+
+### automakes
+.DS_Store
+COPYING
+INSTALL
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+configure
+libtool
+
+
+
+*.model
+driver1
+driver2
+driver3
+driver4
+driver5

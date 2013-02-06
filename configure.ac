@@ -535,6 +535,7 @@ AC_CONFIG_FILES([Makefile
 		 libstemmer_c/Makefile
 		 liblinear/Makefile
 		 liblbfgs/Makefile
+		 cg_descent/Makefile
 		 wn/Makefile
 		 progs/Makefile
 		 scripts/Makefile
