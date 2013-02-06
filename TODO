@@ -201,3 +201,5 @@ Implement potentially faster xxhash
 Add colorizer filter to cicada_filter_text
     Use red for Hiragana and blue for Katakana, green for Either one, assuming utf-8 text
     and use icu's property + utf-8 specific character detector
+
+Unify the liblbfgs and cg_descent code...?
