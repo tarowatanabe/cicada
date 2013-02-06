@@ -234,7 +234,8 @@ noinst_DATA = .gitignore
 noinst_HEADERS = \
 bitpack_impl.hpp \
 sgml_entity_table.hpp \
-sgml_entity_table_inverse.hpp
+sgml_entity_table_inverse.hpp \
+sgml_uspatent_table.hpp
 
 bitpack8.cpp  : bitpack_impl.hpp bitpack8_impl.hpp
 bitpack16.cpp  : bitpack_impl.hpp bitpack16_impl.hpp
@@ -265,6 +266,9 @@ sgml_entity_table.hpp : parse-sgml-entity.py
 
 sgml_entity_table_inverse.hpp : parse-sgml-entity-inverse.py
 	cat ../sgml_entity/*.ent | ./parse-sgml-entity-inverse.py > sgml_entity_table_inverse.hpp
+
+sgml_uspatent_table.hpp : parse-uspatent.py
+	cat ../sgml_entity/uspatent.txt | ./parse-uspatent.py > sgml_uspatent_table.hpp
 
 alloc_vector_main_SOURCES = alloc_vector_main.cpp
 alloc_vector_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
