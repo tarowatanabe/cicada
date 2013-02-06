@@ -566,8 +566,8 @@ icu::Transliterator* initialize()
     }
 
     // xml entities
-    rules += "\\u0022 <> '&quot;';\n";
     rules += "\\u0026 <> '&amp;';\n";
+    rules += "\\u0022 <> '&quot;';\n";
     //rules += "\\u0027 <> '&apos;';\n";
     rules += "\\u003c <> '&lt;';\n";
     rules += "\\u003e <> '&gt;';\n";    
