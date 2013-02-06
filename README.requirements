@@ -345,11 +345,52 @@ We provide reference implementations in C++, with a friendly MIT license.
 ==========================================================
 CG_DESCENT
 
-cg_descent is a conjugate gradient algorithm for solving
-an unconstrained minimization problem of the form:
-
-                    min f (x)
-
-The algorithm is developed in the following papers
-(see www.math.ufl.edu/~hager/papers/CG):
-
+       ________________________________________________________________
+      |      A conjugate gradient method with guaranteed descent       |
+      |             C-code Version 1.1  (October 6, 2005)              |
+      |                    Version 1.2  (November 14, 2005)            |
+      |                    Version 2.0  (September 23, 2007)           |
+      |                    Version 3.0  (May 18, 2008)                 |
+      |                    Version 4.0  (March 28, 2011)               |
+      |                    Version 4.1  (April 8, 2011)                |
+      |                    Version 4.2  (April 14, 2011)               |
+      |                    Version 5.0  (May 1, 2011)                  |
+      |                    Version 5.1  (January 31, 2012)             |
+      |                    Version 5.2  (April 17, 2012)               |
+      |                    Version 5.3  (May 18, 2012)                 |
+      |                    Version 6.0  (November 6, 2012)             |
+      |                    Version 6.1  (January 27, 2013)             |
+      |                    Version 6.2  (February 2, 2013)             |
+      |                                                                |
+      |           William W. Hager    and   Hongchao Zhang             |
+      |          hager@math.ufl.edu       hozhang@math.lsu.edu         |
+      |                   Department of Mathematics                    |
+      |                     University of Florida                      |
+      |                 Gainesville, Florida 32611 USA                 |
+      |                      352-392-0281 x 244                        |
+      |                                                                |
+      |                 Copyright by William W. Hager                  |
+      |                                                                |
+      |          http://www.math.ufl.edu/~hager/papers/CG              |
+      |                                                                |
+      |  Disclaimer: The views expressed are those of the authors and  |
+      |              do not reflect the official policy or position of |
+      |              the Department of Defense or the U.S. Government. |
+      |                                                                |
+      |      Approved for Public Release, Distribution Unlimited       |
+      |________________________________________________________________|
+       ________________________________________________________________
+      |This program is free software; you can redistribute it and/or   |
+      |modify it under the terms of the GNU General Public License as  |
+      |published by the Free Software Foundation; either version 2 of  |
+      |the License, or (at your option) any later version.             |
+      |This program is distributed in the hope that it will be useful, |
+      |but WITHOUT ANY WARRANTY; without even the implied warranty of  |
+      |MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the   |
+      |GNU General Public License for more details.                    |
+      |                                                                |
+      |You should have received a copy of the GNU General Public       |
+      |License along with this program; if not, write to the Free      |
+      |Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, |
+      |MA  02110-1301  USA                                             |
+      |________________________________________________________________|
