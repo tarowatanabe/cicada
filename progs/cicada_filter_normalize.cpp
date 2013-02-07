@@ -525,6 +525,9 @@ icu::Transliterator* initialize()
     rules += "'&amp;' <> \\u0026;\n";
     rules += icu::UnicodeString::fromUTF8(":: SGMLEntities ;\n");
     rules += icu::UnicodeString::fromUTF8(":: Hex-Any;\n");
+    rules += "'&Circlesolid;'   <> \\u25CF;\n"; // ●
+    rules += "'&Asteriskpseud;' <> \\u203B;\n"; // ※ 
+    rules += "'&rlarr2;'        <> \\u2252;\n"; // ≒
   }
 
   if (entity_sgml) {
