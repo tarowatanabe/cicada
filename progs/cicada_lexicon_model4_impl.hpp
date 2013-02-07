@@ -811,7 +811,7 @@ struct LearnModel4 : public LearnBase
 	    }
 	
 	if (gain_move <= 1.0 && gain_swap <= 1.0)
-	  return;
+	  break;
 
 	if (gain_move >= gain_swap) {
 	  //std::cerr << "moving: j=" << move_j << " i=" << move_i << " gain: " << gain_move << std::endl;
