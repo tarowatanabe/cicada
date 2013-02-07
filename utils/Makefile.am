@@ -268,7 +268,7 @@ sgml_entity_table.hpp : parse-sgml-entity.py
 sgml_entity_table_inverse.hpp : parse-sgml-entity-inverse.py
 	cat ../sgml_entity/*.ent | ./parse-sgml-entity-inverse.py > sgml_entity_table_inverse.hpp
 
-sgml_uspatent_table.hpp : parse-uspatent.py
+sgml_uspatent_table.hpp : parse-uspatent.py ../sgml_entity/uspatent.txt
 	cat ../sgml_entity/uspatent.txt | ./parse-uspatent.py > sgml_uspatent_table.hpp
 
 uspatent_table.hpp : uspatent-table.py sgml_uspatent_table.hpp sgml_entity_table.hpp
