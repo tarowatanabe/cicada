@@ -1,13 +1,14 @@
 2013-x-x
-Faster grammar extraction and scoring by eliminating spurious locking
-Better help messages in python scripts with default values
 INCOMPATIBLE: feature application by apply_cube_{prune,grow,grow_coarse} are modified:
 	      If two candidates share the same score, we prefer those closer to the left-upper-corner.
 INCOMPATIBLE: Use of murmur3 for hash functions. This will not break the compatibility with the "indexed, binary" files, but
 	      may affect the ordering of words, features attributes etc.
-New: added cicada_filter_normalize which can perform normalization, i.e. NFKC and remove controls etc. with support
-     colorization of Katakana, katakana-marks and symbols
-new: added cg_descent as a backend for learning. TODO: use it!
+Added cicada_filter_normalize which can perform normalization, i.e. NFKC and remove controls etc. with support
+	for colorization of Katakana, katakana-marks and symbols
+Added cicada_filter_chardet which can detect character in a text using the ICU chardet API
+Added cg_descent as a backend for learning. TODO: use it!
+Faster grammar extraction and scoring by eliminating spurious locking
+Better help messages in python scripts with default values
 
 2013-1-9
 Bugfix: throw when disk is full + added --temporary option to extract_score in order to assingn temporary directory

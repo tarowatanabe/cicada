@@ -98,6 +98,7 @@ bool projective_mode = false;
 bool relation_mode = false;
 bool unescape_mode = false;
 bool normalize_mode = false;
+bool func_mode = false;
 bool forest_mode = false;
 bool head_mode = false;
 bool span_mode = false;
@@ -1324,8 +1325,29 @@ struct Cabocha
 	const int index = utils::lexical_cast<int>(tokens[1]);
 	if (index != static_cast<int>(nodes.size()))
 	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
+	
+	int dep;
+	int head;
+	int func;
+	
+	{
+	  std::string::const_iterator iter = tokens[2].begin();
+	  std::string::const_iterator iter_end = tokens[2].end();
 	  
-	nodes.push_back(node_type(atoi(tokens[2].c_str()), atoi(tokens[3].c_str())));
+	  if (! qi::parse(iter, iter_end, qi::int_ >> qi::lit('D'), dep) || iter != iter_end)
+	    throw std::runtime_error("dep parsing failed?");
+	}
+	
+	{
+	  std::string::const_iterator iter = tokens[3].begin();
+	  std::string::const_iterator iter_end = tokens[3].end();
+	  
+	  if (! qi::parse(iter, iter_end, qi::int_ >> qi::lit('/') >> qi::int_, head, func) || iter != iter_end)
+	    throw std::runtime_error("head/func parsing failed?");
+	}
+	
+	nodes.push_back(node_type(dep, utils::bithack::branch(func_mode, func, head)));
+	
       } else if (tokens.size() == 3) {
 	boost::tokenizer<boost::char_separator<char> > tokenizer(tokens[1], boost::char_separator<char>(","));
 	tokens_type poss(tokenizer.begin(), tokenizer.end());
@@ -2062,6 +2084,7 @@ void options(int argc, char** argv)
     ("relation",   po::bool_switch(&relation_mode),   "assing relation to POS")
     ("unescape",   po::bool_switch(&unescape_mode),   "unescape terminal symbols, such as -LRB-, \\* etc.")
     ("normalize",  po::bool_switch(&normalize_mode),  "normalize category, such as [,] [.] etc.")
+    ("func",       po::bool_switch(&func_mode),       "use function word as a head in bunsetsu")
     ("forest",     po::bool_switch(&forest_mode),     "output as a forest")
     ("head",       po::bool_switch(&head_mode),       "output hypergraph with explicit head")
     ("span",       po::bool_switch(&span_mode),       "output as a set of spans")
