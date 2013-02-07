@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -51,6 +51,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/chart.hpp"
+#include "utils/piece.hpp"
 
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency dependency_type;
@@ -1174,8 +1175,8 @@ struct Cabocha
   };
   typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
   
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-  typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
+  typedef std::vector<utils::piece, std::allocator<utils::piece> > tokens_type;
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
   
   typedef std::vector<int, std::allocator<int> > offset_set_type;
 
@@ -1207,7 +1208,8 @@ struct Cabocha
     TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
     while (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
+      utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
 	
       tokens.clear();
       tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
@@ -1331,16 +1333,16 @@ struct Cabocha
 	int func;
 	
 	{
-	  std::string::const_iterator iter = tokens[2].begin();
-	  std::string::const_iterator iter_end = tokens[2].end();
+	  utils::piece::const_iterator iter = tokens[2].begin();
+	  utils::piece::const_iterator iter_end = tokens[2].end();
 	  
 	  if (! qi::parse(iter, iter_end, qi::int_ >> qi::lit('D'), dep) || iter != iter_end)
 	    throw std::runtime_error("dep parsing failed?");
 	}
 	
 	{
-	  std::string::const_iterator iter = tokens[3].begin();
-	  std::string::const_iterator iter_end = tokens[3].end();
+	  utils::piece::const_iterator iter = tokens[3].begin();
+	  utils::piece::const_iterator iter_end = tokens[3].end();
 	  
 	  if (! qi::parse(iter, iter_end, qi::int_ >> qi::lit('/') >> qi::int_, head, func) || iter != iter_end)
 	    throw std::runtime_error("head/func parsing failed?");
@@ -1349,7 +1351,7 @@ struct Cabocha
 	nodes.push_back(node_type(dep, utils::bithack::branch(func_mode, func, head)));
 	
       } else if (tokens.size() == 3) {
-	boost::tokenizer<boost::char_separator<char> > tokenizer(tokens[1], boost::char_separator<char>(","));
+	boost::tokenizer<boost::char_separator<char>, utils::piece::const_iterator, utils::piece> tokenizer(tokens[1], boost::char_separator<char>(","));
 	tokens_type poss(tokenizer.begin(), tokenizer.end());
 	  
 	if (poss.size() < 2) {
