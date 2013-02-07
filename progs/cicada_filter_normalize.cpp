@@ -521,6 +521,8 @@ icu::Transliterator* initialize()
     
     icu::Transliterator::registerInstance(trans.release());
     
+    // first, decode &
+    rules += "'&amp;' <> \\u0026;\n";
     rules += icu::UnicodeString::fromUTF8(":: SGMLEntities ;\n");
     rules += icu::UnicodeString::fromUTF8(":: Hex-Any;\n");
   }
@@ -571,7 +573,8 @@ icu::Transliterator* initialize()
       icu::Transliterator::registerInstance(trans.release());
     }
 
-    // xml entities
+    // sgml entities
+    // first, encode &
     rules += "\\u0026 <> '&amp;';\n";
     rules += "\\u0022 <> '&quot;';\n";
     //rules += "\\u0027 <> '&apos;';\n";
@@ -583,6 +586,10 @@ icu::Transliterator* initialize()
   if (uspatent_entity) {
     static const char* table_uspatent2entity[] = {
 #include "utils/uspatent_table.hpp"
+
+      "'.revreaction.'    <> \\u2252;", // ≒
+      "'.asterisk-pseud.' <> \\u203B;", // ※
+      "'.circle-solid.'   <> \\u25CF;", // ●
     };
     
     const size_t uspatent_table_size = sizeof(table_uspatent2entity) / sizeof(char*);
@@ -609,6 +616,10 @@ icu::Transliterator* initialize()
   if (entity_uspatent) {
     static const char* table_uspatent2entity[] = {
 #include "utils/uspatent_table.hpp"
+      
+      "'.revreaction.'    <> \\u2252;", // ≒
+      "'.asterisk-pseud.' <> \\u203B;", // ※
+      "'.circle-solid.'   <> \\u25CF;", // ●      
     };
     
     const size_t uspatent_table_size = sizeof(table_uspatent2entity) / sizeof(char*);
