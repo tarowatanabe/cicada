@@ -619,10 +619,6 @@ icu::Transliterator* initialize()
   if (entity_uspatent) {
     static const char* table_uspatent2entity[] = {
 #include "utils/uspatent_table.hpp"
-      
-      "'.revreaction.'    <> \\u2252;", // ≒
-      "'.asterisk-pseud.' <> \\u203B;", // ※
-      "'.circle-solid.'   <> \\u25CF;", // ●      
     };
     
     const size_t uspatent_table_size = sizeof(table_uspatent2entity) / sizeof(char*);
