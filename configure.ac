@@ -20,7 +20,11 @@ AM_INIT_AUTOMAKE(cicada, 0.1.0)
 CICADA_LTVERSION=0:1:0
 AC_SUBST(CICADA_LTVERSION)
 
+CICADA_VERSION=0.1.0
+AC_SUBST(CICADA_VERSION)
+
 AC_CONFIG_HEADERS(utils/config.h)
+
 
 # Checks for programs.
 AC_PROG_LIBTOOL
@@ -541,4 +545,5 @@ AC_CONFIG_FILES([Makefile
 		 scripts/Makefile
                  succinct_db/Makefile
                  utils/Makefile])
+
 AC_OUTPUT

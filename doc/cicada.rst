@@ -6,23 +6,25 @@
 a hypergraph toolkit for machine translation
 ---------------------------------------------
 
-:Author: taro.watanabe@nict.go.jp
+:Author: Taro Watanabe <taro.watanabe@nict.go.jp>
 :Date:   2013-2-8
-:Version: 0.1
 :Manual section: 1
 
 SYNOPSIS
-========
+--------
 
- cicada [options]
+**cicada** [*options*]
 
 DESCRIPTION
-===========
+-----------
 
 
 
 CONFIGURATION OPTIONS
-=====================
+---------------------
+
+Input Options
+~~~~~~~~~~~~~
 
   --input arg                    input file
   --input-id                     id-prefixed input
@@ -34,16 +36,32 @@ CONFIGURATION OPTIONS
   --input-alignment              alignment input
   --input-dependency             dependency input
   --input-directory              input in directory
+
+Grammar Options
+~~~~~~~~~~~~~~~
+
   --goal arg                     goal symbol
   --grammar arg                  grammar specification(s)
   --grammar-list                 list of available grammar specifications
   --tree-grammar arg             tree grammar specification(s)
   --tree-grammar-list            list of available tree grammar specifications
+
+Feature Function Options
+~~~~~~~~~~~~~~~~~~~~~~~~
+
   --feature-function             feature function(s)
   --feature-function-list        list of available feature function(s)
   --output-feature-function arg  output feature function(s)
+
+Operation Options
+~~~~~~~~~~~~~~~~~
+
   --operation arg                operations
   --operation-list               list of available operation(s)
+
+Other List Options
+~~~~~~~~~~~~~~~~~~
+
   --eval-list                    list of available evaluators
   --format-list                  list of available formatters
   --signature-list               list of available signatures
@@ -51,8 +69,8 @@ CONFIGURATION OPTIONS
   --tokenizer-list               list of available tokenizers
   --matcher-list                 list of available matchers
 
-OTHER OPTIONS
-=============
+COMMANDLINE OPTIONS
+-------------------
 
   --config arg          configuration file
   --threads arg         # of threads
@@ -60,9 +78,9 @@ OTHER OPTIONS
   --help                help message
 
 EXAMPLES
-========
+--------
 
 
 
 SEE ALSO
-========
+--------
