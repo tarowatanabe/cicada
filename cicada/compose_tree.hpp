@@ -212,7 +212,11 @@ namespace cicada
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
-    ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source, const bool __frontier)
+    ComposeTree(const symbol_type& __goal,
+		const tree_grammar_type& __tree_grammar,
+		const grammar_type& __grammar,
+		const bool __yield_source,
+		const bool __frontier)
       : goal(__goal),
 	tree_grammar(__tree_grammar), 
 	grammar(__grammar),

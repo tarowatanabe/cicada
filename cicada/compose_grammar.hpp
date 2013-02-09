@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__COMPOSE_GRAMMAR__HPP__
@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <set>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -19,6 +20,7 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
+#include <utils/unordered_map.hpp>
 
 namespace cicada
 {
@@ -46,9 +48,31 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
     
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
     
-    ComposeGrammar(const grammar_type& __grammar, const bool __yield_source=false)
-      : grammar(__grammar), yield_source(__yield_source)
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    
+    ComposeGrammar(const grammar_type& __grammar, const bool __yield_source=false, const bool __frontier=false)
+      : grammar(__grammar),
+	yield_source(__yield_source),
+	frontier(__frontier),
+	attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     { }
 
     struct filter_edge
@@ -70,6 +94,9 @@ namespace cicada
       graph = source;
       if (! graph.is_valid()) return;
 
+      frontiers_source.clear();
+      frontiers_target.clear();
+      
       filter_edge::removed_type removed(graph.edges.size(), false);
       bool found = false;
       
@@ -112,6 +139,35 @@ namespace cicada
 	    edge_new.rule = rule;
 	    edge_new.features = riter->features;
 	    edge_new.attributes = riter->attributes;
+
+	    if (frontier) {
+	      const rule_type* rule_source = riter->source.get();
+	      const rule_type* rule_target = riter->target.get();
+	      
+	      if (rule_source) {
+		frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+		if (siter == frontiers_source.end()) {
+		  std::ostringstream os;
+		  os << rule_source->rhs;
+		  
+		  siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+		}
+		
+		edge_new.attributes[attr_frontier_source] = siter->second;
+	      }
+	      
+	      if (rule_target) {
+		frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+		if (titer == frontiers_target.end()) {
+		  std::ostringstream os;
+		  os << rule_target->rhs;
+		  
+		  titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+		}
+		
+		edge_new.attributes[attr_frontier_target] = titer->second;
+	      }
+	    }
 	    
 	    graph.connect_edge(edge_new.id, edge.head);
 	  }
@@ -130,12 +186,19 @@ namespace cicada
   private:
     const grammar_type& grammar;
     const bool yield_source;
+    const bool frontier;
+    
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
   };
 
   inline
-  void compose_grammar(const Grammar& grammar, const HyperGraph& source, HyperGraph& target, const bool yield_source=false)
+  void compose_grammar(const Grammar& grammar, const HyperGraph& source, HyperGraph& target, const bool yield_source=false, const bool frontier=false)
   {
-    ComposeGrammar(grammar, yield_source)(source, target);
+    ComposeGrammar(grammar, yield_source, frontier)(source, target);
   }
 
 };

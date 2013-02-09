@@ -32,6 +32,7 @@ namespace cicada
       std::string goal;
       
       bool yield_source;
+      bool frontier;
       bool unique_goal;
       
       int debug;
@@ -75,6 +76,7 @@ namespace cicada
       std::string goal;
   
       bool yield_source;
+      bool frontier;
   
       int debug;
     };
@@ -118,6 +120,7 @@ namespace cicada
       std::string goal;
 
       bool yield_source;
+      bool frontier;
       
       int debug;
     };
@@ -140,6 +143,7 @@ namespace cicada
       int distortion;
       
       bool yield_source;
+      bool frontier;
   
       int debug;
     };

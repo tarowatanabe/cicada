@@ -9,6 +9,7 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -129,15 +130,38 @@ namespace cicada
 
     typedef std::vector<int, std::allocator<int> > node_set_type;
 
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+    
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
 		  const int& __max_distortion,
-		  const bool __yield_source)
+		  const bool __yield_source,
+		  const bool __frontier)
       : grammar(__grammar),
 	max_distortion(__max_distortion),
 	yield_source(__yield_source),
+	frontier(__frontier),
 	attr_phrase_span_first("phrase-span-first"),
-	attr_phrase_span_last("phrase-span-last")
+	attr_phrase_span_last("phrase-span-last"),
+	attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     {
       rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
       
@@ -158,6 +182,9 @@ namespace cicada
       span_nodes.clear();
       nodes.clear();
       coverages.clear();
+
+      frontiers_source.clear();
+      frontiers_target.clear();
       
       queue_type queue;
       
@@ -286,6 +313,35 @@ namespace cicada
 	      edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(state.first);
 	      edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(state.last);
 	      
+	      if (frontier) {
+		const rule_type* rule_source = riter->source.get();
+		const rule_type* rule_target = riter->target.get();
+		
+		if (rule_source) {
+		  frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+		  if (siter == frontiers_source.end()) {
+		    std::ostringstream os;
+		    os << rule_source->rhs;
+		    
+		    siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+		  }
+		  
+		  edge.attributes[attr_frontier_source] = siter->second;
+		}
+		
+		if (rule_target) {
+		  frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+		  if (titer == frontiers_target.end()) {
+		    std::ostringstream os;
+		    os << rule_target->rhs;
+		    
+		    titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+		  }
+	      
+		  edge.attributes[attr_frontier_target] = titer->second;
+		}
+	      }
+	      
 	      graph.connect_edge(edge.id, node.id);
 	    }
 	  }
@@ -383,9 +439,12 @@ namespace cicada
     const grammar_type& grammar;
     const int max_distortion;
     const bool yield_source;
+    const bool frontier;
     
     const attribute_type attr_phrase_span_first;
     const attribute_type attr_phrase_span_last;
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
 
     span_node_map_type span_nodes;
     node_map_type      nodes;
@@ -397,12 +456,15 @@ namespace cicada
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
     rule_ptr_type rule_x1;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
   };
   
   inline
-  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
+  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool frontier=false)
   {
-    ComposePhrase __composer(non_terminal, grammar, max_distortion, yield_source);
+    ComposePhrase __composer(non_terminal, grammar, max_distortion, yield_source, frontier);
     __composer(lattice, graph);
   }
 

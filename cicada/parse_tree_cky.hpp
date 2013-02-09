@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <set>
 #include <queue>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -89,6 +90,7 @@ namespace cicada
 		 const function_type& __function,
 		 const int __beam_size,
 		 const bool __yield_source=false,
+		 const bool __frontier=false,
 		 const bool __unique_goal=false)
       : goal(__goal),
 	tree_grammar(__tree_grammar),
@@ -96,11 +98,14 @@ namespace cicada
 	function(__function),
 	beam_size(__beam_size),
 	yield_source(__yield_source),
+	frontier_attribute(__frontier),
 	unique_goal(__unique_goal),
 	attr_internal_node("internal-node"),
 	attr_span_first("span-first"),
 	attr_span_last("span-last"),
-	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
+        attr_glue_tree(__grammar.empty() ? "" : "glue-tree"),
+        attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
     }
@@ -385,6 +390,44 @@ namespace cicada
 			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
+
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+
+    struct tree_rule_hash_type
+    {
+      size_t operator()(const tree_rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+    
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    struct tree_rule_equal_type
+    {
+      bool operator()(const tree_rule_type* x, const tree_rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef typename utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+					  std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    
+    typedef typename utils::unordered_map<const tree_rule_type*, std::string, tree_rule_hash_type, tree_rule_equal_type,
+					  std::allocator<std::pair<const tree_rule_type*, std::string> > >::type tree_frontier_set_type;
     
     struct less_non_terminal
     {
@@ -471,6 +514,11 @@ namespace cicada
       tree_tables.reserve(tree_grammar.size());
       tree_tables.resize(tree_grammar.size());
       
+      frontiers_source.clear();
+      frontiers_target.clear();
+      tree_frontiers_source.clear();
+      tree_frontiers_target.clear();
+
       derivation_set_type derivations;
       derivation_set_type passive_arcs;
       
@@ -1309,18 +1357,66 @@ namespace cicada
 	
 	typename rule_candidate_set_type::iterator citer = riter->second.begin();
 	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	for (transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer)
+	for (transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer) {
 	  *citer = rule_candidate_type(function(iter->features),
 				       iter->source->lhs,
 				       yield_source ? iter->source : iter->target,
 				       iter->features,
 				       iter->attributes);
 	  
+	  if (frontier_attribute) {
+	    const rule_type* rule_source = iter->source.get();
+	    const rule_type* rule_target = iter->target.get();
+
+	    if (rule_source) {
+	      typename frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+	      if (siter == frontiers_source.end()) {
+		std::ostringstream os;
+		os << rule_source->rhs;
+	  
+		siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+	      }
+	
+	      citer->attributes[attr_frontier_source] = siter->second;
+	    }
+
+	    if (rule_target) {
+	      typename frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+	      if (titer == frontiers_target.end()) {
+		std::ostringstream os;
+		os << rule_target->rhs;
+		
+		titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+	      }
+	      
+	      citer->attributes[attr_frontier_target] = titer->second;
+	    }
+	  }
+	}
+	
 	std::sort(riter->second.begin(), riter->second.end(), greater_score<rule_candidate_type>());
       }
       
       return riter->second;
     }
+
+    struct FrontierIterator
+    {
+      FrontierIterator(std::string& __buffer) : buffer(__buffer) {}
+      
+      FrontierIterator& operator=(const std::string& value)
+      {
+	if (! buffer.empty())
+	  buffer += ' ';
+	buffer += value;
+	return *this;
+      }
+      
+      FrontierIterator& operator*() { return *this; }
+      FrontierIterator& operator++() { return *this; }
+      
+      std::string& buffer;
+    };
 
     const tree_candidate_set_type& candidate_trees(const size_type& table, const tree_transducer_type::id_type& node)
     {
@@ -1343,6 +1439,35 @@ namespace cicada
 	  const attribute_set_type::int_type size_internal = iter->source->size_internal();
 	  if (size_internal)
 	    citer->attributes[attr_internal_node] = size_internal;
+	  
+	  if (frontier_attribute) {
+	    const tree_rule_type* rule_source = iter->source.get();
+	    const tree_rule_type* rule_target = iter->target.get();
+	    
+	    if (rule_source) {
+	      typename tree_frontier_set_type::iterator siter = tree_frontiers_source.find(rule_source);
+	      if (siter == tree_frontiers_source.end()) {
+		std::string frontier;
+		rule_source->frontier(FrontierIterator(frontier));
+		
+		siter = tree_frontiers_source.insert(std::make_pair(rule_source, frontier)).first;
+	      }
+	      
+	      citer->attributes[attr_frontier_source] = siter->second;
+	    }
+	    
+	    if (rule_target) {
+	      typename tree_frontier_set_type::iterator titer = tree_frontiers_target.find(rule_target);
+	      if (titer == tree_frontiers_target.end()) {
+		std::string frontier;
+		rule_target->frontier(FrontierIterator(frontier));
+		
+		titer = tree_frontiers_target.insert(std::make_pair(rule_target, frontier)).first;
+	      }
+	      
+	      citer->attributes[attr_frontier_target] = titer->second;
+	    }
+	  }
 	}
 	
 	std::sort(riter->second.begin(), riter->second.end(), greater_score<tree_candidate_type>());
@@ -1350,7 +1475,7 @@ namespace cicada
       
       return riter->second;
     }
-    
+  
   private:
     const symbol_type goal;
     const tree_grammar_type& tree_grammar;
@@ -1360,12 +1485,15 @@ namespace cicada
     const int beam_size;
 
     const bool yield_source;
+    const bool frontier_attribute;
     const bool unique_goal;
     
     const attribute_type attr_internal_node;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     const attribute_type attr_glue_tree;
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
     
     rule_ptr_type goal_rule;
 
@@ -1398,13 +1526,19 @@ namespace cicada
     internal_symbol_set_type symbol_map_terminal;
     internal_label_map_type  label_map;
     terminal_label_map_type  terminal_map;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
+
+    tree_frontier_set_type tree_frontiers_source;
+    tree_frontier_set_type tree_frontiers_target;
   };
   
   template <typename Function>
   inline
-  void parse_tree_cky(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool unique_goal=false)
+  void parse_tree_cky(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool frontier=false, const bool unique_goal=false)
   {
-    ParseTreeCKY<typename Function::value_type, Function>(goal, tree_grammar, grammar, function, size, yield_source, unique_goal)(lattice, graph);
+    ParseTreeCKY<typename Function::value_type, Function>(goal, tree_grammar, grammar, function, size, yield_source, frontier, unique_goal)(lattice, graph);
   }
   
 };

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -41,6 +41,7 @@ namespace cicada
 	weights_one(false),
 	weights_fixed(false),
 	yield_source(false),
+	frontier(false),
 	unique_goal(false),
 	debug(__debug)
     {
@@ -73,6 +74,8 @@ namespace cicada
 	  grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "tree-grammar")
 	  tree_grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else
@@ -125,9 +128,9 @@ namespace cicada
       tree_grammar_parse.assign(lattice);
       
       if (weights_one)
-	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, unique_goal);
+	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, frontier, unique_goal);
       else
-	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, unique_goal);
+	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, frontier, unique_goal);
 	
       utils::resource end;
     
@@ -439,6 +442,7 @@ namespace cicada
 	treebank(false),
 	pos_mode(false),
 	ordered(false),
+	frontier(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -474,6 +478,8 @@ namespace cicada
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "ordered")
 	  ordered = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for agenda parser: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -522,9 +528,9 @@ namespace cicada
       grammar_parse.assign(lattice);
       
       if (weights_one)
-	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
+	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       else
-	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
+	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       
       utils::resource end;
     
@@ -581,6 +587,7 @@ namespace cicada
 	treebank(false),
 	pos_mode(false),
 	ordered(false),
+	frontier(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -612,6 +619,8 @@ namespace cicada
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "ordered")
 	  ordered = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "goal")
 	  goal = piter->second;
 	else if (utils::ipiece(piter->first) == "grammar")
@@ -736,12 +745,12 @@ namespace cicada
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
+			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       else
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered);
+			     weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       
       utils::resource end;
     
@@ -785,6 +794,7 @@ namespace cicada
 	weights_fixed(false),
 	distortion(0),
 	yield_source(false),
+	frontier(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -816,6 +826,8 @@ namespace cicada
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else if (utils::ipiece(piter->first) == "distortion")
 	  distortion = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for phrase parser: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -864,13 +876,13 @@ namespace cicada
       grammar_parse.assign(lattice);
       
       
-      cicada::compose_phrase(goal, grammar_parse, distortion, lattice, parsed, yield_source);
+      cicada::compose_phrase(goal, grammar_parse, distortion, lattice, parsed, yield_source, frontier);
       
 #if 0
       if (weights_one)
-	cicada::parse_phrase(goal, grammar_parse, weight_function_one<weight_type>(), size, distortion, lattice, parsed, yield_source);
+	cicada::parse_phrase(goal, grammar_parse, weight_function_one<weight_type>(), size, distortion, lattice, parsed, yield_source, frontier);
       else
-	cicada::parse_phrase(goal, grammar_parse, weight_function<weight_type>(*weights_parse), size, distortion, lattice, parsed, yield_source);
+	cicada::parse_phrase(goal, grammar_parse, weight_function<weight_type>(*weights_parse), size, distortion, lattice, parsed, yield_source, frontier);
 #endif
       
       utils::resource end;

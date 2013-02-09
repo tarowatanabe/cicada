@@ -84,6 +84,7 @@ clear: clear data structure\n\
 \tcounts=[true|false] clear ngram counts\n\
 compose-earley: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
@@ -96,10 +97,12 @@ compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-grammar: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-alignment: composition from lattice (or forest) with target\n\
@@ -121,6 +124,7 @@ compose-tree: composition from tree with tree grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\
 compose-tree-cky: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\
@@ -162,6 +166,7 @@ parse-agenda: parsing via agenda\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tordered=[true|false] ordered non-terminal index\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \tsize=<beam size>\n\
@@ -184,6 +189,7 @@ parse-coarse: parsing via coarse-to-fine\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tordered=[true|false] ordered non-terminal index\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
@@ -197,6 +203,7 @@ parse-coarse: parsing via coarse-to-fine\n\
 parse-phrase: parsing for phrase based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \tsize=<beam size>\n\
@@ -213,6 +220,7 @@ parse-tree: parsing for tree-matching\n\
 \tweights-one=[true|false] one initialized weight\n\
 parse-tree-cky: parsing for tree-matching\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\

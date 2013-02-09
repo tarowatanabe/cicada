@@ -6,10 +6,10 @@
 #ifndef __CICADA__COMPOSE_EARLEY__HPP__
 #define __CICADA__COMPOSE_EARLEY__HPP__ 1
 
-
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -25,6 +25,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/unordered_set.hpp>
+#include <utils/unordered_map.hpp>
 #include <utils/hashmurmur3.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/small_vector.hpp>
@@ -47,14 +48,20 @@ namespace cicada
     typedef Transducer transducer_type;
     typedef HyperGraph hypergraph_type;
     
-    typedef hypergraph_type::feature_set_type feature_set_type;
-    
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+    typedef attribute_set_type::attribute_type attribute_type;
+
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-    ComposeEarley(const grammar_type& __grammar, const bool __yield_source=false)
-      : grammar(__grammar), yield_source(__yield_source)
-
+    ComposeEarley(const grammar_type& __grammar, const bool __yield_source=false, const bool __frontier=false)
+      : grammar(__grammar),
+	yield_source(__yield_source),
+	frontier(__frontier),
+	attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     {
       rule_epsilon = rule_type::create(rule_type(vocab_type::X,    rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       rule_goal    = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X)));
@@ -321,6 +328,25 @@ namespace cicada
 			       std::allocator<hypergraph_type::id_type> > goal_node_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+    
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -331,6 +357,9 @@ namespace cicada
       if (source.goal == hypergraph_type::invalid)
 	return;
       
+      frontiers_source.clear();
+      frontiers_target.clear();
+
       initialize_grammar(source);
 
       id_map_type::const_iterator giter = grammar_nodes[0].non_terminals.find(goal_symbol);
@@ -588,6 +617,35 @@ namespace cicada
 	      edge.rule = (yield_source ? riter->source : riter->target);
 	      edge.features   = riter->features;
 	      edge.attributes = riter->attributes;
+
+	      if (frontier) {
+		const rule_type* rule_source = riter->source.get();
+		const rule_type* rule_target = riter->target.get();
+		
+		if (rule_source) {
+		  frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+		  if (siter == frontiers_source.end()) {
+		    std::ostringstream os;
+		    os << rule_source->rhs;
+		    
+		    siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+		  }
+		  
+		  edge.attributes[attr_frontier_source] = siter->second;
+		}
+		
+		if (rule_target) {
+		  frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+		  if (titer == frontiers_target.end()) {
+		    std::ostringstream os;
+		    os << rule_target->rhs;
+		    
+		    titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+		  }
+	      
+		  edge.attributes[attr_frontier_target] = titer->second;
+		}
+	      }
 	      
 	      target.connect_edge(edge.id, node.id);
 	    }
@@ -744,6 +802,10 @@ namespace cicada
   private:  
     const grammar_type& grammar;
     const bool yield_source;
+    const bool frontier;
+
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
     
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
@@ -768,12 +830,15 @@ namespace cicada
     goal_node_set_type goal_nodes;
     
     non_terminal_set_type non_terminals;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
   };
   
   inline
-  void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target, const bool yield_source=false)
+  void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target, const bool yield_source=false, const bool frontier=false)
   {
-    ComposeEarley composer(grammar, yield_source);
+    ComposeEarley composer(grammar, yield_source, frontier);
       
     composer(source, target);
   }

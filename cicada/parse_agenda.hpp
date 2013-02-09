@@ -9,7 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <set>
-#include <iostream>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -364,6 +364,25 @@ namespace cicada
     typedef utils::compact_map<const edge_type*, head_edge_set_type,
 			       edge_unassigned,	edge_unassigned, 
 			       edge_passive_hash_type, edge_passive_equal_type > discovered_passive_type;
+
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+    
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef typename utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+					  std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
     
     ParseAgenda(const symbol_type& __goal,
 		const grammar_type& __grammar,
@@ -372,7 +391,8 @@ namespace cicada
 		const bool __yield_source=false,
 		const bool __treebank=false,
 		const bool __pos_mode=false,
-		const bool __ordered=false)
+		const bool __ordered=false,
+		const bool __frontier=false)
       : goal(__goal),
 	grammar(__grammar),
 	function(__function),
@@ -381,8 +401,11 @@ namespace cicada
 	treebank(__treebank),
 	pos_mode(__pos_mode),
 	ordered(__ordered),
+	frontier(__frontier),
 	attr_span_first("span-first"),
-	attr_span_last("span-last")
+        attr_span_last("span-last"),
+        attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     { }
 
     struct __extract
@@ -434,6 +457,9 @@ namespace cicada
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
       
+      frontiers_source.clear();
+      frontiers_target.clear();
+
       // initialize by empty word... we do not support epsilon insertion as in the "Parsing and Hypergraphs"
       for (size_type table = 0; table != grammar.size(); ++ table) {
 	const transducer_type& transducer = grammar[table];
@@ -920,6 +946,35 @@ namespace cicada
 							iter->features,
 							iter->attributes));
 	  
+	  if (frontier) {
+	    const rule_type* rule_source = iter->source.get();
+	    const rule_type* rule_target = iter->target.get();
+	    
+	    if (rule_source) {
+	      typename frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+	      if (siter == frontiers_source.end()) {
+		std::ostringstream os;
+		os << rule_source->rhs;
+		    
+		siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+	      }
+		  
+	      rule_candidates.back().attributes[attr_frontier_source] = siter->second;
+	    }
+		
+	    if (rule_target) {
+	      typename frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+	      if (titer == frontiers_target.end()) {
+		std::ostringstream os;
+		os << rule_target->rhs;
+		
+		titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+	      }
+	      
+	      rule_candidates.back().attributes[attr_frontier_target] = titer->second;
+	    }
+	  }
+	  
 	  riter->second.push_back(&(rule_candidates.back()));
 	}
       }
@@ -937,8 +992,12 @@ namespace cicada
     const bool treebank;
     const bool pos_mode;
     const bool ordered;
+    const bool frontier;
+    
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
     
     edge_set_type edges;
     
@@ -955,14 +1014,17 @@ namespace cicada
     
     rule_candidate_set_type   rule_candidates;
     rule_candidate_table_type rule_tables;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
   };
   
   
   template <typename Function>
   inline
-  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool ordered=false)
+  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool ordered=false, const bool frontier=false)
   {
-    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, pos_mode, ordered)(lattice, graph);
+    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, pos_mode, ordered, frontier)(lattice, graph);
   }
 
 };

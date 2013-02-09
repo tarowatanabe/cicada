@@ -311,8 +311,9 @@ namespace cicada
 	       const bool __yield_source=false,
 	       const bool __treebank=false,
 	       const bool __pos_mode=false,
-	       const bool __ordered=false)
-	: goal(__goal), grammar(__grammar), function(__function), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), ordered(__ordered)
+	       const bool __ordered=false,
+	       const bool __frontier=false)
+	: goal(__goal), grammar(__grammar), function(__function), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), ordered(__ordered), frontier(__frontier)
       {
 	//closure.set_empty_key(id_type(-1));
 	//closure_next.set_empty_key(id_type(-1));
@@ -867,6 +868,7 @@ namespace cicada
       const bool treebank;
       const bool pos_mode;
       const bool ordered;
+      const bool frontier;
 
       symbol_map_type symbol_map;
       id_type goal_id;
@@ -895,7 +897,8 @@ namespace cicada
 		const bool __yield_source=false,
 		const bool __treebank=false,
 		const bool __pos_mode=false,
-		const bool __ordered=false)
+		const bool __ordered=false,
+		const bool __frontier=false)
       : goal(__goal),
 	grammars(gfirst, glast),
 	thresholds(tfirst, tlast),
@@ -904,7 +907,8 @@ namespace cicada
 	yield_source(__yield_source),
 	treebank(__treebank),
 	pos_mode(__pos_mode),
-        ordered(__ordered)
+        ordered(__ordered),
+        frontier(__frontier)
     {
       if (grammars.empty())
 	throw std::runtime_error("no grammar?");
@@ -921,7 +925,8 @@ namespace cicada
 		const bool __yield_source=false,
 		const bool __treebank=false,
 		const bool __pos_mode=false,
-		const bool __ordered=false)
+		const bool __ordered=false,
+		const bool __frontier=false)
       : goal(__goal),
 	grammars(__grammars.begin(), __grammars.end()),
 	thresholds(__thresholds.begin(), __thresholds.end()),
@@ -930,7 +935,8 @@ namespace cicada
 	yield_source(__yield_source),
 	treebank(__treebank),
         pos_mode(__pos_mode),
-        ordered(__ordered)
+        ordered(__ordered),
+        frontier(__frontier)
     {
       if (grammars.empty())
 	throw std::runtime_error("no grammar?");
@@ -954,12 +960,12 @@ namespace cicada
       label_score_chart_type scores_prev;
       parser_ptr_set_type parsers(grammars.size() - 1);
       
-      parsers.front().reset(new ParseCKY(goal, grammars.front(), function, yield_source, treebank, pos_mode, ordered));
+      parsers.front().reset(new ParseCKY(goal, grammars.front(), function, yield_source, treebank, pos_mode, ordered, frontier));
       parsers.front()->operator()(lattice, scores_init, PruneNone());
 
       // final parsing with hypergraph construction
       //ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, ordered, false, true);
-      cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, ordered, false, true);
+      cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, ordered, frontier, true);
       
       std::vector<double, std::allocator<double> > factors(thresholds.size(), 1.0);
       
@@ -973,7 +979,7 @@ namespace cicada
 	size_t level = 1;
 	for (/**/; level != grammars.size() - 1; ++ level) {
 	  if (! parsers[level])
-	    parsers[level].reset(new ParseCKY(goal, grammars[level], function, yield_source, treebank, pos_mode, ordered));
+	    parsers[level].reset(new ParseCKY(goal, grammars[level], function, yield_source, treebank, pos_mode, ordered, frontier));
 
 	  //std::cerr << "level: " << level << std::endl;
 	  
@@ -1027,6 +1033,7 @@ namespace cicada
     const bool treebank;
     const bool pos_mode;
     const bool ordered;
+    const bool frontier;
   };
   
   
@@ -1042,9 +1049,10 @@ namespace cicada
 		    const bool yield_source=false,
 		    const bool treebank=false,
 		    const bool pos_mode=false,
-		    const bool ordered=false)
+		    const bool ordered=false,
+		    const bool frontier=false)
   {
-    ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, beam_size, yield_source, treebank, pos_mode, ordered)(lattice, graph);
+    ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, beam_size, yield_source, treebank, pos_mode, ordered, frontier)(lattice, graph);
   }
   
   template <typename Grammars, typename Thresholds, typename Function>
@@ -1059,9 +1067,10 @@ namespace cicada
 		    const bool yield_source=false,
 		    const bool treebank=false,
 		    const bool pos_mode=false,
-		    const bool ordered=false)
+		    const bool ordered=false,
+		    const bool frontier=false)
   {
-    ParseCoarse<typename Function::value_type, Function>(goal, grammars, thresholds, function, beam_size, yield_source, treebank, pos_mode, ordered)(lattice, graph);
+    ParseCoarse<typename Function::value_type, Function>(goal, grammars, thresholds, function, beam_size, yield_source, treebank, pos_mode, ordered, frontier)(lattice, graph);
   }
   
 };

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -27,6 +27,7 @@ namespace cicada
 	tree_grammar(__tree_grammar), grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
+	frontier(false),
 	unique_goal(false), 
 	debug(__debug)
     {
@@ -56,6 +57,8 @@ namespace cicada
 	  grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "tree-grammar")
 	  tree_grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else
@@ -87,7 +90,7 @@ namespace cicada
       grammar_compose.assign(lattice);
       tree_grammar_compose.assign(lattice);
       
-      cicada::compose_tree_cky(goal, tree_grammar_compose, grammar_compose, lattice, composed, yield_source, unique_goal);
+      cicada::compose_tree_cky(goal, tree_grammar_compose, grammar_compose, lattice, composed, yield_source, frontier, unique_goal);
 	
       utils::resource end;
     
@@ -220,6 +223,7 @@ namespace cicada
 	grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
+	frontier(false), 
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -241,6 +245,8 @@ namespace cicada
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else if (utils::ipiece(piter->first) == "grammar")
 	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for Earley composer: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -267,7 +273,7 @@ namespace cicada
 
       grammar_compose.assign(hypergraph);
     
-      cicada::compose_earley(grammar_compose, hypergraph, composed, yield_source);
+      cicada::compose_earley(grammar_compose, hypergraph, composed, yield_source, frontier);
     
       utils::resource end;
     
@@ -409,6 +415,7 @@ namespace cicada
 	grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
+	frontier(false),
 	debug(__debug)
     {
      
@@ -431,6 +438,8 @@ namespace cicada
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else if (utils::ipiece(piter->first) == "grammar")
 	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -457,7 +466,7 @@ namespace cicada
 
       grammar_compose.assign(hypergraph);
       
-      cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source);
+      cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source, frontier);
     
       utils::resource end;
     
@@ -497,6 +506,7 @@ namespace cicada
 	goal(__goal),
 	distortion(0),
 	yield_source(false),
+	frontier(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -522,6 +532,8 @@ namespace cicada
 	  goal = piter->second;
 	else if (utils::ipiece(piter->first) == "grammar")
 	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -550,7 +562,7 @@ namespace cicada
 
       grammar_compose.assign(lattice);
       
-      cicada::compose_phrase(goal, grammar_compose, distortion, lattice, composed, yield_source);
+      cicada::compose_phrase(goal, grammar_compose, distortion, lattice, composed, yield_source, frontier);
     
       utils::resource end;
     

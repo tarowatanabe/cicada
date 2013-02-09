@@ -9,6 +9,7 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include <sstream>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -179,20 +180,43 @@ namespace cicada
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     typedef std::vector<candidate_heap_type, std::allocator<candidate_heap_type> > candidate_heap_map_type;
+
+    struct rule_hash_type
+    {
+      size_t operator()(const rule_type* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+    
+    struct rule_equal_type
+    {
+      bool operator()(const rule_type* x, const rule_type* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
+    };
+
+    typedef typename utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
+					  std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
     
     ParsePhrase(const symbol_type& non_terminal,
 		const grammar_type& __grammar,
 		const function_type& __function,
 		const int __beam_size,
 		const int& __max_distortion,
-		const bool __yield_source)
+		const bool __yield_source,
+		const bool __frontier)
       : grammar(__grammar),
 	function(__function),
 	beam_size(__beam_size),
 	max_distortion(__max_distortion),
 	yield_source(__yield_source),
+	frontier(__frontier),
 	attr_phrase_span_first("phrase-span-first"),
-	attr_phrase_span_last("phrase-span-last")
+	attr_phrase_span_last("phrase-span-last"),
+	attr_frontier_source(__frontier ? "frontier-source" : ""),
+        attr_frontier_target(__frontier ? "frontier-target" : "")
     {
       rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
       
@@ -223,6 +247,9 @@ namespace cicada
 
       phrase_tables.clear();
       phrase_tables.resize(grammar.size());
+
+      frontiers_source.clear();
+      frontiers_target.clear();
       
       const coverage_id_type coverage_start_id = coverage_map(coverage_type());
       
@@ -493,11 +520,41 @@ namespace cicada
 	
 	typename phrase_candidate_set_type::iterator citer = riter->second.begin();
 	transducer_type::rule_pair_set_type::const_iterator iter_end = phrases.end();
-	for (transducer_type::rule_pair_set_type::const_iterator iter = phrases.begin(); iter != iter_end; ++ iter, ++ citer)
+	for (transducer_type::rule_pair_set_type::const_iterator iter = phrases.begin(); iter != iter_end; ++ iter, ++ citer) {
 	  *citer = phrase_candidate_type(function(iter->features),
 					 yield_source ? iter->source : iter->target,
 					 iter->features,
 					 iter->attributes);
+	  
+	  if (frontier) {
+	    const rule_type* rule_source = iter->source.get();
+	    const rule_type* rule_target = iter->target.get();
+	    
+	    if (rule_source) {
+	      typename frontier_set_type::iterator siter = frontiers_source.find(rule_source);
+	      if (siter == frontiers_source.end()) {
+		std::ostringstream os;
+		os << rule_source->rhs;
+		    
+		siter = frontiers_source.insert(std::make_pair(rule_source, os.str())).first;
+	      }
+		  
+	      citer->attributes[attr_frontier_source] = siter->second;
+	    }
+	    
+	    if (rule_target) {
+	      typename frontier_set_type::iterator titer = frontiers_target.find(rule_target);
+	      if (titer == frontiers_target.end()) {
+		std::ostringstream os;
+		os << rule_target->rhs;
+		    
+		titer = frontiers_target.insert(std::make_pair(rule_target, os.str())).first;
+	      }
+	      
+	      citer->attributes[attr_frontier_target] = titer->second;
+	    }
+	  }
+	}
 	
 	std::sort(riter->second.begin(), riter->second.end(), greater_score<phrase_candidate_type>());
       }
@@ -513,9 +570,12 @@ namespace cicada
     
     const int max_distortion;
     const bool yield_source;
+    const bool frontier;
     
     const attribute_type attr_phrase_span_first;
     const attribute_type attr_phrase_span_last;
+    const attribute_type attr_frontier_source;
+    const attribute_type attr_frontier_target;
 
     coverage_set_type     coverages;
     lattice_node_map_type lattice_nodes;
@@ -533,13 +593,16 @@ namespace cicada
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
+
+    frontier_set_type frontiers_source;
+    frontier_set_type frontiers_target;
   };
   
   template <typename Function>
   inline
-  void parse_phrase(const Symbol& non_terminal, const Grammar& grammar, const Function& function, const int beam_size, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
+  void parse_phrase(const Symbol& non_terminal, const Grammar& grammar, const Function& function, const int beam_size, const int max_distortion, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool frontier=false)
   {
-    ParsePhrase<typename Function::value_type, Function> __parser(non_terminal, grammar, function, beam_size, max_distortion, yield_source);
+    ParsePhrase<typename Function::value_type, Function> __parser(non_terminal, grammar, function, beam_size, max_distortion, yield_source, frontier);
     __parser(lattice, graph);
   }
 
