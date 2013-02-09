@@ -71,6 +71,7 @@ namespace cicada
       bool weights_fixed;
       
       bool yield_source;
+      bool frontier;
       
       int debug;
     };
@@ -101,6 +102,7 @@ namespace cicada
       bool treebank;
       bool pos_mode;
       bool ordered;
+      bool frontier;
       bool unique_goal;
       
       int debug;

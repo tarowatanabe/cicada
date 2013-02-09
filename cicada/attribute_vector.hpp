@@ -61,6 +61,7 @@ namespace cicada
     template <typename Iterator>
     AttributeVector(Iterator first, Iterator last) : __values(first, last) { }
     AttributeVector(const utils::piece& x) : __values() { assign(x); }
+    AttributeVector(const value_type& x) : __values() { __values.insert(x); }
 
   public:
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);

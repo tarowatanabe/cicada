@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -90,6 +90,7 @@ compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tordered=[true|false] ordered non-terminal index\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tunique-goal=[true|false] unique goal\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
@@ -114,6 +115,7 @@ compose-dependency: composition by dependency\n\
 \tdegree2=[true|false] degree-2 restricted non-projective parsing\n\
 compose-tree: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\
@@ -170,6 +172,7 @@ parse-cky|cyk: parsing via CKY\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tordered=[true|false] ordered non-terminal index\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tunique-goal=[true|false] unique goal\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
@@ -201,6 +204,7 @@ parse-phrase: parsing for phrase based grammar\n\
 \tweights-one=[true|false] one initialized weight\n\
 parse-tree: parsing for tree-matching\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tfrontier=[true|false] keep source/target frontier\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\

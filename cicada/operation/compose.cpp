@@ -126,6 +126,7 @@ namespace cicada
 	tree_grammar(__tree_grammar), grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
+	frontier(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -151,13 +152,15 @@ namespace cicada
 	  grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "tree-grammar")
 	  tree_grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for Tree composer: " << piter->first << "=" << piter->second << std::endl;
       }
-	
+      
       if (source && target)
 	throw std::runtime_error("Tree composer can work either source or target yield");
-	
+      
       yield_source = source;
     }
 
@@ -179,7 +182,7 @@ namespace cicada
       grammar_compose.assign(hypergraph);
       tree_grammar_compose.assign(hypergraph);
 	
-      cicada::compose_tree(goal, tree_grammar_compose, grammar_compose, hypergraph, composed, yield_source);
+      cicada::compose_tree(goal, tree_grammar_compose, grammar_compose, hypergraph, composed, yield_source, frontier);
 	
       utils::resource end;
     
@@ -305,6 +308,7 @@ namespace cicada
 	treebank(false),
 	pos_mode(false),
 	ordered(false),
+	frontier(false),
 	unique_goal(false),
 	debug(__debug)
     { 
@@ -331,6 +335,8 @@ namespace cicada
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "ordered")
 	  ordered = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "frontier")
+	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "goal")
@@ -365,7 +371,7 @@ namespace cicada
 
       grammar_compose.assign(lattice);
 	
-      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, ordered, unique_goal);
+      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, ordered, frontier, unique_goal);
     
       utils::resource end;
     

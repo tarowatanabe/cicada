@@ -958,8 +958,8 @@ namespace cicada
       parsers.front()->operator()(lattice, scores_init, PruneNone());
 
       // final parsing with hypergraph construction
-      //ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, ordered, true);
-      cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, ordered, true);
+      //ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, ordered, false, true);
+      cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, ordered, false, true);
       
       std::vector<double, std::allocator<double> > factors(thresholds.size(), 1.0);
       
