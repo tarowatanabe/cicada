@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -295,8 +295,7 @@ namespace cicada
     
     typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 2, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
     typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
-    
-    typedef utils::array_power2<cache_node_type,          1024 * 2, std::allocator<cache_node_type> >          cache_node_set_type;
+    typedef utils::array_power2<cache_node_type,          1024 * 8, std::allocator<cache_node_type> >          cache_node_set_type;
     
     TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
@@ -443,7 +442,6 @@ namespace cicada
       AttributeVectorCODEC attribute_codec;
       
       const size_type cache_pos = node & (cache_rule.size() - 1);
-      
       cache_rule_pair_set_type& cache = const_cast<cache_rule_pair_set_type&>(cache_rule[cache_pos]);
       
       std::pair<cache_rule_pair_set_type::iterator, bool> result = cache.find(node);
@@ -540,11 +538,6 @@ namespace cicada
     }
 
   private:
-
-    typedef std::vector<char, std::allocator<char> > code_buffer_type;
-
-    code_buffer_type buffer_impl;
-    
     const rule_ptr_type& read_rule(size_type pos,
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
@@ -552,8 +545,8 @@ namespace cicada
       TreeRuleCODEC codec;
 
       const size_type cache_pos = pos & (caches.size() - 1);
-      
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
+      
       if (cache.pos != pos) {
 	rule_type rule;
 	codec.decode(db[pos].begin(), vocab, rule);

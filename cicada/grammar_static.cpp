@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -290,7 +290,7 @@ namespace cicada
 
     typedef utils::array_power2<cache_rule_set_type, 1024 * 2, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 * 2, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
-    typedef utils::array_power2<cache_node_type,     1024 * 2, std::allocator<cache_node_type> >     cache_node_set_type;
+    typedef utils::array_power2<cache_node_type,     1024 * 8, std::allocator<cache_node_type> >     cache_node_set_type;
 
     typedef std::pair<word_type, size_type> word_node_type;
 
@@ -415,7 +415,6 @@ namespace cicada
       AttributeVectorCODEC attribute_codec;
       
       const size_type cache_pos = node & (cache_rule_sets.size() - 1);
-      
       cache_rule_set_type& cache = const_cast<cache_rule_set_type&>(cache_rule_sets[cache_pos]);
       
       std::pair<cache_rule_set_type::iterator, bool> result = cache.find(node);
@@ -544,8 +543,8 @@ namespace cicada
       typedef utils::hashmurmur3<size_t> hasher_type;
       
       const size_type cache_pos = hasher_type()(pos, lhs.id()) & (cache_phrases.size() - 1);
-      
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
+      
       if (cache.pos != pos || ! cache.rule || cache.rule->lhs != lhs) {
 	typedef utils::piece code_set_type;
 	
