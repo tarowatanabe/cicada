@@ -220,7 +220,7 @@ namespace cicada
 
     struct rule_hash_type
     {
-      size_t operator()(const rule_type* x) const
+      size_t operator()(const rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -228,7 +228,7 @@ namespace cicada
 
     struct tree_rule_hash_type
     {
-      size_t operator()(const tree_rule_type* x) const
+      size_t operator()(const tree_rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -236,7 +236,7 @@ namespace cicada
     
     struct rule_equal_type
     {
-      bool operator()(const rule_type* x, const rule_type* y) const
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
@@ -244,17 +244,17 @@ namespace cicada
 
     struct tree_rule_equal_type
     {
-      bool operator()(const tree_rule_type* x, const tree_rule_type* y) const
+      bool operator()(const tree_rule_ptr_type& x, const tree_rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
     };
 
-    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
-				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    typedef utils::unordered_map<rule_ptr_type, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
     
-    typedef utils::unordered_map<const tree_rule_type*, std::string, tree_rule_hash_type, tree_rule_equal_type,
-				 std::allocator<std::pair<const tree_rule_type*, std::string> > >::type tree_frontier_set_type;
+    typedef utils::unordered_map<tree_rule_ptr_type, std::string, tree_rule_hash_type, tree_rule_equal_type,
+				 std::allocator<std::pair<const tree_rule_ptr_type, std::string> > >::type tree_frontier_set_type;
     
     struct less_non_terminal
     {
@@ -429,7 +429,7 @@ namespace cicada
 		      apply_rule(riter->source->label,
 				 rule,
 				 riter->features,
-				 riter->attributes + frontier_attributes(riter->source.get(), riter->target.get()),
+				 riter->attributes + frontier_attributes(riter->source, riter->target),
 				 rule_internal_size(*(riter->source)),
 				 tails, 
 				 passive_arcs,
@@ -488,7 +488,7 @@ namespace cicada
 		      apply_rule(riter->source->lhs,
 				 rule,
 				 riter->features,
-				 riter->attributes + frontier_attributes(riter->source.get(), riter->target.get()),
+				 riter->attributes + frontier_attributes(riter->source, riter->target),
 				 rule_internal_size(*(riter->source)),
 				 tails,
 				 passive_arcs,
@@ -674,7 +674,7 @@ namespace cicada
 	      apply_rule(extract_lhs(*riter),
 			 yield_source ? riter->source : riter->target,
 			 riter->features + citer->features,
-			 riter->attributes + citer->attributes + frontier_attributes(riter->source.get(), riter->target.get()),
+			 riter->attributes + citer->attributes + frontier_attributes(riter->source, riter->target),
 			 rule_internal_size(*(riter->source)),
 			 citer->tails, 
 			 passive_arcs,
@@ -1040,7 +1040,7 @@ namespace cicada
       return edge_id;
     }
     
-    attribute_set_type frontier_attributes(const rule_type* rule_source, const rule_type* rule_target)
+    attribute_set_type frontier_attributes(const rule_ptr_type& rule_source, const rule_ptr_type& rule_target)
     {
       attribute_set_type attributes;
       
@@ -1089,7 +1089,7 @@ namespace cicada
       std::string& buffer;
     };
     
-    attribute_set_type frontier_attributes(const tree_rule_type* rule_source, const tree_rule_type* rule_target)
+    attribute_set_type frontier_attributes(const tree_rule_ptr_type& rule_source, const tree_rule_ptr_type& rule_target)
     {
       attribute_set_type attributes;
       

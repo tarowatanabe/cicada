@@ -257,22 +257,22 @@ namespace cicada
     
     struct rule_hash_type
     {
-      size_t operator()(const rule_type* x) const
+      size_t operator()(const rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
     };
-
+    
     struct rule_equal_type
     {
-      bool operator()(const rule_type* x, const rule_type* y) const
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
     };
     
-    typedef typename utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
-					  std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    typedef typename utils::unordered_map<rule_ptr_type, std::string, rule_hash_type, rule_equal_type,
+					  std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
 
     struct less_non_terminal
     {
@@ -897,8 +897,8 @@ namespace cicada
 					 iter->features,
 					 iter->attributes);
 	    
-	    const rule_type* rule_source = iter->source.get();
-	    const rule_type* rule_target = iter->target.get();
+	    const rule_ptr_type& rule_source = iter->source;
+	    const rule_ptr_type& rule_target = iter->target;
 	    
 	    if (rule_source) {
 	      typename frontier_set_type::iterator siter = frontiers_source.find(rule_source);

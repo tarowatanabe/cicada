@@ -40,6 +40,7 @@
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
+#include "utils/hashmurmur3.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
@@ -282,9 +283,20 @@ namespace cicada
       
       cache_rule_type() : rule(), pos(size_type(-1)) {}
     };
+
+    struct cache_node_type
+    {
+      size_type node;
+      size_type next;
+      uint32_t  id;
+
+      cache_node_type() : node(size_type(-1)), next(size_type(-1)), id(uint32_t(-1)) {}
+    };
     
     typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 2, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
     typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
+    
+    typedef utils::array_power2<cache_node_type,          1024 * 2, std::allocator<cache_node_type> >          cache_node_set_type;
     
     TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
@@ -348,6 +360,9 @@ namespace cicada
       cache_rule.clear();
       cache_source.clear();
       cache_target.clear();
+
+      cache_edges.clear();
+      cache_nodes.clear();
     }
 
     size_type find_edge(const word_type& word) const
@@ -358,8 +373,20 @@ namespace cicada
     
     size_type find_edge(const word_type& word, size_type node) const
     {
-      const word_type::id_type id = vocab[word];
-      return edge_db.find(&id, 1, node);
+      typedef utils::hashmurmur3<size_t> hasher_type; 
+      
+      const size_type cache_pos = hasher_type()(word.id(), node) & (cache_edges.size() - 1);
+      cache_node_type& cache = const_cast<cache_node_type&>(cache_edges[cache_pos]);
+      
+      if (cache.node != node || cache.id != word.id()) {
+	const word_type::id_type id = vocab[word];
+	
+	cache.next = edge_db.find(&id, 1, node);
+	cache.node = node;
+	cache.id   = word.id();
+      }
+      
+      return cache.next;
     }
     
     size_type find(const id_type& id) const
@@ -370,13 +397,36 @@ namespace cicada
     
     size_type find(const id_type& id, size_type node) const
     {
-      return rule_db.find(&id, 1, node);
+      typedef utils::hashmurmur3<size_t> hasher_type; 
+      
+      const size_type cache_pos = hasher_type()(id, node) & (cache_nodes.size() - 1);
+      cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
+      
+      if (cache.node != node || cache.id != id) {
+	cache.next = rule_db.find(&id, 1, node);
+	cache.node = node;
+	cache.id   = id;
+      }
+      
+      return cache.next;
     }
 
     size_type find(const symbol_type& symbol, size_type node) const
     {
-      const word_type::id_type id = vocab[symbol];
-      return rule_db.find(&id, 1, node);
+      typedef utils::hashmurmur3<size_t> hasher_type; 
+      
+      const size_type cache_pos = hasher_type()(symbol.id(), node) & (cache_nodes.size() - 1);
+      cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
+      
+      if (cache.node != node || cache.id != symbol.id()) {
+	const word_type::id_type id = vocab[symbol];
+	
+	cache.next = rule_db.find(&id, 1, node);
+	cache.node = node;
+	cache.id   = symbol.id();
+      }
+      
+      return cache.next;
     }
     
     bool is_valid_edge(size_type node) const { return edge_db.is_valid(node); }
@@ -581,6 +631,9 @@ namespace cicada
     cache_rule_pair_map_type cache_rule;
     cache_rule_set_type      cache_source;
     cache_rule_set_type      cache_target;
+
+    cache_node_set_type      cache_edges;
+    cache_node_set_type      cache_nodes;
 
     int debug;
   };

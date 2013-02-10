@@ -149,7 +149,7 @@ namespace cicada
 
     struct rule_hash_type
     {
-      size_t operator()(const rule_type* x) const
+      size_t operator()(const rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -157,7 +157,7 @@ namespace cicada
 
     struct tree_rule_hash_type
     {
-      size_t operator()(const tree_rule_type* x) const
+      size_t operator()(const tree_rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -165,7 +165,7 @@ namespace cicada
     
     struct rule_equal_type
     {
-      bool operator()(const rule_type* x, const rule_type* y) const
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
@@ -173,17 +173,17 @@ namespace cicada
 
     struct tree_rule_equal_type
     {
-      bool operator()(const tree_rule_type* x, const tree_rule_type* y) const
+      bool operator()(const tree_rule_ptr_type& x, const tree_rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
     };
 
-    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
-				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    typedef utils::unordered_map<rule_ptr_type, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
     
-    typedef utils::unordered_map<const tree_rule_type*, std::string, tree_rule_hash_type, tree_rule_equal_type,
-				 std::allocator<std::pair<const tree_rule_type*, std::string> > >::type tree_frontier_set_type;
+    typedef utils::unordered_map<tree_rule_ptr_type, std::string, tree_rule_hash_type, tree_rule_equal_type,
+				 std::allocator<std::pair<const tree_rule_ptr_type, std::string> > >::type tree_frontier_set_type;
     
     struct State
     {
@@ -402,8 +402,8 @@ namespace cicada
 	    edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 	    
 	    if (frontier_attribute) {
-	      const rule_type* rule_source = riter->source.get();
-	      const rule_type* rule_target = riter->target.get();
+	      const rule_ptr_type& rule_source = riter->source;
+	      const rule_ptr_type& rule_target = riter->target;
 
 	      if (rule_source) {
 		frontier_set_type::iterator siter = frontiers_source.find(rule_source);
@@ -596,8 +596,8 @@ namespace cicada
 	    if (frontier_attribute) {
 	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		const tree_rule_type* rule_source = riter->source.get();
-		const tree_rule_type* rule_target = riter->target.get();
+		const tree_rule_ptr_type& rule_source = riter->source;
+		const tree_rule_ptr_type& rule_target = riter->target;
 
 		attribute_set_type attributes;
 		

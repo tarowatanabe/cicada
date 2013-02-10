@@ -279,8 +279,18 @@ namespace cicada
       cache_phrase_type() : rule(), pos(size_type(-1)) {}
     };
     
+    struct cache_node_type
+    {
+      size_type node;
+      size_type next;
+      uint32_t  id;
+
+      cache_node_type() : node(size_type(-1)), next(size_type(-1)), id(uint32_t(-1)) {}
+    };
+
     typedef utils::array_power2<cache_rule_set_type, 1024 * 2, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 * 2, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
+    typedef utils::array_power2<cache_node_type,     1024 * 2, std::allocator<cache_node_type> >     cache_node_set_type;
 
     typedef std::pair<word_type, size_type> word_node_type;
 
@@ -302,15 +312,9 @@ namespace cicada
       }
     };
 
-    typedef utils::compact_map<word_node_type, size_type,
-			       unassigned_cache, deleted_cache,
-			       utils::hashmurmur3<size_t>, std::equal_to<word_node_type>,
-			       std::allocator<std::pair<const word_node_type, size_type> > > cache_node_type;
-
   public:
     GrammarStaticImpl(const std::string& parameter)
       : max_span(15),
-	caching(false),
 	debug(0)
     {
       read(parameter);
@@ -330,7 +334,6 @@ namespace cicada
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
 	max_span(x.max_span),
-	caching(x.caching),
 	debug(x.debug)
     { }
 
@@ -351,7 +354,6 @@ namespace cicada
       feature_names   = x.feature_names;
       attribute_names = x.attribute_names;
       max_span        = x.max_span;
-      caching         = x.caching;
       debug           = x.debug;
       
       return *this;
@@ -377,28 +379,27 @@ namespace cicada
       cache_rule_sets.clear();
       cache_sources.clear();
       cache_targets.clear();
-
-      cache_node.clear();
+      cache_nodes.clear();
 
       max_span = 15;
-      caching = false;
     }
     
     size_type find(const word_type& word, size_type node) const
     {
-      if (caching && word.is_non_terminal()) {
-	cache_node_type& __cache_node = const_cast<cache_node_type&>(cache_node);
-	
-	std::pair<cache_node_type::iterator, bool> result = __cache_node.insert(std::make_pair(std::make_pair(word, node), 0));
-	if (result.second) {
-	  const word_type::id_type id = vocab[word];
-	  result.first->second = rule_db.find(&id, 1, node);
-	}
-	return result.first->second;
-      } else {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      
+      const size_type cache_pos = hasher_type()(word.id(), node) & (cache_nodes.size() - 1);
+      cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
+      
+      if (cache.node != node || cache.id != word.id()) {
 	const word_type::id_type id = vocab[word];
-	return rule_db.find(&id, 1, node);
+	
+	cache.next = rule_db.find(&id, 1, node);
+	cache.node = node;
+	cache.id   = word.id();
       }
+      
+      return cache.next;
     }
     
     // valid implies that you can continue searching from node...
@@ -644,12 +645,11 @@ namespace cicada
     
     cache_phrase_set_type cache_sources;
     cache_phrase_set_type cache_targets;
-
-    cache_node_type cache_node;
+    
+    cache_node_set_type   cache_nodes;
 
   public:
     int max_span;
-    bool caching;
     int debug;
   };
   
@@ -988,10 +988,6 @@ namespace cicada
     if (siter != param.end())
       max_span = utils::lexical_cast<int>(siter->second);
 
-    parameter_type::const_iterator citer = param.find("cache");
-    if (citer != param.end())
-      caching = utils::lexical_cast<bool>(citer->second);
-    
     parameter_type::const_iterator piter = param.find("populate");
     if (piter != param.end() && utils::lexical_cast<bool>(piter->second))
       populate();

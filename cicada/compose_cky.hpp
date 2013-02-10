@@ -153,7 +153,7 @@ namespace cicada
 
     struct rule_hash_type
     {
-      size_t operator()(const rule_type* x) const
+      size_t operator()(const rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -161,14 +161,14 @@ namespace cicada
     
     struct rule_equal_type
     {
-      bool operator()(const rule_type* x, const rule_type* y) const
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
     };
 
-    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
-				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    typedef utils::unordered_map<rule_ptr_type, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
 
     struct less_non_terminal
     {
@@ -339,8 +339,7 @@ namespace cicada
 		if (frontier)
 		  apply_rule(rule,
 			     riter->features + citer->features,
-			     riter->attributes + citer->attributes + frontier_attributes(riter->source.get(),
-											 riter->target.get()),
+			     riter->attributes + citer->attributes + frontier_attributes(riter->source, riter->target),
 			     citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
 			     first, last);
 		else 
@@ -407,8 +406,7 @@ namespace cicada
 		    if (frontier)
 		      apply_rule(rule,
 				 riter->features,
-				 riter->attributes + frontier_attributes(riter->source.get(),
-									 riter->target.get()),
+				 riter->attributes + frontier_attributes(riter->source, riter->target),
 				 &passive_arcs[p], (&passive_arcs[p]) + 1, passive_arcs, graph,
 				 first, last, level + 1);
 		    else
@@ -513,7 +511,7 @@ namespace cicada
     }
 
   private:
-    attribute_set_type frontier_attributes(const rule_type* rule_source, const rule_type* rule_target)
+    attribute_set_type frontier_attributes(const rule_ptr_type& rule_source, const rule_ptr_type& rule_target)
     {
       attribute_set_type attributes;
       

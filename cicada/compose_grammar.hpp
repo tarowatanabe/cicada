@@ -50,7 +50,7 @@ namespace cicada
     
     struct rule_hash_type
     {
-      size_t operator()(const rule_type* x) const
+      size_t operator()(const rule_ptr_type& x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -58,14 +58,14 @@ namespace cicada
     
     struct rule_equal_type
     {
-      bool operator()(const rule_type* x, const rule_type* y) const
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
       {
 	return x == y ||(x && y && *x == *y);
       }
     };
 
-    typedef utils::unordered_map<const rule_type*, std::string, rule_hash_type, rule_equal_type,
-				 std::allocator<std::pair<const rule_type*, std::string> > >::type frontier_set_type;
+    typedef utils::unordered_map<rule_ptr_type, std::string, rule_hash_type, rule_equal_type,
+				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
     
     ComposeGrammar(const grammar_type& __grammar, const bool __yield_source=false, const bool __frontier=false)
       : grammar(__grammar),
@@ -141,8 +141,8 @@ namespace cicada
 	    edge_new.attributes = riter->attributes;
 
 	    if (frontier) {
-	      const rule_type* rule_source = riter->source.get();
-	      const rule_type* rule_target = riter->target.get();
+	      const rule_ptr_type& rule_source = riter->source;
+	      const rule_ptr_type& rule_target = riter->target;
 	      
 	      if (rule_source) {
 		frontier_set_type::iterator siter = frontiers_source.find(rule_source);
