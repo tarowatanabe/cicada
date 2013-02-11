@@ -17,6 +17,7 @@
 #include "utils/small_vector.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/unordered_map.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -86,15 +87,11 @@ namespace cicada
       };
       typedef utils::array_power2<cache_phrase_type, 1024 * 4, std::allocator<cache_phrase_type> > cache_phrase_set_type;
       
-      struct cache_feature_type
-      {
-	word_type source;
-	word_type target;
-	feature_linear_set_type features;
-	
-	cache_feature_type() : source(), target(), features() {}
-      };
-      typedef utils::array_power2<cache_feature_type, 1024 * 4, std::allocator<cache_feature_type> > cache_feature_set_type;
+      typedef std::pair<word_type, word_type> word_pair_type;
+
+      typedef utils::unordered_map<word_pair_type, feature_linear_set_type, utils::hashmurmur3<size_t>, std::equal_to<word_pair_type>,
+				   std::allocator<std::pair<const word_pair_type, feature_linear_set_type> > >::type cache_feature_set_type;
+      
       
       typedef FeatureBuilder feature_builder_type;
 
@@ -174,19 +171,15 @@ namespace cicada
 	  if (! skipper(*siter))
 	    for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
 	      if (! skipper(*titer)) {
-		const size_t cache_pos = hasher_type::operator()(siter->id(), titer->id()) & (cache_features.size() - 1);
-		cache_feature_type& cache = cache_features[cache_pos];
 		
-		if (cache.source != *siter || cache.target != *titer) {
-		  cache.source = *siter;
-		  cache.target = *titer;
+		cache_feature_set_type::iterator fiter = cache_features.find(word_pair_type(*siter, *titer));
+		if (fiter == cache_features.end()) {
+		  fiter = cache_features.insert(std::make_pair(word_pair_type(*siter, *titer), feature_linear_set_type())).first;
 		  
-		  cache.features.clear();
-		  
-		  apply(*siter, *titer, cache.features);
+		  apply(*siter, *titer, fiter->second);
 		}
 		
-		features += cache.features;
+		features += fiter->second;
 	      }
       }
       
@@ -279,6 +272,7 @@ namespace cicada
       
       void clear()
       {
+	cache_features.clear();
       }
       
       void clear_cache()
@@ -436,6 +430,12 @@ namespace cicada
 					 feature_set_type& features,
 					 const bool final) const
     {}
+
+
+    void FrontierLexicon::initialize()
+    {
+      pimpl->clear();
+    }
     
   };
 };

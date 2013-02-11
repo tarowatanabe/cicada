@@ -75,6 +75,8 @@ namespace cicada
 				  const edge_type& edge,
 				  feature_set_type& features,
 				  const bool final) const;
+
+      virtual void initialize();
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new FrontierLexicon(*this)); }
       
