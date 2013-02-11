@@ -1,3 +1,10 @@
+=======
+lattice
+=======
+
+-------------------------------------
+A description for JSON lattice format
+-------------------------------------
 
 The native lattice format is JLF (JSON Lattice Format) newly introduced in cicada,
 but we can "read" PLF (Python Lattice Format) used in Moses (we do not support "writing").

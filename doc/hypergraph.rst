@@ -2,9 +2,9 @@
 hypergraph
 ==========
 
--------------------------------------------------------------------------
-hypergraph foramt description and tools to convert from/to the hypergraph
--------------------------------------------------------------------------
+------------------------------------------------------------------------------
+JSON hypergraph foramt description and tools to convert from/to the hypergraph
+------------------------------------------------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
 :Date:   2013-2-11
@@ -64,13 +64,14 @@ EDGE
   :: 
 
     {
-     "tail" : [node-id, node-id, ...], 
+     "tail" : [node-id, node-id, ...], (optional)
      "feature" : {"feature-name" : FLOAT, "feature-name2" : FLOAT, ... }, (optional)
      "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...}, (optional)
      "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
     }
 
-  The "tail" field is a list of node in a hypergraph.
+  The "tail" field is a list of node in a hypergraph. No tails implies
+  "source nodes."
   The "feature" field is a list of key-value pair, consisting of
   JSON string and FLOAT value.
   The "attribuete" field is a list of key-value pair, consisting of
@@ -88,6 +89,56 @@ ATTRIBUTE
   floating point value (double precision) or JSON string. Internally,
   it is implemented as `boost.variant <http://www.boost.org/doc/libs/release/libs/variant/>`_ which
   supports "enum" like storage in an efficient fashion.
+
+EXAMPLE
+-------
+
+::
+
+  {"rules": ["[PRP] ||| I",
+           "[NP] ||| [PRP]",
+           "[MD] ||| 'd",
+           "[VB] ||| like",
+	   "[TO] ||| to",
+	   "[VB] ||| have",
+	   "[DT] ||| a",
+	   "[NN] ||| glass",
+	   "[NP] ||| [DT] [NN]",
+	   "[IN] ||| of", 
+	   "[NN] ||| water", 
+	   "[NP] ||| [NN]", 
+	   "[PP] ||| [IN] [NP]", 
+	   "[NP] ||| [NP] [PP]", 
+	   "[VP] ||| [VB] [NP]", 
+	   "[VP] ||| [TO] [VP]", 
+	   "[S] ||| [VP]", 
+	   "[VP] ||| [VB] [S]",
+	   "[VP] ||| [MD] [VP]", 
+	   "[.] ||| .", 
+	   "[S] ||| [NP] [VP] [.]", 
+	   "[ROOT] ||| [S]"],
+    "nodes": [[{"rule":1}],
+           [{"tail":[0],"rule":2}],
+	   [{"rule":3}],
+	   [{"rule":4}], 
+	   [{"rule":5}], 
+	   [{"rule":6}], 
+	   [{"rule":7}], 
+	   [{"rule":8}],
+	   [{"tail":[6,7],"rule":9}], 
+	   [{"rule":10}],[{"rule":11}],
+	   [{"tail":[10],"rule":12}], 
+	   [{"tail":[9,11],"rule":13}],
+	   [{"tail":[8,12],"rule":14}], 
+	   [{"tail":[5,13],"rule":15}],
+ 	   [{"tail":[4,14],"rule":16}], 
+	   [{"tail":[15],"rule":17}],
+	   [{"tail":[3,16],"rule":18}], 
+	   [{"tail":[2,17],"rule":19}],
+	   [{"rule":20}], 
+	   [{"tail":[1,18,19],"rule":21}],
+	   [{"tail":[20],"rule":22}]],
+    "goal": 21}
 
 TOOLS
 -----
