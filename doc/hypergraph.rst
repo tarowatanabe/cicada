@@ -9,7 +9,7 @@ JSON hypergraph foramt description and tools to convert from/to the hypergraph
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
 :Date:   2013-2-11
 
-FORMAT
+Format
 ------
 
 The hypergraph, or forest in short, is represented by a `JSON data format <http://www.json.org>`_.
@@ -44,12 +44,20 @@ RULE
 
   ::
 
-    "LHS ||| RHS"
+    "NON-TERMINAL ||| (NON-TERMINAL | TERMINAL)+"
 
-  Each rule is a JSON string, thus some characters should be escaped, i.e. " to \\", \\ to \\\\ etc.
-  "LHS" is a left-hand-side of a rule. "RHS" is a list of symbols,
-  either terminals or non-terminals. Note that the "LHS" is used as a label for
-  each node.
+  Each rule is a JSON string, thus some characters employed in rhs and/or
+  lhs should be escaped, i.e. " to \\", \\ to \\\\ etc.
+  The lhs of a rule consists of a single non-terminal, whereby its rhs
+  consists of a sequence of NON-TERMINAL and TERMINAL.
+  Note that the lhs is also used as a label for each node.
+  NON-TERMINAL is represented by [.+], and TERMINAL can be any strings
+  which does not starts with '[' and does not end with ']'.
+  Also, we cannot use '|||' as a TERMINAL. Each NON-TERMINAL in the
+  rhs can embed an "index" separeted by comma, which is represented by
+  [.+,([0-9]+)]. The index is an indice to tail nodes (one-base). For
+  instance, [x,2] refers to the second position of a tail in a
+  hyperedge.
 
 NODE
 
@@ -90,7 +98,7 @@ ATTRIBUTE
   it is implemented as `boost.variant <http://www.boost.org/doc/libs/release/libs/variant/>`_ which
   supports "enum" like storage in an efficient fashion.
 
-EXAMPLE
+Example
 -------
 
 ::
@@ -140,7 +148,7 @@ EXAMPLE
 	   [{"tail":[20],"rule":22}]],
     "goal": 21}
 
-TOOLS
+Tools
 -----
 
 cicada_filter_penntreebank
