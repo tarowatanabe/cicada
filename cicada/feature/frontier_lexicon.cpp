@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <set>
@@ -15,10 +15,8 @@
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/alloc_vector.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/small_vector.hpp"
-#include "utils/compact_set.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/space_separator.hpp"
 
@@ -68,33 +66,7 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef symbol_type word_type;
-      typedef std::pair<word_type, word_type> word_pair_type;
-      
-      typedef utils::compact_set<word_type,
-				 utils::unassigned<word_type>, utils::unassigned<word_type>,
-				 boost::hash<word_type>, std::equal_to<word_type>,
-				 std::allocator<word_type> > word_unique_type;
-      
-      typedef std::vector<word_pair_type, std::allocator<word_pair_type> > word_pair_set_type;
-      
-      struct unassigned_key : utils::unassigned<word_type>
-      {
-	word_pair_type operator()() const 
-	{
-	  return word_pair_type(utils::unassigned<word_type>::operator()(),
-				utils::unassigned<word_type>::operator()());
-	}
-      };
-
-      typedef utils::compact_set<word_pair_type,
-				 unassigned_key, unassigned_key,
-				 utils::hashmurmur3<size_t>, std::equal_to<word_pair_type>,
-				 std::allocator<word_pair_type> > word_pair_unique_type;
-
-      typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
-      typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
-      typedef std::set<size_type, std::less<size_type>, std::allocator<size_type> > pos_set_type;
-      
+            
       struct CacheNormalize
       {
 	typedef utils::small_vector<word_type, std::allocator<word_type> > word_set_type;
