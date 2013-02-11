@@ -12,7 +12,7 @@ JSON hypergraph foramt description and tools to convert from/to the hypergraph
 Format
 ------
 
-The hypergraph, or forest in short, is represented by a `JSON data format <http://www.json.org>`_.
+The hypergraph, or forest in short, is represented by the `JSON data format <http://www.json.org>`_.
 Strings must be escaped (see JSON specification). You may insert spaces at arbitrary positions.
 One-line-per-single-hypergraph is prefered for easier preprocessing.
 We assume topologically sorted hypergraph (or, node-id is ordered by post-traversal order), but
@@ -166,3 +166,9 @@ ciada_filter_charniak
 
   A tool which transforms Charniak's parser forest output into a JSON
   hypergraph format.
+
+cicada_unite_forest
+
+  A tool to merge multiple hypergraphs into one. If the label of goal
+  nodes differ, then, we will introduce an additional goal node,
+  [goal].
