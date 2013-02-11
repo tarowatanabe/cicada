@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -267,6 +267,9 @@ int main(int argc, char ** argv)
 				  true,
 				  debug ? debug - 1 : debug);
     
+    if (mpi_rank == 0 && debug)
+      std::cerr << "operations: " << operations.size() << std::endl;
+
     // make sure to synchronize here... otherwise, badthink may happen...
     if (mpi_rank == 0 && ! operations.get_output_data().directory.empty())
       prepare_directory(operations.get_output_data().directory);

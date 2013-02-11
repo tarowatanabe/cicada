@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -174,6 +174,9 @@ int main(int argc, char ** argv)
 				  input_bitext_mode,
 				  true,
 				  debug);
+
+    if (mpi_rank == 0 && debug)
+      std::cerr << "operations: " << operations.size() << std::endl;
     
     // make sure to synchronize here... otherwise, badthink may happen...
     if (mpi_rank == 0 && ! operations.get_output_data().directory.empty())

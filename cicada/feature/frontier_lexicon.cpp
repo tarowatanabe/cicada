@@ -2,8 +2,6 @@
 //  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include <set>
-
 #include "frontier_lexicon.hpp"
 #include "feature_builder.hpp"
 

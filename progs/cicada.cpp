@@ -152,6 +152,8 @@ int main(int argc, char ** argv)
       model.push_back(feature_function_type::create(*piter));
     model.initialize();
 
+    if (debug)
+      std::cerr << "feature functions: " << model.size() << std::endl;
 
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
@@ -168,6 +170,9 @@ int main(int argc, char ** argv)
 				  input_bitext_mode,
 				  false,
 				  debug);
+
+    if (debug)
+      std::cerr << "operations: " << operations.size() << std::endl;
 
     if (! operations.get_output_data().directory.empty())
       prepare_directory(operations.get_output_data().directory);

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION_SET__HPP__
@@ -17,6 +17,9 @@ namespace cicada
   class OperationSet
   {
   public:
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    
     typedef Operation     operation_type;
     
     typedef operation_type::data_type        data_type;
@@ -103,6 +106,9 @@ namespace cicada
     const data_type& get_data() const { return data; }
 
     const statistics_type& get_statistics() const { return statistics; }
+
+    size_type size() const { return operations.size(); }
+    bool empty() const { return operations.empty(); }
 
     OperationSet clone() const
     {
