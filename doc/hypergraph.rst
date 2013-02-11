@@ -1,123 +1,109 @@
+==========
+hypergraph
+==========
 
-The hypergraph format is a-bit complicated, and most people will not want to
-edit by yourself (including me).
-A convenience tool exists, 
+-------------------------------------------------------------------------
+hypergraph foramt description and tools to convert from/to the hypergraph
+-------------------------------------------------------------------------
 
-cicada_filter_penntreebank and cicada_filter_dependency
+:Author: Taro Watanabe <taro.watanabe@nict.go.jp>
+:Date:   2013-2-11
 
-to convert from penn-treebank or dependency structures into hypergraph format.
+FORMAT
+------
 
-PennTreebank filter was tested on output from stanford parser, thus, may not work on raw treebank file.
-If you need support contact me.
-
-cicada_filter_penntreebank [options]
-options:
-  --input arg (=-)      input file
-  --output arg (=-)     output
-  --map arg             map terminal symbols
-  --escape              escape English penntreebank
-  --normalize           normalize category, such as [,] [.] etc.
-  --leaf                collect leaf nodes only
-  --rule                collect rules only
-  --span                collect span only
-  --binarize            perform binarization
-  --category            added category to span
-  --unary-top           use top-most category for unary rules
-  --unary-bottom        use bottom-most category for unary rules
-  --unary-root          use single category for root
-  --exclude-terminal    no terminal in span
-  --debug [=arg(=1)]    debug level
-  --help                help message
-
-For English treebanks, you may want to transform [,] or [.] into [COMMA] [PERIOD] respectively, otherwise
-you may encounter serious errors. (',' is a separator for index and category!)
-If your parser automatically modify tokens (like '(' => -LRB- etc.), you can use --map <file name>
-which will map the modified terminals into the original form, where "file name" is your original data
-used as an input to your parser.
-"--span" option will print spans each category covers. together with --category, you can dump span in
-first-last:category.
-
-For forest output, we can use Charniak parser exteded with forest output or 
-Egret parser, another parser variant supporting English/Chinese.
-
-cicada_filter_charniak [options]
-options:
-  --input arg (=-)      input file
-  --output arg (=-)     output
-  --map arg             map terminal symbols
-  --normalize           normalize category, such as [,] [.] etc.
-  --debug [=arg(=1)]    debug level
-  --help                help message
-
-Dependency outputs are transformed by cicada_filter_dependency with --hypergraph option.
-Head words are split into different hyperedge (--head) or incorporated into an existing edge (default).
-The input is either MST (--mst), CoNLL (--conll) or Cabocha (--cabocha), and by default w/o --hypergraph option, 
-the tool output dependency information in a single line:
-
-sentence ||| POSs ||| dependency
-
-where POSs is a sequence of either POS (by default) or dependency relation (--relation).
-The tool (will) supports projection of source-side dependency into target-side via word alignment (TODO!).
-
-cicada_filter_dependency [options]
-options:
-  --input arg (="-")        input file
-  --output arg (="-")       output file
-  --map arg                 map file
-  --goal arg (=[s])         goal symbol
-  --non-terminal arg (=[x]) non-terminal symbol
-  --mst                     tranform MST dependency
-  --conll                   tranform CoNLL dependency
-  --cabocha                 tranform Cabocha dependency
-  --khayashi                tranform KHayashi dependency
-  --khayashi-forest         tranform KHayashi Forest dependency
-  --projective              project into projective dependency
-  --relation                assing relation to POS
-  --unescape                unescape terminal symbols, such as -LRB-, \* etc.
-  --normalize               normalize category, such as [,] [.] etc.
-  --forest                  output as a forest
-  --head                    output hypergraph with explicit head
-  --help                    help message
-
-
-You can merge multiple hypergraphs in one by:
-cicada_unite_forest
-	This will simply merge by root...
-
-FORMAT of HYPEERGRAPH
-
-The hypergraph is represented by JSON data format (www.json.org)
+The hypergraph, or forest in short, is represented by a `JSON data format <http://www.json.org>`_.
 Strings must be escaped (see JSON specification). You may insert spaces at arbitrary positions.
 One-line-per-single-hypergraph is prefered for easier preprocessing.
 We assume topologically sorted hypergraph (or, node-id is ordered by post-traversal order), but
-input/output can handle any-ordered hypergraph.
+input/output can handle node ids in any orders.
 
 HYPERGRAPH
 
-{
- "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph. zero is reserved for no-rule (error?))
- "nodes" : [ NODE, NODE, ...],  (NODE positin (zero-based) is the node-id inside this hypergraph)
- "goal" : node-id-for-goal (usually pointing to the last-node. No goal implies an invalid graph)
-}
+  ::
 
-RULE (rules are double quoted, thus you should perform proper escaping, i.e. " to \", \ to \\ etc.)
+    {
+     "rules" : [ RULE, RULE, ... ], 
+     "nodes" : [ NODE, NODE, ...],  
+     "goal" : node-id-for-goal (optional)
+    }
 
-"lhs ||| rhs"
+  The "rules" field is a list of rules associated with each edges. Each
+  rule-id starts from one, and refered by its rule-id by each
+  hyperedge. zero is reserved for no-rule, or errornous hypergraph.
 
-NODE (contains list of edge)
+  The "nodes" field is a list of nodes and each node is refered by its
+  node id. The node-id starts from zero.
 
-[EDGE, EDGE, ...]
+  The "goal" field points to the final goal node id of the
+  hypergrpah. Unorder the topologically sorted order, the goal field
+  usually points to the last node in the node list.
+  No goal implies an invalid hypergraph.
+
+RULE
+
+  ::
+
+    "LHS ||| RHS"
+
+  Each rule is a JSON string, thus some characters should be escaped, i.e. " to \\", \\ to \\\\ etc.
+  "LHS" is a left-hand-side of a rule. "RHS" is a list of symbols,
+  either terminals or non-terminals. Note that the "LHS" is used as a label for
+  each node.
+
+NODE
+
+  ::
+
+    [EDGE, EDGE, ...]
+
+  Each node consists of a list of edge.
 
 EDGE
 
-{
- "tail" : [node-id, node-id, ...],  (if no tails, this entry is empty)
- "feature" : {"feature-name" : double, "feature-name2" : double, ... }, (if no features, this entry is empty)
- "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...}, (if no attributes, this entry is empty)
- "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
-}
+  :: 
+
+    {
+     "tail" : [node-id, node-id, ...], 
+     "feature" : {"feature-name" : FLOAT, "feature-name2" : FLOAT, ... }, (optional)
+     "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...}, (optional)
+     "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
+    }
+
+  The "tail" field is a list of node in a hypergraph.
+  The "feature" field is a list of key-value pair, consisting of
+  JSON string and FLOAT value.
+  The "attribuete" field is a list of key-value pair, consisting of
+  JSON string and ATTRIBUTE value. The ATTRIBUTE can take either 64bit
+  integer, floaring point value (double precision) or JSON string.
+  The "rule" field is a map to a rule id in the rule list.
 
 ATTRIBUTE
 
-float(double precision) | integer(64-bit) | " escaped string "
+  :: 
 
+    FLOAT(double precision) | INTEGER(64-bit) | JSON-string
+
+  As described in the EDGE, ATTRIBUTE can be either 64bit integer,
+  floating point value (double precision) or JSON string. Internally,
+  it is implemented as `boost.variant <http://www.boost.org/doc/libs/release/libs/variant/>`_ which
+  supports "enum" like storage in an efficient fashion.
+
+TOOLS
+-----
+
+cicada_filter_penntreebank
+
+  A tool which transform Penn Treebank style constituency parse
+  tree(s) into JSON hypergrpah format.
+
+cicada_filter_dependency
+
+  A tool which transforms dependency trees into a JSON hypergraph
+  format. Currently, we support: MST, CoNLL, Malt, Cabocha and cicada
+  native format.
+
+ciada_filter_charniak
+
+  A tool which transforms Charniak's parser forest output into a JSON
+  hypergraph format.
