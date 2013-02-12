@@ -36,6 +36,10 @@ AC_LANG_CPLUSPLUS
 
 AC_SYS_LARGEFILE
 
+# Check for binaries...
+AC_PATH_PROG(RST2MAN, rst2man.py, no)
+AM_CONDITIONAL(WITH_RST2MAN, test "$RST2MAN" != no)
+
 # Checks for libraries.
 
 AC_ARG_WITH(blas,
@@ -534,6 +538,7 @@ AC_CHECK_FUNCS([dup2 gethostname getpagesize gettimeofday memset munmap pow sele
 
 AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
+		 doc/Makefile
 		 eigen/Makefile
 		 codec/Makefile
 		 libstemmer_c/Makefile
