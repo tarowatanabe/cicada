@@ -36,14 +36,14 @@ namespace cicada
     {
       if (! data.hypergraph.is_valid()) return;
       
-      hypergraph_type& hypergraph = data.hypergraph;
-      
       if (debug)
 	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
+
+      cicada::verify(data.lattice);
       
-      cicada::verify(hypergraph);
+      cicada::verify(data.hypergraph);
       
       utils::resource end;
       
@@ -56,16 +56,16 @@ namespace cicada
       
       if (debug)
 	std::cerr << name << ": " << data.id
-		  << " # of nodes: " << hypergraph.nodes.size()
-		  << " # of edges: " << hypergraph.edges.size()
-		  << " valid? " << utils::lexical_cast<std::string>(hypergraph.is_valid())
+		  << " # of nodes: " << data.hypergraph.nodes.size()
+		  << " # of edges: " << data.hypergraph.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(data.hypergraph.is_valid())
 		  << std::endl;
 
       statistics_type::statistic_type& stat = data.statistics[name];
       
       ++ stat.count;
-      stat.node += hypergraph.nodes.size();
-      stat.edge += hypergraph.edges.size();
+      stat.node += data.hypergraph.nodes.size();
+      stat.edge += data.hypergraph.edges.size();
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
       stat.thread_time  += (end.thread_time() - start.thread_time());

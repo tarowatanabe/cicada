@@ -9,6 +9,7 @@
 #include <vector>
 #include <stdexcept>
 
+#include <cicada/lattice.hpp>
 #include <cicada/hypergraph.hpp>
 
 #include <utils/bithack.hpp>
@@ -21,7 +22,7 @@ namespace cicada
     typedef ptrdiff_t difference_type;
     
     typedef HyperGraph hypergraph_type;
-    typedef Vocab      vocab_type;
+    typedef Lattice    lattice_type;
     
     typedef hypergraph_type::rule_type    rule_type;
     
@@ -30,6 +31,21 @@ namespace cicada
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
     typedef std::vector<bool, std::allocator<bool> > visited_set_type;
+
+    void operator()(const lattice_type& lattice)
+    {
+      lattice_type::const_iterator liter_end = lattice.end();
+      for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+
+	if (liter->empty())
+	  throw std::runtime_error("no arcs in a node?");
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	  if (liter + aiter->distance > liter_end)
+	    throw std::runtime_error("invalid arc?");
+      }
+    }
     
     void operator()(const hypergraph_type& graph)
     {
@@ -120,6 +136,14 @@ namespace cicada
       }
     }
   };
+
+
+  inline
+  void verify(Lattice& lattice)
+  {
+    Verify __verify;
+    __verify(lattice);
+  }
 
   inline
   void verify(HyperGraph& graph)
