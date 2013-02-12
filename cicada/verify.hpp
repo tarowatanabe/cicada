@@ -29,6 +29,7 @@ namespace cicada
     typedef rule_type::symbol_set_type symbol_set_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
+    typedef std::vector<bool, std::allocator<bool> > visited_set_type;
     
     void operator()(const hypergraph_type& graph)
     {
@@ -36,7 +37,8 @@ namespace cicada
       if (! graph.is_valid())
 	throw std::runtime_error("invalid hypergraph: no goal?");
 
-      label_set_type labels(graph.nodes.size());
+      label_set_type   labels(graph.nodes.size());
+      visited_set_type visited(graph.edges.size(), false);
 
       // verify nodes...
       size_type node_pos = 0;
@@ -56,6 +58,11 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  if (*eiter >= graph.edges.size())
 	    throw std::runtime_error("invalid hyperedge id");
+
+	  if (visited[*eiter])
+	    throw std::runtime_error("multiple instances of hyperedge?");
+	  
+	  visited[*eiter] = true;
 	  
 	  if (graph.edges[*eiter].head != node_pos)
 	    throw std::runtime_error("invalid head in a hyperedge?");
@@ -83,6 +90,9 @@ namespace cicada
 	
 	if (! edge.rule)
 	  throw std::runtime_error("no rules associated with a hyperedge?");
+
+	if (! visited[edge_pos])
+	  throw std::runtime_error("isolated hyperedge?");
 	
 	// verify tails...
 	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
