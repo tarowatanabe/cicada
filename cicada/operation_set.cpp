@@ -44,6 +44,7 @@
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
 #include "operation/output.hpp"
+#include "operation/verify.hpp"
 #include "operation/viterbi.hpp"
 
 #include "utils/resource.hpp"
@@ -269,6 +270,7 @@ remove-unary: remove unary rules from forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 sort-topologically: topologically sort\n\
 span-forest: annotate terminal span\n\
+verify: verify hypergrpah\n\
 viterbi: compute viterbi tree\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
@@ -369,6 +371,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::Posterior(*piter, debug)));
       else if (param_name == "prune")
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
+      else if (param_name == "verify")
+	operations.push_back(operation_ptr_type(new operation::Verify(*piter, debug)));
       else if (param_name == "viterbi")
 	operations.push_back(operation_ptr_type(new operation::Viterbi(*piter, debug)));
       else if (param_name == "span-forest")

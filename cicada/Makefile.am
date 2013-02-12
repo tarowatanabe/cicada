@@ -369,6 +369,7 @@ operation/sort_tail.hpp \
 operation/sort_topologically.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
+operation/verify.hpp \
 operation/viterbi.hpp
 
 libcicada_operation_la_SOURCES = \
@@ -400,6 +401,7 @@ operation/remove_unary.cpp \
 operation/sort_tail.cpp \
 operation/sort_topologically.cpp \
 operation/span_forest.cpp \
+operation/verify.cpp \
 operation/viterbi.cpp
 libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)
 
@@ -548,6 +550,7 @@ tree_rule_codec.hpp \
 tree_rule_compact.hpp \
 tree_transducer.hpp \
 unite.hpp \
+verify.hpp \
 viterbi.hpp \
 vocab.hpp \
 weight_vector.hpp
