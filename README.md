@@ -1,7 +1,9 @@
 cicada
+======
 
 A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
+
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree),
      word alignment, grammar for parsing
    - translate sentence, lattice and/or parsed tree
@@ -15,12 +17,14 @@ Based on the generic framework, we can
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
 
 Basically, we have four distinct structures:
+
    - lattice: a representation of graph implemented as a two-dimentional array.
    - grammar: a collection of WFST implemented as a trie structure.
    - tree-grammar: a collectin of WFSTT (tree-transducer) implemented as a (nested) trie structure.
    - hypergraph: a compact representation of set of trees (or forest).
 
 Translation/parsing can be carried out by:
+
    - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2,24].
    - A lattice (or sentence) is composed with a tree-grammar, generating a hypergraph [27].
    - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
@@ -28,6 +32,7 @@ Translation/parsing can be carried out by:
    - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4].
 
 Alignment can be carried out by:
+
    - A lattice is composed with dictionary, generating alignment hypergraph, or
    - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
      
@@ -39,6 +44,7 @@ Alignment can be carried out by:
      Also, lexicon model can be discriminatively trained [28].
 
 Dependency parsing can be carried out by:
+
    - A lattice is dependency parsed by compose-dependency-{arc-standard, arc-eager, hybrid, degree2}, generating
      derivation hypergraph
    - Forests are rescored by dependency features (TODO)
@@ -47,6 +53,7 @@ Dependency parsing can be carried out by:
      dependency parses after projections.
 
 After the hypergraph generation, you can:
+
    - Additional features are evaluated to generate another hypergraph [4].
       * cicada implementes cube-pruning [4], cube-growing [4], incremental [18]
         and exact (and stateless-inside-algorithm) methods
@@ -59,6 +66,7 @@ After the hypergraph generation, you can:
    - Generate oracle translations (BLEU only).
 
 Or, you can combine outputs from multiple systems by [29]:
+
    - Perform parsing over nbests (use your favorite parser, such as Berkeley parser/Stanford parser etc.)
    - Generate context-free confusion forest by combining trees (not confusion network!)
       * It is performed by collecting rules from parse trees, and generate by Earley algorithm
@@ -70,11 +78,13 @@ Or, you can combine outputs from multiple systems by [29]:
    - Generate k-best translations after feature application etc.
 
 Monolingual grammar learning is implemented:
+
    - A simple PCFG by simply extracting rules.
    - Learn latent annotated PCFG by split/merge process with an EM algorihtm [25].
    - Also, learn coarse grammars from the latent annotated PCFG for coarse-to-fine parsing [26].
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
+
    - A conventional phrase extract algorithm in Moses
    - A conventional hierarchical phrase extraction algorithm in Hiero
       + syntax augmented rule extraction is also supported [15]
@@ -85,6 +95,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
    - After count extraction, you can perform map/reduce to compute model scores [19]
 
 Various learning components are implemented:
+
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
    - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear [30]
    - Large feature set on small devset with MIRA [6,7], but with hypergraph
@@ -101,7 +112,8 @@ Various learning components are implemented:
 
 Word clustering tool is also included to support word alignment learning + translation [20]
 
-References:
+References
+----------
 
 [1]
 @InProceedings{li-eisner:2009:EMNLP,
