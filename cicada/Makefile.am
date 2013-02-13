@@ -141,6 +141,7 @@ feature/distortion.hpp \
 feature/feature_builder.hpp \
 feature/frontier_lexicon.hpp \
 feature/frontier_pair.hpp \
+feature/frontier_shape.hpp \
 feature/global_lexicon.hpp \
 feature/insertion.hpp \
 feature/lexicalized_reordering.hpp \
@@ -175,6 +176,7 @@ feature/depeval.cpp \
 feature/deletion.cpp \
 feature/frontier_lexicon.cpp \
 feature/frontier_pair.cpp \
+feature/frontier_shape.cpp \
 feature/global_lexicon.cpp \
 feature/insertion.cpp \
 feature/lexicalized_reordering.cpp \

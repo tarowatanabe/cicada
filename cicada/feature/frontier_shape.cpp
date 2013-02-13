@@ -2,7 +2,7 @@
 //  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include "frontier_pair.hpp"
+#include "frontier_shape.hpp"
 #include "feature_builder.hpp"
 
 #include "cicada/parameter.hpp"
@@ -27,7 +27,7 @@ namespace cicada
   {
 
 
-    class FrontierPairImpl : public utils::hashmurmur3<size_t>
+    class FrontierShapeImpl : public utils::hashmurmur3<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -37,8 +37,7 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Lattice       lattice_type;
       typedef cicada::HyperGraph    hypergraph_type;
-
-
+      
       typedef utils::hashmurmur3<size_t> hasher_type;
 
       typedef cicada::FeatureFunction feature_function_type;
@@ -82,12 +81,11 @@ namespace cicada
 
       typedef utils::unordered_map<phrase_pair_type, feature_type, phrase_pair_hash, std::equal_to<phrase_pair_type>,
 				   std::allocator<std::pair<const phrase_pair_type, feature_type> > >::type cache_feature_set_type;
-      
-      
+
       typedef FeatureBuilder feature_builder_type;
 
-      FrontierPairImpl()
-	: skip_sgml_tag(false), prefix("frontier-pair"), forced_feature(false),
+      FrontierShapeImpl()
+	: skip_sgml_tag(false), prefix("frontier-shape"), forced_feature(false),
 	  attr_frontier_source("frontier-source"),
 	  attr_frontier_target("frontier-target")
       { }
@@ -108,13 +106,13 @@ namespace cicada
 	}
       };
       
-      void pair_score(const edge_type& edge,
-		      feature_set_type& features)
+      void shape_score(const edge_type& edge,
+		       feature_set_type& features)
       {
 	if (skip_sgml_tag)
-	  pair_score(edge, features, skipper_sgml());
+	  shape_score(edge, features, skipper_sgml());
 	else
-	  pair_score(edge, features, skipper_epsilon());
+	  shape_score(edge, features, skipper_epsilon());
       }
       
       struct __attribute_string : public boost::static_visitor<cicada::AttributeVector::string_type>
@@ -134,9 +132,9 @@ namespace cicada
       };
       
       template <typename Skipper>
-      void pair_score(const edge_type& edge,
-		      feature_set_type& features,
-		      Skipper skipper)
+      void shape_score(const edge_type& edge,
+		       feature_set_type& features,
+		       Skipper skipper)
       {
 	attribute_set_type::const_iterator siter = edge.attributes.find(attr_frontier_source);
 	attribute_set_type::const_iterator titer = edge.attributes.find(attr_frontier_target);
@@ -147,7 +145,7 @@ namespace cicada
 	const std::string& frontier_target = boost::apply_visitor(__attribute_string(), titer->second);
 	
 	if (frontier_source.empty() || frontier_target.empty()) return;
-	
+
 	cache_feature_set_type::iterator fiter = cache_features.find(phrase_pair_type(frontier_source, frontier_target));
 	
 	if (fiter != cache_features.end()) {
@@ -184,14 +182,25 @@ namespace cicada
 	  
 	  feature_builder.clear();
 	  bool initial = true;
+	  int non_terminal_pos = 1;
 	  
 	  tokenizer_type::iterator titer_end = tokenizer.end();
 	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	    const symbol_type word = *titer;
-	    if (! skipper(word)) {
+	    
+	    if (word.is_non_terminal()) {
+	      const int __non_terminal_index = word.non_terminal_index();
+	      const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index);
+	      ++ non_terminal_pos;
+	      
 	      if (! initial)
 		feature_builder << "_";
-	      feature_builder << word;
+	      feature_builder << non_terminal_index;
+	      initial = false;
+	    } else if (! skipper(word)) {
+	      if (! initial)
+		feature_builder << "_";
+	      feature_builder << "0";
 	      initial = false;
 	    }
 	  }
@@ -231,7 +240,7 @@ namespace cicada
       attribute_type attr_frontier_target;
     };
     
-    FrontierPair::FrontierPair(const std::string& parameter)
+    FrontierShape::FrontierShape(const std::string& parameter)
       : pimpl(0)
     {
       typedef cicada::Parameter parameter_type;
@@ -239,8 +248,8 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (utils::ipiece(param.name()) != "frontier-pair")
-	throw std::runtime_error("this is not frontier pair feature: " + parameter);
+      if (utils::ipiece(param.name()) != "frontier-shape")
+	throw std::runtime_error("this is not frontier shape feature: " + parameter);
 
       bool skip_sgml_tag = false;
       
@@ -252,31 +261,31 @@ namespace cicada
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
-	  std::cerr << "WARNING: unsupported parameter for frontier pair: " << piter->first << "=" << piter->second << std::endl;
+	  std::cerr << "WARNING: unsupported parameter for frontier shape: " << piter->first << "=" << piter->second << std::endl;
       }
             
-      std::auto_ptr<impl_type> pair_impl(new impl_type());
+      std::auto_ptr<impl_type> shape_impl(new impl_type());
 
-      pair_impl->skip_sgml_tag = skip_sgml_tag;
-      pair_impl->prefix = (name.empty() ? std::string("frontier-pair") : name);
+      shape_impl->skip_sgml_tag = skip_sgml_tag;
+      shape_impl->prefix = (name.empty() ? std::string("frontier-shape") : name);
 
       base_type::__state_size = 0;
-      base_type::__feature_name = (name.empty() ? std::string("frontier-pair") : name);
+      base_type::__feature_name = (name.empty() ? std::string("frontier-shape") : name);
       base_type::__sparse_feature = true;
       
-      pimpl = pair_impl.release();
+      pimpl = shape_impl.release();
     }
     
-    FrontierPair::~FrontierPair() { std::auto_ptr<impl_type> tmp(pimpl); }
+    FrontierShape::~FrontierShape() { std::auto_ptr<impl_type> tmp(pimpl); }
     
-    FrontierPair::FrontierPair(const FrontierPair& x)
+    FrontierShape::FrontierShape(const FrontierShape& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
     {
       pimpl->clear_cache();
     }
 
-    FrontierPair& FrontierPair::operator=(const FrontierPair& x)
+    FrontierShape& FrontierShape::operator=(const FrontierShape& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
@@ -286,31 +295,22 @@ namespace cicada
       return *this;
     }
     
-    void FrontierPair::apply(state_ptr_type& state,
-			     const state_ptr_set_type& states,
-			     const edge_type& edge,
-			     feature_set_type& features,
-			     const bool final) const
+    void FrontierShape::apply(state_ptr_type& state,
+			      const state_ptr_set_type& states,
+			      const edge_type& edge,
+			      feature_set_type& features,
+			      const bool final) const
     {
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
       feature_set_type feats;
       
-      pimpl->pair_score(edge, feats);
+      pimpl->shape_score(edge, feats);
 
       features.update(feats, static_cast<const std::string&>(base_type::feature_name()));
     }
 
-    void FrontierPair::apply_coarse(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features,
-				    const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-    
-    void FrontierPair::apply_predict(state_ptr_type& state,
+    void FrontierShape::apply_coarse(state_ptr_type& state,
 				     const state_ptr_set_type& states,
 				     const edge_type& edge,
 				     feature_set_type& features,
@@ -318,24 +318,33 @@ namespace cicada
     {
       apply(state, states, edge, features, final);
     }
-
     
-    void FrontierPair::apply_scan(state_ptr_type& state,
-				  const state_ptr_set_type& states,
-				  const edge_type& edge,
-				  const int dot,
-				  feature_set_type& features,
-				  const bool final) const
-    {}
-    void FrontierPair::apply_complete(state_ptr_type& state,
+    void FrontierShape::apply_predict(state_ptr_type& state,
 				      const state_ptr_set_type& states,
 				      const edge_type& edge,
 				      feature_set_type& features,
 				      const bool final) const
+    {
+      apply(state, states, edge, features, final);
+    }
+
+    
+    void FrontierShape::apply_scan(state_ptr_type& state,
+				   const state_ptr_set_type& states,
+				   const edge_type& edge,
+				   const int dot,
+				   feature_set_type& features,
+				   const bool final) const
+    {}
+    void FrontierShape::apply_complete(state_ptr_type& state,
+				       const state_ptr_set_type& states,
+				       const edge_type& edge,
+				       feature_set_type& features,
+				       const bool final) const
     {}
 
 
-    void FrontierPair::initialize()
+    void FrontierShape::initialize()
     {
       pimpl->clear();
     }
