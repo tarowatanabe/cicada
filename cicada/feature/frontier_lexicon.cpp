@@ -157,8 +157,8 @@ namespace cicada
 	
 	if (frontier_source.empty() || frontier_target.empty()) return;
 	
-	const phrase_type& phrase_source = phrase(frontier_source, cache_phrase_source);
-	const phrase_type& phrase_target = phrase(frontier_target, cache_phrase_target);
+	const phrase_type& phrase_source = phrase(frontier_source, cache_phrase_source, skipper);
+	const phrase_type& phrase_target = phrase(frontier_target, cache_phrase_target, skipper);
 	
 	if (phrase_source.empty() || phrase_target.empty()) return;
 
@@ -166,21 +166,19 @@ namespace cicada
 	phrase_type::const_iterator siter_end   = phrase_source.end();
 	phrase_type::const_iterator titer_begin = phrase_target.begin();
 	phrase_type::const_iterator titer_end   = phrase_target.end();
-		
+	
 	for (phrase_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	  if (! skipper(*siter))
-	    for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
-	      if (! skipper(*titer)) {
-		
-		cache_feature_set_type::iterator fiter = cache_features.find(word_pair_type(*siter, *titer));
-		if (fiter == cache_features.end()) {
-		  fiter = cache_features.insert(std::make_pair(word_pair_type(*siter, *titer), feature_linear_set_type())).first;
-		  
-		  apply(*siter, *titer, fiter->second);
-		}
-		
-		features += fiter->second;
-	      }
+	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    
+	    cache_feature_set_type::iterator fiter = cache_features.find(word_pair_type(*siter, *titer));
+	    if (fiter == cache_features.end()) {
+	      fiter = cache_features.insert(std::make_pair(word_pair_type(*siter, *titer), feature_linear_set_type())).first;
+	      
+	      apply(*siter, *titer, fiter->second);
+	    }
+	    
+	    features += fiter->second;
+	  }
       }
       
       template <typename Features>
@@ -234,8 +232,10 @@ namespace cicada
 	}
       }
 
+      template <typename Skipper>
       const phrase_type& phrase(const std::string& frontier,
-				cache_phrase_set_type& caches)
+				cache_phrase_set_type& caches,
+				Skipper skipper)
       {
 	cache_phrase_type& cache = caches[hasher_type::operator()(frontier.begin(), frontier.end(), 0) & (caches.size() - 1)];
 	
@@ -244,8 +244,16 @@ namespace cicada
 	  
 	  utils::piece frontier_piece(frontier);
 	  tokenizer_type tokenizer(frontier_piece);
-	  cache.phrase.assign(tokenizer.begin(), tokenizer.end());
+
 	  cache.frontier = frontier;
+	  cache.phrase.clear();
+	  
+	  tokenizer_type::iterator titer_end = tokenizer.end();
+	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+	    const symbol_type word = *titer;
+	    if (! skipper(word))
+	      cache.phrase.push_back(word);
+	  }
 	}
 	
 	return cache.phrase;

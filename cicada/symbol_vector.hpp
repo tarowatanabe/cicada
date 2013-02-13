@@ -50,32 +50,19 @@ namespace cicada
     SymbolVector(Iterator first, Iterator last) : __impl(first, last) {}
 
   public:
-    void clear()
-    {
-      __impl.clear();
-    }
-
-    void resize(size_type x)
-    {
-      __impl.resize(x);
-    }
-
-    void assign(const SymbolVector& x)
-    {
-      __impl = x.__impl;
-    }
+    void clear() { __impl.clear(); }
     
-    void assign(size_type size, const symbol_type& word)
-    {
-      __impl.assign(size, word);
-    }
+    void resize(size_type x) { __impl.resize(x); }
+    
+    void push_back(const symbol_type& x) { __impl.push_back(x); }
+    
+    void assign(const SymbolVector& x) { __impl = x.__impl; }
+    
+    void assign(size_type size, const symbol_type& word) { __impl.assign(size, word); }
     
     template <typename Iterator>
-    void assign(Iterator first, Iterator last)
-    {
-      __impl.assign(first, last);
-    }
-
+    void assign(Iterator first, Iterator last) { __impl.assign(first, last); }
+    
     void swap(SymbolVector& x) { __impl.swap(x.__impl); }
     
   public:

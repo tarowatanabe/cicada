@@ -18,6 +18,7 @@
 #include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
 #include "feature/frontier_lexicon.hpp"
+#include "feature/frontier_pair.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/insertion.hpp"
 #include "feature/lexicalized_reordering.hpp"
@@ -102,6 +103,9 @@ frontier-lexicon: sparse lexicon feature from frontiers\n\
 \tstemmer-target=[stemmer spec] stemming for target side\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-lexicon)\n\
+frontier-pair: sparse frontier pair features\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-pair)\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
 insertion: insertion feature\n\
@@ -270,6 +274,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Depeval(parameter));
     else if (param_name == "frontier-lexicon")
       return feature_function_ptr_type(new feature::FrontierLexicon(parameter));
+    else if (param_name == "frontier-pair")
+      return feature_function_ptr_type(new feature::FrontierPair(parameter));
     else if (param_name == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
     else if (param_name == "insertion")
