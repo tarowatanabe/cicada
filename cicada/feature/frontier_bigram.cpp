@@ -9,7 +9,6 @@
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
-#include "cicada/feature_vector_linear.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/chunk_vector.hpp"
@@ -50,8 +49,6 @@ namespace cicada
 
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
-
-      typedef FeatureVectorLinear<feature_set_type::mapped_type> feature_linear_set_type;
 
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
@@ -403,9 +400,9 @@ namespace cicada
 
       if (! source_mode && ! target_mode)
 	source_mode = true;
-            
+      
       std::auto_ptr<impl_type> bigram_impl(new impl_type());
-
+      
       bigram_impl->skip_sgml_tag = skip_sgml_tag;
       bigram_impl->prefix = (name.empty() ? std::string("frontier-bigram") : name);
       bigram_impl->source_mode = source_mode;
