@@ -150,7 +150,7 @@ namespace cicada
 	
 	cache_feature_set_type::iterator fiter = cache_features.find(phrase_pair_type(frontier_source, frontier_target));
 	
-	if (fiter != cache_features.end()) {
+	if (fiter == cache_features.end()) {
 	  fiter = cache_features.insert(std::make_pair(phrase_pair_type(frontier_source, frontier_target), feature_type())).first;
 	  
 	  const std::string& phrase_source = phrase(frontier_source, cache_phrase_source, skipper);

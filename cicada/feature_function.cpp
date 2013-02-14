@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "feature_function.hpp"
@@ -17,6 +17,7 @@
 #include "feature/depeval.hpp"
 #include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
+#include "feature/frontier_bigram.hpp"
 #include "feature/frontier_lexicon.hpp"
 #include "feature/frontier_pair.hpp"
 #include "feature/frontier_shape.hpp"
@@ -97,6 +98,9 @@ depeval: dependency evaluation feature\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
 distortion: phrase-based distortion\n\
+frontier-bigram: sparse frontier source side bigram\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-bigram)\n\
 frontier-lexicon: sparse lexicon feature from frontiers\n\
 \tcluster-source=[word class file] word-class for source side\n\
 \tcluster-target=[word class file] word-class for target side\n\
@@ -276,6 +280,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Dependency(parameter));
     else if (param_name == "depeval")
       return feature_function_ptr_type(new feature::Depeval(parameter));
+    else if (param_name == "frontier-bigram")
+      return feature_function_ptr_type(new feature::FrontierBigram(parameter));
     else if (param_name == "frontier-lexicon")
       return feature_function_ptr_type(new feature::FrontierLexicon(parameter));
     else if (param_name == "frontier-pair")

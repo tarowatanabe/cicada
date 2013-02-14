@@ -148,7 +148,7 @@ namespace cicada
 
 	cache_feature_set_type::iterator fiter = cache_features.find(phrase_pair_type(frontier_source, frontier_target));
 	
-	if (fiter != cache_features.end()) {
+	if (fiter == cache_features.end()) {
 	  fiter = cache_features.insert(std::make_pair(phrase_pair_type(frontier_source, frontier_target), feature_type())).first;
 	  
 	  const std::string& phrase_source = phrase(frontier_source, cache_phrase_source, skipper);
@@ -182,6 +182,7 @@ namespace cicada
 	  
 	  feature_builder.clear();
 	  bool initial = true;
+	  bool terminal_prev = false;
 	  int non_terminal_pos = 1;
 	  
 	  tokenizer_type::iterator titer_end = tokenizer.end();
@@ -196,11 +197,16 @@ namespace cicada
 	      if (! initial)
 		feature_builder << "_";
 	      feature_builder << non_terminal_index;
+	      terminal_prev = false;
 	      initial = false;
 	    } else if (! skipper(word)) {
-	      if (! initial)
-		feature_builder << "_";
-	      feature_builder << "0";
+
+	      if (! terminal_prev) {
+		if (! initial)
+		  feature_builder << "_";
+		feature_builder << "0";
+	      }
+	      terminal_prev = true;
 	      initial = false;
 	    }
 	  }
