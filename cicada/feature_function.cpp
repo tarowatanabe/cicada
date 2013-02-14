@@ -99,6 +99,8 @@ depeval: dependency evaluation feature\n\
 \ttokenizer=[tokenizer spec]\n\
 distortion: phrase-based distortion\n\
 frontier-bigram: sparse frontier source side bigram\n\
+\tsource=[true|false] source side bigram (this is a default)\n\
+\ttarget=[true|false] target side bigram (you can specify both)\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-bigram)\n\
 frontier-lexicon: sparse lexicon feature from frontiers\n\

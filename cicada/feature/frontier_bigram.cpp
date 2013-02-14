@@ -168,106 +168,170 @@ namespace cicada
 
 	static const frontier_map_type::index_type root = frontier_map_type::index_type(-1);
 	
-	frontier_map_type::index_type node(root);
+	frontier_map_type::index_type node_source(root);
+	frontier_map_type::index_type node_target(root);
 	
 	if (! frontier_source.empty() && ! frontier_target.empty()) {
-	  frontier_map_type::iterator iter = const_cast<frontier_map_type&>(frontier_map).insert(frontier_source).first;
-	  node = iter - frontier_map.begin();
-	  
-	  if (frontier_string.size() <= node)
-	    frontier_string.resize(node + 1);
-	  
-	  if (frontier_string[node].empty()) {
-	    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-	    
-	    utils::piece frontier_piece(frontier_source);
-	    tokenizer_type tokenizer(frontier_piece);
-
-	    feature_builder.clear();
-	    bool initial = true;
-	    
-	    tokenizer_type::iterator titer_end = tokenizer.end();
-	    for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-	      const symbol_type word = *titer;
-	      
-	      if (! skipper(word)) {
-		if (! initial)
-		  feature_builder << "_";
-		feature_builder << word;
-		initial = false;
-	      }
-	    }
-	    
-	    frontier_string[node] = feature_builder;
-	  }
+	  if (source_mode)
+	    node_source = frontier_node(frontier_source, frontier_map_source, frontier_string_source, skipper);
+	  if (target_mode)
+	    node_target = frontier_node(frontier_target, frontier_map_target, frontier_string_target, skipper);
 	}
 	
-	if (node != root) {
-	  if (! states.empty()) {
-	    state_ptr_set_type::const_iterator siter_end = states.end();
-	    for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
-	      const node_set_type& antecedents = node_map[*reinterpret_cast<const id_type*>(*siter)];
-	      
-	      // we use the pair of node and antecedents as a feature!
-	      
-	      node_set_type::const_iterator aiter_end = antecedents.end();
-	      for (node_set_type::const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter) {
-
-		cache_feature_set_type::iterator fiter = cache_features.find(node_pair_type(node, *aiter));
-		if (fiter == cache_features.end()) {
-		  fiter = cache_features.insert(std::make_pair(node_pair_type(node, *aiter), feature_type())).first;
-		  
-		  feature_builder.clear();
-		  feature_builder << prefix << ":" << frontier_string[node] << "|" << frontier_string[*aiter];
-		  
-		  if (forced_feature || feature_builder.exists())
-		    fiter->second = feature_builder;
-		}
-		
-		if (! fiter->second.empty())
-		  features[fiter->second] += 1.0;
-	      }
-	    }
+	if (states.empty()) {
+	  int pos = 0;
+	  
+	  if (source_mode) {
+	    node_map_type::iterator niter = node_map_source.insert(node_set_type(node_source != root, node_source)).first;
+	    reinterpret_cast<id_type*>(state)[pos] = niter - node_map_source.begin();
+	    
+	    ++ pos;
 	  }
 	  
-	  // new state...
-	  node_map_type::iterator niter = const_cast<node_map_type&>(node_map).insert(node_set_type(1, node)).first;
-	  *reinterpret_cast<id_type*>(state) = niter - node_map.begin();
+	  if (target_mode) {
+	    node_map_type::iterator niter = node_map_target.insert(node_set_type(node_target != root, node_target)).first;
+	    reinterpret_cast<id_type*>(state)[pos] = niter - node_map_target.begin();
+	  }
 	} else {
-	  if (states.empty()) {
-	    // no states from antecedents
-	    
-	    node_map_type::iterator niter = const_cast<node_map_type&>(node_map).insert(node_set_type()).first;
-	    *reinterpret_cast<id_type*>(state) = niter - node_map.begin();
-	  } else {
-	    // simply copy from states into state...
-	    
-	    node_set_type nodes;
-	    
-	    state_ptr_set_type::const_iterator siter_end = states.end();
-	    for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
-	      const node_set_type& antecedents = node_map[*reinterpret_cast<const id_type*>(*siter)];
+	  int pos = 0;
+	  
+	  if (source_mode) {
+	    if (node_source == root) {
+	      node_set_type nodes;
 	      
-	      if (! antecedents.empty())
+	      state_ptr_set_type::const_iterator siter_end = states.end();
+	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		const node_set_type& antecedents = node_map_source[reinterpret_cast<const id_type*>(*siter)[pos]];
+		
 		nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+	      }
+	      
+	      std::sort(nodes.begin(), nodes.end());
+	      
+	      node_map_type::iterator niter = node_map_source.insert(nodes).first;
+	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_source.begin();
+	    } else {
+	      state_ptr_set_type::const_iterator siter_end = states.end();
+	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		const node_set_type& antecedents = node_map_source[reinterpret_cast<const id_type*>(*siter)[pos]];
+		
+		node_set_type::const_iterator aiter_end = antecedents.end();
+		for (node_set_type::const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
+		  frontier_feature("source", node_source, *aiter, frontier_string_source, cache_features_source, features);
+	      }
+	      
+	      node_map_type::iterator niter = node_map_source.insert(node_set_type(1, node_source)).first;
+	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_source.begin();
 	    }
 	    
-	    std::sort(nodes.begin(), nodes.end());
-	    
-	    node_map_type::iterator niter = const_cast<node_map_type&>(node_map).insert(nodes).first;
-	    *reinterpret_cast<id_type*>(state) = niter - node_map.begin();
+	    ++ pos;
+	  }
+	  
+	  if (target_mode) {
+	    if (node_target == root) {
+	      node_set_type nodes;
+	      
+	      state_ptr_set_type::const_iterator siter_end = states.end();
+	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		const node_set_type& antecedents = node_map_target[reinterpret_cast<const id_type*>(*siter)[pos]];
+		
+		nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+	      }
+	      
+	      std::sort(nodes.begin(), nodes.end());
+	      
+	      node_map_type::iterator niter = node_map_target.insert(nodes).first;
+	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_target.begin();
+	    } else {
+	      state_ptr_set_type::const_iterator siter_end = states.end();
+	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		const node_set_type& antecedents = node_map_target[reinterpret_cast<const id_type*>(*siter)[pos]];
+		
+		node_set_type::const_iterator aiter_end = antecedents.end();
+		for (node_set_type::const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
+		  frontier_feature("target", node_target, *aiter, frontier_string_target, cache_features_target, features);
+	      }
+	      
+	      node_map_type::iterator niter = node_map_target.insert(node_set_type(1, node_target)).first;
+	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_target.begin();
+	    }
 	  }
 	}
       }
+      
+      void frontier_feature(const char* tag,
+			    const frontier_map_type::index_type node,
+			    const frontier_map_type::index_type antecedent,
+			    const frontier_string_type& frontier_string,
+			    cache_feature_set_type& cache_features,
+			    feature_set_type& features)
+      {
+	cache_feature_set_type::iterator fiter = cache_features.find(node_pair_type(node, antecedent));
+	if (fiter == cache_features.end()) {
+	  fiter = cache_features.insert(std::make_pair(node_pair_type(node, antecedent), feature_type())).first;
+	  
+	  feature_builder.clear();
+	  feature_builder << prefix << ":" << tag << ":" << frontier_string[node] << "|" << frontier_string[antecedent];
+	  
+	  if (forced_feature || feature_builder.exists())
+	    fiter->second = feature_builder;
+	}
 	
-            
+	if (! fiter->second.empty())
+	  features[fiter->second] += 1.0;
+      }
+      
+      template <typename Skipper>
+      frontier_map_type::index_type frontier_node(const std::string& frontier,
+						  frontier_map_type& frontier_map,
+						  frontier_string_type& frontier_string,
+						  Skipper skipper)
+      {
+	frontier_map_type::iterator   iter = frontier_map.insert(frontier).first;
+	frontier_map_type::index_type node = iter - frontier_map.begin();
+	
+	if (frontier_string.size() <= node)
+	  frontier_string.resize(node + 1);
+	
+	if (frontier_string[node].empty()) {
+	  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+	  
+	  utils::piece frontier_piece(frontier);
+	  tokenizer_type tokenizer(frontier_piece);
+	  
+	  feature_builder.clear();
+	  bool initial = true;
+	  
+	  tokenizer_type::iterator titer_end = tokenizer.end();
+	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+	    const symbol_type word = *titer;
+	    
+	    if (! skipper(word)) {
+	      if (! initial)
+		feature_builder << "_";
+	      feature_builder << word;
+	      initial = false;
+	    }
+	  }
+	  
+	  frontier_string[node] = feature_builder;
+	}
+
+	return node;
+      }
+      
+      
+      
       void clear()
       {
-	cache_features.clear();
-	
-	frontier_map.clear();
-	frontier_string.clear();
-	node_map.clear();
+	frontier_map_source.clear();
+	frontier_map_target.clear();
+	frontier_string_source.clear();
+	frontier_string_target.clear();
+	node_map_source.clear();
+	node_map_target.clear();
+	cache_features_source.clear();
+	cache_features_target.clear();
       }
       
       void clear_cache()
@@ -275,11 +339,15 @@ namespace cicada
 	clear();
       }
 
-      frontier_map_type    frontier_map;
-      frontier_string_type frontier_string;
-      node_map_type        node_map;
-
-      cache_feature_set_type cache_features;
+      frontier_map_type    frontier_map_source;
+      frontier_map_type    frontier_map_target;
+      frontier_string_type frontier_string_source;
+      frontier_string_type frontier_string_target;
+      node_map_type        node_map_source;
+      node_map_type        node_map_target;
+      
+      cache_feature_set_type cache_features_source;
+      cache_feature_set_type cache_features_target;
 
       feature_builder_type feature_builder;
       
@@ -290,6 +358,9 @@ namespace cicada
 
       attribute_type attr_frontier_source;
       attribute_type attr_frontier_target;
+
+      bool source_mode;
+      bool target_mode;
     };
     
     FrontierBigram::FrontierBigram(const std::string& parameter)
@@ -304,24 +375,35 @@ namespace cicada
 	throw std::runtime_error("this is not frontier bigram feature: " + parameter);
 
       bool skip_sgml_tag = false;
+      bool source_mode = false;
+      bool target_mode = false;
       
       std::string name;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "source")
+	  source_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "target")
+	  target_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for frontier bigram: " << piter->first << "=" << piter->second << std::endl;
       }
+
+      if (! source_mode && ! target_mode)
+	source_mode = true;
             
       std::auto_ptr<impl_type> bigram_impl(new impl_type());
 
       bigram_impl->skip_sgml_tag = skip_sgml_tag;
       bigram_impl->prefix = (name.empty() ? std::string("frontier-bigram") : name);
-
-      base_type::__state_size = sizeof(impl_type::id_type);
+      bigram_impl->source_mode = source_mode;
+      bigram_impl->target_mode = target_mode;
+      
+      base_type::__state_size = sizeof(impl_type::id_type) * (int(source_mode) + int(target_mode));
       base_type::__feature_name = (name.empty() ? std::string("frontier-bigram") : name);
       base_type::__sparse_feature = true;
       
