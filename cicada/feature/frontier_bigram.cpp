@@ -132,7 +132,7 @@ namespace cicada
 	  bigram_score(state, states, edge, features, skipper_epsilon());
       }
       
-      struct __attribute_string : public boost::static_visitor<cicada::AttributeVector::string_type>
+      struct __attribute_string : public boost::static_visitor<const cicada::AttributeVector::string_type&>
       {
 	typedef cicada::AttributeVector attribute_set_type;
 	
