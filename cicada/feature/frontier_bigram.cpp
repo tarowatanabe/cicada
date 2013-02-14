@@ -314,6 +314,7 @@ namespace cicada
 	    if (! skipper(word)) {
 	      if (! initial)
 		feature_builder << "_";
+	      
 	      feature_builder << word;
 	      initial = false;
 	    }
@@ -463,10 +464,7 @@ namespace cicada
 				       const edge_type& edge,
 				       feature_set_type& features,
 				       const bool final) const
-    {
-      apply(state, states, edge, features, final);
-    }
-
+    {}
     
     void FrontierBigram::apply_scan(state_ptr_type& state,
 				    const state_ptr_set_type& states,
@@ -475,12 +473,15 @@ namespace cicada
 				    feature_set_type& features,
 				    const bool final) const
     {}
+    
     void FrontierBigram::apply_complete(state_ptr_type& state,
 					const state_ptr_set_type& states,
 					const edge_type& edge,
 					feature_set_type& features,
 					const bool final) const
-    {}
+    {
+      apply(state, states, edge, features, final);
+    }
 
 
     void FrontierBigram::initialize()

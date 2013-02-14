@@ -185,9 +185,11 @@ namespace cicada
 	  tokenizer_type::iterator titer_end = tokenizer.end();
 	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	    const symbol_type word = *titer;
+	    
 	    if (! skipper(word)) {
 	      if (! initial)
 		feature_builder << "_";
+	      
 	      feature_builder << word;
 	      initial = false;
 	    }

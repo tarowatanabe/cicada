@@ -91,7 +91,7 @@ namespace cicada
       {
 	bool operator()(const symbol_type& word) const
 	{
-	  return word.is_terminal() && (word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS);
+	  return (word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS);
 	}
       };
 
@@ -99,7 +99,7 @@ namespace cicada
       {
 	bool operator()(const symbol_type& word) const
 	{
-	  return word.is_terminal() && (word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS || word.is_sgml_tag());
+	  return (word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS || word.is_sgml_tag());
 	}
       };
       
@@ -193,6 +193,7 @@ namespace cicada
 	      
 	      if (! initial)
 		feature_builder << "_";
+	      
 	      feature_builder << non_terminal_index;
 	      terminal_prev = false;
 	      initial = false;
@@ -201,6 +202,7 @@ namespace cicada
 	      if (! terminal_prev) {
 		if (! initial)
 		  feature_builder << "_";
+		
 		feature_builder << "0";
 	      }
 	      terminal_prev = true;
