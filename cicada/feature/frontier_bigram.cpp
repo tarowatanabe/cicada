@@ -198,7 +198,7 @@ namespace cicada
 	  if (source_mode) {
 	    if (node_source == root) {
 	      if (states.size() == 1)
-		reinterpret_cast<id_type*>(state)[pos] = states.front()[pos];
+		reinterpret_cast<id_type*>(state)[pos] = reinterpret_cast<const id_type*>(states.front())[pos];
 	      else {
 		node_set_type nodes;
 		
@@ -234,7 +234,7 @@ namespace cicada
 	  if (target_mode) {
 	    if (node_target == root) {
 	      if (states.size() == 1)
-		reinterpret_cast<id_type*>(state)[pos] = states.front()[pos];
+		reinterpret_cast<id_type*>(state)[pos] = reinterpret_cast<const id_type*>(states.front())[pos];
 	      else {
 		node_set_type nodes;
 		
