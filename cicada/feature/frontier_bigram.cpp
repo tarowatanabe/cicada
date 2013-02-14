@@ -197,19 +197,23 @@ namespace cicada
 	  
 	  if (source_mode) {
 	    if (node_source == root) {
-	      node_set_type nodes;
-	      
-	      state_ptr_set_type::const_iterator siter_end = states.end();
-	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
-		const node_set_type& antecedents = node_map_source[reinterpret_cast<const id_type*>(*siter)[pos]];
+	      if (states.size() == 1)
+		reinterpret_cast<id_type*>(state)[pos] = states.front()[pos];
+	      else {
+		node_set_type nodes;
 		
-		nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+		state_ptr_set_type::const_iterator siter_end = states.end();
+		for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		  const node_set_type& antecedents = node_map_source[reinterpret_cast<const id_type*>(*siter)[pos]];
+		  
+		  nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+		}
+		
+		std::sort(nodes.begin(), nodes.end());
+		
+		node_map_type::iterator niter = node_map_source.insert(nodes).first;
+		reinterpret_cast<id_type*>(state)[pos] = niter - node_map_source.begin();
 	      }
-	      
-	      std::sort(nodes.begin(), nodes.end());
-	      
-	      node_map_type::iterator niter = node_map_source.insert(nodes).first;
-	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_source.begin();
 	    } else {
 	      state_ptr_set_type::const_iterator siter_end = states.end();
 	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
@@ -229,19 +233,23 @@ namespace cicada
 	  
 	  if (target_mode) {
 	    if (node_target == root) {
-	      node_set_type nodes;
-	      
-	      state_ptr_set_type::const_iterator siter_end = states.end();
-	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
-		const node_set_type& antecedents = node_map_target[reinterpret_cast<const id_type*>(*siter)[pos]];
+	      if (states.size() == 1)
+		reinterpret_cast<id_type*>(state)[pos] = states.front()[pos];
+	      else {
+		node_set_type nodes;
 		
-		nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+		state_ptr_set_type::const_iterator siter_end = states.end();
+		for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+		  const node_set_type& antecedents = node_map_target[reinterpret_cast<const id_type*>(*siter)[pos]];
+		  
+		  nodes.insert(nodes.end(), antecedents.begin(), antecedents.end());
+		}
+		
+		std::sort(nodes.begin(), nodes.end());
+		
+		node_map_type::iterator niter = node_map_target.insert(nodes).first;
+		reinterpret_cast<id_type*>(state)[pos] = niter - node_map_target.begin();
 	      }
-	      
-	      std::sort(nodes.begin(), nodes.end());
-	      
-	      node_map_type::iterator niter = node_map_target.insert(nodes).first;
-	      reinterpret_cast<id_type*>(state)[pos] = niter - node_map_target.begin();
 	    } else {
 	      state_ptr_set_type::const_iterator siter_end = states.end();
 	      for (state_ptr_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
