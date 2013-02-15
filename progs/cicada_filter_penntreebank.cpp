@@ -426,6 +426,7 @@ path_type output_file = "-";
 path_type map_file;
 
 std::string root_symbol;
+bool skip_non_tree = false;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
@@ -503,27 +504,22 @@ int main(int argc, char** argv)
     iter_type iter(is);
     iter_type iter_end;
     
-    int num = 0;
     while (iter != iter_end) {
       parsed.clear();
-
-      if (debug)
-	std::cerr << "parsing: " << num << std::endl;
       
       if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed)) {
 	std::string buffer;
 	for (int i = 0; i != 64 && iter != iter_end; ++ i, ++iter)
 	  buffer += *iter;
-
+	
 	throw std::runtime_error("parsing failed: " + buffer);
       }
-
-      ++ num;
-
+      
+      
       if (ms) {
 	if (! std::getline(*ms, line))
 	  throw std::runtime_error("# of lines do not match with map-file");
-
+	
 	utils::piece line_piece(line);
 	boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer(line_piece);
 	
@@ -537,7 +533,10 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("# of words do not match?");
 	}
       }
-      
+
+      if (skip_non_tree && parsed.antecedents.empty())
+	continue;
+
       if (! root_symbol.empty())
 	parsed.cat = root_symbol;
 
@@ -697,6 +696,8 @@ void options(int argc, char** argv)
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
+
+    ("skip-non-tree", po::bool_switch(&skip_non_tree), "skip non-treebank")
     
     ("fix-terminal",   po::bool_switch(&fix_terminal),       "fix fragmented terminals")
     ("replace-root",   po::value<std::string>(&root_symbol), "replace root symbol")

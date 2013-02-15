@@ -194,7 +194,7 @@ class PBS:
         self.workers[-1].start()
         
         # sleep for safety...
-        time.sleep(0.1)
+        time.sleep(0.5)
 
 class Threads:
     
