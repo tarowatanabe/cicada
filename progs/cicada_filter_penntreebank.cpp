@@ -37,6 +37,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/chart.hpp"
+#include "utils/piece.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -143,6 +144,15 @@ void transform(const treebank_type& treebank, hypergraph_type& graph)
   graph.goal = graph.add_node().id;
   
   transform(graph.goal, treebank, graph);
+}
+
+void transform(const utils::piece pos, const treebank_type& treebank, sentence_type& sent) 
+{
+  if (treebank.antecedents.empty())
+    sent.push_back(treebank.cat + '/' + pos);
+  else
+    for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      transform(treebank.cat, *aiter, sent);
 }
 
 void transform(const treebank_type& treebank, sentence_type& sent) 
@@ -438,6 +448,7 @@ bool fix_terminal = false;
 std::string stemmer;
 
 bool leaf = false;
+bool leaf_pos = false;
 bool rule = false;
 
 bool span = false;
@@ -585,7 +596,20 @@ int main(int argc, char** argv)
 	
 	if (flush_output)
 	  os << std::flush;
-
+      } else if (leaf_pos) {
+	sent.clear();
+	
+	transform("UNK", parsed, sent);
+	
+	if (! sent.empty()) {
+	  std::copy(sent.begin(), sent.end() - 1, std::ostream_iterator<std::string>(os, " "));
+	  os << sent.back();
+	  os << '\n';
+	} else
+	  os << '\n';
+	
+	if (flush_output)
+	  os << std::flush;
       } else if (span) {
 	spans.clear();
 	
@@ -710,8 +734,9 @@ void options(int argc, char** argv)
     ("add-bos-eos",    po::bool_switch(&add_bos_eos),        "add [BOS]/[EOS] and <s>/</s>")
     ("stemmer",        po::value<std::string>(&stemmer),     "stemming for terminals")
     
-    ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
-    ("rule",      po::bool_switch(&rule),    "collect rules only")
+    ("leaf",      po::bool_switch(&leaf),     "collect leaf nodes only")
+    ("leafpos",   po::bool_switch(&leaf_pos), "collect leaf/pos nodes only")
+    ("rule",      po::bool_switch(&rule),     "collect rules only")
 
     ("span",      po::bool_switch(&span),     "collect span only")
     ("binarize",  po::bool_switch(&binarize), "perform binarization")
