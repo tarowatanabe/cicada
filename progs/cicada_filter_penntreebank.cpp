@@ -735,7 +735,7 @@ void options(int argc, char** argv)
     ("stemmer",        po::value<std::string>(&stemmer),     "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),     "collect leaf nodes only")
-    ("leafpos",   po::bool_switch(&leaf_pos), "collect leaf/pos nodes only")
+    ("leaf-pos",  po::bool_switch(&leaf_pos), "collect leaf/pos nodes only")
     ("rule",      po::bool_switch(&rule),     "collect rules only")
 
     ("span",      po::bool_switch(&span),     "collect span only")
