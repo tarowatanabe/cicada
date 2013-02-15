@@ -149,7 +149,7 @@ void transform(const treebank_type& treebank, hypergraph_type& graph)
 void transform(const utils::piece pos, const treebank_type& treebank, sentence_type& sent) 
 {
   if (treebank.antecedents.empty())
-    sent.push_back(treebank.cat + '/' + pos);
+    sent.push_back(treebank.cat + '_' + pos);
   else
     for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
       transform(treebank.cat, *aiter, sent);
