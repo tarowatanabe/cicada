@@ -75,7 +75,7 @@ opt_parser = OptionParser(
     make_option("--mpi-host-file", default="", action="store", type="string",
                 help="host list file to run job. Identical to --hostfile for mpirun", metavar="FILE"),
     
-    make_option("--threads", default=2, action="store", type="int",
+    make_option("--threads", default=1, action="store", type="int",
                 help="# of thrads for thread-based parallel processing"),
     
     make_option("--pbs", default=None, action="store_true",

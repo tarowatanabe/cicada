@@ -106,6 +106,7 @@ bool span_mode = false;
 bool binarize_mode = false;
 bool category_mode = false;
 bool leaf_mode = false;
+bool leaf_pos_mode = false;
 
 void options(int argc, char** argv);
 
@@ -207,8 +208,8 @@ int main(int argc, char** argv)
     if (int(mst_mode) + conll_mode + malt_mode + cabocha_mode + khayashi_mode + khayashi_forest_mode + cicada_mode > 1)
       throw std::runtime_error("one of mst/conll/malt/khayashi/khayashi-forest/cicada mode");
 
-    if (int(forest_mode) + span_mode + leaf_mode > 1)
-      throw std::runtime_error("one of forest/span/leaf");
+    if (int(forest_mode) + span_mode + leaf_mode + leaf_pos_mode> 1)
+      throw std::runtime_error("one of forest/span/leaf/leaf-pos");
     
     if (mst_mode)
       apply<MST>(input_file, map_file, output_file);
@@ -728,6 +729,21 @@ struct MST
 	if (leaf_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), mst.words))
 	    throw std::runtime_error("generation failed");
+	} else if (leaf_pos_mode) {
+	  if (relation_mode) {
+	    for (size_t i = 0; i != mst.words.size(); ++ i) {
+	      if (i)
+		os << ' ';
+	      os << mst.words[i] << '_' << mst.labels[i];
+	    }
+	  } else {
+	    for (size_t i = 0; i != mst.words.size(); ++ i) {
+	      if (i)
+		os << ' ';
+	      os << mst.words[i] << '_' << mst.poss[i];
+	    }
+	  }
+	  os << '\n';
 	} else if (relation_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
@@ -943,6 +959,26 @@ struct CoNLL
 	    os << conll.back().form;
 	  }
 	  os << '\n';
+	} else if (leaf_pos_mode) {
+	  
+	  conll_set_type::const_iterator citer_begin = conll.begin();
+	  conll_set_type::const_iterator citer_end   = conll.end();
+
+	  if (relation_mode) {
+	    for (conll_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	      if (citer != citer_begin)
+		os << ' ';
+	      os << citer->form << '_' << citer->deprel;
+	    }
+	  } else {
+	    for (conll_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	      if (citer != citer_begin)
+		os << ' ';
+	      os << citer->form << '_' << citer->cpostag;
+	    }
+	  }
+	  os << '\n';
+	  
 	} else {
 	  conll_set_type::const_iterator citer_end = conll.end();
 	  for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
@@ -1138,6 +1174,16 @@ struct Malt
 	    os << malt.back().word;
 	  }
 	  os << '\n';
+	  
+	} else if (leaf_pos_mode) {
+	  malt_set_type::const_iterator citer_begin = malt.begin();
+	  malt_set_type::const_iterator citer_end   = malt.end();
+	  for (malt_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	    if (citer != citer_begin)
+	      os << ' ';
+	    os << citer->word << '_' << citer->tag;
+	  }
+	  os << '\n';
 	} else {
 	  malt_set_type::const_iterator citer_end = malt.end();
 	  for (malt_set_type::const_iterator citer = malt.begin(); citer != citer_end; ++ citer)
@@ -1301,6 +1347,15 @@ struct Cabocha
 	      for (terminal_set_type::const_iterator titer = terminals.begin(); titer != titer_end; ++ titer)
 		os << titer->first << ' ';
 	      os << terminals.back().first;
+	    }
+	    os << '\n';
+	  } else if (leaf_pos_mode) {
+	    terminal_set_type::const_iterator titer_begin = terminals.begin();
+	    terminal_set_type::const_iterator titer_end = terminals.end();
+	    for (terminal_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	      if (titer != titer_begin)
+		os << ' ';
+	      os << titer->first << '_' << titer->second;
 	    }
 	    os << '\n';
 	  } else {
@@ -1521,6 +1576,12 @@ struct KHayashi
 	if (leaf_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), khayashi.words))
 	    throw std::runtime_error("generation failed");
+	} else if (leaf_pos_mode) {
+	  for (size_t i = 0; i != khayashi.words.size(); ++ i) {
+	    if (i)
+	      os << ' ';
+	    os << khayashi.words[i] << '_' << khayashi.poss[i];
+	  }
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
@@ -2043,6 +2104,12 @@ struct Cicada
 	if (leaf_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ') << '\n'), cicada.tok))
 	    throw std::runtime_error("generation failed");
+	} else if (leaf_pos_mode) {
+	  for (size_t i = 0; i != cicada.tok.size(); ++ i) {
+	    if (i)
+	      os << ' ';
+	    os << cicada.tok[i] << '_' << cicada.pos[i];
+	  }
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
@@ -2093,6 +2160,7 @@ void options(int argc, char** argv)
     ("binarize",   po::bool_switch(&binarize_mode),   "output binarized spans")
     ("category",   po::bool_switch(&category_mode),   "output spans with category labels")
     ("leaf",       po::bool_switch(&leaf_mode),       "output leafs (temrinals)")
+    ("leaf-pos",   po::bool_switch(&leaf_pos_mode),   "output leaf-pos (temrinal+POS)")
             
     ("help", "help message");
   

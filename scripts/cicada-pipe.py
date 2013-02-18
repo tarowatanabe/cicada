@@ -48,7 +48,7 @@ opt_parser = OptionParser(
     make_option("--mpi-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="MPI directory"),
 
-    make_option("--threads", default=2, action="store", type="int",
+    make_option("--threads", default=1, action="store", type="int",
                 help="# of thrads for thread-based parallel processing"),
     # perform threading or MPI training    
     make_option("--mpi", default=0, action="store", type="int",
