@@ -1582,6 +1582,7 @@ struct KHayashi
 	      os << ' ';
 	    os << khayashi.words[i] << '_' << khayashi.poss[i];
 	  }
+	  os << '\n';
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
@@ -2110,6 +2111,7 @@ struct Cicada
 	      os << ' ';
 	    os << cicada.tok[i] << '_' << cicada.pos[i];
 	  }
+	  os << '\n';
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
