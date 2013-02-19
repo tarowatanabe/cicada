@@ -430,13 +430,29 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
   transform_span(treebank, spans, terminal, config, 0);
 }
 
+std::ostream& treebank_output(const treebank_type& treebank, std::ostream& os)
+{
+  if (treebank.antecedents.empty())
+    os << treebank.cat;
+  else {
+    os << '(';
+    os << treebank.cat;
+    os << ' ';
+    
+    for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      treebank_output(*aiter, os);
+    os << ')';
+  }
+  
+  return os;
+}
+
 
 path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
 std::string root_symbol;
-bool skip_non_tree = false;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
@@ -450,6 +466,7 @@ std::string stemmer;
 bool leaf = false;
 bool leaf_pos = false;
 bool rule = false;
+bool treebank_mode = false;
 
 bool span = false;
 bool category = false;
@@ -473,6 +490,10 @@ int main(int argc, char** argv)
 
     if (unary_top && unary_bottom)
       throw std::runtime_error("which strategy? unary-[top|bottom]");
+
+    if (int(leaf) + leaf_pos + rule + span + treebank_mode > 1)
+      throw std::runtime_error("multiple output options specified: leaf/leaf-pos/rule/span/treebank/(default for cicada-forest)");
+      
 
     typedef boost::spirit::istream_iterator iter_type;
 
@@ -525,7 +546,9 @@ int main(int argc, char** argv)
 	
 	throw std::runtime_error("parsing failed: " + buffer);
       }
-      
+
+      if (parsed.antecedents.empty())
+	continue;
       
       if (ms) {
 	if (! std::getline(*ms, line))
@@ -544,9 +567,6 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("# of words do not match?");
 	}
       }
-
-      if (skip_non_tree && parsed.antecedents.empty())
-	continue;
 
       if (! root_symbol.empty())
 	parsed.cat = root_symbol;
@@ -655,6 +675,14 @@ int main(int argc, char** argv)
 	if (flush_output)
 	  os << std::flush;
 
+      } else if (treebank_mode) {
+	if (parsed.antecedents.empty())
+	  os << "(())";
+	else
+	  treebank_output(parsed, os);
+	os << '\n';
+	if (flush_output)
+	  os << std::flush;
       } else {
 	graph.clear();
 	
@@ -721,8 +749,6 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
 
-    ("skip-non-tree", po::bool_switch(&skip_non_tree), "skip non-treebank")
-    
     ("fix-terminal",   po::bool_switch(&fix_terminal),       "fix fragmented terminals")
     ("replace-root",   po::value<std::string>(&root_symbol), "replace root symbol")
     ("unescape",       po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
@@ -734,11 +760,12 @@ void options(int argc, char** argv)
     ("add-bos-eos",    po::bool_switch(&add_bos_eos),        "add [BOS]/[EOS] and <s>/</s>")
     ("stemmer",        po::value<std::string>(&stemmer),     "stemming for terminals")
     
-    ("leaf",      po::bool_switch(&leaf),     "collect leaf nodes only")
-    ("leaf-pos",  po::bool_switch(&leaf_pos), "collect leaf/pos nodes only")
-    ("rule",      po::bool_switch(&rule),     "collect rules only")
-
-    ("span",      po::bool_switch(&span),     "collect span only")
+    ("leaf",      po::bool_switch(&leaf),          "output leaf nodes")
+    ("leaf-pos",  po::bool_switch(&leaf_pos),      "output leaf/pos nodes")
+    ("rule",      po::bool_switch(&rule),          "output rules")
+    ("treebank",  po::bool_switch(&treebank_mode), "output treebank")
+    
+    ("span",      po::bool_switch(&span),     "output spans")
     ("binarize",  po::bool_switch(&binarize), "perform binarization")
     ("category",  po::bool_switch(&category), "added category to span")
     
