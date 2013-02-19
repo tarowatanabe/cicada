@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -82,7 +82,7 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
     cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
     treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
     root %= (qi::hold['(' >> cat >> +treebank >> ')']
-	     | qi::hold['(' >> qi::attr("") >> +treebank >> ')']
+	     | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')']
 	     | qi::hold[qi::lit('(') >> qi::attr("") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')]
 	     | cat);
   }
@@ -430,6 +430,18 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
   transform_span(treebank, spans, terminal, config, 0);
 }
 
+bool treebank_validate(const treebank_type& treebank)
+{
+  if (treebank.cat.empty() && treebank.antecedents.empty()) return true;
+  
+  if (treebank.antecedents.empty()) return false;
+
+  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
+    if (aiter->antecedents.empty()) return false;
+  }
+  
+  return true;
+}
 
 std::ostream& treebank_output(const treebank_type& treebank, std::ostream& os)
 {
@@ -549,7 +561,7 @@ int main(int argc, char** argv)
       }
 
       // skip invalid treebank...
-      if (skip_invalid && parsed.antecedents.empty())
+      if (! treebank_validate(parsed))
 	continue;
       
       if (ms) {
