@@ -430,6 +430,7 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
   transform_span(treebank, spans, terminal, config, 0);
 }
 
+
 std::ostream& treebank_output(const treebank_type& treebank, std::ostream& os)
 {
   if (treebank.antecedents.empty())
@@ -547,7 +548,10 @@ int main(int argc, char** argv)
 	throw std::runtime_error("parsing failed: " + buffer);
       }
 
-      if (parsed.antecedents.empty())
+      std::cout << parsed.cat << std::endl;
+
+      // skip invalid treebank...
+      if (skip_invalid && parsed.antecedents.empty())
 	continue;
       
       if (ms) {
