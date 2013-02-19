@@ -82,8 +82,8 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
     cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
     treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
     root %= (qi::hold['(' >> cat >> +treebank >> ')']
-	     | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')']
-	     | qi::hold[qi::lit('(') >> qi::attr("ROOT") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')]
+	     | qi::hold['(' >> qi::attr("") >> +treebank >> ')']
+	     | qi::hold[qi::lit('(') >> qi::attr("") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')]
 	     | cat);
   }
   
@@ -572,6 +572,8 @@ int main(int argc, char** argv)
 
       if (! root_symbol.empty())
 	parsed.cat = root_symbol;
+      else if (parsed.cat.empty())
+	parsed.cat = "ROOT";
 
       if (fix_terminal)
 	transform_terminals(parsed);
