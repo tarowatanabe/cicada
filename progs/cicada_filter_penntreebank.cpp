@@ -784,15 +784,15 @@ void options(int argc, char** argv)
     ("rule",      po::bool_switch(&rule),          "output rules")
     ("treebank",  po::bool_switch(&treebank_mode), "output treebank")
     
-    ("span",      po::bool_switch(&span),     "output spans")
-    ("binarize",  po::bool_switch(&binarize), "perform binarization")
-    ("category",  po::bool_switch(&category), "added category to span")
+    ("span",      po::bool_switch(&span),            "output spans")
+    ("binarize",  po::bool_switch(&binarize),        "span: perform binarization")
+    ("category",  po::bool_switch(&category),        "span: added category to span")
     
-    ("unary-top",    po::bool_switch(&unary_top),    "use top-most category for unary rules")
-    ("unary-bottom", po::bool_switch(&unary_bottom), "use bottom-most category for unary rules")
-    ("unary-root",   po::bool_switch(&unary_root),   "use single category for root")
+    ("unary-top",    po::bool_switch(&unary_top),    "span: use top-most category for unary rules")
+    ("unary-bottom", po::bool_switch(&unary_bottom), "span: use bottom-most category for unary rules")
+    ("unary-root",   po::bool_switch(&unary_root),   "span: use single category for root")
     
-    ("exclude-terminal", po::bool_switch(&exclude_terminal), "no terminal in span")
+    ("exclude-terminal", po::bool_switch(&exclude_terminal), "span: no terminal in span")
     
     ("skip",     po::bool_switch(&skip_invalid), "skip invalid penntree")
     ("validate", po::bool_switch(&validate),     "validate penntreebank")
