@@ -432,13 +432,16 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
 
 bool treebank_validate(const treebank_type& treebank)
 {
-  if (treebank.cat.empty() && treebank.antecedents.empty()) return true;
+  if (treebank.cat.empty() && treebank.antecedents.empty())
+    return true;
   
-  if (treebank.antecedents.empty()) return false;
-
-  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-    if (aiter->antecedents.empty()) return false;
-  }
+  if (treebank.antecedents.empty())
+    return false;
+  
+  treebank_type::antecedents_type::const_iterator aiter_end = treebank.antecedents.end();
+  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != aiter_end; ++ aiter)
+    if (aiter->antecedents.empty())
+      return false;
   
   return true;
 }
