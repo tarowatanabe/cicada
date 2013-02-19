@@ -548,8 +548,6 @@ int main(int argc, char** argv)
 	throw std::runtime_error("parsing failed: " + buffer);
       }
 
-      std::cout << parsed.cat << std::endl;
-
       // skip invalid treebank...
       if (skip_invalid && parsed.antecedents.empty())
 	continue;
