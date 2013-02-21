@@ -1264,7 +1264,7 @@ struct Task
     {
       if (rule_pairs.size() < 1024 * 4
 	  || (min_counts_size && rule_pairs.size() < min_counts_size)
-	  || utils::malloc_stats::used() <= malloc_threshold) return;
+	  || utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*) <= malloc_threshold) return;
       
       if (! min_counts_size)
 	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 2;

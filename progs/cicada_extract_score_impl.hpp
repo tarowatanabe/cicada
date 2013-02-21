@@ -1762,7 +1762,7 @@ struct PhrasePairReverseReducer
       if (((iteration & iteration_mask) == iteration_mask)
 	  && ! counts.empty()
 	  && (! min_counts_size || counts.size() > min_counts_size)
-	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	  && (utils::malloc_stats::used() + counts.size() * sizeof(void*) > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 2;
 	    
@@ -2453,7 +2453,7 @@ struct PhrasePairTargetReducer
       if (((iteration & iteration_mask) == iteration_mask)
 	  && ! counts.empty()
 	  && (! min_counts_size || counts.size() > min_counts_size)
-	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	  && (utils::malloc_stats::used() + counts.size() * sizeof(void*) > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 2;
 	

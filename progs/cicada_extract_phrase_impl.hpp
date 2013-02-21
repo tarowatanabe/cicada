@@ -584,7 +584,7 @@ struct Task
       
       if (((iter & iteration_mask) == iteration_mask)
 	  && (! min_counts_size || phrase_pairs.size() > min_counts_size)
-	  && (utils::malloc_stats::used() > malloc_threshold)) {
+	  && (utils::malloc_stats::used() + phrase_pairs.size() * sizeof(void*) > malloc_threshold)) {
 	
 	if (! min_counts_size)
 	  min_counts_size = phrase_pairs.size() >> 2;
