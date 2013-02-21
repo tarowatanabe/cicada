@@ -289,8 +289,73 @@ struct ExtractTree
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
   
+#if 0
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
+#endif
+
+  struct rule_pair_set_type
+  {
+    typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+				 std::allocator<rule_pair_type> >::type count_set_type;
+
+    typedef count_set_type::size_type       size_type;
+    typedef count_set_type::difference_type difference_type;
+
+    typedef count_set_type::const_iterator const_iterator;
+    typedef count_set_type::iterator       iterator;
+    
+    struct string_hash : public utils::hashmurmur3<size_t>
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      size_t operator()(const std::string& x) const
+      {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+    
+    typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>, std::allocator<std::string> >::type unique_set_type;
+    
+    const_iterator begin() const { return counts.begin(); }
+    iterator begin() { return counts.begin(); }
+
+    const_iterator end() const { return counts.end(); }
+    iterator end() { return counts.end(); }
+    
+    std::pair<iterator, bool> insert(const rule_pair_type& x)
+    {
+      std::pair<iterator, bool> result = counts.insert(x);
+      
+      if (result.second) {
+	const_cast<rule_pair_type&>(*(result.first)).source = *(sources.insert(x.source).first);
+	const_cast<rule_pair_type&>(*(result.first)).target = *(targets.insert(x.target).first);
+      }
+      
+      return result;
+    }
+    
+    size_type size() const { return counts.size(); }
+    bool empty() const { return counts.empty(); }
+
+    void swap(rule_pair_set_type& x)
+    {
+      counts.swap(x.counts);
+      sources.swap(x.sources);
+      targets.swap(x.targets);
+    }
+    
+    void clear()
+    {
+      counts.clear();
+      sources.clear();
+      targets.clear();
+    }
+    
+  private:
+    count_set_type  counts;
+    unique_set_type sources;
+    unique_set_type targets;
+  };
   
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
