@@ -620,6 +620,18 @@ struct ExtractGHKM
     extract_composed(graph, sentence, rules, dumper);
   }
   
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>, std::allocator<std::string> >::type string_unique_type;
+  
+
   struct Candidate
   {
     const derivation_edge_type* edge;
@@ -673,6 +685,8 @@ struct ExtractGHKM
     
     rule_pair_set_local_type rule_pairs_local;
     rule_pair_type rule_pair;
+    string_unique_type  uniques_source;
+    string_unique_type  uniques_target;
 
     edge_set_type edges_new;
     node_set_type tails_new;
@@ -800,6 +814,7 @@ struct ExtractGHKM
       
       // if we share the same edge set, then, we can easily conclude that it is
       // caused by unaligned word ambiguity...
+      
       rule_pair_set_local_type::iterator riter_end = rule_pairs_local.end();
       for (rule_pair_set_local_type::iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
 	rule_pair_list_type& rule_list = riter->second;
@@ -810,19 +825,30 @@ struct ExtractGHKM
 	for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
 	  liter->count *= factor;
 
+	  
 	  if (liter->count >= cutoff) {
 	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
-	    if (! result.second)
+	    if (! result.second) {
 	      const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
+	      
+	      const_cast<rule_pair_type&>(*(result.first)).source = *(uniques_source.insert(liter->source).first);
+	      const_cast<rule_pair_type&>(*(result.first)).target = *(uniques_target.insert(liter->target).first);
+	    }
 	  }
 	}
       }
       rule_pairs_local.clear();
-
+      uniques_source.clear();
+      uniques_target.clear();
+      
       if ((id & id_mask) == id_mask) {
 	dumper(rule_pairs);
 	
-	rule_pair_set_local_type(rule_pairs_local).swap(rule_pairs_local);
+	if (rule_pairs.empty()) {
+	  rule_pair_set_local_type(rule_pairs_local).swap(rule_pairs_local);
+	  string_unique_type(uniques_source).swap(uniques_source);
+	  string_unique_type(uniques_target).swap(uniques_target);
+	}
       }
       
       //std::cerr << "dumped" << std::endl;
