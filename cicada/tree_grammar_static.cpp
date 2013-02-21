@@ -699,6 +699,8 @@ namespace cicada
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     
+    utils::resource start;
+
     for (size_t feature = 0; feature < score_db.size(); ++ feature)
       if (score_db[feature].score.is_open()) {
 	
@@ -813,6 +815,14 @@ namespace cicada
 	attr_db[attr].binarized.open(path);
 	attr_db[attr].score.clear();
       }
+
+    utils::resource end;
+    
+    if (debug)
+      std::cerr << "binarization:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
   }
 
   void TreeGrammarStaticImpl::quantize()
@@ -829,6 +839,8 @@ namespace cicada
     typedef boost::array<base_type, 256> codebook_type;
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
+
+    utils::resource start;
     
     hashed_type      hashed;
     counts_type      counts;
@@ -933,6 +945,14 @@ namespace cicada
 	attr_db[attr].quantized.open(path);
 	attr_db[attr].score.clear();
       }
+    
+    utils::resource end;
+    
+    if (debug)
+      std::cerr << "quantization:"
+		<< " cpu time: " << end.cpu_time() - start.cpu_time()
+		<< " user time: " << end.user_time() - start.user_time()
+		<< std::endl;
   }
   
   
@@ -1448,7 +1468,7 @@ namespace cicada
     TreeGrammarParser::parser<std::string::const_iterator> features_parser;
     TreeRuleCODEC codec;
     
-    utils::resource start;
+    utils::resource read_start;
     
     size_t num_line = 0;
     for (/**/; std::getline(is, line); ++ num_line) {
@@ -1552,19 +1572,19 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
 
-    utils::resource end;
+    utils::resource read_end;
 
     if (debug) {
       if ((num_line % 100000) % 100)
 	std::cerr << std::endl;
 
-      std::cerr << "# of rules: " << num_line << std::endl;
-      
-      std::cerr << "indexing:"
-		<< " cpu time: " << end.cpu_time() - start.cpu_time()
-		<< " user time: " << end.user_time() - start.user_time()
+      std::cerr << "# of rules: " << num_line
+		<< " cpu time: " << read_end.cpu_time() - read_start.cpu_time()
+		<< " user time: " << read_end.user_time() - read_start.user_time()
 		<< std::endl;
     }
+
+    utils::resource index_start;
    
     source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
@@ -1670,6 +1690,14 @@ namespace cicada
       attribute_data.open(path_attribute_data);
       attribute_vocab.open(path_attribute_vocab);
     }
+
+    utils::resource index_end;
+    
+    if (debug)
+      std::cerr << "indexing"
+		<< " cpu time: " << index_end.cpu_time() - index_start.cpu_time()
+		<< " user time: " << index_end.user_time() - index_start.user_time()
+		<< std::endl;
   }
 
   void TreeGrammarStaticImpl::read_text(const std::string& parameter)
@@ -1762,7 +1790,7 @@ namespace cicada
     scores_parser %= "|||" >> +qi::float_;
     attrs_parser  %= -("|||" >> *qi::float_);
 
-    utils::resource start;
+    utils::resource read_start;
     
     size_t num_line = 0;
     for (/**/; std::getline(is, line); ++ num_line) {
@@ -1897,19 +1925,19 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
 
-    utils::resource end;
+    utils::resource read_end;
     
     if (debug) {
       if ((num_line % 100000) % 100)
 	std::cerr << std::endl;
       
-      std::cerr << "# of rules: " << num_line << std::endl;
-      
-      std::cerr << "indexing:"
-		<< " cpu time: " << end.cpu_time() - start.cpu_time()
-		<< " user time: " << end.user_time() - start.user_time()
+      std::cerr << "# of rules: " << num_line
+		<< " cpu time: " << read_end.cpu_time() - read_start.cpu_time()
+		<< " user time: " << read_end.user_time() - read_start.user_time()
 		<< std::endl;
     }
+
+    utils::resource index_start;
     
     source_map->prune(static_cast<const hasher_type&>(*this));
     source_map->write(path_source);
@@ -2048,6 +2076,14 @@ namespace cicada
       if (attribute_names[attribute] == attribute_type())
 	attribute_names[attribute] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(attribute);
     }
+
+    utils::resource index_end;
+    
+    if (debug)
+      std::cerr << "indexing"
+		<< " cpu time: " << index_end.cpu_time() - index_start.cpu_time()
+		<< " user time: " << index_end.user_time() - index_start.user_time()
+		<< std::endl;
     
     // perform binarization, if possible!
     binarize();
