@@ -525,7 +525,7 @@ class Lexicon:
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
 
-        logfile = os.path.join(self.makedirs, "extract-lexicon.log")
+        logfile = os.path.join(self.makedirs, "lex.log")
 
         QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
                                              threads=self.threads,
@@ -583,8 +583,8 @@ class ExtractPhrase(Extract):
 
         self.data.append(corpus.source)
         self.data.append(corpus.target)
-        self.logfile = "extract-phrase.log"
-        self.name = "extract-phrase"
+        self.logfile = "phrase-counts.log"
+        self.name = "phrase-counts"
         
         prog_name = cicada.cicada_extract_phrase
         if mpi:
@@ -630,8 +630,8 @@ class ExtractSCFG(Extract):
         
         self.data.append(corpus.source)
         self.data.append(corpus.target)
-        self.logfile = "extract-scfg.log"
-        self.name = "extract-scfg"
+        self.logfile = "scfg-counts.log"
+        self.name = "scfg-counts"
         
         if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
             raise ValueError, "both of source/target span specified... which one?"
@@ -710,8 +710,8 @@ class ExtractGHKM(Extract):
             self.data.append(corpus.target_forest)
             self.data.append(corpus.source)
             
-        self.logfile = "extract-ghkm.log"
-        self.name = "extract-ghkm"
+        self.logfile = "ghkm-counts.log"
+        self.name = "ghkm-counts"
         
         prog_name = cicada.cicada_extract_ghkm
         if mpi:
@@ -790,8 +790,8 @@ class ExtractTree(Extract):
 
         self.data.append(corpus.source_forest)
         self.data.append(corpus.target_forest)
-        self.logfile = "extract-tree.log"
-        self.name = "extract-tree"
+        self.logfile = "tree-counts.log"
+        self.name = "tree-counts"
         
         prog_name = cicada.cicada_extract_tree
         if mpi:
@@ -848,30 +848,32 @@ class ExtractScore(Extract):
         if phrase:
             self.counts = os.path.join(counts_dir, "phrase-counts")
             self.scores = os.path.join(score_dir,  "phrase-score")
-            self.logfile = "extract-score.phrase.log"
+            self.logfile = "phrase-score.log"
+            self.name = "phrase-score"
             option = " --score-phrase"
         elif scfg:
             self.counts = os.path.join(counts_dir, "scfg-counts")
             self.scores = os.path.join(score_dir,  "scfg-score")
-            self.logfile = "extract-score.scfg.log"
+            self.logfile = "scfg-score.log"
+            self.name = "scfg-score"
             option = " --score-scfg"
         elif ghkm:
             self.counts = os.path.join(counts_dir, "ghkm-counts")
             self.scores = os.path.join(score_dir,  "ghkm-score")
-            self.logfile = "extract-score.ghkm.log"
+            self.logfile = "ghkm-score.log"
+            self.name = "ghkm-score"
             option = " --score-ghkm"
         elif tree:
             self.counts = os.path.join(counts_dir, "tree-counts")
             self.scores = os.path.join(score_dir,  "tree-score")
-            self.logfile = "extract-score.tree.log"
+            self.logfile = "tree-score.log"
+            self.name = "tree-score"
             option = " --score-ghkm"
         else:
             raise ValueError, "no count type?"
 
         if not os.path.exists(self.counts):
             raise ValueError, "no counts? %s" %(self.counts)
-
-        self.name = "extract-score"
         
         prog_name = cicada.cicada_extract_score
         if mpi:

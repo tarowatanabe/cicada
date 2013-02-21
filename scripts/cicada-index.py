@@ -562,9 +562,9 @@ class Index(UserString.UserString):
             raise ValueError, "no root source? %s" %(root_source)
         if not root_target:
             raise ValueError, "no root target? %s" %(root_target)
-                
-        self.name    = "index-" + indexer.name
-        self.logfile = os.path.join(indexer.base, "index-" + indexer.name + "." + name + ".log")
+        
+        self.name    = indexer.name + "-index"
+        self.logfile = os.path.join(indexer.base, indexer.name + "-index." + name + ".log")
         
         command = ""
 
