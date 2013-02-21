@@ -587,7 +587,7 @@ struct Task
 	  && (utils::malloc_stats::used() + phrase_pairs.size() * sizeof(void*) > malloc_threshold)) {
 	
 	if (! min_counts_size)
-	  min_counts_size = phrase_pairs.size() >> 2;
+	  min_counts_size = phrase_pairs.size() >> 3;
 	
 	dump(phrase_pairs);
 	
