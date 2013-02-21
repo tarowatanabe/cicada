@@ -828,9 +828,10 @@ struct ExtractGHKM
 	  
 	  if (liter->count >= cutoff) {
 	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
-	    if (! result.second) {
+	    if (! result.second)
 	      const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
-	      
+	    else {
+	      // uniquify source/target...
 	      const_cast<rule_pair_type&>(*(result.first)).source = *(uniques_source.insert(liter->source).first);
 	      const_cast<rule_pair_type&>(*(result.first)).target = *(uniques_target.insert(liter->target).first);
 	    }
