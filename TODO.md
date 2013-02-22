@@ -202,3 +202,10 @@ Documentation:
 
 Lua integration:
   Any use...????
+
+extract_{phrase,scfg,ghkm,tree}
+  Currently, we employ the reference counting std::string (i.e. those
+  in gcc) for sharing rules/phrases.... Is there an alternative, since
+  reference counting would be deprecated soon.... Implement an
+  alternative ref-count-string?
+
