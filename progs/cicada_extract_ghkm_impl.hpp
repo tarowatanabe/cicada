@@ -791,10 +791,7 @@ struct ExtractGHKM
 	    -- j[i];
 	  }
       }
-      
-      // clear candidates, since all the can is empty!
-      candidates.clear();
-      
+            
       //std::cerr << "finished" << std::endl;
       
       // allocate new derivations!
@@ -802,6 +799,12 @@ struct ExtractGHKM
       
       // sort for cube-pruning!
       std::sort(node.edges.begin(), node.edges.end(), less_derivation_edge_type());
+
+      // clear candidates, since all the cand is empty
+      candidates.clear();
+      
+      // clear new derivation edges, since we alread swapped!
+      derivation_edges_new.clear();
       
       // if we share the same edge set, then, we can easily conclude that it is
       // caused by unaligned word ambiguity...
