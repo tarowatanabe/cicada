@@ -39,7 +39,8 @@ opt_parser = OptionParser(
     
     make_option("--insertion", default=None, action="store_true", help="insertion grammar"),
     make_option("--deletion",  default=None, action="store_true", help="deletion grammar"),
-    make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
+    make_option("--fallback-glue", default=None, action="store_true", help="fallback tree-grammar with glue non-terminal"),
+    make_option("--fallback",      default=None, action="store_true", help="fallback tree-grammar"),
     
     ### feature functions
     make_option("--feature-ngram", default=[], action="append", type="string", help="ngram feature"),
@@ -193,11 +194,22 @@ if __name__ == '__main__':
                 print transducer
         print
 
+    if options.fallback and options.fallback_glue:
+        raise ValueError, "specified both of fallback glue and fallback"
+
     if options.fallback:
+        print "# fallback grammar with glue non-terminal"
+        print "# tree-grammar = fallback:non-terminal=%s" %(options.glue)
+        print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
+        print "tree-grammar = fallback"
+        print
+    elif options.fallback_glue:
+        print "# fallback grammar with glue non-terminal"
         print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
         print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
         print "# tree-grammar = fallback"
         print
+
 
     ### feature-functions
 
