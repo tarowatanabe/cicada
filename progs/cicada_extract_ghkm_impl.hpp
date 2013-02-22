@@ -662,6 +662,8 @@ struct ExtractGHKM
     candidate_set_type    candidates;
     candidate_heap_type   cand;
     
+    derivation_node_type::edge_set_type derivation_edges_new;
+    
     // difficult...
     // we need to keep track of how many nodes / maximum height in the composed rules...
     
@@ -687,10 +689,8 @@ struct ExtractGHKM
       derivation_node_type& node = derivations[id];
       
       //std::cerr << "node id: " << id << " range: [" << node.range.first << ", " << node.range.second << ")" << std::endl;
-     
-      
-      derivation_node_type::edge_set_type derivation_edges_new;
-
+           
+      derivation_edges_new.clear();
       candidates.clear();
       
       cand.clear();
