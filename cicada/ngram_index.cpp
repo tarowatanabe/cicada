@@ -18,7 +18,12 @@ namespace cicada
     typedef utils::repository repository_type;
       
     clear();
-      
+    
+    if (path.empty())
+      throw std::runtime_error("no ngram index?");
+    else if (! boost::filesystem::exists(path))
+      throw std::runtime_error("no ngram index? " + path.string());
+    
     repository_type rep(path, repository_type::read);
       
     ids.open(rep.path("index"));

@@ -77,6 +77,11 @@ namespace cicada
     typedef utils::repository repository_type;
     
     clear();
+
+    if (path.empty())
+      throw std::runtime_error("no ngram?");
+    else if (! boost::filesystem::exists(path))
+      throw std::runtime_error("no ngram? " + path.string());
     
     repository_type rep(path, repository_type::read);
     

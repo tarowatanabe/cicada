@@ -257,7 +257,7 @@ namespace utils
       if (path.empty())
 	throw std::runtime_error("empty path");
       if (! boost::filesystem::exists(path) || ! boost::filesystem::is_directory(path))
-	throw std::runtime_error("invalid directory");
+	throw std::runtime_error("invalid directory? " + path.string());
       
       repository_dir = path;
       repository_mode = read;
@@ -265,7 +265,7 @@ namespace utils
       const path_type prop_path = repository_dir / "prop.list";
       
       if (! boost::filesystem::exists(prop_path) || boost::filesystem::is_directory(prop_path))
-	throw std::runtime_error("invalid property list");
+	throw std::runtime_error("invalid property list? " + prop_path.string());
       
 #if BOOST_FILESYSTEM_VERSION == 2
       std::ifstream is(prop_path.file_string().c_str());
