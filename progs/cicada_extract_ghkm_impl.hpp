@@ -791,7 +791,10 @@ struct ExtractGHKM
 	    -- j[i];
 	  }
       }
-
+      
+      // clear candidates, since all the can is empty!
+      candidates.clear();
+      
       //std::cerr << "finished" << std::endl;
       
       // allocate new derivations!
