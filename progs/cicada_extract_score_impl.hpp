@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_SCORE_IMPL__HPP__
@@ -1544,6 +1544,18 @@ struct PhrasePairReverseReducer
   typedef utils::unordered_set<simple_type, boost::hash<simple_type>, std::equal_to<simple_type>,
 			       std::allocator<simple_type> >::type simple_unique_type;
   
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>,
+			       std::allocator<std::string> >::type unique_set_type;
+  
   simple_parser_type    parser;
   simple_generator_type generator;
 
@@ -1730,11 +1742,15 @@ struct PhrasePairReverseReducer
     operator()(EmptyProgress());
   }
   
+  
+  
   template <typename Progress>
   void operator()(const Progress& progress)
   {
     simple_type        reversed;
     simple_unique_type counts;
+    unique_set_type    sources;
+    unique_set_type    targets;
 
     int num_termination = 0;
     
@@ -1758,6 +1774,10 @@ struct PhrasePairReverseReducer
       std::pair<simple_unique_type::iterator, bool> result = counts.insert(reversed);
       if (! result.second)
 	const_cast<simple_type&>(*result.first).increment(reversed.counts.begin(), reversed.counts.end());
+      else {
+	const_cast<simple_type&>(*result.first).source = *(sources.insert(result.first->source).first);
+	const_cast<simple_type&>(*result.first).target = *(targets.insert(result.first->target).first);
+      }
       
       if (((iteration & iteration_mask) == iteration_mask)
 	  && ! counts.empty()
@@ -1767,8 +1787,13 @@ struct PhrasePairReverseReducer
 	  min_counts_size = counts.size() >> 2;
 	    
 	dump_counts(paths, counts);
+	
 	counts.clear();
+	sources.clear();
+	targets.clear();
 	simple_unique_type(counts).swap(counts);
+	unique_set_type(sources).swap(sources);
+	unique_set_type(targets).swap(targets);
       }
     }
     
@@ -2232,6 +2257,18 @@ struct PhrasePairTargetReducer
   typedef map_reduce_type::root_count_type     root_count_type;
   typedef map_reduce_type::root_count_set_type root_count_set_type;
 
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>,
+			       std::allocator<std::string> >::type unique_set_type;
+
   typedef PhrasePairSimpleParser    simple_parser_type;
   typedef PhrasePairSimpleGenerator simple_generator_type;
 
@@ -2428,6 +2465,8 @@ struct PhrasePairTargetReducer
     
     simple_type     target;
     simple_set_type counts;
+    unique_set_type    sources;
+    unique_set_type    targets;
     
     int num_termination = 0;
     
@@ -2448,6 +2487,9 @@ struct PhrasePairTargetReducer
 	  continue;
       }
       
+      target.source = *(sources.insert(target.source).first);
+      target.target = *(targets.insert(target.target).first);
+      
       counts.push_back(target);
       
       if (((iteration & iteration_mask) == iteration_mask)
@@ -2459,7 +2501,11 @@ struct PhrasePairTargetReducer
 	
 	dump_counts(paths, counts);
 	counts.clear();
+	sources.clear();
+	targets.clear();
 	simple_set_type(counts).swap(counts);
+	unique_set_type(sources).swap(sources);
+	unique_set_type(targets).swap(targets);
       }
     }
     
