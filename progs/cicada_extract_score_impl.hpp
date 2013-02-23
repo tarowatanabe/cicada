@@ -1785,20 +1785,27 @@ struct PhrasePairReverseReducer
 	  && (utils::malloc_stats::used() + counts.size() * sizeof(void*) > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 2;
-	    
+
+	sources.clear();
+	targets.clear();
+	unique_set_type(sources).swap(sources);
+	unique_set_type(targets).swap(targets);
+	
 	dump_counts(paths, counts);
 	
 	counts.clear();
-	sources.clear();
-	targets.clear();
 	simple_unique_type(counts).swap(counts);
-	unique_set_type(sources).swap(sources);
-	unique_set_type(targets).swap(targets);
       }
     }
     
     if (! counts.empty()) {
+      sources.clear();
+      targets.clear();
+      unique_set_type(sources).swap(sources);
+      unique_set_type(targets).swap(targets);
+      
       dump_counts(paths, counts);
+      
       counts.clear();
       simple_unique_type(counts).swap(counts);
     }
@@ -2498,19 +2505,27 @@ struct PhrasePairTargetReducer
 	  && (utils::malloc_stats::used() + counts.size() * sizeof(void*) > malloc_threshold)) {
 	if (! min_counts_size)
 	  min_counts_size = counts.size() >> 2;
-	
-	dump_counts(paths, counts);
-	counts.clear();
+
 	sources.clear();
 	targets.clear();
-	simple_set_type(counts).swap(counts);
 	unique_set_type(sources).swap(sources);
 	unique_set_type(targets).swap(targets);
+	
+	dump_counts(paths, counts);
+	
+	counts.clear();
+	simple_set_type(counts).swap(counts);
       }
     }
     
     if (! counts.empty()) {
+      sources.clear();
+      targets.clear();
+      unique_set_type(sources).swap(sources);
+      unique_set_type(targets).swap(targets);
+      
       dump_counts(paths, counts);
+      
       counts.clear();
       simple_set_type(counts).swap(counts);
     }
