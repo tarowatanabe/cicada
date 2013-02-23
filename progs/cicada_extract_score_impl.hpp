@@ -2465,8 +2465,8 @@ struct PhrasePairTargetReducer
     
     simple_type     target;
     simple_set_type counts;
-    unique_set_type    sources;
-    unique_set_type    targets;
+    unique_set_type sources;
+    unique_set_type targets;
     
     int num_termination = 0;
     
