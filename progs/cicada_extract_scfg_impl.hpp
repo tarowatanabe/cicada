@@ -27,6 +27,7 @@
 
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/chart.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
@@ -323,8 +324,23 @@ struct ExtractSCFG
       }
     };
     
+    struct string_unassigned
+    {
+      const std::string& operator()() const
+      {
+	static std::string __str;
+	return __str;
+      }
+    };
+    
+#if 0
     typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>,
 				 std::allocator<std::string> >::type unique_set_type;
+#endif
+    typedef utils::compact_set<std::string,
+			       string_unassigned, string_unassigned,
+			       string_hash, std::equal_to<std::string>,
+			       std::allocator<std::string> > unique_set_type;
     
     const_iterator begin() const { return counts.begin(); }
     iterator begin() { return counts.begin(); }
