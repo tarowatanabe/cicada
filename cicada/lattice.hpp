@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__LATTICE__HPP__
@@ -12,6 +12,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/feature_vector.hpp>
+#include <cicada/attribute_vector.hpp>
 
 #include <utils/vector2.hpp>
 #include <utils/piece.hpp>
@@ -56,19 +57,34 @@ namespace cicada
     
     typedef cicada::Symbol symbol_type;
     typedef cicada::FeatureVector<double, std::allocator<double> > feature_set_type;
+    typedef cicada::AttributeVector                                attribute_set_type;
     
     struct arc_type
     {
-      arc_type() : features(), label(), distance(0) {}
-      arc_type(const symbol_type& __label) : features(), label(__label), distance(1) {}
+      arc_type() : features(), attributes(), label(), distance(0) {}
+      arc_type(const symbol_type& __label) : features(), attributes(), label(__label), distance(1) {}
       arc_type(const symbol_type& __label,
 	       const feature_set_type& __features,
 	       const int& __distance)
-	: features(__features), label(__label), distance(__distance) {}
+	: features(__features), attributes(), label(__label), distance(__distance) {}
+      arc_type(const symbol_type& __label,
+	       const feature_set_type& __features,
+	       const attribute_set_type& __attributes,
+	       const int& __distance)
+	: features(__features), attributes(__attributes), label(__label), distance(__distance) {}
+
+      void swap(arc_type& x)
+      {
+	features.swap(x.features);
+	attributes.swap(x.attributes);
+	label.swap(x.label);
+	std::swap(distance, x.distance);
+      }
       
-      feature_set_type features;
-      symbol_type      label;
-      int              distance;
+      feature_set_type   features;
+      attribute_set_type attributes;
+      symbol_type        label;
+      int                distance;
     };
     
     typedef std::vector<arc_type, std::allocator<arc_type> > arc_set_type;
@@ -188,7 +204,7 @@ namespace cicada
   inline
   bool operator==(const Lattice::arc_type& x, const Lattice::arc_type& y)
   {
-    return x.label == y.label && x.distance == y.distance && x.features == y.features;
+    return x.label == y.label && x.distance == y.distance && x.features == y.features && x.attributes == y.attributes;
   }
   inline
   bool operator!=(const Lattice::arc_type& x, const Lattice::arc_type& y)

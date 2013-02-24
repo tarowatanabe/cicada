@@ -339,20 +339,15 @@ namespace cicada
       rule %= lhs << " ||| " << phrase;
     }
     
-    
     boost::spirit::karma::rule<Iterator, symbol_type()>      lhs;
     boost::spirit::karma::rule<Iterator, symbol_set_type()>  phrase;
     boost::spirit::karma::rule<Iterator, rule_type()>        rule;
   };
 
-  typedef std::pair<Feature, double> feature_gen_type;
-  typedef std::vector<feature_gen_type, std::allocator<feature_gen_type> > feature_generated_type;
-
   template <typename Iterator>
   struct features_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
   {
     typedef cicada::HyperGraph::feature_set_type feature_set_type;
-    //typedef feature_generated_type feature_set_type;
     
     features_generator() : features_generator::base_type(features)
     {
@@ -375,6 +370,41 @@ namespace cicada
     
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
+
+  template <typename Iterator>
+  struct attributes_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::attribute_set_type()>
+  {
+    typedef cicada::HyperGraph::attribute_set_type attribute_set_type;
+    
+    attributes_generator() : attributes_generator::base_type(attributes)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      
+      attribute_data %= data_int | data_double | data_string;
+      attribute %= attribute_key << ':' << attribute_data;
+      
+      attributes %= attribute % ',';
+    }
+
+    struct real_precision : boost::spirit::karma::real_policies<double>
+    {
+      static unsigned int precision(double) 
+      { 
+        return 10;
+      }
+    };
+    
+    boost::spirit::karma::real_generator<double, real_precision>                 data_double;
+    boost::spirit::karma::int_generator<attribute_set_type::int_type, 10, false> data_int;
+    utils::json_string_generator<Iterator>                                       data_string;
+    
+    utils::json_string_generator<Iterator>                                 attribute_key;
+    boost::spirit::karma::rule<Iterator, attribute_set_type::data_type()>  attribute_data;
+    boost::spirit::karma::rule<Iterator, attribute_set_type::value_type()> attribute;
+    boost::spirit::karma::rule<Iterator, attribute_set_type()>             attributes;
+  };
+  
 
   namespace hypergraph_rule_generator_impl
   {
@@ -411,6 +441,37 @@ namespace cicada
     typedef std::ostream_iterator<char> iterator_type;
     
     typedef features_generator<iterator_type> grammar_type;
+
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
+
+  namespace hypergraph_attribute_generator_impl
+  {
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    typedef attributes_generator<iterator_type> grammar_type;
 
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
@@ -510,9 +571,8 @@ namespace cicada
     {
       karma::generate(iterator_type(os), karma::lit("\"nodes\": ["));
       
-      hypergraph_feature_generator_impl::grammar_type& grammar = hypergraph_feature_generator_impl::instance();
-      
-      //feature_generated_type features;
+      hypergraph_feature_generator_impl::grammar_type&   grammar_feature   = hypergraph_feature_generator_impl::instance();
+      hypergraph_attribute_generator_impl::grammar_type& grammar_attribute = hypergraph_attribute_generator_impl::instance();
       
       // dump nodes...
       bool initial_node = true;
@@ -542,11 +602,13 @@ namespace cicada
 	  
 	  if (! edge.features.empty())
 	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os),
-			    "\"feature\":{" << grammar << "},",
+			    "\"feature\":{" << grammar_feature << "},",
 			    edge.features);
 	  
 	  if (! edge.attributes.empty())
-	    os << "\"attribute\":" << edge.attributes << ',';
+	    karma::generate(hypergraph_attribute_generator_impl::iterator_type(os),
+			    "\"attribute\":{" << grammar_attribute << "},",
+			    edge.attributes);
 	  
 	  karma::generate(iterator_type(os), "\"rule\":" << karma::uint_, ! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  
