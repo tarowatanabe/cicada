@@ -341,8 +341,9 @@ namespace cicada
     
     typedef graphviz_impl::iterator_type iterator_type;
     
-    graphviz_impl::grammar_label_type&   grammar_label   = graphviz_impl::instance_label();
-    graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
+    graphviz_impl::grammar_label_type&     grammar_label     = graphviz_impl::instance_label();
+    graphviz_impl::grammar_feature_type&   grammar_feature   = graphviz_impl::instance_feature();
+    graphviz_impl::grammar_attribute_type& grammar_attribute = graphviz_impl::instance_attribute();
 
     os << "digraph { ordering=out;";
     
@@ -359,6 +360,8 @@ namespace cicada
 	karma::generate(iterator_type(os), grammar_label, arc.label);
 	if (! arc.features.empty())
 	  karma::generate(iterator_type(os), " | " << grammar_feature, arc.features);
+	if (! arc.attributes.empty())
+	  karma::generate(iterator_type(os), " | " << grammar_attribute, arc.attributes);
 	
 	os << "\", shape=record];";
 	
