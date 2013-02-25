@@ -11,6 +11,7 @@
 #include <cicada/lattice.hpp>
 #include <cicada/msgpack/symbol.hpp>
 #include <cicada/msgpack/feature_vector.hpp>
+#include <cicada/msgpack/attribute_vector.hpp>
 
 #ifdef HAVE_MSGPACK_HPP
 
@@ -24,12 +25,13 @@ namespace msgpack
   {
     if (o.type != msgpack::type::ARRAY)
       throw msgpack::type_error();
-    if (o.via.array.size != 3)
+    if (o.via.array.size != 4)
       throw msgpack::type_error();
       
     o.via.array.ptr[0].convert(&v.features);
-    o.via.array.ptr[1].convert(&v.label);
-    o.via.array.ptr[2].convert(&v.distance);
+    o.via.array.ptr[1].convert(&v.attributes);
+    o.via.array.ptr[2].convert(&v.label);
+    o.via.array.ptr[3].convert(&v.distance);
     
     return v;
   }
@@ -38,8 +40,9 @@ namespace msgpack
   inline
   msgpack::packer<Stream>& operator<<(msgpack::packer<Stream>& o, const cicada::Lattice::arc_type& v)
   {
-    o.pack_array(3);
+    o.pack_array(4);
     o.pack(v.features);
+    o.pack(v.attributes);
     o.pack(v.label);
     o.pack(v.distance);
     return o;
@@ -50,14 +53,15 @@ namespace msgpack
   {
     o.type = msgpack::type::ARRAY;
       
-    msgpack::object* p = (msgpack::object*) o.zone->malloc(sizeof(msgpack::object) * 3);
+    msgpack::object* p = (msgpack::object*) o.zone->malloc(sizeof(msgpack::object) * 4);
       
     o.via.array.ptr = p;
-    o.via.array.size = 3;
+    o.via.array.size = 4;
       
-    p[0] = msgpack::object(v.features, o.zone);
-    p[1] = msgpack::object(v.label,    o.zone);
-    p[2] = msgpack::object(v.distance, o.zone);
+    p[0] = msgpack::object(v.features,   o.zone);
+    p[1] = msgpack::object(v.attributes, o.zone);
+    p[2] = msgpack::object(v.label,      o.zone);
+    p[3] = msgpack::object(v.distance,   o.zone);
   }
 
   inline

@@ -54,8 +54,11 @@ namespace cicada
   void GlobalLexicon::open(const path_type& path)
   {
     typedef utils::repository repository_type;
-
+    
     clear();
+    
+    if (! boost::filesystem::exists(path))
+      throw std::runtime_error("no file? " + path.string());
 
     repository_type rep(path, repository_type::read);
     

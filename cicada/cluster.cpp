@@ -28,8 +28,11 @@ namespace cicada
   void Cluster::open(const path_type& path)
   {
     typedef utils::repository repository_type;
-
+    
     clear();
+    
+    if (path != "-" && ! boost::filesystem::exists(path))
+      throw std::runtime_error("no file? " + path.string());
     
     if (boost::filesystem::is_directory(path)) {
       repository_type rep(path, repository_type::read);

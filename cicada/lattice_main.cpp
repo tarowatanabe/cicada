@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     
     std::cout << input << std::endl;
 
-    msgpack_test(lattice);
+    msgpack_test(input);
     
     cicada::remove_epsilon(input, removed);
 
