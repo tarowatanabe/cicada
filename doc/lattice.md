@@ -13,19 +13,26 @@ JLF Format
 ----------
 
 The native lattice format is JLF (JSON Lattice Format) which is
-represented by the `JSON data format <http://www.json.org>`_.
+represented by the [JSON data format](http://www.json.org>).
 Strings must be escaped (see JSON specification).
 
+```
+arc ::= [label, features(, attributes), distance]
+label ::= JSON-STRING
+features ::= {} | { *feature }
+```
 
-
+```ruby
+require 'redcarpet'
+markdown = Redcarpet.new("Hello World!")
+puts markdown.to_html
+```
 
 PLF Format
 ----------
 
-cicada can read PLF (Python Lattice Format) used in `Moses <http://statmt.org/moses/>`_, but do not
+cicada can read PLF (Python Lattice Format) used in [Moses](http://statmt.org/moses/), but do not
 support writing.
-
-
 
 
 Examples:
