@@ -7,6 +7,7 @@ Added cicada_filter_normalize which can perform normalization, i.e. NFKC and rem
 	for colorization of Katakana, katakana-marks and symbols
 Added cicada_filter_chardet which can detect character in a text using the ICU chardet API
 Added cg_descent as a backend for learning. TODO: use it!
+Added attributes for each arc in the lattice data structure.
 Faster grammar extraction and scoring by eliminating spurious locking
 Better help messages in python scripts with default values
 
