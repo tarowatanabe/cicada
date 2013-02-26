@@ -499,7 +499,7 @@ namespace cicada
   };
   
   template <typename Tp>
-  struct null_const_ptr
+  struct ptr_unassigned
   {
     const Tp* operator()() const { return 0; }
   };
@@ -515,7 +515,7 @@ namespace cicada
     typedef hypergraph_type::rule_type rule_type;
     
     typedef utils::compact_map<const rule_type*, int,
-			       null_const_ptr<rule_type>, null_const_ptr<rule_type>,
+			       ptr_unassigned<rule_type>, ptr_unassigned<rule_type>,
 			       boost::hash<const rule_type*>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
     karma::generate(iterator_type(os), '{');
@@ -529,8 +529,6 @@ namespace cicada
 
       hypergraph_rule_generator_impl::grammar_type& grammar = hypergraph_rule_generator_impl::instance();
       
-      bool initial_rule = true;
-      
       hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 
@@ -542,18 +540,13 @@ namespace cicada
 	  
 	  if (edge.rule) {
 	    const rule_type& rule = *(edge.rule);
-
-	    rule_unique_map_type::iterator riter = rules_unique.find(&rule);
 	    
-	    if (riter == rules_unique.end()) {
-	      // + 1 for none-rule which will be zero-rule-id
-	      const int rule_id = rules_unique.size() + 1;
-	      
-	      rules_unique.insert(std::make_pair(&rule, rule_id));
-	      
-	      if (! initial_rule)
+	    std::pair<rule_unique_map_type::iterator, bool> result = rules_unique.insert(std::make_pair(&rule,
+													rules_unique.size() + 1));
+	    
+	    if (result.second) {
+	      if (rules_unique.size() != 1)
 		karma::generate(iterator_type(os), karma::lit(", "));
-	      initial_rule = false;
 	      
 	      karma::generate(hypergraph_rule_generator_impl::iterator_type(os),
 			      '\"' << grammar << '\"',
