@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__STEMMER_NFKD__HPP__
@@ -16,12 +16,13 @@ namespace cicada
     {
     public:
       NFKD();
+      ~NFKD();
       
     public:
       std::string operator()(const utils::piece& word) const;
       
     private:
-      const void* handle;
+      void* handle;
     };
   };
 };

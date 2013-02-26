@@ -11,14 +11,16 @@ int main(int argc, char** argv)
     std::cout << cicada::Stemmer::lists();
     return 1;
   }
-
   
-  
-  cicada::Stemmer& stemmer(cicada::Stemmer::create(argv[1]));
-  
-  std::string word;
-  while (std::cin >> word)
-    std::cout << "word: " << word << " stemmed: " << stemmer(word) << std::endl;
-
-  
+  try {
+    cicada::Stemmer& stemmer(cicada::Stemmer::create(argv[1]));
+    
+    std::string word;
+    while (std::cin >> word)
+      std::cout << "word: " << word << " stemmed: " << stemmer(word) << std::endl;
+  }
+  catch (std::exception& err) {
+    std::cerr << "erro: " << err.what() << std::endl;
+    return 1;
+  }
 }
