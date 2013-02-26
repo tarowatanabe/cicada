@@ -503,6 +503,25 @@ namespace cicada
   {
     const Tp* operator()() const { return 0; }
   };
+
+  template <typename Tp>
+  struct ptr_hash
+  {
+    size_t operator()(const Tp* x) const
+    {
+      return (x ? hash_value(*x) : size_t(0));
+    }
+  };
+  
+  template <typename Tp>
+  struct ptr_equal
+  {
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return (x == y) || (x && y && *x == *y);
+    }
+  };
+
   
   std::ostream& operator<<(std::ostream& os, const HyperGraph& graph)
   {
@@ -516,7 +535,7 @@ namespace cicada
     
     typedef utils::compact_map<const rule_type*, int,
 			       ptr_unassigned<rule_type>, ptr_unassigned<rule_type>,
-			       boost::hash<const rule_type*>, std::equal_to<const rule_type*> > rule_unique_map_type;
+			       ptr_hash<rule_type>, ptr_equal<rule_type> > rule_unique_map_type;
     
     karma::generate(iterator_type(os), '{');
     
