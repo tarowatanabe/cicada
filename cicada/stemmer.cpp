@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer.hpp"
@@ -7,6 +7,7 @@
 #include "stemmer/prefix.hpp"
 #include "stemmer/suffix.hpp"
 #include "stemmer/katakana.hpp"
+#include "stemmer/hiragana.hpp"
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
@@ -44,6 +45,7 @@ suffix: taking suffix of letters\n\
 \tsize=[int] suffix size\n\
 digit: digits normalized to @\n\
 katakana: katakana\n\
+hiragana: hiragana\n\
 latin: romanization\n\
 lower: lower casing\n\
 upper: upper casing\n\
@@ -147,6 +149,16 @@ nfkd: NFKD\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Katakana()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "hiragana") {
+      const std::string name("hiragana");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Hiragana()))).first;
 	iter->second->__algorithm = parameter;
       }
       

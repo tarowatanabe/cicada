@@ -215,6 +215,7 @@ stemmer/arabic.hpp \
 stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/katakana.hpp \
+stemmer/hiragana.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
 stemmer/upper.hpp \
@@ -232,6 +233,7 @@ stemmer/arabic.cpp \
 stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/katakana.cpp \
+stemmer/hiragana.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
 stemmer/upper.cpp \
