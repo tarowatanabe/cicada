@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -41,7 +41,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      data %= data_string | double_dot | int64_;
+      data %= data_string | data_double | data_int;
       
       attribute %= key >> ':' >> data;
       attributes %= '{' >> -(attribute % ',') >> '}';
@@ -49,13 +49,13 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
     
-    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
-    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
-
-    utils::json_string_parser<Iterator> key;
-    utils::json_string_parser<Iterator> data_string;
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1>                      data_int;
+    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
+    utils::json_string_parser<Iterator>                                                      data_string;
     
+    utils::json_string_parser<Iterator>                                         key;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
+    
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_set_parsed_type(), space_type>  attributes;
   };
@@ -68,9 +68,9 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      data %= int64_ | double10 | string;
+      data %= data_int | data_double | data_string;
       
-      attribute %= string << ':' << data;
+      attribute %= key << ':' << data;
       attributes %= '{' << -(attribute % ',') << '}';
     }
     
@@ -82,11 +82,12 @@ namespace cicada
       }
     };
     
-    boost::spirit::karma::real_generator<double, real_precision> double10;
-    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
-    utils::json_string_generator<Iterator, true> string;
+    boost::spirit::karma::real_generator<double, real_precision>              data_double;
+    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> data_int;
+    utils::json_string_generator<Iterator, true>                              data_string;
 
-    boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
+    utils::json_string_generator<Iterator, true>                        key;
+    boost::spirit::karma::rule<Iterator, AttributeVector::data_type()>  data;
     boost::spirit::karma::rule<Iterator, AttributeVector::value_type()> attribute;
     boost::spirit::karma::rule<Iterator, AttributeVector::attribute_vector_type()> attributes;
   };
@@ -214,14 +215,14 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      data %= string | double_dot | int64_;
+      data %= data_string | data_double | data_int;
     }
     
     typedef boost::spirit::standard::space_type space_type;
 
-    utils::json_string_parser<Iterator> string;
-    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
-    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    utils::json_string_parser<Iterator>                                                      data_string;
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1>                      data_int;
+    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
     
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
   };
@@ -234,7 +235,7 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      data %= int64_ | double10 | string;
+      data %= data_int | data_double | data_string;
     }
     
     struct real_precision : boost::spirit::karma::real_policies<double>
@@ -245,9 +246,9 @@ namespace cicada
       }
     };
     
-    boost::spirit::karma::real_generator<double, real_precision> double10;
-    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
-    utils::json_string_generator<Iterator, true> string;
+    boost::spirit::karma::real_generator<double, real_precision>              data_double;
+    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> data_int;
+    utils::json_string_generator<Iterator, true>                              data_string;
     
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
   };

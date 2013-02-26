@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -90,7 +90,7 @@ namespace cicada
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
       // attributes...
-      data %= data_string | double_dot | int64_;
+      data %= data_string | data_double | data_int;
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
@@ -207,18 +207,17 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string_action;
     boost::spirit::qi::rule<Iterator, rule_parsed_set_type(), space_type> rule_string_set;
     
-    boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type>      tail_node_set;
+    boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type> tail_node_set;
     
-    utils::json_string_parser<Iterator> feature_name;
+    utils::json_string_parser<Iterator>                                      feature_name;
     boost::spirit::qi::rule<Iterator, feature_parsed_type(), space_type>     feature;
     boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), space_type> feature_set;
     
-    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
-    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1>                      data_int;
+    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
+    utils::json_string_parser<Iterator>                                                      data_string;
     
-    utils::json_string_parser<Iterator> key;
-    utils::json_string_parser<Iterator> data_string;
-    
+    utils::json_string_parser<Iterator>                                         key;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_parsed_set_type(), space_type>  attribute_set;
