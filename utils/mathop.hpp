@@ -28,6 +28,15 @@ namespace utils
   namespace mathop
   {
     
+    // val < 0 ? -1
+    // val = 0 ? 0
+    // val > 0 ? 1
+    template <typename Tp>
+    int signum(Tp val)
+    {
+      return (Tp() < val) - (val < Tp());
+    }
+    
     template <typename Tp>
     inline
     Tp factorial(unsigned n)
