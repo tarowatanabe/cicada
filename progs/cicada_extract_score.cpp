@@ -252,15 +252,15 @@ struct progress_mapper : public Mapper
     {
       ++ const_cast<size_t&>(i);
       
-      if (i % 100000 == 0)
+      if (i % 1000000 == 0)
 	std::cerr << '.';
-      if (i % 10000000 == 0)
+      if (i % 100000000 == 0)
 	std::cerr << std::endl;
     }
     
     void final() const
     {
-      if ((i % 100000) % 100)
+      if ((i % 1000000) % 100)
 	std::cerr << std::endl;
     }
   

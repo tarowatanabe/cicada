@@ -47,7 +47,7 @@ namespace std
 namespace cicada
 {
 
-  static const size_t DEBUG_DOT = 100000;
+  static const size_t DEBUG_DOT = 1000000;
   static const size_t DEBUG_LINE = DEBUG_DOT * 100;
   
   class GrammarMutableImpl
