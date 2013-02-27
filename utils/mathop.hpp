@@ -32,7 +32,7 @@ namespace utils
     // val = 0 ? 0
     // val > 0 ? 1
     template <typename Tp>
-    int signum(Tp val)
+    int sgn(Tp val)
     {
       return (Tp() < val) - (val < Tp());
     }
