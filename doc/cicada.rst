@@ -103,9 +103,6 @@ COMMANDLINE OPTIONS
 
   **--help** help message
 
-EXAMPLES
---------
-
 
 INPUTS
 ------
@@ -123,6 +120,29 @@ By default, cicada assumes sentence input, but if **--input-lattice**
 option is specified, lattice is assumed, instead.
 It is followed by optional entries, `forest`, `span`, `alignment`,
 `dependency` and a set of `sentence`.
+
+The input can be stdin (when **--input** is `-`) or a file with each
+line consisting of an input described above.
+Or, a directory can be specified. When **--input-directory** is
+specified, we always try a directory input, and if the input file
+specified by the --input option is not a directory, cicada will quit
+with error.
+The directory should contain a file `id.gz` with each file contains
+one line of an input, and id specifies the id of the input.
+
+GRAMMARS
+--------
+
+FEATURE FUNCTIONS
+-----------------
+
+
+OPERATIONS
+----------
+
+
+EXAMPLES
+--------
 
 
 SEE ALSO
