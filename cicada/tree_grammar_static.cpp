@@ -61,6 +61,9 @@
 
 namespace cicada
 {
+  static const size_t DEBUG_DOT = 1000000;
+  static const size_t DEBUG_LINE = DEBUG_DOT * 100;
+
   struct TreeGrammarStaticImpl : public utils::hashmurmur<uint64_t>
   {
     friend class TreeGrammarStatic;
@@ -1486,9 +1489,9 @@ namespace cicada
       std::string::const_iterator iter = line.begin();
 
       if (debug) {
-	if ((num_line + 1) % 100000 == 0)
+	if ((num_line + 1) % DEBUG_DOT == 0)
 	  std::cerr << '.';
-	if ((num_line + 1) % 10000000 == 0)
+	if ((num_line + 1) % DEBUG_LINE == 0)
 	  std::cerr << std::endl;
       } 
       
@@ -1575,7 +1578,7 @@ namespace cicada
     utils::resource read_end;
 
     if (debug) {
-      if ((num_line % 100000) % 100)
+      if ((num_line % DEBUG_DOT) % 100)
 	std::cerr << std::endl;
 
       std::cerr << "# of rules: " << num_line
@@ -1805,9 +1808,9 @@ namespace cicada
       std::string::const_iterator iter = line.begin();
       
       if (debug) {
-	if ((num_line + 1) % 100000 == 0)
+	if ((num_line + 1) % DEBUG_DOT == 0)
 	  std::cerr << '.';
-	if ((num_line + 1) % 10000000 == 0)
+	if ((num_line + 1) % DEBUG_LINE == 0)
 	  std::cerr << std::endl;
       } 
       
@@ -1928,7 +1931,7 @@ namespace cicada
     utils::resource read_end;
     
     if (debug) {
-      if ((num_line % 100000) % 100)
+      if ((num_line % DEBUG_DOT) % 100)
 	std::cerr << std::endl;
       
       std::cerr << "# of rules: " << num_line

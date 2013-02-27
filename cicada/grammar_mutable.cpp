@@ -46,6 +46,9 @@ namespace std
 
 namespace cicada
 {
+
+  static const size_t DEBUG_DOT = 100000;
+  static const size_t DEBUG_LINE = DEBUG_DOT * 100;
   
   class GrammarMutableImpl
   {
@@ -361,9 +364,9 @@ namespace cicada
       std::string::const_iterator iter_end = line.end();
       
       if (debug) {
-	if ((num_line + 1) % 100000 == 0)
+	if ((num_line + 1) % DEBUG_DOT == 0)
 	  std::cerr << '.';
-	if ((num_line + 1) % 10000000 == 0)
+	if ((num_line + 1) % DEBUG_LINE == 0)
 	  std::cerr << std::endl;
       } 
 
@@ -442,7 +445,7 @@ namespace cicada
     utils::resource end;
     
     if (debug) {
-      if (num_line % 10000000 != 0)
+      if ((num_line % DEBUG_DOT) % 100)
 	std::cerr << std::endl;
 
       std::cerr << "# of rules: " << num_line << std::endl;
