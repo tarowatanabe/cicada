@@ -7,7 +7,7 @@ a hypergraph toolkit for machine translation
 ---------------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
-:Date:   2013-2-8
+:Date:   2013-2-27
 :Manual section: 1
 
 SYNOPSIS
@@ -133,6 +133,16 @@ one line of an input, and id specifies the id of the input.
 GRAMMARS
 --------
 
+Grammars are either specified by **--grammar** or **--tree-grammar**
+with the goal symbol **--goal**.
+By default, the goal symbol is set to `[s]`.
+**--grammar** is used to specify synchronosu context free grammars
+(SCFGs), while **--tree-grammar** is used to specify synchronous tree
+substitution grammars (STSGs).
+For details of available grammar specification, see **--grammar-list**
+for the list of available SCFGs, and **--tree-grammar-list** for the
+list of available STSGs.
+
 FEATURE FUNCTIONS
 -----------------
 
@@ -147,3 +157,5 @@ EXAMPLES
 
 SEE ALSO
 --------
+
+cicada_mpi(1)
