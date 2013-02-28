@@ -559,24 +559,6 @@ struct progress_mapper : public Mapper
   };
 };
 
-struct string_unique_type : public utils::hashmurmur3<size_t>
-{
-  typedef utils::hashmurmur3<size_t> hasher_type;
-  typedef utils::array_power2<std::string, 1024 * 4, std::allocator<std::string> > unique_type;
-  
-  const std::string& operator()(const std::string& x)
-  {
-    const size_t uniq_pos = hasher_type::operator()(x.begin(), x.end(), 0) & (uniques.size() - 1);
-    
-    std::string& uniq = const_cast<std::string&>(uniques[uniq_pos]);
-    if (uniq != x)
-      uniq = x;
-    return uniq;
-  }
-  
-  unique_type uniques;
-};
-
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files)
 {
@@ -1201,9 +1183,6 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   simple_parser_type parser;
   std::string line;
 
-  string_unique_type sources;
-  string_unique_type targets;
-  
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
@@ -1214,11 +1193,9 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, target)) {
-	    target.source = sources(target.source);
-	    target.target = targets(target.target);
+	  if (parser(line, target))
 	    queue.push_swap(target);
-	  } else
+	  else
 	    std::cerr << "failed simple phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
@@ -1459,9 +1436,6 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   simple_parser_type parser;
   std::string line;
   
-  string_unique_type sources;
-  string_unique_type targets;
-  
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
@@ -1472,11 +1446,9 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, reversed)) {
-	    reversed.source = sources(reversed.source);
-	    reversed.target = targets(reversed.target);
+	  if (parser(line, reversed))
 	    queue.push_swap(reversed);
-	  } else
+	  else
 	    std::cerr << "failed reversed phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
