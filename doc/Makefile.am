@@ -2,6 +2,8 @@
 if WITH_RST2MAN
 
 man1_MANS = \
+cicada-alignment.py.man \
+cicada-extract.py.man \
 cicada.man \
 cicada_mpi.man \
 cicada_filter_alignment.man \

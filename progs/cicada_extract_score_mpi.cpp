@@ -22,6 +22,7 @@
 #include <utils/bithack.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/random_seed.hpp>
+#include <utils/array_power2.hpp>
 
 #include <codec/lz4.hpp>
 
@@ -556,6 +557,24 @@ struct progress_mapper : public Mapper
   
     size_t i;
   };
+};
+
+struct string_unique_type : public utils::hashmurmur3<size_t>
+{
+  typedef utils::hashmurmur3<size_t> hasher_type;
+  typedef utils::array_power2<std::string, 1024 * 4, std::allocator<std::string> > unique_type;
+  
+  const std::string& operator()(const std::string& x)
+  {
+    const size_t uniq_pos = hasher_type::operator()(x.begin(), x.end(), 0) & (uniques.size() - 1);
+    
+    std::string& uniq = const_cast<std::string&>(uniques[uniq_pos]);
+    if (uniq != x)
+      uniq = x;
+    return uniq;
+  }
+  
+  unique_type uniques;
 };
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
@@ -1178,10 +1197,12 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   queue_type queue(queue_size);
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, 128, debug));
   
-  simple_type     target;
-  
+  simple_type target;
   simple_parser_type parser;
   std::string line;
+
+  string_unique_type sources;
+  string_unique_type targets;
   
   int non_found_iter = 0;
   for (;;) {
@@ -1193,9 +1214,11 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, target))
+	  if (parser(line, target)) {
+	    target.source = sources(target.source);
+	    target.target = targets(target.target);
 	    queue.push_swap(target);
-	  else
+	  } else
 	    std::cerr << "failed simple phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
@@ -1432,10 +1455,12 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, 128, debug)));
   
-  simple_type     reversed;
-  
+  simple_type reversed;
   simple_parser_type parser;
   std::string line;
+  
+  string_unique_type sources;
+  string_unique_type targets;
   
   int non_found_iter = 0;
   for (;;) {
@@ -1447,15 +1472,17 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
 	if (std::getline(*stream[rank], line)) {
-	  if (parser(line, reversed))
+	  if (parser(line, reversed)) {
+	    reversed.source = sources(reversed.source);
+	    reversed.target = targets(reversed.target);
 	    queue.push_swap(reversed);
-	  else
+	  } else
 	    std::cerr << "failed reversed phrase parsing: " << line << std::endl;
 	} else {
 	  stream[rank].reset();
 	  device[rank].reset();
 	}
-
+	
 	found = true;
       }
     }
