@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_extract_score_impl.hpp"
@@ -393,7 +393,7 @@ void merge_counts(path_set_type& counts_files)
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), 128 / threads)));
+    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), utils::bithack::max(128 / threads, 1))));
   
   workers.join_all();
   
@@ -513,6 +513,7 @@ void target_counts(const path_map_type& reversed_files,
 						       target_files[shard],
 						       threads,
 						       max_malloc,
+						       utils::bithack::max(128 / threads, 1),
 						       debug)));
   
   boost::thread_group mappers;
@@ -671,6 +672,7 @@ void reverse_counts(const path_set_type& counts_files,
 						       reversed_files[shard],
 						       threads,
 						       max_malloc,
+						       utils::bithack::max(128 / threads, 1),
 						       debug)));
 
   boost::thread_group mappers;

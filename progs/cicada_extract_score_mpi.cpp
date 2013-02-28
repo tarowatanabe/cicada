@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_extract_score_impl.hpp"
@@ -1176,7 +1176,7 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
   }
   
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, debug));
+  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, 128, debug));
   
   simple_type     target;
   
@@ -1430,7 +1430,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   queue_type queue(queue_size);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, debug)));
+  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, 128, debug)));
   
   simple_type     reversed;
   

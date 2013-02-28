@@ -1581,6 +1581,7 @@ struct PhrasePairReverseReducer
   
   int            shard_size;
   double         max_malloc;
+  size_t         max_files;
   int            debug;
   
   PhrasePairReverseReducer(queue_type&    __queue,
@@ -1588,13 +1589,19 @@ struct PhrasePairReverseReducer
 			   path_set_type& __paths,
 			   const int      __shard_size,
 			   const double   __max_malloc,
+			   const int      __max_files,
 			   const int      __debug)
     : queue(__queue),
       prefix(__prefix),
       paths(__paths),
       shard_size(__shard_size),
       max_malloc(__max_malloc),
-      debug(__debug) {}
+      max_files(__max_files),
+      debug(__debug)
+  {
+    if (__max_files <= 0)
+      throw std::runtime_error("invalid max files");
+  }
 
   struct less_file_size
   {
@@ -1651,7 +1658,7 @@ struct PhrasePairReverseReducer
     typedef std::pair<size_t, path_type> size_path_type;
     typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
 
-    if (paths.size() <= 64) return;
+    if (paths.size() <= max_files) return;
     
     size_path_set_type size_paths;
     
@@ -1659,7 +1666,7 @@ struct PhrasePairReverseReducer
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
       size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
 
-    while (size_paths.size() > 64) {
+    while (size_paths.size() > max_files) {
       
       // sort according to the file-size...
       std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
@@ -2319,6 +2326,7 @@ struct PhrasePairTargetReducer
   
   int            shard_size;
   double         max_malloc;
+  size_t         max_files;
   int            debug;
   
   PhrasePairTargetReducer(queue_type&    __queue,
@@ -2326,15 +2334,20 @@ struct PhrasePairTargetReducer
 			  path_set_type& __paths,
 			  const int      __shard_size,
 			  const double   __max_malloc,
+			  const int      __max_files,
 			  const int      __debug)
     : queue(__queue),
       prefix(__prefix),
       paths(__paths),
       shard_size(__shard_size),
       max_malloc(__max_malloc),
-      debug(__debug) {}
+      max_files(__max_files),
+      debug(__debug)
+  {
+    if (__max_files <= 0)
+      throw std::runtime_error("invalid max files");
+  }
   
-
   struct less_file_size
   {
     bool operator()(const path_type& x, const path_type& y) const
@@ -2389,7 +2402,7 @@ struct PhrasePairTargetReducer
     typedef std::pair<size_t, path_type> size_path_type;
     typedef std::vector<size_path_type, std::allocator<size_path_type> > size_path_set_type;
     
-    if (paths.size() <= 64) return;
+    if (paths.size() <= max_files) return;
     
     size_path_set_type size_paths;
     
@@ -2397,7 +2410,7 @@ struct PhrasePairTargetReducer
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter)
       size_paths.push_back(size_path_type(boost::filesystem::file_size(*piter), *piter));
     
-    while (size_paths.size() > 64) {
+    while (size_paths.size() > max_files) {
       
       // sort according to the file-size...
       std::sort(size_paths.begin(), size_paths.end(), std::greater<size_path_type>());
