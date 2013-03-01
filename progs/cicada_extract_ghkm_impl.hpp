@@ -37,6 +37,7 @@
 #include "utils/chart.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/small_vector.hpp"
+#include "utils/array_power2.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -1044,6 +1045,30 @@ struct ExtractGHKM
   
   buffer_type buffer_source;
   buffer_type buffer_target;
+
+  struct rule_cache_type : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef std::string rule_type;
+    
+    typedef utils::array_power2<rule_type, 1024 * 4, std::allocator<rule_type> > rule_set_type;
+
+    const rule_type& operator()(const utils::piece& x)
+    {
+      const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (rules.size() - 1);
+      
+      rule_type& rule = rules[pos];
+      if (rule != x)
+	rule = x;
+      
+      return rule;
+    }
+
+    rule_set_type rules;
+  };
+
+  rule_cache_type rules_source;
+  rule_cache_type rules_target;
   
   bool construct_rule_pair(const hypergraph_type& graph,
 			   const sentence_type& sentence,
@@ -1224,9 +1249,9 @@ struct ExtractGHKM
       os_target << rule_target;
     }
     
-    rule_pair.source.assign(buffer_source.begin(), buffer_source.end());
-    rule_pair.target.assign(buffer_target.begin(), buffer_target.end());
-
+    rule_pair.source = rules_source(utils::piece(buffer_source.begin(), buffer_source.end()));
+    rule_pair.target = rules_target(utils::piece(buffer_target.begin(), buffer_target.end()));
+    
     return true;
   }
   

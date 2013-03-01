@@ -32,6 +32,7 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/span_edge.hpp"
 
+#include "utils/array_power2.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
@@ -1743,6 +1744,29 @@ struct ExtractTree
   typedef std::vector<char, std::allocator<char> > buffer_type;
   
   buffer_type buffer;
+			
+  struct rule_cache_type : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    typedef std::string rule_type;
+    
+    typedef utils::array_power2<rule_type, 1024 * 8, std::allocator<rule_type> > rule_set_type;
+    
+    const rule_type& operator()(const utils::piece& x)
+    {
+      const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (rules.size() - 1);
+      
+      rule_type& rule = rules[pos];
+      if (rule != x)
+	rule = x;
+      
+      return rule;
+    }
+    
+    rule_set_type rules;
+  };
+  
+  rule_cache_type rules_cache;
 
   template <typename FrontierAlignment>
   void construct_rule(const FrontierAlignment& frontier_alignment,
@@ -1812,7 +1836,7 @@ struct ExtractTree
       os << tree_rule;
     }
 
-    edge.rule.assign(buffer.begin(), buffer.end());
+    edge.rule = rules_cache(utils::piece(buffer.begin(), buffer.end()));
   }
   
   template <typename FrontierAlignment, typename Derivations, typename Iterator, typename PosMap, typename Covered>
