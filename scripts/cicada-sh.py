@@ -249,7 +249,7 @@ class MPI:
         
         command = self.mpirun
         if self.dir:
-            mpirun += ' --prefix %s' %(self.dir)
+            command += ' --prefix %s' %(self.dir)
         if self.number > 0:
             command += ' --np %d' %(self.number)
             
