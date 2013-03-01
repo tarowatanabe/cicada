@@ -470,7 +470,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
     stream_ptr_set_type stream(mpi_size);
     
     for (int rank = 1; rank < mpi_size; ++ rank) {
-      device[rank].reset(new device_type(rank, root_count_tag, 4096));
+      device[rank].reset(new device_type(rank, root_count_tag, 1024 * 1024));
       stream[rank].reset(new stream_type());
       
       //stream[rank]->push(boost::iostreams::zlib_decompressor());
@@ -516,7 +516,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
     boost::iostreams::filtering_ostream os;
     //os.push(boost::iostreams::zlib_compressor());
     os.push(codec::lz4_compressor());
-    os.push(utils::mpi_device_sink(0, root_count_tag, 4096));
+    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
     
     RootCountGenerator generator;
     root_count_set_type::const_iterator riter_end = root_counts.end();
