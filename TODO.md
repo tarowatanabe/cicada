@@ -209,3 +209,7 @@ extract_{phrase,scfg,ghkm,tree}
   reference counting would be deprecated soon.... Implement an
   alternative ref-count-string?
 
+Correctly implement alignment/distortion model estimation in
+lexicon_hmm/model4
+	Currenlty, it is very apt, and gives non-optimal parameters...
+
