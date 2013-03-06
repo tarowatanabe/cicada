@@ -248,8 +248,7 @@ class MPI:
                 setattr(self, binprog, binprog)
         
         command = self.mpirun
-        if self.dir:
-            command += ' --prefix %s' %(self.dir)
+        
         if self.number > 0:
             command += ' --np %d' %(self.number)
             

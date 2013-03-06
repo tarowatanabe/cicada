@@ -230,8 +230,6 @@ class PBS:
         if mpi:
             prefix = mpi.mpirun
             
-            if mpi.dir:
-                prefix += ' --prefix %s' %(mpi.dir)
             if os.environ.has_key('TMPDIR_SPEC'):
                 prefix += ' -x TMPDIR_SPEC'
             if os.environ.has_key('LD_LIBRARY_PATH'):

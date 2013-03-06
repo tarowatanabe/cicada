@@ -218,8 +218,6 @@ class PBS:
         if mpi:
             prefix = mpi.mpirun
 
-            if mpi.dir:
-                prefix += ' --prefix %s' %(mpi.dir)
             if os.environ.has_key('TMPDIR_SPEC'):
                 prefix += ' -x TMPDIR_SPEC'
             if os.environ.has_key('LD_LIBRARY_PATH'):
@@ -272,8 +270,6 @@ class MPI:
                 
     def run(self, command, logfile=None):
         mpirun = self.mpirun
-        if self.dir:
-            mpirun += ' --prefix %s' %(self.dir)
         if self.number > 0:
             mpirun += ' --np %d' %(self.number)
         if self.hosts:
