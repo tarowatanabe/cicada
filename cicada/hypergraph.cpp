@@ -11,8 +11,7 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-
-#include <boost/spirit/include/phoenix_bind.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
 
 #include <boost/functional/hash/hash.hpp>
 
@@ -95,8 +94,8 @@ namespace cicada
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
       // attributes...
-      data = (data_string [qi::_val = phoenix::bind(&attribute_string_cache_type::operator(), data_string_cache, qi::_1)]
-	      | data_double [qi::_val = qi::_1]
+      data = (data_string [qi::_val = data_string_cache(qi::_1)]
+              | data_double [qi::_val = qi::_1]
 	      | data_int [qi::_val = qi::_1]);
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
@@ -217,6 +216,9 @@ namespace cicada
       
       typedef utils::array_power2<string_type, 1024 * 4, std::allocator<string_type> > string_set_type;
       
+      template <typename >
+      struct result { typedef const string_type& type; };
+      
       const string_type& operator()(const string_type& x) const
       {
 	const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (caches.size() - 1);
@@ -246,7 +248,7 @@ namespace cicada
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1>                      data_int;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
     utils::json_string_parser<Iterator>                                                      data_string;
-    attribute_string_cache_type                                                              data_string_cache;
+    boost::phoenix::function<attribute_string_cache_type>                                    data_string_cache;
     
     utils::json_string_parser<Iterator>                                         key;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
