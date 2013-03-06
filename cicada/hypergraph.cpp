@@ -12,6 +12,8 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
+#include <boost/spirit/include/phoenix_bind.hpp>
+
 #include <boost/functional/hash/hash.hpp>
 
 #include <boost/fusion/tuple.hpp>
@@ -22,6 +24,8 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
+#include "utils/array_power2.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
@@ -80,6 +84,7 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
       
       rule_string_action = rule_string [add_rule(rules)];
       rule_string_set = '[' >> -(rule_string_action % ',')  >> ']';
@@ -90,7 +95,9 @@ namespace cicada
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
       // attributes...
-      data %= data_string | data_double | data_int;
+      data = (data_string [qi::_val = phoenix::bind(&attribute_string_cache_type::operator(), data_string_cache, qi::_1)]
+	      | data_double [qi::_val = qi::_1]
+	      | data_int [qi::_val = qi::_1]);
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
@@ -201,6 +208,29 @@ namespace cicada
     rule_ptr_set_type rules;
 
     typedef boost::spirit::standard::space_type space_type;
+
+
+    struct attribute_string_cache_type : public utils::hashmurmur3<size_t>
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef std::string string_type;
+      
+      typedef utils::array_power2<string_type, 1024 * 4, std::allocator<string_type> > string_set_type;
+      
+      const string_type& operator()(const string_type& x) const
+      {
+	const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (caches.size() - 1);
+	
+	string_type& ret = const_cast<string_type&>(caches[pos]);
+	if (ret != x)
+	  ret = x;
+	
+	return ret;
+      }
+      
+      string_set_type caches;
+    };
+
     
     utils::json_string_parser<Iterator> rule_string;
     
@@ -216,6 +246,7 @@ namespace cicada
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1>                      data_int;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
     utils::json_string_parser<Iterator>                                                      data_string;
+    attribute_string_cache_type                                                              data_string_cache;
     
     utils::json_string_parser<Iterator>                                         key;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;

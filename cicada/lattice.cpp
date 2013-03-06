@@ -27,6 +27,8 @@
 
 #include <boost/thread.hpp>
 
+#include "utils/array_power2.hpp"
+#include "utils/hashmurmur3.hpp"
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/python_string_parser.hpp"
@@ -119,7 +121,9 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
 
-      attribute_data %= data_string | data_double | data_int;
+      attribute_data = (data_string [qi::_val = phoenix::bind(&attribute_string_cache_type::operator(), data_string_cache, qi::_1)]
+			| data_double [qi::_val = qi::_1]
+			| data_int [qi::_val = qi::_1]);
       attribute  %= attribute_key >> ':' >> attribute_data;
       attributes %= qi::hold[qi::lit(',') >> '{' >> -(attribute % ',') >> '}'] | qi::eps;
       
@@ -158,10 +162,32 @@ namespace cicada
     typedef attribute_set_type::data_type attribute_data_type;
     typedef std::pair<std::string, attribute_data_type> attribute_parsed_type;
     typedef std::vector<attribute_parsed_type> attribute_parsed_set_type;
+
+    struct attribute_string_cache_type : public utils::hashmurmur3<size_t>
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      typedef std::string string_type;
+      
+      typedef utils::array_power2<string_type, 1024 * 4, std::allocator<string_type> > string_set_type;
+      
+      const string_type& operator()(const string_type& x) const
+      {
+	const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (caches.size() - 1);
+	
+	string_type& ret = const_cast<string_type&>(caches[pos]);
+	if (ret != x)
+	  ret = x;
+	
+	return ret;
+      }
+      
+      string_set_type caches;
+    };
     
     boost::spirit::qi::int_parser<attribute_set_type::int_type, 10, 1, -1>                   data_int;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > data_double;
     utils::json_string_parser<Iterator>                                                      data_string;
+    attribute_string_cache_type                                                              data_string_cache;
     
     utils::json_string_parser<Iterator>                                            attribute_key;
     boost::spirit::qi::rule<Iterator, attribute_set_type::data_type(), space_type> attribute_data;
