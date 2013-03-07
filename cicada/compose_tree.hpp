@@ -206,8 +206,8 @@ namespace cicada
     {
       typedef utils::small_vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > node_set_type;
       
-      phrase_type   phrase;
-      node_set_type nodes;
+      const phrase_type* phrase;
+      node_set_type      nodes;
       phrase_cache_type() : phrase(), nodes() {}
     };
     typedef utils::array_power2<phrase_cache_type, 1024 * 4, std::allocator<phrase_cache_type> > phrase_cache_set_type;
@@ -384,16 +384,17 @@ namespace cicada
       
       phrase_set_type::const_iterator piter_end = phrase_map[id].end();
       for (phrase_set_type::const_iterator piter = phrase_map[id].begin(); piter != piter_end; ++ piter) {
-	const phrase_type& phrase = *(*piter);
-
+	const phrase_type* phrase_ptr = *piter;
+	const phrase_type& phrase = *phrase_ptr;
+	
 	if (phrase.empty()) continue;
 	
-	const size_t cache_pos = hash_sequence<phrase_type>()(phrase) & (caches_phrase.size() - 1);
+	const size_t cache_pos = boost::hash<const phrase_type*>()(phrase_ptr) & (caches_phrase.size() - 1);
 	
 	phrase_cache_type& cache = caches_phrase[cache_pos];
 	
-	if (cache.nodes.empty() || cache.phrase != phrase) {
-	  cache.phrase = phrase;
+	if (cache.nodes.empty() || cache.phrase != phrase_ptr) {
+	  cache.phrase = phrase_ptr;
 	  cache.nodes.resize(grammar.size());
 	  
 	  for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
