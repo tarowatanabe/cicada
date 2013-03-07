@@ -31,10 +31,10 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
-#include <utils/simple_vector.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
+#include <utils/simple_vector.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/functional/hash/hash.hpp>
@@ -120,7 +120,7 @@ namespace cicada
     
     typedef typename utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_unique_type;
     
-    typedef utils::small_vector<const phrase_type*, std::allocator<const phrase_type*> > phrase_set_type;
+    typedef utils::simple_vector<const phrase_type*, std::allocator<const phrase_type*> > phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
 
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
