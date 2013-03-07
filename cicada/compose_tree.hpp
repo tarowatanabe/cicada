@@ -109,8 +109,6 @@ namespace cicada
     // for phrasal matching...
     typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_unique_type;
     
-    
-
     typedef utils::small_vector<const phrase_type*, std::allocator<const phrase_type*> > phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
     
