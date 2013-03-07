@@ -20,6 +20,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 
+#include <utils/array_power2.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur3.hpp>
@@ -28,6 +29,7 @@
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
 #include <utils/compact_map.hpp>
+#include <utils/small_vector.hpp>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -196,6 +198,16 @@ namespace cicada
 			       boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
+
+    struct phrase_cache_type
+    {
+      typedef utils::small_vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > node_set_type;
+      
+      phrase_type   phrase;
+      node_set_type nodes;
+      phrase_cache_type() : phrase(), nodes() {}
+    };
+    typedef utils::array_power2<phrase_cache_type, 1024 * 4, std::allocator<phrase_cache_type> > phrase_cache_set_type;
     
     ComposeTree(const symbol_type& __goal,
 		const tree_grammar_type& __tree_grammar,
@@ -244,6 +256,8 @@ namespace cicada
       frontiers_target.clear();
       tree_frontiers_source.clear();
       tree_frontiers_target.clear();
+
+      caches_phrase.clear();
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
@@ -352,21 +366,37 @@ namespace cicada
       // then, try matching within this span...
       
       const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
-
-      for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
-	const transducer_type& transducer = grammar[grammar_id];
+      
+      phrase_set_type::const_iterator piter_end = phrase_map[id].end();
+      for (phrase_set_type::const_iterator piter = phrase_map[id].begin(); piter != piter_end; ++ piter) {
+	const phrase_type& phrase = *piter;
 	
-	phrase_set_type::const_iterator piter_end = phrase_map[id].end();
-	for (phrase_set_type::const_iterator piter = phrase_map[id].begin(); piter != piter_end; ++ piter) {
-	  const phrase_type& phrase = *piter;
+	const size_t cache_pos = hash_sequence<phrase_type>()(phrase) & (caches_phrase.size() - 1);
+	
+	phrase_cache_type& cache = caches_phrase[cache_pos];
+	
+	if (cache.nodes.empty() || cache.phrase != phrase) {
+	  cache.phrase = phrase;
+	  cache.nodes.resize(grammar.size());
 	  
-	  transducer_type::id_type node = transducer.root();
-	  
-	  phrase_type::const_iterator iter_end = phrase.end();
-	  for (phrase_type::const_iterator iter = phrase.begin(); iter != iter_end; ++ iter) {
-	    node = transducer.next(node, *iter);
-	    if (node == transducer.root()) break;
+	  for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
+	    const transducer_type& transducer = grammar[grammar_id];
+	    
+	    transducer_type::id_type node = transducer.root();
+	    
+	    phrase_type::const_iterator iter_end = phrase.end();
+	    for (phrase_type::const_iterator iter = phrase.begin(); iter != iter_end; ++ iter) {
+	      node = transducer.next(node, *iter);
+	      if (node == transducer.root()) break;
+	    }
+	    
+	    cache.nodes[grammar_id] = node;
 	  }
+	}
+	
+	for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
+	  const transducer_type& transducer = grammar[grammar_id];
+	  const transducer_type::id_type node = cache.nodes[grammar_id];
 	  
 	  if (node == transducer.root()) continue;
 	  
@@ -812,6 +842,8 @@ namespace cicada
 
     tree_frontier_set_type tree_frontiers_source;
     tree_frontier_set_type tree_frontiers_target;
+    
+    phrase_cache_set_type caches_phrase;
   };
   
   
