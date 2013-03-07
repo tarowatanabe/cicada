@@ -109,10 +109,9 @@ namespace cicada
     // for phrasal matching...
     typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_unique_type;
     
-    typedef utils::compact_set<const phrase_type*,
-			       utils::unassigned<const phrase_type*>, utils::unassigned<const phrase_type*>,
-			       boost::hash<const phrase_type*>, std::equal_to<const phrase_type*>,
-			       std::allocator<const phrase_type*> > phrase_set_type;
+    
+
+    typedef utils::small_vector<const phrase_type*, std::allocator<const phrase_type*> > phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
     
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
@@ -325,6 +324,10 @@ namespace cicada
     void match_phrase(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       typedef std::deque<phrase_type, std::allocator<phrase_type> >  buffer_type;
+      typedef utils::compact_set<const phrase_type*,
+				 utils::unassigned<const phrase_type*>, utils::unassigned<const phrase_type*>,
+				 boost::hash<const phrase_type*>, std::equal_to<const phrase_type*>,
+				 std::allocator<const phrase_type*> > buffer_unique_type;
 
       if (graph_in.nodes[id].edges.empty()) return;
       
@@ -332,6 +335,8 @@ namespace cicada
 
       buffer_type buffer;
       buffer_type buffer_next;
+      
+      buffer_unique_type buffer_unique;
       
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = graph_in.nodes[id].edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = graph_in.nodes[id].edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -369,8 +374,10 @@ namespace cicada
 	
 	buffer_type::const_iterator biter_end = buffer.end();
 	for (buffer_type::const_iterator biter = buffer.begin(); biter != biter_end; ++ biter)
-	  phrase_map[id].insert(&(*(phrases.insert(*biter).first)));
+	  buffer_unique.insert(&(*(phrases.insert(*biter).first)));
       }
+      
+      phrase_map[id] = phrase_set_type(buffer_unique.begin(), buffer_unique.end());
       
       // then, try matching within this span...
       
