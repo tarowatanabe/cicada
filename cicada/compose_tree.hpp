@@ -29,6 +29,7 @@
 #include <utils/bithack.hpp>
 #include <utils/indexed_set.hpp>
 #include <utils/compact_map.hpp>
+#include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
 
 #include <boost/fusion/tuple.hpp>
@@ -106,8 +107,12 @@ namespace cicada
     typedef attribute_set_type::attribute_type attribute_type;
     
     // for phrasal matching...
+    typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_unique_type;
     
-    typedef utils::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> >::type phrase_set_type;
+    typedef utils::compact_set<const phrase_type*,
+			       utils::unassigned<const phrase_type*>, utils::unassigned<const phrase_type*>,
+			       boost::hash<const phrase_type*>, std::equal_to<const phrase_type*>,
+			       std::allocator<const phrase_type*> > phrase_set_type;
     typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
     
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
@@ -243,6 +248,8 @@ namespace cicada
       node_map_phrase.reserve(graph_in.nodes.size());
       node_map_phrase.resize(graph_in.nodes.size());
       
+      phrases.clear();
+
       phrase_map.clear();
       phrase_map.reserve(graph_in.nodes.size());
       phrase_map.resize(graph_in.nodes.size());
@@ -349,7 +356,7 @@ namespace cicada
 	      buffer_type::const_iterator biter_end = buffer.end();
 	      for (buffer_type::const_iterator biter = buffer.begin(); biter != biter_end; ++ biter) {
 		buffer_next.push_back(*biter);
-		buffer_next.back().insert(buffer_next.back().end(), piter->begin(), piter->end());
+		buffer_next.back().insert(buffer_next.back().end(), (*piter)->begin(), (*piter)->end());
 	      }
 	    }
 	    
@@ -360,7 +367,9 @@ namespace cicada
 	      biter->push_back(*titer);
 	  }
 	
-	phrase_map[id].insert(buffer.begin(), buffer.end());
+	buffer_type::const_iterator biter_end = buffer.end();
+	for (buffer_type::const_iterator biter = buffer.begin(); biter != biter_end; ++ biter)
+	  phrase_map[id].insert(&(*(phrases.insert(*biter).first)));
       }
       
       // then, try matching within this span...
@@ -369,7 +378,9 @@ namespace cicada
       
       phrase_set_type::const_iterator piter_end = phrase_map[id].end();
       for (phrase_set_type::const_iterator piter = phrase_map[id].begin(); piter != piter_end; ++ piter) {
-	const phrase_type& phrase = *piter;
+	const phrase_type& phrase = *(*piter);
+
+	if (phrase.empty()) continue;
 	
 	const size_t cache_pos = hash_sequence<phrase_type>()(phrase) & (caches_phrase.size() - 1);
 	
@@ -814,6 +825,7 @@ namespace cicada
     node_map_set_type node_map;
     node_map_set_type node_map_phrase;
     
+    phrase_unique_type phrases;
     phrase_map_type phrase_map;
     
     internal_level_map_type  level_map;
