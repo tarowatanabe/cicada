@@ -10,6 +10,7 @@ Added cg_descent as a backend for learning. TODO: use it!
 Added attributes for each arc in the lattice data structure.
 Faster grammar extraction and scoring by eliminating spurious locking
 Better help messages in python scripts with default values
+Reduced memory consumption in compose_tree and parse_tree especially for plugging phrases
 
 2013-1-9
 Bugfix: throw when disk is full + added --temporary option to extract_score in order to assingn temporary directory
