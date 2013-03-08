@@ -708,6 +708,7 @@ namespace cicada
       __vocab.clear();
       __order = 0;
       __path = path_type();
+      __backsort = false;
     }
     void close() { clear(); }
     
@@ -725,7 +726,8 @@ namespace cicada
     path_type path() const { return __path; }
     
     inline const int& order() const { return __order; }
-    inline       int& order()       { return __order; }
+    
+    bool backsort() const { return __backsort; }
     
     size_type ngram_size(int order) const
     {
@@ -761,6 +763,7 @@ namespace cicada
     
     int            __order;
     path_type      __path;
+    bool           __backsort;
   };
   
 };
