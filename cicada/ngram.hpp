@@ -215,7 +215,7 @@ namespace cicada
 	order = index.order(state) + 1;
       }
     }
-    
+
     template <typename Iterator>
     std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
     {
@@ -264,16 +264,8 @@ namespace cicada
     }
 
     template <typename Iterator>
-    logprob_type logbound(Iterator first, Iterator last) const {
-      bool estimated = false;
-      return logbound(first, last, estimated);
-    }
-    
-    template <typename Iterator>
-    logprob_type logbound(Iterator first, Iterator last, bool& estimated) const
+    logprob_type logbound(Iterator first, Iterator last) const
     {
-      estimated = false;
-      
       if (first == last) return 0.0;
       
       const int order = last - first;
@@ -290,10 +282,9 @@ namespace cicada
 	  const logprob_type __logbound = (result.second < logbounds[shard_index].size()
 					   ? logbounds[shard_index](result.second, order)
 					   : logprobs[shard_index](result.second, order));
-	  if(__logbound != logprob_min()) {
-	    estimated = true;
+	  if(__logbound != logprob_min())
 	    return __logbound;
-	  } else {
+	  else {
 	    // backoff...
 	    const size_type parent = index[shard_index].parent(result.second);
 	    const logprob_type logbackoff = (parent != size_type(-1)
@@ -318,10 +309,9 @@ namespace cicada
 					   ? logbounds[shard_index](result.second, order)
 					   : logprobs[shard_index](result.second, order));
 	  
-	  if (__logbound != logprob_min()) {
-	    estimated = true;
+	  if (__logbound != logprob_min())
 	    return __logbound;
-	  } else
+	  else
 	    return (index.is_bos(*first) ? logprob_bos() : smooth);
 	} else
 	  return smooth;
