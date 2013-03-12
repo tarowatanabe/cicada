@@ -791,6 +791,16 @@ namespace succinctdb
     {
       return base_type::__traverse(index, positions, key_buf, node_pos, key_pos, key_len);
     }
+
+  public:
+    
+    template <typename K, typename D, typename A>
+    friend
+    bool operator==(const succinct_trie_mapped<K,D,A>& x, const succinct_trie_mapped<K,D,A>& y);
+
+    template <typename K, typename D, typename A>
+    friend
+    bool operator!=(const succinct_trie_mapped<K,D,A>& x, const succinct_trie_mapped<K,D,A>& y);
     
   private:
     position_set_type positions;
@@ -799,6 +809,20 @@ namespace succinctdb
     mapped_set_type   mapped;
   };
 
+  template <typename K, typename D, typename A>
+  inline
+  bool operator==(const succinct_trie_mapped<K,D,A>& x, const succinct_trie_mapped<K,D,A>& y)
+  {
+    return x.positions == y.positions && x.index_map == y.index_map && x.index == y.index && x.mapped == y.mapped;
+  }
+  
+  template <typename K, typename D, typename A>
+  inline
+  bool operator!=(const succinct_trie_mapped<K,D,A>& x, const succinct_trie_mapped<K,D,A>& y)
+  {
+    return !(x == y);
+  }
+  
   template <typename Key, typename Alloc, size_t KeySize>
   struct __succinct_trie_index_impl
   {

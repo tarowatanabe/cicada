@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__MAP_FILE__HPP__
@@ -221,16 +221,34 @@ namespace utils
     {
       pimpl.swap(x.pimpl);
     }
-
+    
     void populate()
     {
       if (pimpl)
 	pimpl->populate();
     }
-    
+
   private:
     boost::shared_ptr<impl_type> pimpl;
   };
+
+  template <typename T, typename A>
+  inline
+  bool operator==(const map_file<T,A>& x, const map_file<T,A>& y)
+  {
+    return ((! x.is_open() && ! y.is_open())
+	    || (x.is_open() && y.is_open()
+		&& (x.path() == y.path()
+		    || (x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin())))));
+  }
+
+  template <typename T, typename A>
+  inline
+  bool operator!=(const map_file<T,A>& x, const map_file<T,A>& y)
+  {
+    return !(x == y);
+  }
+
 };
 
 namespace std

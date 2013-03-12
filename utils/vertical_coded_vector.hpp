@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__VERTICAL_CODED_VECTOR__HPP__
@@ -394,6 +394,14 @@ namespace utils
       compressed.populate();
       off.populate();
     }
+
+  public:
+    template <typename T, typename A>
+    friend
+    bool operator==(const vertical_coded_vector_mapped<T,A>& x, const vertical_coded_vector_mapped<T,A>& y);
+    template <typename T, typename A>
+    friend
+    bool operator!=(const vertical_coded_vector_mapped<T,A>& x, const vertical_coded_vector_mapped<T,A>& y);
     
   private:
     compressed_vector_type compressed;
@@ -403,6 +411,21 @@ namespace utils
     uint64_t       __mask_pos;
     uint64_t       __mask_value;
   };
+  
+
+  template <typename T, typename A>
+  inline
+  bool operator==(const vertical_coded_vector_mapped<T,A>& x, const vertical_coded_vector_mapped<T,A>& y)
+  {
+    return x.compressede == y.compressed && x.off == y.off;
+  }
+  
+  template <typename T, typename A>
+  inline
+  bool operator!=(const vertical_coded_vector_mapped<T,A>& x, const vertical_coded_vector_mapped<T,A>& y)
+  {
+    return !(x == y);
+  }
   
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class vertical_coded_vector : public __vertical_coded_vector_base

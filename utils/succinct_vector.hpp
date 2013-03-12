@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__SUCCINCT_VECTOR__HPP__
@@ -555,6 +555,14 @@ namespace utils
       __rank_high.populate();
       __rank_low.populate();
     }
+
+  public:
+    template <typename A>
+    friend
+    bool operator==(const succinct_vector_mapped<A>& x, const succinct_vector_mapped<A>& y);
+    template <typename A>
+    friend
+    bool operator!=(const succinct_vector_mapped<A>& x, const succinct_vector_mapped<A>& y);
     
   public:
     size_type          __size;
@@ -571,6 +579,23 @@ namespace utils
     uint64_t __select1_mask_pos;
     uint64_t __select1_mask_select;
   };
+
+  template <typename A>
+  inline
+  bool operator==(const succinct_vector_mapped<A>& x, const succinct_vector_mapped<A>& y)
+  {
+    return (x.__size == y.__size
+	    && x.__blocks == y.__blocks
+	    && x.__rank_high == y.__rank_high
+	    && x.__rank_low == y.__rank_low);
+  }
+
+  template <typename A>
+  inline
+  bool operator!=(const succinct_vector_mapped<A>& x, const succinct_vector_mapped<A>& y)
+  {
+    return !(x == y);
+  }
   
   template <typename _Alloc=std::allocator<uint32_t> >
   class succinct_vector : protected __succinct_vector_base

@@ -293,6 +293,15 @@ namespace succinctdb
       
       return (last - first == difference_type(size)) && std::equal(first, last, buf);
     }
+
+  public:
+    template <typename K, typename A>
+    friend
+    bool operator==(const succinct_hash_mapped<K,A>& x, const succinct_hash_mapped<K,A>& y);
+    
+    template <typename K, typename A>
+    friend
+    bool operator!=(const succinct_hash_mapped<K,A>& x, const succinct_hash_mapped<K,A>& y);
     
   private:
     bin_set_type  bins;
@@ -300,6 +309,20 @@ namespace succinctdb
     key_set_type  keys;
     off_set_type  offs;
   };
+  
+  template <typename K, typename A>
+  inline
+  bool operator==(const succinct_hash_mapped<K,A>& x, const succinct_hash_mapped<K,A>& y)
+  {
+    return x.bins == y.bins && x.nexts == y.nexts && x.keys == y.keys && x.offs == y.offs;
+  }
+  
+  template <typename K, typename A>
+  inline
+  bool operator!=(const succinct_hash_mapped<K,A>& x, const succinct_hash_mapped<K,A>& y)
+  {
+    return !(x == y);
+  }
 
   template <typename Key, typename Alloc=std::allocator<Key> >
   class succinct_hash_stream : public __succinct_hash_base

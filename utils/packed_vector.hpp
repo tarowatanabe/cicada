@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__PACKED_VECTOR__HPP__
@@ -507,10 +507,32 @@ namespace utils
     }
 
   public:
+    template <typename T, typename A>
+    friend
+    bool operator==(const packed_vector_mapped<T,A>& x, const packed_vector_mapped<T,A>& y);
+    template <typename T, typename A>
+    friend
+    bool operator!=(const packed_vector_mapped<T,A>& x, const packed_vector_mapped<T,A>& y);
+
+  public:
     size_type         __size;
     data_vector_type  __data;
     index_vector_type __index;
   };
+
+  template <typename T, typename A>
+  inline
+  bool operator==(const packed_vector_mapped<T,A>& x, const packed_vector_mapped<T,A>& y)
+  {
+    return x.__size == y.__size && x.__data == y.__data && x.__index == y.__index;
+  }
+  
+  template <typename T, typename A>
+  inline
+  bool operator!=(const packed_vector_mapped<T,A>& x, const packed_vector_mapped<T,A>& y)
+  {
+    return !(x == y);
+  }
   
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class packed_vector : public __packed_vector_base<Tp, sizeof(Tp)>
