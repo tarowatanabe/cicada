@@ -1,4 +1,5 @@
 2013-x-x
+INCOMPATIBLE: ngram language models assume back-sorted-trie data structure
 INCOMPATIBLE: feature application by apply_cube_{prune,grow,grow_coarse} are modified:
 	      If two candidates share the same score, we prefer those closer to the left-upper-corner.
 INCOMPATIBLE: Use of murmur3 for hash functions. This will not break the compatibility with the "indexed, binary" files, but

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__NGRAM__HPP__
@@ -131,41 +131,38 @@ namespace cicada
       max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
       
       int order = index.order(state) + 1;
-      while (order > max_order) {
-	state = index.suffix(state);
-	order = index.order(state) + 1;
-      }
+      for (/**/; order > max_order; -- order)
+	state = index.prev(state);
       
-      state_type state_ret;
-      logprob_type logbackoff = 0.0;
-      for (;;) {
-	const state_type state_next = index.next(state, word);
+      logprob_type backoff = 0.0;
+      for (/**/; order; -- order) {
+	const state_type result = index.next(state, word);
 	
-	if (! state_next.is_root_node()) {
+	if (! result.is_root_node()) {
+	  const size_type shard_index = index.shard_index(result);
+	  const logprob_type score = (! backoffed && result.node() < logbounds[shard_index].size()
+				      ? logbounds[shard_index](result.node(), order)
+				      : logprobs[shard_index](result.node(), order));
 	  
-	  if (state_ret.is_root())
-	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
-	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
-	  const logprob_type __logprob = (! backoffed && state_next.node() < logbounds[shard_index].size()
-					  ? logbounds[shard_index](state_next.node(), order)
-					  : logprobs[shard_index](state_next.node(), order));
-	  
-	  if (__logprob != logprob_min())
-	    return std::make_pair(state_ret, __logprob + logbackoff);
+	  if (score != logprob_min()) {
+	    state = index.suffix(result);
+	    for (int order_state = index.order(state) + 1; order_state > max_order; -- order_state)
+	      state = index.prev(state);
+	    
+	    return std::make_pair(state, score + backoff);
+	  }
 	}
 	
-	backoffed = true;
-	
 	if (state.is_root())
-	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
+	  return std::make_pair(state_type(), index.is_bos(word) ? logprob_bos() : smooth + backoff);
 	
-	// we will backoff
-	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
-	logbackoff += backoffs[shard_index](state.node(), order - 1);
-	state = index.suffix(state);
-	order = index.order(state) + 1;
+	backoffed = true;
+	backoff += backoffs[index.shard_index(state)](state.node(), order - 1);
+	state = index.prev(state);
       }
+      
+      // we will not reach here...
+      return std::make_pair(state_type(), index.is_bos(word) ? logprob_bos() : smooth + backoff);
     }
     
     template <typename _Word>
@@ -180,219 +177,238 @@ namespace cicada
       max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
       
       int order = index.order(state) + 1;
-      while (order > max_order) {
-	state = index.suffix(state);
-	order = index.order(state) + 1;
-      }
-
-      state_type state_ret;
-
-      logprob_type logbackoff = 0.0;
-      for (;;) {
-	const state_type state_next = index.next(state, word);
-
-	if (! state_next.is_root_node()) {
+      for (/**/; order > max_order; -- order)
+	state = index.prev(state);
+      
+      logprob_type backoff = 0.0;
+      for (/**/; order; -- order) {
+	const state_type result = index.next(state, word);
+	
+	if (! result.is_root_node()) {
+	  const logprob_type score = logprobs[index.shard_index(result)](result.node(), order);
 	  
-	  if (state_ret.is_root())
-	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
-	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
-	  const logprob_type __logprob = logprobs[shard_index](state_next.node(), order);
-	  
-	  if (__logprob != logprob_min())
-	    return std::make_pair(state_ret, __logprob + logbackoff);
+	  if (score != logprob_min()) {
+	    state = index.suffix(result);
+	    for (int order_state = index.order(state) + 1; order_state > max_order; -- order_state)
+	      state = index.prev(state);
+	    
+	    return std::make_pair(state, score + backoff);
+	  }
 	}
-
-	backoffed = true;
 	
 	if (state.is_root())
-	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
+	  return std::make_pair(state_type(), index.is_bos(word) ? logprob_bos() : smooth + backoff);
 	
-	// we will backoff
-	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
-	logbackoff += backoffs[shard_index](state.node(), order - 1);
-	state = index.suffix(state);
-	order = index.order(state) + 1;
-      }
-    }
-
-    template <typename Iterator>
-    std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
-    {
-      if (first == last || first + 1 == last) return std::make_pair(first, last);
-      
-      const size_type shard_index = index.shard_index(first, last);
-      std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
-      
-      return std::make_pair(first, std::min(result.first + 1, last));
-    }
-
-    template <typename Iterator>
-    std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
-    {
-      if (first == last || first + 1 == last) return std::make_pair(first, last);
-      
-      first = std::max(first, last - index.order());
-      
-      int       shard_prev = -1;
-      size_type node_prev = size_type(-1);
-      
-      for (/**/; first != last - 1; ++ first) {
-	const size_type shard_index = index.shard_index(first, last);
-	
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last, shard_prev, node_prev);
-	
-	shard_prev = -1;
-	node_prev = size_type(-1);
-	
-	if (result.first == last)
-	  return std::make_pair(first, last);
-	else if (result.first == last - 1) {
-	  shard_prev = shard_index;
-	  node_prev = result.second;
-	}
+	backoffed = true;
+	backoff += backoffs[index.shard_index(state)](state.node(), order - 1);
+	state = index.prev(state);
       }
       
-      return std::make_pair(first, last);
+      // we will not reach here...
+      return std::make_pair(state_type(), index.is_bos(word) ? logprob_bos() : smooth + backoff);
     }
 
+    
     template <typename Iterator>
-    bool exists(Iterator first, Iterator last) const
-    {
-      if (first == last) return false;
-      return index.traverse(first, last).first == last;
-    }
-
-    template <typename Iterator>
-    logprob_type logbound(Iterator first, Iterator last) const
+    logprob_type logbound(Iterator first, Iterator last, bool smooth_smallest=false) const
     {
       if (first == last) return 0.0;
       
-      const int order = last - first;
+      const int order = std::distance(first, last);
       
       if (order >= index.order())
-	return logprob(first, last);
+	return logprob(first, last, smooth_smallest);
       
-      if (order >= 2) { 
-	const size_type shard_index = index.shard_index(first, last);
-	const size_type shard_index_backoff = size_type((order == 2) - 1) & shard_index;
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+      if (order == 1) {
+	const state_type result = index.next(state_type(), *(last - 1));
 	
-	if (result.first == last) {
-	  const logprob_type __logbound = (result.second < logbounds[shard_index].size()
-					   ? logbounds[shard_index](result.second, order)
-					   : logprobs[shard_index](result.second, order));
-	  if(__logbound != logprob_min())
-	    return __logbound;
-	  else {
-	    // backoff...
-	    const size_type parent = index[shard_index].parent(result.second);
-	    const logprob_type logbackoff = (parent != size_type(-1)
-					     ? backoffs[shard_index_backoff](parent, order - 1)
-					     : logprob_type(0.0));
-	    return logprob(first + 1, last) + logbackoff; 
-	  }
-	} else {
-	  // backoff...
-	  const logprob_type logbackoff = (result.first == last - 1
-					   ? backoffs[shard_index_backoff](result.second, order - 1)
-					   : logprob_type(0.0));
-	  return logprob(first + 1, last) + logbackoff; 
+	if (! result.is_root_node()) {
+	  const logprob_type logprob = (result.node() < logbounds[0].size()
+					? logbounds[0](result.node(), 1)
+					: logprobs[0](result.node(), 1));
+	  
+	  if (logprob != logprob_min())
+	    return logprob;
 	}
 	
+	return (index.is_bos(*(last - 1)) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth));
       } else {
-	const size_type shard_index = index.shard_index(first, last);
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+	// search for the "suffix" history...
+	int order_trie = 1;
+	state_type state(index.shard_index_backward(first, last));
 	
-	if (result.first == last) {
-	  const logprob_type __logbound = (result.second < logbounds[shard_index].size()
-					   ? logbounds[shard_index](result.second, order)
-					   : logprobs[shard_index](result.second, order));
+	for (Iterator iter = last - 1; iter != first; -- iter, ++ order_trie) {
+	  const state_type result = index.next(state, *(iter - 1));
 	  
-	  if (__logbound != logprob_min())
-	    return __logbound;
-	  else
-	    return (index.is_bos(*first) ? logprob_bos() : smooth);
-	} else
-	  return smooth;
+	  if (result.is_root_node()) break;
+	  
+	  state = result;
+	}
+	
+	if (order_trie <= 2)
+	  state = state_type(size_type(-1), state.node());
+
+	bool backoffed = (order_trie != order);
+	logprob_type backoff = 0.0;
+	
+	for (/**/; order_trie; -- order_trie) {
+	  const state_type result = index.next(state, *(last - 1));
+	  
+	  if (! result.is_root_node()) {
+	    const size_type shard_index = index.shard_index(result);
+	    const logprob_type score = (! backoffed && result.node() < logbounds[shard_index].size()
+					? logbounds[shard_index](result.node(), order_trie)
+					: logprobs[shard_index](result.node(), order_trie));
+	    
+	    if (score != logprob_min())
+	      return score + backoff;
+	  }
+	  
+	  if (state.is_root())
+	    return (index.is_bos(*(last - 1)) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
+	  
+	  backoffed = true;
+	  backoff += backoffs[index.shard_index(state)](state.node(), order_trie - 1);
+	  state = index.prev(state);
+	}
+	
+	return (index.is_bos(*(last - 1)) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
       }
     }
     
     template <typename Iterator>
-    logprob_type operator()(Iterator first, Iterator last) const
+    logprob_type operator()(Iterator first, Iterator last, bool smooth_smallest=false) const
     {
-      return logprob(first, last);
+      return logprob(first, last, smooth_smallest);
     }
     
     template <typename Iterator>
-    logprob_type logprob(Iterator first, Iterator last) const
+    logprob_type logprob(Iterator first, Iterator last, bool smooth_smallest=false) const
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
+      
+      return __logprob_dispatch(first, last, value_type(), smooth_smallest);
+    }
+
+  private:
+    
+    template <typename Iterator, typename _Word>
+    logprob_type __logprob_dispatch(Iterator first, Iterator last, _Word __word, bool smooth_smallest=false) const
     {
       if (first == last) return 0.0;
-      
-      first = std::max(first, last - index.order());
 
-      int       shard_prev = -1;
-      size_type node_prev = size_type(-1);
+      first = std::max(first, last - index.order());
       
-      logprob_type logbackoff = 0.0;
-      for (/**/; first != last - 1; ++ first) {
-	const int order = last - first;
-	const size_type shard_index = index.shard_index(first, last);
-	const size_type shard_index_backoff = size_type((order == 2) - 1) & shard_index;
-	
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last, shard_prev, node_prev);
-	//std::pair<Iterator, size_type> result2 = index.traverse(shard_index, first, last);
-	
-	shard_prev = -1;
-	node_prev = size_type(-1);
-	
-	if (result.first == last) {
-#if 0
-	  if (result2.first != result.first)
-	    std::cerr << "no iterator match???" << std::endl;
-	  if (result2.second != result.second)
-	    std::cerr << "no node match???" << std::endl;
-#endif
-	  
-	  const logprob_type __logprob = logprobs[shard_index](result.second, order);
-	  if (__logprob != logprob_min())
-	    return logbackoff + __logprob;
-	  else {
-	    const size_type parent = index[shard_index].parent(result.second);
-	    if (parent != size_type(-1)) {
-	      logbackoff += backoffs[shard_index_backoff](parent, order - 1);
-	      
-	      shard_prev = shard_index;
-	      node_prev = parent;
-	    }
-	  }
-	} else if (result.first == last - 1) {
-#if 0
-	  if (result2.first != result.first)
-	    std::cerr << "no backoff iterator match???" << std::endl;
-	  if (result2.second != result.second)
-	    std::cerr << "no backoff node match???" << std::endl;
-#endif
-	  
-	  logbackoff += backoffs[shard_index_backoff](result.second, order - 1);
-	  
-	  shard_prev = shard_index;
-	  node_prev = result.second;
-	} else {
-#if 0
-	  if (result2.first == last || result2.first == last - 1)
-	    std::cerr << "no match..." << std::endl;
-#endif
+      const int order = std::distance(first, last);
+      const id_type word_id = index.vocab()[*(last - 1)];
+      
+      if (order == 1) {
+	const state_type result = index.next(state_type(), word_id);
+
+	if (! result.is_root_node()) {
+	  const logprob_type logprob = logprobs[0](result.node(), 1);
+
+	  if (logprob != logprob_min())
+	    return logprob;
 	}
+	
+	return (index.is_bos(word_id) ? logprob_bos() : smooth);
+      } else {
+	// search for the "suffix" history...
+	int order_trie = 1;
+	state_type state(index.shard_index_backward(first, last));
+	
+	for (Iterator iter = last - 1; iter != first; -- iter, ++ order_trie) {
+	  const state_type result = index.next(state, *(iter - 1));
+
+	  if (result.is_root_node()) break;
+	  
+	  state = result;
+	}
+	
+	if (order_trie <= 2)
+	  state = state_type(size_type(-1), state.node());
+
+	logprob_type backoff = 0.0;
+	for (/**/; order_trie; -- order_trie) {
+	  // modify this for bigram case!
+	  const state_type result = index.next(state, word_id);
+
+	  if (! result.is_root_node()) {
+	    const logprob_type score = logprobs[index.shard_index(result)](result.node(), order_trie);
+	    
+	    if (score != logprob_min())
+	      return score + backoff;
+	  }
+	  
+	  if (state.is_root())
+	    return (index.is_bos(word_id) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
+	  
+	  backoff += backoffs[index.shard_index(state)](state.node(), order_trie - 1);
+	  state = index.prev(state);
+	}
+	
+	return (index.is_bos(word_id) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
       }
+    }
+
+    template <typename Iterator>
+    logprob_type __logprob_dispatch(Iterator first, Iterator last, const id_type __word, bool smooth_smallest=false) const
+    {
+      if (first == last) return 0.0;
+
+      first = std::max(first, last - index.order());
       
-      const int order = last - first;
-      const size_type shard_index = index.shard_index(first, last);
-      std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+      const int order = std::distance(first, last);
+      const id_type word_id = *(last - 1);
       
-      return logbackoff + (result.first == last && logprobs[shard_index](result.second, order) != logprob_min()
-			   ? logprobs[shard_index](result.second, order)
-			   : (index.is_bos(*first) ? logprob_bos() : smooth));
+      if (order == 1) {
+	const state_type result = index.next(state_type(), word_id);
+	
+	if (! result.is_root_node()) {
+	  const logprob_type logprob = logprobs[0](result.node(), 1);
+
+	  if (logprob != logprob_min())
+	    return logprob;
+	}
+	
+	return (index.is_bos(word_id) ? logprob_bos() : smooth);
+      } else {
+	// search for the "suffix" history...
+	int order_trie = 1;
+	state_type state(index.shard_index_backward(first, last));
+	
+	for (Iterator iter = last - 1; iter != first; -- iter, ++ order_trie) {
+	  const state_type result = index.next(state, *(iter - 1));
+	  
+	  if (result.is_root_node()) break;
+	  
+	  state = result;
+	}
+
+	if (order_trie <= 2)
+	  state = state_type(size_type(-1), state.node());
+
+	logprob_type backoff = 0.0;
+	for (/**/; order_trie; -- order_trie) {
+	  const state_type result = index.next(state, word_id);
+	  
+	  if (! result.is_root_node()) {
+	    const logprob_type score = logprobs[index.shard_index(result)](result.node(), order_trie);
+	    
+	    if (score != logprob_min())
+	      return score + backoff;
+	  }
+	  
+	  if (state.is_root())
+	    return (index.is_bos(word_id) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
+	  
+	  backoff += backoffs[index.shard_index(state)](state.node(), order_trie - 1);
+	  state = index.prev(state);
+	}
+	
+	return (index.is_bos(word_id) ? logprob_bos() : (smooth_smallest ? logprob_min() : smooth + backoff));
+      }
     }
     
     

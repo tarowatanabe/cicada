@@ -58,6 +58,8 @@ namespace cicada
       typedef uint64_t state_type;
       
       State() : state(state_type(-1)) {}
+      State(const state_type shard)
+	: state(((shard & 0xffff) << 48) | (state_type(-1) & 0xffffffffffffll)) {}
       State(const state_type shard, const state_type node)
 	: state(((shard & 0xffff) << 48) | (node & 0xffffffffffffll)) {}
       
@@ -123,15 +125,6 @@ namespace cicada
 	cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
       };
       
-      struct cache_backoff_type
-      {
-	size_type pos;
-	size_type pos_prev;
-	int       shard_prev;
-	
-	cache_backoff_type() : pos(size_type(-1)), pos_prev(size_type(-1)), shard_prev(-1) {}
-      };
-
       struct cache_suffix_type
       {
 	state_type state;
@@ -140,9 +133,8 @@ namespace cicada
 	cache_suffix_type() : state(), suffix() {}
       };
       
-      typedef utils::array_power2<cache_pos_type,     1024 * 64, std::allocator<cache_pos_type> >     cache_pos_set_type;
-      typedef utils::array_power2<cache_backoff_type, 1024 * 64, std::allocator<cache_backoff_type> > cache_backoff_set_type;
-      typedef utils::array_power2<cache_suffix_type,  1024 * 64, std::allocator<cache_suffix_type> >  cache_suffix_set_type;
+      typedef utils::array_power2<cache_pos_type,    1024 * 64, std::allocator<cache_pos_type> >    cache_pos_set_type;
+      typedef utils::array_power2<cache_suffix_type, 1024 * 64, std::allocator<cache_suffix_type> > cache_suffix_set_type;
       
     public:
       Shard() {}
@@ -156,7 +148,6 @@ namespace cicada
 	offsets = x.offsets;
 	
 	caches_pos.clear();
-	caches_backoff.clear();
 	caches_suffix.clear();
 	return *this;
       }
@@ -170,7 +161,6 @@ namespace cicada
 	offsets.clear();
 	
 	caches_pos.clear();
-	caches_backoff.clear();
 	caches_suffix.clear();
       };
       
@@ -233,22 +223,6 @@ namespace cicada
 	typedef typename std::iterator_traits<Iterator>::value_type value_type;
 	return __traverse_dispatch(first, last, vocab, value_type());
       }
-
-      template <typename Iterator>
-      std::pair<Iterator, size_type> traverse(Iterator first, Iterator last, const vocab_type& vocab, const int& shard_prev, const size_type& pos_prev) const
-      {
-	typedef typename std::iterator_traits<Iterator>::value_type value_type;
-	
-	if (std::distance(first, last) >= 3 && shard_prev >= 0) {
-	  trylock_type lock(const_cast<spinlock_type&>(spinlock_backoff));
-	  if (lock)
-	    return __traverse_dispatch(first, last, vocab, shard_prev, pos_prev, value_type());
-	  else
-	    return traverse(first, last, vocab);
-	} else
-	  return traverse(first, last, vocab);
-      }
-      
       
       size_type __find(size_type pos, const id_type& id) const
       {
@@ -348,82 +322,17 @@ namespace cicada
 	return std::make_pair(first, pos);
       }
       
-      template <typename Iterator, typename _Word>
-      std::pair<Iterator, size_type> __traverse_dispatch(Iterator first,
-							 Iterator last,
-							 const vocab_type& vocab,
-							 const int& shard_prev,
-							 const size_type& pos_prev,
-							 _Word) const
-      {
-	const size_type cache_pos = hasher_type::operator()(pos_prev, shard_prev) & (caches_backoff.size() - 1);
-	cache_backoff_type& cache = const_cast<cache_backoff_type&>(caches_backoff[cache_pos]);
-	if (cache.shard_prev != shard_prev || cache.pos_prev != pos_prev) {
-	  cache.shard_prev = shard_prev;
-	  cache.pos_prev   = pos_prev;
-	  
-	  cache.pos = size_type(-1);
-	  for (Iterator iter = first; iter != last - 1; ++ iter) {
-	    cache.pos = find(cache.pos, vocab[word_type(*iter)]);
-	    if (cache.pos == size_type(-1)) break;
-	  }
-	}
-
-	if (cache.pos != size_type(-1)) {
-	  const size_type node = find(cache.pos, vocab[word_type(*(last - 1))]);
-	  if (node != size_type(-1))
-	    return std::make_pair(last, node);
-	  else
-	    return std::make_pair(last - 1, cache.pos);
-	} else
-	  return std::make_pair(first, cache.pos);
-      }
-      
-      template <typename Iterator>
-      std::pair<Iterator, size_type> __traverse_dispatch(Iterator first,
-							 Iterator last,
-							 const vocab_type& vocab,
-							 const int& shard_prev,
-							 const size_type& pos_prev,
-							 id_type) const
-      {
-	const size_type cache_pos = hasher_type::operator()(pos_prev, shard_prev) & (caches_backoff.size() - 1);
-	cache_backoff_type& cache = const_cast<cache_backoff_type&>(caches_backoff[cache_pos]);
-	if (cache.shard_prev != shard_prev || cache.pos_prev != pos_prev) {
-	  cache.shard_prev = shard_prev;
-	  cache.pos_prev   = pos_prev;
-	  
-	  cache.pos = size_type(-1);
-	  for (Iterator iter = first; iter != last - 1; ++ iter) {
-	    cache.pos = find(cache.pos, *iter);
-	    if (cache.pos == size_type(-1)) break;
-	  }
-	}
-	
-	if (cache.pos != size_type(-1)) {
-	  const size_type node = find(cache.pos, *(last - 1));
-	  if (node != size_type(-1))
-	    return std::make_pair(last, node);
-	  else
-	    return std::make_pair(last - 1, cache.pos);
-	} else
-	  return std::make_pair(first, cache.pos);
-      }
-
     public:
       id_set_type        ids;
       position_set_type  positions;
       off_set_type       offsets;
       
       spinlock_type          spinlock_pos;
-      spinlock_type          spinlock_backoff;
       spinlock_type          spinlock_suffix;
       
       cache_pos_set_type     caches_pos;
-      cache_backoff_set_type caches_backoff;
       cache_suffix_set_type  caches_suffix;
     };
-
     
     typedef Shard shard_type;
     typedef std::vector<shard_type, std::allocator<shard_type> > shard_set_type;
@@ -441,30 +350,35 @@ namespace cicada
   public:
     state_type root() const { return state_type(); }
 
-    bool has_next(const state_type& state) const
+    
+    size_type shard_index(const state_type& state) const
     {
-      if (state.is_root()) return true;
+      const size_type shard = state.shard();
+      const size_type node = state.node();
       
-      const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
-      
-      return __shards[shard_index].has_child(state.node());
+      return (shard == size_type(-1) || node == size_type(-1) || node < __shards[shard].offsets[1]
+	      ? size_type(0)
+	      : shard);
     }
     
-    template <typename Iterator>
-    std::pair<state_type, Iterator> next(state_type state, Iterator first, Iterator last) const
+    state_type prev(const state_type& state) const
     {
-      for (/**/; first != last; ++ first) {
-	const state_type state_next = next(state, *first);
-	if (state_next.is_root_node())
-	  return std::make_pair(state, first);
-	
-	state = state_next;
-      }
+      if (state.is_root_shard())
+	return state_type();
       
-      return std::make_pair(state, first);
+      size_type shard_index = state.shard();
+      size_type node = state.node();
+      
+      const shard_type& shard = __shards[shard_index];
+      
+      if (node != size_type(-1))
+	node = shard.parent(node);
+      
+      return state_type(node == size_type(-1) || node < shard.offsets[1]
+			? size_type(-1) : shard_index,
+			node);
     }
 
-    
     template <typename _Word>
     state_type next(const state_type& state, const _Word& word) const
     {
@@ -476,12 +390,10 @@ namespace cicada
       if (state.is_root())
 	return state_type(state.shard(), __shards[0].find(state.node(), word));
       else {
-	if (state.is_root_node())
-	  throw std::runtime_error("invalid state");
-	
 	if (! state.is_root_shard())
 	  return state_type(state.shard(), __shards[state.shard()].find(state.node(), word));
 	else {
+	  // we reached a bigram query!
 	  // state.node() is equal to unigram's id
 	  const size_type shard = shard_index(state.node(), word);
 	  
@@ -511,9 +423,49 @@ namespace cicada
     template <typename Iterator>
     std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
     {
-      if (first == last || first + 1 == last) return std::make_pair(first, last);
+      // this is the maximum prefix...
+      last = std::min(last, first + order() - 1);
       
-      return std::make_pair(first, std::min(next(state_type(), first, last).second + 1, last));
+      size_type length = std::distance(first, last);
+      
+      if (length <= 1)
+	return std::make_pair(first, last);
+
+      // Any way, we will + 1 after the longest match. So, we can decrement and try
+      // find the longest match within this decremented range.
+      -- last;
+      -- length;
+      
+      // we will try find the maximum ngram we can match
+      // TODO: do we use the context-inverted style for ngram indexing, or use full-inversion for backoff indexing...???
+      // Here, we use context-inverted ngram indexing, not backoff indexing
+      for (Iterator iter = last; iter != first; -- iter, -- length) {
+	if (length == 1)
+	  return std::make_pair(first, first + 1 + bool(! next(state_type(), *(iter - 1)).is_root_node()));
+	else {
+	  size_type order_trie = 1;
+	  state_type state(shard_index_backward(first, iter));
+	  
+	  for (Iterator end = iter - 1; end != first; -- end, ++ order_trie) {
+	    const state_type result = next(state, *(end - 1));
+	    
+	    if (result.is_root_node()) break;
+	    
+	    state = result;
+	  }
+	  
+	  if (order_trie != length) continue;
+	  
+	  if (order_trie <= 2)
+	    state = state_type(size_type(-1), state.node());
+	  
+	  if (! next(state, *(iter - 1)).is_root_node())
+	    return std::make_pair(first, iter + 1);
+	}
+      }
+      
+      // nothing found... actually, we will not reach here...
+      return std::make_pair(first, first + 1);
     }
 
     template <typename Iterator>
@@ -521,33 +473,14 @@ namespace cicada
     {
       typedef typename std::iterator_traits<Iterator>::value_type value_type;
       
-      return __suffix(first, last, value_type());
-    }
-
-    template <typename Iterator, typename _Word>
-    state_type __suffix(Iterator first, Iterator last, _Word) const 
-    {
-      typedef std::vector<id_type, std::allocator<id_type> > buffer_type;
-      
-      const size_type length = std::distance(first, last);
-
-      if (length == 0)
-	return state_type();
-      else if (length == 1) {
-	const state_type state = next(state_type(), *first);
-	return (state.is_root_node() ? state_type() : state);
-      }
-
-      buffer_type buffer(length);
-      for (typename buffer_type::iterator biter = buffer.begin(); first != last; ++ first, ++ biter)
-	*biter = __vocab[*first];
-      
-      return __suffix(buffer.begin(), buffer.end(), id_type());
+      return __suffix_dispatch(first, last, value_type());
     }
     
-    template <typename Iterator>
-    state_type __suffix(Iterator first, Iterator last, id_type) const 
+    template <typename Iterator, typename __Word>
+    state_type __suffix_dispatch(Iterator first, Iterator last, __Word) const
     {
+      first = std::max(first, last - order() + 1);
+      
       const size_type length = std::distance(first, last);
       
       if (length == 0)
@@ -557,37 +490,78 @@ namespace cicada
 	return (state.is_root_node() ? state_type() : state);
       }
       
-      first = std::max(first, last - order());
+      // we take the last two words!
+      state_type state(shard_index(__vocab[*(last - 2)], __vocab[*(last - 1)]));
       
-      state_type state;
-      
-      while (first != last) {
-	std::pair<state_type, Iterator> result = next(state, first, last);
+      for (int order = 0; last != first; -- last, ++ order) {
+	const state_type result = next(state, *(last - 1));
+	if (result.is_root_node())
+	  return (order <= 1 ? state_type(size_type(-1), state.node()) : state);
 	
-	if (result.second == last)
-	  return result.first;
-	else {
-	  state = suffix(result.first);
-	  first = result.second;
-	}
+	state = result;
       }
       
-      return state_type();
+      return state;
     }
-    
+
+    template <typename Iterator>
+    state_type __suffix_dispatch(Iterator first, Iterator last, id_type) const
+    {
+      first = std::max(first, last - order() + 1);
+      
+      const size_type length = std::distance(first, last);
+      
+      if (length == 0)
+	return state_type();
+      else if (length == 1) {
+	const state_type state = next(state_type(), *first);
+	return (state.is_root_node() ? state_type() : state);
+      }
+      
+      // we take the last two words!
+      state_type state(shard_index(*(last - 2), *(last - 1)));
+      
+      for (int order = 0; last != first; -- last, ++ order) {
+	const state_type result = next(state, *(last - 1));
+	if (result.is_root_node())
+	  return (order <= 1 ? state_type(size_type(-1), state.node()) : state);
+	
+	state = result;
+      }
+      
+      return state;
+    }
     
     state_type suffix(const state_type& state) const
     {
       typedef std::vector<id_type, std::allocator<id_type> > context_type;
       
-      // root or unigram's suffix is root
-      if (state.is_root() || state.is_root_shard()) return state_type();
+      // root or unigram
+      if (state.is_root() || state.is_root_shard())
+	return state;
       
-      shard_type& shard = const_cast<shard_type&>(__shards[state.shard()]);
+      const size_type shard_index = state.shard();
+      shard_type& shard = const_cast<shard_type&>(__shards[shard_index]);
       
-      // if we are bigram, we will simply take root_shard + current id
-      if (state.node() < shard.offsets[2])
-	return state_type(size_type(-1), shard[state.node()]);
+      // if we are bigram
+      if (state.node() < shard.offsets[2]) {
+	size_type node = state.node();
+	
+	const id_type word2 = shard[node];
+	const id_type word1 = shard[shard.parent(node)];
+	
+	const state_type state(shard_index);
+	const state_type state1 = next(state, word2);
+	
+	if (state1.is_root_node())
+	  return state_type();
+	
+	const state_type state2 = next(state1, word1);
+	
+	return (state2.is_root_node() ? state_type(size_type(-1), state1.node()) : state2);
+      }
+
+      // trigram or higher....
       
       const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
       
@@ -599,30 +573,24 @@ namespace cicada
 	  return shard.caches_suffix[cache_pos].suffix;
       }
       
-      // we will push in reverse order...
-      context_type context(order());
-      context_type::reverse_iterator riter = context.rbegin();
-	
-      {
-	size_type node = state.node();
-	for (/**/; node != size_type(-1); ++ riter) {
-	  *riter = shard[node];
-	  node = shard.parent(node);
-	}
-      }
+      // remember, we traver in the order:
+      //    history in inverse direction
+      //    the last word
       
-      context_type::const_iterator first = riter.base() + 1;
-      context_type::const_iterator last  = context.end();
-
-      state_type state_suffix;
-      for (/**/; first != last - 1; ++ first) {
-	std::pair<state_type, context_type::const_iterator> result = next(state_type(), first, last);
-	
-	if (result.second == last) {
-	  state_suffix = result.first;
-	  break;
-	}
+      context_type context(order());
+      context_type::iterator first = context.begin();
+      context_type::iterator last  = context.begin();
+      
+      const id_type word = shard[state.node()];
+      size_type curr = shard.parent(state.node());
+      for (/**/; curr != size_type(-1); ++ last) {
+	*last = shard[curr];
+	curr = shard.parent(curr);
       }
+      *last = word;
+      ++ last;
+      
+      const state_type state_suffix = suffix(first, last);
       
       // trylock...
       {
@@ -641,14 +609,23 @@ namespace cicada
     {
       return __hasher(first, __hasher(second, 0)) % __shards.size();
     }
-    
+
     template <typename Iterator>
     size_type shard_index(Iterator first, Iterator last) const
     {
-      if (last == first || last - first == 1) return 0;
+      if (std::distance(first, last) <= 1) return 0;
       
       typedef typename std::iterator_traits<Iterator>::value_type value_type;
       return __shard_index_dispatch(first, last, value_type());
+    }
+
+    template <typename Iterator>
+    size_type shard_index_backward(Iterator first, Iterator last) const
+    {
+      if (std::distance(first, last) <= 1) return 0;
+      
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
+      return __shard_index_backward_dispatch(first, last, value_type());
     }
     
     template <typename Iterator>
@@ -656,25 +633,13 @@ namespace cicada
     {
       return __shards[shard].traverse(first, last, __vocab);
     }
-    
-    template <typename Iterator>
-    std::pair<Iterator, size_type> traverse(size_type shard, Iterator first, Iterator last, const int& shard_prev, const size_type& pos_prev) const
-    {
-      return __shards[shard].traverse(first, last, __vocab, shard_prev, pos_prev);
-    }
-    
+        
     template <typename Iterator>
     std::pair<Iterator, size_type> traverse(Iterator first, Iterator last) const
     {
       return __shards[shard_index(first, last)].traverse(first, last, __vocab);
     }
     
-    template <typename Iterator>
-    std::pair<Iterator, size_type> traverse(Iterator first, Iterator last, const int& shard_prev, const size_type& pos_prev) const
-    {
-      return __shards[shard_index(first, last)].traverse(first, last, __vocab, shard_prev, pos_prev);
-    }
-
     bool is_bos(const id_type& id) const
     {
       return __vocab[vocab_type::BOS] == id;
@@ -747,13 +712,29 @@ namespace cicada
     template <typename Iterator, typename _Word>
     size_type __shard_index_dispatch(Iterator first, Iterator last, _Word) const
     {
-      return __hasher(__vocab[word_type(*first)], __hasher(__vocab[word_type(*(first + 1))], 0)) % __shards.size();
+      return shard_index(__vocab[word_type(*first)], __vocab[word_type(*(first + 1))]);
     }
     
     template <typename Iterator>
     size_type __shard_index_dispatch(Iterator first, Iterator last, id_type) const
     {
-      return __hasher(*first, __hasher(*(first + 1), 0)) % __shards.size();
+      return shard_index(*first, *(first + 1));
+    }
+    
+    template <typename Iterator, typename _Word>
+    size_type __shard_index_backward_dispatch(Iterator first, Iterator last, _Word) const
+    {
+      const bool length_adjust = std::distance(first, last) > 2;
+      
+      return shard_index(__vocab[word_type(*(last - 2 - length_adjust))], __vocab[word_type(*(last - 1 - length_adjust))]);
+    }
+    
+    template <typename Iterator>
+    size_type __shard_index_backward_dispatch(Iterator first, Iterator last, id_type) const
+    {
+      const bool length_adjust = std::distance(first, last) > 2;
+      
+      return shard_index(*(last - 2 - length_adjust), *(last - 1 - length_adjust));
     }
     
   private:

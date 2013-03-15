@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -73,6 +73,9 @@ namespace cicada
     repository_type::const_iterator biter = rep.find("backward");
     if (biter != rep.end())
       __backward = utils::lexical_cast<bool>(biter->second);
+
+    if (! __backward)
+      throw std::runtime_error("this is not a backward trie");
     
     // vocabulary...
     __vocab.open(rep.path("vocab"));
