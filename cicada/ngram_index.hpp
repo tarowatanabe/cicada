@@ -349,34 +349,19 @@ namespace cicada
     
   public:
     state_type root() const { return state_type(); }
-
     
-    size_type shard_index(const state_type& state) const
+    template <typename Iterator>
+    std::pair<state_type, Iterator> next(state_type state, Iterator first, Iterator last) const
     {
-      const size_type shard = state.shard();
-      const size_type node = state.node();
+      for (/**/; first != last; ++ first) {
+	const state_type state_next = next(state, *first);
+	if (state_next.is_root_node())
+	  return std::make_pair(state, first);
+	
+	state = state_next;
+      }
       
-      return (shard == size_type(-1) || node == size_type(-1) || node < __shards[shard].offsets[1]
-	      ? size_type(0)
-	      : shard);
-    }
-    
-    state_type prev(const state_type& state) const
-    {
-      if (state.is_root_shard())
-	return state_type();
-      
-      size_type shard_index = state.shard();
-      size_type node = state.node();
-      
-      const shard_type& shard = __shards[shard_index];
-      
-      if (node != size_type(-1))
-	node = shard.parent(node);
-      
-      return state_type(node == size_type(-1) || node < shard.offsets[1]
-			? size_type(-1) : shard_index,
-			node);
+      return std::make_pair(state, first);
     }
 
     template <typename _Word>
@@ -390,10 +375,12 @@ namespace cicada
       if (state.is_root())
 	return state_type(state.shard(), __shards[0].find(state.node(), word));
       else {
+	if (state.is_root_node())
+	  throw std::runtime_error("invalid state");
+	
 	if (! state.is_root_shard())
 	  return state_type(state.shard(), __shards[state.shard()].find(state.node(), word));
 	else {
-	  // we reached a bigram query!
 	  // state.node() is equal to unigram's id
 	  const size_type shard = shard_index(state.node(), word);
 	  
@@ -423,73 +410,11 @@ namespace cicada
     template <typename Iterator>
     std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
     {
-      // this is the maximum prefix...
       last = std::min(last, first + order() - 1);
       
-      size_type length = std::distance(first, last);
+      if (first == last || first + 1 == last) return std::make_pair(first, last);
       
-      if (length <= 1)
-	return std::make_pair(first, last);
-
-      // Any way, we will + 1 after the longest match. So, we can decrement and try
-      // find the longest match within this decremented range.
-      -- last;
-      -- length;
-      
-      // we will try find the maximum ngram we can match
-      // TODO: do we use the context-inverted style for ngram indexing, or use full-inversion for backoff indexing...???
-#if 0
-      // Here, we use context-inverted ngram indexing, not backoff indexing
-      for (Iterator iter = last; iter != first; -- iter, -- length) {
-	if (length == 1)
-	  return std::make_pair(first, first + 1 + bool(! next(state_type(), *(iter - 1)).is_root_node()));
-	else {
-	  size_type order_trie = 1;
-	  state_type state(shard_index_backward(first, iter));
-	  
-	  for (Iterator end = iter - 1; end != first; -- end, ++ order_trie) {
-	    const state_type result = next(state, *(end - 1));
-	    
-	    if (result.is_root_node()) break;
-	    
-	    state = result;
-	  }
-	  
-	  if (order_trie != length) continue;
-	  
-	  if (order_trie <= 2)
-	    state = state_type(size_type(-1), state.node());
-	  
-	  if (! next(state, *(iter - 1)).is_root_node())
-	    return std::make_pair(first, iter + 1);
-	}
-      }
-#endif
-      
-      // Here, we use full-inversion backoff indexing...
-      for (Iterator iter = last; iter != first; -- iter, --length) {
-	if (length == 1)
-	  return std::make_pair(first, first + 1 + bool(! next(state_type(), *(iter - 1)).is_root_node()));
-	else {
-	  size_type order_trie = 0;
-	  state_type state(shard_index(iter - 2, iter));
-	  
-	  for (Iterator end = iter; end != first; -- end, ++ order_trie) {
-	    const state_type result = next(state, *(end - 1));
-	    
-	    if (result.is_root_node()) break;
-	    
-	    state = result;
-	  }
-	  
-	  if (order_trie != length) continue;
-	  
-	  return std::make_pair(first, iter + 1);
-	}
-      }
-      
-      // nothing found... actually, we will not reach here...
-      return std::make_pair(first, first + 1);
+      return std::make_pair(first, next(state_type(), first, last).second + 1);
     }
 
     template <typename Iterator>
@@ -503,7 +428,7 @@ namespace cicada
     template <typename Iterator, typename __Word>
     state_type __suffix_dispatch(Iterator first, Iterator last, __Word) const
     {
-      first = std::max(first, last - order() + 1);
+      typedef std::vector<id_type, std::allocator<id_type> > buffer_type;
       
       const size_type length = std::distance(first, last);
       
@@ -514,25 +439,16 @@ namespace cicada
 	return (state.is_root_node() ? state_type() : state);
       }
       
-      // we take the last two words!
-      state_type state(shard_index(__vocab[*(last - 2)], __vocab[*(last - 1)]));
+      buffer_type buffer(length);
+      for (typename buffer_type::iterator biter = buffer.begin(); first != last; ++ first, ++ biter)
+	*biter = __vocab[*first];
       
-      for (int order = 0; last != first; -- last, ++ order) {
-	const state_type result = next(state, *(last - 1));
-	if (result.is_root_node())
-	  return (order <= 1 ? state_type(size_type(-1), state.node()) : state);
-	
-	state = result;
-      }
-      
-      return state;
+      return __suffix_dispatch(buffer.begin(), buffer.end(), id_type());
     }
 
     template <typename Iterator>
     state_type __suffix_dispatch(Iterator first, Iterator last, id_type) const
     {
-      first = std::max(first, last - order() + 1);
-      
       const size_type length = std::distance(first, last);
       
       if (length == 0)
@@ -542,50 +458,37 @@ namespace cicada
 	return (state.is_root_node() ? state_type() : state);
       }
       
-      // we take the last two words!
-      state_type state(shard_index(*(last - 2), *(last - 1)));
+      first = std::max(first, last - order());
       
-      for (int order = 0; last != first; -- last, ++ order) {
-	const state_type result = next(state, *(last - 1));
-	if (result.is_root_node())
-	  return (order <= 1 ? state_type(size_type(-1), state.node()) : state);
+      state_type state;
+      
+      while (first != last) {
+	std::pair<state_type, Iterator> result = next(state, first, last);
 	
-	state = result;
+	if (result.second == last)
+	  return result.first;
+	else {
+	  state = suffix(result.first);
+	  first = result.second;
+	}
       }
       
-      return state;
+      return state_type();
     }
     
     state_type suffix(const state_type& state) const
     {
       typedef std::vector<id_type, std::allocator<id_type> > context_type;
       
-      // root or unigram
+      // root or unigram's suffix is root
       if (state.is_root() || state.is_root_shard())
-	return state;
+	return state_type();
       
-      const size_type shard_index = state.shard();
-      shard_type& shard = const_cast<shard_type&>(__shards[shard_index]);
+      shard_type& shard = const_cast<shard_type&>(__shards[state.shard()]);
       
-      // if we are bigram
-      if (state.node() < shard.offsets[2]) {
-	size_type node = state.node();
-	
-	const id_type word2 = shard[node];
-	const id_type word1 = shard[shard.parent(node)];
-	
-	const state_type state(shard_index);
-	const state_type state1 = next(state, word2);
-	
-	if (state1.is_root_node())
-	  return state_type();
-	
-	const state_type state2 = next(state1, word1);
-	
-	return (state2.is_root_node() ? state_type(size_type(-1), state1.node()) : state2);
-      }
-
-      // trigram or higher....
+      // if we are bigram, we will simply take root_shard + current id
+      if (state.node() < shard.offsets[2])
+	return state_type(size_type(-1), shard[state.node()]);
       
       const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
       
@@ -596,26 +499,32 @@ namespace cicada
 	if (lock && shard.caches_suffix[cache_pos].state == state)
 	  return shard.caches_suffix[cache_pos].suffix;
       }
-      
-      // remember, we traver in the order:
-      //    history in inverse direction
-      //    the last word
-      
+
+      // we will push in reverse order...
       context_type context(order());
-      context_type::iterator first = context.begin();
-      context_type::iterator last  = context.begin();
-      
-      const id_type word = shard[state.node()];
-      size_type curr = shard.parent(state.node());
-      for (/**/; curr != size_type(-1); ++ last) {
-	*last = shard[curr];
-	curr = shard.parent(curr);
+      context_type::reverse_iterator riter = context.rbegin();
+	
+      {
+	size_type node = state.node();
+	for (/**/; node != size_type(-1); ++ riter) {
+	  *riter = shard[node];
+	  node = shard.parent(node);
+	}
       }
-      *last = word;
-      ++ last;
       
-      const state_type state_suffix = suffix(first, last);
-      
+      context_type::const_iterator first = riter.base() + 1;
+      context_type::const_iterator last  = context.end();
+
+      state_type state_suffix;
+      for (/**/; first != last - 1; ++ first) {
+	std::pair<state_type, context_type::const_iterator> result = next(state_type(), first, last);
+	
+	if (result.second == last) {
+	  state_suffix = result.first;
+	  break;
+	}
+      }
+
       // trylock...
       {
 	shard_type::trylock_type lock(shard.spinlock_suffix);
@@ -641,15 +550,6 @@ namespace cicada
       
       typedef typename std::iterator_traits<Iterator>::value_type value_type;
       return __shard_index_dispatch(first, last, value_type());
-    }
-
-    template <typename Iterator>
-    size_type shard_index_backward(Iterator first, Iterator last) const
-    {
-      if (std::distance(first, last) <= 1) return 0;
-      
-      typedef typename std::iterator_traits<Iterator>::value_type value_type;
-      return __shard_index_backward_dispatch(first, last, value_type());
     }
     
     template <typename Iterator>
@@ -697,7 +597,6 @@ namespace cicada
       __vocab.clear();
       __order = 0;
       __path = path_type();
-      __backward = false;
     }
     void close() { clear(); }
     
@@ -715,9 +614,7 @@ namespace cicada
     path_type path() const { return __path; }
     
     inline const int& order() const { return __order; }
-    
-    bool backward() const { return __backward; }
-    
+        
     size_type ngram_size(int order) const
     {
       switch (order) {
@@ -744,23 +641,7 @@ namespace cicada
     {
       return shard_index(*first, *(first + 1));
     }
-    
-    template <typename Iterator, typename _Word>
-    size_type __shard_index_backward_dispatch(Iterator first, Iterator last, _Word) const
-    {
-      const bool length_adjust = std::distance(first, last) > 2;
-      
-      return shard_index(__vocab[word_type(*(last - 2 - length_adjust))], __vocab[word_type(*(last - 1 - length_adjust))]);
-    }
-    
-    template <typename Iterator>
-    size_type __shard_index_backward_dispatch(Iterator first, Iterator last, id_type) const
-    {
-      const bool length_adjust = std::distance(first, last) > 2;
-      
-      return shard_index(*(last - 2 - length_adjust), *(last - 1 - length_adjust));
-    }
-    
+        
   private:
     shard_set_type __shards;
     vocab_type     __vocab;
@@ -768,7 +649,6 @@ namespace cicada
     
     int            __order;
     path_type      __path;
-    bool           __backward;
   };
   
 };
