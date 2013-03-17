@@ -414,6 +414,9 @@ namespace cicada
       
       if (first == last || first + 1 == last) return std::make_pair(first, last);
       
+      // decrement first...
+      -- last;
+      
       return std::make_pair(first, next(state_type(), first, last).second + 1);
     }
 
