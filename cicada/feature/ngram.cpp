@@ -334,7 +334,7 @@ namespace cicada
 	  cache[cache_pos] = std::distance(result.first, result.second);
 	}
 	
-	return std::make_pair(first, first + cacche_prefix[cache_pos]);
+	return std::make_pair(first, first + cache_prefix[cache_pos]);
       }
 
       struct extract_cluster
