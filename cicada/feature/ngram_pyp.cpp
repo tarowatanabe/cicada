@@ -203,10 +203,10 @@ namespace cicada
 	    score += ngram->logprob(buffer.begin(), buffer.end());
 	  }
 	  
-	  cache.score(cache_pos) = score;
+	  cache[cache_pos] = score;
 	}
 	
-	return cache_estimate.score(cache_pos);
+	return cache_estimate[cache_pos];
       }
 
       struct extract_word

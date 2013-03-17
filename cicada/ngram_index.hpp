@@ -438,6 +438,7 @@ namespace cicada
       
       // we will try find the maximum ngram we can match
       // TODO: do we use the context-inverted style for ngram indexing, or use full-inversion for backoff indexing...???
+#if 0
       // Here, we use context-inverted ngram indexing, not backoff indexing
       for (Iterator iter = last; iter != first; -- iter, -- length) {
 	if (length == 1)
@@ -461,6 +462,29 @@ namespace cicada
 	  
 	  if (! next(state, *(iter - 1)).is_root_node())
 	    return std::make_pair(first, iter + 1);
+	}
+      }
+#endif
+      
+      // Here, we use full-inversion backoff indexing...
+      for (Iterator iter = last; iter != first; -- iter, --length) {
+	if (length == 1)
+	  return std::make_pair(first, first + 1 + bool(! next(state_type(), *(iter - 1)).is_root_node()));
+	else {
+	  size_type order_trie = 0;
+	  state_type state(shard_index(iter - 2, iter));
+	  
+	  for (Iterator end = iter; end != first; -- end, ++ order_trie) {
+	    const state_type result = next(state, *(end - 1));
+	    
+	    if (result.is_root_node()) break;
+	    
+	    state = result;
+	  }
+	  
+	  if (order_trie != length) continue;
+	  
+	  return std::make_pair(first, iter + 1);
 	}
       }
       

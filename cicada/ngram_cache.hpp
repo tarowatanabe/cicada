@@ -51,8 +51,8 @@ namespace cicada
       return hasher_type::operator()(first, last, 0) & (cache_size - 1);
     }
     
-    inline       score_type& score(size_type pos) { return scores[pos]; }
-    inline const score_type& score(size_type pos) const { return scores[pos]; }
+    inline       score_type& operator[](size_type pos) { return scores[pos]; }
+    inline const score_type& operator[](size_type pos) const { return scores[pos]; }
     
     template <typename Iterator>
     bool equal_to(size_type pos, Iterator first, Iterator last) const

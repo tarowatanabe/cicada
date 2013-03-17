@@ -59,6 +59,7 @@ namespace cicada
       typedef std::pair<ngram_state_type, double> state_score_type;
       
       typedef cicada::NGramCache<symbol_type::id_type, state_score_type> ngram_cache_type;
+      typedef cicada::NGramCache<symbol_type::id_type, int>              prefix_cache_type;
       
       typedef cicada::Cluster cluster_type;
       
@@ -164,6 +165,7 @@ namespace cicada
       {
 	cache_logprob.clear();
 	cache_estimate = ngram_cache_type(ngram->index.order());
+	cache_prefix   = prefix_cache_type(ngram->index.order());
       }
       
       template <typename Iterator>
@@ -312,10 +314,27 @@ namespace cicada
 	    state_score.second += result.second;
 	  }
 	  
-	  cache.score(cache_pos) = state_score;
+	  cache[cache_pos] = state_score;
 	}
 	
-	return cache_estimate.score(cache_pos);
+	return cache_estimate[cache_pos];
+      }
+
+      template <typename Iterator>
+      std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
+      {
+	const size_type cache_pos = cache_prefix(first, last);
+	
+	if (! cache_prefix.equal_to(cache_pos, first, last)) {
+	  prefix_cache_type& cache = const_cast<prefix_cache_type&>(cache_prefix);
+	  cache.assign(cache_pos, first, last);
+	  
+	  const std::pair<Iterator, Iterator > result = ngram->prefix(first, last);
+	  
+	  cache[cache_pos] = std::distance(result.first, result.second);
+	}
+	
+	return std::make_pair(first, first + cacche_prefix[cache_pos]);
       }
 
       struct extract_cluster
@@ -426,7 +445,8 @@ namespace cicada
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+	  //std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
 	  
 	  if (prefix.second == biter_end) {
 	    *ngram_state = state_invalid;
@@ -479,7 +499,8 @@ namespace cicada
 		buffer_type::const_iterator biter_end   = buffer.end();
 		buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 		
-		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+		//std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
 		
 		if (prefix.second == biter_end) {
 		  // implicitly, invalid state, but we do not have to make an assignment, since state_rule will be assinged from antecedent.
@@ -526,7 +547,8 @@ namespace cicada
 	  buffer_type::const_iterator biter_end   = buffer.end();
 	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
 	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+	  //std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
 	  
 	  if (prefix.second == biter_end) {
 	    *ngram_state = state_invalid;
@@ -712,6 +734,7 @@ namespace cicada
       // caching...
       cache_context_set_type cache_logprob;
       ngram_cache_type       cache_estimate;
+      prefix_cache_type      cache_prefix;
       
       // actual buffers...
       buffer_type    buffer_impl;
