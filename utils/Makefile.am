@@ -293,6 +293,8 @@ bichart_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 bichart_main_LDADD = $(BOOST_THREAD_LIBS)
 
 bithack_main_SOURCES = bithack_main.cpp
+bithack_main_LDFLAGS = $(BOOST_UNIT_TEST_FRAMEWORK_LDFLAGS)
+bithack_main_LDADD   = $(BOOST_UNIT_TEST_FRAMEWORK_LIBS)
 
 bitpack_main_SOURCES = bitpack_main.cpp
 bitpack_main_LDFLAGS = $(BOOST_THREAD_LDFLAGS)

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -8,26 +8,55 @@
 
 #include <boost/numeric/conversion/bounds.hpp>
 
+#define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE bithack_test
+
+#include <boost/test/unit_test.hpp>
+
+BOOST_AUTO_TEST_CASE(power2)
+{
+  BOOST_CHECK(utils::bithack::is_power2(0));
+  BOOST_CHECK(utils::bithack::is_power2(1));
+  BOOST_CHECK(utils::bithack::is_power2(2));
+  BOOST_CHECK(! utils::bithack::is_power2(3));
+  BOOST_CHECK(utils::bithack::is_power2(4));
+  BOOST_CHECK(! utils::bithack::is_power2(5));
+  BOOST_CHECK(! utils::bithack::is_power2(6));
+  BOOST_CHECK(! utils::bithack::is_power2(7));
+  BOOST_CHECK(utils::bithack::is_power2(8));
+
+  BOOST_CHECK_EQUAL( 1, utils::bithack::next_largest_power2(0));
+  BOOST_CHECK_EQUAL( 2, utils::bithack::next_largest_power2(1));
+  BOOST_CHECK_EQUAL( 4, utils::bithack::next_largest_power2(2));
+  BOOST_CHECK_EQUAL( 4, utils::bithack::next_largest_power2(3));
+  BOOST_CHECK_EQUAL( 8, utils::bithack::next_largest_power2(4));
+  BOOST_CHECK_EQUAL( 8, utils::bithack::next_largest_power2(5));
+  BOOST_CHECK_EQUAL( 8, utils::bithack::next_largest_power2(6));
+  BOOST_CHECK_EQUAL( 8, utils::bithack::next_largest_power2(7));
+  BOOST_CHECK_EQUAL(16, utils::bithack::next_largest_power2(8));
+}
+
+BOOST_AUTO_TEST_CASE(min_max)
+{
+  //
+  // revise this implementation... so that we can make a meaningful comparison
+  // 
+  BOOST_CHECK_EQUAL(-56, utils::bithack::min(-56, 72));
+  BOOST_CHECK_EQUAL( 72, utils::bithack::max(-56, 72));
+  BOOST_CHECK_EQUAL(size_t(72), utils::bithack::min(size_t(-56), size_t(72)));
+  BOOST_CHECK_EQUAL(size_t(-56), utils::bithack::max(size_t(-56), size_t(72)));
+  BOOST_CHECK_EQUAL( 56, utils::bithack::min(56, 72));
+  BOOST_CHECK_EQUAL( 72, utils::bithack::max(56, 72));
+
+  BOOST_CHECK_EQUAL(56, utils::bithack::min(56, boost::numeric::bounds<int>::highest()));
+  BOOST_CHECK_EQUAL(boost::numeric::bounds<int>::highest(), utils::bithack::max(56, boost::numeric::bounds<int>::highest()));
+}
+
+
+#if 0
 int main(int argc, char** argv)
 {
-  for (int i = 0; i != 16; ++ i)
-    std::cout << i << ' ' << utils::bithack::is_power2(i) << ' ' << utils::bithack::next_largest_power2(i) << std::endl;
 
-  std::cout << utils::bithack::min(-56, 72) << std::endl;
-  std::cout << utils::bithack::max(-56, 72) << std::endl;
-  
-  std::cout << utils::bithack::min(size_t(-56), size_t(72)) << std::endl;
-  std::cout << utils::bithack::max(size_t(-56), size_t(72)) << std::endl;
-  
-  std::cout << "min/max 56 and 72" << std::endl;
-  
-  std::cout << utils::bithack::min(56, 72) << std::endl;
-  std::cout << utils::bithack::max(56, 72) << std::endl;
-
-  std::cout << "min/max 56 and highest" << std::endl;
-
-  std::cout << utils::bithack::min(56, boost::numeric::bounds<int>::highest()) << std::endl;
-  std::cout << utils::bithack::max(56, boost::numeric::bounds<int>::highest()) << std::endl;
 
   std::cout << "min/max 56 and lowest" << std::endl;
 
@@ -79,3 +108,4 @@ int main(int argc, char** argv)
   std::cerr << "5 < 64 ? 0 : 5 = " << utils::bithack::branch(5 < 64, 0, 5) << std::endl;
   std::cerr << "5 < 3 ? 0 : 5 = " << utils::bithack::branch(5 < 3, 0, 5) << std::endl;
 }
+#endif
