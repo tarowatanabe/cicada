@@ -1374,6 +1374,8 @@ struct Cabocha
 	  if (flush_output)
 	    os << std::flush;
 	}
+
+	nodes.clear();
 	  
       } else if (tokens.size() == 5) {
 	if (tokens.front() != "*")
