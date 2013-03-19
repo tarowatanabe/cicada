@@ -1381,7 +1381,9 @@ struct Cabocha
 	  
 	const int index = utils::lexical_cast<int>(tokens[1]);
 	if (index != static_cast<int>(nodes.size()))
-	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
+	  throw std::runtime_error("invalid cabocha F1 format: node size do not match: "
+				   + tokens[1]
+				   + " " + utils::lexical_cast<std::string>(nodes.size()));
 	
 	int dep;
 	int head;
@@ -1405,7 +1407,7 @@ struct Cabocha
 	
 	nodes.push_back(node_type(dep, utils::bithack::branch(func_mode, func, head)));
 	
-      } else if (tokens.size() == 3) {
+      } else if (tokens.size() == 3 || tokens.size() == 2) {
 	boost::tokenizer<boost::char_separator<char>, utils::piece::const_iterator, utils::piece> tokenizer(tokens[1], boost::char_separator<char>(","));
 	tokens_type poss(tokenizer.begin(), tokenizer.end());
 	  

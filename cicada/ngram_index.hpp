@@ -280,7 +280,7 @@ namespace cicada
 	    for (/**/; first != last && ids[first] < id; ++ first);
 	    return first + offset;
 	  } else {
-	    while (length > 0) {
+	    while (length) {
 	      const size_t half  = length >> 1;
 	      const size_t middle = first + half;
 	      
