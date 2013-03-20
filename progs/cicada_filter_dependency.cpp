@@ -841,7 +841,7 @@ struct CoNLL
     
       token %= qi::lexeme[+(standard::char_ - standard::space)];
       
-      conll  %= size >> token >> token >> token >> token >> token >> size >> token >> (size | token) >> token >> qi::eol;
+      conll  %= size >> token >> token >> token >> token >> token >> size >> token >> -((size | token) >> token) >> qi::eol;
       conlls %= *conll >> qi::eol;
     }
     
