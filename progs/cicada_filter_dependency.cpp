@@ -804,6 +804,7 @@ struct conll_type
       form(__form),
       lemma(__lemma),
       cpostag(__cpostag),
+      postag(__postag),
       feats(__feats),
       head(__head),
       deprel(__deprel),
@@ -911,7 +912,7 @@ struct CoNLL
 	    if (relation_mode)
 	      citer->deprel = normalize(citer->deprel);
 	    else
-	      citer->cpostag = normalize(citer->cpostag);
+	      citer->postag = normalize(citer->postag);
 	  }
 	}
       }
@@ -926,7 +927,7 @@ struct CoNLL
 	  if (relation_mode)
 	    deps.postag.push_back('[' + citer->deprel + ']');
 	  else
-	    deps.postag.push_back('[' + citer->cpostag + ']');
+	    deps.postag.push_back('[' + citer->postag + ']');
 	    
 	  if (projective_mode) {
 	    const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
@@ -974,7 +975,7 @@ struct CoNLL
 	    for (conll_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
 	      if (citer != citer_begin)
 		os << ' ';
-	      os << citer->form << '_' << citer->cpostag;
+	      os << citer->form << '_' << citer->postag;
 	    }
 	  }
 	  os << '\n';
@@ -992,7 +993,7 @@ struct CoNLL
 	  } else {
 	    conll_set_type::const_iterator citer_end = conll.end();
 	    for (conll_set_type::const_iterator citer = conll.begin(); citer != citer_end; ++ citer)
-	      os << citer->cpostag << ' ';
+	      os << citer->postag << ' ';
 	  }
 	  os << "|||";
 	  
