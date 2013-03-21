@@ -1396,7 +1396,7 @@ struct Cabocha
 	  utils::piece::const_iterator iter = tokens[2].begin();
 	  utils::piece::const_iterator iter_end = tokens[2].end();
 	  
-	  if (! qi::parse(iter, iter_end, qi::int_ >> qi::lit('D'), dep) || iter != iter_end)
+	  if (! qi::parse(iter, iter_end, qi::int_ >> (qi::lit('D') | qi::lit('P') | qi::lit('A')), dep) || iter != iter_end)
 	    throw std::runtime_error("dep parsing failed?");
 	}
 	
