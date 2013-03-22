@@ -546,7 +546,7 @@ template <size_t Floors, typename Tp, typename Hash=boost::hash<Tp>, typename Pr
 					     std::numeric_limits<double>::infinity(),
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
 	
 	if (has_discount_prior()) 
 	  parameter.discount = slice_sampler(discount_sampler,
@@ -556,7 +556,7 @@ template <size_t Floors, typename Tp, typename Hash=boost::hash<Tp>, typename Pr
 					     1.0,
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
       }
       
       if (has_strength_prior())
@@ -567,7 +567,7 @@ template <size_t Floors, typename Tp, typename Hash=boost::hash<Tp>, typename Pr
 					   std::numeric_limits<double>::infinity(),
 					   0.0,
 					   num_iterations,
-					   100 * num_iterations);
+					   32 * num_iterations);
     }
     
   private:

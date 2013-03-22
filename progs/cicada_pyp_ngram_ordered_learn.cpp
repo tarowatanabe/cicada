@@ -585,7 +585,7 @@ struct PYPLM
 							  std::numeric_limits<double>::infinity(),
 							  0.0,
 							  num_iterations,
-							  100 * num_iterations);
+							  32 * num_iterations);
 	parameters[order].verify_parameters();
 	
 	parameters[order].discount = utils::slice_sampler(discount_sampler,
@@ -595,7 +595,7 @@ struct PYPLM
 							  1.0,
 							  0.0,
 							  num_iterations,
-							  100 * num_iterations);
+							  32 * num_iterations);
 	parameters[order].verify_parameters();
       }
       
@@ -606,7 +606,7 @@ struct PYPLM
 							std::numeric_limits<double>::infinity(),
 							0.0,
 							num_iterations,
-							100 * num_iterations);
+							32 * num_iterations);
       parameters[order].verify_parameters();
       
       node_ptr_set_type::const_iterator niter_end = nodes[order].end();

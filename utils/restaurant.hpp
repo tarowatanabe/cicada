@@ -524,7 +524,7 @@ namespace utils
 					     std::numeric_limits<double>::infinity(),
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
 	
 	if (has_discount_prior()) 
 	  parameter.discount = slice_sampler(discount_sampler,
@@ -534,7 +534,7 @@ namespace utils
 					     1.0,
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
       }
       
       if (has_strength_prior())
@@ -545,7 +545,7 @@ namespace utils
 					   std::numeric_limits<double>::infinity(),
 					   0.0,
 					   num_iterations,
-					   100 * num_iterations);
+					   32 * num_iterations);
     }
     
   private:

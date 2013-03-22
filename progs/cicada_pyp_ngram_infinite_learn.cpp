@@ -552,7 +552,7 @@ struct PYPLM
 							  std::numeric_limits<double>::infinity(),
 							  0.0,
 							  num_iterations,
-							  100 * num_iterations);
+							  32 * num_iterations);
 
 	parameters[order].verify_parameters();
 	
@@ -563,7 +563,7 @@ struct PYPLM
 							  1.0,
 							  0.0,
 							  num_iterations,
-							  100 * num_iterations);
+							  32 * num_iterations);
 	
 	parameters[order].verify_parameters();
       }
@@ -575,7 +575,7 @@ struct PYPLM
 							std::numeric_limits<double>::infinity(),
 							0.0,
 							num_iterations,
-							100 * num_iterations);
+							32 * num_iterations);
       
       parameters[order].verify_parameters();
       

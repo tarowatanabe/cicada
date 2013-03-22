@@ -620,7 +620,7 @@ struct PYPWord
 					       std::numeric_limits<double>::infinity(),
 					       0.0,
 					       num_iterations,
-					       100 * num_iterations);
+					       32 * num_iterations);
 	
 	discount[order] = utils::slice_sampler(discount_sampler,
 					       discount[order],
@@ -629,7 +629,7 @@ struct PYPWord
 					       1.0,
 					       0.0,
 					       num_iterations,
-					       100 * num_iterations);
+					       32 * num_iterations);
       }
       
       strength[order] = utils::slice_sampler(strength_sampler,
@@ -639,7 +639,7 @@ struct PYPWord
 					     std::numeric_limits<double>::infinity(),
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
       
       if (order == 0) {
 	root.table.discount() = discount[order];
@@ -1007,7 +1007,7 @@ struct PYPLM
 					       std::numeric_limits<double>::infinity(),
 					       0.0,
 					       num_iterations,
-					       100 * num_iterations);
+					       32 * num_iterations);
 	
 	discount[order] = utils::slice_sampler(discount_sampler,
 					       discount[order],
@@ -1016,7 +1016,7 @@ struct PYPLM
 					       1.0,
 					       0.0,
 					       num_iterations,
-					       100 * num_iterations);
+					       32 * num_iterations);
       }
       
       strength[order] = utils::slice_sampler(strength_sampler,
@@ -1026,7 +1026,7 @@ struct PYPLM
 					     std::numeric_limits<double>::infinity(),
 					     0.0,
 					     num_iterations,
-					     100 * num_iterations);
+					     32 * num_iterations);
       
       if (order == 0) {
 	root.table.discount() = discount[order];
