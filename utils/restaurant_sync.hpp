@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-13 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 
@@ -111,44 +111,40 @@ namespace utils
     struct Location
     {
       typedef typename Alloc::template rebind<size_type>::other alloc_type;
-      typedef std::vector<size_type, alloc_type> table_set_type;
+
+      typedef utils::table_count<size_type, 1, alloc_type> count_set_type;
       
-      typedef typename table_set_type::const_iterator const_iterator;
-      
+      typedef typename count_set_type::histogram_type::const_iterator const_iterator;
+
       typedef utils::rwticket mutex_type;
       
-      Location() : customers(0), tables(), mutex() {}
-      Location(const Location& x) : customers(x.customers), tables(x.tables), mutex() {}
+      Location() : counts(), mutex() {}
+      Location(const Location& x) : counts(x.counts), mutex() {}
       Location& operator=(const Location& x)
       {
-	customers = x.customers;
-	tables = x.tables;
+	counts = x.counts;
 	return *this;
       }
       
-      const_iterator begin() const { return tables.begin(); }
-      const_iterator end() const { return tables.end(); }
+      const_iterator begin() const { return counts[0].begin(); }
+      const_iterator end() const { return counts[0].end(); }
 
-      size_type size_customer() const { return customers; }
-      size_type size_table() const { return tables.size(); }
+      size_type size_customer() const { return counts.customers(); }
+      size_type size_table() const { return counts.tables(); }
+
+      bool empty() const { return counts.customers() == 0; }
       
-      bool empty() const { return tables.empty(); }
-
       void clear()
       {
-	customers = 0;
-	tables.clear();
+	counts.clear();
       }
 
       void swap(Location& x)
       {
-	std::swap(customers, x.customers);
-	tables.swap(x.tables);
+	counts.swap(x.counts);
       }
       
-      size_type      customers;
-      table_set_type tables;
-
+      count_set_type counts;
       mutex_type mutex;
     };
     typedef Location location_type;
@@ -193,17 +189,16 @@ namespace utils
     size_type size() const { return dishes.size(); }
     
     size_type size_customer() const { return customers; }
-    
     size_type size_table() const { return tables; }
     
     size_type size_table(const dish_type dish) const
     {
-      return (dish < dishes.size() ? dishes[dish].tables.size() : size_type(0));
+      return (dish < dishes.size() ? dishes[dish].size_table() : size_type(0));
     }
 
     size_type size_customer(const dish_type dish) const
     {
-      return (dish < dishes.size() ? dishes[dish].customers : size_type(0));
+      return (dish < dishes.size() ? dishes[dish].size_customer() : size_type(0));
     }
 
     void swap(restaurant_sync& x)
@@ -244,37 +239,19 @@ namespace utils
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 
       if (loc.empty()) {
-	loc.tables.push_back(1);
+	loc.counts.increment_new();
+	
+	utils::atomicop::add_and_fetch(customers, size_type(1));
 	utils::atomicop::add_and_fetch(tables, size_type(1));
 	
-	++ loc.customers;
+	return true;
+      } else {
+	loc.counts.increment_existing(parameter.discount, sampler);
+	
 	utils::atomicop::add_and_fetch(customers, size_type(1));
 	
-	return true;
+	return false;
       }
-      
-      double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
-      
-      bool incremented = false;
-      
-      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	r -= (*titer - parameter.discount);
-	  
-	if (r <= 0.0) {
-	  ++ (*titer);
-	  incremented = true;
-	  break;
-	}
-      }
-      
-      if (! incremented)
-	throw std::runtime_error("not incremented?");
-      
-      ++ loc.customers;
-      utils::atomicop::add_and_fetch(customers, size_type(1));
-      
-      return false;
     }
     
     template <typename Sampler>
@@ -286,12 +263,11 @@ namespace utils
       location_type& loc = dishes[dish];
       
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
-
-      loc.tables.push_back(1);
-      utils::atomicop::add_and_fetch(tables, size_type(1));
       
-      ++ loc.customers;
+      loc.counts.increment_new();
+      
       utils::atomicop::add_and_fetch(customers, size_type(1));
+      utils::atomicop::add_and_fetch(tables, size_type(1));
       
       return true;
     }
@@ -307,48 +283,34 @@ namespace utils
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
       
       bool existing = false;
-      if (loc.customers) {
+      if (loc.size_customer()) {
 	if (temperature == 1.0) {
 	  const double p_base = (parameter.strength + tables * parameter.discount) * p0;
-	  const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
+	  const double p_gen  = (loc.size_customer() - loc.size_table() * parameter.discount);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	} else {
 	  const double p_base = std::pow((parameter.strength + tables * parameter.discount) * p0, 1.0 / temperature);
-	  const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
+	  const double p_gen  = std::pow((loc.size_customer() - loc.size_table() * parameter.discount), 1.0 / temperature);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	}
       }
       
-      if (existing) {
-	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
+      if (! existing) {
+	loc.counts.increment_new();
 	
-	bool incremented = false;
-	
-	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	  r -= (*titer - parameter.discount);
-	  
-	  if (r <= 0.0) {
-	    ++ (*titer);
-	    incremented = true;
-	    break;
-	  }
-	}
-	
-	if (! incremented)
-	  throw std::runtime_error("not incremented?");
-
-      } else {
-	loc.tables.push_back(1);
+	utils::atomicop::add_and_fetch(customers, size_type(1));
 	utils::atomicop::add_and_fetch(tables, size_type(1));
+	
+	return true;
+      } else {
+	loc.counts.increment_existing(parameter.discount, sampler);
+	
+	utils::atomicop::add_and_fetch(customers, size_type(1));
+	
+	return false;
       }
-      
-      ++ loc.customers;
-      utils::atomicop::add_and_fetch(customers, size_type(1));
-      
-      return ! existing;
     }
 
     template <typename Iterator, typename Sampler>
@@ -360,7 +322,7 @@ namespace utils
     }
 
     template <typename Iterator, typename Sampler>
-    size_type increment_dispatch(Iterator first, Iterator last, const double& p0, Sampler& sampler, const double temperature, boost::false_type)
+    size_type increment_dispatch(Iterator first, Iterator last, const double& p0, Sampler& sampler, const double& temperature, boost::false_type)
     {
       size_type inserted_customers = 0;
       size_type inserted_tables = 0;
@@ -376,46 +338,28 @@ namespace utils
 	typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 	
 	bool existing = false;
-	if (loc.customers) {
+	if (loc.size_customer()) {
 	  if (temperature == 1.0) {
 	    const double p_base = (parameter.strength + (tables + inserted_tables) * parameter.discount) * p0;
-	    const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
+	    const double p_gen  = (loc.size_customer() - loc.size_table() * parameter.discount);
 	    
 	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	  } else {
 	    const double p_base = std::pow((parameter.strength + (tables + inserted_tables) * parameter.discount) * p0, 1.0 / temperature);
-	    const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
+	    const double p_gen  = std::pow((loc.size_customer() - loc.size_table() * parameter.discount), 1.0 / temperature);
 	    
 	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	  }
 	}
 	
-	if (existing) {
-	  double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
-	  
-	  bool incremented = false;
-	  
-	  typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	  for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	    r -= (*titer - parameter.discount);
-	    
-	    if (r <= 0.0) {
-	      ++ (*titer);
-	      incremented = true;
-	      break;
-	    }
-	  }
-	  
-	  if (! incremented)
-	    throw std::runtime_error("not incremented?");
-	  
-	} else {
-	  loc.tables.push_back(1);
+	if (! existing) {
+	  ++ inserted_customers;
 	  ++ inserted_tables;
+	  loc.counts.increment_new();
+	} else {
+	  ++ inserted_customers;
+	  loc.counts.increment_existing(parameter.discount, sampler);
 	}
-	
-	++ loc.customers;
-	++ inserted_customers;
       }
       
       utils::atomicop::add_and_fetch(customers, inserted_customers);
@@ -425,7 +369,7 @@ namespace utils
     }
 
     template <typename Sampler>
-    size_type increment_dispatch(const dish_type dish, const size_type count, const double& p0, Sampler& sampler, const double temperature, boost::true_type)
+    size_type increment_dispatch(const dish_type dish, const size_type count, const double& p0, Sampler& sampler, const double& temperature, boost::true_type)
     {
       if (dish >= dishes.size())
 	dishes.resize(dish + 1);
@@ -440,46 +384,28 @@ namespace utils
       for (size_type i = 0; i != count; ++ i) {
 	
 	bool existing = false;
-	if (loc.customers) {
+	if (loc.size_customer()) {
 	  if (temperature == 1.0) {
 	    const double p_base = (parameter.strength + (tables + inserted_tables) * parameter.discount) * p0;
-	    const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
+	    const double p_gen  = (loc.size_customer() - loc.size_table() * parameter.discount);
 	    
 	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	  } else {
 	    const double p_base = std::pow((parameter.strength + (tables + inserted_tables) * parameter.discount) * p0, 1.0 / temperature);
-	    const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
-	  
+	    const double p_gen  = std::pow((loc.size_customer() - loc.size_table() * parameter.discount), 1.0 / temperature);
+	    
 	    existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	  }
 	}
-      
-	if (existing) {
-	  double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
 	
-	  bool incremented = false;
-	
-	  typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	  for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	    r -= (*titer - parameter.discount);
-	  
-	    if (r <= 0.0) {
-	      ++ (*titer);
-	      incremented = true;
-	      break;
-	    }
-	  }
-	
-	  if (! incremented)
-	    throw std::runtime_error("not incremented?");
-
-	} else {
-	  loc.tables.push_back(1);
+	if (! existing) {
+	  ++ inserted_customers;
 	  ++ inserted_tables;
+	  loc.counts.increment_new();
+	} else {
+	  ++ inserted_customers;
+	  loc.counts.increment_existing(parameter.discount, sampler);
 	}
-      
-	++ loc.customers;
-	++ inserted_customers;
       }
 
       utils::atomicop::add_and_fetch(customers, inserted_customers);
@@ -498,41 +424,13 @@ namespace utils
 
       typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
       
-      if (loc.customers == 1) {
-	loc.clear();
-	utils::atomicop::add_and_fetch(tables, size_type(-1));
-	utils::atomicop::add_and_fetch(customers, size_type(-1));
-	return true;
-      }
+      const bool removed = loc.counts.decrement(sampler).second;
       
-      bool erased = false;
-      bool decremented = false;
-      double r = sampler.uniform() * loc.customers;
-      
-      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	r -= *titer;
-	
-	if (r <= 0.0) {
-	  -- (*titer);
-	  decremented = true;
-	  
-	  if (! (*titer)) {
-	    erased = true;
-	    utils::atomicop::add_and_fetch(tables, size_type(-1));
-	    loc.tables.erase(titer);
-	  }
-	  break;
-	}
-      }
-
-      if (! decremented)
-	throw std::runtime_error("not decremented?");
-      
-      -- loc.customers;
       utils::atomicop::add_and_fetch(customers, size_type(-1));
+      if (removed)
+	utils::atomicop::add_and_fetch(tables, size_type(-1));
       
-      return erased;
+      return removed;
     }
 
     template <typename Iterator, typename Sampler>
@@ -559,37 +457,8 @@ namespace utils
 	
 	typename location_type::mutex_type::scoped_writer_lock lock(loc.mutex);
 	
-	if (loc.customers == 1) {
-	  loc.clear();
-	  ++ erased_customers;
-	  ++ erased_tables;
-	  continue;
-	}
-	
-	bool decremented = false;
-	double r = sampler.uniform() * loc.customers;
-	
-	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	  r -= *titer;
-	
-	  if (r <= 0.0) {
-	    -- (*titer);
-	    decremented = true;
-	    
-	    if (! (*titer)) {
-	      ++ erased_tables;
-	      loc.tables.erase(titer);
-	    }
-	    break;
-	  }
-	}
-	
-	if (! decremented)
-	  throw std::runtime_error("not decremented?");
-	
-	-- loc.customers;
 	++ erased_customers;
+	erased_tables += loc.counts.decrement(sampler).second;
       }
       
       utils::atomicop::add_and_fetch(customers, size_type(0) - erased_customers);
@@ -612,37 +481,8 @@ namespace utils
       size_type erased_tables = 0;
       
       for (size_type i = 0; i != count; ++ i) {
-	if (loc.customers == 1) {
-	  loc.clear();
-	  ++ erased_customers;
-	  ++ erased_tables;
-	  continue;
-	}
-	
-	bool decremented = false;
-	double r = sampler.uniform() * loc.customers;
-	
-	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	  r -= *titer;
-	
-	  if (r <= 0.0) {
-	    -- (*titer);
-	    decremented = true;
-	    
-	    if (! (*titer)) {
-	      ++ erased_tables;
-	      loc.tables.erase(titer);
-	    }
-	    break;
-	  }
-	}
-	
-	if (! decremented)
-	  throw std::runtime_error("not decremented?");
-	
-	-- loc.customers;
 	++ erased_customers;
+	erased_tables += loc.counts.decrement(sampler).second;
       }
       
       utils::atomicop::add_and_fetch(customers, size_type(0) - erased_customers);
@@ -659,7 +499,7 @@ namespace utils
       else {
 	typename location_type::mutex_type::scoped_reader_lock lock(const_cast<location_type&>(dishes[dish]).mutex);
 
-	return (P(dishes[dish].customers - parameter.discount * dishes[dish].tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
+	return (P(dishes[dish].size_customer() - parameter.discount * dishes[dish].size_table()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
       }
     }
     
@@ -680,7 +520,7 @@ namespace utils
 	if (dishes[dish].empty())
 	  return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);
 	else
-	  return std::make_pair((P(dishes[dish].customers - parameter.discount * dishes[dish].tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
+	  return std::make_pair((P(dishes[dish].size_customer() - parameter.discount * dishes[dish].size_table()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
       }
     }
     
@@ -710,16 +550,16 @@ namespace utils
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	  const location_type& loc = *diter;
 	  
-	  typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	  for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	    logprob += utils::mathop::lgamma(*titer - discount) - lg;
+	  typename location_type::const_iterator titer_end = loc.end();
+	  for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
+	    logprob += (utils::mathop::lgamma(titer->first - discount) - lg) * titer->second;
 	}
       } else if (discount == 0.0) {
 	logprob += utils::mathop::lgamma(strength) + tables * std::log(strength) - utils::mathop::lgamma(strength + tables);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
-	  logprob += utils::mathop::lgamma(diter->tables.size());
+	  logprob += utils::mathop::lgamma(diter->size_table());
       } else
 	throw std::runtime_error("negative discount?");
       
@@ -800,10 +640,11 @@ namespace utils
       for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	const location_type& loc = *diter;
 	
-	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	  for (size_type j = 1; j < *titer; ++ j)
-	    z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));
+	typename location_type::const_iterator titer_end = loc.end();
+	for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
+	  for (size_type i = 0; i != titer->second; ++ i)
+	    for (size_type j = 1; j < titer->first; ++ j)
+	      z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));
       }
       
       return z;

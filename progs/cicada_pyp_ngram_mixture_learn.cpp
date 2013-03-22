@@ -673,7 +673,7 @@ struct PYPMixture
   
   struct Node
   {
-    typedef utils::restaurant_floor<word_type, boost::hash<word_type>, std::equal_to<word_type>,
+    typedef utils::restaurant_floor<16, word_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<word_type > > table_type;
   
     typedef utils::rwticket mutex_type;
@@ -1504,6 +1504,9 @@ int main(int argc, char ** argv)
 
     for (size_t i = 0; i != stemmer_specs.size(); ++ i)
       normalizers[i + cluster_files.size()] = normalizer_type(&stemmer_type::create(stemmer_specs[i]));
+
+    if (normalizers.size() > 16)
+      throw std::runtime_error("we support up to 16 mixtures!");
     
     sampler_type sampler;
     const size_t num_vocab = vocabulary_size(train_files);

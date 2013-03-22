@@ -51,7 +51,7 @@
 namespace utils
 {
 
-  template <typename Tp, typename Hash=boost::hash<Tp>, typename Pred=std::equal_to<Tp>, typename Alloc=std::allocator<Tp> >
+template <size_t Floors, typename Tp, typename Hash=boost::hash<Tp>, typename Pred=std::equal_to<Tp>, typename Alloc=std::allocator<Tp> >
   class restaurant_floor
   {
   public:
@@ -120,39 +120,33 @@ namespace utils
   private:
     struct Location
     {
-      typedef size_type count_type;
-      typedef size_type floor_type;
-      typedef std::pair<size_type, size_type> value_type;
-      typedef typename Alloc::template rebind<value_type>::other alloc_type;
-      
-      typedef std::vector<value_type, alloc_type> table_set_type;
+      typedef typename Alloc::template rebind<size_type>::other alloc_type;
 
-      typedef typename table_set_type::const_iterator const_iterator;
+      typedef utils::table_count<size_type, Floors, alloc_type> count_set_type;
       
-      Location() : customers(0) {}
+      typedef typename count_set_type::const_iterator const_iterator;
       
-      const_iterator begin() const { return tables.begin(); }
-      const_iterator end() const { return tables.end(); }
-
-      size_type size_customer() const { return customers; }
-      size_type size_table() const { return tables.size(); }
+      Location() : counts() {}
       
-       bool empty() const { return tables.empty(); }
+      const_iterator begin() const { return counts.begin(); }
+      const_iterator end() const { return counts.end(); }
+      
+      size_type size_customer() const { return counts.customers(); }
+      size_type size_table() const { return counts.tables(); }
+      
+      bool empty() const { return counts.customers() == 0; }
 
       void clear()
       {
-	customers = 0;
-	tables.clear();
+	counts.clear();
       }
 
       void swap(Location& x)
       {
-	std::swap(customers, x.customers);
-	tables.swap(x.tables);
+	counts.swap(x.counts);
       }
 
-      size_type      customers;
-      table_set_type tables;
+      count_set_type counts;
     };
     typedef Location location_type;
     
@@ -200,14 +194,14 @@ namespace utils
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      return (diter == dishes.end() ? size_type(0) : diter->second.tables.size());
+      return (diter == dishes.end() ? size_type(0) : diter->second.size_table());
     }
 
     size_type size_customer(const dish_type& dish) const
     {
       typename dish_set_type::const_iterator diter = dishes.find(dish);
       
-      return (diter == dishes.end() ? size_type(0) : diter->second.customers);
+      return (diter == dishes.end() ? size_type(0) : diter->second.size_customer());
     }
     
     void swap(restaurant_floor& x)
@@ -229,40 +223,28 @@ namespace utils
       location_type& loc = dishes[dish];
       
       const double p0 = std::inner_product(first, last, lambda, 0.0);
-      size_type floor = 0;
       
       bool existing = false;
-      if (loc.customers) {
+      if (loc.size_customer()) {
 	if (temperature == 1.0) {
 	  const double p_base = (parameter.strength + tables * parameter.discount) * p0;
-	  const double p_gen  = (loc.customers - loc.tables.size() * parameter.discount);
+	  const double p_gen  = (loc.size_customer() - loc.size_table() * parameter.discount);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	} else {
 	  const double p_base = std::pow((parameter.strength + tables * parameter.discount) * p0, 1.0 / temperature);
-	  const double p_gen  = std::pow((loc.customers - loc.tables.size() * parameter.discount), 1.0 / temperature);
+	  const double p_gen  = std::pow((loc.size_customer() - loc.size_table() * parameter.discount), 1.0 / temperature);
 	  
 	  existing = sampler.bernoulli(p_gen / (p_base + p_gen));
 	}
       }
-      
-      if (existing) {
-	double r = sampler.uniform() * (loc.customers - loc.tables.size() * parameter.discount);
-	
-	typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	  r -= titer->first - parameter.discount;
-	  
-	  if (r <= 0.0) {
-	    ++ titer->first;
-	    floor = titer->second;
-	    break;
-	  }
-	}
-      } else {
-	// sample what floor...
-	const size_type num_floor = std::distance(first, last);
 
+      if (! existing) {
+	// sample what floor...
+	
+	size_type floor = 0;
+	const size_type num_floor = std::distance(first, last);
+	
 	if (num_floor > 1) {
 	  double r = sampler.uniform() * p0;
 	  for (/**/; floor != num_floor; ++ floor, ++ first, ++ lambda) {
@@ -272,14 +254,13 @@ namespace utils
 	  }
 	}
 	
-	loc.tables.push_back(std::make_pair(1, floor));
+	++ customers;
 	++ tables;
+	return loc.counts.increment_new(floor);
+      } else {
+	++ customers;
+	return loc.counts.increment_existing(parameter.discount, sampler);
       }
-      
-      ++ loc.customers;
-      ++ customers;
-      
-      return std::make_pair(floor, ! existing);
     }
     
     template <typename Sampler>
@@ -292,40 +273,14 @@ namespace utils
       
       location_type& loc = diter->second;
       
-      if (loc.customers == 1) {
-	const size_type floor = loc.tables.front().second;
-	dishes.erase(diter);
-	-- tables;
-	-- customers;
-	return std::make_pair(floor, true);
-      }
-      
-      size_type floor = 0;
-      bool erased = false;
-      double r = sampler.uniform() * loc.customers;
-      -- loc.customers;
-      
-      typename location_type::table_set_type::iterator titer_end = loc.tables.end();
-      for (typename location_type::table_set_type::iterator titer = loc.tables.begin(); titer != titer_end; ++ titer) {
-	r -= titer->first;
-	
-	if (r <= 0.0) {
-	  floor = titer->second;
-	  -- titer->first;
-	  
-	  if (! titer->first) {
-	    erased = true;
-	    -- tables;
-	    loc.tables.erase(titer);
-	  }
-	  break;
-	}
-      }
+      const std::pair<size_type, bool> result = loc.counts.decrement(sampler);
       
       -- customers;
-      return std::make_pair(floor, erased);
+      tables -= result.second;
+      
+      return result;
     }
-
+    
     template <typename PriorIterator, typename LambdaIterator>
     typename std::iterator_traits<PriorIterator>::value_type prob(PriorIterator first, PriorIterator last, LambdaIterator lambda) const
     {
@@ -348,7 +303,7 @@ namespace utils
       if (diter == dishes.end())
 	return P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength);
       else
-	return (P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
+	return (P(diter->second.size_customer() - parameter.discount * diter->second.size_table()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength);
     }
     
     template <typename PriorIterator, typename LambdaIterator>
@@ -362,9 +317,9 @@ namespace utils
       if (diter == dishes.end())
 	return std::make_pair(P(tables * parameter.discount + parameter.strength) * p0 / P(customers + parameter.strength), false);
       else
-	return std::make_pair((P(diter->second.customers - parameter.discount * diter->second.tables.size()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
+	return std::make_pair((P(diter->second.size_customer() - parameter.discount * diter->second.size_table()) + P(tables * parameter.discount + parameter.strength) * p0) / P(customers + parameter.strength), true);
     }
-
+    
     double log_likelihood() const
     {
       return log_likelihood(parameter.discount, parameter.strength);
@@ -390,17 +345,19 @@ namespace utils
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	  const location_type& loc = diter->second;
-	  
-	  typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	  for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	    logprob += utils::mathop::lgamma(titer->first - discount) - lg;
+
+	  for (size_type floor = 0; floor != Floors; ++ floor) {
+	    typename location_type::count_set_type::histogram_type::const_iterator titer_end = loc.counts[floor].end();
+	    for (typename location_type::count_set_type::histogram_type::const_iterator titer = loc.counts[floor].begin(); titer != titer_end; ++ titer)
+	      logprob += (utils::mathop::lgamma(titer->first - discount) - lg) * titer->second;
+	  }
 	}
       } else if (discount == 0.0) {
 	logprob += utils::mathop::lgamma(strength) + tables * std::log(strength) - utils::mathop::lgamma(strength + tables);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
-	  logprob += utils::mathop::lgamma(diter->second.tables.size());
+	  logprob += utils::mathop::lgamma(diter->second.size_table());
       } else
 	throw std::runtime_error("negative discount?");
       
@@ -487,10 +444,13 @@ namespace utils
       for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	const location_type& loc = diter->second;
 	
-	typename location_type::table_set_type::const_iterator titer_end = loc.tables.end();
-	for (typename location_type::table_set_type::const_iterator titer = loc.tables.begin(); titer != titer_end; ++ titer)
-	  for (size_type j = 1; j < titer->first; ++ j)
-	    z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));
+	for (size_type floor = 0; floor != Floors; ++ floor) {
+	  typename location_type::count_set_type::histogram_type::const_iterator titer_end = loc.counts[floor].end();
+	  for (typename location_type::count_set_type::histogram_type::const_iterator titer = loc.counts[floor].begin(); titer != titer_end; ++ titer)
+	    for (size_type i = 0; i != titer->second; ++ i)
+	      for (size_type j = 1; j < titer->first; ++ j)
+		z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));
+	}
       }
       
       return z;
@@ -620,9 +580,9 @@ namespace utils
 
 namespace std
 {
-  template <typename T, typename H, typename P, typename A>
+  template <size_t F, typename T, typename H, typename P, typename A>
   inline
-  void swap(utils::restaurant_floor<T,H,P,A>& x, utils::restaurant_floor<T,H,P,A>& y)
+  void swap(utils::restaurant_floor<F,T,H,P,A>& x, utils::restaurant_floor<F,T,H,P,A>& y)
   {
     x.swap(y);
   }

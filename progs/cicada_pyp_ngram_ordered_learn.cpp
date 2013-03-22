@@ -90,7 +90,7 @@ struct PYPLM
   
   struct Node
   {
-    typedef utils::restaurant_floor<word_type, boost::hash<word_type>, std::equal_to<word_type>,
+    typedef utils::restaurant_floor<16, word_type, boost::hash<word_type>, std::equal_to<word_type>,
 				    std::allocator<word_type > > table_type;
   
     Node() : table(), parent(id_type(-1)), order(0) {}
@@ -873,6 +873,9 @@ int main(int argc, char ** argv)
     
     if (order <= 1)
       throw std::runtime_error("order must be positive and greater than 2");
+
+    if (order > 16)
+      throw std::runtime_error("we support up to order of 16");
     
     if (samples < 0)
       throw std::runtime_error("# of samples must be positive");
@@ -882,7 +885,7 @@ int main(int argc, char ** argv)
 
     if (train_files.empty() && train_count_files.empty())
       throw std::runtime_error("no training data?");
-    
+
     sampler_type sampler;
     sampler_set_type samplers(threads, sampler);
     
