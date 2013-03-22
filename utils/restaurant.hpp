@@ -111,7 +111,12 @@ namespace utils
       
       typedef utils::table_count<size_type, 1, alloc_type> count_set_type;
 
+      typedef typename count_set_type::histogram_type::const_iterator const_iterator;
+
       Location() : counts() {}
+      
+      const_iterator begin() const { return counts[0].begin(); }
+      const_iterator end() const { return counts[0].end(); }
 
       size_type size_customer() const { return counts.customers(); }
       size_type size_table() const { return counts.tables(); }
@@ -201,10 +206,12 @@ namespace utils
       if (loc.empty()) {
 	++ customers;
 	++ tables;
-	return loc.counts.increment_new().second;
+	loc.counts.increment_new();
+	return true;
       } else {
 	++ customers;
-	return loc.counts.increment_existing(parameter.discount, sampler).second;
+	loc.counts.increment_existing(parameter.discount, sampler);
+	return false;
       }
     }
     
@@ -237,13 +244,15 @@ namespace utils
 	}
       }
       
-      if (existing) {
-	++ customers;
-	return loc.counts.increment_existing(parameter.discount, sampler).second;
-      } else {
+      if (! existing) {
 	++ customers;
 	++ tables;
-	return loc.counts.increment_new().second;
+	loc.counts.increment_new();
+	return true;
+      } else {
+	++ customers;
+	loc.counts.increment_existing(parameter.discount, sampler);
+	return false;
       }
     }
     
@@ -319,8 +328,8 @@ namespace utils
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	  const location_type& loc = diter->second;
 	  
-	  typename location_type::count_set_type::histogram_type::const_iterator titer_end = loc.counts[0].end();
-	  for (typename location_type::count_set_type::histogram_type::const_iterator titer = loc.counts[0].begin(); titer != titer_end; ++ titer)
+	  typename location_type::const_iterator titer_end = loc.end();
+	  for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
 	    logprob += (utils::mathop::lgamma(titer->first - discount) - lg) * titer->second;
 	}
       } else if (discount == 0.0) {
@@ -415,8 +424,8 @@ namespace utils
       for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
 	const location_type& loc = diter->second;
 	
-	typename location_type::count_set_type::histogram_type::const_iterator titer_end = loc.counts[0].end();
-	for (typename location_type::count_set_type::histogram_type::const_iterator titer = loc.counts[0].begin(); titer != titer_end; ++ titer)
+	typename location_type::const_iterator titer_end = loc.end();
+	for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
 	  for (size_type i = 0; i != titer->second; ++ i)
 	    for (size_type j = 1; j < titer->first; ++ j)
 	      z += 1 - sampler.bernoulli(double(j - 1) / (j - discount));

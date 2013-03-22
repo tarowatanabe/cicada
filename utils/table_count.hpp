@@ -159,7 +159,7 @@ namespace utils
 	    
 	    ++ customers_;
 	    
-	    return std::make_pair(floor, true);
+	    return std::make_pair(floor, false);
 	  }
 	  
 	  r -= step;
@@ -205,7 +205,7 @@ namespace utils
     }
     
 
-    void swap(table_count& x, table_count& y)
+    void swap(table_count& x)
     {
       std::swap(customers_, x.customers_);
       std::swap(tables_, x.tables_);
