@@ -21,6 +21,7 @@
 #include <utils/pyp_parameter.hpp>
 #include <utils/rwticket.hpp>
 #include <utils/atomicop.hpp>
+#include <utils/table_count.hpp>
 
 // Chinese Restaurant Process
 //

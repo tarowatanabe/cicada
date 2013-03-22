@@ -18,11 +18,6 @@ std::ostream& operator<<(std::ostream& os, const utils::restaurant<std::string>&
   crp_type::const_iterator citer_end = crp.end();
   for (crp_type::const_iterator citer = crp.begin(); citer != citer_end; ++ citer) {
     os << '\t' << citer->first << " customer: " << citer->second.size_customer() << " tables: " << citer->second.size_table() << '\n';
-    
-    crp_type::mapped_type::const_iterator iter_end = citer->second.end();
-    for (crp_type::mapped_type::const_iterator iter = citer->second.begin(); iter != iter_end; ++ iter) {
-      
-    }
   }
   
   return os;
@@ -39,10 +34,6 @@ std::ostream& operator<<(std::ostream& os, const utils::restaurant<char>& crp)
   for (crp_type::const_iterator citer = crp.begin(); citer != citer_end; ++ citer) {
     os << '\t' << std::string(1, citer->first) << " customer: " << citer->second.size_customer() << " tables: " << citer->second.size_table() << '\n';
     
-    crp_type::mapped_type::const_iterator iter_end = citer->second.end();
-    for (crp_type::mapped_type::const_iterator iter = citer->second.begin(); iter != iter_end; ++ iter) {
-      
-    }
   }
   
   return os;

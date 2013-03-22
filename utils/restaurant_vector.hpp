@@ -18,6 +18,7 @@
 #include <utils/slice_sampler.hpp>
 #include <utils/mathop.hpp>
 #include <utils/pyp_parameter.hpp>
+#include <utils/table_count.hpp>
 
 // Chinese Restaurant Process
 //

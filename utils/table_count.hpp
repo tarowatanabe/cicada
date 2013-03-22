@@ -108,8 +108,15 @@ namespace utils
     
     typedef detail::table_count_histogram<Count,Alloc> histogram_type;
 
+    typedef const histogram_type* const_iterator;
+
   public:
     table_count() : customers_(0), tables_(0) {}
+    
+    const histogram_type& operator[](size_type floor) const { return floors_[floor]; }
+
+    const_iterator begin() const { return floors_; }
+    const_iterator end() const { return floors_ + Floors; }
     
     count_type customers() const { return customers_; }
     count_type tables() const { return tables_; }
@@ -123,19 +130,19 @@ namespace utils
 	floors_[floor].clear();
     }
 
-    bool increment_new(const size_type floor=0)
+    std::pair<size_type, bool> increment_new(const size_type floor=0)
     {
       floors_[floor].increment(1);
       ++ customers_;
       ++ tables_;
       
-      return true;
+      return std::make_pair(floor, true);
     }
     
     template <typename Sampler>
     std::pair<size_type, bool> increment_existing(const double discount, Sampler& sampler)
     {
-      double r = sampler.uniform() * (customers() - discount * tables());
+      double r = sampler.uniform() * (customers_ - discount * tables_);
       
       for (size_type floor = 0; floor != Floors; ++ floor) {
 	typename histogram_type::iterator hiter_end = floors_[floor].end();
@@ -165,7 +172,7 @@ namespace utils
     template <typename Sampler>
     std::pair<size_type, bool> decrement(Sampler& sampler)
     {
-      difference_type r = sampler.uniform() * customers();
+      difference_type r = sampler.uniform() * customers_;
       
       for (size_type floor = 0; floor != Floors; ++ floor) {
 	typename histogram_type::iterator hiter_end = floors_[floor].end();
@@ -205,7 +212,7 @@ namespace utils
       std::swap(floors_, x.floors_);
     }
     
-  public:
+  private:
     count_type     customers_;
     count_type     tables_;
     histogram_type floors_[Floors];
