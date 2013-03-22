@@ -209,7 +209,9 @@ namespace utils
     {
       std::swap(customers_, x.customers_);
       std::swap(tables_, x.tables_);
-      std::swap(floors_, x.floors_);
+      
+      for (size_type floor = 0; floor != Floors; ++ floor)
+	floors_[floor].swap(x.floors_[floor]);
     }
     
   private:
