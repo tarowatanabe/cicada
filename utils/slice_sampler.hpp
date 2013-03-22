@@ -107,7 +107,8 @@ namespace utils
     bool acceptable(F x0, F x1, F y, F w, F l, F r) const {
       bool d = false;
       while (r - l > 1.1*w) {
-	F m = (l+r)/2;
+	//F m = (l+r)/2;
+	F m = (l+r) * 0.5;
 	if ((x0 < m && x1 >= m) || (x0 >= m && x1 < m))
 	  d = true;
 	if (x1 < m) 
@@ -195,11 +196,12 @@ namespace utils
     
     if (w <= 0.0) {                           // set w to a default width 
       if (min_x > -std::numeric_limits<F>::infinity() 
-	  && max_x < std::numeric_limits<F>::infinity())
-	w = (max_x - min_x)/4;
-      else {
+	  && max_x < std::numeric_limits<F>::infinity()) {
+	//w = (max_x - min_x)/4;
+	w = (max_x - min_x) * 0.25;
+      }else {
 	//w = std::max(((x0 < 0.0) ? -x0 : x0) /2, 1e-7);
-	w = std::max(std::fabs(x0) /2, 1e-7);
+	w = std::max(std::fabs(x0) * 0.5, 1e-7);
       }
     }
 
