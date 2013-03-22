@@ -213,3 +213,8 @@ Correctly implement alignment/distortion model estimation in
 lexicon_hmm/model4
 	Currenlty, it is very apt, and gives non-optimal parameters...
 
+
+Revise and test restaurtna implementation:
+   Currently, we use a vector-based implementation, but
+   hash-based implementation is potentially faster, especially
+   when decrementing counts.
