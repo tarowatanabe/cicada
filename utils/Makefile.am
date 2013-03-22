@@ -124,6 +124,7 @@ symbol_set.hpp \
 symbol_hashtable.hpp \
 symbol_sequence.hpp \
 symbol_tree.hpp \
+table_count.hpp \
 tempfile.hpp \
 thread_specific_ptr.hpp \
 traits.hpp \
