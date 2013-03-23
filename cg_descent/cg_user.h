@@ -1,8 +1,15 @@
+#ifndef __CG_DESCENT__CG_USER__H__
+#define __CG_DESCENT__CG_USER__H__ 1
+
 #include <limits.h>
 #include <float.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#ifdef  __cplusplus
+extern "C" {
+#endif/*__cplusplus*/
 
 #define INT long int
 #define INT_INF LONG_MAX
@@ -229,3 +236,9 @@ void cg_default /* set default parameter values */
 (
     cg_parameter   *Parm
 ) ;
+
+#ifdef  __cplusplus
+}
+#endif/*__cplusplus*/
+
+#endif

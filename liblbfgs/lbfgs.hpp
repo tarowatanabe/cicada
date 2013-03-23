@@ -3,8 +3,11 @@
 //  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __LBFGS__HPP__
-#define __LBFGS__HPP__ 1
+#ifndef __LIBLBFGS__LBFGS__HPP__
+#define __LIBLBFGS__LBFGS__HPP__ 1
+
+#include <climits>
+#include <vector>
 
 #include <liblbfgs/lbfgs.h>
 #include <liblbfgs/lbfgs_error.hpp>
@@ -20,23 +23,12 @@ namespace liblbfgs
     typedef ptrdiff_t difference_type;
     
     LBFGS(const Function& function,
+	  const size_type max_iterations=0,
 	  const lbfgsfloatval_t l1 = 0.0,
-	  const size_type l1_start = 0,
-	  const size_type m = 6,
-	  const lbfgsfloatval_t epsilon=1e-5,
-	  const lbfgsfloatval_t delta=0.0,
-	  const size_type max_iterations=0)
+	  const size_type l1_start = 0)
       : function_(function)
     {
       lbfgs_parameter_init(&param_);
-      
-      param_.m = m;
-      param_.epsilon = epsilon;
-      
-      if (delta > 0.0) {
-        param_.delta = delta;
-        param_.past = 1;
-      }
       
       param_.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
       
@@ -77,12 +69,12 @@ namespace liblbfgs
     {
       LBFGS<Function>* obj = reinterpret_cast<LBFGS<Function>*>(instance);
       
-      const lbfgsfloatval_t result = obj->operator()(n, x, g);
+      const lbfgsfloatval_t result = obj->function_(n, x, g);
       
       lbfgsfloatval_t result_orthantwise = result;
       if (obj->param_.orthantwise_c > 0.0) {
 	lbfgsfloatval_t l1 = 0.0;
-	for (size_type i = obj->param_.orthantwise_start; i != n; ++ i)
+	for (difference_type i = obj->param_.orthantwise_start; i != n; ++ i)
 	  l1 += std::fabs(x[i]);
 	
 	result_orthantwise += obj->param_.orthantwise_c * l1;

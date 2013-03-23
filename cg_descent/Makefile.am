@@ -4,7 +4,7 @@ LIBCG_DESCENT=libcg_descent.la
 
 noinst_LTLIBRARIES = libcg_descent.la
 noinst_HEADERS = \
-	cg.h \
+	cg.hpp \
 	cg_user.h \
 	cg_descent.h \
 	cg_blas.h

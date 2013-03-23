@@ -1351,7 +1351,7 @@ struct OptimizeXBLEU
   }
 };
 
-
+#if 0
 struct OptimizeLBFGS
 {
   OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
@@ -1650,6 +1650,247 @@ struct OptimizeLBFGS
   double objective_opt;
   weight_set_type weights_opt;
 };
+#endif
+
+struct OptimizeLBFGS
+{
+  OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
+		const hypergraph_set_type& __graphs_intersected,
+		weight_set_type& __weights)
+    : graphs_forest(__graphs_forest),
+      graphs_intersected(__graphs_intersected),
+      weights(__weights) {}
+
+  const hypergraph_set_type& graphs_forest;
+  const hypergraph_set_type& graphs_intersected;
+  weight_set_type& weights;
+  
+  struct Task
+  {
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+    
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::WeightVector<weight_type > gradient_static_type;
+    
+    typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+
+    Task(queue_type&            __queue,
+	 const weight_set_type& __weights,
+	 const hypergraph_set_type& __graphs_forest,
+	 const hypergraph_set_type& __graphs_intersected,
+	 const size_t& __instances)
+      : queue(__queue),
+	weights(__weights),
+	graphs_forest(__graphs_forest),
+	graphs_intersected(__graphs_intersected),
+	instances(__instances)
+    {}
+    
+    struct weight_function
+    {
+      typedef weight_type value_type;
+
+      weight_function(const weight_set_type& __weights) : weights(__weights) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
+      }
+      
+      const weight_set_type& weights;
+    };
+    
+    struct feature_function
+    {
+      struct value_type
+      {
+	value_type(const feature_set_type& __features,
+		   const weight_set_type& __weights)
+	  : features(__features), weights(__weights) {}
+	
+	friend
+	value_type operator*(value_type x, const weight_type& weight)
+	{
+	  x.inside_outside = weight;
+	  return x;
+	}
+	
+	weight_type inside_outside;
+	const feature_set_type& features;
+	const weight_set_type&  weights;
+      };
+      
+      feature_function(const weight_set_type& __weights) : weights(__weights) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	return value_type(edge.features, weights);
+      }
+      
+      const weight_set_type& weights;
+    };
+    
+    struct gradients_type
+    {
+      struct value_type
+      {
+	value_type(gradient_type& __gradient) : gradient(__gradient) {}
+	
+	value_type& operator+=(const feature_function::value_type& x)
+	{
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(x.features, x.weights)) * x.inside_outside;
+	  
+	  feature_set_type::const_iterator fiter_end = x.features.end();
+	  for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter)
+	    gradient[fiter->first] += weight_type(fiter->second) * weight;
+	  
+	  return *this;
+	}
+	
+	gradient_type& gradient;
+      };
+      
+      value_type operator[](size_t pos)
+      {
+	return value_type(gradient);
+      }
+      
+      void clear() { gradient.clear(); }
+      
+      gradient_type gradient;
+    };
+
+    void operator()()
+    {
+      gradients_type gradients;
+      gradients_type gradients_intersected;
+      weights_type   inside;
+      weights_type   inside_intersected;
+      
+      gradient_static_type  feature_expectations;
+
+      g.clear();
+      objective = 0.0;
+      
+      while (1) {
+	int id = 0;
+	queue.pop(id);
+	if (id < 0) break;
+	
+	gradients.clear();
+	gradients_intersected.clear();
+	
+	inside.clear();
+	inside_intersected.clear();
+	
+	inside.reserve(graphs_forest[id].nodes.size());
+	inside.resize(graphs_forest[id].nodes.size(), weight_type());
+	
+	inside_intersected.reserve(graphs_intersected[id].nodes.size());
+	inside_intersected.resize(graphs_intersected[id].nodes.size(), weight_type());
+	
+	cicada::inside_outside(graphs_forest[id], inside, gradients, weight_function(weights), feature_function(weights));
+	cicada::inside_outside(graphs_intersected[id], inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
+	
+	gradient_type& gradient = gradients.gradient;
+	weight_type& Z = inside.back();
+	
+	gradient_type& gradient_intersected = gradients_intersected.gradient;
+	weight_type& Z_intersected = inside_intersected.back();
+	
+	gradient /= Z;
+	gradient_intersected /= Z_intersected;
+	
+	feature_expectations -= gradient_intersected;
+	feature_expectations += gradient;
+	
+	const double margin = log(Z_intersected) - log(Z);
+	
+	objective -= margin;
+	
+	if (debug >= 3)
+	  std::cerr << "id: " << id << " margin: " << margin << std::endl;
+      }
+      
+      // transform feature_expectations into g...
+      g.allocate();
+      
+      std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
+      
+      // normalize!
+      objective /= instances;
+      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
+    }
+
+    queue_type&            queue;
+    
+    const weight_set_type& weights;
+    
+    const hypergraph_set_type& graphs_forest;
+    const hypergraph_set_type& graphs_intersected;
+    size_t instances;
+    
+    double          objective;
+    weight_set_type g;
+  };
+  
+  double operator()(size_t n, const double* x, double* g) const
+  {
+    typedef Task                  task_type;
+    typedef task_type::queue_type queue_type;
+    
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
+    const int id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
+    size_t instances = 0;
+    for (int id = 0; id != id_max; ++ id)
+      instances += (graphs_forest[id].is_valid() && graphs_intersected[id].is_valid());
+    
+    queue_type queue;
+    task_set_type tasks(threads, task_type(queue, weights, graphs_forest, graphs_intersected, instances));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    // push...
+    for (int id = 0; id != id_max; ++ id)
+      if (graphs_forest[id].is_valid() && graphs_intersected[id].is_valid())
+	queue.push(id);
+    
+    // collect all the objective and gradients...
+    std::fill(g, g + n, 0.0);
+    
+    // termination...
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    workers.join_all();
+    
+    // collect objective and gradients...
+    double objective = 0.0;
+    for (int i = 0; i < threads; ++ i) {
+      objective += tasks[i].objective;
+      std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
+    }
+    
+    // regularization...
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < n; ++ i) {
+	g[i] += C * x[i];
+	norm += x[i] * x[i];
+      }
+      
+      objective += 0.5 * C * norm;
+    }
+    
+    return objective;
+  }
+};
 
 template <typename Optimizer>
 double optimize_xbleu(const hypergraph_set_type& forests,
@@ -1697,12 +1938,20 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 }
 
 
-template <typename Optimizer>
+template <typename Func>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
 		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights)
 {
-  return Optimizer(graphs_forest, graphs_intersected, weights)();
+  Func func(graphs_forest, graphs_intersected, weights);
+  
+  liblbfgs::LBFGS<Func> optimizer(func,
+				  iteration,
+				  regularize_l1 ? C : 0.0);
+  
+  return optimizer(weights.size(), &(*weights.begin()));
+  
+  //return Func(graphs_forest, graphs_intersected, weights)();
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
