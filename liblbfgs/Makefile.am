@@ -7,6 +7,7 @@ noinst_HEADERS = \
 	arithmetic_ansi.h \
 	arithmetic_sse_double.h \
 	arithmetic_sse_float.h \
+	lbfgs.hpp \
 	lbfgs.h \
 	lbfgs_error.hpp
 

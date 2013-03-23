@@ -36,6 +36,7 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 
+#include "liblbfgs/lbfgs.hpp"
 #include "liblbfgs/lbfgs.h"
 #include "liblbfgs/lbfgs_error.hpp"
 
