@@ -67,12 +67,14 @@ path_type output_objective_path;
 path_set_type refset_files;
 
 int iteration = 100;
-bool learn_sgd = false;
 bool learn_xbleu = false;
-bool learn_lbfgs = false;
+bool learn_softmax = false;
 bool learn_mira = false;
 bool learn_linear = false;
 bool learn_svm = false;
+
+bool optimize_lbfgs = false;
+bool optimize_cg = false;
 
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 
@@ -155,27 +157,35 @@ double optimize_mert(const scorer_document_type& scorers,
 
 struct OptimizeLinear;
 struct OptimizeSVM;
-struct OptimizeLBFGS;
-struct OptimizeXBLEU;
+struct ObjectiveSoftmax;
+struct ObjectiveXBLEU;
 
 int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_linear + learn_svm + learn_xbleu > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,linear,svm}");
-    if (int(learn_lbfgs) + learn_linear + learn_svm + learn_xbleu == 0)
-      learn_lbfgs = true;
+    if (int(learn_softmax) + learn_linear + learn_svm + learn_xbleu > 1)
+      throw std::runtime_error("eitehr learn-{softmax,linear,svm,xbleu}");
+    if (int(learn_softmax) + learn_linear + learn_svm + learn_xbleu == 0)
+      learn_softmax = true;
     
+    if (int(optimize_lbfgs) + optimize_cg > 1)
+      throw std::runtime_error("either optimize-{lbfgs,cg}");
+    if (int(optimize_lbfgs) + optimize_cg == 0)
+      optimize_lbfgs = true;
+
     if (conservative_loss && line_search)
       throw std::runtime_error("we do not allow both conservative-update and line-search");
     
-    if (learn_lbfgs && regularize_l1 && regularize_l2)
+    if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
-
+    
+    if (regularize_l1 && optimize_cg)
+      throw std::runtime_error("optimize via CG with L1 regularization is not implemented");
+    
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     
@@ -263,9 +273,9 @@ int main(int argc, char ** argv)
     else if (learn_svm)
       objective = optimize_svm<OptimizeSVM>(kbests, oracles, weights);
     else if (learn_xbleu)
-      objective = optimize_xbleu<OptimizeXBLEU>(kbests, scorers, weights);
+      objective = optimize_xbleu<ObjectiveXBLEU>(kbests, scorers, weights);
     else
-      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
+      objective = optimize_batch<ObjectiveSoftmax>(kbests, oracles, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -1604,7 +1614,8 @@ public:
   const double tolerance;
 };
 
-struct OptimizeXBLEU
+
+struct ObjectiveXBLEU
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
@@ -1613,66 +1624,38 @@ struct OptimizeXBLEU
   typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > sample_set_type;
   typedef std::vector<sample_set_type, std::allocator<sample_set_type> > sample_map_type;
   
-  OptimizeXBLEU(const hypothesis_map_type& __kbests,
-		const sample_map_type& __features_kbest,
-		const scorer_document_type& __scorers,
-		weight_set_type& __weights,
-		const double& __lambda,
-		const feature_type& __feature_scale)
+  ObjectiveXBLEU(const hypothesis_map_type& __kbests,
+		 const scorer_document_type& __scorers,
+		 weight_set_type& __weights,
+		 const double& __lambda,
+		 const feature_type& __feature_scale)
     : kbests(__kbests),
-      features_kbest(__features_kbest),
       scorers(__scorers),
       weights(__weights),
       lambda(__lambda),
       feature_scale(__feature_scale)
-  { }
+  {
+    features_kbest.clear();
+    features_kbest.reserve(kbests.size());
+    features_kbest.resize(kbests.size());
+    
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty()) {
+	
+	for (size_t k = 0; k != kbests[id].size(); ++ k)
+	  features_kbest[id].push_back(kbests[id][k].features.begin(), kbests[id][k].features.end());
+      }
+    
+  }
   
   const hypothesis_map_type& kbests;
-  const sample_map_type&     features_kbest;
   const scorer_document_type& scorers;
   weight_set_type& weights;
   
   double lambda;
   const feature_type feature_scale;
-
-  double objective_opt;
-  weight_set_type weights_opt;
   
-  double operator()()
-  {
-    lbfgs_parameter_t param;
-    lbfgs_parameter_init(&param);
-    
-    param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
-    
-    if (regularize_l1) {
-      param.orthantwise_c = C;
-      param.orthantwise_start = 1;
-    } else
-      param.orthantwise_c = 0.0;
-    
-    param.max_iterations = iteration;
-    
-    objective_opt = std::numeric_limits<double>::infinity();
-    double objective = 0.0;
-    
-    // swapping...!
-    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
-    
-    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
-    
-    // swapping...!
-    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
-
-    if (debug)
-      std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
-    
-    // copy from opt weights!
-    if (result < 0)
-      weights = weights_opt;
-    
-    return objective;
-  }
+  sample_map_type features_kbest;
   
   struct Task
   {
@@ -1963,38 +1946,28 @@ struct OptimizeXBLEU
       e = entropy;
     }
   };
+
   
-  static lbfgsfloatval_t evaluate(void *instance,
-				  const lbfgsfloatval_t *x,
-				  lbfgsfloatval_t *g,
-				  const int size,
-				  const lbfgsfloatval_t step)
+  double operator()(size_t size, const double* x, double* g) const
   {
     typedef Task                  task_type;
     typedef task_type::queue_type queue_type;
     
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-
-    OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
     
     // swapping...!
-    std::swap(optimizer.weights[feature_type(feature_type::id_type(0))], optimizer.weights[optimizer.feature_scale]);
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
     
     queue_type queue;
-    task_set_type tasks(threads, task_type(queue,
-					   optimizer.kbests,
-					   optimizer.features_kbest,
-					   optimizer.scorers,
-					   optimizer.weights,
-					   optimizer.feature_scale));
+    task_set_type tasks(threads, task_type(queue, kbests, features_kbest, scorers, weights, feature_scale));
     
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     size_type instances = 0;
-    for (size_t id = 0; id != optimizer.kbests.size(); ++ id)
-      if (! optimizer.kbests[id].empty()) {
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty()) {
 	queue.push(id);
 	++ instances;
       }
@@ -2002,12 +1975,8 @@ struct OptimizeXBLEU
     for (int i = 0; i < threads; ++ i)
       queue.push(-1);
     
-    // clear g...
-    std::fill(g, g + size, 0.0);
-    
     workers.join_all();
     
-    // collect statistics
     task_type::ngram_counts_type c_matched(order + 1, 0.0);
     task_type::ngram_counts_type c_hypo(order + 1, 0.0);
 
@@ -2044,13 +2013,13 @@ struct OptimizeXBLEU
 	smoothing *= 0.1;
       }
     }
-
+    
     // compute P
     double P = 0.0;
     for (int n = 1; n <= order; ++ n)
       if (c_hypo[n] > 0.0)
 	P += (1.0 / order) * (utils::mathop::log(c_matched[n]) - utils::mathop::log(c_hypo[n]));
-
+    
     // compute C and B
     const double C = r / c_hypo[1];
     const double B = task_type::brevity_penalty(1.0 - C);
@@ -2063,8 +2032,10 @@ struct OptimizeXBLEU
     const double objective_bleu = exp_P * B;
     const double entropy = e / instances;
     
-    // entropy
-    std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
+    if (temperature != 0.0)
+      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
+    else
+      std::fill(g, g + size, 0.0);
     
     for (int n = 1; n <= order; ++ n) 
       if (c_hypo[n] > 0.0) {
@@ -2089,63 +2060,50 @@ struct OptimizeXBLEU
     
     // we need to minimize negative bleu... + regularized by average entropy...
     double objective = - objective_bleu - temperature * entropy;
-    double objective_regularized = objective;
-
+    
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
-	g[i] += optimizer.lambda * x[i] * double(i != optimizer.feature_scale.id());
-	norm += x[i] * x[i] * double(i != optimizer.feature_scale.id());
+	g[i] += lambda * x[i] * double(i != feature_scale.id());
+	norm += x[i] * x[i] * double(i != feature_scale.id());
       }
       
-      objective_regularized += 0.5 * optimizer.lambda * norm;
-      objective += 0.5 * optimizer.lambda * norm;
-    } else if (regularize_l1) {
-      double norm = 0.0;
-      for (size_t i = 0; i < static_cast<size_t>(size); ++ i)
-	norm += std::fabs(x[i]) * double(i != optimizer.feature_scale.id());
-      
-      objective_regularized += optimizer.lambda * norm;
+      objective += 0.5 * lambda * norm;
     }
-
+    
     if (scale_fixed)
-      g[optimizer.feature_scale.id()] = 0.0;
-
+      g[feature_scale.id()] = 0.0;
+    
     if (debug >= 2)
-      std::cerr << "objective: " << objective_regularized
+      std::cerr << "objective: " << objective
 		<< " xBLEU: " << objective_bleu
 		<< " BP: " << B
 		<< " entropy: " << entropy
-		<< " scale: " << optimizer.weights[optimizer.feature_scale]
+		<< " scale: " << weights[feature_scale]
 		<< std::endl;
     
-    // keep the best so forth...
-    if (std::isfinite(objective_regularized) && objective_regularized <= optimizer.objective_opt) {
-      optimizer.objective_opt = objective_regularized;
-      optimizer.weights_opt = optimizer.weights;
-    }
-    
     // swapping...!
-    std::swap(optimizer.weights[feature_type(feature_type::id_type(0))], optimizer.weights[optimizer.feature_scale]);
-    std::swap(g[0], g[optimizer.feature_scale.id()]);
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    std::swap(g[0], g[feature_scale.id()]);
     
     return objective;
   }
+  
 };
 
-
-struct OptimizeLBFGS
+struct ObjectiveSoftmax
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
   typedef hypothesis_type::feature_value_type feature_value_type;
 
+  
   struct SampleSet
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > offsets_type;
-
+    
     struct Sample
     {
       typedef const feature_value_type* const_iterator;
@@ -2242,11 +2200,13 @@ struct OptimizeLBFGS
   };
   
   typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
-  
-  OptimizeLBFGS(const hypothesis_map_type& kbests,
-		const hypothesis_map_type& oracles,
-		weight_set_type& __weights)
-    : weights(__weights)
+
+  ObjectiveSoftmax(const hypothesis_map_type& kbests,
+		   const hypothesis_map_type& oracles,
+		   weight_set_type& __weights,
+		   const double& __lambda)
+    : weights(__weights),
+      lambda(__lambda)
   {
     // transform into sample-pair-set-type
     
@@ -2257,36 +2217,11 @@ struct OptimizeLBFGS
       if (! kbests[id].empty() && ! oracles[id].empty())
 	samples.push_back(sample_pair_type(kbests[id], oracles[id]));
   }
-
-  double operator()()
-  {
-    lbfgs_parameter_t param;
-    lbfgs_parameter_init(&param);
-    
-    param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
-    
-    if (regularize_l1)
-      param.orthantwise_c = C;
-    else
-      param.orthantwise_c = 0.0;
-    
-    param.max_iterations = iteration;
-    
-    objective_opt = std::numeric_limits<double>::infinity();
-    double objective = 0.0;
-    
-    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
-    
-    if (debug)
-      std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
-    
-    // copy from opt weights!
-    if (result < 0)
-      weights = weights_opt;
-        
-    return objective;
-  }
-
+  
+  sample_pair_set_type samples;
+  
+  weight_set_type& weights;
+  double lambda;
   
   struct Task
   {
@@ -2392,32 +2327,24 @@ struct OptimizeLBFGS
     const weight_set_type& weights;
     const sample_pair_set_type& samples;
     
-    size_t instances;
+    size_type instances;
     
     double          objective;
     weight_set_type g;
   };
-
   
-  static lbfgsfloatval_t evaluate(void *instance,
-				  const lbfgsfloatval_t *x,
-				  lbfgsfloatval_t *g,
-				  const int n,
-				  const lbfgsfloatval_t step)
+  double operator()(size_t n, const double* x, double* g) const
   {
     typedef Task                  task_type;
     typedef task_type::queue_type queue_type;
     
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-
-    OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
-
-    const size_t instances = optimizer.samples.size();
-        
-    queue_type queue;
     
-    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.samples, instances));
-
+    const size_type instances = samples.size();
+    
+    queue_type queue;
+    task_set_type tasks(threads, task_type(queue, weights, samples, instances));
+    
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -2429,6 +2356,7 @@ struct OptimizeLBFGS
     double objective = 0.0;
     std::fill(g, g + n, 0.0);
     
+    // termination
     for (int i = 0; i < threads; ++ i)
       queue.push(-1);
     
@@ -2438,48 +2366,76 @@ struct OptimizeLBFGS
       objective += tasks[i].objective;
       std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
     }
-
-    const double objective_unregularized = objective;
-    double objective_regularized = objective;
-        
+    
     // L2...
     if (regularize_l2) {
       double norm = 0.0;
-      for (int i = 0; i < n; ++ i) {
-	g[i] += C * x[i];
+      for (size_type i = 0; i < n; ++ i) {
+	g[i] += lambda * x[i];
 	norm += x[i] * x[i];
       }
-      objective_regularized += 0.5 * C * norm;
-      objective += 0.5 * C * norm;
-    } else if (regularize_l1) {
-      double norm = 0.0;
-      for (int i = 0; i < n; ++ i)
-	norm += std::fabs(x[i]);
       
-      objective_regularized += C * norm;
+      objective += 0.5 * lambda * norm;
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective_regularized << " non-regularized: " << objective_unregularized << std::endl;
+      std::cerr << "objective: " << objective << std::endl;
     
-    // keep the best so forth...
-    if (std::isfinite(objective_regularized) && objective_regularized <= optimizer.objective_opt) {
-      optimizer.objective_opt = objective_regularized;
-      optimizer.weights_opt = optimizer.weights;
-    }
-
     return objective;
   }
-  
-  sample_pair_set_type samples;
-  
-  weight_set_type& weights;
-  
-  double objective_opt;
-  weight_set_type weights_opt;
 };
 
 template <typename Optimizer>
+double optimize_xbleu(Optimizer& optimizer,
+		      weight_set_type& weights,
+		      const feature_type& feature_scale)
+{
+  double result = 0.0;
+  
+  if (annealing_mode) {
+    for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
+      if (debug >= 2)
+	std::cerr << "temperature: " << temperature << std::endl;
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+      
+      result = optimizer(weights.size(), &(*weights.begin()));
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    }
+    
+  } else {
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    
+    result = optimizer(weights.size(), &(*weights.begin()));
+    
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+  }
+  
+  if (quenching_mode)
+    for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
+      if (debug >= 2)
+	std::cerr << "quench: " << quench << std::endl;
+      
+      weights[feature_scale] = quench;
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+      
+      result = optimizer(weights.size(), &(*weights.begin()));
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    }
+  
+  if (weights[feature_scale] < 0.0) {
+    // inverse weights...
+    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
+      weights[i] = - weights[i];
+  }
+  
+  return result;
+}
+
+template <typename Objective>
 double optimize_xbleu(const hypothesis_map_type& kbests,
 		      const scorer_document_type& scorers,
 		      weight_set_type& weights)
@@ -2488,57 +2444,39 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
   
   weights[feature_scale] = scale;
   
-  typename Optimizer::sample_map_type features(kbests.size());
-  for (size_t id = 0; id != kbests.size(); ++ id)
-    if (! kbests[id].empty()) {
-      
-      for (size_t k = 0; k != kbests[id].size(); ++ k)
-	features[id].push_back(kbests[id][k].features.begin(), kbests[id][k].features.end());
-    }
-
-  Optimizer optimizer(kbests, features, scorers, weights, C, feature_scale);
+  Objective objective(kbests, scorers, weights, C, feature_scale);
   
-  double objective = 0.0;
-  
-  if (annealing_mode) {
-    for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
-      if (debug >= 2)
-	std::cerr << "temperature: " << temperature << std::endl;
-	
-      objective = optimizer();
-    }
-  } else 
-    objective = optimizer();
+  if (optimize_lbfgs) {
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0, 1);
     
-  if (quenching_mode) {
-    temperature = 0.0;
+    return optimize_xbleu(optimizer, weights, feature_scale);
+  } else if (optimize_cg) {
+    cg::CG<Objective> optimizer(objective, iteration);
     
-    for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
-      if (debug >= 2)
-	std::cerr << "quench: " << quench << std::endl;
-      
-      weights[feature_scale] = quench;
-      
-      objective = optimizer();
-    }
-  }
-  
-  if (weights[feature_scale] < 0.0) {
-    // inverse weights...
-    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
-      weights[i] = - weights[i];
-  }
-  
-  return objective;
+    return optimize_xbleu(optimizer, weights, feature_scale);
+  } else
+    throw std::runtime_error("invalid xbleu algorithm");
 }
 
 
-template <typename Optimizer>
+template <typename Objective>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights)
 {
-  return Optimizer(kbests, oracles, weights)();
+  Objective objective(kbests, oracles, weights, C);
+  
+  if (optimize_lbfgs) {
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0);
+    
+    return optimizer(weights.size(), &(*weights.begin()));
+  } else if (optimize_cg) {
+    cg::CG<Objective> optimizer(objective, iteration);
+    
+    return optimizer(weights.size(), &(*weights.begin()));
+  } else
+    throw std::runtime_error("invalid batch algorithm");
+
 }
 
 struct EnvelopeTask
@@ -3340,10 +3278,14 @@ void options(int argc, char** argv)
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
-    ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU algorithm")
-    ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
-    ("learn-svm",    po::bool_switch(&learn_svm),    "structural SVM")
+    ("learn-softmax", po::bool_switch(&learn_softmax), "Softmax objective")
+    ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU objective")
+    ("learn-linear",  po::bool_switch(&learn_linear),  "liblinear algorithm")
+    ("learn-svm",     po::bool_switch(&learn_svm),     "structural SVM")
+    
+    ("optimize-lbfgs", po::bool_switch(&optimize_lbfgs), "LBFGS optimizer")
+    ("optimize-cg",    po::bool_switch(&optimize_cg),    "CG optimizer")
+
     ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
      " 0: \tL2-regularized logistic regression (primal)\n"
      " 1: \tL2-regularized L2-loss support vector classification (dual)\n"

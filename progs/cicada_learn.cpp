@@ -1579,7 +1579,6 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     return optimize_xbleu(optimizer, weights, feature_scale);
   } else
     throw std::runtime_error("invalid xbleu algorithm");
-  
 }
 
 
