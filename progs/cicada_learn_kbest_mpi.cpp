@@ -49,6 +49,8 @@
 
 #include "liblbfgs/lbfgs.h"
 #include "liblbfgs/lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.hpp"
+#include "cg_descent/cg.hpp"
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -66,8 +68,6 @@ path_set_type weights_history_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
-path_type bound_lower_file;
-path_type bound_upper_file;
 
 path_set_type refset_files;
 
@@ -141,8 +141,6 @@ double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
 		   const kbest_map_type& kbest_map,
-		   const weight_set_type& bounds_lower,
-		   const weight_set_type& bounds_upper,
 		   const weights_history_type& weights_history,
 		   weight_set_type& weights);
 template <typename Optimize>
@@ -152,16 +150,12 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
-		      const weight_set_type& bounds_lower,
-		      const weight_set_type& bounds_upper,
 		      weight_set_type& weights);
 template <typename Optimize, typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       const kbest_map_type& kbest_map,
-		       const weight_set_type& bounds_lower,
-		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
 		       Generator& generator);
 
@@ -239,15 +233,6 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("quenching rate should be > 1.0: " + utils::lexical_cast<std::string>(quench_rate)); 
     }
 
-    if (! bound_lower_file.empty())
-      if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
-	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
-    
-    if (! bound_upper_file.empty())
-      if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
-	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
-
-
     scorer_document_type scorers(scorer_name);
     
     if (! refset_files.empty()) {
@@ -323,15 +308,6 @@ int main(int argc, char ** argv)
       bcast_weights(rank, weights);
     }
     
-    weight_set_type bounds_lower;
-    weight_set_type bounds_upper;
-    
-    if (! bound_lower_file.empty())
-      read_bounds(bound_lower_file, bounds_lower, - std::numeric_limits<double>::infinity());
-    
-    if (! bound_upper_file.empty())
-      read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
-
     if (debug && mpi_rank == 0)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
@@ -346,44 +322,30 @@ int main(int argc, char ** argv)
     
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, kbest_map, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, kbest_map, weights, generator);
     } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, kbest_map, weights, generator);
     else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, kbest_map, weights, generator);
     else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, kbest_map, weights, generator);
     else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, kbest_map, weights, generator);
     else if (learn_nherd)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights, generator);
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, weights, generator);
     else if (learn_cp)
-      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
+      objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, weights_history, weights);
     else if (learn_mcp)
-      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, bounds_lower, bounds_upper, weights_history, weights);
+      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, weights_history, weights);
     else if (learn_xbleu)
       objective = optimize_xbleu<OptimizeXBLEU>(kbests, scorers, weights);
     else 
-      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, bounds_lower, bounds_upper, weights);
+      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
 
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
-    
-    if (! bounds_lower.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::max(weights[i], bounds_lower[i]);
-    }
-    
-    if (! bounds_upper.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::min(weights[i], bounds_upper[i]);
-    }
     
     if (mert_search) {
       const double objective = optimize_mert(scorers, kbests, kbest_map, 0.1, 1.1, weights_prev, weights);
@@ -555,12 +517,8 @@ struct OptimizeOnline
   
   OptimizeOnline(Optimizer& __optimizer,
 		 const hypothesis_map_type& kbests,
-		 const hypothesis_map_type& oracles,
-		 const weight_set_type& __bounds_lower,
-		 const weight_set_type& __bounds_upper)
-    : optimizer(__optimizer),
-      bounds_lower(__bounds_lower),
-      bounds_upper(__bounds_upper)
+		 const hypothesis_map_type& oracles)
+    : optimizer(__optimizer)
   {
     samples.reserve(kbests.size());
     
@@ -641,18 +599,10 @@ struct OptimizeOnline
       }
       
       
-      if (! bounds_lower.empty() || ! bounds_upper.empty())
-	optimizer(gradient_oracles,
-		  gradient_kbests,
-		  Z_oracle,
-		  Z_kbest,
-		  bounds_lower,
-		  bounds_upper);
-      else
-	optimizer(gradient_oracles,
-		  gradient_kbests,
-		  Z_oracle,
-		  Z_kbest);
+      optimizer(gradient_oracles,
+		gradient_kbests,
+		Z_oracle,
+		Z_kbest);
     }
   }
 
@@ -720,9 +670,6 @@ struct OptimizeOnline
   Optimizer& optimizer;
 
   sample_pair_set_type samples;
-
-  const weight_set_type& bounds_lower;
-  const weight_set_type& bounds_upper;
 
   id_set_type ids;
 };
@@ -856,12 +803,8 @@ struct OptimizeOnlineMargin
   
   OptimizeOnlineMargin(Optimizer& __optimizer,
 		       const hypothesis_map_type& kbests,
-		       const hypothesis_map_type& oracles,
-		       const weight_set_type& __bounds_lower,
-		       const weight_set_type& __bounds_upper)
-    : optimizer(__optimizer),
-      bounds_lower(__bounds_lower),
-      bounds_upper(__bounds_upper)
+		       const hypothesis_map_type& oracles)
+    : optimizer(__optimizer)
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
@@ -1006,18 +949,10 @@ struct OptimizeOnlineMargin
     boost::random_number_generator<Generator> gen(generator);
     std::random_shuffle(ids.begin(), ids.end(), gen);
     
-    if (! bounds_lower.empty() || ! bounds_upper.empty()) {
-      for (size_t i = 0; i != ids.size(); ++ i) {
-	const size_type id = ids[i];
-	
-	optimizer(features[id].begin(), features[id].end(), bounds_lower, bounds_upper, losses[id]);
-      }
-    } else {
-      for (size_t i = 0; i != ids.size(); ++ i) {
-	const size_type id = ids[i];
-	
-	optimizer(features[id].begin(), features[id].end(), losses[id]);
-      }
+    for (size_t i = 0; i != ids.size(); ++ i) {
+      const size_type id = ids[i];
+      
+      optimizer(features[id].begin(), features[id].end(), losses[id]);
     }
   }
   
@@ -1126,9 +1061,6 @@ struct OptimizeOnlineMargin
   }
 
   Optimizer& optimizer;
-  
-  const weight_set_type& bounds_lower;
-  const weight_set_type& bounds_upper;
   
   sample_set_type features;
   loss_set_type   losses;
@@ -1272,8 +1204,6 @@ double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       const kbest_map_type& kbest_map,
-		       const weight_set_type& bounds_lower,
-		       const weight_set_type& bounds_upper,
 		       weight_set_type& weights,
 		       Generator& generator)
 {
@@ -1294,7 +1224,7 @@ double optimize_online(const scorer_document_type& scorers,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
 
   optimizer_type optimizer(instances, C);
-  Optimize opt(optimizer, kbests, oracles, bounds_lower, bounds_upper);
+  Optimize opt(optimizer, kbests, oracles);
 
   const double norm_local = opt.normalizer();
   double norm = 0.0;
@@ -1346,22 +1276,6 @@ double optimize_online(const scorer_document_type& scorers,
       
       optimizer.weights *= (1.0 / samples);
       
-      // optimizer.weights is the new weights.
-      if (! bounds_lower.empty()) {
-	const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-	
-	for (size_t i = 0; i != weights_size; ++ i)
-	  weights[i] = std::max(weights[i], bounds_lower[i]);
-      }
-      
-      if (! bounds_upper.empty()) {
-	const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-	
-	for (size_t i = 0; i != weights_size; ++ i)
-	  weights[i] = std::min(weights[i], bounds_upper[i]);
-      }
-
-
       if (line_search) {
 	// perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
 	
@@ -2769,8 +2683,6 @@ double optimize_cp(const scorer_document_type& scorers,
 		   const hypothesis_map_type& kbests,
 		   const hypothesis_map_type& oracles,
 		   const kbest_map_type& kbest_map,
-		   const weight_set_type& bounds_lower,
-		   const weight_set_type& bounds_upper,
 		   const weights_history_type& weights_history,
 		   weight_set_type& weights)
 {
@@ -4014,13 +3926,9 @@ struct OptimizeLBFGS
   typedef std::vector<sample_pair_type, std::allocator<sample_pair_type> > sample_pair_set_type;
 
   OptimizeLBFGS(const sample_pair_set_type& __samples,
-		const weight_set_type& __bounds_lower,
-		const weight_set_type& __bounds_upper,
 		weight_set_type& __weights,
 		const size_t& __instances)
     : samples(__samples),
-      bounds_lower(__bounds_lower),
-      bounds_upper(__bounds_upper),
       weights(__weights),
       instances(__instances) {}
 
@@ -4220,9 +4128,6 @@ struct OptimizeLBFGS
     
   const sample_pair_set_type& samples;
 
-  const weight_set_type& bounds_lower;
-  const weight_set_type& bounds_upper;
-  
   weight_set_type& weights;
   size_t instances;
   
@@ -4361,8 +4266,6 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
 template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
-		      const weight_set_type& bounds_lower,
-		      const weight_set_type& bounds_upper,
 		      weight_set_type& weights)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -4385,7 +4288,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(samples, bounds_lower, bounds_upper, weights, instances)();
+    const double objective = Optimize(samples, weights, instances)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -5262,9 +5165,6 @@ void options(int argc, char** argv)
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
-    ("bound-lower", po::value<path_type>(&bound_lower_file),                     "lower bounds definition for feature weights")
-    ("bound-upper", po::value<path_type>(&bound_upper_file),                     "upper bounds definition for feature weights")
-
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")

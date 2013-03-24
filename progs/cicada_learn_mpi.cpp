@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // learning from hypergraphs...
@@ -49,6 +49,8 @@
 
 #include "liblbfgs/lbfgs.h"
 #include "liblbfgs/lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.hpp"
+#include "cg_descent/cg.hpp"
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -60,9 +62,6 @@ path_type weights_path;
 path_set_type weights_history_path;
 path_type output_path = "-";
 path_type output_objective_path;
-
-path_type bound_lower_file;
-path_type bound_upper_file;
 
 int iteration = 100;
 
@@ -196,14 +195,6 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("quenching rate should be > 1.0: " + utils::lexical_cast<std::string>(quench_rate)); 
     }
     
-    if (! bound_lower_file.empty())
-      if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
-	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
-    
-    if (! bound_upper_file.empty())
-      if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
-	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
-
     scorer_document_type scorers(scorer_name);
     if (! refset_path.empty())
       read_refset(refset_path, scorers);
@@ -243,15 +234,6 @@ int main(int argc, char ** argv)
       bcast_weights(rank, weights);
     }
 
-    weight_set_type bounds_lower;
-    weight_set_type bounds_upper;
-    
-    if (! bound_lower_file.empty()) 
-      read_bounds(bound_lower_file, bounds_lower, - std::numeric_limits<double>::infinity());
-    
-    if (! bound_upper_file.empty())
-      read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
-
     if (debug && mpi_rank == 0)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
@@ -285,20 +267,6 @@ int main(int argc, char ** argv)
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
 
-    if (! bounds_lower.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::max(weights[i], bounds_lower[i]);
-    }
-    
-    if (! bounds_upper.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::min(weights[i], bounds_upper[i]);
-    }
-    
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_path, 1024 * 1024);
       os.precision(20);
@@ -2438,9 +2406,6 @@ void options(int argc, char** argv)
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
-    ("bound-lower", po::value<path_type>(&bound_lower_file),                     "lower bounds definition for feature weights")
-    ("bound-upper", po::value<path_type>(&bound_upper_file),                     "upper bounds definition for feature weights")
-
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",   po::bool_switch(&learn_lbfgs),   "batch LBFGS algorithm")

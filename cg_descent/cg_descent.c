@@ -85,19 +85,20 @@ int cg_descent /*  return status of solution process:
                        9 (no cost or gradient improvement in
                           2n + Parm->nslow iterations)
                       10 (out of memory)
-                      11 (function nan or +-INF and could not be repaired)
+                      11 (function nan or +-DBL_MAX and could not be repaired)
                       12 (invalid choice for memory parameter) */
 (
     double            *x, /* input: starting guess, output: the solution */
-    INT                n, /* problem dimension */
+    CG_INT                n, /* problem dimension */
     cg_stats       *Stat, /* structure with statistics (can be NULL) */
     cg_parameter  *UParm, /* user parameters, NULL = use default parameters */
     double      grad_tol, /* StopRule = 1: |g|_infty <= max (grad_tol,
                                            StopFac*initial |g|_infty) [default]
                              StopRule = 0: |g|_infty <= grad_tol(1+|f|) */
-    double      (*value) (double *, INT),  /* f = value (x, n) */
-    void         (*grad) (double *, double *, INT), /* grad (g, x, n) */
-    double    (*valgrad) (double *, double *, INT), /* f = valgrad (g, x, n),
+    void*       instance,
+    double      (*value) (void*, double *, CG_INT),  /* f = value (x, n) */
+    void         (*grad) (void*, double *, double *, CG_INT), /* grad (g, x, n) */
+    double    (*valgrad) (void*, double *, double *, CG_INT), /* f = valgrad (g, x, n),
                           NULL = compute value & gradient using value & grad */
     double         *Work  /* NULL => allocate storage
                              memory > 0 => need (mem+6)*n + (3*mem+9)*mem + 5
@@ -105,7 +106,7 @@ int cg_descent /*  return status of solution process:
                              memory = 0 => need 4*n */
 )
 {
-    INT     i, iter, IterRestart, maxit, n5, nrestart, nrestartsub ;
+    CG_INT     i, iter, IterRestart, maxit, n5, nrestart, nrestartsub ;
     int     nslow, slowlimit, IterQuad, status, PrintLevel, QuadF, StopRule ;
     double  delta2, Qk, Ck, fbest, gbest,
             f, ftemp, gnorm, xnorm, gnorm2, dnorm2, denom,
@@ -146,9 +147,9 @@ int cg_descent /*  return status of solution process:
     Com.eps = Parm->eps ;
     Com.PertRule = Parm->PertRule ;
     Com.Wolfe = FALSE ; /* initially Wolfe line search not performed */
-    Com.nf = (INT) 0 ;  /* number of function evaluations */
-    Com.ng = (INT) 0 ;  /* number of gradient evaluations */
-    iter = (INT) 0 ;
+    Com.nf = (CG_INT) 0 ;  /* number of function evaluations */
+    Com.ng = (CG_INT) 0 ;  /* number of gradient evaluations */
+    iter = (CG_INT) 0 ;
     QuadF = FALSE ;     /* initially function assumed to be nonquadratic */
     NegDiag = FALSE ;   /* no negative diagonal elements in QR factorization */
     mem = Parm->memory ;/* cg_descent corresponds to mem = 0 */
@@ -194,6 +195,7 @@ int cg_descent /*  return status of solution process:
     Com.n = n ;          /* problem dimension */
     Com.neps = 0 ;       /* number of times eps updated */
     Com.AWolfe = Parm->AWolfe ; /* do not touch user's AWolfe */
+    Com.instance = instance ;
     Com.cg_value = value ;
     Com.cg_grad = grad ;
     Com.cg_valgrad = valgrad ;
@@ -205,7 +207,7 @@ int cg_descent /*  return status of solution process:
     memk = 0 ;         /* number of vectors in current memory */
 
     /* the conjugate gradient algorithm is restarted every nrestart iteration */
-    nrestart = (INT) (((double) n)*Parm->restart_fac) ;
+    nrestart = (CG_INT) (((double) n)*Parm->restart_fac) ;
 
     /* allocate storage connected with limited memory CG */
     if ( mem > 0 )
@@ -252,8 +254,8 @@ int cg_descent /*  return status of solution process:
     maxit = Parm->maxit ;
 
     f = ZERO ;
-    fbest = INF ;
-    gbest = INF ;
+    fbest = DBL_MAX ;
+    gbest = DBL_MAX ;
     nslow = 0 ;
     slowlimit = 2*n + Parm->nslow ;
     n5 = n % 5 ;
@@ -1449,7 +1451,7 @@ int cg_descent /*  return status of solution process:
     }
     status = 2 ;
 Exit:
-    if ( status == 11 ) gnorm = INF ; /* function is undefined */
+    if ( status == 11 ) gnorm = DBL_MAX ; /* function is undefined */
     if ( Stat != NULL )
     {
         Stat->nfunc = Com.nf ;
@@ -2197,7 +2199,7 @@ PRIVATE int cg_evaluate
     cg_com   *Com
 )
 {
-    INT n ;
+    CG_INT n ;
     int i ;
     double alpha, *d, *gtemp, *x, *xtemp ;
     cg_parameter *Parm ;
@@ -2215,11 +2217,11 @@ PRIVATE int cg_evaluate
         {
             cg_step (xtemp, x, d, alpha, n) ;
             /* provisional function value */
-            Com->f = Com->cg_value (xtemp, n) ;
+            Com->f = Com->cg_value (Com->instance, xtemp, n) ;
             Com->nf++ ;
 
             /* reduce stepsize if function value is nan */
-            if ( (Com->f != Com->f) || (Com->f >= INF) || (Com->f <= -INF) )
+            if ( (Com->f != Com->f) || (Com->f >= DBL_MAX) || (Com->f <= -DBL_MAX) )
             {
                 for (i = 0; i < Parm->ntries; i++)
                 {
@@ -2232,10 +2234,10 @@ PRIVATE int cg_evaluate
                         alpha *= Parm->nan_decay ;
                     }
                     cg_step (xtemp, x, d, alpha, n) ;
-                    Com->f = Com->cg_value (xtemp, n) ;
+                    Com->f = Com->cg_value (Com->instance, xtemp, n) ;
                     Com->nf++ ;
-                    if ( (Com->f == Com->f) && (Com->f < INF) &&
-                         (Com->f > -INF) ) break ;
+                    if ( (Com->f == Com->f) && (Com->f < DBL_MAX) &&
+                         (Com->f > -DBL_MAX) ) break ;
                 }
                 if ( i == Parm->ntries ) return (11) ;
             }
@@ -2244,11 +2246,11 @@ PRIVATE int cg_evaluate
         else if ( !strcmp (what, "g") ) /* compute gradient */
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->cg_grad (gtemp, xtemp, n) ;
+            Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
             Com->ng++ ;
             Com->df = cg_dot (gtemp, d, n) ;
             /* reduce stepsize if derivative is nan */
-            if ( (Com->df != Com->df) || (Com->df >= INF) || (Com->df <= -INF) )
+            if ( (Com->df != Com->df) || (Com->df >= DBL_MAX) || (Com->df <= -DBL_MAX) )
             {
                 for (i = 0; i < Parm->ntries; i++)
                 {
@@ -2261,11 +2263,11 @@ PRIVATE int cg_evaluate
                         alpha *= Parm->nan_decay ;
                     }
                     cg_step (xtemp, x, d, alpha, n) ;
-                    Com->cg_grad (gtemp, xtemp, n) ;
+                    Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
                     Com->ng++ ;
                     Com->df = cg_dot (gtemp, d, n) ;
-                    if ( (Com->df == Com->df) && (Com->df < INF) &&
-                         (Com->df > -INF) ) break ;
+                    if ( (Com->df == Com->df) && (Com->df < DBL_MAX) &&
+                         (Com->df > -DBL_MAX) ) break ;
                 }
                 if ( i == Parm->ntries ) return (11) ;
                 Com->rho = Parm->nan_rho ;
@@ -2278,20 +2280,20 @@ PRIVATE int cg_evaluate
             cg_step (xtemp, x, d, alpha, n) ;
             if ( Com->cg_valgrad != NULL )
             {
-                Com->f = Com->cg_valgrad (gtemp, xtemp, n) ;
+                Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
             }
             else
             {
-                Com->cg_grad (gtemp, xtemp, n) ;
-                Com->f = Com->cg_value (xtemp, n) ;
+                Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+                Com->f = Com->cg_value (Com->instance, xtemp, n) ;
             }
             Com->df = cg_dot (gtemp, d, n) ;
             Com->nf++ ;
             Com->ng++ ;
             /* reduce stepsize if function value or derivative is nan */
             if ( (Com->df !=  Com->df) || (Com->f != Com->f) ||
-                 (Com->df >=  INF)     || (Com->f >= INF)    ||
-                 (Com->df <= -INF)     || (Com->f <= -INF))
+                 (Com->df >=  DBL_MAX)     || (Com->f >= DBL_MAX)    ||
+                 (Com->df <= -DBL_MAX)     || (Com->f <= -DBL_MAX))
             {
                 for (i = 0; i < Parm->ntries; i++)
                 {
@@ -2306,19 +2308,19 @@ PRIVATE int cg_evaluate
                     cg_step (xtemp, x, d, alpha, n) ;
                     if ( Com->cg_valgrad != NULL )
                     {
-                        Com->f = Com->cg_valgrad (gtemp, xtemp, n) ;
+                        Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
                     }
                     else
                     {
-                        Com->cg_grad (gtemp, xtemp, n) ;
-                        Com->f = Com->cg_value (xtemp, n) ;
+                        Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+                        Com->f = Com->cg_value (Com->instance, xtemp, n) ;
                     }
                     Com->df = cg_dot (gtemp, d, n) ;
                     Com->nf++ ;
                     Com->ng++ ;
                     if ( (Com->df == Com->df) && (Com->f == Com->f) &&
-                         (Com->df <  INF)     && (Com->f <  INF)    &&
-                         (Com->df > -INF)     && (Com->f > -INF) ) break ;
+                         (Com->df <  DBL_MAX)     && (Com->f <  DBL_MAX)    &&
+                         (Com->df > -DBL_MAX)     && (Com->f > -DBL_MAX) ) break ;
                 }
                 if ( i == Parm->ntries ) return (11) ;
                 Com->rho = Parm->nan_rho ;
@@ -2335,12 +2337,12 @@ PRIVATE int cg_evaluate
             {
                 if ( Com->cg_valgrad != NULL )
                 {
-                    Com->f = Com->cg_valgrad (Com->g, x, n) ;
+                    Com->f = Com->cg_valgrad (Com->instance, Com->g, x, n) ;
                 }
                 else
                 {
-                    Com->cg_grad (Com->g, x, n) ;
-                    Com->f = Com->cg_value (x, n) ;
+                    Com->cg_grad (Com->instance, Com->g, x, n) ;
+                    Com->f = Com->cg_value (Com->instance, x, n) ;
                 }
             }
             else
@@ -2348,36 +2350,36 @@ PRIVATE int cg_evaluate
                 cg_step (xtemp, x, d, alpha, n) ;
                 if ( Com->cg_valgrad != NULL )
                 {
-                    Com->f = Com->cg_valgrad (gtemp, xtemp, n) ;
+                    Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
                 }
                 else
                 {
-                    Com->cg_grad (gtemp, xtemp, n) ;
-                    Com->f = Com->cg_value (xtemp, n) ;
+                    Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+                    Com->f = Com->cg_value (Com->instance, xtemp, n) ;
                 }
                 Com->df = cg_dot (gtemp, d, n) ;
             }
             Com->nf++ ;
             Com->ng++ ;
             if ( (Com->df != Com->df) || (Com->f != Com->f) ||
-                 (Com->df == INF)     || (Com->f == INF)    ||
-                 (Com->df ==-INF)     || (Com->f ==-INF) ) return (11) ;
+                 (Com->df == DBL_MAX)     || (Com->f == DBL_MAX)    ||
+                 (Com->df ==-DBL_MAX)     || (Com->f ==-DBL_MAX) ) return (11) ;
         }
         else if ( !strcmp (what, "f") ) /* compute function */
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->f = Com->cg_value (xtemp, n) ;
+            Com->f = Com->cg_value (Com->instance, xtemp, n) ;
             Com->nf++ ;
-            if ( (Com->f != Com->f) || (Com->f == INF) || (Com->f ==-INF) )
+            if ( (Com->f != Com->f) || (Com->f == DBL_MAX) || (Com->f ==-DBL_MAX) )
                 return (11) ;
         }
         else
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->cg_grad (gtemp, xtemp, n) ;
+            Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
             Com->df = cg_dot (gtemp, d, n) ;
             Com->ng++ ;
-            if ( (Com->df != Com->df) || (Com->df == INF) || (Com->df ==-INF) )
+            if ( (Com->df != Com->df) || (Com->df == DBL_MAX) || (Com->df ==-DBL_MAX) )
                 return (11) ;
         }
     }
@@ -2438,13 +2440,13 @@ PRIVATE void cg_matvec
     double *A, /* dense matrix */
     double *x, /* input vector */
     int     n, /* number of columns of A */
-    INT     m, /* number of rows of A */
+    CG_INT     m, /* number of rows of A */
     int     w  /* T => y = A*x, F => y = A'*x */
 )
 {
 /* if the blas have not been installed, then hand code the produce */
 #ifdef NOBLAS
-    INT j, l ;
+    CG_INT j, l ;
     l = 0 ;
     if ( w )
     {
@@ -2467,7 +2469,7 @@ PRIVATE void cg_matvec
 
 /* if the blas have been installed, then possibly call gdemv */
 #ifndef NOBLAS
-    INT j, l ;
+    CG_INT j, l ;
     BLAS_INT M, N ;
     if ( w || (!w && (m*n < MATVEC_START)) )
     {
@@ -2558,11 +2560,11 @@ PRIVATE void cg_trisolve
 PRIVATE double cg_inf
 (
     double *x, /* vector */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 )
 {
 #ifdef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t ;
     t = ZERO ;
     n5 = n % 5 ;
@@ -2580,7 +2582,7 @@ PRIVATE double cg_inf
 #endif
 
 #ifndef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t ;
     BLAS_INT N ;
     if ( n < IDAMAX_START )
@@ -2602,7 +2604,7 @@ PRIVATE double cg_inf
     else
     {
         N = (BLAS_INT) n ;
-        i = (INT) CG_IDAMAX (&N, x, blas_one) ;
+        i = (CG_INT) CG_IDAMAX (&N, x, blas_one) ;
         return (fabs (x [i-1])) ; /* adjust for fortran indexing */
     }
 #endif
@@ -2670,10 +2672,10 @@ PRIVATE void cg_scale
     double *y, /* output vector */
     double *x, /* input vector */
     double  s, /* scalar */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     n5 = n % 5 ;
     if ( y == x)
     {
@@ -2752,7 +2754,7 @@ PRIVATE void cg_daxpy0
     int         n  /* length of the vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     n5 = n % 5 ;
     if (alpha == -ONE)
     {
@@ -2791,11 +2793,11 @@ PRIVATE void cg_daxpy
     double     *x, /* input and output vector */
     double     *d, /* direction */
     double  alpha, /* stepsize */
-    INT         n  /* length of the vectors */
+    CG_INT         n  /* length of the vectors */
 )
 {
 #ifdef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     n5 = n % 5 ;
     if (alpha == -ONE)
     {
@@ -2824,7 +2826,7 @@ PRIVATE void cg_daxpy
 #endif
 
 #ifndef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     BLAS_INT N ;
     if ( n < DAXPY_START )
     {
@@ -2856,7 +2858,7 @@ PRIVATE void cg_daxpy
     }
     else
     {
-        N = (BLAS_INT) n ;
+        N = (CG_INT) n ;
         CG_DAXPY (&N, &alpha, d, blas_one, x, blas_one) ;
     }
 #endif
@@ -2876,7 +2878,7 @@ PRIVATE double cg_dot0
     int     n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t ;
     t = ZERO ;
     if ( n <= 0 ) return (t) ;
@@ -2899,11 +2901,11 @@ PRIVATE double cg_dot
 (
     double *x, /* first vector */
     double *y, /* second vector */
-    INT     n /* length of vectors */
+    CG_INT     n /* length of vectors */
 )
 {
 #ifdef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t ;
     t = ZERO ;
     if ( n <= 0 ) return (t) ;
@@ -2918,9 +2920,9 @@ PRIVATE double cg_dot
 #endif
 
 #ifndef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t ;
-    BLAS_INT N ;
+    CG_INT N ;
     if ( n < DDOT_START )
     {
         t = ZERO ;
@@ -2936,7 +2938,7 @@ PRIVATE double cg_dot
     }
     else
     {
-        N = (BLAS_INT) n ;
+        N = (CG_INT) n ;
         return (CG_DDOT (&N, x, blas_one, y, blas_one)) ;
     }
 #endif
@@ -2982,11 +2984,11 @@ PRIVATE void cg_copy
 (
     double *y, /* output of copy */
     double *x, /* input of copy */
-    INT     n  /* length of vectors */
+    CG_INT     n  /* length of vectors */
 )
 {
 #ifdef NOBLAS
-    INT i, n5 ;
+    CG_INT i, n5 ;
     n5 = n % 5 ;
     for (i = 0; i < n5; i++) y [i] = x [i] ;
     for (; i < n; )
@@ -3005,8 +3007,8 @@ PRIVATE void cg_copy
 #endif
 
 #ifndef NOBLAS
-    INT i, n5 ;
-    BLAS_INT N ;
+    CG_INT i, n5 ;
+    CG_INT N ;
     if ( n < DCOPY_START )
     {
         n5 = n % 5 ;
@@ -3027,7 +3029,7 @@ PRIVATE void cg_copy
     }
     else
     {
-        N = (BLAS_INT) n ;
+        N = (CG_INT) n ;
         CG_DCOPY (&N, x, blas_one, y, blas_one) ;
     }
 #endif
@@ -3050,10 +3052,10 @@ PRIVATE void cg_step
     double     *x, /* initial vector */
     double     *d, /* search direction */
     double  alpha, /* stepsize */
-    INT         n  /* length of the vectors */
+    CG_INT         n  /* length of the vectors */
 )
 {
-    INT n5, i ;
+    CG_INT n5, i ;
     n5 = n % 5 ;
     if (alpha == -ONE)
     {
@@ -3091,10 +3093,10 @@ PRIVATE void cg_init
 (
     double *x, /* input and output vector */
     double  s, /* scalar */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     n5 = n % 5 ;
     for (i = 0; i < n5; i++) x [i] = s ;
     for (; i < n;)
@@ -3124,10 +3126,10 @@ PRIVATE double cg_update_2
     double *gold, /* old g */
     double *gnew, /* new g */
     double    *d, /* d */
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double s, t ;
     t = ZERO ;
     n5 = n % 5 ;
@@ -3259,10 +3261,10 @@ PRIVATE double cg_update_inf
     double *gold, /* old g */
     double *gnew, /* new g */
     double    *d, /* d */
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double s, t ;
     t = ZERO ;
     n5 = n % 5 ;
@@ -3360,10 +3362,10 @@ PRIVATE double cg_update_ykyk
     double *gnew, /* new g */
     double *Ykyk,
     double *Ykgk,
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double t, gnorm, yk, ykyk, ykgk ;
     gnorm = ZERO ;
     ykyk = ZERO ;
@@ -3437,10 +3439,10 @@ PRIVATE double cg_update_inf2
     double   *gnew, /* new g */
     double      *d, /* d */
     double *gnorm2, /* 2-norm of g */
-    INT          n /* length of vectors */
+    CG_INT          n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double gnorm, s, t ;
     gnorm = ZERO ;
     s = ZERO ;
@@ -3506,10 +3508,10 @@ PRIVATE double cg_update_d
     double      *g,
     double    beta,
     double *gnorm2, /* 2-norm of g */
-    INT          n /* length of vectors */
+    CG_INT          n /* length of vectors */
 )
 {
-    INT i, n5 ;
+    CG_INT i, n5 ;
     double dnorm2, s, t ;
     s = ZERO ;
     dnorm2 = ZERO ;
@@ -3621,10 +3623,10 @@ PRIVATE void cg_Yk
     double *gold, /* initial vector */
     double *gnew, /* search direction */
     double  *yty, /* y'y */
-    INT        n  /* length of the vectors */
+    CG_INT        n  /* length of the vectors */
 )
 {
-    INT n5, i ;
+    CG_INT n5, i ;
     double s, t ;
     n5 = n % 5 ;
     if ( (y != NULL) && (yty == NULL) )
@@ -3853,7 +3855,7 @@ void cg_default
     Parm->step = ZERO ;
 
     /* abort cg after maxit iterations */
-    Parm->maxit = INT_INF ;
+    Parm->maxit = CG_INT_MAX ;
 
     /* maximum number of times the bracketing interval grows during expansion */
     Parm->ntries = (int) 50 ;

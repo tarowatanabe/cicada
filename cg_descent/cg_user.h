@@ -11,9 +11,8 @@
 extern "C" {
 #endif/*__cplusplus*/
 
-#define INT long int
-#define INT_INF LONG_MAX
-#define INF DBL_MAX
+#define CG_INT long int
+#define CG_INT_MAX LONG_MAX
 
 #ifndef FALSE
 #define FALSE 0
@@ -128,7 +127,7 @@ typedef struct cg_parameter_struct /* user controlled parameters */
     double step ;
 
     /* abort cg after maxit iterations */
-    INT maxit ;
+    CG_INT maxit ;
 
     /* maximum number of times the bracketing interval grows during expansion */
     int ntries ;
@@ -197,9 +196,9 @@ typedef struct cg_stats_struct /* statistics returned to user */
 {
     double               f ; /*function value at solution */
     double           gnorm ; /* max abs component of gradient */
-    INT               iter ; /* number of iterations */
-    INT              nfunc ; /* number of function evaluations */
-    INT              ngrad ; /* number of gradient evaluations */
+    CG_INT               iter ; /* number of iterations */
+    CG_INT              nfunc ; /* number of function evaluations */
+    CG_INT              ngrad ; /* number of gradient evaluations */
 } cg_stats ;
 
 /* prototypes */
@@ -220,15 +219,16 @@ int cg_descent /*  return:
                       10 (out of memory) */
 (
     double            *x, /* input: starting guess, output: the solution */
-    INT                n, /* problem dimension */
+    CG_INT                n, /* problem dimension */
     cg_stats      *Stats, /* structure with statistics (see cg_descent.h) */
     cg_parameter  *UParm, /* user parameters, NULL = use default parameters */
     double      grad_tol, /* StopRule = 1: |g|_infty <= max (grad_tol,
                                            StopFac*initial |g|_infty) [default]
                              StopRule = 0: |g|_infty <= grad_tol(1+|f|) */
-    double        (*value) (double *, INT),  /* f = value (x, n) */
-    void           (*grad) (double *, double *, INT), /* grad (g, x, n) */
-    double      (*valgrad) (double *, double *, INT), /* f = valgrad (g,x,n)*/
+    void* instance,       /* an instance for function computation */
+    double        (*value) (void*, double *, CG_INT),  /* f = value (x, n) */
+    void           (*grad) (void*, double *, double *, CG_INT), /* grad (g, x, n) */
+    double      (*valgrad) (void*, double *, double *, CG_INT), /* f = valgrad (g,x,n)*/
     double         *Work  /* either size 4n work array or NULL */
 ) ;
 

@@ -45,6 +45,9 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
 
+#include "liblbfgs/lbfgs.hpp"
+#include "cg_descent/cg.hpp"
+
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/thread.hpp>

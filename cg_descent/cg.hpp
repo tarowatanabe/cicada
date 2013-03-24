@@ -32,15 +32,15 @@ namespace cg
     
     double operator()(const size_type n, double* x)
     {
-      cg_descent(x, n, &stats_, &param_, 1e-8, NULL, NULL, _evaluate, NULL);
+      cg_descent(x, n, &stats_, &param_, 1e-5, NULL, NULL, NULL, _evaluate, NULL);
       
       return stats_.f;
     }
     
   private:
-    static double _evaluate(double* g, double* x, size_type n)
+    static double _evaluate(void* instance, double* g, double* x, CG_INT n)
     {
-      
+      return reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
     }
     
   private:

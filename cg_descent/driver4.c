@@ -32,28 +32,31 @@
 
 double myvalue
 (
+ void*,
     double   *x,
-    INT       n
+    CG_INT       n
 ) ;
 
 void mygrad
 (
+ void*,
     double    *g,
     double    *x,
-    INT        n
+    CG_INT        n
 ) ;
 
 double myvalgrad
 (
+ void*,
     double    *g,
     double    *x,
-    INT        n
+    CG_INT        n
 ) ;
 
 int main (void)
 {
     double *x ;
-    INT i, n ;
+    CG_INT i, n ;
     cg_parameter Parm ;
 
 
@@ -73,7 +76,7 @@ int main (void)
     Parm.rho = 1.5 ;
 
     /* solve the problem */
-    cg_descent(x, n, NULL, &Parm, 1.e-8, myvalue, mygrad, myvalgrad, NULL) ;
+    cg_descent(x, n, NULL, &Parm, 1.e-8, NULL, myvalue, mygrad, myvalgrad, NULL) ;
 
     /* starting guess */
     for (i = 0; i < n; i++) x [i] = 1. ;
@@ -82,7 +85,7 @@ int main (void)
     Parm.rho = 5. ;
 
     /* solve the problem */
-    cg_descent(x, n, NULL, &Parm, 1.e-8, myvalue, mygrad, myvalgrad, NULL) ;
+    cg_descent(x, n, NULL, &Parm, 1.e-8, NULL, myvalue, mygrad, myvalgrad, NULL) ;
 
 /* free work space */
     free (x) ;
@@ -90,12 +93,13 @@ int main (void)
 
 double myvalue
 (
+ void* instance,
     double   *x,
-    INT       n
+    CG_INT       n
 )
 {
     double f, t ;
-    INT i ;
+    CG_INT i ;
     f = 0. ;
     for (i = 0; i < n; i++)
     {
@@ -108,13 +112,14 @@ double myvalue
 
 void mygrad
 (
+ void* instance,
     double    *g,
     double    *x,
-    INT        n
+    CG_INT        n
 )
 {
     double t ;
-    INT i ;
+    CG_INT i ;
     for (i = 0; i < n; i++)
     {
         t = i + 1 ;
@@ -126,13 +131,14 @@ void mygrad
 
 double myvalgrad
 (
+ void* instance,
     double    *g,
     double    *x,
-    INT        n
+    CG_INT        n
 )
 {
     double ex, f, t ;
-    INT i ;
+    CG_INT i ;
     f = (double) 0 ;
     for (i = 0; i < n; i++)
     {

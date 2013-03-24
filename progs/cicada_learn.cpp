@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // learning from hypergraphs...
@@ -36,9 +36,10 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 
-#include "liblbfgs/lbfgs.hpp"
 #include "liblbfgs/lbfgs.h"
 #include "liblbfgs/lbfgs_error.hpp"
+#include "liblbfgs/lbfgs.hpp"
+#include "cg_descent/cg.hpp"
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
@@ -53,15 +54,14 @@ path_set_type weights_history_path;
 path_type output_path = "-";
 path_type output_objective_path;
 
-path_type bound_lower_file;
-path_type bound_upper_file;
-
 int iteration = 100;
 
-bool learn_sgd = false;
-bool learn_lbfgs = false;
-bool learn_mira = false;
+bool learn_softmax = false;
 bool learn_xbleu = false;
+
+bool optimize_lbfgs = false;
+bool optimize_cg = false;
+bool optimize_sgd = false;
 
 bool regularize_l1 = false;
 bool regularize_l2 = false;
@@ -111,11 +111,11 @@ void read_forest(const path_set_type& forest_path,
 		 hypergraph_set_type& graphs_forest,
 		 hypergraph_set_type& graphs_intersected);
 
-template <typename Optimizer>
+template <typename Objective>
 double optimize_xbleu(const hypergraph_set_type& forests,
 		      const scorer_document_type& scorers,
 		      weight_set_type& weights);
-template <typename Optimizer>
+template <typename Objective>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
 		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights);
@@ -125,8 +125,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 		       weight_set_type& weights,
 		       Generator& generator);
 
-struct OptimizeXBLEU;
-struct OptimizeLBFGS;
+struct ObjectiveXBLEU;
+struct ObjectiveSoftmax;
 
 template <typename Optimizer, typename Generator>
 struct OptimizeOnline;
@@ -136,16 +136,26 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
-    if (int(learn_lbfgs) + learn_sgd == 0)
-      learn_lbfgs = true;
+    if (int(learn_softmax) + learn_xbleu > 1)
+      throw std::runtime_error("either learn-{softmax,xbleu}");
+    if (int(learn_softmax) + learn_xbleu == 0)
+      learn_softmax = true;
+
+    if (int(optimize_lbfgs) + optimize_cg + optimize_sgd > 1)
+      throw std::runtime_error("either optimize-{lbfgs,cg,sgd}");
+    if (int(optimize_lbfgs) + optimize_cg + optimize_sgd == 0)
+      optimize_lbfgs = true;
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
 
+    if (learn_xbleu && optimize_sgd)
+      throw std::runtime_error("optimize XBLEU usign SGD is not implemeneted");
+    if (regularize_l1 && optimize_cg)
+      throw std::runtime_error("optimize via CG with L1 regularization is not implemented");
+    
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
@@ -172,14 +182,6 @@ int main(int argc, char ** argv)
       if (quench_rate <= 1.0)
 	throw std::runtime_error("quenching rate should be > 1.0: " + utils::lexical_cast<std::string>(quench_rate)); 
     }
-
-    if (! bound_lower_file.empty())
-      if (bound_lower_file != "-" && ! boost::filesystem::exists(bound_lower_file))
-	throw std::runtime_error("no lower-bound file? " + bound_lower_file.string());
-    
-    if (! bound_upper_file.empty())
-      if (bound_upper_file != "-" && ! boost::filesystem::exists(bound_upper_file))
-	throw std::runtime_error("no upper-bound file? " + bound_upper_file.string());
     
     threads = utils::bithack::max(1, threads);
 
@@ -211,15 +213,6 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_path, 1024 * 1024);
       is >> weights;
     }
-        
-    weight_set_type bounds_lower;
-    weight_set_type bounds_upper;
-    
-    if (! bound_lower_file.empty())
-      read_bounds(bound_lower_file, bounds_lower, - std::numeric_limits<double>::infinity());
-    
-    if (! bound_upper_file.empty())
-      read_bounds(bound_upper_file, bounds_upper,   std::numeric_limits<double>::infinity());
     
     weights.allocate();
     
@@ -228,33 +221,23 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
 
-    if (learn_sgd) {
-      if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
-      else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
-    } else if (learn_xbleu)
-      objective = optimize_xbleu<OptimizeXBLEU>(graphs_forest, scorers, weights);
-    else
-      objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
+    if (learn_xbleu)
+      objective = optimize_xbleu<ObjectiveXBLEU>(graphs_forest, scorers, weights);
+    else if (learn_softmax) {
+      if (optimize_sgd) {
+	if (regularize_l1)
+	  objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
+	else
+	  objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
+      } else
+	objective = optimize_batch<ObjectiveSoftmax>(graphs_forest, graphs_intersected, weights);
+      
+    } else
+      throw std::runtime_error("unknown objective");
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
 
-    if (! bounds_lower.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_lower.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::max(weights[i], bounds_lower[i]);
-    }
-    
-    if (! bounds_upper.empty()) {
-      const size_t weights_size = utils::bithack::min(weights.size(), bounds_upper.size());
-      
-      for (size_t i = 0; i != weights_size; ++ i)
-	weights[i] = std::min(weights[i], bounds_upper[i]);
-    }
-    
     utils::compress_ostream os(output_path, 1024 * 1024);
     os.precision(20);
     os << weights;
@@ -508,12 +491,13 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   return Optimizer(graphs_forest, graphs_intersected, weights, generator)();
 }
 
-struct OptimizeXBLEU
+#if 0
+struct ObjectiveXBLEU
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  OptimizeXBLEU(const hypergraph_set_type& __forests,
+  ObjectiveXBLEU(const hypergraph_set_type& __forests,
 		const scorer_document_type& __scorers,
 		weight_set_type& __weights,
 		const double& __lambda,
@@ -555,7 +539,7 @@ struct OptimizeXBLEU
     // swapping...!
     std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
     
-    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeXBLEU::evaluate, 0, this, &param);
+    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, ObjectiveXBLEU::evaluate, 0, this, &param);
     
     // swapping...!
     std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
@@ -1184,7 +1168,7 @@ struct OptimizeXBLEU
     
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
     
-    OptimizeXBLEU& optimizer = *((OptimizeXBLEU*) instance);
+    ObjectiveXBLEU& optimizer = *((ObjectiveXBLEU*) instance);
     
     // swapping...!
     std::swap(optimizer.weights[feature_type(feature_type::id_type(0))], optimizer.weights[optimizer.feature_scale]);
@@ -1351,319 +1335,797 @@ struct OptimizeXBLEU
   }
 };
 
-#if 0
-struct OptimizeLBFGS
+#endif
+
+struct ObjectiveXBLEU
 {
-  OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
-		const hypergraph_set_type& __graphs_intersected,
-		weight_set_type& __weights)
-    : graphs_forest(__graphs_forest),
-      graphs_intersected(__graphs_intersected),
-      weights(__weights) {}
-
-  double operator()()
-  {
-    lbfgs_parameter_t param;
-    lbfgs_parameter_init(&param);
-
-    param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
-    
-    if (regularize_l1)
-      param.orthantwise_c = C;
-    else
-      param.orthantwise_c = 0.0;
-    
-    param.max_iterations = iteration;
-    
-    objective_opt = std::numeric_limits<double>::infinity();
-    double objective = 0.0;
-
-    const int result = lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
-    
-    if (debug)
-      std::cerr << "lbfgs: " << lbfgs_error(result) << std::endl;
-    
-    // copy from opt weights!
-    if (result < 0)
-      weights = weights_opt;
-    
-    return objective;
-  }
-
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  ObjectiveXBLEU(const hypergraph_set_type& __forests,
+		const scorer_document_type& __scorers,
+		weight_set_type& __weights,
+		const double& __lambda,
+		const feature_type& __feature_scale)
+    : forests(__forests),
+      scorers(__scorers),
+      weights(__weights),
+      lambda(__lambda),
+      feature_scale(__feature_scale) {}
+  
+  const hypergraph_set_type& forests;
+  const scorer_document_type& scorers;
+  weight_set_type& weights;
+  
+  double lambda;
+  const feature_type& feature_scale;
   
   struct Task
   {
-    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
-    
     typedef cicada::semiring::Log<double> weight_type;
-    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-    typedef cicada::WeightVector<weight_type > gradient_static_type;
     
+    static weight_type brevity_penalty(const double x)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+
+      // return (std::exp(x) - 1) / (1.0 + std::exp(1000.0 * x)) + 1.0;
+      
+      return ((traits_type::exp(x) - traits_type::one()) / (traits_type::one() + traits_type::exp(1000.0 * x))) + traits_type::one();
+    }
+    
+    static weight_type derivative_brevity_penalty(const double x)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+       
+      const weight_type expx     = traits_type::exp(x);
+      const weight_type expxm1   = expx - traits_type::one();
+      const weight_type exp1000x = traits_type::exp(1000.0 * x);
+      const weight_type p1exp1000x = traits_type::one() + exp1000x;
+      
+      return (expx / p1exp1000x) - ((expxm1 * weight_type(1000.0) * exp1000x) / (p1exp1000x * p1exp1000x));
+      
+      //return expx / (1.0 + exp1000x) - boost::math::expm1(x) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x))
+    }
+    
+    static weight_type clip_count(const weight_type& x, const weight_type& clip)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+      
+      //return (x - clip) / (1.0 + std::exp(1000.0 * (x - clip))) + clip;
+      return (weight_type(x - clip) / (traits_type::one() + traits_type::exp(1000.0 * (x - clip)))) + weight_type(clip);
+    }
+    
+    static weight_type derivative_clip_count(const weight_type& x, const weight_type& clip)
+    {
+      typedef cicada::semiring::traits<weight_type> traits_type;
+      
+      const weight_type exp1000xmc = traits_type::exp(1000.0 * (x - clip));
+      const weight_type p1exp1000xmc = exp1000xmc + traits_type::one();
+      
+      return (traits_type::one() / p1exp1000xmc) - ((weight_type(x - clip) * weight_type(1000.0) * exp1000xmc) / (p1exp1000xmc * p1exp1000xmc));
+      
+      //return 1.0 / (1.0 + exp1000x) - (x - clip) * (1000.0 * exp1000x) / ((1.0 + exp1000x) * (1.0 + exp1000x));
+    }
+
+    typedef cicada::WeightVector<weight_type > gradient_type;
+    typedef std::vector<gradient_type, std::allocator<gradient_type> > gradients_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
 
-    Task(queue_type&            __queue,
-	 const weight_set_type& __weights,
-	 const hypergraph_set_type& __graphs_forest,
-	 const hypergraph_set_type& __graphs_intersected,
-	 const size_t& __instances)
-      : queue(__queue),
-	weights(__weights),
-	graphs_forest(__graphs_forest),
-	graphs_intersected(__graphs_intersected),
-	instances(__instances)
-    {}
+    
+    typedef cicada::Symbol       word_type;
+    typedef cicada::SymbolVector ngram_type;
 
-    struct weight_function
+    typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > index_set_type;
+    typedef utils::simple_vector<index_set_type::id_type, std::allocator<index_set_type::id_type> > id_set_type;
+    typedef std::vector<id_set_type, std::allocator<id_set_type> > id_map_type;
+
+    // queue...
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+    
+    struct Count
     {
-      typedef weight_type value_type;
+      weight_type c;
+      weight_type mu_prime;
+      
+      Count() : c(), mu_prime() {}
+    };
+    typedef Count count_type;
+    typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
+    typedef std::vector<ngram_type, std::allocator<ngram_type> > ngram_set_type;
+    
 
-      weight_function(const weight_set_type& __weights) : weights(__weights) {}
+    typedef std::vector<double, std::allocator<double> > ngram_counts_type;
+    typedef std::vector<weight_set_type, std::allocator<weight_set_type> > feature_counts_type;
+    
+    struct CollectCounts
+    {
+      CollectCounts(index_set_type& __index,
+		    ngram_set_type& __ngrams,
+		    count_set_type& __counts,
+		    id_map_type& __ids)
+	: index(__index), ngrams(__ngrams), counts(__counts), ids(__ids) {}
+      
+      template <typename Edge, typename Weight, typename Counts>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts)
+      {
+	
+      }
+      
+      template <typename Edge, typename Weight, typename Counts, typename Iterator>
+      void operator()(const Edge& edge, const Weight& weight, Counts& __counts, Iterator first, Iterator last)
+      {
+	if (first == last) return;
+	
+	index_set_type::id_type id = index.root();
+	for (Iterator iter = first; iter != last; ++ iter)
+	  id = index.push(id, *iter);
+	
+	if (id >= ngrams.size())
+	  ngrams.resize(id + 1);
+	if (id >= counts.size())
+	  counts.resize(id + 1);
+	
+	counts[id].c += weight;
+	
+	if (ngrams[id].empty())
+	  ngrams[id] = ngram_type(first, last);
+	
+	ids[edge.id].push_back(id);
+      }
+      
+      index_set_type& index;
+      ngram_set_type& ngrams;
+      count_set_type& counts;
+      id_map_type& ids;
+    };
+    
+    typedef cicada::semiring::Tuple<weight_type> ngram_weight_type;
+    typedef cicada::semiring::Expectation<weight_type, ngram_weight_type> bleu_weight_type;
+    typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_weights_type;
+    
+    struct bleu_function
+    {
+      typedef bleu_weight_type value_type;
+      
+      bleu_function(const ngram_set_type& __ngrams,
+		    const count_set_type& __counts,
+		    const id_map_type& __ids,
+		    const weight_set_type& __weights,
+		    const double& __scale)
+	: ngrams(__ngrams), counts(__counts), ids(__ids),
+	  weights(__weights), scale(__scale) {}
       
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	// p_e
-	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
+	const double margin = cicada::dot_product(edge.features, weights);
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * scale);
+	
+	value_type bleu(weight, ngram_weight_type(order * 2, weight_type()));
+	
+	id_set_type::const_iterator iter_end = ids[edge.id].end();
+	for (id_set_type::const_iterator iter = ids[edge.id].begin(); iter != iter_end; ++ iter) {
+	  const int n = ngrams[*iter].size();
+	  const int index = (n - 1) << 1;
+	  
+	  bleu.r[index] += weight;
+	  bleu.r[index + 1] += counts[*iter].mu_prime * weight;
+	}
+	
+	return bleu;
       }
       
+      const ngram_set_type&  ngrams;
+      const count_set_type&  counts;
+      const id_map_type&     ids;
       const weight_set_type& weights;
+      const double           scale;
     };
     
-    struct feature_function
+    struct bleu_gradient_function
     {
       struct value_type
       {
-	value_type(const feature_set_type& __features,
-		   const weight_set_type& __weights)
-	  : features(__features), weights(__weights) {}
+	value_type(const hypergraph_type::edge_type& __edge)
+	  : edge(__edge) {}
 	
 	friend
-	value_type operator*(value_type x, const weight_type& weight)
+	value_type operator*(value_type x, const bleu_weight_type& weight)
 	{
 	  x.inside_outside = weight;
 	  return x;
 	}
 	
-	weight_type inside_outside;
-	const feature_set_type& features;
-	const weight_set_type&  weights;
+	bleu_weight_type inside_outside;
+	const hypergraph_type::edge_type& edge;
       };
       
-      feature_function(const weight_set_type& __weights) : weights(__weights) {}
+      bleu_gradient_function() {}
       
-      template <typename Edge>
-      value_type operator()(const Edge& edge) const
+      value_type operator()(const hypergraph_type::edge_type& edge) const
       {
-	return value_type(edge.features, weights);
+	return value_type(edge);
       }
-      
-      const weight_set_type& weights;
     };
     
-    struct gradients_type
+    struct bleu_gradient_type
     {
+      typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+      typedef std::vector<accumulated_type, std::allocator<accumulated_type> > accumulated_set_type;
+
       struct value_type
       {
-	value_type(gradient_type& __gradient) : gradient(__gradient) {}
-	
-	value_type& operator+=(const feature_function::value_type& x)
+	value_type& operator+=(const bleu_gradient_function::value_type& x)
 	{
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(x.features, x.weights)) * x.inside_outside;
+	  const double margin = cicada::dot_product(x.edge.features, impl.weights);
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * impl.scale);
+	  const weight_type value_scale(margin);
 	  
-	  feature_set_type::const_iterator fiter_end = x.features.end();
-	  for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter)
-	    gradient[fiter->first] += weight_type(fiter->second) * weight;
+	  bleu_weight_type bleu(weight, ngram_weight_type(order * 2, weight_type()));
+	  
+	  id_set_type::const_iterator iter_end = impl.ids[x.edge.id].end();
+	  for (id_set_type::const_iterator iter = impl.ids[x.edge.id].begin(); iter != iter_end; ++ iter) {
+	    const int n = impl.ngrams[*iter].size();
+	    const int index = (n - 1) << 1;
+	    
+	    bleu.r[index] += weight;
+	    bleu.r[index + 1] += impl.counts[*iter].mu_prime * weight;
+	  }
+	  
+	  bleu *= x.inside_outside;
+	  
+	  // accumulate gradients....
+	  for (int n = 1; n <= order; ++ n) 
+	    if (impl.matched[n] > weight_type()) {
+	      const int index = (n - 1) << 1;
+	      const weight_type scale_matched = bleu.r[index + 1] - bleu.p * impl.matched[n];
+	      const weight_type scale_hypo    = bleu.r[index]     - bleu.p * impl.hypo[n];
+	      
+	      feature_set_type::const_iterator fiter_end = x.edge.features.end();
+	      for (feature_set_type::const_iterator fiter = x.edge.features.begin(); fiter != fiter_end; ++ fiter)
+		if (fiter->second != 0.0) {
+		  const weight_type value(fiter->second * impl.scale);
+		  
+		  impl.dM[n][fiter->first] += value * scale_matched;
+		  impl.dH[n][fiter->first] += value * scale_hypo;
+		}
+	      
+	      impl.dM[n][impl.feature_scale] += value_scale * scale_matched;
+	      impl.dH[n][impl.feature_scale] += value_scale * scale_hypo;
+	    }
 	  
 	  return *this;
 	}
 	
-	gradient_type& gradient;
+	value_type(bleu_gradient_type& __impl) : impl(__impl) {}
+	
+	bleu_gradient_type& impl;
       };
       
-      value_type operator[](size_t pos)
+      value_type operator[](size_t id) { return value_type(*this); }
+      
+      bleu_gradient_type(const ngram_set_type& __ngrams,
+			 const count_set_type& __counts,
+			 const id_map_type& __ids,
+			 const weights_type& __matched,
+			 const weights_type& __hypo,
+			 const weight_set_type& __weights,
+			 const double& __scale,
+			 const feature_type& __feature_scale) 
+	: ngrams(__ngrams), counts(__counts), ids(__ids),
+	  matched(__matched), hypo(__hypo),
+	  weights(__weights), scale(__scale), feature_scale(__feature_scale),
+	  dM(order + 1),
+	  dH(order + 1) {}
+      
+      
+      const ngram_set_type&  ngrams;
+      const count_set_type&  counts;
+      const id_map_type&     ids;
+      
+      const weights_type&    matched;
+      const weights_type&    hypo;
+      
+      const weight_set_type& weights;
+      const double           scale;
+      const feature_type     feature_scale;
+      
+      accumulated_set_type dM;
+      accumulated_set_type dH;
+    };
+    
+    
+
+    typedef cicada::semiring::Expectation<weight_type, weight_type> entropy_weight_type;
+
+    struct entropy_function
+    {
+      typedef entropy_weight_type value_type;
+      
+      entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
       {
-	return value_type(gradient);
+	const double value = cicada::dot_product(edge.features, weights) * scale;
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(value);
+	
+	return value_type(weight, weight * weight_type(value));
       }
       
-      void clear() { gradient.clear(); }
-      
-      gradient_type gradient;
+      const weight_set_type& weights;
+      const double scale;
     };
 
+    struct entropy_gradient_function
+    {
+      struct value_type
+      {
+	value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	  : features(__features), weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
+	
+	friend
+	value_type operator*(value_type x, const entropy_weight_type& weight)
+	{
+	  x.inside_outside = weight;
+	  return x;
+	}
+	
+	entropy_weight_type inside_outside;
+	
+	const feature_set_type& features;
+	const weight_set_type& weights;
+	const double scale;
+	const feature_type& feature_scale;
+      };
+      
+      entropy_gradient_function(const weight_set_type& __weights, const double& __scale, const feature_type& __feature_scale)
+	: weights(__weights), scale(__scale), feature_scale(__feature_scale) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	return value_type(edge.features, weights, scale, feature_scale);
+      }
+      
+      const weight_set_type& weights;
+      const double scale;
+      const feature_type& feature_scale;
+    };
+    
+
+    struct entropy_gradient_type
+    {
+      typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+
+      struct proxy_type
+      {
+	proxy_type(accumulated_type& __dZ, accumulated_type& __dR) : dZ(__dZ), dR(__dR) {}
+	
+	proxy_type& operator+=(const entropy_gradient_function::value_type& x) 
+	{
+	  const double value = cicada::dot_product(x.features, x.weights);
+	  const double log_p_e = value * x.scale;
+	  const weight_type p_e = cicada::semiring::traits<weight_type>::exp(log_p_e);
+	  const weight_type value_scale(value);
+	  
+	  // dZ += \lnabla p_e * x.inside_outside.p;
+	  // dR += (1 + \log p_e) * \nalba p_e * x.inside_outside.p + \lnabla p_e * x.inside_outside.r;
+	  
+	  feature_set_type::const_iterator fiter_end = x.features.end();
+	  for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter) 
+	    if (fiter->second != 0.0) {
+	      const weight_type value(fiter->second * x.scale);
+	      
+	      dZ[fiter->first] += value * p_e * x.inside_outside.p;
+	      dR[fiter->first] += (weight_type(1.0 + log_p_e) * value * p_e * x.inside_outside.p + value * p_e * x.inside_outside.r);
+	    }
+	  
+	  dZ[x.feature_scale] += value_scale * p_e * x.inside_outside.p;
+	  dR[x.feature_scale] += (weight_type(1.0 + log_p_e) * value_scale * p_e * x.inside_outside.p + value_scale * p_e * x.inside_outside.r);
+	  
+	  return *this;
+	}
+	
+	accumulated_type& dZ;
+	accumulated_type& dR;
+      };
+      
+      typedef proxy_type value_type;
+      
+      proxy_type operator[](size_t id) { return proxy_type(dZ, dR); }
+      
+      accumulated_type dZ;
+      accumulated_type dR;
+    };
+
+    typedef std::vector<entropy_weight_type, std::allocator<entropy_weight_type> > entropy_weights_type;
+    
+
+    Task(queue_type& __queue,
+	 const hypergraph_set_type& __forests,
+	 const scorer_document_type& __scorers,
+	 const weight_set_type& __weights,
+	 const feature_type& __feature_scale)
+      : queue(__queue),
+	forests(__forests), scorers(__scorers), weights(__weights), feature_scale(__feature_scale),
+	c_matched(order + 1),
+	c_hypo(order + 1),
+	g_matched(order + 1),
+	g_hypo(order + 1),
+	r(0) {}
+    
     void operator()()
     {
-      gradients_type gradients;
-      gradients_type gradients_intersected;
-      weights_type   inside;
-      weights_type   inside_intersected;
+      const word_type __tmp;
       
-      gradient_static_type  feature_expectations;
+      index_set_type index;
+      ngram_set_type ngrams;
+      count_set_type counts;
+      id_map_type    ids;
+      
+      weights_type   matched(order + 1);
+      weights_type   hypo(order + 1);
+      
+      weights_type   counts_matched(order + 1);
+      weights_type   counts_hypo(order + 1);
+      gradients_type gradients_matched(order + 1);
+      gradients_type gradients_hypo(order + 1);
 
-      g.clear();
-      objective = 0.0;
+      bleu_weights_type bleu_inside;
       
-      while (1) {
+      weight_type          entropy;
+      entropy_weights_type entropy_inside;
+      gradient_type        gradient_entropy;
+
+      
+      
+      for (size_t n = 0; n != g_matched.size(); ++ n) {
+	gradients_matched[n].allocate();
+	gradients_hypo[n].allocate();
+	
+	g_matched[n].clear();
+	g_hypo[n].clear();
+      }
+
+      gradient_entropy.allocate();
+      g_entropy.clear();
+      
+      std::fill(counts_matched.begin(), counts_matched.end(), weight_type());
+      std::fill(counts_hypo.begin(), counts_hypo.end(), weight_type());
+      std::fill(c_matched.begin(), c_matched.end(), 0.0);
+      std::fill(c_hypo.begin(), c_hypo.end(), 0.0);
+      r = 0.0;
+      e = 0.0;
+
+      const double scale = weights[feature_scale];
+      
+      for (;;) {
 	int id = 0;
 	queue.pop(id);
 	if (id < 0) break;
 	
-	gradients.clear();
-	gradients_intersected.clear();
+	const hypergraph_type& forest = forests[id];
 	
-	inside.clear();
-	inside_intersected.clear();
+	if (! forest.is_valid()) continue;
 	
-	inside.reserve(graphs_forest[id].nodes.size());
-	inside.resize(graphs_forest[id].nodes.size(), weight_type());
+	const cicada::eval::BleuScorer* scorer = dynamic_cast<const cicada::eval::BleuScorer*>(scorers[id].get());
 	
-	inside_intersected.reserve(graphs_intersected[id].nodes.size());
-	inside_intersected.resize(graphs_intersected[id].nodes.size(), weight_type());
+	if (! scorer)
+	  throw std::runtime_error("we do not have bleu scorer...");
 	
-	cicada::inside_outside(graphs_forest[id], inside, gradients, weight_function(weights), feature_function(weights));
-	cicada::inside_outside(graphs_intersected[id], inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
+	// here, we will implement forest xBLEU...
 	
-	gradient_type& gradient = gradients.gradient;
-	weight_type& Z = inside.back();
 	
-	gradient_type& gradient_intersected = gradients_intersected.gradient;
-	weight_type& Z_intersected = inside_intersected.back();
+	// first, collect expected ngrams
+	index.clear();
+	counts.clear();
+	ngrams.clear();
+	ids.clear();
 	
-	gradient /= Z;
-	gradient_intersected /= Z_intersected;
+	ids.resize(forest.edges.size());
+		
+	cicada::expected_ngram(forest,
+			       cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			       CollectCounts(index, ngrams, counts, ids),
+			       index,
+			       order);
 	
-	feature_expectations -= gradient_intersected;
-	feature_expectations += gradient;
+	// second, commpute clipped ngram counts (\mu')
+	std::fill(matched.begin(), matched.end(), weight_type());
+	std::fill(hypo.begin(), hypo.end(), weight_type());
 	
-	const double margin = log(Z_intersected) - log(Z);
+	for (size_type i = 0; i != ngrams.size(); ++ i) 
+	  if (! ngrams[i].empty()) {
+	    const size_type    order = ngrams[i].size();
+	    const weight_type& count = counts[i].c;
+	    const weight_type  clip = scorer->find(ngrams[i]);
+	    
+	    counts[i].mu_prime = derivative_clip_count(count, clip);
+	    
+	    // collect counts for further inside/outside
+	    matched[order] += counts[i].c * counts[i].mu_prime;
+	    hypo[order]    += counts[i].c;
+	    
+	    // collect global counts
+	    counts_matched[order] += clip_count(count, clip);
+	    counts_hypo[order]    += counts[i].c;
+	  }
 	
-	objective -= margin;
+	r += scorer->reference_length(hypo[1]);
 	
-	if (debug >= 3)
-	  std::cerr << "id: " << id << " margin: " << margin << std::endl;
+	if (debug >= 4)
+	  for (int n = 1; n <= order; ++ n)
+	    std::cerr << "order: " << n << " matched: " << matched[n] << " hypo: " << hypo[n] << std::endl;
+	
+	
+	
+	// third, collect feature expectation, \hat{m} - m and \hat{h} - h
+	bleu_inside.clear();
+	bleu_inside.resize(forest.nodes.size(), bleu_weight_type());
+	
+	bleu_gradient_type bleu_gradient(ngrams, counts, ids,
+					 matched, hypo,
+					 weights, scale, feature_scale);
+	
+	cicada::inside_outside(forest,
+			       bleu_inside,
+			       bleu_gradient,
+			       bleu_function(ngrams, counts, ids, weights, scale),
+			       bleu_gradient_function());
+	
+	for (int n = 1; n <= order; ++ n) {
+	  const weight_type& Z = bleu_inside.back().p;
+	  const bleu_gradient_type::accumulated_set_type& dM = bleu_gradient.dM;
+	  const bleu_gradient_type::accumulated_set_type& dH = bleu_gradient.dH;
+	  
+	  bleu_gradient_type::accumulated_type::const_iterator miter_end = dM[n].end();
+	  for (bleu_gradient_type::accumulated_type::const_iterator miter = dM[n].begin(); miter != miter_end; ++ miter)
+	    gradients_matched[n][miter->first] += miter->second / Z;
+	  
+	  bleu_gradient_type::accumulated_type::const_iterator hiter_end = dH[n].end();
+	  for (bleu_gradient_type::accumulated_type::const_iterator hiter = dH[n].begin(); hiter != hiter_end; ++ hiter)
+	    gradients_hypo[n][hiter->first] += hiter->second / Z;
+	}
+
+	
+	// forth, compute entorpy...
+	entropy_inside.clear();
+	entropy_inside.resize(forest.nodes.size(), entropy_weight_type());
+
+	entropy_gradient_type entropy_gradient;
+	
+	cicada::inside_outside(forest,
+			       entropy_inside,
+			       entropy_gradient,
+			       entropy_function(weights, scale),
+			       entropy_gradient_function(weights, scale, feature_scale));
+	
+	const weight_type& Z = entropy_inside.back().p;
+	const weight_type& R = entropy_inside.back().r;
+	
+	const weight_type entropy_segment = weight_type(cicada::semiring::log(Z)) - (R / Z);
+	
+	if (debug >= 4)
+	  std::cerr << "entropy: " << double(entropy_segment) << std::endl;
+	
+	entropy += entropy_segment;
+	
+	const entropy_gradient_type::accumulated_type& dZ = entropy_gradient.dZ;
+	const entropy_gradient_type::accumulated_type& dR = entropy_gradient.dR;
+
+	// compute...
+	// \frac{\nabla Z}{Z} - \frac{Z \nabla \bar{r} - \bar{r} \nabla Z}{Z^2}
+	
+	entropy_gradient_type::accumulated_type::const_iterator ziter_end = dZ.end();
+	for (entropy_gradient_type::accumulated_type::const_iterator ziter = dZ.begin(); ziter != ziter_end; ++ ziter)
+	  gradient_entropy[ziter->first] += ziter->second * ((cicada::semiring::traits<weight_type>::one() / Z) + R / (Z * Z));
+	
+	entropy_gradient_type::accumulated_type::const_iterator riter_end = dR.end();
+	for (entropy_gradient_type::accumulated_type::const_iterator riter = dR.begin(); riter != riter_end; ++ riter)
+	  gradient_entropy[riter->first] -= riter->second / Z;
       }
       
-      // transform feature_expectations into g...
-      g.allocate();
+      std::copy(counts_matched.begin(), counts_matched.end(), c_matched.begin());
+      std::copy(counts_hypo.begin(), counts_hypo.end(), c_hypo.begin());
       
-      std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
+      for (size_t n = 1; n != g_matched.size(); ++ n) {
+	g_matched[n].allocate();
+	g_hypo[n].allocate();
+	
+	std::copy(gradients_matched[n].begin(), gradients_matched[n].end(), g_matched[n].begin());
+	std::copy(gradients_hypo[n].begin(), gradients_hypo[n].end(), g_hypo[n].begin());
+      }
       
-      // normalize!
-      objective /= instances;
-      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
+      g_entropy.allocate();
+      std::copy(gradient_entropy.begin(), gradient_entropy.end(), g_entropy.begin());
+      
+      e = entropy;
     }
-
-    queue_type&            queue;
     
+    queue_type& queue;
+    
+    const hypergraph_set_type& forests;
+    const scorer_document_type& scorers;
     const weight_set_type& weights;
+    const feature_type& feature_scale;
     
-    const hypergraph_set_type& graphs_forest;
-    const hypergraph_set_type& graphs_intersected;
-    size_t instances;
-    
-    double          objective;
-    weight_set_type g;
+    ngram_counts_type   c_matched;
+    ngram_counts_type   c_hypo;
+    feature_counts_type g_matched;
+    feature_counts_type g_hypo;
+    weight_set_type     g_entropy;
+    double r;
+    double e;
   };
-
   
-  static lbfgsfloatval_t evaluate(void *instance,
-				  const lbfgsfloatval_t *x,
-				  lbfgsfloatval_t *g,
-				  const int n,
-				  const lbfgsfloatval_t step)
+  
+  double operator()(size_t size, const double* x, double* g) const
   {
     typedef Task                  task_type;
     typedef task_type::queue_type queue_type;
     
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-
-    OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
     
-    const int id_max = utils::bithack::min(optimizer.graphs_forest.size(), optimizer.graphs_intersected.size());
-    size_t instances = 0;
-    for (int id = 0; id != id_max; ++ id)
-      instances += (optimizer.graphs_forest[id].is_valid() && optimizer.graphs_intersected[id].is_valid());
+    // swapping...!
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
     
     queue_type queue;
+    task_set_type tasks(threads, task_type(queue, forests, scorers, weights, feature_scale));
     
-    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected, instances));
-
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    for (int id = 0; id != id_max; ++ id)
-      if (optimizer.graphs_forest[id].is_valid() && optimizer.graphs_intersected[id].is_valid())
+    // distribute!
+    size_type instances = 0;
+    for (size_type id = 0; id != forests.size(); ++ id)
+      if (forests[id].is_valid()) {
 	queue.push(id);
+	++ instances;
+      }
     
-    // collect all the objective and gradients...
-    double objective = 0.0;
-    std::fill(g, g + n, 0.0);
-    
+    // termination...
     for (int i = 0; i < threads; ++ i)
       queue.push(-1);
-    
+        
     workers.join_all();
     
-    for (int i = 0; i < threads; ++ i) {
-      objective += tasks[i].objective;
-      std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
-    }
+    task_type::ngram_counts_type c_matched(order + 1, 0.0);
+    task_type::ngram_counts_type c_hypo(order + 1, 0.0);
     
-    const double objective_unregularized = objective;
-    double objective_regularized = objective;
-        
-    // L2...
-    if (regularize_l2) {
-      double norm = 0.0;
-      for (int i = 0; i < n; ++ i) {
-	g[i] += C * x[i];
-	norm += x[i] * x[i];
+    task_type::feature_counts_type g_matched(order + 1);
+    task_type::feature_counts_type g_hypo(order + 1);
+    weight_set_type g_entropy;
+    
+    double r(0.0);
+    double e(0.0);
+    
+    for (int i = 0; i < threads; ++ i) {
+      std::transform(tasks[i].c_matched.begin(), tasks[i].c_matched.end(), c_matched.begin(), c_matched.begin(), std::plus<double>());
+      std::transform(tasks[i].c_hypo.begin(), tasks[i].c_hypo.end(), c_hypo.begin(), c_hypo.begin(), std::plus<double>());
+      
+      for (int n = 1; n <= order; ++ n) {
+	g_matched[n] += tasks[i].g_matched[n];
+	g_hypo[n] += tasks[i].g_hypo[n];
       }
       
-      objective_regularized += 0.5 * C * norm;
-      objective += 0.5 * C * norm;
-    } else if (regularize_l1) {
-      double norm = 0.0;
-      for (int i = 0; i < n; ++ i)
-	norm += std::fabs(x[i]);
+      g_entropy += tasks[i].g_entropy;
       
-      objective_regularized += C * norm;
+      r += tasks[i].r;
+      e += tasks[i].e;
     }
+    
+    // smoothing...
+    {
+      double smoothing = 1e-40;
+      for (int n = 1; n <= order; ++ n) {
+	if (c_hypo[n] > 0.0 && c_matched[n] <= 0.0)
+	  c_matched[n] = smoothing;
+	smoothing *= 0.1;
+      }
+    }
+    
+    // compute P
+    double P = 0.0;
+    for (int n = 1; n <= order; ++ n)
+      if (c_hypo[n] > 0.0)
+	P += (1.0 / order) * (utils::mathop::log(c_matched[n]) - utils::mathop::log(c_hypo[n]));
+    
+    // compute C and B
+    const double C = r / c_hypo[1];
+    const double B = task_type::brevity_penalty(1.0 - C);
+    
+    // for computing g...
+    const double exp_P = utils::mathop::exp(P);
+    const double C_dC  = C * task_type::derivative_brevity_penalty(1.0 - C);
+    
+    //std::cerr << "P: " << P << " B: " << B << " C: " << C << std::endl;
+    
+    // xBLEU...
+    const double objective_bleu = exp_P * B;
+    const double entropy = e / instances;
+    
+    // initialize g either by entroy or zero...
+    // entropy
+    if (temperature != 0.0)
+      std::transform(g_entropy.begin(), g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
+    else
+      std::fill(g, g + size, 0.0);
+    
+    // gradients..
+    for (int n = 1; n <= order; ++ n) 
+      if (c_hypo[n] > 0.0) {
+	const double factor_matched = - (exp_P * B / order) / c_matched[n];
+	const double factor_hypo    = - (exp_P * B / order) / c_hypo[n];
+	
+	for (size_t i = 0; i != static_cast<size_t>(size); ++ i) {
+	  g[i] += factor_matched * g_matched[n][i];
+	  g[i] -= factor_hypo * g_hypo[n][i];
+	}
+      }
+    
+    if (c_hypo[1] > 0.0) {
+      // I think the missed exp(P) is a bug in Rosti et al. (2011)
+      const double factor = - exp_P * C_dC / c_hypo[1];
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+	g[i] += factor * g_hypo[1][i];
+    }
+    
+    if (debug >= 3) {
+      std::cerr << "grad:" << std::endl;
+      for (size_t i = 0; i != static_cast<size_t>(size); ++ i)
+	if (g[i] != 0.0 && feature_type(i) != feature_type())
+	  std::cerr << feature_type(i) << ' ' << g[i] << std::endl;
+    }
+    
+    // we need to minimize negative bleu... + regularized by average entropy...
+    double objective = - objective_bleu - temperature * entropy;
+    
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (size_t i = 0; i < static_cast<size_t>(size); ++ i) {
+	g[i] += lambda * x[i] * double(i != feature_scale.id());
+	norm += x[i] * x[i] * double(i != feature_scale.id());
+      }
+      
+      objective += 0.5 * lambda * norm;
+    }
+    
+    if (scale_fixed)
+      g[feature_scale.id()] = 0.0;
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective_regularized << " non-regularized: " << objective_unregularized << std::endl;
+      std::cerr << "objective: " << objective
+		<< " xBLEU: " << objective_bleu
+		<< " BP: " << B
+		<< " entropy: " << entropy
+		<< " scale: " << weights[feature_scale]
+		<< std::endl;
     
-    // keep the best so forth...
-    if (std::isfinite(objective_regularized) && objective_regularized <= optimizer.objective_opt) {
-      optimizer.objective_opt = objective_regularized;
-      optimizer.weights_opt = optimizer.weights;
-    }
+    // swapping...!
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    std::swap(g[0], g[feature_scale.id()]);
     
     return objective;
   }
-  
-  const hypergraph_set_type& graphs_forest;
-  const hypergraph_set_type& graphs_intersected;
-  
-  weight_set_type& weights;
-  
-  double objective_opt;
-  weight_set_type weights_opt;
 };
-#endif
 
-struct OptimizeLBFGS
+struct ObjectiveSoftmax
 {
-  OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
-		const hypergraph_set_type& __graphs_intersected,
-		weight_set_type& __weights)
+  ObjectiveSoftmax(const hypergraph_set_type& __graphs_forest,
+		   const hypergraph_set_type& __graphs_intersected,
+		   weight_set_type& __weights,
+		   const double& __lambda)
     : graphs_forest(__graphs_forest),
       graphs_intersected(__graphs_intersected),
-      weights(__weights) {}
+      weights(__weights),
+      lambda(__lambda) {}
 
   const hypergraph_set_type& graphs_forest;
   const hypergraph_set_type& graphs_intersected;
   weight_set_type& weights;
+  double lambda;
   
   struct Task
   {
@@ -1881,11 +2343,11 @@ struct OptimizeLBFGS
     if (regularize_l2) {
       double norm = 0.0;
       for (size_t i = 0; i < n; ++ i) {
-	g[i] += C * x[i];
+	g[i] += lambda * x[i];
 	norm += x[i] * x[i];
       }
       
-      objective += 0.5 * C * norm;
+      objective += 0.5 * lambda * norm;
     }
     
     return objective;
@@ -1893,6 +2355,56 @@ struct OptimizeLBFGS
 };
 
 template <typename Optimizer>
+double optimize_xbleu(Optimizer& optimizer,
+		      weight_set_type& weights,
+		      const feature_type& feature_scale)
+{
+  double result = 0.0;
+  
+  if (annealing_mode) {
+    for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
+      if (debug >= 2)
+	std::cerr << "temperature: " << temperature << std::endl;
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+      
+      result = optimizer(weights.size(), &(*weights.begin()));
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    }
+    
+  } else {
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    
+    result = optimizer(weights.size(), &(*weights.begin()));
+    
+    std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+  }
+  
+  if (quenching_mode)
+    for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
+      if (debug >= 2)
+	std::cerr << "quench: " << quench << std::endl;
+      
+      weights[feature_scale] = quench;
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+      
+      result = optimizer(weights.size(), &(*weights.begin()));
+      
+      std::swap(weights[feature_type(feature_type::id_type(0))], weights[feature_scale]);
+    }
+  
+  if (weights[feature_scale] < 0.0) {
+    // inverse weights...
+    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
+      weights[i] = - weights[i];
+  }
+  
+  return result;
+}
+
+template <typename Objective>
 double optimize_xbleu(const hypergraph_set_type& forests,
 		      const scorer_document_type& scorers,
 		      weight_set_type& weights)
@@ -1901,58 +2413,40 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   
   weights[feature_scale] = scale;
   
-  Optimizer optimizer(forests, scorers, weights, C, feature_scale);
+  Objective objective(forests, scorers, weights, C, feature_scale);
   
-  double objective = 0.0;
-  
-  if (annealing_mode) {
-    for (temperature = temperature_start; temperature >= temperature_end; temperature *= temperature_rate) {
-      if (debug >= 2)
-	std::cerr << "temperature: " << temperature << std::endl;
-	
-      objective = optimizer();
-    }
-  } else 
-    objective = optimizer();
-    
-  if (quenching_mode) {
-    temperature = 0.0;
-      
-    for (double quench = quench_start; quench <= quench_end; quench *= quench_rate) {
-      if (debug >= 2)
-	std::cerr << "quench: " << quench << std::endl;
-	
-      weights[feature_scale] = quench;
-	
-      objective = optimizer();
-    }
-  }
+  if (optimize_lbfgs) {
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0, 1);
 
-  if (weights[feature_scale] < 0.0) {
-    // inverse weights...
-    for (feature_type::id_type i = 0; i != weights.size(); ++ i)
-      weights[i] = - weights[i];
-  }
+    return optimize_xbleu(optimizer, weights, feature_scale);
+  } else if (optimize_cg) {
+    cg::CG<Objective> optimizer(objective, iteration);
     
-  return objective;
+    return optimize_xbleu(optimizer, weights, feature_scale);
+  } else
+    throw std::runtime_error("invalid xbleu algorithm");
+  
 }
 
 
-template <typename Func>
+template <typename Objective>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
 		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights)
 {
-  Func func(graphs_forest, graphs_intersected, weights);
+  Objective objective(graphs_forest, graphs_intersected, weights, C);
   
-  liblbfgs::LBFGS<Func> optimizer(func,
-				  iteration,
-				  regularize_l1 ? C : 0.0);
-  
-  return optimizer(weights.size(), &(*weights.begin()));
-  
-  //return Func(graphs_forest, graphs_intersected, weights)();
-}
+  if (optimize_lbfgs) {
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0);
+    
+    return optimizer(weights.size(), &(*weights.begin()));
+  } else if (optimize_cg) {
+    cg::CG<Objective> optimizer(objective, iteration);
+    
+    return optimizer(weights.size(), &(*weights.begin()));
+  } else
+    throw std::runtime_error("invalid batch algorithm");
+}  
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
@@ -2253,14 +2747,14 @@ void options(int argc, char** argv)
     
     ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
-    ("bound-lower", po::value<path_type>(&bound_lower_file),                     "lower bounds definition for feature weights")
-    ("bound-upper", po::value<path_type>(&bound_upper_file),                     "upper bounds definition for feature weights")
-
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
-    ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
-    ("learn-xbleu",  po::bool_switch(&learn_xbleu),  "xBLEU algorithm")
+    ("learn-softmax", po::bool_switch(&learn_softmax), "Softmax objective")
+    ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEE objective")
+
+    ("optimize-lbfgs", po::bool_switch(&optimize_lbfgs), "LBFGS optimizer")
+    ("optimize-cg",    po::bool_switch(&optimize_cg),    "CG optimizer")
+    ("optimize-sgd",   po::bool_switch(&optimize_sgd),   "SGD optimizer")
     
     ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
     ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")

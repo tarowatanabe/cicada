@@ -15,9 +15,9 @@
 typedef struct cg_com_struct /* common variables */
 {
     /* parameters computed by the code */
-    INT              n ; /* problem dimension, saved for reference */
-    INT             nf ; /* number of function evaluations */
-    INT             ng ; /* number of gradient evaluations */
+    CG_INT              n ; /* problem dimension, saved for reference */
+    CG_INT             nf ; /* number of function evaluations */
+    CG_INT             ng ; /* number of gradient evaluations */
     int         QuadOK ; /* T (quadratic step successful) */
     int       UseCubic ; /* T (use cubic step) F (use secant step) */
     int           neps ; /* number of time eps updated */
@@ -50,9 +50,10 @@ typedef struct cg_com_struct /* common variables */
     double          *d ; /* current search direction */
     double          *g ; /* gradient at x */
     double      *gtemp ; /* gradient at x + alpha*d */
-    double   (*cg_value) (double *, INT) ; /* f = cg_value (x, n) */
-    void      (*cg_grad) (double *, double *, INT) ; /* cg_grad (g, x, n) */
-    double (*cg_valgrad) (double *, double *, INT) ; /* f = cg_valgrad (g,x,n)*/
+    void*     instance ; /* an instance for feature computation */
+    double   (*cg_value) (void*, double *, CG_INT) ; /* f = cg_value (x, n) */
+    void      (*cg_grad) (void*,  double *, double *, CG_INT) ; /* cg_grad (g, x, n) */
+    double (*cg_valgrad) (void*, double *, double *, CG_INT) ; /* f = cg_valgrad (g,x,n)*/
     cg_parameter *Parm ; /* user parameters */
 } cg_com ;
 
@@ -111,7 +112,7 @@ PRIVATE void cg_matvec
     double *A, /* dense matrix */
     double *x, /* input vector */
     int     n, /* number of columns of A */
-    INT     m, /* number of rows of A */
+    CG_INT     m, /* number of rows of A */
     int     w  /* T => y = A*x, F => y = A'*x */
 ) ;
 
@@ -127,7 +128,7 @@ PRIVATE void cg_trisolve
 PRIVATE double cg_inf
 (
     double *x, /* vector */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 ) ;
 
 PRIVATE void cg_scale0
@@ -143,7 +144,7 @@ PRIVATE void cg_scale
     double *y, /* output vector */
     double *x, /* input vector */
     double  s, /* scalar */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 ) ;
 
 PRIVATE void cg_daxpy0
@@ -159,7 +160,7 @@ PRIVATE void cg_daxpy
     double     *x, /* input and output vector */
     double     *d, /* direction */
     double  alpha, /* stepsize */
-    INT         n  /* length of the vectors */
+    CG_INT         n  /* length of the vectors */
 ) ;
 
 PRIVATE double cg_dot0
@@ -173,7 +174,7 @@ PRIVATE double cg_dot
 (
     double *x, /* first vector */
     double *y, /* second vector */
-    INT     n /* length of vectors */
+    CG_INT     n /* length of vectors */
 ) ;
 
 PRIVATE void cg_copy0
@@ -187,7 +188,7 @@ PRIVATE void cg_copy
 (
     double *y, /* output of copy */
     double *x, /* input of copy */
-    INT     n  /* length of vectors */
+    CG_INT     n  /* length of vectors */
 ) ;
 
 PRIVATE void cg_step
@@ -196,14 +197,14 @@ PRIVATE void cg_step
     double     *x, /* initial vector */
     double     *d, /* search direction */
     double  alpha, /* stepsize */
-    INT         n  /* length of the vectors */
+    CG_INT         n  /* length of the vectors */
 ) ;
 
 PRIVATE void cg_init
 (
     double *x, /* input and output vector */
     double  s, /* scalar */
-    INT     n /* length of vector */
+    CG_INT     n /* length of vector */
 ) ;
 
 PRIVATE double cg_update_2
@@ -211,7 +212,7 @@ PRIVATE double cg_update_2
     double *gold, /* old g */
     double *gnew, /* new g */
     double    *d, /* d */
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 ) ;
 
 PRIVATE double cg_update_inf
@@ -219,7 +220,7 @@ PRIVATE double cg_update_inf
     double *gold, /* old g */
     double *gnew, /* new g */
     double    *d, /* d */
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 ) ;
 
 PRIVATE double cg_update_ykyk
@@ -228,7 +229,7 @@ PRIVATE double cg_update_ykyk
     double *gnew, /* new g */
     double *Ykyk,
     double *Ykgk,
-    INT        n /* length of vectors */
+    CG_INT        n /* length of vectors */
 ) ;
 
 PRIVATE double cg_update_inf2
@@ -237,7 +238,7 @@ PRIVATE double cg_update_inf2
     double   *gnew, /* new g */
     double      *d, /* d */
     double *gnorm2, /* 2-norm of g */
-    INT          n /* length of vectors */
+    CG_INT          n /* length of vectors */
 ) ;
 
 PRIVATE double cg_update_d
@@ -246,7 +247,7 @@ PRIVATE double cg_update_d
     double      *g,
     double    beta,
     double *gnorm2, /* 2-norm of g */
-    INT          n /* length of vectors */
+    CG_INT          n /* length of vectors */
 ) ;
 
 PRIVATE void cg_Yk
@@ -255,7 +256,7 @@ PRIVATE void cg_Yk
     double *gold, /* initial vector */
     double *gnew, /* search direction */
     double  *yty, /* y'y */
-    INT        n  /* length of the vectors */
+    CG_INT        n  /* length of the vectors */
 ) ;
 
 PRIVATE void cg_printParms

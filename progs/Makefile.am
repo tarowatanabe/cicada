@@ -9,11 +9,12 @@ boost_LDADD = \
 	$(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_FILESYSTEM_LIBS) \
 	$(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_IOSTREAMS_LIBS)
 
-LIBCICADA = $(top_builddir)/cicada/libcicada.la
-LIBUTILS  = $(top_builddir)/utils/libutils.la
-LIBCODEC  = $(top_builddir)/codec/libcodec.la
-LIBLINEAR = $(top_builddir)/liblinear/liblinear.la
-LIBLBFGS  = $(top_builddir)/liblbfgs/liblbfgs.la
+LIBCICADA     = $(top_builddir)/cicada/libcicada.la
+LIBUTILS      = $(top_builddir)/utils/libutils.la
+LIBCODEC      = $(top_builddir)/codec/libcodec.la
+LIBLINEAR     = $(top_builddir)/liblinear/liblinear.la
+LIBLBFGS      = $(top_builddir)/liblbfgs/liblbfgs.la
+LIBCG_DESCENT = $(top_builddir)/cg_descent/libcg_descent.la
 
 noinst_PROGRAMS = \
 cicada_extract_score_main \
@@ -311,27 +312,27 @@ cicada_index_tree_grammar_SOURCES = cicada_index_tree_grammar.cpp
 cicada_index_tree_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_learn_SOURCES = cicada_learn.cpp cicada_learn_impl.hpp
-cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS)
+cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 cicada_learn_mpi_SOURCES  = cicada_learn_mpi.cpp cicada_learn_impl.hpp
 cicada_learn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS)
+cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 cicada_learn_kbest_SOURCES = cicada_learn_kbest.cpp cicada_kbest_impl.hpp
-cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS)
+cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp cicada_kbest_impl.hpp $(LBFGS_FORTRAN_SOURCE)
 cicada_learn_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS) 
-cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS)
+cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 cicada_learn_online_kbest_mpi_SOURCES  = cicada_learn_online_kbest_mpi.cpp cicada_learn_online_kbest_impl.hpp
 cicada_learn_online_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_learn_online_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS)
+cicada_learn_online_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 
 cicada_learn_online_mpi_SOURCES  = cicada_learn_online_mpi.cpp cicada_learn_online_impl.hpp
 cicada_learn_online_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
 cicada_lexicon_SOURCES = cicada_lexicon.cpp
 cicada_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
