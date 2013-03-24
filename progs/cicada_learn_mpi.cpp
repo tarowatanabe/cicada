@@ -1384,9 +1384,6 @@ struct ObjectiveXBLEU
     const double objective_bleu = exp_P * B;
     const double entropy = task.e / instances;
     
-    // compute g..
-    std::fill(g, g + size, 0.0);
-
     // entropy
     if (temperature != 0.0)
       std::transform(task.g_entropy.begin(), task.g_entropy.end(), g, std::bind2nd(std::multiplies<double>(), - temperature / instances));
@@ -1822,7 +1819,6 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	  send_weights(task.g_hypo[n]);
 	}
 	send_weights(task.g_entropy);
-	
       }
     }
     

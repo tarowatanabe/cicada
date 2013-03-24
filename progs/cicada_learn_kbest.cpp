@@ -274,8 +274,10 @@ int main(int argc, char ** argv)
       objective = optimize_svm<OptimizeSVM>(kbests, oracles, weights);
     else if (learn_xbleu)
       objective = optimize_xbleu<ObjectiveXBLEU>(kbests, scorers, weights);
-    else
+    else if (learn_softmax)
       objective = optimize_batch<ObjectiveSoftmax>(kbests, oracles, weights);
+    else
+      throw std::runtime_error("invalid learning objective");
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
