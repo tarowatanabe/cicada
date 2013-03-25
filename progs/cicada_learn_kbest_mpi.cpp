@@ -825,6 +825,8 @@ struct OptimizeOnlineMargin
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
+
+    const feature_type feature_bias(":feature-bias:");
     
     features_type feats;
     sentence_unique_type  sentences;
@@ -862,6 +864,9 @@ struct OptimizeOnlineMargin
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
+
+	      // add bias!
+	      feats.push_back(std::make_pair(feature_bias, 1.0));
 	      
 	      features_sample.insert(feats.begin(), feats.end());
 	      losses_sample.push_back(loss);
@@ -885,6 +890,9 @@ struct OptimizeOnlineMargin
 	    construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
 	    if (feats.empty()) continue;
+
+	    // add bias!
+	    feats.push_back(std::make_pair(feature_bias, 1.0));
 	    
 	    features_sample.insert(feats.begin(), feats.end());
 	    losses_sample.push_back(loss);
@@ -924,6 +932,9 @@ struct OptimizeOnlineMargin
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
 	      if (feats.empty()) continue;
+
+	      // add bias!
+	      feats.push_back(std::make_pair(feature_bias, 1.0));
 
 	      if (loss_margin) {
 		const double loss = kbest.loss - oracle.loss;
@@ -1540,6 +1551,7 @@ struct OptimizeCP
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
+  typedef hypothesis_type::feature_type       feature_type;
   typedef hypothesis_type::feature_value_type feature_value_type;
   
   struct SampleSet
@@ -1666,6 +1678,8 @@ struct OptimizeCP
   {
     typedef std::vector<feature_value_type, std::allocator<feature_value_type> > features_type;
     typedef std::vector<size_type, std::allocator<size_type> > pos_set_type;
+
+    const feature_type feature_bias(":feature-bias:");
     
     features_type feats;
     sentence_unique_type  sentences;
@@ -1703,6 +1717,9 @@ struct OptimizeCP
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
+
+	      // add bias!
+	      feats.push_back(std::make_pair(feature_bias, 1.0));
 	      
 	      features_sample.insert(feats.begin(), feats.end());
 	      losses_sample.push_back(loss);
@@ -1726,6 +1743,9 @@ struct OptimizeCP
 	    construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	    
 	    if (feats.empty()) continue;
+
+	    // add bias!
+	    feats.push_back(std::make_pair(feature_bias, 1.0));
 	    
 	    features_sample.insert(feats.begin(), feats.end());
 	    losses_sample.push_back(loss);
@@ -1765,6 +1785,9 @@ struct OptimizeCP
 	      construct_pair(oracle.features.begin(), oracle.features.end(), kbest.features.begin(), kbest.features.end(), feats);
 	      
 	      if (feats.empty()) continue;
+
+	      // add bias!
+	      feats.push_back(std::make_pair(feature_bias, 1.0));
 	      
 	      if (loss_margin) {
 		const double loss = kbest.loss - oracle.loss;
@@ -1922,6 +1945,7 @@ struct OptimizeMCP
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
+  typedef hypothesis_type::feature_type       feature_type;
   typedef hypothesis_type::feature_value_type feature_value_type;
   
   struct SampleSet
