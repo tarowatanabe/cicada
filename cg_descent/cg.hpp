@@ -36,7 +36,7 @@ namespace cg
       g_local.reserve(n);
       g_local.resize(n);
 
-      cg_descent(x, n, &stats_, &param_, 1e-5, this, _value, _grad, _valgrad, NULL);
+      cg_descent(x, n, &stats_, &param_, 1e-8, this, _value, _grad, _valgrad, NULL);
       
       return stats_.f;
     }
@@ -50,22 +50,11 @@ namespace cg
     static void _grad(void* instance, double* g, double* x, CG_INT n)
     {
       reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
-      
-      // inversion..
-      for (size_type i = 0; i != n; ++ i)
-	g[i] = - g[i];
-      
     }
-
+    
     static double _valgrad(void* instance, double* g, double* x, CG_INT n)
     {
-      const double result = reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
-
-      // inversion..
-      for (size_type i = 0; i != n; ++ i)
-	g[i] = - g[i];
-
-      return result;
+      return reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
     }
     
   private:
