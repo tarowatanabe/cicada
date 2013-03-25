@@ -2200,7 +2200,7 @@ PRIVATE void cg_swap
  )
 {
   CG_INT i, n5;
-  double tmp, tmp1, tmp2, tmp3, tmp4, tmp5;
+  double tmp, tmps[5];
   
   n5 = n % 5 ;
   for (i = 0; i < n5; ++ i) {
@@ -2210,29 +2210,29 @@ PRIVATE void cg_swap
   }
   
   for (;i < n;) {
-    tmp1 = x[i];
+    tmps[0] = x[i];
     x[i] = y[i];
-    y[i] = tmp1;
+    y[i] = tmps[0];
     ++ i;
     
-    tmp2 = x[i];
+    tmps[1] = x[i];
     x[i] = y[i];
-    y[i] = tmp2;
+    y[i] = tmps[1];
     ++ i;
     
-    tmp3 = x[i];
+    tmps[2] = x[i];
     x[i] = y[i];
-    y[i] = tmp3;
+    y[i] = tmps[2];
     ++ i;
 
-    tmp4 = x[i];
+    tmps[3] = x[i];
     x[i] = y[i];
-    y[i] = tmp4;
+    y[i] = tmps[3];
     ++ i;
 
-    tmp5 = x[i];
+    tmps[4] = x[i];
     x[i] = y[i];
-    y[i] = tmp5;
+    y[i] = tmps[4];
     ++ i;
   }
 }
