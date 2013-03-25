@@ -27,7 +27,6 @@ namespace cg
     {
       cg_default(&param_);
       
-      param_.LBFGS = true;
       param_.maxit = max_iterations;
     }
     
@@ -51,11 +50,22 @@ namespace cg
     static void _grad(void* instance, double* g, double* x, CG_INT n)
     {
       reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
+      
+      // inversion..
+      for (size_type i = 0; i != n; ++ i)
+	g[i] = - g[i];
+      
     }
 
     static double _valgrad(void* instance, double* g, double* x, CG_INT n)
     {
-      return reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
+      const double result = reinterpret_cast<CG<Function>*>(instance)->function_(n, x, g);
+
+      // inversion..
+      for (size_type i = 0; i != n; ++ i)
+	g[i] = - g[i];
+
+      return result;
     }
     
   private:
