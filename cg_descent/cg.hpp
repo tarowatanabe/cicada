@@ -32,7 +32,7 @@ namespace cg
     
     double operator()(const size_type n, double* x)
     {
-      cg_descent(x, n, &stats_, &param_, 1e-5, NULL, NULL, NULL, _evaluate, NULL);
+      cg_descent(x, n, &stats_, &param_, 1e-5, this, NULL, NULL, _evaluate, NULL);
       
       return stats_.f;
     }
