@@ -2199,12 +2199,41 @@ PRIVATE void cg_swap
  CG_INT     n  /* length of vectors */  
  )
 {
-  CG_INT i;
+  CG_INT i, n5;
+  double tmp, tmp1, tmp2, tmp3, tmp4, tmp5;
   
-  for (i = 0; i < n; ++ i) {
-    double tmp = x[i];
+  n5 = n % 5 ;
+  for (i = 0; i < n5; ++ i) {
+    tmp = x[i];
     x[i] = y[i];
     y[i] = tmp;
+  }
+  
+  for (;i < n;) {
+    tmp1 = x[i];
+    x[i] = y[i];
+    y[i] = tmp1;
+    ++ i;
+    
+    tmp2 = x[i];
+    x[i] = y[i];
+    y[i] = tmp2;
+    ++ i;
+    
+    tmp3 = x[i];
+    x[i] = y[i];
+    y[i] = tmp3;
+    ++ i;
+
+    tmp4 = x[i];
+    x[i] = y[i];
+    y[i] = tmp4;
+    ++ i;
+
+    tmp5 = x[i];
+    x[i] = y[i];
+    y[i] = tmp5;
+    ++ i;
   }
 }
 
