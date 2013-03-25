@@ -33,9 +33,9 @@ namespace cg
     
     double operator()(const size_type n, double* x)
     {
-      g_local.clear();
-      g_local.reserve(n);
-      g_local.resize(n);
+      g_local_.clear();
+      g_local_.reserve(n);
+      g_local_.resize(n);
 
       cg_descent(x, n, &stats_, &param_, 1e-5, this, _value, _grad, _valgrad, NULL);
       
@@ -45,7 +45,7 @@ namespace cg
   private:
     static double _value(void* instance, double* x, CG_INT n)
     {
-      return reinterpret_cast<CG<Function>*>(instance)->function_(n, x, &(*reinterpret_cast<CG<Function>*>(instance)->g_local.begin()));
+      return reinterpret_cast<CG<Function>*>(instance)->function_(n, x, &(*reinterpret_cast<CG<Function>*>(instance)->g_local_.begin()));
     }
     
     static void _grad(void* instance, double* g, double* x, CG_INT n)
@@ -63,7 +63,7 @@ namespace cg
     cg_stats     stats_;
     const Function& function_;
     
-    std::vector<double, std::allocator<double> > g_local;
+    std::vector<double, std::allocator<double> > g_local_;
   };
 };
 
