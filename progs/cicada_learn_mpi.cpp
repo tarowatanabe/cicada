@@ -31,6 +31,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/mpi_traits.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -582,15 +583,15 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   id_set_type ids(graphs_forest.size());
-  int instances_local = 0;
+  size_t instances_local = 0;
   
   for (size_t id = 0; id != ids.size(); ++ id) {
     ids[id] = id;
     instances_local += (graphs_intersected[id].is_valid() && graphs_forest[id].is_valid());
   }
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   optimizer_type optimizer(instances, C);
   Optimize opt(optimizer);
@@ -603,7 +604,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
     for (int iter = 0; iter < iteration; ++ iter) {
       
       for (int rank = 1; rank < mpi_size; ++ rank)
-	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+	MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
       
       bcast_weights(0, optimizer.weights);
       
@@ -622,11 +623,11 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
       reduce_weights(optimizer.weights);
       
       objective = 0.0;
-      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
-      int samples = 0;
-      int samples_local = (optimizer.samples + 1);
-      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+      size_t samples = 0;
+      size_t samples_local = (optimizer.samples + 1);
+      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
       
       optimizer.weights *= (1.0 / samples);
       
@@ -636,7 +637,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
 
     weights.swap(optimizer.weights);
     
@@ -649,8 +650,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
     
     MPI::Prequest requests[2];
     
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -678,11 +679,11 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	send_weights(optimizer.weights);
 	
 	double objective = 0.0;
-	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
-	int samples = 0;
-	int samples_local = (optimizer.samples + 1);
-	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+	size_t samples = 0;
+	size_t samples_local = (optimizer.samples + 1);
+	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
       }
     }
     
@@ -1313,7 +1314,7 @@ struct ObjectiveXBLEU
     
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
     
     if (debug >= 3)
       std::cerr << "weights:" << std::endl
@@ -1331,10 +1332,10 @@ struct ObjectiveXBLEU
       double                       e(0.0);
       
       // reduce c_* and r 
-      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
       task.c_matched.swap(c_matched);
       task.c_hypo.swap(c_hypo);
@@ -1648,7 +1649,7 @@ struct ObjectiveSoftmax
     
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
     
     bcast_weights(0, weights);
     
@@ -1662,7 +1663,7 @@ struct ObjectiveSoftmax
     std::transform(task.g.begin(), task.g.end(), g, g, std::plus<double>());
     
     double objective = 0.0;
-    MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+    MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
     
     // L2...
     if (regularize_l2) {
@@ -1746,12 +1747,12 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   
   weights[feature_scale] = scale;
   
-  int instances_local = 0;
+  size_t instances_local = 0;
   for (size_t id = 0; id != forests.size(); ++ id)
     instances_local += forests[id].is_valid();
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
     Objective objective(forests, scorers, weights, C, instances, feature_scale);
@@ -1771,7 +1772,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
     
     return result;
   } else {
@@ -1782,8 +1783,8 @@ double optimize_xbleu(const hypergraph_set_type& forests,
     
     MPI::Prequest requests[2];
     
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -1807,10 +1808,10 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	double                                e(0.0);
 	
 	// reduce c_* and r 
-	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
 	// reduce g_*
 	for (int n = 1; n <= order; ++ n) {
@@ -1839,12 +1840,12 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   
   const size_t id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
   
-  int instances_local = 0;
+  size_t instances_local = 0;
   for (size_t id = 0; id != id_max; ++ id)
     instances_local += (graphs_intersected[id].is_valid() && graphs_forest[id].is_valid());
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
     Objective objective(graphs_forest, graphs_intersected, weights, C, instances);
@@ -1864,7 +1865,7 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
     
     return result;
   } else {
@@ -1875,8 +1876,8 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
     
     MPI::Prequest requests[2];
 
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -1897,7 +1898,7 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
 	send_weights(task.g);
 	
 	double objective = 0.0;
-	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       }
     }
     

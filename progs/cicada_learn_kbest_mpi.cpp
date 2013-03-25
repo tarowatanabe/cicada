@@ -29,6 +29,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/mpi_traits.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -1231,20 +1232,19 @@ double optimize_online(const scorer_document_type& scorers,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  int instances_local = 0;
-  
+  size_t instances_local = 0;
   for (size_t id = 0; id != kbests.size(); ++ id)
     instances_local += ! kbests[id].empty() && ! oracles[id].empty();
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
 
   optimizer_type optimizer(instances, C);
   Optimize opt(optimizer, kbests, oracles);
 
   const double norm_local = opt.normalizer();
   double norm = 0.0;
-  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+  MPI::COMM_WORLD.Reduce(&norm_local, &norm, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
   
   weight_set_type weights_init = weights;
   point_set_type points;
@@ -1265,7 +1265,7 @@ double optimize_online(const scorer_document_type& scorers,
     for (int iter = 0; iter < iteration; ++ iter) {
       
       for (int rank = 1; rank < mpi_size; ++ rank)
-	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+	MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
       
       weight_set_type weights_prev = optimizer.weights;
       
@@ -1279,12 +1279,12 @@ double optimize_online(const scorer_document_type& scorers,
       reduce_weights(optimizer.weights);
       
       objective = 0.0;
-      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       objective /= norm;
       
-      int samples = 0;
-      int samples_local = optimizer.samples;
-      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+      size_t samples = 0;
+      size_t samples_local = optimizer.samples;
+      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
 
       const int active_size = samples;
             
@@ -1314,8 +1314,8 @@ double optimize_online(const scorer_document_type& scorers,
 	double grad_pos = 0.0;
 	double grad_neg = 0.0;
 	
-	MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
 	const double norm_w      = cicada::dot_product(optimizer.weights, optimizer.weights);
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
@@ -1417,7 +1417,7 @@ double optimize_online(const scorer_document_type& scorers,
       const double objective_local = opt.objective(optimizer.weights);
       
       objective = 0.0;
-      MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       objective /= norm;
       
       if (regularize_l2)
@@ -1452,7 +1452,7 @@ double optimize_online(const scorer_document_type& scorers,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
 
     weights.swap(weights_min);
     
@@ -1466,8 +1466,8 @@ double optimize_online(const scorer_document_type& scorers,
     
     MPI::Prequest requests[2];
     
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -1490,11 +1490,11 @@ double optimize_online(const scorer_document_type& scorers,
 	send_weights(optimizer.weights);
 	
 	double objective = 0.0;
-	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
-	int samples = 0;
-	int samples_local = optimizer.samples;
-	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+	size_t samples = 0;
+	size_t samples_local = optimizer.samples;
+	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
 	
 	if (line_search) {
 	  // perform line-search between weights_prev and optimizer.weights, and update optimizer.weights
@@ -1511,8 +1511,8 @@ double optimize_online(const scorer_document_type& scorers,
 	  double grad_pos = 0.0;
 	  double grad_neg = 0.0;
 	  
-	  MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
-	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+	  MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	  MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	}
 
 	if (mert_search_local)
@@ -1523,7 +1523,7 @@ double optimize_online(const scorer_document_type& scorers,
 	
 	const double objective_local = opt.objective(optimizer.weights);
 	objective = 0.0;
-	MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       }
     }
     
@@ -2717,20 +2717,20 @@ double optimize_cp(const scorer_document_type& scorers,
   // setup norm...
   const double instances_local = opt.instances();
   opt.samples = 0.0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &opt.samples, 1, MPI::DOUBLE, MPI::SUM);
+  MPI::COMM_WORLD.Allreduce(&instances_local, &opt.samples, 1, utils::mpi_traits<double>::data_type(), MPI::SUM);
   
   weight_queue_type a;
   f_set_type        f;
   alpha_set_type    alpha;
 
   {
-    int history_size = weights_history.size();
-    MPI::COMM_WORLD.Bcast(&history_size, 1, MPI::INT, 0);
+    size_t history_size = weights_history.size();
+    MPI::COMM_WORLD.Bcast(&history_size, 1, utils::mpi_traits<size_t>::data_type(), 0);
     
     if (history_size) {
       weight_set_type weights;
       
-      for (int i = 0; i != history_size; ++ i) {
+      for (size_t i = 0; i != history_size; ++ i) {
 	if (mpi_rank == 0)
 	  a.push_back(weight_set_type());
 	else
@@ -2750,7 +2750,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	
 	// reduce objective part
 	double risk = 0.0;
-	MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
 	// reduce score part
 	reduce_score(risk_local.second);
@@ -2787,7 +2787,7 @@ double optimize_cp(const scorer_document_type& scorers,
   // at most 1000 iterations
   // at least two updates
   
-  int num_minimum = 0;
+  size_t num_minimum = 0;
   for (int iter = 0; (num_minimum <= 1 || iter < iteration) && (iter < 1000); ++ iter) {
     if (mpi_rank == 0)
       a.push_back(weight_set_type());
@@ -2803,7 +2803,7 @@ double optimize_cp(const scorer_document_type& scorers,
     
     // reduce objective part
     double risk = 0.0;
-    MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, MPI::DOUBLE, MPI::SUM, 0);
+    MPI::COMM_WORLD.Reduce(&risk_local.first, &risk, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
     
     // reduce score part
     reduce_score(risk_local.second);
@@ -2861,8 +2861,8 @@ double optimize_cp(const scorer_document_type& scorers,
       double grad_pos = 0.0;
       double grad_neg = 0.0;
       
-      MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&grads.first,  &grad_pos, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&grads.second, &grad_neg, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
       if (mpi_rank == 0) {
 	
@@ -3214,7 +3214,7 @@ double optimize_cp(const scorer_document_type& scorers,
     std::pair<double, score_ptr_pair_type> objective_master_local = opt.objective(weights);
     
     // reduce objectice part
-    MPI::COMM_WORLD.Reduce(&objective_master_local.first, &objective_master, 1, MPI::DOUBLE, MPI::SUM, 0);
+    MPI::COMM_WORLD.Reduce(&objective_master_local.first, &objective_master, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
     
     // reduce score part
     reduce_score(objective_master_local.second);
@@ -3230,7 +3230,7 @@ double optimize_cp(const scorer_document_type& scorers,
       
       ++ num_minimum;
     }
-    MPI::COMM_WORLD.Bcast(&num_minimum, 1, MPI::INT, 0);
+    MPI::COMM_WORLD.Bcast(&num_minimum, 1, utils::mpi_traits<size_t>::data_type(), 0);
 
     if (mpi_rank == 0 && debug >= 2)
       std::cerr << "objective master: " << objective_master
@@ -3239,11 +3239,11 @@ double optimize_cp(const scorer_document_type& scorers,
     
     // check termination condition...
     int terminate = (std::fabs((objective_master - objective_reduced) / objective_master) < 0.01);
-    MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
+    MPI::COMM_WORLD.Bcast(&terminate, 1, utils::mpi_traits<int>::data_type(), 0);
     
     if (terminate) break;
 
-    MPI::COMM_WORLD.Bcast(&objective_master, 1, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Bcast(&objective_master, 1, utils::mpi_traits<double>::data_type(), 0);
     
     // we will update proximy when better solution found
 
@@ -3631,7 +3631,7 @@ struct ObjectiveXBLEU
     
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
     
     if (debug >= 3)
       std::cerr << "weights:" << std::endl
@@ -3649,10 +3649,10 @@ struct ObjectiveXBLEU
       double                       e(0.0);
       
       // reduce c_* and r 
-      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.r, &r, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&task.e, &e, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
       task.c_matched.swap(c_matched);
       task.c_hypo.swap(c_hypo);
@@ -4004,7 +4004,7 @@ struct ObjectiveSoftmax
     
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
     
     bcast_weights(0, weights);
     
@@ -4018,7 +4018,7 @@ struct ObjectiveSoftmax
     std::fill(std::copy(task.g.begin(), task.g.end(), g), g + n, 0.0);
     
     double objective = 0.0;
-    MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+    MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
     
         // L2...
     if (regularize_l2) {
@@ -4104,7 +4104,7 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
   
   typename Objective::sample_set_type features;
   
-  int instances_local = 0;
+  size_t instances_local = 0;
   for (size_t id = 0; id != kbests.size(); ++ id) 
     if (! kbests[id].empty()) {
       
@@ -4114,8 +4114,8 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
       ++ instances_local;
     }
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
     Objective objective(kbests, features, scorers, weights, C, instances, feature_scale);
@@ -4135,7 +4135,7 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
     
     return result;
   } else {
@@ -4146,8 +4146,8 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
     
     MPI::Prequest requests[2];
 
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -4171,10 +4171,10 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
 	double                                e(0.0);
 	
 	// reduce c_* and r 
-	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, MPI::DOUBLE, MPI::SUM, 0);
-	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_matched.begin()), &(*c_matched.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&(*task.c_hypo.begin()), &(*c_hypo.begin()), order + 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.r, &r, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.e, &e, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
 	task.c_matched.swap(c_matched);
 	task.c_hypo.swap(c_hypo);
@@ -4213,7 +4213,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
   typename Objective::sample_pair_set_type samples;
   samples.reserve(id_max);
   
-  int instances_local = 0;
+  size_t instances_local = 0;
   for (size_t id = 0; id != id_max; ++ id) 
     if (! kbests[id].empty() && ! oracles[id].empty()) {
       samples.push_back(typename Objective::sample_pair_type(kbests[id], oracles[id]));
@@ -4221,8 +4221,8 @@ double optimize_batch(const hypothesis_map_type& kbests,
       ++ instances_local;
     }
   
-  int instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  size_t instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
     Objective objective(samples, weights, C, instances);
@@ -4242,7 +4242,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, termination_tag);
     
     return result;
   } else {
@@ -4254,8 +4254,8 @@ double optimize_batch(const hypothesis_map_type& kbests,
     
     MPI::Prequest requests[2];
 
-    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
-    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, termination_tag);
     
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
@@ -4276,7 +4276,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
 	send_weights(task.g);
 	
 	double objective = 0.0;
-	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       }
     }
     

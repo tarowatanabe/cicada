@@ -40,6 +40,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/mpi_traits.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -469,8 +470,8 @@ void synchronize()
     terminated_recv[0] = true;
     terminated_send[0] = true;
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
-      request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, rank, notify_tag);
+      request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
+      request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, utils::mpi_traits<int>::data_type(), rank, notify_tag);
     }
     
     int non_found_iter = 0;
@@ -495,8 +496,8 @@ void synchronize()
       non_found_iter = loop_sleep(found, non_found_iter);
     }
   } else {
-    MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, 0, notify_tag);
-    MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, 0, notify_tag);
+    MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
+    MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, utils::mpi_traits<int>::data_type(), 0, notify_tag);
     
     bool terminated_send = false;
     bool terminated_recv = false;
@@ -706,7 +707,7 @@ void cicada_learn(operation_set_type& operations,
 
     kbests_all.clear();
     
-    int updated = 0;
+    size_t updated = 0;
     score_ptr_type score_1best;
     score_ptr_type score_oracle;
 
@@ -888,17 +889,17 @@ void cicada_learn(operation_set_type& operations,
       
       bcast_weights(weights);
       
-      int updated_total = 0;
-      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, MPI::INT, MPI::SUM);
+      size_t updated_total = 0;
+      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
       
       weights *= 1.0 / updated_total;
     }
     
-    int num_non_zero_prev = 0;
+    size_t num_non_zero_prev = 0;
     for (size_t i = 0; i != weights_prev.size(); ++ i)
       num_non_zero_prev += (weights_prev[i] != 0.0);
     
-    MPI::COMM_WORLD.Bcast(&num_non_zero_prev, 1, MPI::INT, 0);
+    MPI::COMM_WORLD.Bcast(&num_non_zero_prev, 1, utils::mpi_traits<size_t>::data_type(), 0);
     
     // perform line-search....
     if (line_search_mode && num_non_zero_prev) {
@@ -908,9 +909,9 @@ void cicada_learn(operation_set_type& operations,
       double grad_pos = 0.0;
       double grad_neg = 0.0;
       double loss_norm = 0.0;
-      MPI::COMM_WORLD.Reduce(&boost::fusion::get<0>(grad_norm), &grad_pos, 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&boost::fusion::get<1>(grad_norm), &grad_neg, 1, MPI::DOUBLE, MPI::SUM, 0);
-      MPI::COMM_WORLD.Reduce(&boost::fusion::get<2>(grad_norm), &loss_norm, 1, MPI::DOUBLE, MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<0>(grad_norm), &grad_pos, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<1>(grad_norm), &grad_neg, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
+      MPI::COMM_WORLD.Reduce(&boost::fusion::get<2>(grad_norm), &loss_norm, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
       // merge points from others...
       
