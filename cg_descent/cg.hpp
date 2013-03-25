@@ -27,6 +27,7 @@ namespace cg
     {
       cg_default(&param_);
       
+      param_.PrintFinal = false;
       param_.maxit = max_iterations;
     }
     
