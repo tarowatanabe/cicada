@@ -2192,6 +2192,22 @@ PRIVATE int cg_contract
        0 (successful evaluation)
    =========================================================================*/
 
+PRIVATE void cg_swap
+(
+ double *y, /* output of copy */
+ double *x, /* input of copy */
+ CG_INT     n  /* length of vectors */  
+ )
+{
+  CG_INT i;
+  
+  for (i = 0; i < n; ++ i) {
+    double tmp = x[i];
+    x[i] = y[i];
+    y[i] = tmp;
+  }
+}
+
 PRIVATE int cg_evaluate
 (
     char    *what, /* fg = evaluate func and grad, g = grad only,f = func only*/
@@ -2217,7 +2233,10 @@ PRIVATE int cg_evaluate
         {
             cg_step (xtemp, x, d, alpha, n) ;
             /* provisional function value */
-            Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+	    
+	    cg_swap(xtemp, x, n);
+            Com->f = Com->cg_value (Com->instance, x, n) ;
+	    cg_swap(xtemp, x, n);
             Com->nf++ ;
 
             /* reduce stepsize if function value is nan */
@@ -2234,7 +2253,9 @@ PRIVATE int cg_evaluate
                         alpha *= Parm->nan_decay ;
                     }
                     cg_step (xtemp, x, d, alpha, n) ;
-                    Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+		    cg_swap(xtemp, x, n);
+                    Com->f = Com->cg_value (Com->instance, x, n) ;
+		    cg_swap(xtemp, x, n);
                     Com->nf++ ;
                     if ( (Com->f == Com->f) && (Com->f < DBL_MAX) &&
                          (Com->f > -DBL_MAX) ) break ;
@@ -2246,7 +2267,9 @@ PRIVATE int cg_evaluate
         else if ( !strcmp (what, "g") ) /* compute gradient */
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+	    cg_swap(xtemp, x, n);
+            Com->cg_grad (Com->instance, gtemp, x, n) ;
+	    cg_swap(xtemp, x, n);
             Com->ng++ ;
             Com->df = cg_dot (gtemp, d, n) ;
             /* reduce stepsize if derivative is nan */
@@ -2263,7 +2286,9 @@ PRIVATE int cg_evaluate
                         alpha *= Parm->nan_decay ;
                     }
                     cg_step (xtemp, x, d, alpha, n) ;
-                    Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+		    cg_swap(xtemp, x, n);
+                    Com->cg_grad (Com->instance, gtemp, x, n) ;
+		    cg_swap(xtemp, x, n);
                     Com->ng++ ;
                     Com->df = cg_dot (gtemp, d, n) ;
                     if ( (Com->df == Com->df) && (Com->df < DBL_MAX) &&
@@ -2280,12 +2305,16 @@ PRIVATE int cg_evaluate
             cg_step (xtemp, x, d, alpha, n) ;
             if ( Com->cg_valgrad != NULL )
             {
-                Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
+	      cg_swap(xtemp, x, n);
+	      Com->f = Com->cg_valgrad (Com->instance, gtemp, x, n) ;
+	      cg_swap(xtemp, x, n);
             }
             else
             {
-                Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
-                Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+	        cg_swap(xtemp, x, n);
+                Com->cg_grad (Com->instance, gtemp, x, n) ;
+                Com->f = Com->cg_value (Com->instance, x, n) ;
+		cg_swap(xtemp, x, n);
             }
             Com->df = cg_dot (gtemp, d, n) ;
             Com->nf++ ;
@@ -2308,12 +2337,16 @@ PRIVATE int cg_evaluate
                     cg_step (xtemp, x, d, alpha, n) ;
                     if ( Com->cg_valgrad != NULL )
                     {
-                        Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
+		      cg_swap(xtemp, x, n);
+		      Com->f = Com->cg_valgrad (Com->instance, gtemp, x, n) ;
+		      cg_swap(xtemp, x, n);
                     }
                     else
                     {
-                        Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
-                        Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+		      cg_swap(xtemp, x, n);
+		      Com->cg_grad (Com->instance, gtemp, x, n) ;
+		      Com->f = Com->cg_value (Com->instance, x, n) ;
+		      cg_swap(xtemp, x, n);
                     }
                     Com->df = cg_dot (gtemp, d, n) ;
                     Com->nf++ ;
@@ -2350,12 +2383,16 @@ PRIVATE int cg_evaluate
                 cg_step (xtemp, x, d, alpha, n) ;
                 if ( Com->cg_valgrad != NULL )
                 {
-                    Com->f = Com->cg_valgrad (Com->instance, gtemp, xtemp, n) ;
+		  cg_swap(xtemp, x, n);
+		  Com->f = Com->cg_valgrad (Com->instance, gtemp, x, n) ;
+		  cg_swap(xtemp, x, n);
                 }
                 else
                 {
-                    Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
-                    Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+		  cg_swap(xtemp, x, n);
+		  Com->cg_grad (Com->instance, gtemp, x, n) ;
+		  Com->f = Com->cg_value (Com->instance, x, n) ;
+		  cg_swap(xtemp, x, n);
                 }
                 Com->df = cg_dot (gtemp, d, n) ;
             }
@@ -2368,7 +2405,9 @@ PRIVATE int cg_evaluate
         else if ( !strcmp (what, "f") ) /* compute function */
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->f = Com->cg_value (Com->instance, xtemp, n) ;
+	    cg_swap(xtemp, x, n);
+            Com->f = Com->cg_value (Com->instance, x, n) ;
+	    cg_swap(xtemp, x, n);
             Com->nf++ ;
             if ( (Com->f != Com->f) || (Com->f == DBL_MAX) || (Com->f ==-DBL_MAX) )
                 return (11) ;
@@ -2376,7 +2415,9 @@ PRIVATE int cg_evaluate
         else
         {
             cg_step (xtemp, x, d, alpha, n) ;
-            Com->cg_grad (Com->instance, gtemp, xtemp, n) ;
+	    cg_swap(xtemp, x, n);
+            Com->cg_grad (Com->instance, gtemp, x, n) ;
+	    cg_swap(xtemp, x, n);
             Com->df = cg_dot (gtemp, d, n) ;
             Com->ng++ ;
             if ( (Com->df != Com->df) || (Com->df == DBL_MAX) || (Com->df ==-DBL_MAX) )

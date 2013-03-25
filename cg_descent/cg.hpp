@@ -36,7 +36,7 @@ namespace cg
       g_local.reserve(n);
       g_local.resize(n);
 
-      cg_descent(x, n, &stats_, &param_, 1e-8, this, _value, _grad, _valgrad, NULL);
+      cg_descent(x, n, &stats_, &param_, 1e-5, this, _value, _grad, _valgrad, NULL);
       
       return stats_.f;
     }
