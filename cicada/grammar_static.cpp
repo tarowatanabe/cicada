@@ -409,9 +409,7 @@ namespace cicada
 	if (cache[word.id()] == 0) {
 	  const word_type::id_type id = vocab[word];
 	  
-	  cache[word.id()] = (id != word_type::id_type(-1)
-			      ? rule_db.find(&id, 1, 0)
-			      : rule_db_type::out_of_range());
+	  cache[word.id()] = (id != word_type::id_type(-1) ? rule_db.find(&id, 1, 0) : rule_db_type::out_of_range());
 	}
 	
 	return cache[word.id()];
@@ -424,9 +422,7 @@ namespace cicada
 	if (cache.node != node || cache.id != word.id()) {
 	  const word_type::id_type id = vocab[word];
 	  
-	  cache.next = (id != word_type::id_type(-1)
-			? rule_db.find(&id, 1, node)
-			: rule_db_type::out_of_range());
+	  cache.next = (id != word_type::id_type(-1) ? rule_db.find(&id, 1, node) : rule_db_type::out_of_range());
 	  cache.node = node;
 	  cache.id   = word.id();
 	}

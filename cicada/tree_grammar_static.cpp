@@ -394,9 +394,7 @@ namespace cicada
 	if (cache[word.id()] == 0) {
 	  const word_type::id_type id = vocab[word];
 	  
-	  cache[word.id()] = (id != word_type::id_type(-1)
-			      ? edge_db.find(&id, 1, 0)
-			      : edge_db_type::out_of_range());
+	  cache[word.id()] = (id != word_type::id_type(-1) ? edge_db.find(&id, 1, 0) : edge_db_type::out_of_range());
 	}
 	
 	return cache[word.id()];
@@ -409,9 +407,7 @@ namespace cicada
 	if (cache.node != node || cache.id != word.id()) {
 	  const word_type::id_type id = vocab[word];
 	  
-	  cache.next = (id != word_type::id_type(-1)
-			? edge_db.find(&id, 1, node)
-			: edge_db_type::out_of_range());
+	  cache.next = (id != word_type::id_type(-1) ? edge_db.find(&id, 1, node) : edge_db_type::out_of_range());
 	  cache.node = node;
 	  cache.id   = word.id();
 	}
@@ -459,9 +455,7 @@ namespace cicada
 	if (cache[symbol.id()] == 0) {
 	  const symbol_type::id_type id = vocab[symbol];
 	  
-	  cache[symbol.id()] = (id != symbol_type::id_type(-1)
-				? rule_db.find(&id, 1, 0)
-				: rule_pair_db_type::out_of_range());
+	  cache[symbol.id()] = (id != symbol_type::id_type(-1) ? rule_db.find(&id, 1, 0) : rule_pair_db_type::out_of_range());
 	}
 	
 	return cache[symbol.id()];
@@ -474,9 +468,7 @@ namespace cicada
 	if (cache.node != node || cache.id != symbol.id()) {
 	  const word_type::id_type id = vocab[symbol];
 	  
-	  cache.next = (id != word_type::id_type(-1)
-			? rule_db.find(&id, 1, node)
-			: rule_pair_db_type::out_of_range());
+	  cache.next = (id != word_type::id_type(-1) ? rule_db.find(&id, 1, node) : rule_pair_db_type::out_of_range());
 	  cache.node = node;
 	  cache.id   = symbol.id();
 	}
