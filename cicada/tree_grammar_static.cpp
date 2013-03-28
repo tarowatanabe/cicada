@@ -393,6 +393,7 @@ namespace cicada
 	
 	if (cache[word.id()] == 0) {
 	  const word_type::id_type id = vocab[word];
+	  
 	  cache[word.id()] = (id != word_type::id_type(-1)
 			      ? edge_db.find(&id, 1, 0)
 			      : edge_db_type::out_of_range());
@@ -457,6 +458,7 @@ namespace cicada
 	
 	if (cache[symbol.id()] == 0) {
 	  const symbol_type::id_type id = vocab[symbol];
+	  
 	  cache[symbol.id()] = (id != symbol_type::id_type(-1)
 				? rule_db.find(&id, 1, 0)
 				: rule_pair_db_type::out_of_range());
