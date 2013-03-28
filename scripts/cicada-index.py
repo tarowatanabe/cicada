@@ -86,8 +86,10 @@ opt_parser = OptionParser(
     make_option("--plain",    default=None, action="store_true", help="plain output, meaning no-binary indexing"),
     
     ## kbest options
-    make_option("--kbest", default=0, action="store", type="float",
+    make_option("--kbest", default=0, action="store", type="int",
                 metavar="KBEST", help="kbest max count of rules (default: %default)"),
+    make_option("--cutoff", default=0, action="store", type="float",
+                metavar="CUTOFF", help="cutoff count of rules (default: %default)"),
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
                 metavar="MALLOC", help="maximum memory in GB (default: %default)"),
@@ -546,6 +548,7 @@ class Index(UserString.UserString):
                  temporary_dir="",
                  prior=0.1,
                  kbest=0,
+                 cutoff=0.0,
                  quantize=None,
                  features=[],
                  attributes=[]):
@@ -566,11 +569,15 @@ class Index(UserString.UserString):
         
         command = ""
 
-        if kbest > 0:
+        if kbest > 0 or cutoff > 0.0:
             self.threads = 2
 
             command = cicada.cicada_filter_extract
-            command += " --nbest %d" %(kbest)
+            
+            if kbest > 0:
+                command += " --nbest %d" %(kbest)
+            if cutoff > 0.0:
+                command += " --cutoff %g" %(cutoff)
             command += " --input \"%s\"" %(input)
             command += " | "
             command += indexer.filter
@@ -802,6 +809,7 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          cutoff=options.cutoff,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -834,6 +842,7 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          cutoff=options.cutoff,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -862,6 +871,7 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          cutoff=options.cutoff,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)

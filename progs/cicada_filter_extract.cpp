@@ -97,30 +97,28 @@ int main(int argc, char** argv)
     while (std::getline(is, line)) {
       if (! parser(line, phrase_pair)) continue;
       if (phrase_pair.counts.empty()) continue;
+      if (phrase_pair.counts.front() < cutoff) continue;
       
       if (phrase_pair.source != source_prev) {
 	if (! heap.empty()) {
 	  if (heap.size() <= nbest) {
 	    heap_type::iterator iter_end = heap.end();
 	    for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
-	      if (iter->score >= cutoff)
-		os << iter->line << '\n';
+	      os << iter->line << '\n';
 	  } else {
 	    heap_type::iterator iter_begin = heap.begin();
 	    heap_type::iterator iter_kbest = heap.end() - nbest;
 	    heap_type::iterator iter       = heap.end();
 	    
 	    for (/**/; iter_kbest != iter; -- iter) {
-	      if (iter_begin->score >= cutoff)
-		os << iter_begin->line << '\n';
+	      os << iter_begin->line << '\n';
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	    
 	    const double threshold = iter->score;
 	    
 	    for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-	      if (iter_begin->score >= cutoff)
-		os << iter_begin->line << '\n';
+	      os << iter_begin->line << '\n';
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	  }
@@ -150,24 +148,21 @@ int main(int argc, char** argv)
       if (heap.size() <= nbest) {
 	heap_type::iterator iter_end = heap.end();
 	for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
-	  if (iter->score >= cutoff)
-	    os << iter->line << '\n';
+	  os << iter->line << '\n';
       } else {
 	heap_type::iterator iter_begin = heap.begin();
 	heap_type::iterator iter_kbest = heap.end() - nbest;
 	heap_type::iterator iter       = heap.end();
 	    
 	for (/**/; iter_kbest != iter; -- iter) {
-	  if (iter_begin->score >= cutoff)
-	    os << iter_begin->line << '\n';
+	  os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
 	
 	const double threshold = iter->score;
 	
 	for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-	  if (iter_begin->score >= cutoff)
-	    os << iter_begin->line << '\n';
+	  os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
       }
