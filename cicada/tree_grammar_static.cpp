@@ -300,6 +300,8 @@ namespace cicada
     typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
     typedef utils::array_power2<cache_node_type,          1024 * 8, std::allocator<cache_node_type> >          cache_node_set_type;
     
+    typedef std::vector<size_type, std::allocator<size_type> > cache_root_type;
+
     TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
@@ -365,6 +367,8 @@ namespace cicada
 
       cache_edges.clear();
       cache_nodes.clear();
+
+      cache_root.clear();
     }
 
     size_type find_edge(const word_type& word) const
@@ -375,20 +379,44 @@ namespace cicada
     
     size_type find_edge(const word_type& word, size_type node) const
     {
-      typedef utils::hashmurmur3<size_t> hasher_type; 
-      
-      const size_type cache_pos = hasher_type()(word.id(), node) & (cache_edges.size() - 1);
-      cache_node_type& cache = const_cast<cache_node_type&>(cache_edges[cache_pos]);
-      
-      if (cache.node != node || cache.id != word.id()) {
-	const word_type::id_type id = vocab[word];
+      if (node == 0 && word.id() < 1024 * 16) {
+	cache_root_type& cache = const_cast<cache_root_type&>(cache_root);
 	
-	cache.next = edge_db.find(&id, 1, node);
-	cache.node = node;
-	cache.id   = word.id();
+	if (word.id() >= cache.size()) {
+	  cache.resize(word.id() + 1, 0);
+	  
+	  if (cache.capacity() > 1024 * 16) {
+	    cache.resize(1024 * 16, 0);
+	    cache_root_type(cache).swap(cache);
+	  }
+	}
+	
+	if (cache[word.id()] == 0) {
+	  const word_type::id_type id = vocab[word];
+	  cache[word.id()] = (id != word_type::id_type(-1)
+			      ? edge_db.find(&id, 1, 0)
+			      : edge_db_type::out_of_range());
+	}
+	
+	return cache[word.id()];
+      } else {
+	typedef utils::hashmurmur3<size_t> hasher_type; 
+	
+	const size_type cache_pos = hasher_type()(word.id(), node) & (cache_edges.size() - 1);
+	cache_node_type& cache = const_cast<cache_node_type&>(cache_edges[cache_pos]);
+	
+	if (cache.node != node || cache.id != word.id()) {
+	  const word_type::id_type id = vocab[word];
+	  
+	  cache.next = (id != word_type::id_type(-1)
+			? edge_db.find(&id, 1, node)
+			: edge_db_type::out_of_range());
+	  cache.node = node;
+	  cache.id   = word.id();
+	}
+	
+	return cache.next;
       }
-      
-      return cache.next;
     }
     
     size_type find(const id_type& id) const
@@ -415,20 +443,44 @@ namespace cicada
 
     size_type find(const symbol_type& symbol, size_type node) const
     {
-      typedef utils::hashmurmur3<size_t> hasher_type; 
-      
-      const size_type cache_pos = hasher_type()(symbol.id(), node) & (cache_nodes.size() - 1);
-      cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
-      
-      if (cache.node != node || cache.id != symbol.id()) {
-	const word_type::id_type id = vocab[symbol];
+      if (node == 0 && symbol.id() < 1024 * 16) {
+	cache_root_type& cache = const_cast<cache_root_type&>(cache_root);
 	
-	cache.next = rule_db.find(&id, 1, node);
-	cache.node = node;
-	cache.id   = symbol.id();
+	if (symbol.id() >= cache.size()) {
+	  cache.resize(symbol.id() + 1, 0);
+	  
+	  if (cache.capacity() > 1024 * 16) {
+	    cache.resize(1024 * 16, 0);
+	    cache_root_type(cache).swap(cache);
+	  }
+	}
+	
+	if (cache[symbol.id()] == 0) {
+	  const symbol_type::id_type id = vocab[symbol];
+	  cache[symbol.id()] = (id != symbol_type::id_type(-1)
+				? rule_db.find(&id, 1, 0)
+				: rule_pair_db_type::out_of_range());
+	}
+	
+	return cache[symbol.id()];
+      } else {
+	typedef utils::hashmurmur3<size_t> hasher_type; 
+	
+	const size_type cache_pos = hasher_type()(symbol.id(), node) & (cache_nodes.size() - 1);
+	cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
+	
+	if (cache.node != node || cache.id != symbol.id()) {
+	  const word_type::id_type id = vocab[symbol];
+	  
+	  cache.next = (id != word_type::id_type(-1)
+			? rule_db.find(&id, 1, node)
+			: rule_pair_db_type::out_of_range());
+	  cache.node = node;
+	  cache.id   = symbol.id();
+	}
+	
+	return cache.next;
       }
-      
-      return cache.next;
     }
     
     bool is_valid_edge(size_type node) const { return edge_db.is_valid(node); }
@@ -630,6 +682,8 @@ namespace cicada
 
     cache_node_set_type      cache_edges;
     cache_node_set_type      cache_nodes;
+
+    cache_root_type cache_root;
 
     int debug;
   };

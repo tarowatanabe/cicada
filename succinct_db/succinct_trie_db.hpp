@@ -336,6 +336,12 @@ namespace succinctdb
     typedef typename succinct_trie_type::cursor                 cursor;
     typedef typename succinct_trie_type::const_index_iterator   const_index_iterator;
     typedef typename succinct_trie_type::index_iterator         index_iterator;
+
+  public:
+    static size_type out_of_range()
+    {
+      return succinct_trie_type::out_of_range();
+    }
     
   public:
     // operations supported by read-mode

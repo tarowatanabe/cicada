@@ -36,11 +36,13 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/vector2.hpp"
 
 #include "utils/hashmurmur.hpp"
 #include "utils/hashmurmur3.hpp"
 
 #include <boost/lexical_cast.hpp>
+#include <boost/bind.hpp>
 
 #include <boost/filesystem.hpp>
 
@@ -61,7 +63,7 @@ namespace cicada
 
   static const size_t DEBUG_DOT = 1000000;
   static const size_t DEBUG_LINE = DEBUG_DOT * 100;
-  
+
   struct GrammarStaticImpl : public utils::hashmurmur<uint64_t>
   {
     typedef size_t    size_type;
@@ -294,7 +296,9 @@ namespace cicada
     typedef utils::array_power2<cache_rule_set_type, 1024 * 2, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 * 2, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
     typedef utils::array_power2<cache_node_type,     1024 * 8, std::allocator<cache_node_type> >     cache_node_set_type;
-
+    
+    typedef std::vector<size_type, std::allocator<size_type> > cache_root_type;
+    
     typedef std::pair<word_type, size_type> word_node_type;
 
     struct unassigned_cache
@@ -383,26 +387,52 @@ namespace cicada
       cache_sources.clear();
       cache_targets.clear();
       cache_nodes.clear();
+      cache_root.clear();
 
       max_span = 15;
     }
     
     size_type find(const word_type& word, size_type node) const
     {
-      typedef utils::hashmurmur3<size_t> hasher_type;
-      
-      const size_type cache_pos = hasher_type()(word.id(), node) & (cache_nodes.size() - 1);
-      cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
-      
-      if (cache.node != node || cache.id != word.id()) {
-	const word_type::id_type id = vocab[word];
+      if (node == 0 && word.id() < 1024 * 16) {
+	cache_root_type& cache = const_cast<cache_root_type&>(cache_root);
 	
-	cache.next = rule_db.find(&id, 1, node);
-	cache.node = node;
-	cache.id   = word.id();
+	if (word.id() >= cache.size()) {
+	  cache.resize(word.id() + 1, 0);
+	  
+	  if (cache.capacity() > 1024 * 16) {
+	    cache.resize(1024 * 16, 0);
+	    cache_root_type(cache).swap(cache);
+	  }
+	}
+	
+	if (cache[word.id()] == 0) {
+	  const word_type::id_type id = vocab[word];
+	  
+	  cache[word.id()] = (id != word_type::id_type(-1)
+			      ? rule_db.find(&id, 1, 0)
+			      : rule_db_type::out_of_range());
+	}
+	
+	return cache[word.id()];
+      } else {
+	typedef utils::hashmurmur3<size_t> hasher_type;
+	
+	const size_type cache_pos = hasher_type()(word.id(), node) & (cache_nodes.size() - 1);
+	cache_node_type& cache = const_cast<cache_node_type&>(cache_nodes[cache_pos]);
+	
+	if (cache.node != node || cache.id != word.id()) {
+	  const word_type::id_type id = vocab[word];
+	  
+	  cache.next = (id != word_type::id_type(-1)
+			? rule_db.find(&id, 1, node)
+			: rule_db_type::out_of_range());
+	  cache.node = node;
+	  cache.id   = word.id();
+	}
+	
+	return cache.next;
       }
-      
-      return cache.next;
     }
     
     // valid implies that you can continue searching from node...
@@ -597,25 +627,41 @@ namespace cicada
 
     void populate()
     {
+      //boost::thread_group workers;
+
       rule_db.populate();
       source_db.populate();
       target_db.populate();
-
-      for (size_t feature = 0; feature < score_db.size(); ++ feature)
+      //workers.add_thread(new boost::thread(boost::bind(&rule_db_type::populate, boost::ref(rule_db))));
+      //workers.add_thread(new boost::thread(boost::bind(&phrase_db_type::populate, boost::ref(source_db))));
+      //workers.add_thread(new boost::thread(boost::bind(&phrase_db_type::populate, boost::ref(target_db))));
+      
+      for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	score_db[feature].populate();
-
-      for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+	//workers.add_thread(new boost::thread(boost::bind(&score_set_type::populate, boost::ref(score_db[feature]))));
+      }
+      
+      for (size_t attr = 0; attr < attr_db.size(); ++ attr) {
 	attr_db[attr].populate();
+	//workers.add_thread(new boost::thread(boost::bind(&score_set_type::populate, boost::ref(attr_db[attr]))));
+      }
       
       feature_data.populate();
       attribute_data.populate();
+      //workers.add_thread(new boost::thread(boost::bind(&feature_data_type::populate, boost::ref(feature_data))));
+      //workers.add_thread(new boost::thread(boost::bind(&attribute_data_type::populate, boost::ref(attribute_data))));
+      
       
       feature_vocab.populate();
       attribute_vocab.populate();
+      //workers.add_thread(new boost::thread(boost::bind(&feature_vocab_type::populate, boost::ref(feature_vocab))));
+      //workers.add_thread(new boost::thread(boost::bind(&attribute_vocab_type::populate, boost::ref(attribute_vocab))));
       
       vocab.populate();
+      
+      //workers.join_all();
     }
-
+    
     void read_keyed_text(const std::string& path);
     void read_text(const std::string& path);
     void read_binary(const std::string& path);
@@ -649,6 +695,7 @@ namespace cicada
     cache_phrase_set_type cache_targets;
     
     cache_node_set_type   cache_nodes;
+    cache_root_type       cache_root;
 
   public:
     int max_span;

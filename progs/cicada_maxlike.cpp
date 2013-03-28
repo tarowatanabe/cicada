@@ -54,7 +54,8 @@
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 
-#include "liblbfgs/lbfgs.h"
+#include "liblbfgs/lbfgs.hpp"
+#include "cg_descent/cg.hpp"
 
 #include "cicada_impl.hpp"
 #include "cicada_text_impl.hpp"

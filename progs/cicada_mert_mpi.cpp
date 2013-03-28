@@ -43,6 +43,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/mpi_traits.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/space_separator.hpp"
@@ -582,10 +583,10 @@ int main(int argc, char ** argv)
       }
       
       for (int rank = 1; rank < mpi_size; ++ rank)
-	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, envelope_termination_tag);
+	MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, envelope_termination_tag);
       
       for (int rank = 1; rank < mpi_size; ++ rank)
-	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, viterbi_termination_tag);
+	MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, viterbi_termination_tag);
 
       
       if (debug)
@@ -610,11 +611,11 @@ int main(int argc, char ** argv)
 
       MPI::Prequest requests[4];
       
-      requests[ENVELOPE_NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_notify_tag);
-      requests[ENVELOPE_TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_termination_tag);
+      requests[ENVELOPE_NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, envelope_notify_tag);
+      requests[ENVELOPE_TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, envelope_termination_tag);
 
-      requests[VITERBI_NOTIFY]       = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_notify_tag);
-      requests[VITERBI_TERMINATION]  = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_termination_tag);
+      requests[VITERBI_NOTIFY]       = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, viterbi_notify_tag);
+      requests[VITERBI_TERMINATION]  = MPI::COMM_WORLD.Recv_init(0, 0, utils::mpi_traits<int>::data_type(), 0, viterbi_termination_tag);
 
       for (int i = 0; i < 4; ++ i)
 	requests[i].Start();
@@ -703,7 +704,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     
     // send notification tag...
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, envelope_notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, envelope_notify_tag);
     
     bcast_weights(0, origin);
     
@@ -862,7 +863,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
   if (mpi_rank == 0) {
     
     for (int rank = 1; rank < mpi_size; ++ rank)
-      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, viterbi_notify_tag);
+      MPI::COMM_WORLD.Send(0, 0, utils::mpi_traits<int>::data_type(), rank, viterbi_notify_tag);
 
     bcast_weights(0, weights);
 
