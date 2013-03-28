@@ -68,6 +68,7 @@ path_type output_file = "-";
 
 int buffer_size = 1024 * 1024;
 size_t nbest = 100;
+double cutoff = 0.0;
 
 int debug = 0;
 
@@ -102,21 +103,24 @@ int main(int argc, char** argv)
 	  if (heap.size() <= nbest) {
 	    heap_type::iterator iter_end = heap.end();
 	    for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
-	      os << iter->line << '\n';
+	      if (iter->score >= cutoff)
+		os << iter->line << '\n';
 	  } else {
 	    heap_type::iterator iter_begin = heap.begin();
 	    heap_type::iterator iter_kbest = heap.end() - nbest;
 	    heap_type::iterator iter       = heap.end();
 	    
 	    for (/**/; iter_kbest != iter; -- iter) {
-	      os << iter_begin->line << '\n';
+	      if (iter_begin->score >= cutoff)
+		os << iter_begin->line << '\n';
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	    
 	    const double threshold = iter->score;
 	    
 	    for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-	      os << iter_begin->line << '\n';
+	      if (iter_begin->score >= cutoff)
+		os << iter_begin->line << '\n';
 	      std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	    }
 	  }
@@ -128,7 +132,7 @@ int main(int argc, char** argv)
       }
       
       // push-heap and swap line
-      // we memory the temporary score_min and perform pruning
+      // we memorize the temporary score_min and perform pruning
       const double& score = phrase_pair.counts.front();
       
       if (heap.size() >= nbest) {
@@ -146,21 +150,24 @@ int main(int argc, char** argv)
       if (heap.size() <= nbest) {
 	heap_type::iterator iter_end = heap.end();
 	for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
-	  os << iter->line << '\n';
+	  if (iter->score >= cutoff)
+	    os << iter->line << '\n';
       } else {
 	heap_type::iterator iter_begin = heap.begin();
 	heap_type::iterator iter_kbest = heap.end() - nbest;
 	heap_type::iterator iter       = heap.end();
 	    
 	for (/**/; iter_kbest != iter; -- iter) {
-	  os << iter_begin->line << '\n';
+	  if (iter_begin->score >= cutoff)
+	    os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
 	
 	const double threshold = iter->score;
 	
 	for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
-	  os << iter_begin->line << '\n';
+	  if (iter_begin->score >= cutoff)
+	    os << iter_begin->line << '\n';
 	  std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	}
       }
@@ -184,7 +191,8 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("nbest", po::value<size_t>(&nbest)->default_value(nbest), "nbest of pairs (wrt to joint-count)")
+    ("nbest",  po::value<size_t>(&nbest)->default_value(nbest),   "nbest of pairs (wrt to joint-count)")
+    ("cutoff", po::value<double>(&cutoff)->default_value(cutoff), "cutoff count")
     
     ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
