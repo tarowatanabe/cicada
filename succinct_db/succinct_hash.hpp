@@ -469,7 +469,7 @@ namespace succinctdb
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
 	if (! os->write(((char*) &(*data.begin())) + offset, std::min(int64_t(1024 * 1024), file_size - offset)))
-	  throw std::runtime_error("error: succinct hash: write");
+	  throw std::runtime_error("error: succinct hash stream: write");
     }
     
   private:
