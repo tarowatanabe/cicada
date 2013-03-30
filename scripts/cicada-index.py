@@ -816,7 +816,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
-                          types=optoins.types,
+                          types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -850,7 +850,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
-                          types=optoins.types,
+                          types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -880,7 +880,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
-                          types=optoins.types,
+                          types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
