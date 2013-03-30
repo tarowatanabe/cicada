@@ -75,6 +75,7 @@ path_type output_file = "-";
 int buffer_size = 1024 * 1024;
 size_t nbest = 100;
 double cutoff = 0.0;
+int    types = 0;
 double sigtest = 0.0;
 
 bool sigtest_phrase = false;
@@ -102,14 +103,18 @@ struct FilterNone
 
 struct FilterCutoff
 {
-  FilterCutoff(const double& __cutoff) : cutoff(__cutoff) {}
+  FilterCutoff(const double& __cutoff, const int __types) : cutoff(__cutoff), types(__types) {}
   
   bool operator()(const phrase_pair_type& phrase_pair) const
   {
-    return phrase_pair.counts.front() < cutoff;
+    return (phrase_pair.counts.front() < cutoff
+	    && (types <= 0
+		|| phrase_pair.observed_source > types
+		|| phrase_pair.observed_target > types));
   }
   
   const double cutoff;
+  const int types;
 };
 
 template <typename Extractor>
@@ -158,7 +163,7 @@ struct FilterSigtest
     const unsigned int N = jiter->counts.front();
     
     const double density = boost::math::pdf(boost::math::hypergeometric(r, n, N), 1);
-
+    
     if (debug >= 2)
       std::cerr << "density: " << density
 		<< " ||| " << phrase_pair.source << " ||| " << phrase_pair.target
@@ -235,7 +240,7 @@ int main(int argc, char** argv)
       else
 	process(FilterSigtest<ExtractRootPhrase>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
     } else if (cutoff > 0.0)
-      process(FilterCutoff(cutoff), is, os);
+      process(FilterCutoff(cutoff, types), is, os);
     else
       process(FilterNone(), is, os);
   }
@@ -347,6 +352,7 @@ void options(int argc, char** argv)
     
     ("nbest",   po::value<size_t>(&nbest)->default_value(nbest),     "nbest of pairs (wrt to joint-count)")
     ("cutoff",  po::value<double>(&cutoff)->default_value(cutoff),   "cutoff count")
+    ("types",   po::value<int>(&types)->default_value(types),        "cutoff variation")
     ("sigtest", po::value<double>(&sigtest)->default_value(sigtest), "significant test threshold")
     
     ("sigtest-phrase", po::bool_switch(&sigtest_phrase), "significant test for phrase")
