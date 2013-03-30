@@ -109,7 +109,7 @@ struct FilterThreshold
   bool operator()(const phrase_pair_type& phrase_pair) const
   {
     return ((phrase_pair.counts.front() / phrase_pair.counts_source.front()) < cutoff
-	    || (phrase_pair.counts.front() / phrase_pair.counts_target.front()) < cutoff);
+	    && (phrase_pair.counts.front() / phrase_pair.counts_target.front()) < cutoff);
   }
   
   const double cutoff;
