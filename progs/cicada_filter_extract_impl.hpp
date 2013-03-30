@@ -167,8 +167,6 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  (PhrasePair::counts_type, counts_target)
 			  (PhrasePair::count_type,  observed_source)
 			  (PhrasePair::count_type,  observed_target)
-			  (PhrasePair::count_type,  lexicon_target_source)
-			  (PhrasePair::count_type,  lexicon_source_target)
 			  )
 
 struct RootCountParser
