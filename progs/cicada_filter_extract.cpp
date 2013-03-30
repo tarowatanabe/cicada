@@ -75,6 +75,7 @@ path_type output_file = "-";
 int buffer_size = 1024 * 1024;
 size_t nbest = 100;
 double cutoff = 0.0;
+double threshold = 0.0;
 int    types = 0;
 double sigtest = 0.0;
 
@@ -100,6 +101,20 @@ struct FilterNone
     return false;
   }
 };
+
+struct FilterThreshold
+{
+  FilterThreshold(const double& __cutoff) : cutoff(__cutoff) {}
+  
+  bool operator()(const phrase_pair_type& phrase_pair) const
+  {
+    return ((phrase_pair.counts.front() / phrase_pair.counts_source.front()) < cutoff
+	    || (phrase_pair.counts.front() / phrase_pair.counts_target.front()) < cutoff);
+  }
+  
+  const double cutoff;
+};
+
 
 struct FilterCutoff
 {
@@ -239,7 +254,9 @@ int main(int argc, char** argv)
 	process(FilterSigtest<ExtractRootSCFG>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
       else
 	process(FilterSigtest<ExtractRootPhrase>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
-    } else if (cutoff > 0.0)
+    } else if (threshold > 0.0)
+      process(FilterThreshold(threshold), is, os);
+    else if (cutoff > 0.0)
       process(FilterCutoff(cutoff, types), is, os);
     else
       process(FilterNone(), is, os);
@@ -350,10 +367,11 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("nbest",   po::value<size_t>(&nbest)->default_value(nbest),     "nbest of pairs (wrt to joint-count)")
-    ("cutoff",  po::value<double>(&cutoff)->default_value(cutoff),   "cutoff count")
-    ("types",   po::value<int>(&types)->default_value(types),        "cutoff variation")
-    ("sigtest", po::value<double>(&sigtest)->default_value(sigtest), "significant test threshold")
+    ("nbest",     po::value<size_t>(&nbest)->default_value(nbest),         "nbest of pairs (wrt to joint-count)")
+    ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
+    ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
+    ("types",     po::value<int>(&types)->default_value(types),            "cutoff variation")
+    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold")
     
     ("sigtest-phrase", po::bool_switch(&sigtest_phrase), "significant test for phrase")
     ("sigtest-scfg",   po::bool_switch(&sigtest_scfg),   "significant test for synchronous-CFG")

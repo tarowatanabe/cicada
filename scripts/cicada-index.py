@@ -90,6 +90,8 @@ opt_parser = OptionParser(
                 metavar="KBEST", help="kbest max count of rules (default: %default)"),
     make_option("--cutoff", default=0, action="store", type="float",
                 metavar="CUTOFF", help="cutoff count of rules (default: %default)"),
+    make_option("--threshold", default=0, action="store", type="float",
+                metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
     make_option("--types", default=0, action="store", type="int",
                 metavar="types", help="cutoff variation of rules (default: %default)"),
 
@@ -552,6 +554,7 @@ class Index(UserString.UserString):
                  prior=0.1,
                  kbest=0,
                  cutoff=0.0,
+                 threshold=0.0,
                  types=0,
                  quantize=None,
                  features=[],
@@ -573,7 +576,7 @@ class Index(UserString.UserString):
         
         command = ""
 
-        if kbest > 0 or cutoff > 0.0 or types > 0:
+        if kbest > 0 or cutoff > 0.0 or threshold > 0.0 or types > 0:
             self.threads = 2
 
             command = cicada.cicada_filter_extract
@@ -582,6 +585,8 @@ class Index(UserString.UserString):
                 command += " --nbest %d" %(kbest)
             if cutoff > 0.0:
                 command += " --cutoff %g" %(cutoff)
+            if threshold > 0.0:
+                command += " --threshold %g" %(threshold)
             if types > 0:
                 command += " --types %d" %(types)
             command += " --input \"%s\"" %(input)
@@ -816,6 +821,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
+                          threshold=options.threshold,
                           types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
@@ -850,6 +856,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
+                          threshold=options.threshold,
                           types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
@@ -880,6 +887,7 @@ if __name__ == '__main__':
                           prior=options.prior,
                           kbest=options.kbest,
                           cutoff=options.cutoff,
+                          threshold=options.threshold,
                           types=options.types,
                           quantize=options.quantize,
                           features=options.feature,
