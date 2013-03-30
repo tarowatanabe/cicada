@@ -158,6 +158,13 @@ struct FilterSigtest
     const unsigned int N = jiter->counts.front();
     
     const double density = boost::math::pdf(boost::math::hypergeometric(r, n, N), 1);
+
+    if (debug >= 2)
+      std::cerr << "density: " << density
+		<< " ||| " << phrase_pair.source << " ||| " << phrase_pair.target
+		<< " ||| " << phrase_pair.observed_source << ' ' << phrase_pair.observed_target
+		<< std::endl;
+	
     
     return density < sigtest;
   }
