@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "cicada_filter_extract_impl.hpp"
@@ -365,7 +365,7 @@ void options(int argc, char** argv)
     ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
     ("types",     po::value<int>(&types)->default_value(types),            "cutoff variation")
-    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold")
+    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold (actually, this implementation is wrong!)")
     
     ("sigtest-phrase", po::bool_switch(&sigtest_phrase), "significant test for phrase")
     ("sigtest-scfg",   po::bool_switch(&sigtest_scfg),   "significant test for synchronous-CFG")
