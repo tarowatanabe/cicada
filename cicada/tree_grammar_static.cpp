@@ -1765,6 +1765,18 @@ namespace cicada
       if (citer != param.end())
 	cky = utils::lexical_cast<bool>(citer->second);
     }
+
+    std::string feature_prefix;
+    std::string attribute_prefix;
+    {
+      parameter_type::const_iterator piter = param.find("feature-prefix");
+      if (piter != param.end())
+	feature_prefix = piter->second;
+      parameter_type::const_iterator aiter = param.find("attribute-prefix");
+      if (aiter != param.end())
+	attribute_prefix = aiter->second;
+    }
+
     
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
@@ -2092,7 +2104,7 @@ namespace cicada
       
       // default name...!
       if (feature_names[feature] == feature_type())
-	feature_names[feature] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(feature);
+	feature_names[feature] = feature_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
     }
     
     if (attribute_size < 0)
@@ -2125,7 +2137,7 @@ namespace cicada
       
       // default name...!
       if (attribute_names[attribute] == attribute_type())
-	attribute_names[attribute] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(attribute);
+	attribute_names[attribute] = attribute_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
     }
 
     utils::resource index_end;

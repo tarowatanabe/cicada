@@ -77,6 +77,9 @@ opt_parser = OptionParser(
     make_option("--feature-model1",             default=None, action="store_true", help="compute Model1 features"),
     make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
     make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
+
+    make_option("--prefix-feature",   default="", action="store", type="string", help="feature name prefix (default: %default)"),
+    make_option("--prefix-attribute", default="", action="store", type="string", help="attribute name prefix (default: %default)"),
     
     make_option("--threshold-insertion", default=0.5, action="store", type="float", help="threshold for insertion (default: %default)"),
     make_option("--threshold-deletion",  default=0.5, action="store", type="float", help="threshold for deletion (default: %default)"),
@@ -543,6 +546,8 @@ class Index(UserString.UserString):
                  indexer=None,
                  lexicon=None,
                  feats=None,
+                 prefix_feature="",
+                 prefix_attribute="",
                  input="",
                  output="",
                  plain=None,
@@ -640,6 +645,16 @@ class Index(UserString.UserString):
         input_path += sep
         sep = ','
         input_path +='debug=1'
+        
+        if prefix_feature:
+            input_path += sep
+            sep = ','
+            input_path += "feature-prefix=" + prefix_feature
+
+        if prefix_attribute:
+            input_path += sep
+            sep = ','
+            input_path += "attribute-prefix=" + prefix_attribute
 
         command_indexer += " --input %s" %(input_path)
         command_indexer += " --output \"%s\"" %(output)
@@ -810,6 +825,8 @@ if __name__ == '__main__':
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
+                          prefix_feature=options.prefix_feature,
+                          prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
                           plain=options.plain,
@@ -845,6 +862,8 @@ if __name__ == '__main__':
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
+                          prefix_feature=options.prefix_feature,
+                          prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
                           plain=options.plain,
@@ -876,6 +895,8 @@ if __name__ == '__main__':
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
+                          prefix_feature=options.prefix_feature,
+                          prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
                           plain=options.plain,

@@ -1742,6 +1742,17 @@ namespace cicada
     const parameter_type param(parameter);
     const path_type path = param.name();
     
+    std::string feature_prefix;
+    std::string attribute_prefix;
+    {
+      parameter_type::const_iterator piter = param.find("feature-prefix");
+      if (piter != param.end())
+	feature_prefix = piter->second;
+      parameter_type::const_iterator aiter = param.find("attribute-prefix");
+      if (aiter != param.end())
+	attribute_prefix = aiter->second;
+    }
+
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_map_type;
     
     typedef ScoreSetStream score_stream_type;
@@ -2045,7 +2056,7 @@ namespace cicada
       
       // default name...!
       if (feature_names[feature] == feature_type())
-	feature_names[feature] = "rule-table-" + utils::lexical_cast<std::string>(feature);
+	feature_names[feature] = feature_prefix + "rule-table-" + utils::lexical_cast<std::string>(feature);
     }
 
     if (attribute_size < 0)
@@ -2078,7 +2089,7 @@ namespace cicada
       
       // default name...!
       if (attribute_names[attribute] == attribute_type())
-	attribute_names[attribute] = std::string("rule-table-") + utils::lexical_cast<std::string>(attribute);
+	attribute_names[attribute] = attribute_prefix + "rule-table-" + utils::lexical_cast<std::string>(attribute);
     }
 
     utils::resource index_end;
