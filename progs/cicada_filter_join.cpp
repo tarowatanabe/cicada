@@ -88,16 +88,22 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<path_set_type>(&input_files)->multitoken(), "input file(s)")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("help", "help message");
+  
+  po::options_description hidden;
+  hidden.add_options()
+    ("input", po::value<path_set_type>(&input_files), "input file");
+
+  po::options_description cmdline_options;
+  cmdline_options.add(desc).add(hidden);
 
   po::positional_options_description pos;
   pos.add("input", -1); // all the files
 
   po::command_line_parser parser(argc, argv);
   parser.style(po::command_line_style::unix_style & (~po::command_line_style::allow_guessing));
-  parser.options(desc);
+  parser.options(cmdline_options);
   parser.positional(pos);
   
   po::variables_map vm;

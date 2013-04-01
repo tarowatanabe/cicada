@@ -165,17 +165,10 @@ struct FilterSigtest
       throw std::runtime_error("no root count for source: " + source);
     if (titer == root_target.end())
       throw std::runtime_error("no root count for target: " + target);
-
-    if (jiter->counts.size() != 1)
-      throw std::runtime_error("invalid root count: " + source + target);
-    if (siter->counts.size() != 1)
-      throw std::runtime_error("invalid root count for source: " + source);
-    if (titer->counts.size() != 1)
-      throw std::runtime_error("invalid root count for target: " + target);
     
     const unsigned int n = phrase_pair.observed_source;
     const unsigned int r = phrase_pair.observed_target;
-    const unsigned int N = jiter->counts.front();
+    const unsigned int N = jiter->observed;
     
     const double density = boost::math::pdf(boost::math::hypergeometric(r, n, N), 1);
     
@@ -183,6 +176,7 @@ struct FilterSigtest
       std::cerr << "density: " << density
 		<< " ||| " << phrase_pair.source << " ||| " << phrase_pair.target
 		<< " ||| " << phrase_pair.observed_source << ' ' << phrase_pair.observed_target
+		<< " observed: " << N << ' ' << unsigned(siter->observed) << ' ' << unsigned(titer->observed)
 		<< std::endl;
 	
     

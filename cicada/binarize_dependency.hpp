@@ -68,6 +68,11 @@ namespace cicada
       removed_type removed(source.edges.size(), false);
       
       binarized.clear();
+
+      const std::string tag_neutral("^");
+      const std::string tag_left("^L");
+      const std::string tag_right("^R");
+      const std::string tag_middle("^M");
       
       hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -135,17 +140,15 @@ namespace cicada
 	      rhs_new.push_back(riter->front());
 	      tails_new.push_back(titer->front());
 	    } else {
-	      symbol_type lhs_new;
-	      if (rhs.size() == 1)
-		lhs_new = '[' + lhs.non_terminal_strip() + "^]"; // no terminals
-	      else if (riter == riter_begin)
-		lhs_new = '[' + lhs.non_terminal_strip() + "^L]"; // left
-	      else if (riter + 1 == riter_end)
-		lhs_new = '[' + lhs.non_terminal_strip() + "^R]"; // right
-	      else
-		lhs_new = '[' + lhs.non_terminal_strip() + "^M]"; // middle
+	      const std::string& tag = (rhs.size() == 1
+					? tag_neutral
+					: (riter == riter_begin
+					   ? tag_left
+					   : (riter + 1 == riter_end
+					      ? tag_right
+					      : tag_middle)));
 	      
-	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(lhs_new, *riter, *titer, target);
+	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(tag, *riter, *titer, target);
 	      
 	      rhs_new.push_back(result.first);
 	      tails_new.push_back(result.second);
@@ -177,7 +180,7 @@ namespace cicada
     node_chart_type   node_chart;
     label_chart_type  label_chart;
     
-    std::pair<symbol_type, hypergraph_type::id_type> binarize(const symbol_type& lhs,
+    std::pair<symbol_type, hypergraph_type::id_type> binarize(const std::string& tag,
 							      const rhs_type& rhs,
 							      const tails_type& tails,
 							      hypergraph_type& target)
@@ -187,7 +190,7 @@ namespace cicada
       const size_type child_size = rhs.size();
 
       label_chart.clear();
-      label_chart.resize(child_size + 1, lhs);
+      label_chart.resize(child_size + 1, symbol_type());
       
       node_chart.clear();
       node_chart.resize(child_size + 1, hypergraph_type::invalid);
@@ -199,16 +202,28 @@ namespace cicada
       
       symbol_set_type rhs_binarized(2);
       tail_set_type   tails_binarized(2);
-  
+      
       for (size_type length = 2; length <= child_size; ++ length)
 	for (size_type first = 0; first + length <= child_size; ++ first) {
 	  const size_type last = first + length;
+	  
+	  {
+	    const symbol_type::piece_type left = label_chart(first, last - 1).non_terminal_strip();
+	    const symbol_type::piece_type right = label_chart(last - 1, last).non_terminal_strip();
+	    
+	    if (length > 2)
+	      label_chart(first, last) = '[' + std::string(left.begin(), left.end() - tag.size()) + '+' + right + tag + ']';
+	    else
+	      label_chart(first, last) = '[' + std::string(left) + '+' + right + tag + ']';
+	  }
+	  
+	  const symbol_type lhs = label_chart(first, last);
 	  
 	  hypergraph_type::id_type& head = node_chart(first, last);
 	  
 	  for (size_t middle = first + 1; middle != last; ++ middle) {
 	    // [first, middle) and [middle, last)
-	    
+
 	    rhs_binarized.front() = label_chart(first, middle);
 	    rhs_binarized.back()  = label_chart(middle, last);
 	    
