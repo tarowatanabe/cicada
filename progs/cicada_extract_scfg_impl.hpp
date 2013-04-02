@@ -680,7 +680,8 @@ struct ExtractSCFG
 		      extract_rule(source, target, span, *niter1, *niter2, category, rule_pair, true);
 		      rule_pair_list.push_back(rule_pair);
 		    }
-	    
+		
+		// third non-temrinal...
 		if (max_rank >= 3)
 		  for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
 		    if (span != *niter3
@@ -707,6 +708,9 @@ struct ExtractSCFG
 			    extract_rule(source, target, span, *niter1, *niter2, *niter3, category, rule_pair, true);
 			    rule_pair_list.push_back(rule_pair);
 			  }
+
+		      // forth non-temrinal...
+		      
 		    }
 	      }
 	}
@@ -818,6 +822,7 @@ struct ExtractSCFG
 			rule_pair_list.push_back(rule_pair);
 		      }
 	      
+		  // third non-temrinal...
 		  if (max_rank >= 3)
 		    for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
 		      if (*iter != *niter3
@@ -844,6 +849,8 @@ struct ExtractSCFG
 			      extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
 			      rule_pair_list.push_back(rule_pair);
 			    }
+			
+			// forth non-temrinal...
 		      }
 		}
 	  }
@@ -1059,7 +1066,8 @@ struct ExtractSCFG
     typedef std::pair<span_type, symbol_type> span_category_type;
     
     // sort by source-side span...
-    std::vector<span_pair_type, std::allocator<span_pair_type> > spans_nt(3);
+    
+    boost::array<span_pair_type, 3> spans_nt;
     spans_nt[0] = __spans_nt1;
     spans_nt[1] = __spans_nt2;
     spans_nt[2] = __spans_nt3;
@@ -1089,7 +1097,7 @@ struct ExtractSCFG
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
     
     // sort by target-side span with category,...
-    std::vector<span_category_type, std::allocator<span_category_type> > spans_cat(3);
+    boost::array<span_category_type, 3> spans_cat;
     spans_cat[0] = std::make_pair(spans_nt1.target, nt1.non_terminal(1));
     spans_cat[1] = std::make_pair(spans_nt2.target, nt2.non_terminal(2));
     spans_cat[2] = std::make_pair(spans_nt3.target, nt3.non_terminal(3));
@@ -1112,6 +1120,7 @@ struct ExtractSCFG
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
     const int nt3_source_size = spans_nt3.source.second - spans_nt3.source.first;
+    
     const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
     const int nt2_target_size = spans_nt2.target.second - spans_nt2.target.first;
     const int nt3_target_size = spans_nt3.target.second - spans_nt3.target.first;
@@ -1141,6 +1150,126 @@ struct ExtractSCFG
 				      + (mask_target1 & (nt1_target_size - 1))
 				      + (mask_target2 & (nt2_target_size - 1))
 				      + (mask_target3 & (nt3_target_size - 1)));
+	    
+	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	  }
+      }
+  }
+
+  template <typename Category>
+  void extract_rule(const sentence_type& source,
+		    const sentence_type& target,
+		    const span_pair_type& spans,
+		    const span_pair_type& __spans_nt1,
+		    const span_pair_type& __spans_nt2,
+		    const span_pair_type& __spans_nt3,
+		    const span_pair_type& __spans_nt4,
+		    const Category& category,
+		    rule_pair_type& rule_pair,
+		    const bool sentential=false)
+  {
+    typedef std::pair<span_type, symbol_type> span_category_type;
+    
+    // sort by source-side span...
+    boost::array<span_pair_type, 4> spans_nt;
+    spans_nt[0] = __spans_nt1;
+    spans_nt[1] = __spans_nt2;
+    spans_nt[2] = __spans_nt3;
+    spans_nt[3] = __spans_nt4;
+    
+    std::sort(spans_nt.begin(), spans_nt.end(), less_source());
+    
+    const span_pair_type& spans_nt1 = spans_nt[0];
+    const span_pair_type& spans_nt2 = spans_nt[1];
+    const span_pair_type& spans_nt3 = spans_nt[2];
+    const span_pair_type& spans_nt4 = spans_nt[3];
+
+    const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
+    const symbol_type nt1 = category(spans_nt1);
+    const symbol_type nt2 = category(spans_nt2);
+    const symbol_type nt3 = category(spans_nt3);
+    const symbol_type nt4 = category(spans_nt4);
+    
+    rule_pair.source = static_cast<const std::string&>(lhs);
+    for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    for (int src = spans_nt1.source.second; src != spans_nt2.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+    for (int src = spans_nt2.source.second; src != spans_nt3.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt3.non_terminal(3));
+    for (int src = spans_nt3.source.second; src != spans_nt4.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt4.non_terminal(4));
+    for (int src = spans_nt4.source.second; src != spans.source.second; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    
+    // sort by target-side span with category,...
+    boost::array<span_category_type, 4> spans_cat;
+    spans_cat[0] = std::make_pair(spans_nt1.target, nt1.non_terminal(1));
+    spans_cat[1] = std::make_pair(spans_nt2.target, nt2.non_terminal(2));
+    spans_cat[2] = std::make_pair(spans_nt3.target, nt3.non_terminal(3));
+    spans_cat[3] = std::make_pair(spans_nt4.target, nt4.non_terminal(4));
+    
+    std::sort(spans_cat.begin(), spans_cat.end(), less_first());
+    
+    rule_pair.target = static_cast<const std::string&>(lhs);
+    for (int src = spans.target.first; src != spans_cat[0].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[0].second);
+    for (int src = spans_cat[0].first.second; src != spans_cat[1].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[1].second);
+    for (int src = spans_cat[1].first.second; src != spans_cat[2].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[2].second);
+    for (int src = spans_cat[2].first.second; src != spans_cat[3].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[3].second);
+    for (int src = spans_cat[3].first.second; src != spans.target.second; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    
+    const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
+    const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
+    const int nt3_source_size = spans_nt3.source.second - spans_nt3.source.first;
+    const int nt4_source_size = spans_nt4.source.second - spans_nt4.source.first;
+    
+    const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
+    const int nt2_target_size = spans_nt2.target.second - spans_nt2.target.first;
+    const int nt3_target_size = spans_nt3.target.second - spans_nt3.target.first;
+    const int nt4_target_size = spans_nt4.target.second - spans_nt4.target.first;
+    
+    rule_pair.alignment.clear();
+    for (int src = spans.source.first; src != spans.source.second; ++ src)
+      if (is_out_of_span(spans_nt1.source, src) && is_out_of_span(spans_nt2.source, src) && is_out_of_span(spans_nt3.source, src) && is_out_of_span(spans_nt4.source, src)) {
+	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
+	point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
+	
+	for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  if (is_out_of_span(spans_nt1.target, *aiter) && is_out_of_span(spans_nt2.target, *aiter) && is_out_of_span(spans_nt3.target, *aiter) && is_out_of_span(spans_nt4.target, *aiter)) {
+	    const int mask_source1 = - (src >= spans_nt1.source.second);
+	    const int mask_source2 = - (src >= spans_nt2.source.second);
+	    const int mask_source3 = - (src >= spans_nt3.source.second);
+	    const int mask_source4 = - (src >= spans_nt4.source.second);
+	    
+	    const int mask_target1 = - (*aiter >= spans_nt1.target.second);
+	    const int mask_target2 = - (*aiter >= spans_nt2.target.second);
+	    const int mask_target3 = - (*aiter >= spans_nt3.target.second);
+	    const int mask_target4 = - (*aiter >= spans_nt4.target.second);
+	    
+	    // we shift -1, since we have to take into account the <x1> token... (also for <x2>)
+	    const int shift_source = (spans.source.first
+				      + (mask_source1 & (nt1_source_size - 1))
+				      + (mask_source2 & (nt2_source_size - 1))
+				      + (mask_source3 & (nt3_source_size - 1))
+				      + (mask_source4 & (nt4_source_size - 1)));
+	    const int shift_target = (spans.target.first
+				      + (mask_target1 & (nt1_target_size - 1))
+				      + (mask_target2 & (nt2_target_size - 1))
+				      + (mask_target3 & (nt3_target_size - 1))
+				      + (mask_target4 & (nt4_target_size - 1)));
 	    
 	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
