@@ -122,6 +122,8 @@ opt_parser = OptionParser(
                 help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
                 help="constrained extraction in SCFG, GHKM and Tree"),
+    make_option("--exclude", default=None, action="store_true",
+                help="exclude phrasal rules in SCFG"),
     make_option("--project", default=None, action="store_true",
                 help="project non-terminal symbols in GHKM"),
     
@@ -617,7 +619,7 @@ class ExtractSCFG(Extract):
                  max_span_source=15, max_span_target=20,
                  min_hole_source=1, min_hole_target=1,
                  max_rank=2,
-                 exhaustive=None, constrained=None, sentential=None,
+                 exhaustive=None, constrained=None, exclude=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, counts_dir)
@@ -661,6 +663,8 @@ class ExtractSCFG(Extract):
             command += " --exhaustive"
         if constrained:
             command += " --constrained"
+        if exclude:
+            command += " --exclude"
         if sentential:
             command += " --sentential"
         
@@ -986,6 +990,7 @@ if __name__ == '__main__':
                                   max_rank=options.max_rank,
                                   exhaustive=options.exhaustive,
                                   constrained=options.constrained,
+                                  exclude=options.exclude,
                                   sentential=options.sentential,
                                   max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                                   debug=options.debug)

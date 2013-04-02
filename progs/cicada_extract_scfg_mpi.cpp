@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
@@ -52,6 +52,7 @@ int max_rank = 2;
 int max_scope = 3;
 bool exhaustive = false;
 bool constrained = false;
+bool exclude = false;
 bool sentential = false;
 bool inverse = false;
 
@@ -117,7 +118,7 @@ int main(int argc, char** argv)
 		   max_span_source, max_span_target,
 		   min_hole_source, min_hole_target,
 		   max_rank, max_scope,
-		   exhaustive, constrained, sentential, inverse, max_malloc);
+		   exhaustive, constrained, exclude, sentential, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -444,6 +445,7 @@ void options(int argc, char** argv)
     ("max-scope",       po::value<int>(&max_scope)->default_value(max_scope),             "maximum scope")
     ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
     ("constrained",     po::bool_switch(&constrained),                                    "constrained initial phrases")
+    ("exclude",         po::bool_switch(&exclude),                                        "exclude phrase pairs")
     ("sentential",      po::bool_switch(&sentential),                                     "extract sentential rules")
     ("inverse",         po::bool_switch(&inverse),                                        "inversed word alignment")
     

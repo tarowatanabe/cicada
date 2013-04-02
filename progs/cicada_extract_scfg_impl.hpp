@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_SCFG_IMPL__HPP__
@@ -405,6 +405,7 @@ struct ExtractSCFG
 	      const int __max_scope,
 	      const bool __exhaustive,
 	      const bool __constrained,
+	      const bool __exclude,
 	      const bool __sentential,
 	      const bool __inverse)
     : max_length(__max_length),
@@ -417,6 +418,7 @@ struct ExtractSCFG
       max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
+      exclude(__exclude),
       sentential(__sentential),
       inverse(__inverse) {}
   
@@ -430,6 +432,7 @@ struct ExtractSCFG
   int max_scope;
   bool exhaustive;
   bool constrained;
+  bool exclude;
   bool sentential;
   bool inverse;
   
@@ -618,11 +621,12 @@ struct ExtractSCFG
     rule_pair_list_type rule_pair_list;
     rule_pair_type rule_pair;
     
-    if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
-      if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
-	extract_rule(source, target, span, category, rule_pair, true);
-	const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
-      }
+    if (! exclude) // phrasal rule
+      if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
+	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
+	  extract_rule(source, target, span, category, rule_pair, true);
+	  const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
+	}
     
     const int source_count = alignment_count_source[span.source.second] - alignment_count_source[span.source.first];
     //const int target_count = alignment_count_target[span.target.second] - alignment_count_target[span.target.first];
@@ -731,7 +735,7 @@ struct ExtractSCFG
     rule_pair_list_type rule_pair_list;
     rule_pair_type rule_pair;
     
-    { // phrase extraction
+    if (! exclude) { // phrase extraction
       span_pair_set_type::const_iterator iter_end = spans.end();
       for (span_pair_set_type::const_iterator iter = spans.begin(); iter != iter_end; ++ iter) {
 	const int source_length = iter->source.second - iter->source.first;
@@ -1320,6 +1324,7 @@ struct Task
        const int max_scope,
        const bool exhaustive,
        const bool constrained,
+       const bool exclude,
        const bool sentential,
        const bool inverse,
        const double __max_malloc)
@@ -1329,7 +1334,7 @@ struct Task
 		max_span_source, max_span_target, 
 		min_hole_source, min_hole_target,
 		max_rank, max_scope,
-		exhaustive, constrained, sentential, inverse),
+		exhaustive, constrained, exclude, sentential, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
