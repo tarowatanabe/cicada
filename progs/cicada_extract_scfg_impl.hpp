@@ -15,6 +15,7 @@
 #include <boost/fusion/adapted.hpp>
 #include <boost/filesystem.hpp>
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -870,6 +871,59 @@ struct ExtractSCFG
       }
     }
   }
+
+  struct Builder
+  {
+    typedef std::vector<char, std::allocator<char> > buffer_type;
+    
+    typedef buffer_type::iterator       iterator;
+    typedef buffer_type::const_iterator const_iterator;
+    
+    friend
+    Builder& operator<<(Builder& builder, const Builder& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.buffer.begin(), x.buffer.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const symbol_type& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.begin(), x.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const std::string& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.begin(), x.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const char* x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x, x + std::strlen(x));
+      return builder;
+    }
+    
+    template <size_t N>
+    friend
+    Builder& operator<<(Builder& builder, const char (&x)[N])
+    {
+      builder.buffer.insert(builder.buffer.end(), x, x + N);
+      return builder;
+    }
+    
+    void clear() { buffer.clear(); }
+
+    operator std::string() const { return std::string(buffer.begin(), buffer.end()); }
+    
+  private:
+    buffer_type buffer;
+  };
+
+  Builder builder;
   
   template <typename Category>
   void extract_rule(const sentence_type& source,
@@ -880,6 +934,20 @@ struct ExtractSCFG
 		    const bool sentential=false)
   {
     const symbol_type& lhs = (sentential ? vocab_type::S : category(spans));
+
+#if 0
+    builder.clear();
+    builder << lhs;
+    for (int src = spans.source.first; src != spans.source.second; ++ src)
+      builder << ' ' << source[src];
+    rule_pair.source = builder;
+
+    builder.clear();
+    builder << lhs;
+    for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
+      builder << ' ' << target[trg];
+    rule_pair.target = builder;
+#endif
 
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans.source.second; ++ src)
@@ -909,19 +977,39 @@ struct ExtractSCFG
 		    const bool sentential=false)
   {
     const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
-    const symbol_type nt1 = category(spans_nt1);
+    const symbol_type nt1 = symbol_type(category(spans_nt1)).non_terminal(1);
+
+#if 0
+    builder.clear();
+    builder << lhs;
+    for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
+      builder << ' ' << source[src];
+    builder << ' ' << nt1;
+    for (int src = spans_nt1.source.second; src != spans.source.second; ++ src)
+      builder << ' ' << source[src];
+    rule_pair.source = builder;
+    
+    builder.clear();
+    builder << lhs;
+    for (int trg = spans.target.first; trg != spans_nt1.target.first; ++ trg)
+      builder << ' ' << target[trg];
+    builder << ' ' << nt1;
+    for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
+      builder << ' ' << target[trg];
+    rule_pair.target = builder;
+#endif
 
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1);
     for (int src = spans_nt1.source.second; src != spans.source.second; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
     
     rule_pair.target = static_cast<const std::string&>(lhs);
     for (int trg = spans.target.first; trg != spans_nt1.target.first; ++ trg)
       rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
-    rule_pair.target += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    rule_pair.target += ' ' + static_cast<const std::string&>(nt1);
     for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
       rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
 
@@ -967,16 +1055,16 @@ struct ExtractSCFG
     const span_pair_type& spans_nt2 = (__is_ordered ? __spans_nt2 : __spans_nt1);
     
     const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
-    const symbol_type nt1 = category(spans_nt1);
-    const symbol_type nt2 = category(spans_nt2);
+    const symbol_type nt1 = symbol_type(category(spans_nt1)).non_terminal(1);
+    const symbol_type nt2 = symbol_type(category(spans_nt2)).non_terminal(2);
     
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1);
     for (int src = spans_nt1.source.second; src != spans_nt2.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt2);
     for (int src = spans_nt2.source.second; src != spans.source.second; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
 
@@ -984,20 +1072,20 @@ struct ExtractSCFG
       rule_pair.target = static_cast<const std::string&>(lhs);
       for (int trg = spans.target.first; trg != spans_nt1.target.first; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
-      rule_pair.target += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+      rule_pair.target += ' ' + static_cast<const std::string&>(nt1);
       for (int trg = spans_nt1.target.second; trg != spans_nt2.target.first; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
-      rule_pair.target += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+      rule_pair.target += ' ' + static_cast<const std::string&>(nt2);
       for (int trg = spans_nt2.target.second; trg != spans.target.second; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
     } else {
       rule_pair.target = static_cast<const std::string&>(lhs);
       for (int trg = spans.target.first; trg != spans_nt2.target.first; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
-      rule_pair.target += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+      rule_pair.target += ' ' + static_cast<const std::string&>(nt2);
       for (int trg = spans_nt2.target.second; trg != spans_nt1.target.first; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
-      rule_pair.target += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+      rule_pair.target += ' ' + static_cast<const std::string&>(nt1);
       for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
     }
@@ -1079,28 +1167,28 @@ struct ExtractSCFG
     const span_pair_type& spans_nt3 = spans_nt[2];
 
     const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
-    const symbol_type nt1 = category(spans_nt1);
-    const symbol_type nt2 = category(spans_nt2);
-    const symbol_type nt3 = category(spans_nt3);
+    const symbol_type nt1 = symbol_type(category(spans_nt1)).non_terminal(1);
+    const symbol_type nt2 = symbol_type(category(spans_nt2)).non_terminal(2);
+    const symbol_type nt3 = symbol_type(category(spans_nt3)).non_terminal(3);
     
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1);
     for (int src = spans_nt1.source.second; src != spans_nt2.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt2);
     for (int src = spans_nt2.source.second; src != spans_nt3.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt3.non_terminal(3));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt3);
     for (int src = spans_nt3.source.second; src != spans.source.second; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 3> spans_cat;
-    spans_cat[0] = std::make_pair(spans_nt1.target, nt1.non_terminal(1));
-    spans_cat[1] = std::make_pair(spans_nt2.target, nt2.non_terminal(2));
-    spans_cat[2] = std::make_pair(spans_nt3.target, nt3.non_terminal(3));
+    spans_cat[0] = std::make_pair(spans_nt1.target, nt1);
+    spans_cat[1] = std::make_pair(spans_nt2.target, nt2);
+    spans_cat[2] = std::make_pair(spans_nt3.target, nt3);
     
     std::sort(spans_cat.begin(), spans_cat.end(), less_first());
     
@@ -1185,33 +1273,33 @@ struct ExtractSCFG
     const span_pair_type& spans_nt4 = spans_nt[3];
 
     const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
-    const symbol_type nt1 = category(spans_nt1);
-    const symbol_type nt2 = category(spans_nt2);
-    const symbol_type nt3 = category(spans_nt3);
-    const symbol_type nt4 = category(spans_nt4);
+    const symbol_type nt1 = symbol_type(category(spans_nt1)).non_terminal(1);
+    const symbol_type nt2 = symbol_type(category(spans_nt2)).non_terminal(2);
+    const symbol_type nt3 = symbol_type(category(spans_nt3)).non_terminal(3);
+    const symbol_type nt4 = symbol_tyep(category(spans_nt4)).non_terminal(4);
     
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1);
     for (int src = spans_nt1.source.second; src != spans_nt2.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt2);
     for (int src = spans_nt2.source.second; src != spans_nt3.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt3.non_terminal(3));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt3);
     for (int src = spans_nt3.source.second; src != spans_nt4.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
-    rule_pair.source += ' ' + static_cast<const std::string&>(nt4.non_terminal(4));
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt4);
     for (int src = spans_nt4.source.second; src != spans.source.second; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 4> spans_cat;
-    spans_cat[0] = std::make_pair(spans_nt1.target, nt1.non_terminal(1));
-    spans_cat[1] = std::make_pair(spans_nt2.target, nt2.non_terminal(2));
-    spans_cat[2] = std::make_pair(spans_nt3.target, nt3.non_terminal(3));
-    spans_cat[3] = std::make_pair(spans_nt4.target, nt4.non_terminal(4));
+    spans_cat[0] = std::make_pair(spans_nt1.target, nt1);
+    spans_cat[1] = std::make_pair(spans_nt2.target, nt2);
+    spans_cat[2] = std::make_pair(spans_nt3.target, nt3);
+    spans_cat[3] = std::make_pair(spans_nt4.target, nt4);
     
     std::sort(spans_cat.begin(), spans_cat.end(), less_first());
     
@@ -1274,6 +1362,22 @@ struct ExtractSCFG
 	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
+  }
+
+  template <typename Iterator>
+  bool is_out_of_source_span(Iterator first, Iterator last, const int pos) 
+  {
+    for (/**/; first != last; ++ first)
+      if (! is_out_of_span(first->source, pos)) return false;
+    return true;
+  }
+
+  template <typename Iterator>
+  bool is_out_of_target_span(Iterator first, Iterator last, const int pos) 
+  {
+    for (/**/; first != last; ++ first)
+      if (! is_out_of_span(first->target, pos)) return false;
+    return true;
   }
   
   bool is_out_of_span(const span_type& span, const int pos) const
