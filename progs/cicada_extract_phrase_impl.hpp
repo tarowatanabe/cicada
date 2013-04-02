@@ -100,7 +100,8 @@ struct PhrasePair
 {
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
-  typedef boost::array<int, 5> counts_type;
+  typedef int64_t count_type;
+  typedef boost::array<count_type, 5> counts_type;
 
   phrase_type    source;
   phrase_type    target;
@@ -166,6 +167,7 @@ struct PhrasePairGenerator
   
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::alignment_type alignment_type;
+  typedef phrase_pair_type::count_type     count_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
   PhrasePairGenerator() : grammar() {}
@@ -181,10 +183,11 @@ struct PhrasePairGenerator
       namespace standard = boost::spirit::standard;
       
       alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
-      counts %= karma::int_ % ' ';
+      counts %= count % ' ';
       phrase_pair %= standard::string << " ||| " << standard::string << " ||| " << alignment << " ||| " << counts;
     }
-    
+
+    boost::spirit::karma::int_generator<count_type> count;
     boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
     boost::spirit::karma::rule<Iterator, counts_type()> counts;
     boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
@@ -224,7 +227,8 @@ struct ExtractPhrase
   typedef cicada::Alignment alignment_type;
   
   typedef std::string phrase_type;
-  typedef boost::array<int, 5> counts_type;
+  typedef int64_t count_type;
+  typedef boost::array<count_type, 5> counts_type;
 
   typedef std::pair<int, int> span_type;
   struct span_pair_type
@@ -286,7 +290,7 @@ struct ExtractPhrase
 
   span_pair_set_type spans;
   corner_set_type    corners;
-  
+
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
 		  const alignment_type& alignment,
