@@ -130,6 +130,9 @@ namespace cicada
     trie_type      trie;
     edge_trie_type edges;
 
+    std::string feature_prefix;
+    std::string attribute_prefix;
+
     feature_name_set_type   feature_names_default;
     attribute_name_set_type attribute_names_default;
 
@@ -208,7 +211,14 @@ namespace cicada
       if (utils::ipiece(piter->first) == "debug") {
 	debug = utils::lexical_cast<int>(piter->second);
 	continue;
-      }
+      } else if (utils::ipiece(piter->first) == "feature-prefix") {
+	feature_prefix = piter->second;
+	continue;
+      } else if (utils::ipiece(piter->first) == "attribute-prefix") {
+	attribute_prefix = piter->second;
+	continue;
+      } else if (utils::ipiece(piter->first) == "populate")
+	continue;
 
       {
 	std::string::const_iterator iter = piter->first.begin();
@@ -323,7 +333,7 @@ namespace cicada
 	    if (feature >= static_cast<int>(feature_names_default.size()))
 	      feature_names_default.resize(feature + 1);
 	    if (feature_names_default[feature].empty())
-	      feature_names_default[feature] = "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
+	      feature_names_default[feature] = feature_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
 	    
 	    features[feature_names_default[feature]] = fiter->second;
 	  }
@@ -346,7 +356,7 @@ namespace cicada
 	    if (attribute >= static_cast<int>(attribute_names_default.size()))
 	      attribute_names_default.resize(attribute + 1);
 	    if (attribute_names_default[attribute].empty())
-	      attribute_names_default[attribute] = "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
+	      attribute_names_default[attribute] = attribute_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
 	    
 	    attributes[attribute_names_default[attribute]] = aiter->second;
 	  }
@@ -427,7 +437,7 @@ namespace cicada
 	if (feature >= static_cast<int>(feature_names_default.size()))
 	  feature_names_default.resize(feature + 1);
 	if (feature_names_default[feature].empty())
-	  feature_names_default[feature] = "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
+	  feature_names_default[feature] = feature_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
 	
 	features[feature_names_default[feature]] = fiter->second;
 	
@@ -443,7 +453,7 @@ namespace cicada
 	if (attribute >= static_cast<int>(attribute_names_default.size()))
 	  attribute_names_default.resize(attribute + 1);
 	if (attribute_names_default[attribute].empty())
-	  attribute_names_default[attribute] = "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
+	  attribute_names_default[attribute] = attribute_prefix + "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
 	
 	attributes[attribute_names_default[attribute]] = aiter->second;
 	

@@ -29,6 +29,8 @@ file-name: indexed tree grammar or plain text tree grammar\n\
 \tcky|cyk=[true|false] indexing for CKY|CYK parsing/composition\n\
 \tkey-value=[true|false] store key-value format of features/attributes\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
+\tfeature-prefix=[prefix for feature name] add prefix to the default feature name: tree-rule-table\n\
+\tattribute-prefix=[prefix for attribute name] add prefix to the default attribute name: tree-rule-table\n\
 \tfeature0=[feature-name]\n\
 \tfeature1=[feature-name]\n\
 \t...\n\
