@@ -582,8 +582,6 @@ class Index(UserString.UserString):
             raise ValueError, "no root target? %s" %(root_target)
         
         stat_file = os.path.join(indexer.counts, "statistics")
-        if not os.path.exists(stat_file):
-            raise ValueError, "no statistics file for significant testing?" + stat_file
 
         self.name    = indexer.name + "-index"
         self.logfile = os.path.join(indexer.base, indexer.name + "-index." + name + ".log")
@@ -602,6 +600,9 @@ class Index(UserString.UserString):
             if threshold > 0.0:
                 command += " --threshold %g" %(threshold)
             if sigtest != 0.0:
+                if not os.path.exists(stat_file):
+                    raise ValueError, "no statistics file for significant testing?" + stat_file
+
                 command += " --sigtest %g" %(sigtest)
                 command += " --statistic \"%s\"" %(stat_file)
                 
@@ -611,10 +612,11 @@ class Index(UserString.UserString):
             command += " | "
             command += indexer.filter
             command += " --dirichlet-prior %g" %(prior)
-            command += " --statistic \"%s\"" %(stat_file)
             command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
+            if os.path.exists(stat_file):
+                command += " --statistic \"%s\"" %(stat_file)
             if feats:
                 command += feats.options
             if lexicon:
@@ -625,10 +627,11 @@ class Index(UserString.UserString):
 
             command = indexer.filter
             command += " --dirichlet-prior %g" %(prior)
-            command += " --statistic \"%s\"" %(stat_file)
             command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
+            if os.path.exists(stat_file):
+                command += " --statistic \"%s\"" %(stat_file)
             if feats:
                 command += feats.options
             if lexicon:
