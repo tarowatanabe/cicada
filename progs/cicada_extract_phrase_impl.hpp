@@ -25,6 +25,7 @@
 
 #include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
+#include "utils/compact_set.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -101,7 +102,7 @@ struct PhrasePair
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
   typedef int64_t count_type;
-  typedef boost::array<count_type, 5> counts_type;
+  typedef boost::array<count_type, 5+3> counts_type;
 
   phrase_type    source;
   phrase_type    target;
@@ -228,7 +229,7 @@ struct ExtractPhrase
   
   typedef std::string phrase_type;
   typedef int64_t count_type;
-  typedef boost::array<count_type, 5> counts_type;
+  typedef boost::array<count_type, 5+3> counts_type;
 
   typedef std::pair<int, int> span_type;
   struct span_pair_type
@@ -291,6 +292,33 @@ struct ExtractPhrase
   span_pair_set_type spans;
   corner_set_type    corners;
 
+  phrase_pair_set_type phrase_pairs_local;
+
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  struct string_unassigned
+  {
+    const std::string& operator()() const
+    {
+      static std::string __str;
+      return __str;
+    }
+  };
+  typedef utils::compact_set<std::string,
+			     string_unassigned, string_unassigned,
+			     string_hash, std::equal_to<std::string>,
+			     std::allocator<std::string> > unique_set_type;
+  
+  unique_set_type uniques_source;
+  unique_set_type uniques_target;
+  
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
 		  const alignment_type& alignment,
@@ -299,6 +327,10 @@ struct ExtractPhrase
     // first, extract spans...
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+    
+    phrase_pairs_local.clear();
+    uniques_source.clear();
+    uniques_target.clear();
     
     phrases_source.clear();
     phrases_target.clear();
@@ -483,9 +515,9 @@ struct ExtractPhrase
       const bool connected_left_bottom  = corners(source_first,    target_last + 1).right_top;
       const bool connected_right_bottom = corners(source_last + 1, target_last + 1).left_top;
       
-      phrase_pair_set_type::iterator iter = phrase_pairs.find(phrase_pair);
-      if (iter == phrase_pairs.end())
-	iter = phrase_pairs.insert(phrase_pair).first;
+      phrase_pair_set_type::iterator iter = phrase_pairs_local.find(phrase_pair);
+      if (iter == phrase_pairs_local.end())
+	iter = phrase_pairs_local.insert(phrase_pair).first;
       
       counts_type& counts = const_cast<counts_type&>(iter->counts);
       
@@ -497,6 +529,30 @@ struct ExtractPhrase
       counts[3] += (  connected_left_bottom && ! connected_right_bottom);
       counts[4] += (! connected_left_bottom &&   connected_right_bottom);
     }
+    
+    phrase_pair_set_type::const_iterator piter_end = phrase_pairs_local.end();
+    for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; ++ piter) {
+      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(piter->source);
+      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(piter->target);
+      
+      const_cast<std::string&>(piter->source) = *result_source.first;
+      const_cast<std::string&>(piter->target) = *result_target.first;
+      
+      std::pair<phrase_pair_set_type::iterator, bool> result = phrase_pairs.insert(*piter);
+      
+      counts_type& counts = const_cast<counts_type&>(result.first->counts);
+
+      if (! result.second)
+	std::transform(piter->counts.begin(), piter->counts.end(), counts.begin(), counts.begin(), std::plus<count_type>());
+      
+      counts[5] += 1;
+      counts[6] += result_source.second;
+      counts[7] += result_target.second;
+    }
+    
+    phrase_pairs_local.clear();
+    uniques_source.clear();
+    uniques_target.clear();
   }
 };
 

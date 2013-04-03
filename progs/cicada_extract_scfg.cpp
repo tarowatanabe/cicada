@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_extract_scfg_impl.hpp"
 #include "cicada_output_impl.hpp"
 
@@ -155,6 +156,9 @@ int main(int argc, char** argv)
 	os << path_type(piter->filename()).string() << '\n';
       }
     }
+
+    utils::compress_ostream os_stat(output_file / "statistics");
+    os_stat << Statistic(num_samples);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

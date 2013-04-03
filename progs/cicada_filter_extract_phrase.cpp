@@ -224,11 +224,11 @@ struct ScorerCICADA
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5)
+    if (phrase_pair.counts.size() != 5 + 3)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
+    if (phrase_pair.counts_source.size() != 5 + 3)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
+    if (phrase_pair.counts_target.size() != 5 + 3)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -435,11 +435,11 @@ struct ScorerMOSES
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5)
+    if (phrase_pair.counts.size() != 5 + 3)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
+    if (phrase_pair.counts_source.size() != 5 + 3)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
+    if (phrase_pair.counts_target.size() != 5 + 3)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -571,11 +571,11 @@ struct ScorerMOSESReordering
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5)
+    if (phrase_pair.counts.size() != 5 + 3)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
+    if (phrase_pair.counts_source.size() != 5 + 3)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
+    if (phrase_pair.counts_target.size() != 5 + 3)
       throw std::runtime_error("target counts size do not match");
     
     std::ostream_iterator<char> iter(os);

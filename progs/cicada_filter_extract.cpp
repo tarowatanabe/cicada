@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_filter_extract_impl.hpp"
 
 #include <stdexcept>
@@ -13,20 +14,18 @@
 #include <queue>
 
 #include <boost/program_options.hpp>
-#include <boost/math/distributions/hypergeometric.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/unordered_set.hpp>
+#include <utils/mathop.hpp>
 
 typedef boost::filesystem::path path_type;
 
-typedef RootCount  root_count_type;
-typedef PhrasePair phrase_pair_type;
+typedef Statistic statistic_type;
 
-typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type>,
-			     std::allocator<root_count_type> >::type root_count_set_type;
+typedef PhrasePair phrase_pair_type;
 
 struct score_phrase_pair_type
 {
@@ -73,19 +72,12 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 int buffer_size = 1024 * 1024;
-size_t nbest = 100;
+size_t nbest = 0;
 double cutoff = 0.0;
 double threshold = 0.0;
 int    types = 0;
 double sigtest = 0.0;
-
-bool sigtest_phrase = false;
-bool sigtest_scfg   = false;
-bool sigtest_ghkm   = false;
-
-path_type root_joint_file;
-path_type root_source_file;
-path_type root_target_file;
+path_type statistic_file;
 
 int debug = 0;
 
@@ -93,6 +85,11 @@ template <typename Filter>
 void process(const Filter& filter,
 	     std::istream& is,
 	     std::ostream& os);
+
+template <typename Filter>
+void process_kbest(const Filter& filter,
+		   std::istream& is,
+		   std::ostream& os);
 
 struct FilterNone
 {
@@ -132,63 +129,83 @@ struct FilterCutoff
   const int types;
 };
 
-template <typename Extractor>
 struct FilterSigtest
 {
-  FilterSigtest(const root_count_set_type& __root_joint,
-		const root_count_set_type& __root_source,
-		const root_count_set_type& __root_target,
-		const double& __cutoff,
-		const double& __sigtest)
-    : root_joint(__root_joint),
-      root_source(__root_source),
-      root_target(__root_target),
-      cutoff(__cutoff),
-      sigtest(__sigtest) {}
-
-  Extractor extractor;
-
-  bool operator()(const phrase_pair_type& phrase_pair) const
+  typedef int64_t count_type;
+  
+  FilterSigtest(const statistic_type& __statistic,
+		const double& alpha)
+    : statistic(__statistic),
+      threshold()
   {
-    if (phrase_pair.counts.front() < cutoff) return true;
-    
-    const std::string source = extractor(phrase_pair.source);
-    const std::string target = extractor(phrase_pair.target);
-    
-    root_count_set_type::const_iterator jiter = root_joint.find(source + target);
-    root_count_set_type::const_iterator siter = root_source.find(source);
-    root_count_set_type::const_iterator titer = root_target.find(target);
-    
-    if (jiter == root_joint.end())
-      throw std::runtime_error("no root count: " + source + target);
-    if (siter == root_source.end())
-      throw std::runtime_error("no root count for source: " + source);
-    if (titer == root_target.end())
-      throw std::runtime_error("no root count for target: " + target);
-    
-    const unsigned int n = phrase_pair.observed_source;
-    const unsigned int r = phrase_pair.observed_target;
-    const unsigned int N = jiter->observed;
-    
-    const double density = boost::math::pdf(boost::math::hypergeometric(r, n, N), 1);
-    
-    if (debug >= 2)
-      std::cerr << "density: " << density
-		<< " ||| " << phrase_pair.source << " ||| " << phrase_pair.target
-		<< " ||| " << phrase_pair.observed_source << ' ' << phrase_pair.observed_target
-		<< " observed: " << N << ' ' << unsigned(siter->observed) << ' ' << unsigned(titer->observed)
-		<< std::endl;
-	
-    
-    return density < sigtest;
+    threshold = - logfisher(1, 1, 1) + alpha;
   }
   
-  const root_count_set_type& root_joint;
-  const root_count_set_type& root_source;
-  const root_count_set_type& root_target;
+  bool operator()(const phrase_pair_type& phrase_pair) const
+  {
+    if (phrase_pair.counts.size() <= 3)
+      throw std::runtime_error("invalid counts");
+    if (phrase_pair.counts_source.size() <= 3)
+      throw std::runtime_error("invalid source counts");
+    if (phrase_pair.counts_target.size() <= 3)
+      throw std::runtime_error("invalid target counts");
 
-  const double cutoff;
-  const double sigtest;
+    const count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
+    const count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
+    const count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
+    
+    const double score = - logfisher(cfe, cf, ce);
+
+    if (debug >= 2)
+      std::cerr << phrase_pair.source << " ||| " << phrase_pair.target
+		<< " ||| "
+		<< (score < threshold ? "true" : "false")
+		<< ' ' << cfe << ' ' << cf << ' ' << ce << ' ' << score << ' ' << threshold
+		<< std::endl;
+    
+    return score < threshold;
+  }
+
+  double logfisher(const count_type cfe, const count_type cf, const count_type ce) const
+  {
+    count_type a = cfe;
+    count_type b = cf - cfe;
+    count_type c = ce - cfe;
+    count_type d = statistic.bitext - ce - cf + cfe;
+    const count_type n = statistic.bitext;
+    
+    double log_p = (utils::mathop::lgamma<double>(1+a+c)
+		    + utils::mathop::lgamma<double>(1+b+d)
+		    + utils::mathop::lgamma<double>(1+a+b)
+		    + utils::mathop::lgamma<double>(1+c+d)
+		    - utils::mathop::lgamma<double>(1+n)
+		    - utils::mathop::lgamma<double>(1+a)
+		    - utils::mathop::lgamma<double>(1+b)
+		    - utils::mathop::lgamma<double>(1+c)
+		    - utils::mathop::lgamma<double>(1+d));
+    
+    double log_total_p = boost::numeric::bounds<double>::lowest();
+    
+    const count_type tc = utils::bithack::min(b, c);
+    for (count_type i = 0; i <= tc; ++ i) {
+      log_total_p = utils::mathop::logsum(log_total_p, log_p);
+      
+      log_p += (utils::mathop::log<double>(b)
+		+ utils::mathop::log<double>(c)
+		- utils::mathop::log<double>(a + 1)
+		- utils::mathop::log<double>(d + 1));
+      
+      ++ a;
+      -- b;
+      -- c;
+      ++ d;
+    }
+    
+    return log_total_p;
+  }
+  
+  const statistic_type statistic;
+  double threshold;
 };
 
 void options(int argc, char** argv);
@@ -198,62 +215,39 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
-    if (nbest <= 0)
-      throw std::runtime_error("nbest must be positive...");
-
-    if (sigtest > 0.0) {
-      if (int(sigtest_phrase) + sigtest_scfg + sigtest_ghkm != 1)
-	throw std::runtime_error("specify either one of --sigtest-phrase|scfg|ghkm");
-      
-      if (! boost::filesystem::exists(root_joint_file))
-	throw std::runtime_error("no root count file");
-      if (! boost::filesystem::exists(root_source_file))
-	throw std::runtime_error("no root count file for source side");
-      if (! boost::filesystem::exists(root_target_file))
-	throw std::runtime_error("no root count file for target side");
+    if (sigtest != 0.0) {
+      if (statistic_file.empty() || ! boost::filesystem::exists(statistic_file))
+	throw std::runtime_error("no statistic for sigtest?");
     }
     
-    root_count_set_type root_joint;
-    root_count_set_type root_source;
-    root_count_set_type root_target;
-
-    {
-      root_count_type root_count;
-      RootCountParser parser;
-      std::string line;
-      
-      utils::compress_istream is_joint(root_joint_file);
-      while (std::getline(is_joint, line))
-	if (parser(line, root_count))
-	  root_joint.insert(root_count);
-      
-      utils::compress_istream is_source(root_source_file);
-      while (std::getline(is_source, line))
-	if (parser(line, root_count))
-	  root_source.insert(root_count);
-      
-      utils::compress_istream is_target(root_target_file);
-      while (std::getline(is_target, line))
-	if (parser(line, root_count))
-	  root_target.insert(root_count);
+    statistic_type statistic;
+    if (! statistic_file.empty()) {
+      utils::compress_istream is(statistic_file);
+      is >> statistic;
     }
-
+    
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
 
-    if (sigtest > 0.0) {
-      if (sigtest_ghkm)
-	process(FilterSigtest<ExtractRootGHKM>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
-      else if (sigtest_scfg)
-	process(FilterSigtest<ExtractRootSCFG>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
+    if (nbest > 0) {
+      if (sigtest != 0.0)
+	process_kbest(FilterSigtest(statistic, sigtest), is, os);
+      else if (threshold > 0.0)
+	process_kbest(FilterThreshold(threshold), is, os);
+      else if (cutoff > 0.0)
+	process_kbest(FilterCutoff(cutoff, types), is, os);
       else
-	process(FilterSigtest<ExtractRootPhrase>(root_joint, root_source, root_target, cutoff, sigtest), is, os);
-    } else if (threshold > 0.0)
-      process(FilterThreshold(threshold), is, os);
-    else if (cutoff > 0.0)
-      process(FilterCutoff(cutoff, types), is, os);
-    else
-      process(FilterNone(), is, os);
+	process(FilterNone(), is, os);
+    } else {
+      if (sigtest != 0.0)
+	process(FilterSigtest(statistic, sigtest), is, os);
+      else if (threshold > 0.0)
+	process(FilterThreshold(threshold), is, os);
+      else if (cutoff > 0.0)
+	process(FilterCutoff(cutoff, types), is, os);
+      else
+	process(FilterNone(), is, os);
+    }
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -266,6 +260,25 @@ template <typename Filter>
 void process(const Filter& filter,
 	     std::istream& is,
 	     std::ostream& os)
+{
+  phrase_pair_type     phrase_pair;
+  
+  PhrasePairParser  parser;
+  std::string line;
+  
+  while (std::getline(is, line)) {
+    if (! parser(line, phrase_pair)) continue;
+    if (phrase_pair.counts.empty()) continue;
+    if (filter(phrase_pair)) continue;
+    
+    os << line << '\n';
+  }
+}
+
+template <typename Filter>
+void process_kbest(const Filter& filter,
+		   std::istream& is,
+		   std::ostream& os)
 {
   std::string          source_prev;
   phrase_pair_type     phrase_pair;
@@ -365,15 +378,9 @@ void options(int argc, char** argv)
     ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
     ("types",     po::value<int>(&types)->default_value(types),            "cutoff variation")
-    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold (actually, this implementation is wrong!)")
+    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold")
     
-    ("sigtest-phrase", po::bool_switch(&sigtest_phrase), "significant test for phrase")
-    ("sigtest-scfg",   po::bool_switch(&sigtest_scfg),   "significant test for synchronous-CFG")
-    ("sigtest-ghkm",   po::bool_switch(&sigtest_ghkm),   "significant test for ghkm")
-    
-    ("root-joint",  po::value<path_type>(&root_joint_file),  "root count file")
-    ("root-source", po::value<path_type>(&root_source_file), "root source file")
-    ("root-target", po::value<path_type>(&root_target_file), "root target file")
+    ("statistic", po::value<path_type>(&statistic_file),                   "significant test statistic")
     
     ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;

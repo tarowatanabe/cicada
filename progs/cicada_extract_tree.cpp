@@ -1,9 +1,10 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_extract_tree_impl.hpp"
 #include "cicada_output_impl.hpp"
 
@@ -138,6 +139,9 @@ int main(int argc, char** argv)
 	os << path_type(piter->filename()).string() << '\n';
       }
     }
+
+    utils::compress_ostream os_stat(output_file / "statistics");
+    os_stat << Statistic(num_samples);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

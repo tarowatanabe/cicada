@@ -1,9 +1,10 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <stdexcept>
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_extract_tree_impl.hpp"
 #include "cicada_output_impl.hpp"
 
@@ -259,6 +260,8 @@ int main(int argc, char** argv)
 		  << " user time: " << end_extract.user_time() - start_extract.user_time()
 		  << std::endl;
       
+      utils::compress_ostream os_stat(output_file / "statistics");
+      os_stat << Statistic(num_samples);
     } else {
       utils::mpi_device_source device(0, bitext_tag, 4096);
       
