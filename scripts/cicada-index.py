@@ -95,8 +95,8 @@ opt_parser = OptionParser(
                 metavar="CUTOFF", help="cutoff count of rules (default: %default)"),
     make_option("--threshold", default=0, action="store", type="float",
                 metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
-    make_option("--types", default=0, action="store", type="int",
-                metavar="types", help="cutoff variation of rules (default: %default)"),
+    make_option("--sigtest", default=0, action="store", type="float",
+                metavar="SIGTEST", help="significance testing threshold (default: %default)"),
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -560,7 +560,7 @@ class Index(UserString.UserString):
                  kbest=0,
                  cutoff=0.0,
                  threshold=0.0,
-                 types=0,
+                 sigtest=0.0,
                  quantize=None,
                  features=[],
                  attributes=[]):
@@ -581,7 +581,7 @@ class Index(UserString.UserString):
         
         command = ""
 
-        if kbest > 0 or cutoff > 0.0 or threshold > 0.0 or types > 0:
+        if kbest > 0 or cutoff > 0.0 or threshold > 0.0 or sigtest != 0.0:
             self.threads = 2
 
             command = cicada.cicada_filter_extract
@@ -592,9 +592,19 @@ class Index(UserString.UserString):
                 command += " --cutoff %g" %(cutoff)
             if threshold > 0.0:
                 command += " --threshold %g" %(threshold)
-            if types > 0:
-                command += " --types %d" %(types)
+            if sigtest != 0.0:
+                
+                stat_file = os.path.join(indexer.counts, "statistics")
+
+                if not os.path.exists(stat_file):
+                    raise ValueError, "no statistics file for significant testing?" +stat_file
+
+                command += " --sigtest %g" %(sigtest)
+                command += " --statistic \"%s\"" %(stat_file)
+                
             command += " --input \"%s\"" %(input)
+            command += " --debug"
+            
             command += " | "
             command += indexer.filter
             command += " --dirichlet-prior %g" %(prior)
@@ -839,7 +849,7 @@ if __name__ == '__main__':
                           kbest=options.kbest,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
-                          types=options.types,
+                          sigtest=options.sigtest,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -876,7 +886,7 @@ if __name__ == '__main__':
                           kbest=options.kbest,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
-                          types=options.types,
+                          sigtest=options.sigtest,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)
@@ -909,7 +919,7 @@ if __name__ == '__main__':
                           kbest=options.kbest,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
-                          types=options.types,
+                          sigtest=options.sigtest,
                           quantize=options.quantize,
                           features=options.feature,
                           attributes=options.attribute)

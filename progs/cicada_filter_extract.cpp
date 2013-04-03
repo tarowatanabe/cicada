@@ -261,6 +261,9 @@ void process(const Filter& filter,
 	     std::istream& is,
 	     std::ostream& os)
 {
+  size_t num_samples = 0;
+  size_t num_survived = 0;
+  
   phrase_pair_type     phrase_pair;
   
   PhrasePairParser  parser;
@@ -269,10 +272,20 @@ void process(const Filter& filter,
   while (std::getline(is, line)) {
     if (! parser(line, phrase_pair)) continue;
     if (phrase_pair.counts.empty()) continue;
+    
+    ++ num_samples;
+    
     if (filter(phrase_pair)) continue;
+
+    ++ num_survived;
     
     os << line << '\n';
   }
+
+  if (debug)
+    std::cerr << "# of samples: " << num_samples
+	      << " pruned: " << (num_samples - num_survived)
+	      << std::endl;
 }
 
 template <typename Filter>
@@ -280,6 +293,9 @@ void process_kbest(const Filter& filter,
 		   std::istream& is,
 		   std::ostream& os)
 {
+  size_t num_samples = 0;
+  size_t num_survived = 0;
+  
   std::string          source_prev;
   phrase_pair_type     phrase_pair;
   
@@ -292,27 +308,30 @@ void process_kbest(const Filter& filter,
   while (std::getline(is, line)) {
     if (! parser(line, phrase_pair)) continue;
     if (phrase_pair.counts.empty()) continue;
+    
+    ++ num_samples;
+    
     if (filter(phrase_pair)) continue;
     
     if (phrase_pair.source != source_prev) {
       if (! heap.empty()) {
 	if (heap.size() <= nbest) {
 	  heap_type::iterator iter_end = heap.end();
-	  for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
+	  for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter, ++ num_survived)
 	    os << iter->line << '\n';
 	} else {
 	  heap_type::iterator iter_begin = heap.begin();
 	  heap_type::iterator iter_kbest = heap.end() - nbest;
 	  heap_type::iterator iter       = heap.end();
 	    
-	  for (/**/; iter_kbest != iter; -- iter) {
+	  for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
 	    os << iter_begin->line << '\n';
 	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	  }
 	    
 	  const double threshold = iter->score;
 	    
-	  for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+	  for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter, ++ num_survived) {
 	    os << iter_begin->line << '\n';
 	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
 	  }
@@ -342,26 +361,31 @@ void process_kbest(const Filter& filter,
   if (! heap.empty()) {
     if (heap.size() <= nbest) {
       heap_type::iterator iter_end = heap.end();
-      for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter)
+      for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter, ++ num_survived)
 	os << iter->line << '\n';
     } else {
       heap_type::iterator iter_begin = heap.begin();
       heap_type::iterator iter_kbest = heap.end() - nbest;
       heap_type::iterator iter       = heap.end();
 	    
-      for (/**/; iter_kbest != iter; -- iter) {
+      for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
 	os << iter_begin->line << '\n';
 	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
       }
 	
       const double threshold = iter->score;
 	
-      for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter) {
+      for (/**/; iter_begin != iter && iter_begin->score == threshold; -- iter, ++ num_survived) {
 	os << iter_begin->line << '\n';
 	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
       }
     }
   }
+
+  if (debug)
+    std::cerr << "# of samples: " << num_samples
+	      << " pruned: " << (num_samples - num_survived)
+	      << std::endl;
 }
 
 void options(int argc, char** argv)

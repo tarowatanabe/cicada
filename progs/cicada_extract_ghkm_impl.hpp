@@ -553,7 +553,7 @@ struct ExtractGHKM
   };
 
   typedef utils::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-			       std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > >::type rule_pair_set_local_type;
+			       std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > >::type rule_pair_set_span_type;
   
   ExtractGHKM(const symbol_type& __non_terminal,
 	      const int __max_sentence_length,
@@ -757,7 +757,7 @@ struct ExtractGHKM
     //
     // first, we will implement naive enumeration...
     
-    rule_pair_set_local_type rule_pairs_local;
+    rule_pair_set_span_type rule_pairs_span;
     rule_pair_type rule_pair;
 
     edge_set_type edges_new;
@@ -796,7 +796,7 @@ struct ExtractGHKM
 	
 	// construct rule pair and insert into rule pair list
 	if (construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair))
-	  rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
+	  rule_pairs_span[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
 
 	//std::cerr << rule_pair.source << " ||| " << rule_pair.target << std::endl;
 	
@@ -891,8 +891,8 @@ struct ExtractGHKM
       // if we share the same edge set, then, we can easily conclude that it is
       // caused by unaligned word ambiguity...
       
-      rule_pair_set_local_type::iterator riter_end = rule_pairs_local.end();
-      for (rule_pair_set_local_type::iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+      rule_pair_set_span_type::iterator riter_end = rule_pairs_span.end();
+      for (rule_pair_set_span_type::iterator riter = rule_pairs_span.begin(); riter != riter_end; ++ riter) {
 	rule_pair_list_type& rule_list = riter->second;
 	
 	const double factor = 1.0 / rule_list.size();
@@ -908,13 +908,13 @@ struct ExtractGHKM
 	  }
 	}
       }
-      rule_pairs_local.clear();
+      rule_pairs_span.clear();
       
       if ((id & id_mask) == id_mask) {
 	dumper(rule_pairs);
 	
 	if (rule_pairs.empty())
-	  rule_pair_set_local_type(rule_pairs_local).swap(rule_pairs_local);
+	  rule_pair_set_span_type(rule_pairs_span).swap(rule_pairs_span);
       }
       
       //std::cerr << "dumped" << std::endl;
