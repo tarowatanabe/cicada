@@ -531,7 +531,7 @@ struct ExtractPhrase
     }
     
     phrase_pair_set_type::const_iterator piter_end = phrase_pairs_local.end();
-    for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; ++ piter) {
+    for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; /**/) {
       std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(piter->source);
       std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(piter->target);
       
@@ -541,13 +541,15 @@ struct ExtractPhrase
       std::pair<phrase_pair_set_type::iterator, bool> result = phrase_pairs.insert(*piter);
       
       counts_type& counts = const_cast<counts_type&>(result.first->counts);
-
+      
       if (! result.second)
 	std::transform(piter->counts.begin(), piter->counts.end(), counts.begin(), counts.begin(), std::plus<count_type>());
       
       counts[5] += 1;
       counts[6] += result_source.second;
       counts[7] += result_target.second;
+      
+      phrase_pairs_local.erase(piter ++);
     }
     
     phrase_pairs_local.clear();

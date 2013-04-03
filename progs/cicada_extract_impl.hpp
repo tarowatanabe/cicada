@@ -35,7 +35,7 @@ struct Statistic
   friend
   std::ostream& operator<<(std::ostream& os, const Statistic& x)
   {
-    os << x.bitext;
+    os << x.bitext << '\n';
     return os;
   }
 

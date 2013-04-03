@@ -340,6 +340,16 @@ struct ExtractTree
 			       string_unassigned, string_unassigned,
 			       string_hash, std::equal_to<std::string>,
 			       std::allocator<std::string> > unique_set_type;
+
+    void erase(iterator iter)
+    {
+      counts.erase(iter);
+    }
+
+    void erase(const_iterator iter)
+    {
+      counts.erase(iter);
+    }
     
     const_iterator begin() const { return counts.begin(); }
     iterator begin() { return counts.begin(); }
@@ -1737,7 +1747,7 @@ struct ExtractTree
     uniques_target.clear();
     
     rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -1748,6 +1758,8 @@ struct ExtractTree
       rule_pair.freqs[0] += 1;
       rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
       rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
+      
+      rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
