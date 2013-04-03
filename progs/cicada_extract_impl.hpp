@@ -6,6 +6,9 @@
 #ifndef __CICADA__EXTRACT_IMPL__HPP__
 #define __CICADA__EXTRACT_IMPL__HPP__ 1
 
+#include <cstddef>
+#include <stdint.h>
+
 #include <iostream>
 
 struct Statistic
