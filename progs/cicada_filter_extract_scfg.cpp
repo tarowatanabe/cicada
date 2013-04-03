@@ -533,7 +533,7 @@ void options(int argc, char** argv)
     ("moses",    po::bool_switch(&mode_moses),    "output in moses format")
         
     ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
-    ("feature-fisher",     po::bool_switch(&feature_fisher_mode),     "fisher's exact test")
+    ("feature-fisher",     po::bool_switch(&feature_fisher_mode),     "Fisher's exact test")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")

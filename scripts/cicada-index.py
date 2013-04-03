@@ -66,7 +66,7 @@ opt_parser = OptionParser(
     
     ## additional feature functions
     make_option("--feature-root",               default=None, action="store_true", help="generative probability"),
-    make_option("--feature-fisher",             default=None, action="store_true", help="fisher's exact test"),
+    make_option("--feature-fisher",             default=None, action="store_true", help="Fisher's exact test"),
     make_option("--feature-type",               default=None, action="store_true", help="observation probability"),
     make_option("--feature-singleton",          default=None, action="store_true", help="singleton features"),
     make_option("--feature-cross",              default=None, action="store_true", help="cross features"),
@@ -97,7 +97,7 @@ opt_parser = OptionParser(
     make_option("--threshold", default=0, action="store", type="float",
                 metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
     make_option("--sigtest", default=0, action="store", type="float",
-                metavar="SIGTEST", help="significance testing threshold (default: %default)"),
+                metavar="SIGTEST", help="significance testing threshold relative to 1-1-1-N log-p-value (default: %default)"),
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",

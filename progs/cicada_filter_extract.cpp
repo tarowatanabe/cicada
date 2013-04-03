@@ -391,7 +391,7 @@ void options(int argc, char** argv)
     ("nbest",     po::value<size_t>(&nbest)->default_value(nbest),         "nbest of pairs (wrt to joint-count)")
     ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
-    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold")
+    ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold relative to 1-1-1-N log-p-value")
     
     ("statistic", po::value<path_type>(&statistic_file),                   "significant test statistic")
     
