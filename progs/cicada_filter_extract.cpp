@@ -184,21 +184,16 @@ struct FilterSigtest
 		    - utils::mathop::lgamma<double>(1+c)
 		    - utils::mathop::lgamma<double>(1+d));
     
-    double log_total_p = boost::numeric::bounds<double>::lowest();
+    double log_total_p = log_p;
     
-    const count_type tc = utils::bithack::min(b, c);
-    for (count_type i = 0; i <= tc; ++ i) {
-      log_total_p = utils::mathop::logsum(log_total_p, log_p);
-      
+    const count_type total_count = utils::bithack::min(b, c);
+    for (count_type i = 0; i != total_count; ++ i, ++ a, -- b, -- c, ++ d) {
       log_p += (utils::mathop::log<double>(b)
 		+ utils::mathop::log<double>(c)
 		- utils::mathop::log<double>(a + 1)
 		- utils::mathop::log<double>(d + 1));
       
-      ++ a;
-      -- b;
-      -- c;
-      ++ d;
+      log_total_p = utils::mathop::logsum(log_total_p, log_p);
     }
     
     return log_total_p;
