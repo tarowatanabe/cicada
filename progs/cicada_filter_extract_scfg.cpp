@@ -265,11 +265,11 @@ struct ScorerCICADA
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 1 + 3)
+    if (phrase_pair.counts.size() < 1)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 1 + 3)
+    if (phrase_pair.counts_source.size() < 1)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 1 + 3)
+    if (phrase_pair.counts_target.size() < 1)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -310,11 +310,11 @@ struct ScorerCICADA
       if (titer == root_count_target.end())
 	throw std::runtime_error("no root count for target: " + phrase_target.first);
       
-      if (jiter->counts.size() != 1 + 3)
+      if (jiter->counts.size() < 1)
 	throw std::runtime_error("invalid root count: " + phrase_source.first + phrase_target.first);
-      if (siter->counts.size() != 1 + 3)
+      if (siter->counts.size() < 1)
 	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
-      if (titer->counts.size() != 1 + 3)
+      if (titer->counts.size() < 1)
 	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
       
       const double logprob_root = (std::log(dirichlet_prior + count)
@@ -347,11 +347,11 @@ struct ScorerCICADA
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 1 + 3)
+    if (phrase_pair.counts.size() < 1)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 1 + 3)
+    if (phrase_pair.counts_source.size() < 1)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 1 + 3)
+    if (phrase_pair.counts_target.size() < 1)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -386,11 +386,11 @@ struct ScorerCICADA
       if (root_target.label != phrase_target.first)
 	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
 
-      if (root_joint.counts.size() != 1 + 3)
+      if (root_joint.counts.size() < 1)
 	throw std::runtime_error("invalid root count: " + phrase_source.first + phrase_target.first);
-      if (root_source.counts.size() != 1 + 3)
+      if (root_source.counts.size() < 1)
 	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
-      if (root_target.counts.size() != 1 + 3)
+      if (root_target.counts.size() < 1)
 	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
       
       const double logprob_root = (std::log(dirichlet_prior + count)
@@ -423,6 +423,13 @@ struct ScorerCICADA
     std::ostream_iterator<char> iter(os);
 
     if (feature_fisher_mode) {
+      if (phrase_pair.counts.size() < 1 + 3)
+	throw std::runtime_error("invalid counts for Fisher's exact test");
+      if (phrase_pair.counts_source.size() < 1 + 3)
+	throw std::runtime_error("invalid source counts for Fisher's exact test");
+      if (phrase_pair.counts_target.size() < 1 + 3)
+	throw std::runtime_error("invalid target counts for Fisher's exact test");
+
       const Fisher::count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
       const Fisher::count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
       const Fisher::count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];

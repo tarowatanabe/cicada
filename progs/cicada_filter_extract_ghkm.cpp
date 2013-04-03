@@ -71,6 +71,7 @@ int debug = 0;
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
@@ -152,7 +153,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
     
-    process<ScorerCICADA>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+    process<ScorerCICADA>(is, os, statistic, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -164,6 +165,7 @@ int main(int argc, char** argv)
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
@@ -180,7 +182,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_joint, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, statistic, root_joint, root_source, root_target, lexicon, os);
   }
 }
 
@@ -202,6 +204,7 @@ struct ScorerCICADA
   ExtractAlignment extract_alignment;
   Unaligned        unaligned;
   Cross            cross;
+  Fisher           fisher;
   
   typedef ExtractGHKM::sentence_type           sentence_type;
   typedef ExtractAlignment::alignment_type     alignment_type;
@@ -220,6 +223,7 @@ struct ScorerCICADA
   
   template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
+		  const statistic_type& statistic,
 		  const root_count_set_type& root_count_joint,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
@@ -229,11 +233,11 @@ struct ScorerCICADA
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
-    if (phrase_pair.counts.size() != 1)
+    if (phrase_pair.counts.size() < 1)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 1)
+    if (phrase_pair.counts_source.size() < 1)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 1)
+    if (phrase_pair.counts_target.size() < 1)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -270,11 +274,11 @@ struct ScorerCICADA
       if (titer == root_count_target.end())
 	throw std::runtime_error("no root count for target: " + root_target);
       
-      if (jiter->counts.size() != 1)
+      if (jiter->counts.size() < 1)
 	throw std::runtime_error("invalid root count: " + root_source + root_target);
-      if (siter->counts.size() != 1)
+      if (siter->counts.size() < 1)
 	throw std::runtime_error("invalid root count for source: " + root_source);
-      if (titer->counts.size() != 1)
+      if (titer->counts.size() < 1)
 	throw std::runtime_error("invalid root count for target: " + root_target);
       
       const double logprob_root = (std::log(dirichlet_prior + count)
@@ -289,6 +293,24 @@ struct ScorerCICADA
 			    logprob_root_source,
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
+    }
+
+    if (feature_fisher_mode) {
+      if (phrase_pair.counts.size() < 1 + 3)
+	throw std::runtime_error("invalid counts for Fisher's exact test");
+      if (phrase_pair.counts_source.size() < 1 + 3)
+	throw std::runtime_error("invalid source counts for Fisher's exact test");
+      if (phrase_pair.counts_target.size() < 1 + 3)
+	throw std::runtime_error("invalid target counts for Fisher's exact test");
+
+      const Fisher::count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
+      const Fisher::count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
+      const Fisher::count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
+      
+      const double score = fisher(cfe, cf, ce, statistic.bitext);
+      
+      if (! karma::generate(iter, ' ' << double10, score))
+	throw std::runtime_error("failed generation");      
     }
     
     if (feature_internal_mode || feature_height_mode

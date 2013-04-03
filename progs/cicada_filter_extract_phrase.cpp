@@ -245,11 +245,11 @@ struct ScorerCICADA
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5 + 3)
+    if (phrase_pair.counts.size() < 5)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5 + 3)
+    if (phrase_pair.counts_source.size() < 5)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5 + 3)
+    if (phrase_pair.counts_target.size() < 5)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -283,6 +283,13 @@ struct ScorerCICADA
     }
 
     if (feature_fisher_mode) {
+      if (phrase_pair.counts.size() < 5 + 3)
+	throw std::runtime_error("invalid counts for Fisher's exact test");
+      if (phrase_pair.counts_source.size() < 5 + 3)
+	throw std::runtime_error("invalid source counts for Fisher's exact test");
+      if (phrase_pair.counts_target.size() < 5 + 3)
+	throw std::runtime_error("invalid target counts for Fisher's exact test");
+
       const Fisher::count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
       const Fisher::count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
       const Fisher::count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
@@ -469,11 +476,11 @@ struct ScorerMOSES
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5 + 3)
+    if (phrase_pair.counts.size() < 5)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5 + 3)
+    if (phrase_pair.counts_source.size() < 5)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5 + 3)
+    if (phrase_pair.counts_target.size() < 5)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -509,6 +516,13 @@ struct ScorerMOSES
     }
     
     if (feature_fisher_mode) {
+      if (phrase_pair.counts.size() < 5 + 3)
+	throw std::runtime_error("invalid counts for Fisher's exact test");
+      if (phrase_pair.counts_source.size() < 5 + 3)
+	throw std::runtime_error("invalid source counts for Fisher's exact test");
+      if (phrase_pair.counts_target.size() < 5 + 3)
+	throw std::runtime_error("invalid target counts for Fisher's exact test");
+
       const Fisher::count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
       const Fisher::count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
       const Fisher::count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
@@ -617,11 +631,11 @@ struct ScorerMOSESReordering
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    if (phrase_pair.counts.size() != 5 + 3)
+    if (phrase_pair.counts.size() < 5)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5 + 3)
+    if (phrase_pair.counts_source.size() < 5)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5 + 3)
+    if (phrase_pair.counts_target.size() < 5)
       throw std::runtime_error("target counts size do not match");
     
     std::ostream_iterator<char> iter(os);
