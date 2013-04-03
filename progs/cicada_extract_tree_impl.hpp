@@ -1717,7 +1717,7 @@ struct ExtractTree
 	      for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 		if (edge_target.positions[*aiter] < 0)
 		  throw std::runtime_error("inlvalid alignment...?");
-
+		
 		rule_pair.alignment.push_back(std::make_pair(edge_source.positions[src], edge_target.positions[*aiter]));
 	      }
 	    }

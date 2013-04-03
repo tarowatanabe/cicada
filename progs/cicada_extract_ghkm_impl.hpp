@@ -14,13 +14,12 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/array.hpp>
 
 #include <string>
 #include <vector>
 #include <set>
 #include <deque>
-
-#include <boost/array.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/alignment.hpp"
@@ -139,13 +138,16 @@ struct RulePair
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
   typedef double count_type;
+  typedef int64_t frequency_type;
+  typedef boost::array<frequency_type, 3> freqs_type;
   
   phrase_type    source;
   phrase_type    target;
   alignment_type alignment;
   count_type     count;
+  freqs_type     freqs;
 
-  RulePair() : source(), target(), alignment(), count(0) {}
+  RulePair() : source(), target(), alignment(), count(0), freqs() {}
 
 
   friend
@@ -197,6 +199,7 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  (RulePair::phrase_type, target)
 			  (RulePair::alignment_type, alignment)
 			  (RulePair::count_type, count)
+			  (RulePair::freqs_type, freqs)
 			  )
 
 struct RulePairGenerator
@@ -205,11 +208,11 @@ struct RulePairGenerator
   
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::alignment_type alignment_type;
-  typedef phrase_pair_type::count_type    count_type;
+  typedef phrase_pair_type::frequency_type frequency_type;
+  typedef phrase_pair_type::count_type     count_type;
   
   RulePairGenerator() : grammar() {}
   RulePairGenerator(const RulePairGenerator& x) : grammar() {}
-
   
   template <typename Iterator>
   struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
@@ -220,7 +223,11 @@ struct RulePairGenerator
       namespace standard = boost::spirit::standard;
       
       alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
-      phrase_pair %= standard::string << " ||| " << standard::string << " ||| " << alignment << " ||| " << double20;
+      phrase_pair %= (standard::string
+		      << " ||| " << standard::string
+		      << " ||| " << alignment
+		      << " ||| " << double20
+		      << ' ' << (frequency % ' '));
     }
 
     struct real_precision : boost::spirit::karma::real_policies<double>
@@ -232,6 +239,7 @@ struct RulePairGenerator
     };
     
     boost::spirit::karma::real_generator<double, real_precision> double20;
+    boost::spirit::karma::int_generator<frequency_type> frequency;
     
     boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
     boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
@@ -731,6 +739,34 @@ struct ExtractGHKM
     }
   };
   
+  rule_pair_set_type rule_pairs_local;
+  
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+    
+  struct string_unassigned
+  {
+    const std::string& operator()() const
+    {
+      static std::string __str;
+      return __str;
+    }
+  };
+
+  typedef utils::compact_set<std::string,
+			     string_unassigned, string_unassigned,
+			     string_hash, std::equal_to<std::string>,
+			     std::allocator<std::string> > unique_set_type;
+
+  unique_set_type uniques_source;
+  unique_set_type uniques_target;
+
   template <typename Dumper>
   void extract_composed(const hypergraph_type& graph,
 			const sentence_type& sentence,
@@ -740,6 +776,9 @@ struct ExtractGHKM
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+
+
+    rule_pairs_local.clear();
     
     candidate_set_type    candidates;
     candidate_heap_type   cand;
@@ -765,8 +804,6 @@ struct ExtractGHKM
 
     //std::cerr << "derivations size: " << derivations.size() << std::endl;
 
-    const size_t id_mask = (1 << 5) - 1;
-    
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
       
@@ -902,22 +939,43 @@ struct ExtractGHKM
 	  liter->count *= factor;
 	  
 	  if (liter->count >= cutoff) {
-	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
+	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs_local.insert(*liter);
 	    if (! result.second)
 	      const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
 	  }
 	}
       }
+      
       rule_pairs_span.clear();
+    }
+    
+    uniques_source.clear();
+    uniques_target.clear();
+    
+    rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
+    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
       
-      if ((id & id_mask) == id_mask) {
-	dumper(rule_pairs);
-	
-	if (rule_pairs.empty())
-	  rule_pair_set_span_type(rule_pairs_span).swap(rule_pairs_span);
-      }
+      rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
-      //std::cerr << "dumped" << std::endl;
+      if (! result.second)
+	rule_pair.count += riter->count;
+      
+      rule_pair.freqs[0] += 1;
+      rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
+      rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
+    }
+    
+    rule_pairs_local.clear();
+    uniques_source.clear();
+    uniques_target.clear();
+    
+    dumper(rule_pairs);
+
+    if (rule_pairs.empty()) {
+      rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
+      unique_set_type(uniques_source).swap(uniques_source);
+      unique_set_type(uniques_target).swap(uniques_target);
     }
   }
 
